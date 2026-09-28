@@ -987,10 +987,31 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.ersteMinuten = /Min\./.test(blatt());'
                  + '   r.alleDrei = (blatt().match(/ro-kachel">/g) || []).length;'
                  + '   routineFeld(0, \'bild\', \'https://x.de/deich.jpg\');'
+                 + '   /* Ältere Fassungen kennen das noch nicht — dann'
+                 + '      zählen die Prüfungen als Fehler, statt den Lauf'
+                 + '      abzubrechen. */'
+                 + '   var hatDrive = (typeof dateiKennung === \'function\''
+                 + '     && typeof routineBild === \'function\');'
+                 + '   r.ausDateilink = hatDrive ? dateiKennung('
+                 + '     \'https://drive.google.com/file/d/1AbC_deF-7hIjk/view\') : \'\';'
+                 + '   r.ausOrdnerlink = hatDrive ? dateiKennung('
+                 + '     \'https://drive.google.com/drive/folders/1Ord_ner-999/\') : \'\';'
+                 + '   if (hatDrive) {'
+                 + '     routineBild(1, \'https://drive.google.com/file/d/\''
+                 + '       + \'1AbC_deF-7hIjk/view\');'
+                 + '     r.driveVorschau = routineBildQuelle(routineSchritte()[1]);'
+                 + '     routineBild(2, \'https://x.de/foto.jpg\');'
+                 + '     r.fremdeAdresse = routineBildQuelle(routineSchritte()[2]);'
+                 + '     routineBild(2, \'\');'
+                 + '     r.geleert = routineBildQuelle(routineSchritte()[2]);'
+                 + '   } else {'
+                 + '     r.driveVorschau = \'\'; r.fremdeAdresse = \'\';'
+                 + '     r.geleert = \'-\';'
+                 + '   }'
                  + '   routineZeichnen();'
                  + '   r.mitBild = /ro-bild[^>]*deich\\.jpg/.test(blatt());'
-                 + '   r.ohneBildLeer = ((blatt().match(/ro-bild/g) || [])'
-                 + '     .length === 1);'
+                 + '   r.ohneBildLeer = ((blatt().match(/ro-bild"/g) || [])'
+                 + '     .length === 2);'
                  + '   r.vorletzter = /Ein Satz für heute/.test(blatt());'
                  + '   routineLeitsatz(\'Heute ruhig bleiben.\');'
                  + '   r.satzGesetzt = leitsatzText();'
@@ -12153,7 +12174,18 @@ console.log('\n132. Morgenroutine');
     pruefe(e.schritte === 3, 'die drei eigenen Schritte');
     pruefe(e.alleDrei === 3, 'alle stehen als Kacheln zugleich auf dem Blatt');
     pruefe(e.mitBild === true, 'eine Kachel kann ein Bild tragen');
-    pruefe(e.ohneBildLeer === true, 'ohne Bild bleibt die Fläche weg');
+    /* Seit v5.5.0 nimmt das Feld einen Drive-Link: Google Fotos gibt
+       keine dauerhaften Bildadressen heraus. */
+    pruefe(e.ausDateilink === '1AbC_deF-7hIjk',
+           'aus dem Freigabelink einer Datei wird die Kennung gelesen');
+    pruefe(e.ausOrdnerlink === '1Ord_ner-999', 'aus dem eines Ordners ebenso');
+    pruefe(e.driveVorschau.indexOf('drive.google.com/thumbnail') > 0,
+           'gezeigt wird die Vorschauadresse von Drive');
+    pruefe(e.fremdeAdresse === 'https://x.de/foto.jpg',
+           'eine eigene Bildadresse bleibt, wie sie ist');
+    pruefe(e.geleert === '', 'ein leeres Feld nimmt das Bild weg');
+    pruefe(e.ohneBildLeer === true,
+           'ohne Bild bleibt die Fläche weg — nur die Kacheln mit Bild tragen eine');
     pruefe(e.ersterName === 'Fenster auf', 'die Karte nennt den Schritt');
     pruefe(e.ersterSatz === true, 'und den Satz dazu, wenn einer da ist');
     /* Die Minutenangabe ist mit v5.2.0 entfallen: Sie stand da und tat

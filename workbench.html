@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.4.0</title>
+<title>Workbench 5.5.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1223,6 +1223,10 @@ body.breit .ro-kacheln{grid-template-columns:1fr 1fr}
   background:var(--karte)}
 .ro-bild{height:118px;background-size:cover;background-position:center;
   background-color:var(--papier)}
+.ro-bildzeile{display:flex;align-items:center;gap:7px}
+.ro-bildzeile .d-text{flex:1}
+.ro-mini{flex:0 0 34px;height:34px;border-radius:6px;background-size:cover;
+  background-position:center;border:1px solid var(--linie)}
 .ro-inhalt{padding:10px 12px 12px}
 .ro-nr2{font-size:calc(var(--fs)*0.68);color:var(--grau-hell);
   letter-spacing:.06em;margin-bottom:2px}
@@ -2252,7 +2256,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.4.0';
+var APP_VERSION = '5.5.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6126,6 +6130,53 @@ function imFeldGeschrieben(ziel) {
   return ziel.contains(wo);
 }
 
+/* Die Kennung einer Datei in Drive. Ein Freigabelink hat die Form
+   .../file/d/KENNUNG/view; ordnerKennung kennt nur Ordner. */
+function dateiKennung(text) {
+  var t = String(text || '').trim();
+  if (!t.length) { return ''; }
+  var m = t.match(/\/file\/d\/([A-Za-z0-9_-]{6,60})/);
+  if (m) { return m[1]; }
+  m = t.match(/\/d\/([A-Za-z0-9_-]{6,60})/);
+  if (m) { return m[1]; }
+  return ordnerKennung(t);
+}
+
+/* Ein Bild aus Drive: Google Fotos gibt keine dauerhaften Adressen
+   heraus — seine Bildadressen verfallen nach einer Stunde. Eine Datei
+   in Drive hat dagegen eine Vorschauadresse, die bleibt. Eingegeben
+   wird der Freigabelink, gespeichert nur die Kennung. */
+function routineBild(nr, wert) {
+  var s = routineSchritte()[nr];
+  if (!s) { return; }
+  var text = String(wert || '').trim();
+  if (!text.length) {
+    s.bild = '';
+    s.bildDrive = '';
+  } else {
+    var id = /^https?:/i.test(text) ? dateiKennung(text) : ordnerKennung(text);
+    if (id && text.indexOf('drive.google.com') >= 0) {
+      s.bildDrive = id;
+      s.bild = '';
+    } else if (id && !/^https?:/i.test(text)) {
+      s.bildDrive = id;
+      s.bild = '';
+    } else {
+      s.bild = text;
+      s.bildDrive = '';
+    }
+  }
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  zeichneRoutine();
+}
+
+/* Woher das Bild kommt: aus Drive oder von einer eigenen Adresse. */
+function routineBildQuelle(s) {
+  if (s && s.bildDrive) { return googleVorschau(s.bildDrive); }
+  return (s && s.bild) ? s.bild : '';
+}
+
 function routineNameSetzen(wert) {
   routineSatz().name = String(wert || '').trim() || 'Morgenroutine';
   DB.einstellungen.stempel = jetzt();
@@ -6151,9 +6202,10 @@ function routineZeichnen() {
   h += '<div class="ro-kacheln">';
   for (i = 0; i < l.length; i++) {
     h += '<div class="ro-kachel">';
-    if (l[i].bild) {
+    var quelle = routineBildQuelle(l[i]);
+    if (quelle) {
       h += '<div class="ro-bild" style="background-image:url(&quot;'
-         + esc(l[i].bild) + '&quot;)"></div>';
+         + esc(quelle) + '&quot;)"></div>';
     }
     h += '<div class="ro-inhalt"><div class="ro-nr2">' + (i + 1) + '</div>'
        + '<div class="ro-name">' + esc(l[i].name || 'Ohne Namen') + '</div>'
@@ -6215,9 +6267,16 @@ function zeichneRoutine() {
     h += '<input type="text" class="d-text" placeholder="Ein Satz dazu (freiwillig)" '
        + 'value="' + esc(l[i].satz || '') + '" onchange="routineFeld(' + i
        + ',\'satz\',this.value)">';
-    h += '<input type="text" class="d-text" placeholder="Bild: Adresse eines Fotos '
-       + '(freiwillig)" value="' + esc(l[i].bild || '') + '" onchange="routineFeld('
-       + i + ',\'bild\',this.value)">';
+    h += '<div class="ro-bildzeile">'
+       + '<input type="text" class="d-text" placeholder="Bild: Link aus Drive oder '
+       + 'Bildadresse (freiwillig)" value="'
+       + esc(l[i].bildDrive || l[i].bild || '') + '" onchange="routineBild(' + i
+       + ',this.value)">'
+       + (routineBildQuelle(l[i])
+          ? ('<span class="ro-mini" style="background-image:url(&quot;'
+             + esc(routineBildQuelle(l[i])) + '&quot;)"></span>')
+          : '')
+       + '</div>';
     h += '</div>';
   }
   if (!l.length) {
@@ -6230,6 +6289,9 @@ function zeichneRoutine() {
                     + 'Jetzt durchgehen</button>') : '')
      + '</div>';
   var zul = routineSatz().zuletzt;
+  h += '<div class="feld-hinweis">Für ein Bild den Freigabelink einer Datei aus '
+     + 'Google Drive einsetzen — aus Google Fotos geht es nicht, deren Bildadressen '
+     + 'verfallen nach einer Stunde. Die Datei muss freigegeben sein.</div>';
   h += '<div class="feld-hinweis">Danach folgen immer zwei feste Schritte: der Satz '
      + 'für heute und der Tagesplan.'
      + (zul ? (' Zuletzt durchlaufen am ' + esc(kurzDatum(zul)) + '.') : '')
