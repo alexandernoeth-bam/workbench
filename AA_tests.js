@@ -569,6 +569,39 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__dauerApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkFuer = aktionFuer;'
+                 + '   DB = leereDatenbank();'
+                 + '   var h = isoDatum();'
+                 + '   DB.aufgaben = [{ id:\'a1\', titel:\'Vorlage\','
+                 + '     kontext:\'beruflich\', status:\'offen\', art:\'haupt\','
+                 + '     planung: h }];'
+                 + '   aktionFuer = \'a1\';'
+                 + '   var blatt = function(){'
+                 + '     return detailHtml(aufgabeFinden(\'a1\')); };'
+                 + '   var hatZeile = function(){'
+                 + '     return blatt().indexOf(\'>Dauer<\') >= 0; };'
+                 + '   var r = { ohneZeit: hatZeile() };'
+                 + '   dZeit(\'14:00\');'
+                 + '   r.nachZeit = aufgabeFinden(\'a1\').dauer;'
+                 + '   var teil = blatt().split(\'>Dauer<\')[1] || \'\';'
+                 + '   r.stufen = (teil.match(/dDauer\\((\\d+)\\)/g) || [])'
+                 + '     .map(function(x){ return x.slice(7, -1); }).join(\',\');'
+                 + '   r.hinweis = (teil.match(/feld-hinweis">([^<]*)/) || [])[1];'
+                 + '   dDauer(90);'
+                 + '   r.nachStufe = aufgabeFinden(\'a1\').dauer;'
+                 + '   dDauer(\'1:45\');'
+                 + '   r.nachUhrzeitform = aufgabeFinden(\'a1\').dauer;'
+                 + '   dDauer(\'20 Min.\');'
+                 + '   r.nachText = aufgabeFinden(\'a1\').dauer;'
+                 + '   dDauer(\'weiß nicht\');'
+                 + '   r.unsinn = aufgabeFinden(\'a1\').dauer;'
+                 + '   dZeit(\'\');'
+                 + '   r.zeitWeg = hatZeile();'
+                 + '   aktionFuer = merkFuer; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlageApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -12280,6 +12313,46 @@ console.log('\n138. Schritt wird Aufgabe');
            'beim Start entstehen genau die vorgemerkten Aufgaben');
     pruefe(e.imBacklog === true, 'sie stehen im Backlog');
     pruefe(e.amSchritt === true, 'und hängen an ihrem Schritt');
+  }
+}
+
+/* ============================================================
+   139. Uhrzeit und Dauer gehoeren zusammen
+   Grund: Eine Uhrzeit ohne Dauer ist kein Block, sondern ein Punkt —
+   der Stundenplan braucht beides. Bisher liess sich die Dauer nur im
+   Plandialog setzen.
+   ============================================================ */
+console.log('\n139. Dauer im Aufgabenblatt');
+{
+  const skript = hauptSkript();
+  const d = globalThis.__dauerApi;
+
+  pruefe(new RegExp('function\\s+dDauer\\s*\\(').test(skript),
+         'Funktion dDauer ist definiert');
+  const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(dh && /if \(a\.uhrzeit\) \{/.test(dh[0]) && /dDauer\(/.test(dh[0]),
+         'die Zeile erscheint erst, wenn eine Uhrzeit dasteht');
+  const dz = skript.match(/function dZeit\([\s\S]*?\n\}/);
+  pruefe(dz && /a\.uhrzeit && !a\.dauer/.test(dz[0]),
+         'mit der Uhrzeit bekommt die Aufgabe gleich eine Dauer');
+  const dd = skript.match(/function dDauer\([\s\S]*?\n\}/);
+  pruefe(dd && /\[0-9\]\{1,2\}:\[0-5\]\[0-9\]/.test(dd[0]),
+         'auch „1:30" wird verstanden');
+
+  if (!d) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = d.pruefe();
+    pruefe(e.ohneZeit === false, 'ohne Uhrzeit keine Dauerzeile');
+    pruefe(e.nachZeit === 60, 'mit der Uhrzeit steht die Standarddauer da');
+    pruefe(e.stufen === '15,30,45,60,90,120', 'sechs Stufen als Abkürzung');
+    pruefe(e.hinweis === 'Von 14:00 bis 15:00.',
+           'darunter steht, wann der Block endet');
+    pruefe(e.nachStufe === 90, 'eine Stufe setzt die Dauer');
+    pruefe(e.nachUhrzeitform === 105, '„1:45" ergibt 105 Minuten');
+    pruefe(e.nachText === 20, '„20 Min." ergibt 20');
+    pruefe(e.unsinn === 15, 'Unsinn ergibt die kleinste Stufe, nicht null');
+    pruefe(e.zeitWeg === false, 'ohne Uhrzeit verschwindet die Zeile wieder');
   }
 }
 

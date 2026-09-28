@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.13.0</title>
+<title>Workbench 4.14.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1305,6 +1305,7 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   border:1px solid var(--linie);border-radius:7px;background:var(--karte);
   color:var(--tinte)}
 .p-lab{font-size:calc(var(--fs)*0.72);color:var(--grau)}
+.d-kurz{flex:0 0 96px}
 .p-stufen{display:flex;gap:4px;flex-wrap:wrap}
 .p-stufen button{font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 8px;
   border:1px solid var(--linie);border-radius:20px;background:var(--karte);
@@ -2228,7 +2229,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.13.0';
+var APP_VERSION = '4.14.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7918,6 +7919,26 @@ function detailHtml(a) {
   h += '<input type="time" value="' + esc(a.uhrzeit || '') + '" onchange="dZeit(this.value)">';
   h += '</div></div>';
 
+  /* Eine Uhrzeit ohne Dauer ist kein Block, sondern ein Punkt — der
+     Tagesplan braucht beides. Die Zeile erscheint erst, wenn eine
+     Uhrzeit dasteht. */
+  if (a.uhrzeit) {
+    var stufen = [15, 30, 45, 60, 90, 120];
+    var jetztD = aufgabeDauer(a);
+    h += '<div class="d-feld"><div class="d-name">Dauer</div><div class="d-wert">';
+    var s;
+    for (s = 0; s < stufen.length; s++) {
+      h += '<button class="d-wahl' + ((jetztD === stufen[s]) ? ' an' : '') + '" '
+         + 'type="button" onclick="dDauer(' + stufen[s] + ')">' + stufen[s]
+         + '</button>';
+    }
+    h += '<input type="text" class="d-kurz" inputmode="numeric" value="'
+       + jetztD + ' Min." onchange="dDauer(this.value)">';
+    h += '</div></div>';
+    h += '<div class="feld-hinweis">Von ' + esc(a.uhrzeit) + ' bis '
+       + esc(zeitAusMinuten(minutenAus(a.uhrzeit) + jetztD)) + '.</div>';
+  }
+
   var w = a.wiederholung;
   h += '<div class="d-feld"><div class="d-name">Wiederholt</div><div class="d-wert">';
   h += '<button class="d-wahl' + (w ? '' : ' an') + '" type="button" '
@@ -8074,7 +8095,32 @@ function projektKontext(id) {
 function dArt(wert)          { var a = aufgabeFinden(aktionFuer); if (a) { a.art = wert; detailGeaendert(true); } }
 function dThema(wert)        { var a = aufgabeFinden(aktionFuer); if (a) { a.themaId = wert || null; detailGeaendert(false); } }
 function dFrist(wert)        { var a = aufgabeFinden(aktionFuer); if (a) { a.frist = wert || ''; detailGeaendert(false); } }
-function dZeit(wert)         { var a = aufgabeFinden(aktionFuer); if (a) { a.uhrzeit = wert || ''; detailGeaendert(false); } }
+/* Beim Setzen einer Uhrzeit bekommt die Aufgabe gleich eine Dauer —
+   sonst stünde sie als Punkt ohne Länge im Plan. */
+function dZeit(wert) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  a.uhrzeit = wert || '';
+  if (a.uhrzeit && !a.dauer) { a.dauer = aufgabeDauer(a); }
+  detailGeaendert(true);
+}
+/* Die Dauer nimmt Stufen und freie Eingabe — „90", „90 Min.", „1:30"
+   meinen dasselbe. */
+function dDauer(wert) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a) { return; }
+  var text = String(wert).trim();
+  var zahl;
+  if (/^[0-9]{1,2}:[0-5][0-9]$/.test(text)) {
+    zahl = minutenAus(text);
+  } else {
+    zahl = parseInt(text.replace(/[^0-9]/g, ''), 10);
+  }
+  if (!(zahl > 0)) { zahl = 15; }
+  a.dauer = zahl;
+  detailGeaendert(false);
+}
+
 function dBeschreibung(wert) { var a = aufgabeFinden(aktionFuer); if (a) { a.beschreibung = wert; detailGeaendert(false); } }
 
 function dPlanung(wert) {
