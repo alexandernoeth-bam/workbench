@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.0.1</title>
+<title>Workbench 5.1.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1238,7 +1238,8 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
   padding-top:2px;font-variant-numeric:tabular-nums}
 .splan-feld{flex:1}
 .splan-bloecke{position:absolute;left:46px;right:0;top:0;bottom:0}
-.splan-blk{position:absolute;left:0;right:4px;border-radius:7px;padding:4px 8px;
+.splan-blk{position:absolute;left:0;right:auto;width:calc(100% - 4px);
+  border-radius:7px;padding:4px 8px;
   overflow:hidden;background:var(--papier);border-left:3px solid var(--weinrot);
   cursor:pointer}
 .splan-blk.privat{border-left-color:var(--petrol)}
@@ -2241,7 +2242,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.0.1';
+var APP_VERSION = '5.1.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5347,8 +5348,42 @@ function planSymbolHtml(b) {
        + inneres + '</svg></button>';
 }
 
+/* Zwei Termine zur selben Zeit lagen bisher übereinander — der hintere
+   war unsichtbar. Sie werden jetzt nebeneinander gestellt: Alle, die
+   sich berühren, bilden eine Gruppe und teilen sich die Breite. */
+function bloeckeVerteilen(bloecke) {
+  var i, k;
+  /* Erst die Gruppen: Was in eine laufende Gruppe hineinragt, gehört
+     dazu. */
+  var gruppen = [];
+  var jetzige = null;
+  for (i = 0; i < bloecke.length; i++) {
+    if (jetzige && bloecke[i].von < jetzige.bis) {
+      jetzige.drin.push(bloecke[i]);
+      if (bloecke[i].bis > jetzige.bis) { jetzige.bis = bloecke[i].bis; }
+    } else {
+      jetzige = { bis: bloecke[i].bis, drin: [bloecke[i]] };
+      gruppen.push(jetzige);
+    }
+  }
+  /* Dann in jeder Gruppe die Spalten: Ein Block kommt in die erste
+     Spalte, die zu seiner Zeit frei ist. */
+  for (i = 0; i < gruppen.length; i++) {
+    var enden = [];
+    var drin = gruppen[i].drin;
+    for (k = 0; k < drin.length; k++) {
+      var s = 0;
+      while (s < enden.length && enden[s] > drin[k].von) { s++; }
+      enden[s] = drin[k].bis;
+      drin[k].spalte = s;
+    }
+    for (k = 0; k < drin.length; k++) { drin[k].spalten = enden.length; }
+  }
+  return bloecke;
+}
+
 function stundenplanHtml(is, e) {
-  var bloecke = belegteBloecke(is);
+  var bloecke = bloeckeVerteilen(belegteBloecke(is));
   var spanne = stundenSpanne(bloecke);
   var hoehe = function (m) { return ((m - spanne.von) / 60) * STUNDE_HOCH; };
   var h = '<div class="splan-rolle" id="splanRolle"><div class="splan">';
@@ -5373,7 +5408,9 @@ function stundenplanHtml(is, e) {
        + (privat ? ' privat' : '') + (hoch < 40 ? ' kurz' : '')
        + ((!b.fest && planDazu(is, b.id)) ? ' dazu' : '')
        + (b.vorbei ? ' vorbei' : '') + '" '
-       + 'style="top:' + oben.toFixed(0) + 'px;height:' + (hoch - 3).toFixed(0) + 'px" '
+       + 'style="top:' + oben.toFixed(0) + 'px;height:' + (hoch - 3).toFixed(0) + 'px;'
+       + 'left:' + ((b.spalte || 0) * (100 / (b.spalten || 1))).toFixed(2) + '%;'
+       + 'width:calc(' + (100 / (b.spalten || 1)).toFixed(2) + '% - 4px)" '
        + (b.fest
           ? ('onclick="terminBlattOeffnen(\'' + esc(b.id || '') + '\',\'' + is + '\')"')
           : ('onclick="aufgabeAktionen(\'' + esc(b.id) + '\')"'))

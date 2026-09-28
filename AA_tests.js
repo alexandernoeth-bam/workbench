@@ -569,6 +569,26 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__gleichzeitigApi = {'
+                 + ' pruefe: function(){'
+                 + '   var lage = function(l){'
+                 + '     return bloeckeVerteilen(l).map(function(b){'
+                 + '       return b.spalte + \'/\' + b.spalten; }).join(\',\'); };'
+                 + '   var bl = function(von, bis, titel){'
+                 + '     return { von: von, bis: bis, titel: titel || \'x\','
+                 + '              fest: true }; };'
+                 + '   var r = { dreiGleichzeitig: lage(['
+                 + '     bl(780, 840), bl(780, 830), bl(810, 870)]) };'
+                 + '   r.allein = lage([bl(960, 1020)]);'
+                 + '   r.zweiPaare = lage([bl(540, 600), bl(540, 600),'
+                 + '     bl(720, 780), bl(720, 780)]);'
+                 + '   r.kette = lage([bl(540, 600), bl(570, 630), bl(600, 660)]);'
+                 + '   r.reihenfolge = bloeckeVerteilen(['
+                 + '     bl(540, 600, \'Erst\'), bl(550, 610, \'Zweit\'),'
+                 + '     bl(560, 620, \'Dritt\')]).map(function(b){'
+                 + '       return b.titel; }).join(\',\');'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -816,7 +836,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     hauptDauer: aufgabeDauer(aufgabeFinden(\'a2\')),'
                  + '     eigeneDauerGilt: aufgabeDauer(aufgabeFinden(\'a3\')) };'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
-                 + '   var re = /style="top:(\\d+)px;height:(\\d+)px"/g;'
+                 + '   var re = /style="top:(\\d+)px;height:(\\d+)px/g;'
                  + '   var m; var liste = [];'
                  + '   while ((m = re.exec(b)) !== null) {'
                  + '     liste.push({ oben: Number(m[1]), hoch: Number(m[2]) }); }'
@@ -828,6 +848,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.ueberlappt = schlecht.join(\',\');'
                  + '   r.halbeStunde = liste.length ? liste[0].hoch : 0;'
                  + '   r.viertelstunde = (liste.length > 2) ? liste[2].hoch : 0;'
+                 + '   r.spalten = (b.match(/left:([\\d.]+)%;width:calc\\(([\\d.]+)%/g)'
+                 + '     || []).map(function(x){'
+                 + '       var m2 = x.match(/left:([\\d.]+)%;width:calc\\(([\\d.]+)%/);'
+                 + '       return Math.round(Number(m2[1]) / Number(m2[2])) + \'/\''
+                 + '            + Math.round(100 / Number(m2[2])); }).join(\',\');'
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -12236,6 +12261,9 @@ console.log('\n135. Blöcke überlappen nicht');
     pruefe(e.eigeneDauerGilt === 20,
            'eine eingetragene Dauer sticht den Ansatz');
     pruefe(e.ueberlappt === '', 'kein Block ragt in den nächsten hinein');
+    /* Seit v5.1.0 stehen gleichzeitige Blöcke nebeneinander. */
+    pruefe(e.spalten === '0/1,0/1,0/1,0/1',
+           'ohne Gleichzeitigkeit nimmt jeder Block die ganze Breite');
     pruefe(e.halbeStunde === 41,
            'eine halbe Stunde ist 44 Pixel hoch, abzüglich Abstand');
     pruefe(e.viertelstunde === 19,
@@ -12440,6 +12468,43 @@ console.log('\n140. Checkliste und Ablauf');
     pruefe(e.zurueck === true, 'zurückgeschaltet ist alles wieder wie vorher');
     pruefe(e.markeCheck === 'Checkliste' && e.markeAblauf === 'Ablauf',
            'in der Liste trägt jede Vorlage ihre Art');
+  }
+}
+
+/* ============================================================
+   142. Gleichzeitige Bloecke stehen nebeneinander
+   Grund: Zwei Termine zur selben Zeit lagen uebereinander, der hintere
+   war unsichtbar — man haette ihn schlicht verpasst.
+   ============================================================ */
+console.log('\n142. Zwei Termine zur selben Zeit');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__gleichzeitigApi;
+
+  pruefe(new RegExp('function\\s+bloeckeVerteilen\\s*\\(').test(skript),
+         'Funktion bloeckeVerteilen ist definiert');
+  const bv = skript.match(/function bloeckeVerteilen\([\s\S]*?\n\}\n/);
+  pruefe(bv && /bloecke\[i\]\.von < jetzige\.bis/.test(bv[0]),
+         'was in eine laufende Gruppe hineinragt, gehört dazu');
+  pruefe(bv && /while \(s < enden\.length && enden\[s\] > drin\[k\]\.von\)/.test(bv[0]),
+         'jeder Block kommt in die erste Spalte, die zu seiner Zeit frei ist');
+  const sp = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(sp && /bloeckeVerteilen\(belegteBloecke\(is\)\)/.test(sp[0]),
+         'der Stundenplan verteilt, bevor er zeichnet');
+
+  if (!g) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = g.pruefe();
+    pruefe(e.dreiGleichzeitig === '0/3,1/3,2/3',
+           'drei gleichzeitige teilen sich die Breite zu dritt');
+    pruefe(e.allein === '0/1', 'ein Block für sich nimmt die ganze Breite');
+    pruefe(e.zweiPaare === '0/2,1/2,0/2,1/2',
+           'zwei getrennte Paare teilen sich jeweils zu zweit — nicht zu viert');
+    pruefe(e.kette === '0/2,1/2,0/2',
+           'eine Kette zählt als eine Gruppe, aber zwei Spalten reichen');
+    pruefe(e.reihenfolge === 'Erst,Zweit,Dritt',
+           'die Reihenfolge nach Beginn bleibt');
   }
 }
 
