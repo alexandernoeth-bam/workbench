@@ -11106,9 +11106,17 @@ console.log('\n118. Sichtschutz am Pixel');
   pruefe(/id="tkSchmal"|class="tk-schmal"/.test(QUELLE), 'der schmale Kopf ist da');
   pruefe(/body:not\(\.breit\) \.tk-karte\{display:none\}/.test(QUELLE),
          'am Handy tritt er an die Stelle der Kopfkarte');
-  pruefe(/body:not\(\.breit\) \.eingabe-zone\{display:none\}/.test(QUELLE)
-         && /body:not\(\.breit\) \.eingabe-fab\{display:flex/.test(QUELLE),
-         'das Eingabefeld steckt hinter dem Pluszeichen');
+  /* Seit v4.9.0 gilt das auch am Rechner: Die Zeile lief über die
+     ganze Breite und nahm dem Tagesplan die Höhe. */
+  pruefe(/\n\.eingabe-zone\{display:none\}/.test(QUELLE)
+         && /\n\.eingabe-fab\{display:flex/.test(QUELLE),
+         'das Eingabefeld steckt hinter dem Pluszeichen, auf beiden Geräten');
+  pruefe(/body\.eingabe-auf \.eingabe-zone\{display:block\}/.test(QUELLE),
+         'das Pluszeichen klappt es auf');
+  pruefe(/body\.breit \.splan-rolle\{max-height:min\(82vh, 1000px\)\}/.test(QUELLE),
+         'am Rechner passt ein Arbeitstag von 7 bis 18 Uhr in den Plan');
+  pruefe(/body\.breit \.tk-karte\{padding:7px 12px 8px\}/.test(QUELLE),
+         'der Kopf ist dafür enger gesetzt — ohne kleinere Schrift');
   pruefe(!/tk-schmal[\s\S]{0,400}tagBlaettern/.test(QUELLE),
          'kein Blättern im schmalen Kopf — dafür gibt es das Wischen');
 
