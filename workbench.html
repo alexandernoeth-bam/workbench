@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.0.0</title>
+<title>Workbench 5.0.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2241,7 +2241,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.0.0';
+var APP_VERSION = '5.0.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -16810,12 +16810,15 @@ function abZeichnen() {
 
 /* Die Liste der Vorgänge — auf ihrer eigenen Seite und, am Rechner,
    rechts neben den Aktivitäten. */
-function ablaufListeHtml(filter) {
+/* Die Stufe gilt auf der Vorgangsseite. Die Spalte auf der
+   Aufgabenseite zeigt immer das Laufende — Vorlagen gehören dorthin,
+   wo man sie pflegt. */
+function ablaufListeHtml(filter, nurLaufend) {
   var vorlagen = abSichtbar(DB.ablaeufe || [], filter);
   var laufend = abSichtbar(DB.durchlaeufe || [], filter);
   var h = '';
 
-  if (abStufe === 'laufend') {
+  if (nurLaufend || abStufe === 'laufend') {
     /* Nach Zustand, nicht nach Herkunft: Was heute dran ist, steht
        oben; was ruht, unten und blasser. */
     var g, b;
@@ -17183,11 +17186,12 @@ function durchlaufStarten(vorlageId, still) {
   v.zuletzt = isoDatum();
   v.zuletztGestartet = isoDatum();
   v.geaendert = jetzt();
-  if (still) { return; }
+  if (still) { return neu; }
   spaeterSichern();
   abZeichnen();
   tagZeichnen();
-  melde('Durchlauf gestartet: ' + v.name, 'gut');
+  melde('Vorgang gestartet: ' + v.name, 'gut');
+  return neu;
 }
 
 /* Ein abgeschlossener Durchlauf wird entfernt — die Vorlage bleibt. */
@@ -18113,7 +18117,10 @@ function abSchrittWeg(i) {
 function durchlaufStartenAusDetail() {
   var id = abDetail;
   aktionenSchliessen();
-  durchlaufStarten(id);
+  var neu = durchlaufStarten(id);
+  /* Sonst bliebe man auf der Vorlage stehen und sähe nicht, dass
+     überhaupt etwas geschehen ist. */
+  if (neu) { abDetailOeffnen(neu.id, 'durchlauf'); }
 }
 
 /* Aus einem einmaligen Durchlauf wird eine Vorlage, wenn sich der
@@ -18791,7 +18798,7 @@ function aufZeichnen() {
     h += '<div class="tabschnitt"><div class="tabschnitt-titel"><span>Vorgänge</span>'
        + '<button class="kopf-hin" type="button" onclick="zeigeSchirm(\'Ablaeufe\')">'
        + 'Alle und Vorlagen →</button></div>';
-    h += ablaufListeHtml(aufFilter);
+    h += ablaufListeHtml(aufFilter, true);
     h += '</div></div>';
   }
 
