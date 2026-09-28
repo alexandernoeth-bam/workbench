@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.9.0</title>
+<title>Workbench 4.9.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1227,11 +1227,10 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ro-min{flex:0 0 84px}
 
 /* Der Stundenplan im Tag */
-.splan-rolle{max-height:min(62vh, 620px);overflow-y:auto;margin:2px 0 4px;
-  scrollbar-width:thin}
-/* Am Rechner soll ein Arbeitstag von 7 bis 18 Uhr hineinpassen, ohne
-   die Schrift zu verkleinern. */
-body.breit .splan-rolle{max-height:min(82vh, 1000px)}
+/* Kein Rollfeld im Rollfeld: Der Plan steht in voller Höhe, und die
+   Tagesseite rollt — eine Fläche, die in einer anderen rollt, findet
+   man mit dem Rad nicht. */
+.splan-rolle{margin:2px 0 4px}
 .splan{position:relative;border-top:1px solid var(--linie)}
 .splan-stunde{display:flex;align-items:flex-start;height:88px;
   border-bottom:1px solid var(--linie)}
@@ -1398,7 +1397,9 @@ body.breit .splan-rolle{max-height:min(82vh, 1000px)}
    lief über die ganze Breite und nahm dem Tagesplan die Höhe. */
 .eingabe-zone{display:none}
 body.eingabe-auf .eingabe-zone{display:block}
-.eingabe-fab{display:flex;position:fixed;right:22px;bottom:22px;z-index:40;
+/* Über der Leiste, nicht darin: Unten sitzen die fünf Bildschirme. */
+.eingabe-fab{display:flex;position:fixed;right:22px;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 78px);z-index:40;
   width:48px;height:48px;border:0;border-radius:50%;background:var(--weinrot);
   color:var(--karte);font-size:27px;align-items:center;justify-content:center;
   box-shadow:0 3px 10px rgba(0,0,0,.25);cursor:pointer;line-height:1}
@@ -2226,7 +2227,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.9.0';
+var APP_VERSION = '4.9.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5273,12 +5274,17 @@ var PLAN_MIN_BIS = 18 * 60;
 function planRollenSpaeter(is) {
   if (is !== isoDatum()) { return; }
   window.setTimeout(function () {
-    var feld = document.getElementById('splanRolle');
-    if (!feld || !feld.querySelector) { return; }
-    var linie = feld.querySelector('.splan-jetzt');
-    if (!linie) { return; }
-    var ziel = linie.offsetTop - Math.round(feld.clientHeight / 3);
-    feld.scrollTop = (ziel > 0) ? ziel : 0;
+    var blatt = document.getElementById('tagBlatt');
+    if (!blatt || !blatt.querySelector) { return; }
+    var linie = blatt.querySelector('.splan-jetzt');
+    if (!linie || !linie.getBoundingClientRect) { return; }
+    var wo = linie.getBoundingClientRect();
+    var rahmen = blatt.getBoundingClientRect();
+    /* Die Linie soll im oberen Drittel stehen, damit man sieht, was
+       noch kommt. */
+    var ziel = blatt.scrollTop + (wo.top - rahmen.top)
+             - Math.round(blatt.clientHeight / 3);
+    blatt.scrollTop = (ziel > 0) ? ziel : 0;
   }, 0);
 }
 

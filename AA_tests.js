@@ -11038,8 +11038,10 @@ console.log('\n117. Termine als Einzeiler');
      niedriger als die Mindesthöhe, und kurze Blöcke überlappten. */
   pruefe(/\.splan-stunde\{[^}]*height:88px/.test(QUELLE),
          'die Stundenskala gibt den Maßstab — 88 Pixel je Stunde');
-  pruefe(/\.splan-rolle\{[^}]*overflow-y:auto/.test(QUELLE),
-         'dafür rollt der Plan in sich, statt die Seite zu dehnen');
+  /* Seit v4.9.1 rollt die Tagesseite statt des Plans: Eine Fläche, die
+     in einer anderen rollt, findet man mit dem Rad nicht. */
+  pruefe(!/\.splan-rolle\{[^}]*overflow-y:auto/.test(QUELLE),
+         'der Plan steht in voller Höhe, ohne eigenes Rollfeld');
   pruefe(new RegExp('function\\s+planRollenSpaeter\\s*\\(').test(skript),
          'und springt beim Öffnen auf die jetzige Zeit');
   const spm = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
@@ -11054,6 +11056,8 @@ console.log('\n117. Termine als Einzeiler');
          'an anderen Tagen wird nicht gerollt');
   pruefe(pr && /clientHeight \/ 3/.test(pr[0]),
          'die Linie steht danach im oberen Drittel, damit man sieht, was kommt');
+  pruefe(pr && /getBoundingClientRect/.test(pr[0]),
+         'gemessen wird am Ort der Linie, nicht an einer geratenen Höhe');
   pruefe(sp2 && /splan-blk/.test(sp2[0]) && !/tzt-rechts/.test(sp2[0]),
          'in den Blöcken steht kein Kalendername');
   pruefe(sp2 && !/\.ort/.test(sp2[0]) && !/\.beschreibung/.test(sp2[0]),
@@ -11113,8 +11117,12 @@ console.log('\n118. Sichtschutz am Pixel');
          'das Eingabefeld steckt hinter dem Pluszeichen, auf beiden Geräten');
   pruefe(/body\.eingabe-auf \.eingabe-zone\{display:block\}/.test(QUELLE),
          'das Pluszeichen klappt es auf');
-  pruefe(/body\.breit \.splan-rolle\{max-height:min\(82vh, 1000px\)\}/.test(QUELLE),
-         'am Rechner passt ein Arbeitstag von 7 bis 18 Uhr in den Plan');
+  const prs = skript.match(/function planRollenSpaeter\([\s\S]*?\n\}/);
+  pruefe(prs && /getElementById\('tagBlatt'\)/.test(prs[0]),
+         'gerollt wird die Tagesseite, an die Jetzt-Linie');
+  pruefe(/\.eingabe-fab\{[^}]*bottom:calc\(env\(safe-area-inset-bottom,0px\) \+ 78px\)/
+         .test(QUELLE),
+         'das Pluszeichen steht über der Leiste, nicht darin');
   pruefe(/body\.breit \.tk-karte\{padding:7px 12px 8px\}/.test(QUELLE),
          'der Kopf ist dafür enger gesetzt — ohne kleinere Schrift');
   pruefe(!/tk-schmal[\s\S]{0,400}tagBlaettern/.test(QUELLE),
