@@ -569,6 +569,32 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__blattApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.ablaeufe = [{ id:\'v1\', name:\'DFÜ-Abruftest\','
+                 + '     kontext:\'beruflich\', schritte:[] }];'
+                 + '   DB.aufgaben = ['
+                 + '     { id:\'w1\', titel:\'Weekly\', kontext:\'beruflich\','
+                 + '       status:\'offen\', art:\'haupt\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[1] } },'
+                 + '     { id:\'w2\', titel:\'Pflanzen\', kontext:\'privat\','
+                 + '       status:\'offen\', art:\'klein\','
+                 + '       wiederholung:{ takt:\'woche\', tage:[0] } } ];'
+                 + '   abDetailOeffnen(\'v1\', \'vorlage\');'
+                 + '   abAnlassWahl();'
+                 + '   var s = document.getElementById(\'aktionSheet\');'
+                 + '   var hg = document.getElementById(\'aktionHg\');'
+                 + '   var r = { gefuellt: /Welche Aufgabe löst ihn aus\?/'
+                 + '       .test(s.innerHTML) && !!hg,'
+                 + '     angeboten: (s.innerHTML.match(/mf-name">([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.slice(9); }).join(\',\') };'
+                 + '   r.privatWeg = (r.angeboten.indexOf(\'Pflanzen\') < 0);'
+                 + '   abAnlassSetzen(\'w1\');'
+                 + '   r.gewaehlt = ablaufFinden(\'v1\', \'vorlage\').anlassAufgabeId;'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__mitZeitApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank();'
@@ -12146,6 +12172,40 @@ console.log('\n136. Auswahl im Plandialog');
     pruefe(e.klein === 'Brief', 'die Kleinigkeiten stehen für sich');
     pruefe(e.hakenSchalter === true, 'im Stundenplan ist das Kästchen ein Schalter');
     pruefe(e.nachHaken === true, 'ein Tipp darauf hakt die Aufgabe ab');
+  }
+}
+
+/* ============================================================
+   137. Jedes Auswahlblatt muss sich auch oeffnen
+   Grund: „wiederkehrende Aufgabe waehlen" fuellte das Blatt, setzte aber
+   die Klasse „auf" nicht — es blieb unsichtbar, und der Knopf schien
+   tot. Derselbe Fehler kann jede Auswahl treffen.
+   ============================================================ */
+console.log('\n137. Auswahlblätter öffnen sich');
+{
+  const skript = hauptSkript();
+  const a = globalThis.__blattApi;
+
+  /* Wer das Blatt füllt, muss es auch aufklappen. */
+  ['abAnlassWahl', 'terminAblaufWahl'].forEach(function (f) {
+    const m = skript.match(new RegExp('function ' + f + '\\([\\s\\S]*?\\n\\}\\n'));
+    pruefe(m && /sheet\.innerHTML/.test(m[0]) && /sheet\.classList\.add\('auf'\)/.test(m[0]),
+           f + ' füllt das Blatt und klappt es auf');
+    pruefe(m && /hg\.classList\.add\('auf'\)/.test(m[0]),
+           f + ' verdunkelt auch den Hintergrund');
+  });
+
+  if (!a) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = a.pruefe();
+    /* Klassen merkt sich die Prüfumgebung nicht — dass sie gesetzt
+       werden, steht oben im Quelltext; hier zählt der Inhalt. */
+    pruefe(e.gefuellt === true, 'nach dem Tippen steht die Frage im Blatt');
+    pruefe(e.angeboten === 'Weekly',
+           'angeboten werden die wiederkehrenden Aufgaben im selben Kontext');
+    pruefe(e.privatWeg === true, 'die aus dem anderen Kontext nicht');
+    pruefe(e.gewaehlt === 'w1', 'die Wahl kommt an der Vorlage an');
   }
 }
 
