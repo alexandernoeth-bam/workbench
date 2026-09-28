@@ -7310,10 +7310,18 @@ console.log('\n56. Gruppen und Art');
          'die Liste teilt sich in Aufgaben und Kleinigkeiten');
   pruefe(zeichnen && (zeichnen[0].match(/unterKopf\(/g) || []).length === 2,
          'beide lassen sich einklappen');
-  pruefe(zeichnen && /ablaufListeHtml\(aufFilter\)/.test(zeichnen[0])
+  pruefe(zeichnen && /ablaufListeHtml\(aufFilter, true\)/.test(zeichnen[0])
          && /istBreit\(\)/.test(zeichnen[0]),
          'am Rechner stehen die Vorgänge rechts daneben — mit dem Filter der '
          + 'Aufgabenseite');
+  /* Seit v5.0.1 zeigt die Spalte immer das Laufende, nie die Vorlagen:
+     Die Stufe gilt auf der Vorgangsseite, nicht hier. */
+  const alh = skript.match(/function ablaufListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(alh && /if \(nurLaufend \|\| abStufe === 'laufend'\)/.test(alh[0]),
+         'die Spalte auf der Aufgabenseite zeigt immer die laufenden Vorgänge');
+  const dsa = skript.match(/function durchlaufStartenAusDetail\([\s\S]*?\n\}/);
+  pruefe(dsa && /abDetailOeffnen\(neu\.id, 'durchlauf'\)/.test(dsa[0]),
+         '„Jetzt starten" springt zum neuen Vorgang — sonst sähe man nichts');
   pruefe(zeichnen && /kopf-hin[\s\S]*?zeigeSchirm\(\\?'Ablaeufe\\?'\)/.test(zeichnen[0]),
          'und ein Weg führt von dort zur Vorgangsseite mit Vorlagen und Erledigtem');
   const liste = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
