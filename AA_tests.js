@@ -569,6 +569,36 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + 'globalThis.__filterApi = { passtZumTag, setTagFilter, kalenderKontext,'
                  + ' passtZumKalender, setKalFilter };'
                  + 'globalThis.__jtApi = { jtKuerzel };'
+                 + 'globalThis.__vorlageApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank();'
+                 + '   DB.ablaeufe = [{ id:\'v1\', name:\'DFÜ-Abruftest\','
+                 + '     kontext:\'beruflich\', schritte:['
+                 + '       { titel:\'Testdaten\' }, { titel:\'Abruf\' },'
+                 + '       { titel:\'Ergebnis\' }] }];'
+                 + '   abDetail = \'v1\'; abDetailArt = \'vorlage\';'
+                 + '   var zeig = function(){'
+                 + '     return (abSchritteHtml(DB.ablaeufe[0], true, false)'
+                 + '       .match(/abSchrittWirdAufgabe\\(\\d\\)[^>]*>([^<]*)/g) || [])'
+                 + '       .map(function(x){ return x.replace(/.*>/, \'\'); })'
+                 + '       .join(\',\'); };'
+                 + '   var r = { vorher: zeig() };'
+                 + '   abSchrittWirdAufgabe(0); abSchrittWirdAufgabe(2);'
+                 + '   r.nachher = zeig();'
+                 + '   durchlaufStarten(\'v1\', true);'
+                 + '   var d = DB.durchlaeufe[0];'
+                 + '   r.nachStart = d.schritte.map(function(s){'
+                 + '     return s.titel + \':\' + (s.aufgabeId ? \'Aufgabe\''
+                 + '                                            : \'ohne\'); })'
+                 + '     .join(\',\');'
+                 + '   var erste = aufgabeFinden(d.schritte[0].aufgabeId);'
+                 + '   r.imBacklog = !!erste && (erste.planung === \'backlog\');'
+                 + '   r.amSchritt = !!erste'
+                 + '     && (erste.ablaufSchritt === (d.id + \'#0\'));'
+                 + '   abDetail = \'\'; abDetailArt = \'\';'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__blattApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -12211,6 +12241,45 @@ console.log('\n137. Auswahlblätter öffnen sich');
            'angeboten werden die wiederkehrenden Aufgaben im selben Kontext');
     pruefe(e.privatWeg === true, 'die aus dem anderen Kontext nicht');
     pruefe(e.gewaehlt === 'w1', 'die Wahl kommt an der Vorlage an');
+  }
+}
+
+/* ============================================================
+   138. In der Vorlage vormerken, was eine Aufgabe wird
+   Grund: Eine Vorlage hat keine Aufgaben — die entstehen erst beim
+   Start. Bisher liess sich das gar nicht vormerken, das Merkmal war
+   angelegt, aber nirgends bedienbar und wurde beim Start ignoriert.
+   ============================================================ */
+console.log('\n138. Schritt wird Aufgabe');
+{
+  const skript = hauptSkript();
+  const v = globalThis.__vorlageApi;
+
+  pruefe(new RegExp('function\\s+abSchrittWirdAufgabe\\s*\\(').test(skript),
+         'Funktion abSchrittWirdAufgabe ist definiert');
+  const sh = skript.match(/function abSchritteHtml\([\s\S]*?\n\}\n/);
+  pruefe(sh && /abSchrittWirdAufgabe\(/.test(sh[0]),
+         'in der Vorlage steht der Schalter an jedem Schritt');
+  pruefe(sh && (sh[0].match(/onclick="abSchrittNeu\(\)/g) || []).length === 1,
+         'der Knopf „Schritt" steht einmal am Ende, nicht zweimal');
+  const ds = skript.match(/function durchlaufStarten\([\s\S]*?\n\}\n/);
+  pruefe(ds && /if \(!schritte\[i\]\.auf\) \{ continue; \}/.test(ds[0]),
+         'beim Start bekommen die vorgemerkten Schritte ihre Aufgabe');
+  pruefe(ds && /planung: 'backlog'/.test(ds[0]),
+         'sie landet im Backlog — geplant wird sie im Plandialog');
+
+  if (!v) {
+    warn('Funktionen nicht auswertbar');
+  } else {
+    const e = v.pruefe();
+    pruefe(e.vorher === 'nur Schritt,nur Schritt,nur Schritt',
+           'voreingestellt ist jeder Schritt nur ein Schritt');
+    pruefe(e.nachher === 'wird Aufgabe,nur Schritt,wird Aufgabe',
+           'einzeln lässt sich das umschalten');
+    pruefe(e.nachStart === 'Testdaten:Aufgabe,Abruf:ohne,Ergebnis:Aufgabe',
+           'beim Start entstehen genau die vorgemerkten Aufgaben');
+    pruefe(e.imBacklog === true, 'sie stehen im Backlog');
+    pruefe(e.amSchritt === true, 'und hängen an ihrem Schritt');
   }
 }
 

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 4.12.0</title>
+<title>Workbench 4.13.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2228,7 +2228,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '4.12.0';
+var APP_VERSION = '4.13.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -17050,6 +17050,22 @@ function durchlaufStarten(vorlageId, still) {
     anlagen: abAnlagen(v).slice(),
     start: isoDatum(), frist: '', schritte: schritte, geaendert: jetzt()
   };
+  /* Vorgemerkte Schritte bekommen jetzt ihre Aufgabe: In der Vorlage
+     gab es noch keine, hier gibt es sie. */
+  for (i = 0; i < schritte.length; i++) {
+    if (!schritte[i].auf) { continue; }
+    var titel = String(schritte[i].titel || '').trim();
+    if (!titel.length) { continue; }
+    var ausSchritt = {
+      id: neueKennung(), titel: titel, beschreibung: '', kontext: neu.kontext,
+      themaId: null, projektId: neu.projektId || null, frist: '',
+      planung: 'backlog', uhrzeit: '', art: 'haupt',
+      wiederholung: null, status: 'offen', erledigtAm: null, zuletztErledigt: null,
+      ablaufSchritt: neu.id + '#' + i, geaendert: jetzt()
+    };
+    DB.aufgaben.push(ausSchritt);
+    schritte[i].aufgabeId = ausSchritt.id;
+  }
   DB.durchlaeufe.push(neu);
   v.zuletzt = isoDatum();
   v.zuletztGestartet = isoDatum();
@@ -17417,6 +17433,13 @@ function abSchritteHtml(a, istVorlage, vorgang) {
 
     h += '<div class="ms-unten">';
     if (istVorlage) {
+      /* In einer Vorlage gibt es noch keine Aufgaben — sie entstehen
+         erst beim Start. Hier wird nur vermerkt, welche Schritte eine
+         werden sollen. */
+      h += '<button class="ms-wort' + (l[i].auf ? ' an' : '') + '" type="button" '
+         + 'onclick="abSchrittWirdAufgabe(' + i + ')" '
+         + 'title="Aus diesem Schritt wird beim Start eine Aufgabe">'
+         + (l[i].auf ? 'wird Aufgabe' : 'nur Schritt') + '</button>';
       h += '<button class="ms-wort' + ((l[i].wann !== 'danach') ? ' an' : '') + '" '
          + 'type="button" onclick="abSchrittWann(' + i + ',\'davor\')" '
          + 'title="Dieser Schritt gehört vor den Termin">davor</button>';
@@ -17454,9 +17477,6 @@ function abSchritteHtml(a, istVorlage, vorgang) {
        + 'title="Diesen Schritt entfernen">Entfernen</button>';
     h += '</div></div>';
   }
-  h += '<button class="neu-zeile" type="button" onclick="abSchrittNeu()">'
-     + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Schritt</button>';
-
   h += '<button class="neu-zeile" type="button" onclick="abSchrittNeu()">'
      + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Schritt</button>';
   return h;
@@ -17827,6 +17847,16 @@ function abSchrittLoesen(i) {
     a.schritte[i].fertig = (traeger.status === 'erledigt');
   }
   a.schritte[i].aufgabeId = null;
+  abGeaendert(true);
+}
+
+/* Ein Schritt der Vorlage kann vormerken, dass er beim Start eine
+   eigene Aufgabe bekommt — dann steht er später im Tag und im
+   Plandialog wie jede andere Aufgabe. */
+function abSchrittWirdAufgabe(i) {
+  var a = ablaufFinden(abDetail, abDetailArt);
+  if (!a || !a.schritte || !a.schritte[i]) { return; }
+  a.schritte[i].auf = !a.schritte[i].auf;
   abGeaendert(true);
 }
 
