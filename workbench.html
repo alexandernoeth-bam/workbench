@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.7.2</title>
+<title>Workbench 5.7.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1084,6 +1084,7 @@ body:not(.breit) .fl-leiste .fl-knopf,body:not(.breit) .fl-leiste .fl-teiler{fle
 .nb-farben{display:flex;gap:7px;flex-wrap:wrap}
 .nb-farbe{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
 .nb-farbe.an{border-color:var(--tinte)}
+.sl-pille.nb-loeschknopf{border-color:var(--weinrot);color:var(--weinrot)}
 .nb-archiv{background:var(--karte);border:1px solid var(--linie);border-radius:8px;margin-top:6px}
 .nb-archiv-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;
   border-top:1px solid var(--linie);font-size:calc(var(--fs)*0.84)}
@@ -2476,7 +2477,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.7.2';
+var APP_VERSION = '5.7.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8160,6 +8161,21 @@ function rueckgaengig() {
     if (steine[i].s === sammlung && steine[i].id === satz.id) { steine.splice(i, 1); }
   }
   satz.geaendert = jetzt();
+
+  /* Was mit dem Satz zusammen gelöscht wurde, kommt mit zurück — ein
+     Notizbuch etwa mit seinen Seiten. */
+  var dazu = zurueckHolen.dazu;
+  if (dazu && Array.isArray(dazu.saetze)) {
+    if (!Array.isArray(DB[dazu.sammlung])) { DB[dazu.sammlung] = []; }
+    var j;
+    for (j = 0; j < dazu.saetze.length; j++) {
+      DB[dazu.sammlung].push(dazu.saetze[j]);
+      for (i = steine.length - 1; i >= 0; i--) {
+        if (steine[i].s === dazu.sammlung && steine[i].id === dazu.saetze[j].id) { steine.splice(i, 1); }
+      }
+      dazu.saetze[j].geaendert = jetzt();
+    }
+  }
 
   rueckVerbergen();
   tagZeichnen();
@@ -16345,29 +16361,57 @@ function nbZurueckholen(id) {
   nbZeichnen();
 }
 
-/* Löschen nur, solange nichts darin steht — ein beschriebenes
-   Notizbuch wird archiviert, nicht weggeworfen. */
-function nbLoeschen(id) {
+/* Löschen: Ein leeres Notizbuch geht sofort, ein beschriebenes erst
+   nach einer Rückfrage (bestaetigt). Die Seiten gehen mit, jede mit
+   Löschvermerk. Der Rückgängig-Streifen holt das Buch samt Seiten
+   zurück — deshalb reisen sie in zurueckHolen.dazu mit. */
+function nbLoeschen(id, bestaetigt) {
   var b = notizbuchFinden(id);
   if (!b) { return; }
-  if (nbStand(id).anzahl > 0) {
-    melde('Ein beschriebenes Notizbuch lässt sich nur archivieren.', 'warn');
+  var st = nbStand(id);
+  if (st.anzahl > 0 && bestaetigt !== true) {
+    nbLoeschenFragen(id);
     return;
   }
-  var leere = (DB.notizseiten || []).filter(function (s) { return s.buchId === id; });
+  var seiten = (DB.notizseiten || []).filter(function (x) { return x.buchId === id; });
   var j;
-  for (j = 0; j < leere.length; j++) {
-    DB.notizseiten.splice(DB.notizseiten.indexOf(leere[j]), 1);
-    grabsteinSetzen('notizseiten', leere[j].id);
+  for (j = 0; j < seiten.length; j++) {
+    DB.notizseiten.splice(DB.notizseiten.indexOf(seiten[j]), 1);
+    grabsteinSetzen('notizseiten', seiten[j].id);
   }
   var stelle = DB.notizbuecher.indexOf(b);
-  zurueckHolen = { sammlung: 'notizbuecher', satz: b, stelle: stelle };
+  zurueckHolen = { sammlung: 'notizbuecher', satz: b, stelle: stelle,
+                   dazu: { sammlung: 'notizseiten', saetze: seiten } };
   DB.notizbuecher.splice(stelle, 1);
   grabsteinSetzen('notizbuecher', b.id);
   nbBearbeiten = '';
+  if (nbSucheBuch === id) { nbSucheBuch = ''; }
+  if (bestaetigt === true) { aktionenSchliessen(); }
   spaeterSichern();
   rueckZeigen(b.name);
   nbZeichnen();
+}
+
+function nbLoeschenFragen(id) {
+  var b = notizbuchFinden(id);
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!b || !sheet || !hg) { return; }
+  var st = nbStand(id);
+  var h = blattKopf();
+  h += '<div class="as-titel">Notizbuch löschen</div>';
+  h += '<div class="as-meta">„' + esc(b.name || 'Notizbuch') + '“ mit ' + st.anzahl
+     + (st.anzahl === 1 ? ' beschriebenen Seite' : ' beschriebenen Seiten') + '</div>';
+  h += '<div class="as-hinweis">Alle Seiten und Randnotizen werden gelöscht, auch auf deinen '
+     + 'anderen Geräten. Direkt danach lässt es sich noch rückgängig machen. Wer das Notizbuch '
+     + 'nur aus dem Blick haben will, archiviert es besser.</div>';
+  h += '<div class="d-reihe">'
+     + '<button type="button" class="gefahr" onclick="nbLoeschen(\'' + esc(id) + '\', true)">'
+     + 'Endgültig löschen</button>'
+     + '<button type="button" onclick="aktionenSchliessen()">Abbrechen</button></div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
 }
 
 /* Ein Notizbuch öffnet dort, wo zuletzt geschrieben wurde. */
@@ -16450,7 +16494,8 @@ function nbKarteHtml(b) {
          + '<button type="button" class="sl-pille an" onclick="nbBearbeitenUm(\'' + kennung + '\')">Fertig</button>'
          + (st.anzahl
             ? '<button type="button" class="sl-pille" onclick="nbArchivieren(\'' + kennung + '\')">Archivieren</button>'
-            : '<button type="button" class="sl-pille" onclick="nbLoeschen(\'' + kennung + '\')">Löschen</button>')
+            : '')
+         + '<button type="button" class="sl-pille nb-loeschknopf" onclick="nbLoeschen(\'' + kennung + '\')">Löschen</button>'
          + '</div></div>';
   }
 
@@ -16529,6 +16574,7 @@ function nbZeichnen() {
            + '</span></span>'
            + '<button type="button" class="sl-pille" onclick="nbOeffnen(\'' + k + '\')">Lesen</button>'
            + '<button type="button" class="sl-pille" onclick="nbZurueckholen(\'' + k + '\')">Zurückholen</button>'
+           + '<button type="button" class="sl-pille nb-loeschknopf" onclick="nbLoeschen(\'' + k + '\')">Löschen</button>'
            + '</div>';
       }
       h += '</div>';

@@ -866,6 +866,41 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; flaecheFuer = ""; flaecheModus = "ansicht";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__nbLoeschApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkZ = zurueckHolen; DB = leereDatenbank(); var r = {};'
+                 + '   nbAnlegen(); nbAnlegen(); var b = DB.notizbuecher[0]; b.name = "Arbeit Band 3";'
+                 + '   flaecheSetzen(notizseitenKennung(b.id, 1), "# Kopf\\n---\\nx");'
+                 + '   flaecheSetzen(notizseitenKennung(b.id, 2), "y");'
+                 + '   notizseiteFinden(b.id, 1).rand = [{ id: "r1", anker: "x", nr: 2, text: "Notiz" }];'
+                 + '   flaecheSetzen(notizseitenKennung(DB.notizbuecher[1].id, 1), "fremdes Buch");'
+                 + '   var sheet = document.getElementById("aktionSheet"); sheet.innerHTML = "";'
+                 + '   nbLoeschen(b.id);'
+                 + '   r.fragt = DB.notizbuecher.length === 2 && /Endgültig löschen/.test(sheet.innerHTML)'
+                 + '     && /2 beschriebenen Seiten/.test(sheet.innerHTML) && /Arbeit Band 3/.test(sheet.innerHTML);'
+                 + '   nbLoeschen(b.id, true);'
+                 + '   r.weg = !notizbuchFinden(b.id) && DB.notizseiten.filter(function(x){ return x.buchId === b.id; }).length === 0;'
+                 + '   r.fremdBleibt = DB.notizseiten.length === 1 && DB.notizbuecher.length === 1;'
+                 + '   var steine = DB.grabsteine.map(function(g){ return g.s; });'
+                 + '   r.vermerke = steine.filter(function(x){ return x === "notizbuecher"; }).length + "," +'
+                 + '     steine.filter(function(x){ return x === "notizseiten"; }).length;'
+                 + '   var fremd = leereDatenbank(); fremd.notizbuecher = [JSON.parse(JSON.stringify(b))];'
+                 + '   fremd.notizbuecher[0].geaendert = 1;'
+                 + '   fremd.notizseiten = [{ id: "alt1", buchId: b.id, nr: 1, text: "alt", geaendert: 1 }];'
+                 + '   var m = zusammenfuehren(DB, fremd);'
+                 + '   r.abgleich = !m.db.notizbuecher.some(function(x){ return x.id === b.id; });'
+                 + '   rueckgaengig();'
+                 + '   var zurueck = notizbuchFinden(b.id);'
+                 + '   r.zurueck = !!zurueck && DB.notizseiten.filter(function(x){ return x.buchId === b.id; }).length === 2;'
+                 + '   r.randZurueck = !!notizseiteFinden(b.id, 1) && notizseiteFinden(b.id, 1).rand.length === 1;'
+                 + '   r.vermerkeWeg = DB.grabsteine.filter(function(g){ return g.s === "notizbuecher" || g.s === "notizseiten"; }).length === 0;'
+                 + '   nbBearbeiten = b.id; var karte = nbKarteHtml(b); nbBearbeiten = "";'
+                 + '   r.knoepfe = /nbArchivieren\\(/.test(karte) && /nb-loeschknopf" onclick="nbLoeschen\\(/.test(karte);'
+                 + '   nbArchivieren(b.id); nbArchivOffen = true; nbZeichnen();'
+                 + '   r.imArchiv = /nb-loeschknopf" onclick="nbLoeschen\\(/.test(document.getElementById("nbBlatt").innerHTML);'
+                 + '   nbArchivOffen = false; zurueckHolen = merkZ; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -12938,7 +12973,8 @@ console.log('\n143. Notizbücher');
     pruefe(e.keinSchreiben === true, 'im Archiv gibt es keinen Schreibmodus');
     pruefe(e.archivGrenze === 1, 'im Archiv blättert man nur durch Beschriebenes');
     pruefe(e.zurueck === true, 'ein archiviertes Notizbuch lässt sich zurückholen');
-    pruefe(e.beschriebenBleibt === true, 'ein beschriebenes Notizbuch lässt sich nicht löschen');
+    /* Seit v5.7.3 lässt es sich löschen — aber nicht ohne Rückfrage. */
+    pruefe(e.beschriebenBleibt === true, 'ein beschriebenes Notizbuch wird nicht ohne Rückfrage gelöscht');
     pruefe(e.leerGeloescht === true, 'ein leeres wird gelöscht und bekommt einen Löschvermerk');
     pruefe(e.abgleich === true, 'der Abgleich mischt Seiten einzeln');
   }
@@ -13238,6 +13274,39 @@ console.log('\n150. Seitentitel und Inhaltsverzeichnis');
     pruefe(e.ansicht === true, 'Titelzeile und Trennlinie sind in der Ansicht gekennzeichnet');
     pruefe(e.leisteNotiz === true && e.leisteFlaeche === true, 'den Knopf gibt es nur auf Notizseiten');
     pruefe(e.archiv === true, 'im Archiv setzt der Knopf nichts');
+  }
+}
+
+/* ============================================================
+   151. Notizbücher löschen (v5.7.3)
+   Grund: Löschen ging nur bei leeren Notizbüchern. Jetzt geht es auch
+   bei beschriebenen — mit Rückfrage, mit Löschvermerken für Buch und
+   Seiten, und der Rückgängig-Streifen holt alles zusammen zurück.
+   ============================================================ */
+console.log('\n151. Notizbücher löschen');
+{
+  const skript = hauptSkript();
+  const lo = globalThis.__nbLoeschApi;
+  const rg = skript.match(/function rueckgaengig\([\s\S]*?\n\}/);
+  pruefe(rg && /zurueckHolen\.dazu/.test(rg[0]), 'Rückgängig holt zusammengehörige Datensätze mit zurück');
+  let e = null;
+  if (!lo) {
+    warn('Löschen nicht auswertbar');
+  } else {
+    try { e = lo.pruefe(); }
+    catch (x) { fail('Löschen läuft nicht: ' + x.message); }
+  }
+  if (lo && e) {
+    pruefe(e.fragt === true, 'ein beschriebenes Notizbuch wird erst nach Rückfrage gelöscht, sie nennt Name und Seiten');
+    pruefe(e.weg === true, 'nach der Bestätigung sind Buch und Seiten weg');
+    pruefe(e.fremdBleibt === true, 'andere Notizbücher bleiben unberührt');
+    pruefe(e.vermerke === '1,2', 'Buch und jede Seite bekommen einen Löschvermerk');
+    pruefe(e.abgleich === true, 'der Abgleich holt das gelöschte Buch nicht zurück');
+    pruefe(e.zurueck === true, 'Rückgängig holt das Buch samt Seiten zurück');
+    pruefe(e.randZurueck === true, 'auch mit den Randnotizen');
+    pruefe(e.vermerkeWeg === true, 'und nimmt die Löschvermerke wieder weg');
+    pruefe(e.knoepfe === true, 'im Bearbeiten-Bereich steht Löschen neben Archivieren');
+    pruefe(e.imArchiv === true, 'auch im Archiv lässt sich löschen');
   }
 }
 
