@@ -834,6 +834,38 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__nbTitelApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank(); var r = {};'
+                 + '   var tz = function(t){ return nbTitelZeile(t.split("\\n")); };'
+                 + '   r.erkennung = [tz("# Kopf\\n---\\nx"), tz("\\n# Kopf\\n---"), tz("## Kopf\\n---"), tz("# Kopf\\nx"),'
+                 + '     tz("Text\\n# Kopf\\n---"), tz("# Kopf")].join(",");'
+                 + '   r.text = nbTitel({ text: "# Lenkungskreis \\n---" });'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0]; var id = notizseitenKennung(b.id, 1);'
+                 + '   flaecheFuer = id; flaecheModus = "schreiben";'
+                 + '   var feld = document.getElementById("flaecheFeld");'
+                 + '   var probe = function(wert, marke){ feld.value = wert; feld.selectionStart = feld.selectionEnd = marke;'
+                 + '     nbTitelSetzen(); return feld.value + "@" + feld.selectionStart + "-" + feld.selectionEnd; };'
+                 + '   r.ersteZeile = probe("Lenkungskreis\\nx", 3);'
+                 + '   r.leer = probe("", 0);'
+                 + '   r.weiterUnten = probe("a\\nb", 3);'
+                 + '   r.schonDa = probe("# Kopf\\n---\\nx", 11);'
+                 + '   r.trennerDa = probe("- Punkt\\n---", 0);'
+                 + '   r.gespeichert = flaecheText(id);'
+                 + '   flaecheSetzen(id, "# Lenkungskreis\\n---\\nx");'
+                 + '   flaecheSetzen(notizseitenKennung(b.id, 2), "nur Text ohne Titel");'
+                 + '   var inh = nbInhaltHtml(); r.verzeichnis = /Lenkungskreis/.test(inh) && !/nur Text/.test(inh);'
+                 + '   flaecheSetzen(id, "ohne Titel"); flaecheSetzen(notizseitenKennung(b.id, 2), "auch ohne");'
+                 + '   r.verzeichnisLeer = /Noch keine Seite mit Titel/.test(nbInhaltHtml());'
+                 + '   flaecheSetzen(id, "# Lenkungskreis\\n---\\nx");'
+                 + '   var ah = flaecheAnsichtHtml(flaecheText(id), "").html;'
+                 + '   r.ansicht = /data-z="0" class="nb-titelzeile"/.test(ah) && /data-z="1" class="nb-titel-trenner"/.test(ah);'
+                 + '   r.leisteNotiz = /nbTitelSetzen\\(\\)/.test(flaecheLeisteHtml());'
+                 + '   flaecheFuer = "g:x"; r.leisteFlaeche = !/nbTitelSetzen/.test(flaecheLeisteHtml()); flaecheFuer = id;'
+                 + '   nbArchivieren(b.id); r.archiv = probe("neu", 0) === "neu@0-0";'
+                 + '   DB = alt; flaecheFuer = ""; flaecheModus = "ansicht";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -13160,6 +13192,42 @@ console.log('\n149. Datum ohne Jahr');
       pruefe(!re.test('Version 5.6.1') && !re.test('1.2.3'), 'Versionsnummern gelten nicht als Datum');
       pruefe(!re.test('Preis 3.5 Euro'), 'eine Dezimalzahl auch nicht');
     }
+  }
+}
+
+/* ============================================================
+   150. Seitentitel und Inhaltsverzeichnis (v5.7.1)
+   Grund: Das Verzeichnis nahm jede erste Zeile auf. Hinein gehört nur,
+   was man bewusst betitelt: eine H1 in der ersten Zeile mit einer
+   Trennlinie darunter — gesetzt über den Knopf „T" vor H1.
+   ============================================================ */
+console.log('\n150. Seitentitel und Inhaltsverzeichnis');
+{
+  const t = globalThis.__nbTitelApi;
+  pruefe(/\.nb-inhalt \.nb-titelzeile \.fl-h1\{border-bottom:0;text-decoration:underline/.test(QUELLE),
+         'der Titel ist unterstrichen, ohne die graue Linie der H1');
+  let e = null;
+  if (!t) {
+    warn('Seitentitel nicht auswertbar');
+  } else {
+    try { e = t.pruefe(); }
+    catch (x) { fail('Seitentitel laufen nicht: ' + x.message); }
+  }
+  if (t && e) {
+    pruefe(e.erkennung === '0,1,-1,-1,-1,-1',
+           'Titel ist nur eine H1 in der ersten beschriebenen Zeile mit Trennlinie darunter');
+    pruefe(e.text === 'Lenkungskreis', 'der Titeltext kommt ohne Zeichen und Leerraum');
+    pruefe(e.ersteZeile === '# Lenkungskreis\n---\nx@15-15', 'die erste Zeile wird zum Titel, die Marke steht dahinter');
+    pruefe(e.leer === '# Titel\n---@2-7', 'auf einer leeren Seite ist der Platzhalter markiert');
+    pruefe(e.weiterUnten === '# Titel\n---\na\nb@2-7', 'weiter unten kommt der Titel oben hinzu');
+    pruefe(e.schonDa === '# Kopf\n---\nx@2-6', 'gibt es schon einen, wird sein Text markiert, nicht verdoppelt');
+    pruefe(e.trennerDa === '# Punkt\n---@7-7', 'eine vorhandene Trennlinie wird nicht verdoppelt, Zeichen entfallen');
+    pruefe(e.gespeichert === '# Punkt\n---', 'der Titel wird gespeichert');
+    pruefe(e.verzeichnis === true, 'ins Verzeichnis kommen nur betitelte Seiten');
+    pruefe(e.verzeichnisLeer === true, 'ohne Titel sagt das Verzeichnis, wie man einen setzt');
+    pruefe(e.ansicht === true, 'Titelzeile und Trennlinie sind in der Ansicht gekennzeichnet');
+    pruefe(e.leisteNotiz === true && e.leisteFlaeche === true, 'den Knopf gibt es nur auf Notizseiten');
+    pruefe(e.archiv === true, 'im Archiv setzt der Knopf nichts');
   }
 }
 
