@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.5.0</title>
+<title>Workbench 5.6.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -22,7 +22,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --heute:#8A0B22;
@@ -1019,6 +1019,105 @@ body.nacht .zettel{color:#E8E6E1}
 .fl-ansicht mark{background:#f5e6a8;color:inherit;border-radius:2px;padding:0 1px}
 .fl-zeile .tkasten{align-self:center;margin-top:0}
 
+/* ---------- Notizbücher: Übersicht ---------- */
+.nb-titel{font-size:calc(var(--fs)*1.02);font-weight:500;color:var(--tinte)}
+.nb-regal{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin:10px 0 6px}
+.nb-karte{position:relative;background:var(--karte);border:1px solid var(--linie);
+  border-radius:3px 10px 10px 3px;padding:13px 13px 12px 36px;min-height:190px;
+  display:flex;flex-direction:column;cursor:pointer}
+.nb-karte.voll{border-color:var(--weinrot)}
+.nb-ruecken{position:absolute;left:0;top:0;bottom:0;width:24px;border-radius:3px 0 0 3px;
+  background:var(--nb-farbe,var(--weinrot))}
+.nb-ruecken::before{content:"";position:absolute;left:7px;top:18px;bottom:18px;width:10px;
+  background:radial-gradient(circle,var(--karte) 3px,transparent 3.5px) 0 0/10px 30px repeat-y;opacity:.9}
+.nb-name{font-size:calc(var(--fs)*1.0);font-weight:600;line-height:1.25;padding-right:28px}
+.nb-zuordnung{font-size:calc(var(--fs)*0.72);color:var(--grau);margin:2px 0 12px}
+.nb-stand{margin-top:auto;font-size:calc(var(--fs)*0.78)}
+.nb-stand b{font-size:calc(var(--fs)*1.2)}
+.nb-balken{height:5px;background:var(--linie);border-radius:3px;margin:6px 0 7px;overflow:hidden}
+.nb-balken span{display:block;height:100%;background:var(--nb-farbe,var(--weinrot))}
+.nb-zuletzt{font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.nb-hinweis{margin-top:9px;font-size:calc(var(--fs)*0.72);color:var(--weinrot);
+  border:1px solid var(--weinrot);border-radius:4px;padding:3px 7px}
+.nb-aktionen{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.nb-mehr{position:absolute;top:7px;right:7px;width:30px;height:30px;border:0;background:none;
+  color:var(--grau);font:inherit;font-size:18px;line-height:1;cursor:pointer;border-radius:6px}
+.nb-mehr:hover{background:var(--papier)}
+.nb-bearbeiten{cursor:default;gap:8px;min-height:0}
+.nb-bearbeiten label{font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.nb-bearbeiten input,.nb-bearbeiten select{font:inherit;font-size:calc(var(--fs)*0.84);padding:5px 7px;
+  border:1px solid var(--linie);border-radius:6px;background:var(--karte);color:var(--tinte);width:100%}
+.nb-farben{display:flex;gap:7px;flex-wrap:wrap}
+.nb-farbe{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.nb-farbe.an{border-color:var(--tinte)}
+.nb-archiv{background:var(--karte);border:1px solid var(--linie);border-radius:8px;margin-top:6px}
+.nb-archiv-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;
+  border-top:1px solid var(--linie);font-size:calc(var(--fs)*0.84)}
+.nb-archiv-zeile:first-child{border-top:0}
+.nb-archiv-name{flex:1 1 140px;min-width:0}
+.nb-archiv-info{color:var(--grau);font-size:calc(var(--fs)*0.72)}
+
+/* ---------- Notizbücher: die Seite (Fläche im Notizbuch-Kleid) ---------- */
+.nb-blaettern{display:inline-flex;align-items:center;border:1px solid var(--linie);
+  border-radius:6px;background:var(--karte)}
+.nb-blaettern button{border:0;background:none;font:inherit;font-size:calc(var(--fs)*1.0);
+  padding:1px 11px;color:var(--tinte);cursor:pointer}
+.nb-blaettern button:disabled{color:var(--linie);cursor:default}
+.nb-seite{font-size:calc(var(--fs)*0.76);min-width:62px;text-align:center}
+.nb-gesperrt{font-size:calc(var(--fs)*0.7);color:var(--grau);border:1px solid var(--linie);
+  border-radius:10px;padding:1px 8px}
+.nb-buehne{display:grid;grid-template-columns:minmax(0,640px) 220px;gap:18px;align-items:start}
+#schirmFlaeche.nb-schwebend .nb-buehne{grid-template-columns:minmax(0,640px)}
+.nb-blatt{--nb-z:28px;position:relative;display:grid;grid-template-columns:84px minmax(0,1fr);
+  background:var(--karte);min-height:calc(var(--nb-z) * 30);border-radius:2px;
+  box-shadow:0 1px 0 var(--linie),0 6px 16px rgba(0,0,0,.07);overflow:hidden}
+.nb-blatt::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background-image:linear-gradient(var(--linie) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--linie) 1px,transparent 1px);
+  background-size:14px 14px;background-position:-1px -1px}
+.nb-rand{position:relative;border-right:2px solid var(--weinrot);background:rgba(138,11,34,.035)}
+.nb-inhalt{position:relative;min-width:0;padding:var(--nb-z) 16px calc(var(--nb-z) * 2) 12px}
+.nb-seitenzahl{position:absolute;top:5px;right:14px;font-weight:600;color:var(--weinrot);
+  font-size:calc(var(--fs)*0.84)}
+.nb-datum{position:absolute;top:6px;left:12px;color:var(--grau);font-size:calc(var(--fs)*0.7)}
+.nb-inhalt .fl-ansicht{padding-bottom:0;font-family:"Caveat","Segoe Print","Bradley Hand",cursive}
+.nb-inhalt .fl-text,.nb-inhalt .fl-absatz{font-size:calc(var(--fs)*1.25);line-height:24px}
+.nb-inhalt .fl-zeile,.nb-inhalt .fl-absatz{min-height:var(--nb-z);padding:2px 0}
+.nb-inhalt .fl-h1,.nb-inhalt .fl-h2{color:var(--weinrot);line-height:calc(var(--nb-z) * 2);padding:0;margin:0}
+.nb-inhalt .fl-h1{font-size:calc(var(--fs)*1.8)}
+.nb-inhalt .fl-h2{font-size:calc(var(--fs)*1.5)}
+.nb-inhalt .fl-h3{color:var(--weinrot);font-size:calc(var(--fs)*1.3);line-height:var(--nb-z);padding:0;margin:0}
+.nb-inhalt .fl-leer{height:var(--nb-z)}
+.nb-inhalt .fl-feld{font-family:"Caveat","Segoe Print","Bradley Hand",cursive;
+  font-size:calc(var(--fs)*1.25);line-height:var(--nb-z);min-height:calc(var(--nb-z) * 27);
+  border:0;border-radius:0;padding:0;background:transparent;resize:none;position:relative}
+.nb-inhaltsliste{background:var(--karte);border:1px solid var(--linie);border-radius:8px;
+  padding:10px 0;position:sticky;top:0}
+.nb-inhaltsliste h3{margin:0 12px 6px;font-size:calc(var(--fs)*0.84);font-weight:600;
+  display:flex;justify-content:space-between;align-items:center}
+.nb-inhalt-zu{display:none;border:0;background:none;font:inherit;font-size:20px;line-height:1;
+  color:var(--grau);padding:0 2px;cursor:pointer}
+.nb-eintrag{display:flex;gap:9px;width:100%;text-align:left;border:0;background:none;font:inherit;
+  font-size:calc(var(--fs)*0.78);padding:5px 12px;color:var(--tinte);cursor:pointer}
+.nb-eintrag b{color:var(--weinrot);min-width:24px;text-align:right;font-weight:600}
+.nb-eintrag span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nb-eintrag.an{background:var(--papier)}
+.nb-inhalt-fuss{margin:8px 12px 0;padding-top:7px;border-top:1px solid var(--linie);
+  font-size:calc(var(--fs)*0.7);color:var(--grau)}
+.nb-inhalt-knopf{display:none;align-items:center;gap:7px;border:0;border-radius:20px;
+  background:var(--tinte);color:var(--karte);font:inherit;font-size:calc(var(--fs)*0.8);
+  padding:8px 14px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25)}
+.nb-inhalt-knopf span{opacity:.8;font-size:calc(var(--fs)*0.72)}
+#schirmFlaeche.nb-schwebend .nb-inhalt-knopf{display:inline-flex}
+#schirmFlaeche.nb-schwebend .nb-inhaltsliste{display:none;position:fixed;right:16px;
+  top:auto;bottom:136px;width:260px;max-width:calc(100% - 32px);max-height:55vh;overflow:auto;z-index:30;
+  box-shadow:0 8px 26px rgba(0,0,0,.22)}
+#schirmFlaeche.nb-schwebend .nb-inhaltsliste.offen{display:block}
+#schirmFlaeche.nb-schwebend .nb-inhalt-zu{display:block}
+/* Am Handy ist der Rand schmaler — über die Körperklasse, nicht über
+   eine Media-Abfrage (die Darstellung lässt sich von Hand festlegen). */
+body:not(.breit) .nb-blatt{grid-template-columns:56px minmax(0,1fr)}
+
 .vk-flaeche{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
   font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 10px;
   border:1px solid var(--linie);border-radius:20px;background:var(--karte);
@@ -1848,6 +1947,17 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="fl-springer" id="flaecheSpringer"></div>
 </div>
 
+<div class="schirm" id="schirmNotizbuecher">
+  <div class="vh-kopf">
+    <div class="vh-zeile">
+      <span class="nb-titel">Notizbücher</span>
+      <span class="vh-luecke"></span>
+      <span id="nbZahl"></span>
+    </div>
+  </div>
+  <div class="vhblatt" id="nbBlatt"></div>
+</div>
+
 <div class="schirm" id="schirmAblauf">
   <div class="vh-kopf">
     <div class="vh-zeile">
@@ -2246,6 +2356,10 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <button type="button" id="navVorhaben" onclick="zeigeSchirm('Vorhaben')">
     <svg viewBox="0 0 24 24"><path d="M12 3l2.5 6.3L21 10l-4.6 4.2 1.2 6.3L12 17.3 6.4 20.5l1.2-6.3L3 10l6.5-.7z"></path></svg><span>Vorhaben</span>
   </button>
+  <button type="button" id="navNotizbuecher" onclick="zeigeSchirm('Notizbuecher')">
+    <svg viewBox="0 0 24 24"><path d="M7 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7z"></path>
+      <path d="M7 3v18M4 7h5M4 12h5M4 17h5M11 8h5"></path></svg><span>Notizbücher</span>
+  </button>
 
 </div>
 
@@ -2256,7 +2370,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.5.0';
+var APP_VERSION = '5.6.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2281,7 +2395,7 @@ var GRABSTEIN_TAGE = 180;         /* so lange bleibt ein Löschvermerk erhalten 
    eine eigene Terminsammlung gibt es nicht mehr. */
 var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
                   'jahrestermine','ferien','einfaelle','gedanken','pinnwand',
-                  'kalenderzuordnung'];
+                  'kalenderzuordnung','notizbuecher','notizseiten'];
 
 function leereDatenbank() {
   return {
@@ -2298,6 +2412,8 @@ function leereDatenbank() {
     gedanken:          [],
     pinnwand:          [],
     kalenderzuordnung: {},
+    notizbuecher:      [],
+    notizseiten:       [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -7944,6 +8060,7 @@ function rueckgaengig() {
   aufZeichnen();
   abZeichnen();
   vhZeichnen();
+  nbZeichnen();
   zeichne();
   spaeterSichern();
   melde('Wiederhergestellt: ' + (satz.titel || satz.name), 'gut');
@@ -8641,7 +8758,8 @@ function zeigeSchirm(name) {
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
               'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Rueckblick',
-              'Planen', 'Routine', 'Ablauf', 'Pinnwand', 'Migration', 'Diagnose'];
+              'Planen', 'Routine', 'Ablauf', 'Pinnwand', 'Migration', 'Diagnose',
+              'Notizbuecher'];
   var i;
   for (i = 0; i < alle.length; i++) {
     var s = document.getElementById('schirm' + alle[i]);
@@ -8654,8 +8772,11 @@ function zeigeSchirm(name) {
          Die Diagnose erreicht man über das Zahnrad im Tag, also
          leuchtet dort der Tag. */
       var leuchtet = (alle[i] === name)
-                  || ((name === 'Flaeche' || name === 'Gedanken'
+                  || (((name === 'Flaeche' && !istNotizseite(flaecheFuer))
+                       || name === 'Gedanken'
                        || name === 'Taetigkeiten') && alle[i] === 'Vorhaben')
+                  || (name === 'Flaeche' && istNotizseite(flaecheFuer)
+                      && alle[i] === 'Notizbuecher')
                   || (name === 'Rueckblick' && alle[i] === 'Tag')
                   || (name === 'Planen' && alle[i] === 'Tag')
                   || (name === 'Routine' && alle[i] === 'Tag')
@@ -8676,6 +8797,7 @@ function zeigeSchirm(name) {
   if (name === 'Routine') { routineZeichnen(); }
   if (name === 'Ablauf') { abDetailNeu(); }
   if (name === 'Pinnwand') { pinnwandZeichnen(); }
+  if (name === 'Notizbuecher') { nbZeichnen(); }
   if (name === 'Tag') { tagZeichnen(); kalenderNachholen(); }
   if (name === 'Aufgaben') { aufZeichnen(); }
   if (name === 'Vorhaben') { vhZeichnen(); }
@@ -9071,7 +9193,8 @@ function zeichneBestand() {
   var namen = {
     aufgaben: 'Aufgaben', ziele: 'Ziele', themen: 'Themen', projekte: 'Projekte',
     ablaeufe: 'Abläufe', durchlaeufe: 'Durchläufe', jahrestermine: 'Jahrestermine',
-    kalenderzuordnung: 'Kalenderzuordnungen', termine: 'Berufliche Termine'
+    kalenderzuordnung: 'Kalenderzuordnungen', termine: 'Berufliche Termine',
+    notizbuecher: 'Notizbücher', notizseiten: 'Notizseiten'
   };
   var h = '';
   var i;
@@ -14417,6 +14540,11 @@ function vorgangZuFlaeche(id) {
 }
 
 function flaecheText(id) {
+  if (istNotizseite(id)) {
+    var nz = notizseiteZerlegen(id);
+    var ns = notizseiteFinden(nz.buchId, nz.nr);
+    return ns ? String(ns.text || '') : '';
+  }
   if (istVorgangsFlaeche(id)) {
     var d = vorgangZuFlaeche(id);
     return d ? String(d.flaeche || '') : '';
@@ -14430,6 +14558,10 @@ function flaecheText(id) {
 }
 
 function flaecheSetzen(id, text) {
+  if (istNotizseite(id)) {
+    notizseiteSchreiben(id, text);
+    return;
+  }
   if (istVorgangsFlaeche(id)) {
     var dv = vorgangZuFlaeche(id);
     if (!dv) { return; }
@@ -14453,6 +14585,10 @@ function flaecheSetzen(id, text) {
 }
 
 function flaecheName(id) {
+  if (istNotizseite(id)) {
+    var nbn = notizbuchFinden(notizseiteZerlegen(id).buchId);
+    return nbn ? (nbn.name || 'Notizbuch') : 'Notizbuch';
+  }
   if (istVorgangsFlaeche(id)) {
     var dn = vorgangZuFlaeche(id);
     return dn ? (dn.name || 'Vorgang') : 'Vorgang';
@@ -14998,6 +15134,7 @@ function flaecheAnsichtHtml(text, suche) {
 
 /* Ein Kästchen umschalten heißt: im Text ein Zeichen ändern. */
 function flaecheKastenUm(nr) {
+  if (nbGesperrt(flaecheFuer)) { return; }
   var zeilen = flaecheText(flaecheFuer).split('\n');
   if (nr < 0 || nr >= zeilen.length) { return; }
   var z = zeilen[nr];
@@ -15014,6 +15151,7 @@ function flaecheKastenUm(nr) {
    ------------------------------------------------------------ */
 
 function flaecheModusSetzen(m) {
+  if (m === 'schreiben' && nbGesperrt(flaecheFuer)) { m = 'ansicht'; }
   flaecheModus = m;
   flaecheZeichnen();
   if (m === 'schreiben') {
@@ -15339,11 +15477,16 @@ function flaecheOeffnen(id) {
   flaecheModus = 'ansicht';
   flaecheSuche = '';
   flaecheArt = {};
+  nbInhaltOffen = false;
   zeigeSchirm('Flaeche');
   flaecheZeichnen();
 }
 
 function flaecheZurueck() {
+  if (istNotizseite(flaecheFuer)) {
+    zeigeSchirm('Notizbuecher');
+    return;
+  }
   if (istFreie(flaecheFuer)) {
     zeigeSchirm('Gedanken');
     gedankenZeichnen();
@@ -15451,10 +15594,21 @@ function flaecheZeichnen() {
   var kopf = document.getElementById('flaecheKopf');
   if (!blatt) { return; }
   var text = flaecheText(flaecheFuer);
+  var nb = istNotizseite(flaecheFuer);
+  var schirmF = document.getElementById('schirmFlaeche');
+  if (schirmF && schirmF.classList) {
+    if (nb) { schirmF.classList.add('als-notizbuch'); }
+    else {
+      schirmF.classList.remove('als-notizbuch');
+      schirmF.classList.remove('nb-schwebend');
+    }
+  }
 
   if (kopf) {
     var k = '<div class="fl-kopf">';
-    if (istFreie(flaecheFuer)) {
+    if (nb) {
+      k += nbKopfHtml();
+    } else if (istFreie(flaecheFuer)) {
       k += '<input class="fl-name fl-namefeld" type="text" '
          + 'value="' + esc(flaecheName(flaecheFuer)) + '" placeholder="Titel" '
          + 'oninput="gedankeTitelSetzen(\'' + esc(String(flaecheFuer).slice(2))
@@ -15464,12 +15618,16 @@ function flaecheZeichnen() {
     }
     k += '<button class="sl-pille' + (flaecheModus === 'ansicht' ? ' an' : '')
        + '" type="button" onclick="flaecheModusSetzen(\'ansicht\')">Ansicht</button>';
-    k += '<button class="sl-pille' + (flaecheModus === 'schreiben' ? ' an' : '')
-       + '" type="button" onclick="flaecheModusSetzen(\'schreiben\')">Schreiben</button>';
-    k += '<button class="sl-pille' + (flaecheAnsEnde(flaecheFuer) ? ' an' : '')
-       + '" type="button" onclick="flaecheAnsEndeUm()" '
-       + 'title="Wo die Fläche beim Öffnen aufgeht">'
-       + (flaecheAnsEnde(flaecheFuer) ? 'ans Ende' : 'nach oben') + '</button>';
+    if (!nbGesperrt(flaecheFuer)) {
+      k += '<button class="sl-pille' + (flaecheModus === 'schreiben' ? ' an' : '')
+         + '" type="button" onclick="flaecheModusSetzen(\'schreiben\')">Schreiben</button>';
+    }
+    if (!nb) {
+      k += '<button class="sl-pille' + (flaecheAnsEnde(flaecheFuer) ? ' an' : '')
+         + '" type="button" onclick="flaecheAnsEndeUm()" '
+         + 'title="Wo die Fläche beim Öffnen aufgeht">'
+         + (flaecheAnsEnde(flaecheFuer) ? 'ans Ende' : 'nach oben') + '</button>';
+    }
     if (flaecheModus === 'ansicht' && flaecheHatUeberschriften()) {
       k += '<button class="sl-pille" type="button" onclick="flaecheAlleZu(true)" '
          + 'title="Alle Abschnitte einklappen">alles zu</button>';
@@ -15491,7 +15649,7 @@ function flaecheZeichnen() {
     k += '<button class="sl-pille' + (flaecheArt.datum ? ' an' : '') + '" type="button" '
        + 'onclick="flaecheArtUm(\'datum\')">Mit Datum</button>';
     k += '</div>';
-    k += pinKnopfHtml('flaeche', flaecheFuer);
+    if (!nb) { k += pinKnopfHtml('flaeche', flaecheFuer); }
     kopf.innerHTML = k;
   }
 
@@ -15500,13 +15658,14 @@ function flaecheZeichnen() {
     leiste.innerHTML = (flaecheModus === 'schreiben') ? flaecheLeisteHtml() : '';
   }
   var springer = document.getElementById('flaecheSpringer');
-  if (springer) { springer.innerHTML = flaecheSpringerHtml(); }
+  if (springer) { springer.innerHTML = nb ? nbInhaltKnopfHtml() : flaecheSpringerHtml(); }
 
   if (flaecheModus === 'schreiben') {
     var h = '';
     h += '<textarea class="fl-feld" id="flaecheFeld" spellcheck="false" '
        + 'oninput="flaecheGetippt(this.value)">' + esc(text) + '</textarea>';
-    blatt.innerHTML = h;
+    blatt.innerHTML = nb ? nbBuehneHtml(h) : h;
+    nbPlatzPruefen();
     return;
   }
 
@@ -15521,10 +15680,14 @@ function flaecheZeichnen() {
     vor = '<div class="fl-treffer">' + a.treffer
         + (a.treffer === 1 ? ' Zeile · ' : ' Zeilen · ') + was.join(' · ') + '</div>';
   }
-  blatt.innerHTML = vor + '<div class="fl-ansicht">' + a.html + '</div>';
+  var ansichtH = vor + '<div class="fl-ansicht">' + a.html + '</div>';
+  blatt.innerHTML = nb ? nbBuehneHtml(ansichtH) : ansichtH;
+  nbPlatzPruefen();
 
   /* Ans Ende springen, wenn diese Fläche es so hält. */
-  if (!flaecheSuche && flaecheAnsEnde(flaecheFuer)
+  /* Eine Notizseite ist ein festes Blatt — sie öffnet immer oben,
+     sonst rutschen Datum und Seitenzahl aus dem Blick. */
+  if (!nb && !flaecheSuche && flaecheAnsEnde(flaecheFuer)
       && typeof blatt.scrollHeight === 'number') {
     blatt.scrollTop = blatt.scrollHeight;
   }
@@ -15685,6 +15848,541 @@ function gedankenZeichnen() {
   var zahl = document.getElementById('gedankenZahl');
   if (zahl) {
     zahl.textContent = l.length + (l.length === 1 ? ' Fläche' : ' Flächen');
+  }
+}
+
+
+/* ============================================================
+   Notizbücher
+
+   Mehrere Notizbücher mit festen, nummerierten Seiten — keine
+   endlose Rolle. Eine Seite ist eine Fläche mit dem Vorsatz „n:"
+   (n:<Notizbuch>:<Seitennummer>) und benutzt denselben Editor, dieselbe
+   Leiste und dieselbe Suche wie jede andere Fläche. Neu ist nur das
+   Kleid: Karopapier, Rand, Seitenzahl, Blättern, Inhaltsverzeichnis.
+
+   Datenmodell:
+     notizbuecher  { id, name, farbe, zuordnungId, archiviert,
+                     archiviertAm, erstellt, geaendert }
+     notizseiten   { id, buchId, nr, text, angelegt, geaendert }
+   Jede Seite ist ein eigener Datensatz — so bleibt ein Konflikt im
+   Abgleich auf eine Seite begrenzt. Eine Seite entsteht erst, wenn
+   auf ihr etwas steht.
+   ============================================================ */
+
+var NB_SEITEN_MAX = 200;         /* danach wird das Archivieren vorgeschlagen */
+var NB_WARNUNG_AB = 180;         /* ab hier steht auf der Karte, wie viel noch frei ist */
+var NB_BLATT_BREITE = 640;       /* so breit wird eine Seite höchstens */
+var NB_INHALT_BREITE = 220 + 18; /* Verzeichnis plus Abstand */
+var NB_FARBEN = ['#8A0B22', '#19525A', '#2E3A66', '#56663A', '#9A6B1F', '#645F58'];
+
+var nbBearbeiten = '';           /* Kennung des Notizbuchs, das gerade bearbeitet wird */
+var nbArchivOffen = false;
+var nbInhaltOffen = false;
+
+function istNotizseite(id) {
+  return String(id).indexOf('n:') === 0;
+}
+
+function notizseitenKennung(buchId, nr) {
+  return 'n:' + buchId + ':' + nr;
+}
+
+function notizseiteZerlegen(id) {
+  var teile = String(id).slice(2).split(':');
+  var nr = parseInt(teile[1], 10);
+  return { buchId: teile[0] || '', nr: (nr >= 1) ? nr : 1 };
+}
+
+function notizbuchFinden(id) {
+  var l = DB.notizbuecher || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].id === id) { return l[i]; }
+  }
+  return null;
+}
+
+function notizseiteFinden(buchId, nr) {
+  var l = DB.notizseiten || [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].buchId === buchId && l[i].nr === nr) { return l[i]; }
+  }
+  return null;
+}
+
+/* Die Seiten eines Notizbuchs, auf denen etwas steht — nach Nummer. */
+function nbBeschriebeneSeiten(buchId) {
+  var l = DB.notizseiten || [];
+  var aus = [];
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (l[i].buchId === buchId && String(l[i].text || '').trim().length) { aus.push(l[i]); }
+  }
+  aus.sort(function (a, b) { return a.nr - b.nr; });
+  return aus;
+}
+
+/* Wie weit ist das Buch? Maßgeblich ist die höchste beschriebene Seite. */
+function nbStand(buchId) {
+  var seiten = nbBeschriebeneSeiten(buchId);
+  var hoechste = 0;
+  var zuletzt = null;
+  var i;
+  for (i = 0; i < seiten.length; i++) {
+    if (seiten[i].nr > hoechste) { hoechste = seiten[i].nr; }
+    if (!zuletzt || (seiten[i].geaendert || 0) > (zuletzt.geaendert || 0)) { zuletzt = seiten[i]; }
+  }
+  return { hoechste: hoechste, anzahl: seiten.length, zuletzt: zuletzt };
+}
+
+function nbGesperrt(id) {
+  if (!istNotizseite(id)) { return false; }
+  var b = notizbuchFinden(notizseiteZerlegen(id).buchId);
+  return !!(b && b.archiviert);
+}
+
+/* Schreiben auf eine Seite. Eine leere Seite wird erst angelegt,
+   wenn Text kommt — Blättern allein erzeugt keine Datensätze. */
+function notizseiteSchreiben(id, text) {
+  var z = notizseiteZerlegen(id);
+  var b = notizbuchFinden(z.buchId);
+  if (!b || b.archiviert) { return; }
+  if (!Array.isArray(DB.notizseiten)) { DB.notizseiten = []; }
+  var seite = notizseiteFinden(z.buchId, z.nr);
+  if (!seite) {
+    if (!String(text || '').length) { return; }
+    seite = { id: neueKennung(), buchId: z.buchId, nr: z.nr, text: '',
+              angelegt: isoDatum(), geaendert: 0 };
+    DB.notizseiten.push(seite);
+  }
+  seite.text = text;
+  seite.geaendert = jetzt();
+  spaeterSichern();
+}
+
+/* ------------------------------------------------------------
+   Anlegen, Bearbeiten, Archivieren
+   ------------------------------------------------------------ */
+
+function nbAnlegen() {
+  if (!Array.isArray(DB.notizbuecher)) { DB.notizbuecher = []; }
+  var n = DB.notizbuecher.length;
+  var b = { id: neueKennung(), name: 'Notizbuch ' + (n + 1),
+            farbe: NB_FARBEN[n % NB_FARBEN.length], zuordnungId: '',
+            archiviert: false, archiviertAm: '', erstellt: isoDatum(), geaendert: jetzt() };
+  DB.notizbuecher.push(b);
+  nbBearbeiten = b.id;
+  spaeterSichern();
+  nbZeichnen();
+}
+
+/* „Arbeit Band 3" wird zu „Arbeit Band 4", alles andere bekommt „Band 2". */
+function nbFolgename(name) {
+  var t = String(name || 'Notizbuch').trim();
+  var m = t.match(/^(.*?\bBand\s*)(\d+)$/i);
+  if (m) { return m[1] + (parseInt(m[2], 10) + 1); }
+  return t + ' Band 2';
+}
+
+function nbNeuerBand(id) {
+  var alt = notizbuchFinden(id);
+  if (!alt) { return; }
+  var b = { id: neueKennung(), name: nbFolgename(alt.name), farbe: alt.farbe,
+            zuordnungId: alt.zuordnungId || '', archiviert: false, archiviertAm: '',
+            erstellt: isoDatum(), geaendert: jetzt() };
+  DB.notizbuecher.push(b);
+  spaeterSichern();
+  melde('Angelegt: ' + b.name, 'gut');
+  nbZeichnen();
+}
+
+function nbBearbeitenUm(id) {
+  nbBearbeiten = (nbBearbeiten === id) ? '' : id;
+  nbZeichnen();
+}
+
+function nbFeldSetzen(id, feld, wert) {
+  var b = notizbuchFinden(id);
+  if (!b) { return; }
+  if (feld !== 'name' && feld !== 'farbe' && feld !== 'zuordnungId') { return; }
+  b[feld] = String(wert || '');
+  b.geaendert = jetzt();
+  spaeterSichern();
+  /* Beim Tippen des Namens nicht neu zeichnen — sonst springt die Marke. */
+  if (feld !== 'name') { nbZeichnen(); }
+}
+
+function nbArchivieren(id) {
+  var b = notizbuchFinden(id);
+  if (!b) { return; }
+  b.archiviert = true;
+  b.archiviertAm = isoDatum();
+  b.geaendert = jetzt();
+  if (nbBearbeiten === id) { nbBearbeiten = ''; }
+  spaeterSichern();
+  melde('Archiviert: ' + b.name, 'gut');
+  nbZeichnen();
+}
+
+function nbZurueckholen(id) {
+  var b = notizbuchFinden(id);
+  if (!b) { return; }
+  b.archiviert = false;
+  b.archiviertAm = '';
+  b.geaendert = jetzt();
+  spaeterSichern();
+  melde('Zurückgeholt: ' + b.name, 'gut');
+  nbZeichnen();
+}
+
+/* Löschen nur, solange nichts darin steht — ein beschriebenes
+   Notizbuch wird archiviert, nicht weggeworfen. */
+function nbLoeschen(id) {
+  var b = notizbuchFinden(id);
+  if (!b) { return; }
+  if (nbStand(id).anzahl > 0) {
+    melde('Ein beschriebenes Notizbuch lässt sich nur archivieren.', 'warn');
+    return;
+  }
+  var leere = (DB.notizseiten || []).filter(function (s) { return s.buchId === id; });
+  var j;
+  for (j = 0; j < leere.length; j++) {
+    DB.notizseiten.splice(DB.notizseiten.indexOf(leere[j]), 1);
+    grabsteinSetzen('notizseiten', leere[j].id);
+  }
+  var stelle = DB.notizbuecher.indexOf(b);
+  zurueckHolen = { sammlung: 'notizbuecher', satz: b, stelle: stelle };
+  DB.notizbuecher.splice(stelle, 1);
+  grabsteinSetzen('notizbuecher', b.id);
+  nbBearbeiten = '';
+  spaeterSichern();
+  rueckZeigen(b.name);
+  nbZeichnen();
+}
+
+/* Ein Notizbuch öffnet dort, wo zuletzt geschrieben wurde. */
+function nbOeffnen(id) {
+  var st = nbStand(id);
+  var nr = st.zuletzt ? st.zuletzt.nr : 1;
+  flaecheOeffnen(notizseitenKennung(id, nr));
+}
+
+function nbArchivUm() {
+  nbArchivOffen = !nbArchivOffen;
+  nbZeichnen();
+}
+
+/* ------------------------------------------------------------
+   Zuordnung zu einem Thema oder Projekt (freiwillig)
+   ------------------------------------------------------------ */
+
+function nbZuordnungText(b) {
+  var id = b ? (b.zuordnungId || '') : '';
+  if (!id) { return 'Ohne Zuordnung'; }
+  var p = projektFinden(id);
+  if (p) { return 'Projekt ' + (p.name || 'ohne Namen'); }
+  var t = (DB.themen || []).filter(function (x) { return x.id === id; })[0];
+  if (t) { return 'Thema ' + (t.name || 'ohne Namen'); }
+  return 'Ohne Zuordnung';
+}
+
+function nbZuordnungOptionen(b) {
+  var gewaehlt = b.zuordnungId || '';
+  var opt = function (id, name) {
+    return '<option value="' + esc(id) + '"' + (id === gewaehlt ? ' selected' : '') + '>'
+         + esc(name || 'ohne Namen') + '</option>';
+  };
+  var nachName = function (a, c) { return String(a.name || '').localeCompare(String(c.name || ''), 'de'); };
+  var h = opt('', 'Ohne Zuordnung');
+  var themen = (DB.themen || []).slice().sort(nachName);
+  var projekte = (DB.projekte || []).filter(function (p) { return p.status !== 'erledigt'; }).sort(nachName);
+  var i;
+  if (themen.length) {
+    h += '<optgroup label="Themen">';
+    for (i = 0; i < themen.length; i++) { h += opt(themen[i].id, themen[i].name); }
+    h += '</optgroup>';
+  }
+  if (projekte.length) {
+    h += '<optgroup label="Projekte">';
+    for (i = 0; i < projekte.length; i++) { h += opt(projekte[i].id, projekte[i].name); }
+    h += '</optgroup>';
+  }
+  return h;
+}
+
+/* ------------------------------------------------------------
+   Die Übersicht
+   ------------------------------------------------------------ */
+
+function nbKarteHtml(b) {
+  var st = nbStand(b.id);
+  var kennung = esc(b.id);
+  var stil = ' style="--nb-farbe:' + esc(b.farbe || NB_FARBEN[0]) + '"';
+
+  if (nbBearbeiten === b.id) {
+    var farben = '';
+    var i;
+    for (i = 0; i < NB_FARBEN.length; i++) {
+      farben += '<button type="button" class="nb-farbe' + (b.farbe === NB_FARBEN[i] ? ' an' : '') + '" '
+              + 'style="background:' + NB_FARBEN[i] + '" aria-label="Farbe ' + (i + 1) + '" '
+              + 'onclick="nbFeldSetzen(\'' + kennung + '\',\'farbe\',\'' + NB_FARBEN[i] + '\')"></button>';
+    }
+    return '<div class="nb-karte nb-bearbeiten"' + stil + '>'
+         + '<span class="nb-ruecken"></span>'
+         + '<label for="nbName">Name</label>'
+         + '<input id="nbName" type="text" value="' + esc(b.name) + '" '
+         + 'oninput="nbFeldSetzen(\'' + kennung + '\',\'name\',this.value)">'
+         + '<label>Farbe</label><div class="nb-farben">' + farben + '</div>'
+         + '<label for="nbZuordnung">Zuordnung</label>'
+         + '<select id="nbZuordnung" onchange="nbFeldSetzen(\'' + kennung + '\',\'zuordnungId\',this.value)">'
+         + nbZuordnungOptionen(b) + '</select>'
+         + '<div class="nb-aktionen">'
+         + '<button type="button" class="sl-pille an" onclick="nbBearbeitenUm(\'' + kennung + '\')">Fertig</button>'
+         + (st.anzahl
+            ? '<button type="button" class="sl-pille" onclick="nbArchivieren(\'' + kennung + '\')">Archivieren</button>'
+            : '<button type="button" class="sl-pille" onclick="nbLoeschen(\'' + kennung + '\')">Löschen</button>')
+         + '</div></div>';
+  }
+
+  var prozent = Math.min(100, Math.round(st.hoechste / NB_SEITEN_MAX * 100));
+  var zuletzt = st.zuletzt
+    ? 'Zuletzt: Seite ' + st.zuletzt.nr + ', ' + tagKurz(st.zuletzt.geaendert)
+    : 'Noch nichts geschrieben';
+  var zusatz = '';
+  var voll = st.hoechste >= NB_SEITEN_MAX;
+  if (voll) {
+    zusatz = '<div class="nb-hinweis">Das Notizbuch ist voll.</div>'
+           + '<div class="nb-aktionen">'
+           + '<button type="button" class="sl-pille an" onclick="event.stopPropagation();'
+           + 'nbArchivieren(\'' + kennung + '\')">Archivieren</button>'
+           + '<button type="button" class="sl-pille" onclick="event.stopPropagation();'
+           + 'nbNeuerBand(\'' + kennung + '\')">Neuen Band anlegen</button></div>';
+  } else if (st.hoechste >= NB_WARNUNG_AB) {
+    zusatz = '<div class="nb-hinweis">Noch ' + (NB_SEITEN_MAX - st.hoechste) + ' Seiten frei.</div>';
+  }
+  return '<div class="nb-karte' + (voll ? ' voll' : '') + '"' + stil + ' '
+       + 'onclick="nbOeffnen(\'' + kennung + '\')">'
+       + '<span class="nb-ruecken"></span>'
+       + '<button type="button" class="nb-mehr" title="Bearbeiten" aria-label="Notizbuch bearbeiten" '
+       + 'onclick="event.stopPropagation();nbBearbeitenUm(\'' + kennung + '\')">⋯</button>'
+       + '<div class="nb-name">' + esc(b.name || 'Notizbuch') + '</div>'
+       + '<div class="nb-zuordnung">' + esc(nbZuordnungText(b)) + '</div>'
+       + '<div class="nb-stand"><b>' + st.hoechste + '</b> von ' + NB_SEITEN_MAX + ' Seiten</div>'
+       + '<div class="nb-balken"><span style="width:' + prozent + '%"></span></div>'
+       + '<div class="nb-zuletzt">' + esc(zuletzt) + '</div>'
+       + zusatz
+       + '</div>';
+}
+
+/* „heute", „gestern" oder das Datum — aus einem Zeitstempel. */
+function tagKurz(stempel) {
+  if (!stempel) { return ''; }
+  var d = new Date(stempel);
+  var is = d.getFullYear() + '-' + zwei(d.getMonth() + 1) + '-' + zwei(d.getDate());
+  if (is === isoDatum()) { return 'heute'; }
+  if (is === tagePlus(isoDatum(), -1)) { return 'gestern'; }
+  return zwei(d.getDate()) + '.' + zwei(d.getMonth() + 1) + '.';
+}
+
+function nbZeichnen() {
+  var blatt = document.getElementById('nbBlatt');
+  if (!blatt) { return; }
+  var alle = DB.notizbuecher || [];
+  var aktiv = alle.filter(function (b) { return !b.archiviert; });
+  var archiv = alle.filter(function (b) { return !!b.archiviert; });
+
+  var h = '<button class="neu-zeile" type="button" onclick="nbAnlegen()">'
+        + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>'
+        + 'Neues Notizbuch</button>';
+  var i;
+  if (aktiv.length) {
+    h += '<div class="nb-regal">';
+    for (i = 0; i < aktiv.length; i++) { h += nbKarteHtml(aktiv[i]); }
+    h += '</div>';
+  } else {
+    h += '<div class="tleer" style="padding-left:0">Noch kein Notizbuch. Leg eines an.</div>';
+  }
+
+  if (archiv.length) {
+    h += '<div class="vh-gruppe"><span>Archiv · ' + archiv.length + '</span>'
+       + '<button type="button" class="sl-pille" onclick="nbArchivUm()">'
+       + (nbArchivOffen ? 'ausblenden' : 'einblenden') + '</button></div>';
+    if (nbArchivOffen) {
+      h += '<div class="nb-archiv">';
+      for (i = 0; i < archiv.length; i++) {
+        var st = nbStand(archiv[i].id);
+        var k = esc(archiv[i].id);
+        h += '<div class="nb-archiv-zeile">'
+           + '<span class="nb-archiv-name"><b>' + esc(archiv[i].name || 'Notizbuch') + '</b><br>'
+           + '<span class="nb-archiv-info">' + st.hoechste + ' Seiten'
+           + (archiv[i].archiviertAm ? ', archiviert am ' + esc(kurzDatumIso(archiv[i].archiviertAm)) : '')
+           + '</span></span>'
+           + '<button type="button" class="sl-pille" onclick="nbOeffnen(\'' + k + '\')">Lesen</button>'
+           + '<button type="button" class="sl-pille" onclick="nbZurueckholen(\'' + k + '\')">Zurückholen</button>'
+           + '</div>';
+      }
+      h += '</div>';
+    }
+  }
+
+  blatt.innerHTML = h;
+  var zahl = document.getElementById('nbZahl');
+  if (zahl) {
+    zahl.textContent = aktiv.length + (aktiv.length === 1 ? ' Notizbuch' : ' Notizbücher');
+  }
+  if (nbBearbeiten) {
+    var feld = document.getElementById('nbName');
+    if (feld && feld.focus && document.activeElement !== feld) { feld.focus(); }
+  }
+}
+
+/* 2026-10-01 → 01.10.2026 */
+function kurzDatumIso(is) {
+  var m = String(is || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '.' + m[2] + '.' + m[1]) : String(is || '');
+}
+
+/* ------------------------------------------------------------
+   Die Seite: Kopf, Blättern, Blatt, Inhaltsverzeichnis
+   ------------------------------------------------------------ */
+
+/* Bis zur ersten freien Seite nach der letzten beschriebenen darf man
+   blättern — nicht weiter, sonst entstünden Lücken. Im Archiv nur
+   durch das, was es gibt. */
+function nbLetzteErreichbare(buchId) {
+  var b = notizbuchFinden(buchId);
+  var hoechste = nbStand(buchId).hoechste;
+  if (b && b.archiviert) { return Math.max(1, hoechste); }
+  return Math.min(NB_SEITEN_MAX, hoechste + 1);
+}
+
+function nbKopfHtml() {
+  var z = notizseiteZerlegen(flaecheFuer);
+  var grenze = nbLetzteErreichbare(z.buchId);
+  var h = '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
+  if (nbGesperrt(flaecheFuer)) { h += '<span class="nb-gesperrt">archiviert</span>'; }
+  h += '<span class="nb-blaettern">'
+     + '<button type="button" onclick="nbBlaettern(-1)" aria-label="Vorige Seite"'
+     + (z.nr <= 1 ? ' disabled' : '') + '>‹</button>'
+     + '<span class="nb-seite">Seite ' + z.nr + '</span>'
+     + '<button type="button" onclick="nbBlaettern(1)" aria-label="Nächste Seite"'
+     + (z.nr >= grenze ? ' disabled' : '') + '>›</button>'
+     + '</span>';
+  return h;
+}
+
+function nbSpringen(nr) {
+  if (!istNotizseite(flaecheFuer)) { return; }
+  var z = notizseiteZerlegen(flaecheFuer);
+  var ziel = parseInt(nr, 10);
+  if (!(ziel >= 1) || ziel > nbLetzteErreichbare(z.buchId)) { return; }
+  flaecheFuer = notizseitenKennung(z.buchId, ziel);
+  flaecheSuche = '';
+  nbInhaltOffen = false;
+  /* Wer beim Schreiben blättert, schreibt auf der neuen Seite weiter. */
+  flaecheModusSetzen(flaecheModus);
+}
+
+function nbBlaettern(richtung) {
+  if (!istNotizseite(flaecheFuer)) { return; }
+  var z = notizseiteZerlegen(flaecheFuer);
+  var ziel = z.nr + richtung;
+  if (ziel > NB_SEITEN_MAX) {
+    melde('Das Notizbuch ist voll. In der Übersicht kannst du es archivieren und einen neuen Band anlegen.', null);
+    return;
+  }
+  nbSpringen(ziel);
+}
+
+/* Titel einer Seite für das Verzeichnis: die erste Zeile mit Inhalt. */
+function nbSeitentitel(seite) {
+  var t = flaecheVorschau(seite ? seite.text : '');
+  return t.length > 44 ? t.slice(0, 43) + '…' : (t || 'ohne Titel');
+}
+
+function nbInhaltHtml() {
+  var z = notizseiteZerlegen(flaecheFuer);
+  var seiten = nbBeschriebeneSeiten(z.buchId);
+  var h = '<aside class="nb-inhaltsliste' + (nbInhaltOffen ? ' offen' : '') + '" id="nbInhalt">'
+        + '<h3>Inhalt <button type="button" class="nb-inhalt-zu" onclick="nbInhaltZu()" '
+        + 'aria-label="Inhalt schließen">×</button></h3>';
+  var i;
+  if (!seiten.length) {
+    h += '<div class="nb-inhalt-fuss" style="border-top:0;margin-top:0">Noch keine beschriebene Seite.</div>';
+  }
+  for (i = 0; i < seiten.length; i++) {
+    h += '<button type="button" class="nb-eintrag' + (seiten[i].nr === z.nr ? ' an' : '') + '" '
+       + 'onclick="nbSpringen(' + seiten[i].nr + ')"><b>' + seiten[i].nr + '</b>'
+       + '<span>' + esc(nbSeitentitel(seiten[i])) + '</span></button>';
+  }
+  var frei = NB_SEITEN_MAX - nbStand(z.buchId).hoechste;
+  h += '<div class="nb-inhalt-fuss">' + frei + (frei === 1 ? ' Seite' : ' Seiten') + ' frei. Bei '
+     + NB_SEITEN_MAX + ' Seiten wird das Archivieren vorgeschlagen.</div>';
+  h += '</aside>';
+  return h;
+}
+
+function nbInhaltKnopfHtml() {
+  var z = notizseiteZerlegen(flaecheFuer);
+  return '<button type="button" class="nb-inhalt-knopf" id="nbInhaltKnopf" onclick="nbInhaltUm()" '
+       + 'aria-expanded="' + (nbInhaltOffen ? 'true' : 'false') + '" aria-controls="nbInhalt">'
+       + '☰ Inhalt <span>S. ' + z.nr + '</span></button>';
+}
+
+/* Das Blatt um den Inhalt der Fläche: Rand links, Seitenzahl oben rechts. */
+function nbBuehneHtml(inhalt) {
+  var z = notizseiteZerlegen(flaecheFuer);
+  var seite = notizseiteFinden(z.buchId, z.nr);
+  var datum = (seite && seite.angelegt) ? langDatum(seite.angelegt) : '';
+  return '<div class="nb-buehne">'
+       + '<div class="nb-blatt"><div class="nb-rand"></div>'
+       + '<div class="nb-inhalt">'
+       + '<span class="nb-datum">' + esc(datum) + '</span>'
+       + '<span class="nb-seitenzahl">' + z.nr + '</span>'
+       + inhalt
+       + '</div></div>'
+       + nbInhaltHtml()
+       + '</div>';
+}
+
+/* Das Verzeichnis zeigt sich nur um, ohne die Fläche neu zu zeichnen —
+   sonst verlöre ein Textfeld beim Schreiben die Marke. */
+function nbInhaltSetzen(offen) {
+  nbInhaltOffen = !!offen;
+  var liste = document.getElementById('nbInhalt');
+  if (liste && liste.classList) {
+    if (nbInhaltOffen) { liste.classList.add('offen'); } else { liste.classList.remove('offen'); }
+  }
+  var knopf = document.getElementById('nbInhaltKnopf');
+  if (knopf && knopf.setAttribute) { knopf.setAttribute('aria-expanded', nbInhaltOffen ? 'true' : 'false'); }
+}
+
+function nbInhaltUm() {
+  nbInhaltSetzen(!nbInhaltOffen);
+}
+
+function nbInhaltZu() {
+  nbInhaltSetzen(false);
+}
+
+/* Passt das Verzeichnis nicht mehr neben die Seite, schwebt es. */
+function nbPlatzPruefen() {
+  var schirm = document.getElementById('schirmFlaeche');
+  var blatt = document.getElementById('flaecheBlatt');
+  if (!schirm || !schirm.classList || !blatt) { return; }
+  if (!istNotizseite(flaecheFuer)) {
+    schirm.classList.remove('nb-schwebend');
+    return;
+  }
+  var breite = blatt.clientWidth || 0;
+  if (!breite) { return; }
+  if (breite < NB_BLATT_BREITE + NB_INHALT_BREITE) {
+    schirm.classList.add('nb-schwebend');
+  } else {
+    schirm.classList.remove('nb-schwebend');
+    if (nbInhaltOffen) { nbInhaltSetzen(false); }
   }
 }
 
@@ -19372,11 +20070,13 @@ function starten() {
   else if (wunsch === 'aufgaben') { zeigeSchirm('Aufgaben'); }
   else if (wunsch === 'vorhaben') { zeigeSchirm('Vorhaben'); }
   else if (wunsch === 'ablaeufe') { zeigeSchirm('Ablaeufe'); }
+  else if (wunsch === 'notizbuecher') { zeigeSchirm('Notizbuecher'); }
 
   document.addEventListener('visibilitychange', rueckkehrPruefen);
   window.addEventListener('focus', anmeldeStreifenPruefen);
   window.addEventListener('focus', erneuerungPruefen);
   window.addEventListener('resize', darstellungAnwenden);
+  window.addEventListener('resize', nbPlatzPruefen);
   wischenAnmelden();
   window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();

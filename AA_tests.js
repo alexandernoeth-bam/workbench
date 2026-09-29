@@ -245,9 +245,12 @@ console.log('\n6. Datenmodell');
   const skript = hauptSkript();
   /* „termine" ist mit v0.15.0 entfallen: berufliche Termine stehen im
      Google-Kalender, eine zweite Wahrheit soll es nicht geben. */
+  /* Seit v5.6.0 kommen die Notizbücher und ihre Seiten hinzu — jede
+     Seite ein eigener Datensatz, damit der Abgleich seitenweise mischt. */
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
                     'durchlaeufe', 'jahrestermine', 'ferien', 'einfaelle',
-                    'gedanken', 'pinnwand', 'kalenderzuordnung'];
+                    'gedanken', 'pinnwand', 'kalenderzuordnung',
+                    'notizbuecher', 'notizseiten'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -587,6 +590,50 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     bl(540, 600, \'Erst\'), bl(550, 610, \'Zweit\'),'
                  + '     bl(560, 620, \'Dritt\')]).map(function(b){'
                  + '       return b.titel; }).join(\',\');'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__notizbuchApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank(); var r = {};'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0];'
+                 + '   r.angelegt = DB.notizbuecher.length === 1 && b.name === "Notizbuch 1" && !b.archiviert;'
+                 + '   var id = notizseitenKennung(b.id, 1); var z = notizseiteZerlegen(id);'
+                 + '   r.kennung = istNotizseite(id) && !istNotizseite("g:x") && z.nr === 1 && z.buchId === b.id;'
+                 + '   flaecheSetzen(notizseitenKennung(b.id, 2), "");'
+                 + '   r.leerKeinSatz = DB.notizseiten.length === 0;'
+                 + '   flaecheSetzen(id, "# Lenkungskreis\\n[] Risikoliste schicken");'
+                 + '   r.geschrieben = DB.notizseiten.length === 1'
+                 + '     && flaecheText(id).indexOf("Risikoliste") > 0 && DB.notizseiten[0].nr === 1;'
+                 + '   r.name = flaecheName(id);'
+                 + '   r.stand = nbStand(b.id).hoechste; r.grenze = nbLetzteErreichbare(b.id);'
+                 + '   flaecheFuer = id; flaecheModus = "ansicht";'
+                 + '   nbBlaettern(1); var n1 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbBlaettern(1); var n2 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbBlaettern(-1); nbBlaettern(-1); var n3 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   r.blaettern = n1 + "," + n2 + "," + n3;'
+                 + '   r.titel = nbSeitentitel(notizseiteFinden(b.id, 1));'
+                 + '   r.folge = nbFolgename("Arbeit Band 3") + "|" + nbFolgename("Ideen");'
+                 + '   flaecheFuer = id; flaecheZeichnen();'
+                 + '   var blattHtml = document.getElementById("flaecheBlatt").innerHTML;'
+                 + '   r.kleid = /nb-blatt/.test(blattHtml) && /nb-seitenzahl">1</.test(blattHtml)'
+                 + '     && /nb-inhaltsliste/.test(blattHtml);'
+                 + '   nbArchivieren(b.id);'
+                 + '   r.gesperrt = nbGesperrt(id);'
+                 + '   flaecheSetzen(id, "ueberschrieben");'
+                 + '   r.schreibschutz = flaecheText(id).indexOf("Risikoliste") > 0;'
+                 + '   flaecheModusSetzen("schreiben"); r.keinSchreiben = flaecheModus === "ansicht";'
+                 + '   r.archivGrenze = nbLetzteErreichbare(b.id);'
+                 + '   nbZurueckholen(b.id); r.zurueck = !b.archiviert;'
+                 + '   nbLoeschen(b.id); r.beschriebenBleibt = DB.notizbuecher.length === 1;'
+                 + '   nbAnlegen(); var leer = DB.notizbuecher[1]; nbLoeschen(leer.id);'
+                 + '   r.leerGeloescht = DB.notizbuecher.length === 1 && DB.grabsteine.some(function(g){'
+                 + '     return g.s === "notizbuecher" && g.id === leer.id; });'
+                 + '   var fremd = leereDatenbank();'
+                 + '   fremd.notizseiten = [{ id: "fremd1", buchId: b.id, nr: 2, text: "von woanders",'
+                 + '     angelegt: "2026-09-30", geaendert: jetzt() + 1000 }];'
+                 + '   var erg = zusammenfuehren(DB, fremd);'
+                 + '   r.abgleich = erg.db.notizseiten.length === 2 && erg.db.notizbuecher.length === 1;'
+                 + '   DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
@@ -11580,8 +11627,9 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
   const w = globalThis.__weitApi;
 
   const leiste = [...QUELLE.matchAll(/id="nav(\w+)"/g)].map(m => m[1]);
-  pruefe(leiste.join(',') === 'Tag,Pinnwand,Kalender,Aufgaben,Vorhaben',
-         'die Leiste führt vom Tag über das Kurzfristige zum Langfristigen');
+  /* Seit v5.6.0 stehen die Notizbücher als eigener Bereich am Ende. */
+  pruefe(leiste.join(',') === 'Tag,Pinnwand,Kalender,Aufgaben,Vorhaben,Notizbuecher',
+         'die Leiste führt vom Tag über das Kurzfristige zum Langfristigen, dann die Notizbücher');
   pruefe(/id="stufeAufgaben"/.test(QUELLE) && /id="stufeAblaeufe"/.test(QUELLE),
          'Abläufe sind ein Reiter innerhalb der Aufgaben');
   const zs = skript.match(/function zeigeSchirm\([\s\S]*?\n\}\n/);
@@ -12586,6 +12634,80 @@ console.log('\n141. Prüfumgebung');
          'jede Prüf-Schnittstelle trägt einen eigenen Namen'
          + (doppelt.length ? (' — doppelt: ' + doppelt.join(', ')) : ''));
   pruefe(namen.length > 20, 'es gibt sie in nennenswerter Zahl');
+}
+
+/* ============================================================
+   143. Notizbücher
+   Grund: Mit v5.6.0 kam ein eigener Bereich mit festen Seiten. Er
+   benutzt den Editor der Gedankenfläche mit — geht die Anbindung über
+   den Vorsatz „n:" verloren, schreibt man ins Leere oder in eine
+   fremde Fläche, und das merkt man erst, wenn der Text fehlt.
+   ============================================================ */
+console.log('\n143. Notizbücher');
+{
+  const skript = hauptSkript();
+  const nb = globalThis.__notizbuchApi;
+
+  pruefe(/id="navNotizbuecher"/.test(QUELLE) && /id="schirmNotizbuecher"/.test(QUELLE),
+         'der Bereich hat einen Knopf in der Leiste und einen eigenen Bildschirm');
+  ['istNotizseite', 'notizseitenKennung', 'notizseiteZerlegen', 'notizbuchFinden',
+   'notizseiteFinden', 'notizseiteSchreiben', 'nbStand', 'nbGesperrt', 'nbAnlegen',
+   'nbArchivieren', 'nbZurueckholen', 'nbLoeschen', 'nbNeuerBand', 'nbZeichnen',
+   'nbBlaettern', 'nbSpringen', 'nbBuehneHtml', 'nbInhaltHtml', 'nbPlatzPruefen'
+  ].forEach(function (n) {
+    pruefe(new RegExp('function\\s+' + n + '\\s*\\(').test(skript), 'Funktion ' + n + ' ist definiert');
+  });
+
+  /* Die Flächen-Funktionen kennen den Vorsatz — sonst ginge der Text
+     an ein Vorhaben gleicher Kennung. */
+  ['flaecheText', 'flaecheSetzen', 'flaecheName'].forEach(function (n) {
+    const f = skript.match(new RegExp('function ' + n + '\\([\\s\\S]*?\\n\\}'));
+    pruefe(f && /istNotizseite\(id\)/.test(f[0]), n + ' behandelt Notizseiten eigens');
+  });
+  const zeichnen = skript.match(/function flaecheZeichnen\([\s\S]*?\n\}/);
+  pruefe(zeichnen && (zeichnen[0].match(/nbBuehneHtml\(/g) || []).length === 2,
+         'Ansicht und Schreiben stehen beide im Notizbuch-Kleid');
+  pruefe((QUELLE.match(/id="flaecheFeld"/g) || []).length === 1,
+         'es gibt genau ein Schreibfeld — der Editor ist mitbenutzt, nicht kopiert');
+  const schirm = skript.match(/function zeigeSchirm\([\s\S]*?\n\}/);
+  pruefe(schirm && /istNotizseite\(flaecheFuer\)[\s\S]*?'Notizbuecher'/.test(schirm[0]),
+         'auf einer Notizseite leuchtet in der Leiste das Notizbuch, nicht Vorhaben');
+  const kasten = skript.match(/function flaecheKastenUm\([\s\S]*?\n\}/);
+  pruefe(kasten && /nbGesperrt\(flaecheFuer\)/.test(kasten[0]),
+         'im Archiv lassen sich keine Kästchen umschalten');
+  pruefe(!/@media/.test(QUELLE), 'auch die Notizbücher kommen ohne Media-Abfrage aus');
+  /* Das Verzeichnis klebt am PC oben (sticky, top:0). Schwebt es, muss
+     top zurückgesetzt werden — sonst hängt es am oberen Rand statt über
+     seinem Knopf. */
+  const schwebeRegel = QUELLE.match(/#schirmFlaeche\.nb-schwebend \.nb-inhaltsliste\{[^}]*\}/);
+  pruefe(schwebeRegel && /top:auto/.test(schwebeRegel[0]) && /bottom:/.test(schwebeRegel[0]),
+         'das schwebende Verzeichnis hängt unten über seinem Knopf, nicht am oberen Rand');
+  pruefe(zeichnen && /!nb && !flaecheSuche && flaecheAnsEnde\(flaecheFuer\)/.test(zeichnen[0]),
+         'eine Notizseite öffnet oben — nicht am Ende wie eine Gedankenfläche');
+
+  if (!nb) {
+    warn('Notizbuch-Funktionen nicht auswertbar');
+  } else {
+    const e = nb.pruefe();
+    pruefe(e.angelegt === true, 'ein neues Notizbuch bekommt einen Namen und ist nicht archiviert');
+    pruefe(e.kennung === true, 'die Kennung n:<Buch>:<Seite> lässt sich hin und zurück lesen');
+    pruefe(e.leerKeinSatz === true, 'Blättern auf eine leere Seite legt keinen Datensatz an');
+    pruefe(e.geschrieben === true, 'geschriebener Text landet als Seite im Notizbuch');
+    pruefe(e.name === 'Notizbuch 1', 'die Fläche trägt den Namen des Notizbuchs');
+    pruefe(e.stand === 1 && e.grenze === 2, 'man kann bis zur ersten freien Seite blättern');
+    pruefe(e.blaettern === '2,2,1', 'über die erste freie Seite hinaus geht es nicht, zurück schon');
+    pruefe(e.titel === 'Lenkungskreis', 'das Verzeichnis nimmt die erste Zeile ohne Zeichen');
+    pruefe(e.folge === 'Arbeit Band 4|Ideen Band 2', 'ein neuer Band zählt weiter');
+    pruefe(e.kleid === true, 'die Seite trägt Blatt, Seitenzahl und Verzeichnis');
+    pruefe(e.gesperrt === true && e.schreibschutz === true,
+           'ein archiviertes Notizbuch lässt sich lesen, aber nicht beschreiben');
+    pruefe(e.keinSchreiben === true, 'im Archiv gibt es keinen Schreibmodus');
+    pruefe(e.archivGrenze === 1, 'im Archiv blättert man nur durch Beschriebenes');
+    pruefe(e.zurueck === true, 'ein archiviertes Notizbuch lässt sich zurückholen');
+    pruefe(e.beschriebenBleibt === true, 'ein beschriebenes Notizbuch lässt sich nicht löschen');
+    pruefe(e.leerGeloescht === true, 'ein leeres wird gelöscht und bekommt einen Löschvermerk');
+    pruefe(e.abgleich === true, 'der Abgleich mischt Seiten einzeln');
+  }
 }
 
 /* ============================================================
