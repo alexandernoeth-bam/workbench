@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.8.0</title>
+<title>Workbench 5.9.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1246,6 +1246,27 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 .nb-wende .nb-blatt,.nb-wende .nb-deckel{position:absolute;top:0;left:0}
 .nb-wende-schatten{position:absolute;inset:0;pointer-events:none;opacity:0;
   background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(0,0,0,.02))}
+
+/* ---------- Notizbücher 5.9.0: Lesebänder ---------- */
+.nb-baender{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+.nb-band-chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:calc(var(--fs)*0.74);
+  padding:3px 10px 3px 6px;border:1px solid var(--linie);border-radius:20px;background:var(--karte);
+  color:var(--tinte);cursor:pointer}
+.nb-band-chip small{color:var(--grau)}
+.nb-band-chip i,.nb-band-zeile i{width:10px;height:18px;flex:0 0 10px;display:inline-block;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)}
+.nb-band{position:absolute;width:18px;z-index:12;border:0;padding:0;cursor:pointer;
+  box-shadow:1px 2px 3px rgba(0,0,0,.25);clip-path:polygon(0 0,100% 0,100% 100%,50% calc(100% - 12px),0 100%)}
+/* Ein liegendes Band ist nur zu sehen — darunter wird geschrieben und angetippt. */
+.nb-band.liegt{top:-10px;height:calc(28px * 30 + 72px);pointer-events:none}
+.nb-band.haengt{top:calc(28px * 30 - 6px);height:66px}
+.nb-band-name{position:absolute;top:calc(28px * 30 + 22px);font-size:14px;color:var(--grau);
+  white-space:nowrap;pointer-events:none;z-index:12}
+.nb-band-zeile{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--linie);flex-wrap:wrap}
+.nb-band-zeile:first-of-type{border-top:0}
+.nb-band-feld{flex:1 1 140px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.86);padding:5px 8px;
+  border:1px solid var(--linie);border-radius:6px;background:var(--karte);color:var(--tinte)}
+.nb-band-ort{font-size:calc(var(--fs)*0.72);color:var(--grau);min-width:42px}
 
 .vk-flaeche{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
   font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 10px;
@@ -2525,7 +2546,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.8.0';
+var APP_VERSION = '5.9.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -16883,11 +16904,14 @@ function nbBuehneHtml(inhalt) {
     seiten = '<div class="nb-spread" id="nbBuch">'
            + ((l === z.nr) ? nbBlattHtml(l, inhalt, true, false) : nbBlattHtml(l, null, false, false))
            + ((l + 1 === z.nr) ? nbBlattHtml(l + 1, inhalt, true, false) : nbBlattHtml(l + 1, null, false, false))
+           + nbBaenderImBuchHtml()
            + '</div>';
   } else {
-    seiten = '<div class="nb-einzel" id="nbBuch">' + nbBlattHtml(z.nr, inhalt, true, true) + '</div>';
+    seiten = '<div class="nb-einzel" id="nbBuch">' + nbBlattHtml(z.nr, inhalt, true, true)
+           + nbBaenderImBuchHtml() + '</div>';
   }
   return '<div class="nb-buehne' + (doppelt ? ' doppelt' : '') + '"><div class="nb-blattspalte">'
+       + '<div class="nb-baender" id="nbBaender">' + nbBaenderLeisteHtml() + '</div>'
        + '<div class="nb-massrahmen" id="nbMassrahmen"><div class="nb-massstab" id="nbMassstab" '
        + 'onpointerdown="nbWischAnfang(event)" onpointerup="nbWischEnde(event)">' + seiten + '</div></div>'
        + '<div class="nb-stand-zeile" id="nbZeilenStand"></div>'
@@ -17618,7 +17642,7 @@ function nbEinpassen() {
   var schwebend = !!(schirm && schirm.classList && schirm.classList.contains('nb-schwebend'));
   var breite = doppelt ? (NB_BLATT_BREITE * 2 + 30) : NB_BLATT_BREITE;
   var luft = doppelt ? NB_LUFT_OBEN : 0;
-  var hoehe = luft + NB_SEITE_H;
+  var hoehe = luft + NB_SEITE_H + (nbHatBaender() ? NB_BAND_PLATZ : 0);
   var m = (flaeche.clientWidth - 40 - (schwebend ? 0 : NB_INHALT_BREITE)) / breite;
   m = Math.max(0.3, Math.min(m, 1));
   mass.style.transform = 'translate(' + (doppelt ? Math.round(15 * m) : 0) + 'px,'
@@ -17640,6 +17664,10 @@ function nbUmschlagen(alt, ziel, fertig) {
   if (altL === zielL) { return false; }
   if (nbBlaetterLaeuft) { return true; }
   nbBlaetterLaeuft = true;
+  /* Die Bänder werden nach dem Umschlagen neu gelegt. */
+  var baender = buch.querySelectorAll('.nb-band,.nb-band-name');
+  var bi;
+  for (bi = 0; bi < baender.length; bi++) { baender[bi].style.opacity = '0'; }
   var vor = zielL > altL;
   var anzahl = Math.min(5, Math.abs(zielL - altL) / (doppelt ? 2 : 1));
   var dauer = (anzahl > 1) ? 520 : 720;
@@ -17728,6 +17756,194 @@ function nbTaste(e) {
   if (ziel && /^(INPUT|TEXTAREA|SELECT)$/.test(String(ziel.tagName || ''))) { return; }
   if (e.key === 'ArrowRight') { nbBlaettern(1); }
   else if (e.key === 'ArrowLeft') { nbBlaettern(-1); }
+}
+
+
+/* ============================================================
+   Notizbücher, Teil 4: Lesebänder
+
+   Jedes Notizbuch hat fünf farbige Bänder. Ein gelegtes Band liegt auf
+   seiner Seite und hängt unten aus dem Buch; Bänder weiter vorn oder
+   hinten hängen links bzw. rechts unter dem Buchblock heraus. Ein Tipp
+   auf ein Band (oder seinen Chip über dem Buch) schlägt seine Seite auf.
+   Die Bänder gehören zum Notizbuch und gehen mit ihm durch den Abgleich:
+     notizbuecher[].baender = [{ name, farbe, seite }]   seite 0 = nicht gelegt
+   ============================================================ */
+
+var NB_BAND_FARBEN = ['#8A0B22', '#19525A', '#9A6B1F', '#2E3A66', '#56663A'];
+var NB_BAND_PLATZ = 90;          /* so weit hängen die Bänder unten aus dem Buch */
+
+function nbAktuellesBuch() {
+  return istNotizseite(flaecheFuer) ? notizbuchFinden(notizseiteZerlegen(flaecheFuer).buchId) : null;
+}
+
+/* Die fünf Bänder eines Notizbuchs — ältere Bücher bekommen sie hier. */
+function nbBaenderVon(b) {
+  if (!b) { return []; }
+  if (!Array.isArray(b.baender) || b.baender.length !== NB_BAND_FARBEN.length) {
+    var alt = Array.isArray(b.baender) ? b.baender : [];
+    b.baender = NB_BAND_FARBEN.map(function (farbe, i) {
+      var a = alt[i] || {};
+      return { name: String(a.name || ('Band ' + (i + 1))), farbe: farbe, seite: parseInt(a.seite, 10) || 0 };
+    });
+  }
+  return b.baender;
+}
+
+function nbHatBaender() {
+  return nbBaenderVon(nbAktuellesBuch()).some(function (x) { return x.seite > 0; });
+}
+
+function nbBandLegen(i) {
+  var b = nbAktuellesBuch();
+  if (!b || nbGesperrt(flaecheFuer)) { return; }
+  var l = nbBaenderVon(b);
+  if (!l[i]) { return; }
+  l[i].seite = notizseiteZerlegen(flaecheFuer).nr;
+  b.geaendert = jetzt();
+  spaeterSichern();
+  nbBaenderZeichnen();
+  nbBaenderBlattZeigen();
+}
+
+function nbBandEntfernen(i) {
+  var b = nbAktuellesBuch();
+  if (!b || nbGesperrt(flaecheFuer)) { return; }
+  var l = nbBaenderVon(b);
+  if (!l[i]) { return; }
+  l[i].seite = 0;
+  b.geaendert = jetzt();
+  spaeterSichern();
+  nbBaenderZeichnen();
+  nbBaenderBlattZeigen();
+}
+
+/* Beim Tippen des Namens wird das Blatt nicht neu gezeichnet — sonst
+   verlöre das Feld die Marke. */
+function nbBandName(i, wert) {
+  var b = nbAktuellesBuch();
+  if (!b || nbGesperrt(flaecheFuer)) { return; }
+  var l = nbBaenderVon(b);
+  if (!l[i]) { return; }
+  l[i].name = String(wert || '').slice(0, 40);
+  b.geaendert = jetzt();
+  spaeterSichern();
+  nbBaenderZeichnen();
+}
+
+function nbZuBand(i) {
+  var l = nbBaenderVon(nbAktuellesBuch());
+  if (!l[i] || !l[i].seite) { return; }
+  nbSpringen(l[i].seite);
+}
+
+/* Die Chips über dem Buch — am Handy der Hauptweg zu den Bändern. */
+function nbBaenderLeisteHtml() {
+  var l = nbBaenderVon(nbAktuellesBuch());
+  var h = '';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!l[i].seite) { continue; }
+    h += '<button type="button" class="nb-band-chip" onclick="nbZuBand(' + i + ')" '
+       + 'title="Seite ' + l[i].seite + ' aufschlagen">'
+       + '<i style="background:' + l[i].farbe + '"></i>' + esc(l[i].name || ('Band ' + (i + 1)))
+       + ' <small>S. ' + l[i].seite + '</small></button>';
+  }
+  h += '<button type="button" class="sl-pille" onclick="nbBaenderBlattZeigen()">Lesebänder</button>';
+  return h;
+}
+
+/* Die Bänder im Buch, im Buchmaß gesetzt. */
+function nbBaenderImBuchHtml() {
+  var l = nbBaenderVon(nbAktuellesBuch());
+  if (!istNotizseite(flaecheFuer)) { return ''; }
+  var doppelt = nbDoppeltAktiv();
+  var nr = notizseiteZerlegen(flaecheFuer).nr;
+  var vorn = doppelt ? nr - (nr % 2) : nr;
+  var vorher = 0;
+  var nachher = 0;
+  var h = '';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var b = l[i];
+    if (!b.seite) { continue; }
+    var liegt = doppelt ? (b.seite === vorn || b.seite === vorn + 1) : (b.seite === nr);
+    var x;
+    if (liegt) {
+      /* Das Band liegt nah am Falz auf seiner Seite. */
+      if (doppelt) {
+        x = (b.seite % 2 === 0) ? (NB_BLATT_BREITE - 70 - i * 10) : (NB_BLATT_BREITE + 50 + i * 10);
+      } else {
+        x = (b.seite % 2 === 0) ? (NB_BLATT_BREITE - 80 - i * 10) : (60 + i * 10);
+      }
+    } else if (b.seite < vorn) {
+      x = doppelt ? (NB_BLATT_BREITE - 150 - vorher * 26) : (30 + vorher * 26);
+      vorher++;
+    } else {
+      x = doppelt ? (NB_BLATT_BREITE + 130 + nachher * 26) : (NB_BLATT_BREITE - 150 - nachher * 26);
+      nachher++;
+    }
+    h += '<button type="button" class="nb-band ' + (liegt ? 'liegt' : 'haengt') + '" '
+       + 'style="left:' + x + 'px;background:' + b.farbe + '" '
+       + 'title="' + esc(b.name) + ' – Seite ' + b.seite + '" aria-label="' + esc(b.name) + ', Seite ' + b.seite + '" '
+       + 'onclick="event.stopPropagation();nbZuBand(' + i + ')"></button>';
+    if (liegt) {
+      h += '<span class="nb-band-name" style="left:' + (x + 26) + 'px">' + esc(b.name) + '</span>';
+    }
+  }
+  return h;
+}
+
+/* Chips und Bänder neu setzen, ohne die Seite neu zu zeichnen. */
+function nbBaenderZeichnen() {
+  var leiste = document.getElementById('nbBaender');
+  if (leiste) { leiste.innerHTML = nbBaenderLeisteHtml(); }
+  var buch = document.getElementById('nbBuch');
+  if (buch && typeof buch.querySelectorAll === 'function' && typeof buch.insertAdjacentHTML === 'function') {
+    var alte = buch.querySelectorAll('.nb-band,.nb-band-name');
+    var i;
+    for (i = 0; i < alte.length; i++) {
+      if (alte[i].parentNode) { alte[i].parentNode.removeChild(alte[i]); }
+    }
+    buch.insertAdjacentHTML('beforeend', nbBaenderImBuchHtml());
+  }
+  nbEinpassen();
+}
+
+function nbBaenderBlattZeigen() {
+  var b = nbAktuellesBuch();
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!b || !sheet || !hg) { return; }
+  var l = nbBaenderVon(b);
+  var nr = notizseiteZerlegen(flaecheFuer).nr;
+  var gesperrt = nbGesperrt(flaecheFuer);
+  var h = blattKopf();
+  h += '<div class="as-titel">Lesebänder</div>';
+  h += '<div class="as-meta">' + (gesperrt ? 'Im Archiv lassen sich Bänder nur aufschlagen.'
+                                           : 'Ein Band auf Seite ' + nr + ' legen, versetzen oder umbenennen.')
+     + '</div><div class="as-linie"></div>';
+  var i;
+  for (i = 0; i < l.length; i++) {
+    h += '<div class="nb-band-zeile"><i style="background:' + l[i].farbe + '"></i>'
+       + '<input class="nb-band-feld" type="text" value="' + esc(l[i].name) + '" aria-label="Name von Band ' + (i + 1) + '" '
+       + 'oninput="nbBandName(' + i + ',this.value)"' + (gesperrt ? ' readonly' : '') + '>'
+       + '<span class="nb-band-ort">' + (l[i].seite ? 'S. ' + l[i].seite : 'frei') + '</span>';
+    if (!gesperrt && l[i].seite !== nr) {
+      h += '<button type="button" class="sl-pille" onclick="nbBandLegen(' + i + ')">Hierher</button>';
+    }
+    if (!gesperrt && l[i].seite) {
+      h += '<button type="button" class="sl-pille" onclick="nbBandEntfernen(' + i + ')">Lösen</button>';
+    }
+    if (l[i].seite && l[i].seite !== nr) {
+      h += '<button type="button" class="sl-pille" onclick="aktionenSchliessen();nbZuBand(' + i + ')">Aufschlagen</button>';
+    }
+    h += '</div>';
+  }
+  h += '<div class="d-reihe"><button type="button" onclick="aktionenSchliessen()">Schließen</button></div>';
+  sheet.innerHTML = h;
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
 }
 
 

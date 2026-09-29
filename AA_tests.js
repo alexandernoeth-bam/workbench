@@ -975,6 +975,46 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   window.innerWidth = merkB; schirmOffen = merkS; flaecheModus = merkM; DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__nbBandApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkB = window.innerWidth; DB = leereDatenbank(); var r = {};'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0]; var k = function(n){ return notizseitenKennung(b.id, n); };'
+                 + '   var n; for (n = 1; n <= 40; n++) { flaecheSetzen(k(n), "Seite " + n); }'
+                 + '   var l = nbBaenderVon(b);'
+                 + '   r.fuenf = l.length === 5 && l.every(function(x){ return x.seite === 0; })'
+                 + '     && l.map(function(x){ return x.farbe; }).filter(function(f, i, a){ return a.indexOf(f) === i; }).length === 5;'
+                 + '   b.baender = [{ name: "Alt", seite: 7 }]; l = nbBaenderVon(b);'
+                 + '   r.altbestand = l.length === 5 && l[0].name === "Alt" && l[0].seite === 7 && l[1].seite === 0;'
+                 + '   b.baender = null;'
+                 + '   window.innerWidth = 1400; flaecheFuer = k(12);'
+                 + '   nbBandLegen(0); nbBandName(0, "Lenkungskreis");'
+                 + '   flaecheFuer = k(5); nbBandLegen(2); flaecheFuer = k(33); nbBandLegen(1); flaecheFuer = k(12);'
+                 + '   l = nbBaenderVon(b);'
+                 + '   r.gelegt = l.map(function(x){ return x.seite; }).join(",");'
+                 + '   r.name = l[0].name;'
+                 + '   r.hat = nbHatBaender();'
+                 + '   var leiste = nbBaenderLeisteHtml();'
+                 + '   r.leiste = /Lenkungskreis/.test(leiste) && /S\\. 33/.test(leiste) && /nbZuBand\\(1\\)/.test(leiste)'
+                 + '     && !/Band 4/.test(leiste) && /nbBaenderBlattZeigen\\(\\)/.test(leiste);'
+                 + '   var imBuch = nbBaenderImBuchHtml();'
+                 + '   r.liegt = (imBuch.match(/nb-band liegt/g) || []).length === 1 && (imBuch.match(/nb-band haengt/g) || []).length === 2'
+                 + '     && /nb-band-name[^>]*>Lenkungskreis</.test(imBuch);'
+                 + '   r.buehne = /id="nbBaender"/.test(nbBuehneHtml("X")) && /nb-band liegt/.test(nbBuehneHtml("X"));'
+                 + '   nbZuBand(1); r.sprung = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbZuBand(3); r.nichtGelegt = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbBandEntfernen(1); r.entfernt = nbBaenderVon(b)[1].seite;'
+                 + '   var sheet = document.getElementById("aktionSheet"); nbBaenderBlattZeigen();'
+                 + '   r.blatt = (sheet.innerHTML.match(/nb-band-zeile/g) || []).length === 5 && /nbBandLegen\\(1\\)/.test(sheet.innerHTML)'
+                 + '     && /nbBandName\\(0,this\\.value\\)/.test(sheet.innerHTML);'
+                 + '   nbArchivieren(b.id); flaecheFuer = k(20); nbBandLegen(4); r.archiv = nbBaenderVon(b)[4].seite === 0;'
+                 + '   nbBaenderBlattZeigen(); r.archivBlatt = !/nbBandLegen/.test(sheet.innerHTML) && /readonly/.test(sheet.innerHTML);'
+                 + '   nbZurueckholen(b.id);'
+                 + '   var fremd = leereDatenbank(); var kopie = JSON.parse(JSON.stringify(b));'
+                 + '   kopie.baender[3].seite = 40; kopie.geaendert = jetzt() + 5000; fremd.notizbuecher = [kopie];'
+                 + '   r.abgleich = zusammenfuehren(DB, fremd).db.notizbuecher[0].baender[3].seite === 40;'
+                 + '   window.innerWidth = merkB; DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -13499,6 +13539,43 @@ console.log('\n154. Doppelseite und Seitenformat');
     pruefe(e.tasteAnsicht === 14, 'in der Ansicht blättert die Pfeiltaste');
     pruefe(e.einzeln === true && e.buehneEinzeln === true, 'schmal zeigt eine Seite mit Ecken in beide Richtungen');
     pruefe(e.blaetternEinzeln === 14, 'einzeln wird Seite für Seite geblättert');
+  }
+}
+
+/* ============================================================
+   155. Lesebänder (v5.9.0)
+   Grund: Fünf farbige Bänder je Notizbuch, wie bei einem gebundenen
+   Buch: gelegt auf eine Seite, ein Tipp schlägt sie auf.
+   ============================================================ */
+console.log('\n155. Lesebänder');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__nbBandApi;
+  const ein = skript.match(/function nbEinpassen\([\s\S]*?\n\}/);
+  pruefe(ein && /nbHatBaender\(\) \? NB_BAND_PLATZ : 0/.test(ein[0]), 'unter dem Buch ist Platz für heraushängende Bänder');
+  const um = skript.match(/function nbUmschlagen\([\s\S]*?\n\}/);
+  pruefe(um && /\.nb-band,\.nb-band-name/.test(um[0]), 'beim Umblättern verschwinden die Bänder und werden danach neu gelegt');
+  pruefe(/\.nb-band\.liegt\{[^}]*pointer-events:none/.test(QUELLE), 'ein liegendes Band verdeckt das Schreiben nicht');
+  let e = null;
+  if (!t) {
+    warn('Lesebänder nicht auswertbar');
+  } else {
+    try { e = t.pruefe(); }
+    catch (x) { fail('Lesebänder laufen nicht: ' + x.message); }
+  }
+  if (t && e) {
+    pruefe(e.fuenf === true, 'jedes Notizbuch hat fünf Bänder in fünf Farben, zu Beginn nicht gelegt');
+    pruefe(e.altbestand === true, 'unvollständige Bänder werden ergänzt, gelegte bleiben');
+    pruefe(e.gelegt === '12,33,5,0,0' && e.name === 'Lenkungskreis' && e.hat === true,
+           'Bänder lassen sich auf die aktive Seite legen und benennen');
+    pruefe(e.leiste === true, 'über dem Buch stehen die gelegten Bänder als Chips');
+    pruefe(e.liegt === true, 'auf der offenen Doppelseite liegt das Band, die anderen hängen heraus');
+    pruefe(e.buehne === true, 'Chips und Bänder gehören zur Seite');
+    pruefe(e.sprung === 33 && e.nichtGelegt === 33, 'ein Band schlägt seine Seite auf, ein nicht gelegtes nichts');
+    pruefe(e.entfernt === 0, 'ein Band lässt sich lösen');
+    pruefe(e.blatt === true, 'das Blatt „Lesebänder“ zeigt alle fünf zum Legen und Umbenennen');
+    pruefe(e.archiv === true && e.archivBlatt === true, 'im Archiv lassen sich Bänder nur aufschlagen');
+    pruefe(e.abgleich === true, 'die Bänder gehen mit dem Notizbuch durch den Abgleich');
   }
 }
 
