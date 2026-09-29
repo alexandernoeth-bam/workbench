@@ -901,6 +901,80 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   nbArchivOffen = false; zurueckHolen = merkZ; DB = alt;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__nbKontextApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkF = pinFilter; var merkS = sichtschutz; DB = leereDatenbank(); var r = {};'
+                 + '   DB.projekte = [{ id: "p1", name: "Haus", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   DB.themen = [{ id: "t1", name: "Arbeit", kontext: "beruflich" }];'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0];'
+                 + '   r.neu = nbKontext(b);'
+                 + '   nbFeldSetzen(b.id, "kontext", "privat"); r.gesetzt = nbKontext(b);'
+                 + '   nbFeldSetzen(b.id, "kontext", "unsinn"); r.unsinn = nbKontext(b);'
+                 + '   nbFeldSetzen(b.id, "zuordnungId", "t1"); r.ausThema = nbKontext(b);'
+                 + '   nbFeldSetzen(b.id, "zuordnungId", "p1"); r.ausProjekt = nbKontext(b);'
+                 + '   nbBearbeiten = b.id; var karte = nbKarteHtml(b); nbBearbeiten = "";'
+                 + '   r.gesperrt = /disabled/.test(karte) && /aus der Zuordnung/.test(karte);'
+                 + '   nbFeldSetzen(b.id, "zuordnungId", ""); nbFeldSetzen(b.id, "kontext", "beruflich");'
+                 + '   nbBearbeiten = b.id; karte = nbKarteHtml(b); nbBearbeiten = "";'
+                 + '   r.frei = !/disabled/.test(karte) && /nbFeldSetzen\\([^)]*kontext/.test(karte);'
+                 + '   b.kontext = ""; r.altbestand = nbKontext(b); b.kontext = "privat";'
+                 + '   DB.gedanken = [{ id: "g1", titel: "Frei", text: "x", geaendert: 1 },'
+                 + '                  { id: "g2", titel: "Alt", text: "y", geaendert: 1 }];'
+                 + '   gedankeKontextSetzen("g1", "privat"); r.gedanke = DB.gedanken[0].kontext;'
+                 + '   gedankeKontextSetzen("g1", "unsinn"); r.gedankeUnsinn = DB.gedanken[0].kontext;'
+                 + '   flaecheFuer = "g:g1"; flaecheModus = "ansicht"; flaecheZeichnen();'
+                 + '   r.kopfFrei = /gedankeKontextSetzen/.test(document.getElementById("flaecheKopf").innerHTML);'
+                 + '   flaecheSetzen(notizseitenKennung(b.id, 1), "Seite"); flaecheFuer = notizseitenKennung(b.id, 1); flaecheZeichnen();'
+                 + '   r.kopfNotiz = !/gedankeKontextSetzen/.test(document.getElementById("flaecheKopf").innerHTML);'
+                 + '   r.zettelNotiz = pinInhalt({ art: "flaeche", zielId: notizseitenKennung(b.id, 1) }).kontext;'
+                 + '   r.zettelFrei = pinInhalt({ art: "flaeche", zielId: "g:g1" }).kontext;'
+                 + '   r.zettelAlt = pinInhalt({ art: "flaeche", zielId: "g:g2" }).kontext;'
+                 + '   DB.pinnwand = []; pinUm("flaeche", notizseitenKennung(b.id, 1)); pinUm("flaeche", "g:g2");'
+                 + '   var zettel = function(){ pinnwandZeichnen(); return (document.getElementById("pinBlatt").innerHTML.match(/class="zettel /g) || []).length; };'
+                 + '   pinFilter = "beruflich"; r.filterBeruf = zettel();'
+                 + '   pinFilter = "privat"; r.filterPrivat = zettel();'
+                 + '   pinFilter = "alle"; r.markeOhne = /ohne Kontext/.test((pinnwandZeichnen(), document.getElementById("pinBlatt").innerHTML));'
+                 + '   sichtschutz = true; r.sichtschutz = zettel(); sichtschutz = merkS;'
+                 + '   pinFilter = merkF; flaecheFuer = ""; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__nbDoppelApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkB = window.innerWidth; var merkS = schirmOffen; var merkM = flaecheModus;'
+                 + '   DB = leereDatenbank(); var r = {};'
+                 + '   r.seiten = nbSeitenSeite(12) + "," + nbSeitenSeite(13);'
+                 + '   r.deckel = /nb-deckel/.test(nbBlattHtml(0, null, false, false)) && /Rückdeckel/.test(nbBlattHtml(201, null, false, false));'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0]; var k = function(n){ return notizseitenKennung(b.id, n); };'
+                 + '   var n; for (n = 1; n <= 14; n++) { flaecheSetzen(k(n), "Seite " + n); }'
+                 + '   window.innerWidth = 1400; flaecheFuer = k(12); flaecheModus = "ansicht";'
+                 + '   r.doppelt = nbDoppeltAktiv();'
+                 + '   var bh = nbBuehneHtml("INHALT");'
+                 + '   r.buehneDoppelt = /nb-spread/.test(bh) && /data-seite="12">/.test(bh) && /data-seite="13" onclick="nbSpringen\\(13\\)"/.test(bh)'
+                 + '     && /nb-blatt links aktiv" data-seite="12"/.test(bh) && /nb-blatt rechts passiv" data-seite="13"/.test(bh)'
+                 + '     && (bh.match(/id="nbRand"/g) || []).length === 1 && /INHALT/.test(bh);'
+                 + '   r.kopf = /Seiten 12–13/.test(nbKopfHtml());'
+                 + '   r.umschlagenSandkasten = nbUmschlagen(12, 14, function(){}) === false;'
+                 + '   nbBlaettern(1); var a1 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbBlaettern(1); var a2 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbBlaettern(-1); var a3 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbBlaettern(-1); var a4 = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   r.blaetternDoppelt = [a1, a2, a3, a4].join(",");'
+                 + '   flaecheFuer = k(12); nbSpringen(13); r.gleicheDoppelseite = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   flaecheFuer = k(2); nbBlaettern(-1); nbBlaettern(-1); r.vorn = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   schirmOffen = "Flaeche"; flaecheFuer = k(12); flaecheModus = "schreiben";'
+                 + '   nbTaste({ key: "ArrowRight", target: { tagName: "DIV" } }); r.tasteSchreiben = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   flaecheModus = "ansicht"; nbTaste({ key: "ArrowRight", target: { tagName: "TEXTAREA" } });'
+                 + '   r.tasteFeld = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbTaste({ key: "ArrowRight", target: { tagName: "DIV" } }); r.tasteAnsicht = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   window.innerWidth = 800; flaecheFuer = k(13);'
+                 + '   r.einzeln = !nbDoppeltAktiv();'
+                 + '   var be = nbBuehneHtml("X");'
+                 + '   r.buehneEinzeln = /nb-einzel/.test(be) && (be.match(/data-seite=/g) || []).length === 1'
+                 + '     && /nb-blatt rechts aktiv/.test(be) && /nb-ecke links/.test(be) && /nb-ecke rechts/.test(be);'
+                 + '   nbBlaettern(1); r.blaetternEinzeln = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   window.innerWidth = merkB; schirmOffen = merkS; flaecheModus = merkM; DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5682,7 +5756,10 @@ console.log('\n23. Aufrufe im Skript selbst');
       if (z === '/' && /[(,=:[!&|?{};+\n]/.test(zuletzt || '\n')) {
         i++;
         while (i < text.length && text[i] !== '/') {
-          if (text[i] === '\\') { i++; }
+          /* Ein maskiertes Zeichen wird übersprungen, nicht gedeutet — sonst
+             hielt der Leser ein \[ für den Anfang einer Zeichenklasse und
+             las über das Ende des Ausdrucks hinaus (seit v5.8.0 behoben). */
+          if (text[i] === '\\') { i += 2; continue; }
           if (text[i] === '[') {
             while (i < text.length && text[i] !== ']') {
               if (text[i] === '\\') { i++; }
@@ -5704,6 +5781,12 @@ console.log('\n23. Aufrufe im Skript selbst');
     return aus;
   }
 
+  /* Der Leser selbst: Ein maskiertes \[ in einem regulären Ausdruck darf
+     ihn nicht aus dem Tritt bringen — sonst verschwindet danach echter
+     Code aus der Prüfung oder Zeichenketten gelten als Code. */
+  pruefe(nurCode("var a = /^\\[\\s?\\]/.test(b); c('<div>'); d(1);").indexOf('d(') >= 0
+         && nurCode("var a = /^\\[\\s?\\]/.test(b); c('<div>'); d(1);").indexOf('<div') < 0,
+         'der Code-Leser übersteht ein maskiertes [ in einem regulären Ausdruck');
   const skript = nurCode(roh);
 
   const definiert = new Set([...roh.matchAll(/function\s+([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]));
@@ -13307,6 +13390,115 @@ console.log('\n151. Notizbücher löschen');
     pruefe(e.vermerkeWeg === true, 'und nimmt die Löschvermerke wieder weg');
     pruefe(e.knoepfe === true, 'im Bearbeiten-Bereich steht Löschen neben Archivieren');
     pruefe(e.imArchiv === true, 'auch im Archiv lässt sich löschen');
+  }
+}
+
+/* ============================================================
+   152. Der Kopf eines Aktionsblatts verdeckt nichts (v5.7.4)
+   Grund: Das Blatt hat oben Innenabstand, der klebende Kopf wird mit
+   negativem Rand an die Kante gezogen. sticky rechnet vom Innenabstand
+   aus — mit top:0 rutschte der Kopf zurück und verdeckte die obersten
+   Pixel jeder Blatt-Überschrift.
+   ============================================================ */
+console.log('\n152. Kopf der Aktionsblätter');
+{
+  const blatt = QUELLE.match(/\.aktion-sheet\{[^}]*\}/);
+  const kopf = QUELLE.match(/\.as-oben\{[^}]*\}/);
+  const innen = blatt && blatt[0].match(/padding:(\d+)px/);
+  const oben = kopf && kopf[0].match(/[{;]top:(-?\d+)px/);
+  const rand = kopf && kopf[0].match(/margin:(-?\d+)px/);
+  pruefe(!!(innen && oben && rand), 'Innenabstand des Blatts, Rand und Klebeposition des Kopfes sind auslesbar');
+  if (innen && oben && rand) {
+    pruefe(Number(oben[1]) === -Number(innen[1]),
+           'der Kopf klebt dort, wo er ohnehin steht — top gleicht den Innenabstand aus');
+    pruefe(Number(rand[1]) === Number(oben[1]),
+           'negativer Rand und Klebeposition sind gleich groß');
+  }
+}
+
+/* ============================================================
+   153. Beruf/Privat für Notizbücher und freie Flächen (v5.7.5)
+   Grund: Freie Gedankenflächen und nicht zugeordnete Notizbücher hatten
+   keinen Kontext. Auf der Pinnwand standen sie deshalb unter beiden
+   Filtern, und der Sichtschutz verbarg sie nie — private Notizen lagen
+   am Arbeitsplatz offen.
+   ============================================================ */
+console.log('\n153. Beruf/Privat für Notizbücher und Flächen');
+{
+  const k = globalThis.__nbKontextApi;
+  let e = null;
+  if (!k) {
+    warn('Kontext nicht auswertbar');
+  } else {
+    try { e = k.pruefe(); }
+    catch (x) { fail('Kontext läuft nicht: ' + x.message); }
+  }
+  if (k && e) {
+    pruefe(e.neu === 'beruflich', 'ein neues Notizbuch beginnt beruflich');
+    pruefe(e.gesetzt === 'privat' && e.unsinn === 'privat', 'der Kontext lässt sich setzen, Unsinn wird abgewiesen');
+    pruefe(e.ausThema === 'beruflich' && e.ausProjekt === 'privat',
+           'ein zugeordnetes Notizbuch übernimmt den Kontext von Thema oder Projekt');
+    pruefe(e.gesperrt === true, 'dann ist die Auswahl gesperrt und sagt, woher er kommt');
+    pruefe(e.frei === true, 'ohne Zuordnung ist sie wählbar');
+    pruefe(e.altbestand === '', 'ein Notizbuch aus älteren Fassungen bleibt ohne Kontext');
+    pruefe(e.gedanke === 'privat' && e.gedankeUnsinn === 'privat', 'eine freie Fläche bekommt einen Kontext');
+    pruefe(e.kopfFrei === true && e.kopfNotiz === true, 'die Auswahl steht nur im Kopf freier Flächen');
+    pruefe(e.zettelNotiz === 'privat' && e.zettelFrei === 'privat', 'die Zettel tragen den Kontext von Buch und Fläche');
+    pruefe(e.zettelAlt === '', 'ohne gesetzten Kontext bleibt der Zettel ohne');
+    pruefe(e.filterBeruf === 1 && e.filterPrivat === 2, 'die Filter greifen, ein Zettel ohne Kontext steht unter beiden');
+    pruefe(e.markeOhne === true, 'ein Zettel ohne Kontext sagt es');
+    pruefe(e.sichtschutz === 1, 'der Sichtschutz verbirgt den privaten Zettel');
+  }
+}
+
+/* ============================================================
+   154. Festes Seitenformat, Doppelseite, Umblättern (v5.8.0)
+   Grund: Auf großen Bildschirmen liegt das Notizbuch doppelseitig offen,
+   der Schreibrand außen. Damit jede Seite überall gleich umbricht, hat
+   sie ein festes Format und wird nur maßstäblich eingepasst.
+   ============================================================ */
+console.log('\n154. Doppelseite und Seitenformat');
+{
+  const skript = hauptSkript();
+  const d = globalThis.__nbDoppelApi;
+  pruefe(/var NB_BLATT_BREITE = 600;/.test(skript), 'das Seitenformat ist fest 600 Punkte breit');
+  const mess = skript.match(/function nbZeilenMessen\([\s\S]*?\n\}/);
+  pruefe(mess && /mess\.style\.width = NB_BLATT_BREITE \+ 'px'/.test(mess[0]) && !/querySelector\('#flaecheBlatt \.nb-blatt'\)/.test(mess[0]),
+         'gemessen wird im festen Format, nicht an der gezeigten Seite');
+  pruefe(!/body:not\(\.breit\) \.nb-blatt\{grid-template-columns:56px/.test(QUELLE),
+         'am Handy wird der Rand nicht mehr schmaler — sonst bräche die Seite anders um');
+  pruefe(/\.nb-blatt\.rechts \.nb-rand\{order:2;border-right:0;border-left:2px solid var\(--weinrot\)\}/.test(QUELLE),
+         'auf rechten Seiten liegt der Rand rechts');
+  const basis = QUELLE.match(/\.nb-inhalt\{position:relative;min-width:0;padding:var\(--nb-z\) (\d+)px calc\(var\(--nb-z\) \* 2\) (\d+)px\}/);
+  const rechts = QUELLE.match(/\.nb-blatt\.rechts \.nb-inhalt\{order:1;padding:var\(--nb-z\) (\d+)px calc\(var\(--nb-z\) \* 2\) (\d+)px\}/);
+  pruefe(basis && rechts && basis[1] === rechts[2] && basis[2] === rechts[1],
+         'der Innenabstand ist auf rechten Seiten gespiegelt');
+  const trenner = QUELLE.match(/\.nb-blatt\.rechts \.nb-inhalt \.nb-titel-trenner\{margin-left:-(\d+)px;margin-right:-(\d+)px\}/);
+  pruefe(rechts && trenner && trenner[1] === rechts[2] && trenner[2] === rechts[1],
+         'die Titellinie reicht auch rechts genau bis an Rand und Blattkante');
+  const umschlag = skript.match(/function nbUmschlagen\([\s\S]*?\n\}/);
+  pruefe(umschlag && /nbRuhig\(\)/.test(umschlag[0]), 'wer Bewegung reduziert, bekommt keine Drehung');
+  let e = null;
+  if (!d) {
+    warn('Doppelseite nicht auswertbar');
+  } else {
+    try { e = d.pruefe(); }
+    catch (x) { fail('Doppelseite läuft nicht: ' + x.message); }
+  }
+  if (d && e) {
+    pruefe(e.seiten === 'links,rechts', 'gerade Seiten liegen links, ungerade rechts');
+    pruefe(e.deckel === true, 'vor Seite 1 liegt der Innendeckel, hinter der letzten der Rückdeckel');
+    pruefe(e.doppelt === true, 'auf breitem Bildschirm liegt das Buch doppelt offen');
+    pruefe(e.buehneDoppelt === true, 'beide Seiten stehen nebeneinander, nur die aktive ist beschreibbar');
+    pruefe(e.kopf === true, 'der Kopf nennt beide Seitenzahlen');
+    pruefe(e.umschlagenSandkasten === true, 'ohne Animationsfähigkeit wird sofort umgeschlagen');
+    pruefe(e.blaetternDoppelt === '14,14,13,11', 'geblättert wird um eine Doppelseite, nie über die erste freie hinaus');
+    pruefe(e.gleicheDoppelseite === 13, 'ein Tipp auf die andere Seite schlägt sie auf, ohne umzublättern');
+    pruefe(e.vorn === 1, 'vor Seite 1 geht es nicht weiter zurück');
+    pruefe(e.tasteSchreiben === 12 && e.tasteFeld === 12, 'beim Schreiben blättern die Pfeiltasten nicht');
+    pruefe(e.tasteAnsicht === 14, 'in der Ansicht blättert die Pfeiltaste');
+    pruefe(e.einzeln === true && e.buehneEinzeln === true, 'schmal zeigt eine Seite mit Ecken in beide Richtungen');
+    pruefe(e.blaetternEinzeln === 14, 'einzeln wird Seite für Seite geblättert');
   }
 }
 

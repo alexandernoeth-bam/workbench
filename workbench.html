@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.7.3</title>
+<title>Workbench 5.8.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1085,6 +1085,10 @@ body:not(.breit) .fl-leiste .fl-knopf,body:not(.breit) .fl-leiste .fl-teiler{fle
 .nb-farbe{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
 .nb-farbe.an{border-color:var(--tinte)}
 .sl-pille.nb-loeschknopf{border-color:var(--weinrot);color:var(--weinrot)}
+.nb-kontext{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.nb-kontext .sl-pille:disabled{opacity:.55;cursor:default}
+.nb-kontext-hinweis{font-size:calc(var(--fs)*0.68);color:var(--grau)}
+.z-ohne{font-size:calc(var(--fs)*0.6);color:var(--grau);margin-top:-2px}
 .nb-archiv{background:var(--karte);border:1px solid var(--linie);border-radius:8px;margin-top:6px}
 .nb-archiv-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;
   border-top:1px solid var(--linie);font-size:calc(var(--fs)*0.84)}
@@ -1104,7 +1108,7 @@ body:not(.breit) .fl-leiste .fl-knopf,body:not(.breit) .fl-leiste .fl-teiler{fle
   min-height:0;box-shadow:none}
 .nb-messinhalt{padding:0 16px 0 12px}
 .nb-rand{cursor:pointer}
-.nb-randnotiz{position:absolute;left:5px;right:7px;border:0;background:none;padding:0;text-align:left;
+.nb-randnotiz{position:absolute;left:5px;right:7px;z-index:3;border:0;background:none;padding:0;text-align:left;
   font-family:"Caveat","Segoe Print","Bradley Hand",cursive;font-size:calc(var(--fs)*0.98);
   line-height:22px;color:var(--weinrot);cursor:pointer;overflow-wrap:anywhere}
 .nb-randnotiz::after{content:"";position:absolute;right:-8px;top:11px;width:6px;height:2px;background:var(--weinrot)}
@@ -1151,8 +1155,8 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 .nb-seite{font-size:calc(var(--fs)*0.76);min-width:62px;text-align:center}
 .nb-gesperrt{font-size:calc(var(--fs)*0.7);color:var(--grau);border:1px solid var(--linie);
   border-radius:10px;padding:1px 8px}
-.nb-buehne{display:grid;grid-template-columns:minmax(0,640px) 220px;gap:18px;align-items:start}
-#schirmFlaeche.nb-schwebend .nb-buehne{grid-template-columns:minmax(0,640px)}
+.nb-buehne{display:grid;grid-template-columns:auto 220px;justify-content:start;gap:18px;align-items:start}
+#schirmFlaeche.nb-schwebend .nb-buehne{grid-template-columns:auto}
 .nb-blatt{--nb-z:28px;position:relative;display:grid;grid-template-columns:84px minmax(0,1fr);
   background:var(--karte);min-height:calc(var(--nb-z) * 30);border-radius:2px;
   box-shadow:0 1px 0 var(--linie),0 6px 16px rgba(0,0,0,.07);overflow:hidden}
@@ -1199,9 +1203,49 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
   box-shadow:0 8px 26px rgba(0,0,0,.22)}
 #schirmFlaeche.nb-schwebend .nb-inhaltsliste.offen{display:block}
 #schirmFlaeche.nb-schwebend .nb-inhalt-zu{display:block}
-/* Am Handy ist der Rand schmaler — über die Körperklasse, nicht über
-   eine Media-Abfrage (die Darstellung lässt sich von Hand festlegen). */
-body:not(.breit) .nb-blatt{grid-template-columns:56px minmax(0,1fr)}
+/* ---------- Notizbücher 5.8.0: festes Seitenformat, Doppelseite, Umblättern ----------
+   Jede Seite ist 600 Punkte breit und wird nur maßstäblich eingepasst —
+   auch am Handy bleibt der Rand gleich breit, damit jede Seite überall
+   gleich umbricht. Der Schreibrand liegt außen: links auf geraden,
+   rechts auf ungeraden Seiten. */
+.nb-massrahmen{position:relative}
+.nb-massstab{position:absolute;top:0;left:0;transform-origin:0 0;perspective:3600px}
+.nb-einzel,.nb-spread{position:relative;display:flex}
+.nb-blatt{width:600px;flex:0 0 600px}
+.nb-seitenzahl{z-index:3}
+.nb-blatt.links .nb-seitenzahl{right:auto;left:14px}
+.nb-blatt.rechts{grid-template-columns:minmax(0,1fr) 84px}
+.nb-blatt.rechts .nb-rand{order:2;border-right:0;border-left:2px solid var(--weinrot)}
+.nb-blatt.rechts .nb-inhalt{order:1;padding:var(--nb-z) 12px calc(var(--nb-z) * 2) 16px}
+.nb-blatt.rechts .nb-datum{left:16px}
+.nb-blatt.rechts .nb-randnotiz{left:7px;right:5px}
+.nb-blatt.rechts .nb-randnotiz::after{right:auto;left:-8px}
+.nb-blatt.rechts .nb-inhalt .nb-titel-trenner{margin-left:-16px;margin-right:-12px}
+.nb-spread > .nb-blatt.links{border-radius:3px 0 0 3px}
+.nb-spread > .nb-blatt.rechts{border-radius:0 3px 3px 0}
+.nb-spread > .nb-blatt::after{content:"";position:absolute;top:0;bottom:0;width:46px;pointer-events:none;z-index:2}
+.nb-spread > .nb-blatt.links::after{right:0;background:linear-gradient(90deg,rgba(0,0,0,0),rgba(0,0,0,.09))}
+.nb-spread > .nb-blatt.rechts::after{left:0;background:linear-gradient(90deg,rgba(0,0,0,.11),rgba(0,0,0,0))}
+.nb-spread > .nb-blatt.aktiv{box-shadow:0 1px 0 var(--linie),inset 0 3px 0 var(--weinrot)}
+.nb-blatt.passiv{cursor:pointer}
+.nb-blatt.passiv .nb-inhalt *,.nb-blatt.passiv .nb-rand *{pointer-events:none}
+.nb-ecke{position:absolute;bottom:0;width:56px;height:56px;border:0;padding:0;z-index:4;cursor:pointer;opacity:.4;
+  background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.12) 50%,var(--papier) 62%)}
+.nb-ecke:hover{opacity:.95}
+.nb-ecke.rechts{right:0}
+.nb-ecke.links{left:0;background:linear-gradient(225deg,transparent 50%,rgba(0,0,0,.12) 50%,var(--papier) 62%)}
+.nb-deckel{position:relative;width:600px;flex:0 0 600px;min-height:calc(28px * 30);background:#5E0A1B}
+.nb-deckel.links{border-radius:3px 0 0 3px}
+.nb-deckel.rechts{border-radius:0 3px 3px 0}
+.nb-deckeltext{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;color:#f3e4e7;font-size:calc(var(--fs)*0.8);opacity:.85}
+.nb-deckeltext b{font-size:calc(var(--fs)*1.25);font-weight:600}
+.nb-wende{position:absolute;top:0;width:600px;height:calc(28px * 30);transform-style:preserve-3d;z-index:20;pointer-events:none}
+.nb-wende-vorn,.nb-wende-hinten{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.nb-wende-hinten{transform:rotateY(180deg)}
+.nb-wende .nb-blatt,.nb-wende .nb-deckel{position:absolute;top:0;left:0}
+.nb-wende-schatten{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(0,0,0,.2),rgba(0,0,0,.02))}
 
 .vk-flaeche{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
   font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 10px;
@@ -1817,7 +1861,11 @@ body.breit .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
 body.breit .aktion-sheet{bottom:18px;border-radius:12px;
   max-height:calc(var(--app-h) - 60px)}
 .aktion-sheet.auf{display:block}
-.as-oben{position:sticky;top:0;z-index:8;display:flex;align-items:center;gap:10px;
+/* Das Blatt hat oben 8px Innenabstand, der Kopf wird mit margin:-8px an
+   die Kante gezogen. sticky rechnet aber vom Innenabstand aus — mit
+   top:0 schob der Browser den Kopf 8px zurück über die Überschrift.
+   Seit v5.7.4: top gleicht den Innenabstand aus. */
+.as-oben{position:sticky;top:-8px;z-index:8;display:flex;align-items:center;gap:10px;
   background:var(--karte);padding:8px 0 10px;margin:-8px 0 0}
 .as-griff{flex:1;height:4px;border-radius:2px;background:var(--linie);
   max-width:36px;margin:0 auto}
@@ -2477,7 +2525,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.7.3';
+var APP_VERSION = '5.8.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -15895,6 +15943,16 @@ function flaecheZeichnen() {
       k += '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
     }
     k += '<span class="fl-umbruch"></span>';
+    if (istFreie(flaecheFuer)) {
+      var gk = gedankeFinden(String(flaecheFuer).slice(2));
+      var gkw = gk ? (gk.kontext || '') : '';
+      var gid = esc(String(flaecheFuer).slice(2));
+      k += '<span class="nb-kontext" role="group" aria-label="Beruf oder Privat">'
+         + '<button type="button" class="sl-pille' + (gkw === 'beruflich' ? ' an' : '') + '" '
+         + 'onclick="gedankeKontextSetzen(\'' + gid + '\',\'beruflich\')">Beruf</button>'
+         + '<button type="button" class="sl-pille' + (gkw === 'privat' ? ' an' : '') + '" '
+         + 'onclick="gedankeKontextSetzen(\'' + gid + '\',\'privat\')">Privat</button></span>';
+    }
 
     /* Großer Bildschirm: Pillen mit Wörtern */
     k += '<button class="sl-pille fl-nur-breit' + (ansicht ? ' an' : '')
@@ -16050,11 +16108,22 @@ function gedankenUebernehmen() {
 
 function gedankeNeu() {
   if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
-  var g = { id: neueKennung(), titel: '', text: '', geaendert: jetzt() };
+  var g = { id: neueKennung(), titel: '', text: '', kontext: 'beruflich', geaendert: jetzt() };
   DB.gedanken.push(g);
   spaeterSichern();
   flaecheOeffnen('g:' + g.id);
   flaecheModusSetzen('schreiben');
+}
+
+/* Eine freie Fläche gehört zu Beruf oder Privat — damit greifen
+   Pinnwand-Filter und Sichtschutz auch für sie. */
+function gedankeKontextSetzen(id, wert) {
+  var g = gedankeFinden(id);
+  if (!g || (wert !== 'beruflich' && wert !== 'privat')) { return; }
+  g.kontext = wert;
+  g.geaendert = jetzt();
+  spaeterSichern();
+  flaecheZeichnen();
 }
 
 function gedankeTitelSetzen(id, wert) {
@@ -16196,7 +16265,7 @@ function gedankenZeichnen() {
 
 var NB_SEITEN_MAX = 200;         /* danach wird das Archivieren vorgeschlagen */
 var NB_WARNUNG_AB = 180;         /* ab hier steht auf der Karte, wie viel noch frei ist */
-var NB_BLATT_BREITE = 640;       /* so breit wird eine Seite höchstens */
+var NB_BLATT_BREITE = 600;       /* festes Seitenformat (seit v5.8.0), wird nur maßstäblich eingepasst */
 var NB_INHALT_BREITE = 220 + 18; /* Verzeichnis plus Abstand */
 var NB_FARBEN = ['#8A0B22', '#19525A', '#2E3A66', '#56663A', '#9A6B1F', '#645F58'];
 
@@ -16294,7 +16363,7 @@ function nbAnlegen() {
   if (!Array.isArray(DB.notizbuecher)) { DB.notizbuecher = []; }
   var n = DB.notizbuecher.length;
   var b = { id: neueKennung(), name: 'Notizbuch ' + (n + 1),
-            farbe: NB_FARBEN[n % NB_FARBEN.length], zuordnungId: '',
+            farbe: NB_FARBEN[n % NB_FARBEN.length], zuordnungId: '', kontext: 'beruflich',
             archiviert: false, archiviertAm: '', erstellt: isoDatum(), geaendert: jetzt() };
   DB.notizbuecher.push(b);
   nbBearbeiten = b.id;
@@ -16314,7 +16383,7 @@ function nbNeuerBand(id) {
   var alt = notizbuchFinden(id);
   if (!alt) { return; }
   var b = { id: neueKennung(), name: nbFolgename(alt.name), farbe: alt.farbe,
-            zuordnungId: alt.zuordnungId || '', archiviert: false, archiviertAm: '',
+            zuordnungId: alt.zuordnungId || '', kontext: alt.kontext || '', archiviert: false, archiviertAm: '',
             erstellt: isoDatum(), geaendert: jetzt() };
   DB.notizbuecher.push(b);
   spaeterSichern();
@@ -16330,7 +16399,8 @@ function nbBearbeitenUm(id) {
 function nbFeldSetzen(id, feld, wert) {
   var b = notizbuchFinden(id);
   if (!b) { return; }
-  if (feld !== 'name' && feld !== 'farbe' && feld !== 'zuordnungId') { return; }
+  if (feld !== 'name' && feld !== 'farbe' && feld !== 'zuordnungId' && feld !== 'kontext') { return; }
+  if (feld === 'kontext' && wert !== 'beruflich' && wert !== 'privat') { return; }
   b[feld] = String(wert || '');
   b.geaendert = jetzt();
   spaeterSichern();
@@ -16440,6 +16510,36 @@ function nbZuordnungText(b) {
   return 'Ohne Zuordnung';
 }
 
+/* Beruf oder Privat? Ein zugeordnetes Notizbuch übernimmt den Kontext
+   seines Themas oder Projekts, ein freies trägt einen eigenen. Leer
+   heißt: noch nicht gesetzt (Bestand vor v5.7.5). */
+function nbZuordnungKontext(b) {
+  var id = b ? (b.zuordnungId || '') : '';
+  if (!id) { return ''; }
+  var p = projektFinden(id);
+  if (p) { return p.kontext || ''; }
+  var t = (DB.themen || []).filter(function (x) { return x.id === id; })[0];
+  return t ? (t.kontext || '') : '';
+}
+
+function nbKontext(b) {
+  if (!b) { return ''; }
+  return nbZuordnungKontext(b) || b.kontext || '';
+}
+
+function nbKontextWahlHtml(b) {
+  var geerbt = nbZuordnungKontext(b);
+  var gilt = nbKontext(b);
+  var k = esc(b.id);
+  var knopf = function (wert, name) {
+    return '<button type="button" class="sl-pille' + (gilt === wert ? ' an' : '') + '"'
+         + (geerbt ? ' disabled' : '')
+         + ' onclick="nbFeldSetzen(\'' + k + '\',\'kontext\',\'' + wert + '\')">' + name + '</button>';
+  };
+  return '<div class="nb-kontext">' + knopf('beruflich', 'Beruf') + knopf('privat', 'Privat')
+       + (geerbt ? '<span class="nb-kontext-hinweis">aus der Zuordnung</span>' : '') + '</div>';
+}
+
 function nbZuordnungOptionen(b) {
   var gewaehlt = b.zuordnungId || '';
   var opt = function (id, name) {
@@ -16490,6 +16590,7 @@ function nbKarteHtml(b) {
          + '<label for="nbZuordnung">Zuordnung</label>'
          + '<select id="nbZuordnung" onchange="nbFeldSetzen(\'' + kennung + '\',\'zuordnungId\',this.value)">'
          + nbZuordnungOptionen(b) + '</select>'
+         + '<label>Bereich</label>' + nbKontextWahlHtml(b)
          + '<div class="nb-aktionen">'
          + '<button type="button" class="sl-pille an" onclick="nbBearbeitenUm(\'' + kennung + '\')">Fertig</button>'
          + (st.anzahl
@@ -16615,14 +16716,20 @@ function nbLetzteErreichbare(buchId) {
 function nbKopfHtml() {
   var z = notizseiteZerlegen(flaecheFuer);
   var grenze = nbLetzteErreichbare(z.buchId);
+  var doppelt = nbDoppeltAktiv();
+  var l = z.nr - (z.nr % 2);
+  var zurueckAus = doppelt ? (l <= 0) : (z.nr <= 1);
+  var weiterAus = doppelt ? (l + 2 > grenze) : (z.nr >= grenze);
+  var anzeige = !doppelt ? ('Seite ' + z.nr)
+              : ((l <= 0) ? 'Seite 1' : ('Seiten ' + l + '–' + Math.min(l + 1, NB_SEITEN_MAX)));
   var h = '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
   if (nbGesperrt(flaecheFuer)) { h += '<span class="nb-gesperrt">archiviert</span>'; }
   h += '<span class="nb-blaettern">'
      + '<button type="button" onclick="nbBlaettern(-1)" aria-label="Vorige Seite"'
-     + (z.nr <= 1 ? ' disabled' : '') + '>‹</button>'
-     + '<span class="nb-seite">Seite ' + z.nr + '</span>'
+     + (zurueckAus ? ' disabled' : '') + '>‹</button>'
+     + '<span class="nb-seite">' + anzeige + '</span>'
      + '<button type="button" onclick="nbBlaettern(1)" aria-label="Nächste Seite"'
-     + (z.nr >= grenze ? ' disabled' : '') + '>›</button>'
+     + (weiterAus ? ' disabled' : '') + '>›</button>'
      + '</span>';
   return h;
 }
@@ -16632,18 +16739,29 @@ function nbSpringen(nr) {
   var z = notizseiteZerlegen(flaecheFuer);
   var ziel = parseInt(nr, 10);
   nbUmbruchAbschliessen();
-  if (!(ziel >= 1) || ziel > nbLetzteErreichbare(z.buchId)) { return; }
-  flaecheFuer = notizseitenKennung(z.buchId, ziel);
-  flaecheSuche = '';
-  nbInhaltOffen = false;
-  /* Wer beim Schreiben blättert, schreibt auf der neuen Seite weiter. */
-  flaecheModusSetzen(flaecheModus);
+  if (!(ziel >= 1) || ziel > nbLetzteErreichbare(z.buchId) || ziel === z.nr) { return; }
+  var aufschlagen = function () {
+    flaecheFuer = notizseitenKennung(z.buchId, ziel);
+    flaecheSuche = '';
+    nbInhaltOffen = false;
+    /* Wer beim Schreiben blättert, schreibt auf der neuen Seite weiter. */
+    flaecheModusSetzen(flaecheModus);
+  };
+  /* Liegt das Ziel auf einer anderen Doppelseite, schlägt das Blatt um;
+     auf derselben wird nur die andere Seite aktiv. */
+  if (!nbUmschlagen(z.nr, ziel, aufschlagen)) { aufschlagen(); }
 }
 
 function nbBlaettern(richtung) {
   if (!istNotizseite(flaecheFuer)) { return; }
   var z = notizseiteZerlegen(flaecheFuer);
   var ziel = z.nr + richtung;
+  /* Doppelseite: vorwärts auf die linke Seite der nächsten, rückwärts auf
+     die rechte Seite der vorigen Doppelseite. */
+  if (nbDoppeltAktiv()) {
+    var links = z.nr - (z.nr % 2) + 2 * richtung;
+    ziel = (richtung > 0) ? Math.max(1, links) : links + 1;
+  }
   if (ziel > NB_SEITEN_MAX) {
     melde('Das Notizbuch ist voll. In der Übersicht kannst du es archivieren und einen neuen Band anlegen.', null);
     return;
@@ -16758,16 +16876,20 @@ function nbInhaltKnopfHtml() {
 /* Das Blatt um den Inhalt der Fläche: Rand links, Seitenzahl oben rechts. */
 function nbBuehneHtml(inhalt) {
   var z = notizseiteZerlegen(flaecheFuer);
-  var seite = notizseiteFinden(z.buchId, z.nr);
-  var datum = (seite && seite.angelegt) ? langDatum(seite.angelegt) : '';
-  return '<div class="nb-buehne"><div class="nb-blattspalte">'
-       + '<div class="nb-blatt"><div class="nb-rand" id="nbRand" onclick="nbRandTipp(event)" '
-       + 'title="Randnotiz: neben eine Zeile tippen"></div>'
-       + '<div class="nb-inhalt">'
-       + '<span class="nb-datum">' + esc(datum) + '</span>'
-       + '<span class="nb-seitenzahl">' + z.nr + '</span>'
-       + inhalt
-       + '</div></div>'
+  var doppelt = nbDoppeltAktiv();
+  var seiten;
+  if (doppelt) {
+    var l = z.nr - (z.nr % 2);
+    seiten = '<div class="nb-spread" id="nbBuch">'
+           + ((l === z.nr) ? nbBlattHtml(l, inhalt, true, false) : nbBlattHtml(l, null, false, false))
+           + ((l + 1 === z.nr) ? nbBlattHtml(l + 1, inhalt, true, false) : nbBlattHtml(l + 1, null, false, false))
+           + '</div>';
+  } else {
+    seiten = '<div class="nb-einzel" id="nbBuch">' + nbBlattHtml(z.nr, inhalt, true, true) + '</div>';
+  }
+  return '<div class="nb-buehne' + (doppelt ? ' doppelt' : '') + '"><div class="nb-blattspalte">'
+       + '<div class="nb-massrahmen" id="nbMassrahmen"><div class="nb-massstab" id="nbMassstab" '
+       + 'onpointerdown="nbWischAnfang(event)" onpointerup="nbWischEnde(event)">' + seiten + '</div></div>'
        + '<div class="nb-stand-zeile" id="nbZeilenStand"></div>'
        + '</div>'
        + nbInhaltHtml()
@@ -16805,12 +16927,21 @@ function nbPlatzPruefen() {
   }
   var breite = blatt.clientWidth || 0;
   if (!breite) { return; }
-  if (breite < NB_BLATT_BREITE + NB_INHALT_BREITE) {
+  /* Wechselt die Ansicht zwischen Einzel- und Doppelseite, wird neu gezeichnet. */
+  var ansicht = nbDoppeltAktiv() ? 'doppelt' : 'einzeln';
+  if (nbLetzteAnsicht && nbLetzteAnsicht !== ansicht && schirmOffen === 'Flaeche' && !nbBlaetterLaeuft) {
+    nbLetzteAnsicht = ansicht;
+    flaecheZeichnen();
+    return;
+  }
+  nbLetzteAnsicht = ansicht;
+  if (ansicht === 'doppelt' || breite < NB_BLATT_BREITE + NB_INHALT_BREITE) {
     schirm.classList.add('nb-schwebend');
   } else {
     schirm.classList.remove('nb-schwebend');
     if (nbInhaltOffen) { nbInhaltSetzen(false); }
   }
+  nbEinpassen();
 }
 
 
@@ -16852,11 +16983,9 @@ function nbZeilenMessen(text) {
     if (mess.setAttribute) { mess.setAttribute('aria-hidden', 'true'); }
     document.body.appendChild(mess);
   }
-  var vorbild = (typeof document.querySelector === 'function')
-              ? document.querySelector('#flaecheBlatt .nb-blatt') : null;
-  var breite = (vorbild && vorbild.getBoundingClientRect)
-             ? vorbild.getBoundingClientRect().width : NB_BLATT_BREITE;
-  if (mess.style) { mess.style.width = (breite || NB_BLATT_BREITE) + 'px'; }
+  /* Gemessen wird im festen Seitenformat — nicht an der gerade gezeigten,
+     maßstäblich veränderten Seite. So bricht jede Seite überall gleich um. */
+  if (mess.style) { mess.style.width = NB_BLATT_BREITE + 'px'; }
 
   /* Gemessen wird die ganze Seite — ohne Suche und Filter. */
   var merkArt = flaecheArt;
@@ -17055,9 +17184,11 @@ function nbAktuelleSeite() {
 
 /* Die gezeichnete Zeile mit dieser Nummer — oder der Block, der sie
    enthält (eine Tabelle trägt die Nummer ihrer ersten Zeile). */
-function nbZeilenElement(nr) {
-  if (typeof document.querySelectorAll !== 'function') { return null; }
-  var alle = document.querySelectorAll('#flaecheBlatt .nb-inhalt [data-z]');
+function nbZeilenElement(nr, wurzel) {
+  var basis = wurzel || document;
+  if (typeof basis.querySelectorAll !== 'function') { return null; }
+  var alle = basis.querySelectorAll(wurzel ? '.nb-inhalt [data-z]'
+                                           : '#flaecheBlatt .nb-blatt.aktiv .nb-inhalt [data-z]');
   var beste = null;
   var i;
   for (i = 0; i < alle.length; i++) {
@@ -17067,35 +17198,50 @@ function nbZeilenElement(nr) {
   return beste;
 }
 
+/* Randnotizen auf allen offenen Seiten. Die Abstände werden am
+   Bildschirm gemessen und ins Buchmaß zurückgerechnet — das Buch ist
+   maßstäblich eingepasst. Auf der nicht aktiven Seite sind sie nur zu
+   sehen; ein Tipp schlägt erst die Seite auf. */
 function nbRandZeichnen() {
-  var rand = document.getElementById('nbRand');
-  if (!rand || !istNotizseite(flaecheFuer)) { return; }
-  var seite = nbAktuelleSeite();
-  if (flaecheModus !== 'ansicht' || !seite || !Array.isArray(seite.rand) || !seite.rand.length) {
-    rand.innerHTML = '';
-    return;
+  if (!istNotizseite(flaecheFuer) || typeof document.querySelectorAll !== 'function') { return; }
+  var mass = document.getElementById('nbMassstab');
+  var m = (mass && mass.getAttribute) ? (parseFloat(mass.getAttribute('data-m')) || 1) : 1;
+  var z = notizseiteZerlegen(flaecheFuer);
+  var blaetter = document.querySelectorAll('#nbBuch > .nb-blatt[data-seite]');
+  var k;
+  for (k = 0; k < blaetter.length; k++) {
+    var blatt = blaetter[k];
+    var rand = blatt.querySelector('.nb-rand');
+    if (!rand) { continue; }
+    var aktiv = blatt.classList.contains('aktiv');
+    var seite = notizseiteFinden(z.buchId, parseInt(blatt.getAttribute('data-seite'), 10));
+    if ((aktiv && flaecheModus !== 'ansicht') || !seite || !Array.isArray(seite.rand) || !seite.rand.length) {
+      rand.innerHTML = '';
+      continue;
+    }
+    var zeilen = String(seite.text || '').split('\n');
+    var oben = rand.getBoundingClientRect().top;
+    var h = '';
+    var i;
+    for (i = 0; i < seite.rand.length; i++) {
+      var r = seite.rand[i];
+      var el = nbZeilenElement(nbRandIndex(zeilen, r), blatt);
+      if (!el || !el.getBoundingClientRect) { continue; }
+      var y = Math.max(0, Math.round((el.getBoundingClientRect().top - oben) / m));
+      h += aktiv
+         ? ('<button type="button" class="nb-randnotiz" style="top:' + y + 'px" '
+            + 'onclick="event.stopPropagation();nbRandOeffnen(\'' + esc(r.id) + '\')">' + esc(r.text) + '</button>')
+         : ('<span class="nb-randnotiz" style="top:' + y + 'px">' + esc(r.text) + '</span>');
+    }
+    rand.innerHTML = h;
   }
-  var zeilen = String(seite.text || '').split('\n');
-  var oben = rand.getBoundingClientRect ? rand.getBoundingClientRect().top : 0;
-  var h = '';
-  var i;
-  for (i = 0; i < seite.rand.length; i++) {
-    var r = seite.rand[i];
-    var el = nbZeilenElement(nbRandIndex(zeilen, r));
-    if (!el || !el.getBoundingClientRect) { continue; }
-    var y = Math.max(0, Math.round(el.getBoundingClientRect().top - oben));
-    h += '<button type="button" class="nb-randnotiz" style="top:' + y + 'px" '
-       + 'onclick="event.stopPropagation();nbRandOeffnen(\'' + esc(r.id) + '\')">'
-       + esc(r.text) + '</button>';
-  }
-  rand.innerHTML = h;
 }
 
 /* Ein Tipp in den Rand: Welche Zeile steht daneben? */
 function nbRandTipp(e) {
   if (!e || nbGesperrt(flaecheFuer) || flaecheModus !== 'ansicht') { return; }
   if (typeof document.querySelectorAll !== 'function') { return; }
-  var alle = document.querySelectorAll('#flaecheBlatt .nb-inhalt [data-z]');
+  var alle = document.querySelectorAll('#flaecheBlatt .nb-blatt.aktiv .nb-inhalt [data-z]');
   var treffer = -1;
   var i;
   for (i = 0; i < alle.length; i++) {
@@ -17373,6 +17519,215 @@ function nbTrefferOeffnen(i) {
     flaecheSucheAuf = true;
     flaecheZeichnen();
   }
+}
+
+
+/* ============================================================
+   Notizbücher, Teil 3: festes Seitenformat, Doppelseite, Umblättern
+
+   Eine Seite ist immer 600 Punkte breit (etwa A5 hoch) und wird nur
+   maßstäblich eingepasst — so bricht sie auf jedem Gerät gleich um.
+   Auf großen Bildschirmen liegt das Buch als Doppelseite offen: links
+   die gerade, rechts die ungerade Seite, Seite 1 rechts neben dem
+   Innendeckel. Der Schreibrand liegt außen. Bearbeitet wird die aktive
+   Seite; ein Tipp auf die andere macht sie aktiv. Umgeblättert wird
+   mit einer 3D-Drehung um den Falz — wer „Bewegung reduzieren"
+   eingestellt hat, bekommt sie nicht.
+   ============================================================ */
+
+var NB_DOPPELT_AB = 1100;        /* ab dieser Fensterbreite liegt das Buch doppelt offen */
+var NB_SEITE_H = 840;            /* Höhe einer Seite im Buchmaß (30 Zeilen) */
+var NB_LUFT_OBEN = 100;          /* das drehende Blatt ragt perspektivisch über das Buch */
+var nbBlaetterLaeuft = false;
+var nbWischStart = null;
+var nbLetzteAnsicht = '';
+
+function nbDoppeltAktiv() {
+  return istBreit() && typeof window.innerWidth === 'number' && window.innerWidth >= NB_DOPPELT_AB;
+}
+
+function nbRuhig() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+/* Ungerade Seiten liegen rechts, gerade links — auch einzeln gezeigt,
+   damit der Rand an derselben Stelle bleibt wie im offenen Buch. */
+function nbSeitenSeite(nr) {
+  return (nr % 2 === 1) ? 'rechts' : 'links';
+}
+
+function nbDeckelHtml(nr) {
+  var b = istNotizseite(flaecheFuer) ? notizbuchFinden(notizseiteZerlegen(flaecheFuer).buchId) : null;
+  var innen = (nr <= 0);
+  return '<div class="nb-deckel ' + (innen ? 'links' : 'rechts') + '"><div class="nb-deckeltext">'
+       + (innen ? '<b>' + esc(b ? (b.name || 'Notizbuch') : 'Notizbuch') + '</b><span>Innendeckel</span>'
+                : '<span>Rückdeckel</span>')
+       + '</div></div>';
+}
+
+/* Ein Blatt des Buchs. inhalt: das HTML der aktiven Seite (Ansicht oder
+   Schreibfeld); fehlt es, wird die Seite als Ansicht gezeichnet. */
+function nbBlattHtml(nr, inhalt, aktiv, einzeln) {
+  if (nr <= 0 || nr > NB_SEITEN_MAX) { return nbDeckelHtml(nr); }
+  var z = notizseiteZerlegen(flaecheFuer);
+  var seite = notizseiteFinden(z.buchId, nr);
+  var datum = (seite && seite.angelegt) ? langDatum(seite.angelegt) : '';
+  var lage = nbSeitenSeite(nr);
+  var html = inhalt;
+  if (html === null || html === undefined) {
+    var merkArt = flaecheArt;
+    flaecheArt = {};
+    html = (seite && String(seite.text || '').trim().length)
+         ? '<div class="fl-ansicht">' + flaecheAnsichtHtml(String(seite.text), '').html + '</div>' : '';
+    flaecheArt = merkArt;
+  }
+  var ecke = function (richtung, seiteDerEcke) {
+    return '<button type="button" class="nb-ecke ' + seiteDerEcke + '" '
+         + 'aria-label="' + (richtung > 0 ? 'Weiterblättern' : 'Zurückblättern') + '" title="Umblättern" '
+         + 'onclick="event.stopPropagation();nbBlaettern(' + richtung + ')"></button>';
+  };
+  var ecken = einzeln ? (ecke(-1, 'links') + ecke(1, 'rechts'))
+                      : ecke(lage === 'rechts' ? 1 : -1, lage);
+  return '<div class="nb-blatt ' + lage + (aktiv ? ' aktiv' : ' passiv') + '" data-seite="' + nr + '"'
+       + (aktiv ? '' : ' onclick="nbSpringen(' + nr + ')" title="Diese Seite aufschlagen"') + '>'
+       + '<div class="nb-rand"'
+       + (aktiv ? ' id="nbRand" onclick="nbRandTipp(event)" title="Randnotiz: neben eine Zeile tippen"' : '')
+       + '></div>'
+       + '<div class="nb-inhalt"><span class="nb-datum">' + esc(datum) + '</span>' + html + '</div>'
+       + '<span class="nb-seitenzahl">' + nr + '</span>'
+       + ecken
+       + '</div>';
+}
+
+function nbFuellblattHtml(lage) {
+  return '<div class="nb-blatt ' + lage + ' passiv nb-fuell"><div class="nb-rand"></div>'
+       + '<div class="nb-inhalt"></div></div>';
+}
+
+/* Das Buch maßstäblich in die verfügbare Breite setzen, höchstens in
+   Originalgröße. Nicht zusätzlich in die Höhe: In der Workbench mit Kopf
+   und Leiste würde die Schrift sonst auf 10 bis 12 Pixel schrumpfen —
+   zu klein zum Schreiben. Wird es höher als der Platz, rollt die Seite. */
+function nbEinpassen() {
+  var rahmen = document.getElementById('nbMassrahmen');
+  var mass = document.getElementById('nbMassstab');
+  var flaeche = document.getElementById('flaecheBlatt');
+  if (!rahmen || !mass || !flaeche || !mass.style || !rahmen.style || !flaeche.clientWidth) { return; }
+  var doppelt = nbDoppeltAktiv();
+  var schirm = document.getElementById('schirmFlaeche');
+  var schwebend = !!(schirm && schirm.classList && schirm.classList.contains('nb-schwebend'));
+  var breite = doppelt ? (NB_BLATT_BREITE * 2 + 30) : NB_BLATT_BREITE;
+  var luft = doppelt ? NB_LUFT_OBEN : 0;
+  var hoehe = luft + NB_SEITE_H;
+  var m = (flaeche.clientWidth - 40 - (schwebend ? 0 : NB_INHALT_BREITE)) / breite;
+  m = Math.max(0.3, Math.min(m, 1));
+  mass.style.transform = 'translate(' + (doppelt ? Math.round(15 * m) : 0) + 'px,'
+                       + Math.round(luft * m) + 'px) scale(' + m + ')';
+  if (mass.setAttribute) { mass.setAttribute('data-m', String(m)); }
+  rahmen.style.width = Math.round(breite * m) + 'px';
+  rahmen.style.height = Math.round(hoehe * m) + 'px';
+}
+
+/* Ein oder mehrere Blätter schlagen um. Gibt false zurück, wenn nicht
+   animiert wird — dann wechselt der Aufrufer sofort. Bei großen Sprüngen
+   fächern bis zu fünf Blätter kurz durch, erst das letzte zeigt das Ziel. */
+function nbUmschlagen(alt, ziel, fertig) {
+  var buch = document.getElementById('nbBuch');
+  if (!buch || typeof buch.animate !== 'function' || nbRuhig() || schirmOffen !== 'Flaeche') { return false; }
+  var doppelt = nbDoppeltAktiv();
+  var altL = doppelt ? alt - (alt % 2) : alt;
+  var zielL = doppelt ? ziel - (ziel % 2) : ziel;
+  if (altL === zielL) { return false; }
+  if (nbBlaetterLaeuft) { return true; }
+  nbBlaetterLaeuft = true;
+  var vor = zielL > altL;
+  var anzahl = Math.min(5, Math.abs(zielL - altL) / (doppelt ? 2 : 1));
+  var dauer = (anzahl > 1) ? 520 : 720;
+  var abstand = 120;
+
+  /* Unter den umschlagenden Blättern liegt schon die Zielseite. */
+  var unten = buch.children[doppelt ? (vor ? 1 : 0) : 0];
+  if (unten) {
+    unten.outerHTML = doppelt ? nbBlattHtml(vor ? zielL + 1 : zielL, null, false, false)
+                              : nbBlattHtml(ziel, null, false, true);
+  }
+
+  var fertigZahl = 0;
+  var i;
+  for (i = 0; i < anzahl; i++) {
+    var w = document.createElement('div');
+    w.className = 'nb-wende';
+    var vornH;
+    var hintenH;
+    var bahn;
+    if (doppelt) {
+      /* Vorwärts dreht das rechte Blatt um den Falz nach links,
+         rückwärts das linke nach rechts. */
+      w.style.left = (vor ? NB_BLATT_BREITE : 0) + 'px';
+      w.style.transformOrigin = (vor ? 'left' : 'right') + ' center';
+      vornH = (i === 0) ? nbBlattHtml(vor ? altL + 1 : altL, null, false, false)
+                        : nbFuellblattHtml(vor ? 'rechts' : 'links');
+      hintenH = (i === anzahl - 1) ? nbBlattHtml(vor ? zielL : zielL + 1, null, false, false)
+                                   : nbFuellblattHtml(vor ? 'links' : 'rechts');
+      bahn = vor ? [0, -90, -180] : [0, 90, 180];
+    } else {
+      w.style.left = '0px';
+      w.style.transformOrigin = 'left center';
+      vornH = (i === 0) ? nbBlattHtml(alt, null, false, true) : nbFuellblattHtml('rechts');
+      hintenH = nbFuellblattHtml('links');
+      bahn = vor ? [0, -80, -150] : [-150, -80, 0];
+    }
+    w.innerHTML = '<div class="nb-wende-vorn">' + vornH + '</div>'
+                + '<div class="nb-wende-hinten">' + hintenH + '</div>'
+                + '<div class="nb-wende-schatten"></div>';
+    buch.appendChild(w);
+    var ani = w.animate([
+      { transform: 'rotateY(' + bahn[0] + 'deg)' },
+      { transform: 'rotateY(' + bahn[1] + 'deg) translateZ(2px)' },
+      { transform: 'rotateY(' + bahn[2] + 'deg)' }
+    ], { duration: dauer, delay: i * abstand, easing: 'cubic-bezier(.35,.6,.25,1)', fill: 'forwards' });
+    var schatten = w.querySelector('.nb-wende-schatten');
+    if (schatten) {
+      schatten.animate([{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }],
+                       { duration: dauer, delay: i * abstand, fill: 'forwards' });
+    }
+    if (!doppelt) {
+      /* Einzeln verschwindet das Blatt am Ende der Bewegung. */
+      w.animate(vor ? [{ opacity: 1 }, { opacity: 1, offset: 0.6 }, { opacity: 0 }]
+                    : [{ opacity: 0 }, { opacity: 1, offset: 0.4 }, { opacity: 1 }],
+                { duration: dauer, delay: i * abstand, fill: 'forwards' });
+    }
+    ani.onfinish = function () {
+      fertigZahl++;
+      if (fertigZahl === anzahl) {
+        nbBlaetterLaeuft = false;
+        fertig();
+      }
+    };
+  }
+  return true;
+}
+
+/* Wischen und Pfeiltasten blättern — nur in der Ansicht, beim Schreiben
+   gehören beide dem Text. */
+function nbWischAnfang(e) {
+  nbWischStart = (e && flaecheModus === 'ansicht') ? { x: e.clientX, y: e.clientY } : null;
+}
+
+function nbWischEnde(e) {
+  if (!nbWischStart || !e) { nbWischStart = null; return; }
+  var dx = e.clientX - nbWischStart.x;
+  var dy = e.clientY - nbWischStart.y;
+  nbWischStart = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) { nbBlaettern(dx < 0 ? 1 : -1); }
+}
+
+function nbTaste(e) {
+  if (!e || schirmOffen !== 'Flaeche' || !istNotizseite(flaecheFuer) || flaecheModus !== 'ansicht') { return; }
+  var ziel = e.target;
+  if (ziel && /^(INPUT|TEXTAREA|SELECT)$/.test(String(ziel.tagName || ''))) { return; }
+  if (e.key === 'ArrowRight') { nbBlaettern(1); }
+  else if (e.key === 'ArrowLeft') { nbBlaettern(-1); }
 }
 
 
@@ -17924,6 +18279,7 @@ function pinInhalt(p) {
       var pz = notizseiteZerlegen(p.zielId);
       if (!notizbuchFinden(pz.buchId)) { return aus; }
       aus.lebt = true;
+      aus.kontext = nbKontext(notizbuchFinden(pz.buchId));
       aus.titel = nbSeitenName(pz.buchId + ':' + pz.nr);
       aus.fuss = flaecheVorschau(flaecheText(p.zielId)) || 'leer';
       return aus;
@@ -17939,6 +18295,9 @@ function pinInhalt(p) {
     if (!istFrei) {
       var vv = vorhabenFinden(p.zielId, 'projekt') || vorhabenFinden(p.zielId, 'ziel');
       aus.kontext = vv ? vv.kontext : '';
+    } else {
+      var gp = gedankeFinden(String(p.zielId).slice(2));
+      aus.kontext = gp ? (gp.kontext || '') : '';
     }
     return aus;
   }
@@ -18037,6 +18396,8 @@ function pinnwandZeichnen() {
     var artName = (p.art === 'flaeche' && istNotizseite(p.zielId)) ? 'Notizseite'
                 : (PIN_ARTEN[p.art] || '');
     h += '<div class="z-art">' + esc(artName) + '</div>';
+    /* Noch ohne Beruf/Privat: steht unter beiden Filtern — und sagt es. */
+    if (!z.kontext) { h += '<div class="z-ohne">ohne Kontext</div>'; }
     h += '<div class="z-titel">' + esc(z.titel) + '</div>';
     h += '<div class="z-fuss">';
     if (z.kasten) {
@@ -21077,6 +21438,7 @@ function starten() {
   window.addEventListener('resize', darstellungAnwenden);
   window.addEventListener('resize', nbPlatzPruefen);
   window.addEventListener('resize', nbRandZeichnen);
+  document.addEventListener('keydown', nbTaste);
   wischenAnmelden();
   window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();
