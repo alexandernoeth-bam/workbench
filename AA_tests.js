@@ -1015,6 +1015,40 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   window.innerWidth = merkB; DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__nbZoomApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkB = window.innerWidth; var merkL = window.localStorage; DB = leereDatenbank(); var r = {};'
+                 + '   var abgelegt = {}; window.localStorage = { getItem: function(k){ return abgelegt[k] || null; },'
+                 + '     setItem: function(k, v){ abgelegt[k] = v; }, removeItem: function(k){ delete abgelegt[k]; } };'
+                 + '   nbZoomStand = null; window.innerWidth = 1400;'
+                 + '   r.start = nbZoom().art + ":" + nbZoom().faktor + ":" + nbDoppeltAktiv();'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0]; var k = function(n){ return notizseitenKennung(b.id, n); };'
+                 + '   flaecheSetzen(k(1), "Erste Seite"); flaecheFuer = k(1); flaecheModus = "ansicht";'
+                 + '   nbZoomSchritt(1); nbZoomSchritt(1); r.groesser = nbZoom().faktor;'
+                 + '   var i; for (i = 0; i < 20; i++) { nbZoomSchritt(1); } r.hoechstens = nbZoom().faktor;'
+                 + '   for (i = 0; i < 30; i++) { nbZoomSchritt(-1); } r.mindestens = nbZoom().faktor;'
+                 + '   nbZoomArt("seite"); r.seite = nbZoom().art + ":" + nbZoom().faktor + ":" + nbDoppeltAktiv();'
+                 + '   r.gemerkt = JSON.parse(abgelegt["workbench-nb-zoom"] || "{}").art === "seite";'
+                 + '   nbZoomStand = null; r.geladen = nbZoom().art === "seite";'
+                 + '   nbZoomArt("unsinn"); r.unsinn = nbZoom().art;'
+                 + '   nbZoomArt("doppel");'
+                 + '   window.innerWidth = 800; r.doppelGesperrt = /disabled onclick="nbZoomArt\\(.doppel.\\)"/.test(nbZoomHtml()); window.innerWidth = 1400;'
+                 + '   flaecheZeichnen(); var kopf = document.getElementById("flaecheKopf").innerHTML;'
+                 + '   r.kopf = /nbFilterMenueUm\\(\\)/.test(kopf) && /nbBandMenueUm\\(\\)/.test(kopf) && /nbZoomArt/.test(kopf)'
+                 + '     && /fl-pin/.test(kopf) && /id="flaecheArten"/.test(kopf);'
+                 + '   nbFilterMenueUm(); r.filterAuf = /fl-arten[^"]*menue-auf/.test(document.getElementById("flaecheKopf").innerHTML);'
+                 + '   nbBandMenueUm(); r.einMenue = nbBandMenueAuf === true && nbFilterAuf === false;'
+                 + '   nbBandMenueUm();'
+                 + '   DB.gedanken = [{ id: "g1", titel: "G", text: "x", geaendert: 1 }]; flaecheOeffnen("g:g1");'
+                 + '   r.nurNotiz = !/nbZoomArt/.test(document.getElementById("flaecheKopf").innerHTML) && nbFilterAuf === false;'
+                 + '   flaecheFuer = k(1); nbSpringen(150); r.leereSeite = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   nbSpringen(201); r.hinterDemEnde = notizseiteZerlegen(flaecheFuer).nr;'
+                 + '   r.nichtsAngelegt = DB.notizseiten.length === 1;'
+                 + '   nbArchivieren(b.id); r.archiv = nbLetzteErreichbare(b.id);'
+                 + '   nbZoomStand = { art: "doppel", faktor: 1 }; window.innerWidth = merkB; window.localStorage = merkL;'
+                 + '   DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -13086,8 +13120,9 @@ console.log('\n143. Notizbücher');
     pruefe(e.leerKeinSatz === true, 'Blättern auf eine leere Seite legt keinen Datensatz an');
     pruefe(e.geschrieben === true, 'geschriebener Text landet als Seite im Notizbuch');
     pruefe(e.name === 'Notizbuch 1', 'die Fläche trägt den Namen des Notizbuchs');
-    pruefe(e.stand === 1 && e.grenze === 2, 'man kann bis zur ersten freien Seite blättern');
-    pruefe(e.blaettern === '2,2,1', 'über die erste freie Seite hinaus geht es nicht, zurück schon');
+    /* Seit v5.10.0: durch alle Seiten blättern, auch leere — wie im Buch. */
+    pruefe(e.stand === 1 && e.grenze === 200, 'man kann durch alle Seiten blättern, auch leere');
+    pruefe(e.blaettern === '2,4,1', 'geblättert wird auch über leere Seiten, zurück bis Seite 1');
     pruefe(e.titel === 'Lenkungskreis', 'das Verzeichnis nimmt die erste Zeile ohne Zeichen');
     pruefe(e.folge === 'Arbeit Band 4|Ideen Band 2', 'ein neuer Band zählt weiter');
     pruefe(e.kleid === true, 'die Seite trägt Blatt, Seitenzahl und Verzeichnis');
@@ -13532,7 +13567,7 @@ console.log('\n154. Doppelseite und Seitenformat');
     pruefe(e.buehneDoppelt === true, 'beide Seiten stehen nebeneinander, nur die aktive ist beschreibbar');
     pruefe(e.kopf === true, 'der Kopf nennt beide Seitenzahlen');
     pruefe(e.umschlagenSandkasten === true, 'ohne Animationsfähigkeit wird sofort umgeschlagen');
-    pruefe(e.blaetternDoppelt === '14,14,13,11', 'geblättert wird um eine Doppelseite, nie über die erste freie hinaus');
+    pruefe(e.blaetternDoppelt === '14,16,15,13', 'geblättert wird um eine Doppelseite, auch über leere Seiten');
     pruefe(e.gleicheDoppelseite === 13, 'ein Tipp auf die andere Seite schlägt sie auf, ohne umzublättern');
     pruefe(e.vorn === 1, 'vor Seite 1 geht es nicht weiter zurück');
     pruefe(e.tasteSchreiben === 12 && e.tasteFeld === 12, 'beim Schreiben blättern die Pfeiltasten nicht');
@@ -13576,6 +13611,56 @@ console.log('\n155. Lesebänder');
     pruefe(e.blatt === true, 'das Blatt „Lesebänder“ zeigt alle fünf zum Legen und Umbenennen');
     pruefe(e.archiv === true && e.archivBlatt === true, 'im Archiv lassen sich Bänder nur aufschlagen');
     pruefe(e.abgleich === true, 'die Bänder gehen mit dem Notizbuch durch den Abgleich');
+  }
+}
+
+/* ============================================================
+   156. Einzeiliger Kopf, Zoom, alle Seiten blätterbar (v5.10.0)
+   Grund: Am großen Bildschirm nahm der Kopf fünf Zeilen ein, das Buch
+   ließ sich nur bis zur ersten freien Seite blättern, und am iPad fehlte
+   ein Zoom, der eine Seite groß macht.
+   ============================================================ */
+console.log('\n156. Kopf, Zoom, alle Seiten');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__nbZoomApi;
+  pruefe(/body\.breit #schirmFlaeche\.als-notizbuch > \.vh-kopf > \.vh-zeile\{display:none\}/.test(QUELLE)
+         && /body\.breit #schirmFlaeche\.als-notizbuch \.fl-arten\.menue-auf\{display:flex\}/.test(QUELLE),
+         'am großen Bildschirm steht der Kopf einer Notizseite in einer Zeile, Filter als Menü');
+  pruefe(/var NB_LUFT_OBEN = 45;/.test(skript) && /perspective:6000px/.test(QUELLE),
+         'über dem Buch bleibt nur noch wenig Luft für das drehende Blatt');
+  /* Ein liegendes Band gehört an den Falz: seit der Rand außen liegt,
+     verdeckte es sonst den Textanfang rechter Seiten. */
+  const band = skript.match(/function nbBaenderImBuchHtml\([\s\S]*?\n\}/);
+  pruefe(band && /var amFalz = \(b\.seite % 2 === 0\) \? \(NB_BLATT_BREITE - 15 - i \* 15\) : \(1 \+ i \* 15\)/.test(band[0])
+         && /\.nb-band\{position:absolute;width:14px;/.test(QUELLE),
+         'ein liegendes Band liegt am Falz, nicht auf dem Text');
+  const platz = skript.match(/function nbPlatzPruefen\([\s\S]*?\n\}/);
+  pruefe(platz && /seiteGross/.test(platz[0]),
+         'bei „eine Seite“ schwebt das Verzeichnis, statt die große Seite zu überdecken');
+  const zoom = skript.match(/function nbZoomMerken\([\s\S]*?\n\}/);
+  pruefe(zoom && /localStorage/.test(zoom[0]) && !/spaeterSichern/.test(zoom[0]),
+         'der Zoom bleibt auf dem Gerät und geht nicht in den Abgleich');
+  let e = null;
+  if (!t) {
+    warn('Zoom nicht auswertbar');
+  } else {
+    try { e = t.pruefe(); }
+    catch (x) { fail('Zoom läuft nicht: ' + x.message); }
+  }
+  if (t && e) {
+    pruefe(e.start === 'doppel:1:true', 'ohne gemerkten Zoom liegt das Buch doppelt offen, 100 %');
+    pruefe(e.groesser === 1.2 && e.hoechstens === 2 && e.mindestens === 0.6, 'der Zoom geht in 10-%-Schritten von 60 bis 200 %');
+    pruefe(e.seite === 'seite:1:false', '„eine Seite“ zeigt nur die aktive Seite, der Faktor beginnt bei 100 %');
+    pruefe(e.gemerkt === true && e.geladen === true, 'das Gerät merkt sich den Zoom');
+    pruefe(e.unsinn === 'seite', 'eine unbekannte Zoom-Art wird abgewiesen');
+    pruefe(e.doppelGesperrt === true, 'unter 1100 px ist die Doppelseite nicht wählbar');
+    pruefe(e.kopf === true, 'der Kopf trägt Filter, Nadel, Lesebänder und Zoom');
+    pruefe(e.filterAuf === true && e.einMenue === true, 'die Menüs öffnen sich, eines schließt das andere');
+    pruefe(e.nurNotiz === true, 'Gedankenflächen bleiben wie sie sind, die Menüs sind beim Öffnen zu');
+    pruefe(e.leereSeite === 150 && e.hinterDemEnde === 150, 'man kann jede der 200 Seiten aufschlagen, nicht dahinter');
+    pruefe(e.nichtsAngelegt === true, 'Blättern auf leere Seiten legt keine Datensätze an');
+    pruefe(e.archiv === 1, 'im Archiv bleibt es beim Beschriebenen');
   }
 }
 
