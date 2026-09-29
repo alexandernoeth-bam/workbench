@@ -83,9 +83,11 @@ console.log('\n1. Bildschirme und Navigation');
      über das Zahnrad im Tag zu erreichen. */
   /* Seit v3.5.0 sind die Abläufe ein Reiter innerhalb der Aufgaben: Ein
      Ablauf ist etwas, das man abarbeitet. */
+  /* Seit v5.7.0: die Suche in den Notizbüchern — erreichbar aus der
+     Übersicht und von jeder Notizseite. */
   const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
                      'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen',
-                      'Routine'];
+                      'Routine', 'Notizsuche'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -226,7 +228,7 @@ console.log('\n5. Element-IDs');
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
   const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
                       'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen',
-                      'Routine'];
+                      'Routine', 'Notizsuche'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -718,6 +720,117 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.lupeZuLeert = flaecheSucheAuf === false && flaecheSuche === "";'
                  + '   flaecheSucheUm(); r.lupeAuf = flaecheSucheAuf === true;'
                  + '   document.activeElement = vorher; flaecheSucheAuf = false; flaecheSuche = "";'
+                 + '   DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__nbUmbruchApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; var merkMess = nbZeilenMessen; var merkMax = NB_ZEILEN;'
+                 + '   var merkSchirm = schirmOffen; var merkModus = flaecheModus; DB = leereDatenbank(); var r = {};'
+                 + '   nbZeilenMessen = function(t){ if (!String(t).trim().length) { return 0; }'
+                 + '     return String(t).split("\\n").reduce(function(n, z){ return n + (/^#{1,2}\\s/.test(z) ? 2 : 1); }, 0); };'
+                 + '   NB_ZEILEN = 5;'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0]; var k = function(n){ return notizseitenKennung(b.id, n); };'
+                 + '   var txt = function(n){ return flaecheText(k(n)); };'
+                 + '   flaecheSetzen(k(1), "a\\nb\\nc\\nd\\ne\\nf\\ng"); nbUeberlaufWeiter(b.id, 1);'
+                 + '   r.einfach = txt(1) + "|" + txt(2);'
+                 + '   flaecheSetzen(k(1), "1\\n2\\n3\\n4\\n5\\n6\\n7\\n8"); flaecheSetzen(k(2), "w\\nx\\ny\\nz");'
+                 + '   nbUeberlaufWeiter(b.id, 1); r.kaskade = [txt(1), txt(2), txt(3)].join("|");'
+                 + '   nbAnlegen(); var b2 = DB.notizbuecher[1]; var k2 = function(n){ return notizseitenKennung(b2.id, n); };'
+                 + '   flaecheSetzen(k2(1), "a\\nb\\nc\\nd\\n\\n\\nf"); nbUeberlaufWeiter(b2.id, 1);'
+                 + '   r.leerzeilen = flaecheText(k2(2));'
+                 + '   flaecheSetzen(k2(1), "# Kopf\\nw\\nx\\ny\\nz");'
+                 + '   r.ueberschrift = nbSeiteUmbrechen(b2.id, 1) ? flaecheText(k2(1)) : "(passt)";'
+                 + '   nbAnlegen(); var b3 = DB.notizbuecher[2]; var k3 = function(n){ return notizseitenKennung(b3.id, n); };'
+                 + '   flaecheSetzen(k3(1), "a\\nb\\nc\\n| A | B |\\n|---|---|\\n| 1 | 2 |");'
+                 + '   nbUeberlaufWeiter(b3.id, 1); r.tabelle = flaecheText(k3(1)) + "#" + flaecheText(k3(2));'
+                 + '   flaecheSetzen(k3(5), "| 1 | 2 |\\n| 3 | 4 |\\n| 5 | 6 |\\n| 7 | 8 |\\n| 9 | 0 |\\n| a | b |");'
+                 + '   var zg = nbSeiteUmbrechen(b3.id, 5); r.zuGross = !!(zg && zg.zuGross) && flaecheText(k3(6)) === "";'
+                 + '   flaecheSetzen(k3(200), "1\\n2\\n3\\n4\\n5\\n6"); var vo = nbSeiteUmbrechen(b3.id, 200);'
+                 + '   r.voll = !!(vo && vo.voll) && flaecheText(k3(200)).split("\\n").length === 6;'
+                 + '   nbAnlegen(); var b4 = DB.notizbuecher[3]; var k4 = function(n){ return notizseitenKennung(b4.id, n); };'
+                 + '   flaecheSetzen(k4(1), "a\\nb\\nc\\nd\\ne\\nf\\ng"); flaecheSetzen(k4(2), "neu");'
+                 + '   notizseiteFinden(b4.id, 1).rand = [{ id: "r1", anker: "b", nr: 1, text: "bleibt" },'
+                 + '     { id: "r2", anker: "g", nr: 6, text: "wandert" }];'
+                 + '   notizseiteFinden(b4.id, 2).rand = [{ id: "r3", anker: "neu", nr: 0, text: "alt" }];'
+                 + '   nbUeberlaufWeiter(b4.id, 1);'
+                 + '   var s1 = notizseiteFinden(b4.id, 1).rand; var s2 = notizseiteFinden(b4.id, 2).rand;'
+                 + '   r.randBleibt = s1.length === 1 && s1[0].id === "r1";'
+                 + '   r.randWandert = s2.map(function(x){ return x.id + ":" + x.nr; }).join(",");'
+                 + '   nbAnlegen(); var b5 = DB.notizbuecher[4]; var k5 = function(n){ return notizseitenKennung(b5.id, n); };'
+                 + '   schirmOffen = "Flaeche"; flaecheModus = "schreiben"; flaecheFuer = k5(1);'
+                 + '   var t5 = "a\\nb\\nc\\nd\\ne\\nfg"; flaecheSetzen(k5(1), t5);'
+                 + '   var feld = document.getElementById("flaecheFeld"); feld.value = t5;'
+                 + '   feld.selectionStart = feld.selectionEnd = t5.length; nbUmbruchJetzt();'
+                 + '   r.markeFolgt = (flaecheFuer === k5(2)) && feld.selectionStart === 2 && flaecheText(k5(2)) === "fg";'
+                 + '   nbAnlegen(); var b6 = DB.notizbuecher[5]; var k6 = function(n){ return notizseitenKennung(b6.id, n); };'
+                 + '   flaecheFuer = k6(1); var t6 = "a\\nb\\nc\\nd\\ne\\nf"; flaecheSetzen(k6(1), t6);'
+                 + '   feld.value = t6; feld.selectionStart = feld.selectionEnd = 1; nbUmbruchJetzt();'
+                 + '   r.markeBleibt = (flaecheFuer === k6(1)) && feld.value === "a\\nb\\nc\\nd\\ne" && feld.selectionStart === 1'
+                 + '     && flaecheText(k6(2)) === "f";'
+                 + '   nbArchivieren(b6.id); flaecheSetzen(k6(1), "x"); r.archivFest = flaecheText(k6(1)) === "a\\nb\\nc\\nd\\ne";'
+                 + '   nbZeilenMessen = merkMess; NB_ZEILEN = merkMax; schirmOffen = merkSchirm; flaecheModus = merkModus;'
+                 + '   DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__nbRandApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank(); var r = {};'
+                 + '   var zl = ["a", "Lieferzeiten", "c", "Lieferzeiten", "e"];'
+                 + '   r.anker = nbRandIndex(zl, { anker: "Lieferzeiten", nr: 2 }) + "," + nbRandIndex(zl, { anker: "Lieferzeiten", nr: 4 });'
+                 + '   r.ersatz = nbRandIndex(zl, { anker: "weg", nr: 2 }) + "," + nbRandIndex(zl, { anker: "weg", nr: 99 });'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0]; var id = notizseitenKennung(b.id, 1);'
+                 + '   flaecheSetzen(id, "# Kopf\\nRisikoliste schicken\\nc"); flaecheFuer = id; flaecheModus = "ansicht";'
+                 + '   var feld = document.getElementById("nbRandFeld");'
+                 + '   nbRandFuer = { nr: 1, id: "" }; feld.value = "   "; nbRandSpeichern();'
+                 + '   r.leerNichts = !(notizseiteFinden(b.id, 1).rand || []).length;'
+                 + '   nbRandFuer = { nr: 1, id: "" }; feld.value = "bis Fr"; nbRandSpeichern();'
+                 + '   var rd = notizseiteFinden(b.id, 1).rand;'
+                 + '   r.angelegt = rd.length === 1 && rd[0].anker === "Risikoliste schicken" && rd[0].text === "bis Fr";'
+                 + '   nbRandOeffnen(rd[0].id); r.oeffnen = !!nbRandFuer && nbRandFuer.nr === 1 && nbRandFuer.id === rd[0].id;'
+                 + '   feld.value = "bis Mo"; nbRandSpeichern(); r.geaendert = notizseiteFinden(b.id, 1).rand[0].text;'
+                 + '   flaecheSetzen(id, "Neue erste Zeile\\n# Kopf\\nRisikoliste schicken\\nc");'
+                 + '   r.wandertMit = nbRandIndex(flaecheText(id).split("\\n"), notizseiteFinden(b.id, 1).rand[0]);'
+                 + '   r.nummern = /data-z="0"/.test(flaecheAnsichtHtml(flaecheText(id), "").html);'
+                 + '   DB.gedanken = [{ id: "g1", titel: "G", text: "x\\ny", geaendert: 1 }]; flaecheFuer = "g:g1";'
+                 + '   r.nichtAufFlaechen = !/data-z=/.test(flaecheAnsichtHtml("x\\ny", "").html); flaecheFuer = id;'
+                 + '   nbArchivieren(b.id); nbRandFuer = { nr: 0, id: "" }; feld.value = "im Archiv"; nbRandSpeichern();'
+                 + '   r.archivFest = notizseiteFinden(b.id, 1).rand.length === 1; nbZurueckholen(b.id);'
+                 + '   nbRandFuer = { nr: 2, id: notizseiteFinden(b.id, 1).rand[0].id }; nbRandLoeschen();'
+                 + '   r.geloescht = notizseiteFinden(b.id, 1).rand.length === 0;'
+                 + '   var fremd = leereDatenbank(); var kopie = JSON.parse(JSON.stringify(notizseiteFinden(b.id, 1)));'
+                 + '   kopie.rand = [{ id: "f1", anker: "c", nr: 3, text: "von woanders" }]; kopie.geaendert = jetzt() + 5000;'
+                 + '   fremd.notizseiten = [kopie]; fremd.notizbuecher = DB.notizbuecher.slice();'
+                 + '   var m = zusammenfuehren(DB, fremd);'
+                 + '   r.abgleich = m.db.notizseiten[0].rand.length === 1 && m.db.notizseiten[0].rand[0].text === "von woanders";'
+                 + '   nbRandFuer = null; DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__nbSucheApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank(); var r = {};'
+                 + '   nbAnlegen(); nbAnlegen(); var a = DB.notizbuecher[0]; var b = DB.notizbuecher[1];'
+                 + '   a.name = "Arbeit"; b.name = "Alt";'
+                 + '   flaecheSetzen(notizseitenKennung(a.id, 1), "# Lenkungskreis\\n[] Risikoliste bis 02.10.\\n[x] Protokoll\\nLieferzeiten offen");'
+                 + '   notizseiteFinden(a.id, 1).rand = [{ id: "r1", anker: "Lieferzeiten offen", nr: 3, text: "Lieferant anrufen" }];'
+                 + '   flaecheSetzen(notizseitenKennung(a.id, 2), "Lieferkette klären");'
+                 + '   flaecheSetzen(notizseitenKennung(b.id, 1), "Lieferung alt\\n[] Altlast");'
+                 + '   nbArchivieren(b.id);'
+                 + '   flaecheFuer = notizseitenKennung(a.id, 2); flaecheSuche = "";'
+                 + '   nbSucheOeffnen("seite"); r.vonSeite = nbSucheBereich + ":" + (nbSucheBuch === a.id) + ":" + schirmOffen;'
+                 + '   nbSucheOeffnen("uebersicht"); r.vonUebersicht = nbSucheBereich;'
+                 + '   nbSucheArten = {}; nbSucheBegriff = "liefer"; nbSucheBereich = "aktiv";'
+                 + '   var t = nbTrefferListe(); r.aktiv = t.length; r.mitRand = t.some(function(x){ return x.art === "rand"; });'
+                 + '   nbSucheBereich = "alle"; r.alle = nbTrefferListe().length;'
+                 + '   nbSucheBereich = "buch"; nbSucheBuch = a.id; r.buch = nbTrefferListe().length;'
+                 + '   nbSucheBegriff = ""; nbSucheBereich = "alle"; r.leer = nbTrefferListe().length;'
+                 + '   nbSucheArten = { offen: true }; r.offen = nbTrefferListe().map(function(x){ return x.text; }).join(",");'
+                 + '   nbSucheArten = { offen: true, rand: true }; r.offenRand = nbTrefferListe().length;'
+                 + '   nbSucheArten = { datum: true }; nbSucheBereich = "aktiv"; var d = nbTrefferListe();'
+                 + '   r.datum = d.length === 1 && d[0].ueber === "Lenkungskreis";'
+                 + '   nbSucheArten = {}; nbSucheBegriff = "risiko"; nbSucheBereich = "aktiv"; nbTrefferZeichnen();'
+                 + '   nbTrefferOeffnen(0); r.oeffnet = flaecheFuer === notizseitenKennung(a.id, 1) && flaecheSuche === "risiko";'
+                 + '   nbSucheArten = {}; nbSucheBegriff = ""; flaecheSuche = ""; flaecheSucheAuf = false;'
                  + '   DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
@@ -12900,6 +13013,153 @@ console.log('\n145. Suchfeld behält den Fokus');
     pruefe(e.ohneFokus === true, 'wer nicht im Suchfeld war, wird nicht hineingesetzt');
     pruefe(e.lupeZuLeert === true, 'die Lupe schließt die Suche und leert sie');
     pruefe(e.lupeAuf === true, 'und öffnet sie wieder');
+  }
+}
+
+/* ============================================================
+   146. Notizseiten brechen um (v5.7.0)
+   Grund: Eine Seite ließ sich beliebig weiterschreiben. Was nicht mehr
+   aufs Blatt passt, gehört wie auf Papier auf die nächste Seite —
+   mitsamt seinen Randnotizen, und die Schreibmarke folgt.
+   ============================================================ */
+console.log('\n146. Notizseiten: Seitenumbruch');
+{
+  const skript = hauptSkript();
+  const u = globalThis.__nbUmbruchApi;
+  const getippt = skript.match(/function flaecheGetippt\([\s\S]*?\n\}/);
+  pruefe(getippt && /nbUmbruchPlanen\(\)/.test(getippt[0]), 'beim Schreiben wird der Umbruch geplant');
+  const modus = skript.match(/function flaecheModusSetzen\([\s\S]*?\n\}/);
+  pruefe(modus && /nbUmbruchAbschliessen\(\)/.test(modus[0]), 'beim Wechsel in die Ansicht wird umgebrochen');
+  const springen = skript.match(/function nbSpringen\([\s\S]*?\n\}/);
+  pruefe(springen && /nbUmbruchAbschliessen\(\)/.test(springen[0]), 'und vor dem Blättern');
+  const zurueck = skript.match(/function flaecheZurueck\([\s\S]*?\n\}/);
+  pruefe(zurueck && /nbUmbruchAbschliessen\(\)/.test(zurueck[0]), 'und beim Verlassen der Seite');
+  const mess = skript.match(/function nbZeilenMessen\([\s\S]*?\n\}/);
+  pruefe(mess && /flaecheAnsichtHtml\(text, ''\)/.test(mess[0]) && /flaecheArt = \{\}/.test(mess[0]),
+         'gemessen wird die fertige Seite, ohne Suche und Filter');
+  /* Mit position:absolute machte das Messblatt das Dokument scrollbar —
+     beim Fokussieren eines Feldes verrutschte die ganze App. */
+  /* Die Regel muss spezifischer sein als .nb-blatt — sonst setzt deren
+     position:relative sich durch, und das Messblatt drückt die App zusammen. */
+  const messRegel = QUELLE.match(/\.nb-blatt\.nb-messblatt\{[^}]*\}/);
+  pruefe(messRegel && /position:fixed/.test(messRegel[0]) && !/position:absolute/.test(messRegel[0]),
+         'das Messblatt verlängert das Dokument nicht');
+  let e = null;
+  if (!u) {
+    warn('Umbruch nicht auswertbar');
+  } else {
+    try { e = u.pruefe(); }
+    catch (x) { fail('Umbruch läuft nicht: ' + x.message); }
+  }
+  if (u && e) {
+    pruefe(e.einfach === 'a\nb\nc\nd\ne|f\ng', 'was nicht passt, steht auf der nächsten Seite');
+    pruefe(e.kaskade === '1\n2\n3\n4\n5|6\n7\n8\nw\nx|y\nz',
+           'eine volle Folgeseite reicht ihren Überhang weiter');
+    pruefe(e.leerzeilen === 'f', 'leere Zeilen am Anfang der neuen Seite entfallen');
+    pruefe(e.ueberschrift === '# Kopf\nw\nx\ny', 'eine Überschrift zählt doppelt');
+    pruefe(e.tabelle === 'a\nb\nc#| A | B |\n|---|---|\n| 1 | 2 |', 'eine Tabelle wird nicht zerteilt');
+    pruefe(e.zuGross === true, 'ein Block größer als eine Seite bleibt stehen');
+    pruefe(e.voll === true, 'hinter Seite 200 wird nichts verschoben');
+    pruefe(e.randBleibt === true, 'Randnotizen oberhalb des Umbruchs bleiben');
+    pruefe(e.randWandert === 'r2:1,r3:2', 'Randnotizen wandern mit ihrer Zeile, die alten rücken nach');
+    pruefe(e.markeFolgt === true, 'steht die Marke im gewanderten Teil, schreibt man auf der neuen Seite weiter');
+    pruefe(e.markeBleibt === true, 'steht sie weiter oben, bleibt sie, und nur der Überhang geht');
+    pruefe(e.archivFest === true, 'ein archiviertes Notizbuch bleibt unverändert');
+  }
+}
+
+/* ============================================================
+   147. Randnotizen (v5.7.0)
+   Grund: Neben dem Geschriebenen soll am Rand eine Notiz stehen können,
+   die bei ihrer Zeile bleibt — auch wenn darüber eingefügt wird.
+   ============================================================ */
+console.log('\n147. Notizseiten: Randnotizen');
+{
+  const rn = globalThis.__nbRandApi;
+  pruefe(/id="nbRand" onclick="nbRandTipp\(event\)"/.test(hauptSkript()),
+         'der Rand nimmt einen Tipp entgegen');
+  let e = null;
+  if (!rn) {
+    warn('Randnotizen nicht auswertbar');
+  } else {
+    try { e = rn.pruefe(); }
+    catch (x) { fail('Randnotizen laufen nicht: ' + x.message); }
+  }
+  if (rn && e) {
+    pruefe(e.anker === '1,3', 'eine Notiz findet ihre Zeile am Inhalt, bei Gleichen die nächstgelegene');
+    pruefe(e.ersatz === '2,4', 'fehlt die Zeile, gilt die alte Stelle — nie hinter dem Ende');
+    pruefe(e.leerNichts === true, 'eine leere Notiz wird nicht angelegt');
+    pruefe(e.angelegt === true, 'eine Notiz merkt sich ihre Zeile und ihren Text');
+    pruefe(e.oeffnen === true && e.geaendert === 'bis Mo', 'sie lässt sich öffnen und ändern');
+    pruefe(e.wandertMit === 2, 'wird darüber eingefügt, wandert sie mit ihrer Zeile');
+    pruefe(e.nummern === true && e.nichtAufFlaechen === true,
+           'nur Notizseiten tragen Zeilennummern in der Ansicht');
+    pruefe(e.archivFest === true, 'im Archiv kommt keine Notiz hinzu');
+    pruefe(e.geloescht === true, 'eine Notiz lässt sich löschen');
+    pruefe(e.abgleich === true, 'Randnotizen gehen mit ihrer Seite durch den Abgleich');
+  }
+}
+
+/* ============================================================
+   148. Suche in den Notizbüchern (v5.7.0)
+   Grund: Gesucht wird über alle Seiten — von einer Seite aus zuerst im
+   eigenen Notizbuch, mit denselben Schaltern wie in der Workbench.
+   ============================================================ */
+console.log('\n148. Notizbücher: Suche');
+{
+  const skript = hauptSkript();
+  const su = globalThis.__nbSucheApi;
+  pruefe(/id="schirmNotizsuche"/.test(QUELLE) && /onclick="nbSucheOeffnen\('uebersicht'\)"/.test(QUELLE),
+         'die Suche hat einen Bildschirm und ist aus der Übersicht erreichbar');
+  pruefe(/nbSucheOeffnen\(\\'seite\\'\)/.test(skript), 'und von jeder Notizseite');
+  /* Die Handy-Regel „Filter erst über die Lupe" gilt dem Flächenkopf —
+     auf dem Suchbildschirm verschwanden dadurch alle Schalter. */
+  pruefe(/body:not\(\.breit\) \.nb-such-kopf \.fl-arten\{display:flex\}/.test(QUELLE),
+         'am Handy bleiben die Schalter der Suche sichtbar');
+  const za = skript.match(/function zeilePasstZurArt\([\s\S]*?\n\}/);
+  pruefe(za && /function zeilePasstZurArt\(zeile, arten\)/.test(za[0]) && /var art = arten \|\| flaecheArt/.test(za[0]),
+         'die Schalter-Logik ist dieselbe wie auf den Flächen — nicht kopiert');
+  let e = null;
+  if (!su) {
+    warn('Suche nicht auswertbar');
+  } else {
+    try { e = su.pruefe(); }
+    catch (x) { fail('Suche läuft nicht: ' + x.message); }
+  }
+  if (su && e) {
+    pruefe(e.vonSeite === 'buch:true:Notizsuche', 'von einer Seite aus sucht man im aktuellen Notizbuch');
+    pruefe(e.vonUebersicht === 'aktiv', 'aus der Übersicht in allen aktiven');
+    pruefe(e.aktiv === 3 && e.mitRand === true, 'der Begriff findet Zeilen und Randnotizen');
+    pruefe(e.alle === 4, 'mit dem Archiv kommt dessen Inhalt dazu');
+    pruefe(e.buch === 3, 'eingegrenzt auf ein Notizbuch bleibt es dabei');
+    pruefe(e.leer === 0, 'ohne Begriff und Schalter gibt es keine Treffer');
+    pruefe(e.offen === 'Risikoliste bis 02.10.,Altlast', 'der Schalter Offen findet offene Kästchen');
+    pruefe(e.offenRand === 3, 'mehrere Schalter zeigen, was zu einem davon passt');
+    pruefe(e.datum === true, 'Mit Datum findet Termine und nennt die Überschrift darüber');
+    pruefe(e.oeffnet === true, 'ein Treffer öffnet seine Seite mit markiertem Begriff');
+  }
+}
+
+/* ============================================================
+   149. Datum ohne Jahr wird erkannt (v5.7.0)
+   Grund: DATUM_IM_TEXT endete auf \b. Nach „02.10." folgt aber keine
+   Wortgrenze — „Mit Datum" fand deshalb nur Daten mit Jahr und schlug
+   stattdessen bei Versionsnummern wie „5.6.1" an.
+   ============================================================ */
+console.log('\n149. Datum ohne Jahr');
+{
+  const m = hauptSkript().match(/var DATUM_IM_TEXT = (\/.*\/);/);
+  pruefe(!!m, 'DATUM_IM_TEXT ist auslesbar');
+  if (m) {
+    let re = null;
+    try { re = eval(m[1]); } catch (x) { fail('DATUM_IM_TEXT ist kein gültiges Muster: ' + x.message); }
+    if (re) {
+      pruefe(re.test('bis 02.10.'), 'ein Datum ohne Jahr am Zeilenende wird erkannt');
+      pruefe(re.test('29.09. 14:00 Lenkungskreis'), 'auch mit Uhrzeit dahinter');
+      pruefe(re.test('Am 14.09.2026 kommt Zapf') && re.test('2026-10-02'), 'mit Jahr und im ISO-Format weiterhin');
+      pruefe(!re.test('Version 5.6.1') && !re.test('1.2.3'), 'Versionsnummern gelten nicht als Datum');
+      pruefe(!re.test('Preis 3.5 Euro'), 'eine Dezimalzahl auch nicht');
+    }
   }
 }
 
