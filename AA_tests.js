@@ -13204,8 +13204,18 @@ console.log('\n149. Datum ohne Jahr');
 console.log('\n150. Seitentitel und Inhaltsverzeichnis');
 {
   const t = globalThis.__nbTitelApi;
-  pruefe(/\.nb-inhalt \.nb-titelzeile \.fl-h1\{border-bottom:0;text-decoration:underline/.test(QUELLE),
-         'der Titel ist unterstrichen, ohne die graue Linie der H1');
+  /* Seit v5.7.2: nicht unterstrichen; die Trennlinie ist dünn und
+     verbindet sich links mit der senkrechten Randlinie. */
+  pruefe(/\.nb-inhalt \.nb-titelzeile \.fl-h1\{border-bottom:0\}/.test(QUELLE),
+         'der Titel steht ohne die graue Linie der H1');
+  pruefe(!/nb-titelzeile[^{]*\{[^}]*text-decoration:underline/.test(QUELLE),
+         'der Titel ist nicht unterstrichen');
+  pruefe(/\.nb-inhalt \.nb-titel-trenner \.fl-trenner\{border-top:1px solid var\(--weinrot\)/.test(QUELLE),
+         'die Trennlinie unter dem Titel ist dünn');
+  const innen = QUELLE.match(/\.nb-inhalt\{[^}]*padding:var\(--nb-z\) (\d+)px calc\(var\(--nb-z\) \* 2\) (\d+)px\}/);
+  const trennRand = QUELLE.match(/\.nb-inhalt \.nb-titel-trenner\{margin-left:-(\d+)px;margin-right:-(\d+)px\}/);
+  pruefe(innen && trennRand && innen[2] === trennRand[1] && innen[1] === trennRand[2],
+         'sie reicht genau bis an die Randlinie und den Blattrand');
   let e = null;
   if (!t) {
     warn('Seitentitel nicht auswertbar');
