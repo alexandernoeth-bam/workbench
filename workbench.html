@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.6.0</title>
+<title>Workbench 5.6.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1018,6 +1018,40 @@ body.nacht .zettel{color:#E8E6E1}
 .fl-leer{height:9px}
 .fl-ansicht mark{background:#f5e6a8;color:inherit;border-radius:2px;padding:0 1px}
 .fl-zeile .tkasten{align-self:center;margin-top:0}
+
+/* ---------- Flächenkopf: am Handy kompakt ----------
+   Am großen Bildschirm bleibt der Kopf wie er war. Am Handy stehen
+   Zurück und Name in einer Zeile, Ansicht/Schreiben ist ein Umschalter
+   mit zwei Symbolen, Suche und Filter erscheinen erst über die Lupe,
+   und die Formatleiste läuft in einer wischbaren Zeile. Gesteuert über
+   die Körperklasse, nicht über Media-Abfragen. */
+.fl-zurueck-klein,.fl-nur-schmal,.fl-umbruch,.fl-luecke{display:none}
+.fl-ikon{width:36px;height:34px;padding:0;border:1px solid var(--linie);border-radius:8px;
+  background:var(--karte);color:var(--tinte);cursor:pointer;align-items:center;justify-content:center}
+.fl-ikon.an{border-color:var(--weinrot);color:var(--weinrot)}
+.fl-ikon svg,.fl-umschalter svg{width:19px;height:19px;stroke:currentColor;fill:none;
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.fl-umschalter{border:1px solid var(--linie);border-radius:8px;overflow:hidden;background:var(--karte)}
+.fl-umschalter button{border:0;background:none;height:32px;width:40px;padding:0;cursor:pointer;
+  color:var(--grau);display:inline-flex;align-items:center;justify-content:center}
+.fl-umschalter button+button{border-left:1px solid var(--linie)}
+.fl-umschalter button.an{color:var(--weinrot);background:var(--papier)}
+body:not(.breit) #schirmFlaeche > .vh-kopf > .vh-zeile{display:none}
+body:not(.breit) .fl-nur-breit{display:none}
+body:not(.breit) .fl-nur-schmal{display:inline-flex}
+body:not(.breit) .fl-luecke{display:block;flex:1 1 auto}
+body:not(.breit) .fl-umbruch{display:block;flex-basis:100%;height:0}
+body:not(.breit) .fl-zurueck-klein{display:inline-flex;border:0;background:none;padding:0 4px 0 0;
+  font:inherit;font-size:26px;line-height:1;color:var(--tinte);cursor:pointer}
+body:not(.breit) .fl-kopf{gap:6px;margin-top:4px}
+body:not(.breit) .fl-kopf .fl-name{flex:1 1 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body:not(.breit) .fl-kopf .fl-suche{display:none;order:20;flex:1 1 100%}
+body:not(.breit) .fl-kopf.suche-auf .fl-suche{display:block}
+body:not(.breit) .fl-arten{display:none}
+body:not(.breit) .fl-arten.suche-auf{display:flex}
+body:not(.breit) #flaecheKopf .pin-zeile{display:none}
+body:not(.breit) .fl-leiste{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+body:not(.breit) .fl-leiste .fl-knopf,body:not(.breit) .fl-leiste .fl-teiler{flex:0 0 auto}
 
 /* ---------- Notizbücher: Übersicht ---------- */
 .nb-titel{font-size:calc(var(--fs)*1.02);font-weight:500;color:var(--tinte)}
@@ -2370,7 +2404,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.6.0';
+var APP_VERSION = '5.6.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -14513,6 +14547,7 @@ function seiteBearbeiten() {
 var flaecheFuer = '';        /* Kennung des Vorhabens, '' = die freie */
 var flaecheModus = 'ansicht';
 var flaecheSuche = '';
+var flaecheSucheAuf = false;   /* am Handy: Suche und Filter über die Lupe */
 
 
 /* „Mo, 14.09.2026" — in einer Gedankenfläche steht das Datum oft allein
@@ -14623,7 +14658,7 @@ function flaecheName(id) {
    Ziel einmal gelöscht ist.
    ------------------------------------------------------------ */
 
-var WB_MUSTER = /\[\[(projekt|ziel|flaeche|aufgabe):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]/g;
+var WB_MUSTER = /\[\[(projekt|ziel|flaeche|aufgabe|notiz):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]/g;
 
 function wbZielName(art, id) {
   if (art === 'projekt') {
@@ -14635,6 +14670,7 @@ function wbZielName(art, id) {
     return z ? z.name : '';
   }
   if (art === 'flaeche') { return flaecheName(id); }
+  if (art === 'notiz') { return nbSeitenName(id); }
   if (art === 'aufgabe') {
     var a = aufgabeFinden(id);
     return a ? a.titel : '';
@@ -14646,6 +14682,7 @@ function wbSpringen(art, id) {
   if (art === 'projekt') { vhDetailOeffnen(id, 'projekt'); return; }
   if (art === 'ziel') { vhDetailOeffnen(id, 'ziel'); return; }
   if (art === 'flaeche') { flaecheOeffnen(id); return; }
+  if (art === 'notiz') { flaecheOeffnen('n:' + id); return; }
   if (art === 'aufgabe') { aufgabeAktionen(id); return; }
 }
 
@@ -14653,7 +14690,7 @@ function wbLinkHtml(art, id, titel) {
   var lebt = wbZielName(art, id);
   var zeigen = lebt || titel;
   var marken = { projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Fläche',
-                 aufgabe: 'Aufgabe' };
+                 aufgabe: 'Aufgabe', notiz: 'Notizseite' };
   if (!lebt) {
     return '<span class="wb-tot" title="Das Ziel gibt es nicht mehr">'
          + esc(zeigen) + '</span>';
@@ -14698,6 +14735,18 @@ function wbWahlListe() {
     for (i = 0; i < z.length; i++) {
       aus.push({ id: z[i].id, titel: z[i].name, unten: z[i].kontext });
     }
+  } else if (wbWahlArt === 'notiz') {
+    /* Zuletzt Geschriebenes zuerst — alphabetisch stünde S. 10 vor S. 2. */
+    var ns = (DB.notizseiten || []).filter(function (x) {
+      return String(x.text || '').trim().length && !!notizbuchFinden(x.buchId);
+    });
+    ns.sort(function (x, y) { return (y.geaendert || 0) - (x.geaendert || 0); });
+    for (i = 0; i < ns.length; i++) {
+      var nk = ns[i].buchId + ':' + ns[i].nr;
+      if ('n:' + nk === flaecheFuer) { continue; }   /* nicht auf sich selbst */
+      aus.push({ id: nk, titel: nbSeitenName(nk), unten: nbSeitentitel(ns[i]) });
+    }
+    return aus;
   } else if (wbWahlArt === 'flaeche') {
     var f = alleFlaechen();
     for (i = 0; i < f.length; i++) {
@@ -14722,7 +14771,7 @@ function wbWahlHtml() {
   h += '<div class="as-linie"></div>';
   h += '<div class="sl-pillen">';
   var arten = [['projekt', 'Projekte'], ['ziel', 'Ziele'],
-               ['flaeche', 'Flächen'], ['aufgabe', 'Aufgaben']];
+               ['flaeche', 'Flächen'], ['notiz', 'Notizseiten'], ['aufgabe', 'Aufgaben']];
   var i;
   for (i = 0; i < arten.length; i++) {
     h += '<button class="sl-pille' + (wbWahlArt === arten[i][0] ? ' an' : '')
@@ -15071,7 +15120,9 @@ function flaecheAnsichtHtml(text, suche) {
   var zeigen = flaecheSichtbar(zeilen, suche);
   /* Beim Suchen wird nicht zugeklappt — sonst fände man etwas, das
      man nicht sieht. */
-  var faltenGilt = !zeigen;
+  /* Auf einer Notizseite wird nicht gefaltet — eine Seite ist kurz,
+     und eingeklappte Abschnitte verwirren beim Blättern. */
+  var faltenGilt = !zeigen && !istNotizseite(flaecheFuer);
   var h = '';
   var i;
   var treffer = 0;
@@ -15154,6 +15205,13 @@ function flaecheModusSetzen(m) {
   if (m === 'schreiben' && nbGesperrt(flaecheFuer)) { m = 'ansicht'; }
   flaecheModus = m;
   flaecheZeichnen();
+  /* Beim Schreiben schiebt der Browser das Blatt zum Schreibfeld. Zurück
+     in der Ansicht beginnt eine Notizseite wieder oben — sonst fehlen
+     Datum und Seitenzahl. */
+  if (m === 'ansicht' && istNotizseite(flaecheFuer)) {
+    var blattOben = document.getElementById('flaecheBlatt');
+    if (blattOben) { blattOben.scrollTop = 0; }
+  }
   if (m === 'schreiben') {
     var feld = document.getElementById('flaecheFeld');
     if (feld && feld.focus) {
@@ -15175,6 +15233,66 @@ function flaecheModusSetzen(m) {
 
 function flaecheGetippt(wert) {
   flaecheSetzen(flaecheFuer, wert);
+}
+
+/* Chrome setzt die Schreibmarke nach dem Löschen einer Zeile am Ende
+   des Feldes vor den Zeilenumbruch statt dahinter — der nächste Text
+   landete dann am Ende der vorigen Zeile. Also ausdrücklich setzen. */
+function flaecheMarkeSetzen(feld, stelle) {
+  if (feld && typeof feld.setSelectionRange === 'function') {
+    feld.setSelectionRange(stelle, stelle);
+  }
+}
+
+/* Enter in einer Aufzählung oder Kästchenliste setzt die Liste fort:
+   gleiche Einrückung, gleiches Zeichen, ein Kästchen immer offen.
+   Enter in einem leeren Punkt beendet die Liste. Gibt zurück, ob der
+   Zeilenumbruch hier erledigt wurde. */
+function flaecheListeWeiter(feld) {
+  if (!feld) { return false; }
+  var text = String(feld.value || '');
+  var a = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var b = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : a;
+  if (a !== b) { return false; }
+  var anfang = text.lastIndexOf('\n', a - 1) + 1;
+  var ende = text.indexOf('\n', a);
+  if (ende < 0) { ende = text.length; }
+  var zeile = text.slice(anfang, ende);
+  var kasten = zeile.match(/^(\s*)(\[[ xX]?\])(\s*)(.*)$/);
+  var punkt = kasten ? null : zeile.match(/^(\s*)([-•*])(\s+)(.*)$/);
+  var m = kasten || punkt;
+  if (!m) { return false; }
+  var vorne = m[1].length + m[2].length + m[3].length;
+  /* Steht die Marke vor dem Zeichen, ist ein gewöhnlicher Umbruch gemeint. */
+  if (a - anfang < m[1].length + m[2].length) { return false; }
+  if (!m[4].trim().length && a >= anfang + vorne) {
+    feldErsetzen(feld, anfang, ende, '');
+    flaecheMarkeSetzen(feld, anfang);
+    return true;
+  }
+  var neu = '\n' + m[1] + (kasten ? '[] ' : (m[2] + ' '));
+  feldErsetzen(feld, a, a, neu);
+  flaecheMarkeSetzen(feld, a + neu.length);
+  return true;
+}
+
+function flaecheTaste(e) {
+  if (!e || e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey
+      || e.isComposing) { return; }
+  if (flaecheListeWeiter(e.target)) {
+    e.preventDefault();
+    flaecheSetzen(flaecheFuer, e.target.value);
+  }
+}
+
+/* Manche Handy-Tastaturen melden Enter nicht als Taste, sondern nur
+   als Eingabe „Zeilenumbruch" — dort greift dieser Weg. */
+function flaecheVorEingabe(e) {
+  if (!e || (e.inputType !== 'insertLineBreak' && e.inputType !== 'insertParagraph')) { return; }
+  if (flaecheListeWeiter(e.target)) {
+    e.preventDefault();
+    flaecheSetzen(flaecheFuer, e.target.value);
+  }
 }
 
 /* Legt ein Zeichenpaar um die Auswahl — oder setzt es dort ein, wo der
@@ -15337,7 +15455,14 @@ function flaecheSinnbild(art) {
            + '<path d="M3 10h18M9 10v9M15 10v9"></path>',
     trenner: '<path d="M3 12h18"></path>',
     datum:   '<rect x="3" y="5" width="18" height="16" rx="2"></rect>'
-           + '<path d="M3 10h18M8 3v4M16 3v4"></path>'
+           + '<path d="M3 10h18M8 3v4M16 3v4"></path>',
+    auge:    '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path>'
+           + '<circle cx="12" cy="12" r="3"></circle>',
+    stift:   '<path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13 7l4 4"></path>',
+    lupe:    '<circle cx="11" cy="11" r="6"></circle><path d="M20 20l-4.5-4.5"></path>',
+    nadel:   '<path d="M9 3h6l-1 6 4 3v2H6v-2l4-3z"></path><path d="M12 14v7"></path>',
+    zuklappen: '<path d="M7 15l5-5 5 5"></path>',
+    aufklappen: '<path d="M7 9l5 5 5-5"></path>'
   };
   /* Ein unbekannter Name ergäbe ein leeres Bild — der Knopf wäre dann
      unsichtbar, ohne dass etwas meldet. Lieber ein Fragezeichen. */
@@ -15468,6 +15593,21 @@ function flaecheSuchen(wert) {
   flaecheZeichnen();
 }
 
+/* Die Lupe am Handy: öffnet Suchfeld und Filter. Beim Schließen wird
+   die Suche geleert — sonst bliebe die Seite unbemerkt gefiltert. */
+function flaecheSucheUm() {
+  flaecheSucheAuf = !(flaecheSucheAuf || flaecheSuche.length > 0 || flaecheArtAn());
+  if (!flaecheSucheAuf) {
+    flaecheSuche = '';
+    flaecheArt = {};
+  }
+  flaecheZeichnen();
+  if (flaecheSucheAuf) {
+    var feld = document.getElementById('flaecheSuchfeld');
+    if (feld && feld.focus) { feld.focus(); }
+  }
+}
+
 /* ------------------------------------------------------------
    Zeichnen
    ------------------------------------------------------------ */
@@ -15477,6 +15617,7 @@ function flaecheOeffnen(id) {
   flaecheModus = 'ansicht';
   flaecheSuche = '';
   flaecheArt = {};
+  flaecheSucheAuf = false;
   nbInhaltOffen = false;
   zeigeSchirm('Flaeche');
   flaecheZeichnen();
@@ -15605,7 +15746,20 @@ function flaecheZeichnen() {
   }
 
   if (kopf) {
-    var k = '<div class="fl-kopf">';
+    var gesperrt = nbGesperrt(flaecheFuer);
+    var sucheSichtbar = flaecheSucheAuf || flaecheSuche.length > 0 || flaecheArtAn();
+    var ansicht = (flaecheModus === 'ansicht');
+    /* Stand der Suche merken: Der Kopf wird bei jedem Tastendruck neu
+       gezeichnet — ohne das verlöre das Suchfeld nach dem ersten
+       Buchstaben den Fokus. */
+    var fokus = document.activeElement;
+    var suchFokus = !!(fokus && fokus.id === 'flaecheSuchfeld');
+    var suchStelle = (suchFokus && typeof fokus.selectionStart === 'number')
+                   ? fokus.selectionStart : -1;
+
+    var k = '<div class="fl-kopf' + (sucheSichtbar ? ' suche-auf' : '') + '">';
+    k += '<button class="fl-zurueck-klein" type="button" onclick="flaecheZurueck()" '
+       + 'aria-label="Zurück">‹</button>';
     if (nb) {
       k += nbKopfHtml();
     } else if (istFreie(flaecheFuer)) {
@@ -15616,32 +15770,62 @@ function flaecheZeichnen() {
     } else {
       k += '<span class="fl-name">' + esc(flaecheName(flaecheFuer)) + '</span>';
     }
-    k += '<button class="sl-pille' + (flaecheModus === 'ansicht' ? ' an' : '')
+    k += '<span class="fl-umbruch"></span>';
+
+    /* Großer Bildschirm: Pillen mit Wörtern */
+    k += '<button class="sl-pille fl-nur-breit' + (ansicht ? ' an' : '')
        + '" type="button" onclick="flaecheModusSetzen(\'ansicht\')">Ansicht</button>';
-    if (!nbGesperrt(flaecheFuer)) {
-      k += '<button class="sl-pille' + (flaecheModus === 'schreiben' ? ' an' : '')
+    if (!gesperrt) {
+      k += '<button class="sl-pille fl-nur-breit' + (!ansicht ? ' an' : '')
          + '" type="button" onclick="flaecheModusSetzen(\'schreiben\')">Schreiben</button>';
     }
+    /* Handy: ein Umschalter mit zwei Sinnbildern und die Lupe */
+    k += '<span class="fl-umschalter fl-nur-schmal" role="group" aria-label="Ansicht oder Schreiben">'
+       + '<button type="button" class="' + (ansicht ? 'an' : '') + '" '
+       + 'onclick="flaecheModusSetzen(\'ansicht\')" title="Ansicht" aria-label="Ansicht">'
+       + flaecheSinnbild('auge') + '</button>'
+       + (gesperrt ? '' : '<button type="button" class="' + (!ansicht ? 'an' : '') + '" '
+       + 'onclick="flaecheModusSetzen(\'schreiben\')" title="Schreiben" aria-label="Schreiben">'
+       + flaecheSinnbild('stift') + '</button>')
+       + '</span>';
+    k += '<button class="fl-ikon fl-nur-schmal' + (sucheSichtbar ? ' an' : '') + '" type="button" '
+       + 'onclick="flaecheSucheUm()" title="Suchen" aria-label="Suchen">'
+       + flaecheSinnbild('lupe') + '</button>';
+
     if (!nb) {
       k += '<button class="sl-pille' + (flaecheAnsEnde(flaecheFuer) ? ' an' : '')
          + '" type="button" onclick="flaecheAnsEndeUm()" '
          + 'title="Wo die Fläche beim Öffnen aufgeht">'
          + (flaecheAnsEnde(flaecheFuer) ? 'ans Ende' : 'nach oben') + '</button>';
     }
-    if (flaecheModus === 'ansicht' && flaecheHatUeberschriften()) {
-      k += '<button class="sl-pille" type="button" onclick="flaecheAlleZu(true)" '
+    /* Auf Notizseiten wird nicht gefaltet — also auch kein „alles zu". */
+    if (!nb && ansicht && flaecheHatUeberschriften()) {
+      k += '<button class="sl-pille fl-nur-breit" type="button" onclick="flaecheAlleZu(true)" '
          + 'title="Alle Abschnitte einklappen">alles zu</button>';
-      k += '<button class="sl-pille" type="button" onclick="flaecheAlleZu(false)" '
+      k += '<button class="sl-pille fl-nur-breit" type="button" onclick="flaecheAlleZu(false)" '
          + 'title="Alle Abschnitte aufklappen">alles auf</button>';
+      k += '<button class="fl-ikon fl-nur-schmal" type="button" onclick="flaecheAlleZu(true)" '
+         + 'title="Alle Abschnitte einklappen" aria-label="Alle Abschnitte einklappen">'
+         + flaecheSinnbild('zuklappen') + '</button>';
+      k += '<button class="fl-ikon fl-nur-schmal" type="button" onclick="flaecheAlleZu(false)" '
+         + 'title="Alle Abschnitte aufklappen" aria-label="Alle Abschnitte aufklappen">'
+         + flaecheSinnbild('aufklappen') + '</button>';
     }
-    k += '<input class="fl-suche" type="search" placeholder="Suchen" '
+    k += '<input class="fl-suche" id="flaecheSuchfeld" type="search" placeholder="Suchen" '
        + 'value="' + esc(flaecheSuche) + '" oninput="flaecheSuchen(this.value)">';
     if (istFreie(flaecheFuer)) {
       k += '<button class="sk-loeschen" type="button" onclick="gedankeLoeschen(\''
          + esc(String(flaecheFuer).slice(2)) + '\')">Löschen</button>';
     }
+    k += '<span class="fl-luecke"></span>';
+    var angeheftet = !!pinFinden('flaeche', flaecheFuer);
+    k += '<button class="fl-ikon fl-nur-schmal' + (angeheftet ? ' an' : '') + '" type="button" '
+       + 'onclick="pinUm(\'flaeche\',\'' + esc(flaecheFuer) + '\')" '
+       + 'title="' + (angeheftet ? 'Von der Pinnwand nehmen' : 'An die Pinnwand') + '" '
+       + 'aria-label="' + (angeheftet ? 'Von der Pinnwand nehmen' : 'An die Pinnwand') + '">'
+       + flaecheSinnbild('nadel') + '</button>';
     k += '</div>';
-    k += '<div class="fl-arten">';
+    k += '<div class="fl-arten' + (sucheSichtbar ? ' suche-auf' : '') + '">';
     k += '<button class="sl-pille' + (flaecheArt.offen ? ' an' : '') + '" type="button" '
        + 'onclick="flaecheArtUm(\'offen\')">Offen</button>';
     k += '<button class="sl-pille' + (flaecheArt.erledigt ? ' an' : '') + '" '
@@ -15649,8 +15833,17 @@ function flaecheZeichnen() {
     k += '<button class="sl-pille' + (flaecheArt.datum ? ' an' : '') + '" type="button" '
        + 'onclick="flaecheArtUm(\'datum\')">Mit Datum</button>';
     k += '</div>';
-    if (!nb) { k += pinKnopfHtml('flaeche', flaecheFuer); }
+    k += pinKnopfHtml('flaeche', flaecheFuer);
     kopf.innerHTML = k;
+    if (suchFokus) {
+      var suchNeu = document.getElementById('flaecheSuchfeld');
+      if (suchNeu && suchNeu.focus) {
+        suchNeu.focus();
+        if (suchStelle >= 0 && typeof suchNeu.setSelectionRange === 'function') {
+          suchNeu.setSelectionRange(suchStelle, suchStelle);
+        }
+      }
+    }
   }
 
   var leiste = document.getElementById('flaecheLeiste');
@@ -15663,7 +15856,8 @@ function flaecheZeichnen() {
   if (flaecheModus === 'schreiben') {
     var h = '';
     h += '<textarea class="fl-feld" id="flaecheFeld" spellcheck="false" '
-       + 'oninput="flaecheGetippt(this.value)">' + esc(text) + '</textarea>';
+       + 'oninput="flaecheGetippt(this.value)" onkeydown="flaecheTaste(event)" '
+       + 'onbeforeinput="flaecheVorEingabe(event)">' + esc(text) + '</textarea>';
     blatt.innerHTML = nb ? nbBuehneHtml(h) : h;
     nbPlatzPruefen();
     return;
@@ -16294,6 +16488,14 @@ function nbBlaettern(richtung) {
     return;
   }
   nbSpringen(ziel);
+}
+
+/* „Arbeit Band 3, S. 47" — für Verweise und Pinnwand. Die Kennung ist
+   <Buch>:<Seite>, ohne den Vorsatz „n:". */
+function nbSeitenName(kennung) {
+  var z = notizseiteZerlegen('n:' + kennung);
+  var b = notizbuchFinden(z.buchId);
+  return b ? ((b.name || 'Notizbuch') + ', S. ' + z.nr) : '';
 }
 
 /* Titel einer Seite für das Verzeichnis: die erste Zeile mit Inhalt. */
@@ -16931,6 +17133,14 @@ function pinInhalt(p) {
     return aus;
   }
   if (p.art === 'flaeche') {
+    if (istNotizseite(p.zielId)) {
+      var pz = notizseiteZerlegen(p.zielId);
+      if (!notizbuchFinden(pz.buchId)) { return aus; }
+      aus.lebt = true;
+      aus.titel = nbSeitenName(pz.buchId + ':' + pz.nr);
+      aus.fuss = flaecheVorschau(flaecheText(p.zielId)) || 'leer';
+      return aus;
+    }
     var istFrei = istFreie(p.zielId);
     var da = istFrei ? !!gedankeFinden(String(p.zielId).slice(2))
                      : !!(vorhabenFinden(p.zielId, 'projekt')
@@ -17037,7 +17247,9 @@ function pinnwandZeichnen() {
     h += '<button class="z-weg" type="button" '
        + 'onclick="event.stopPropagation();pinWeg(\'' + esc(p.id) + '\')" '
        + 'aria-label="Abnehmen" title="Abnehmen">×</button>';
-    h += '<div class="z-art">' + esc(PIN_ARTEN[p.art] || '') + '</div>';
+    var artName = (p.art === 'flaeche' && istNotizseite(p.zielId)) ? 'Notizseite'
+                : (PIN_ARTEN[p.art] || '');
+    h += '<div class="z-art">' + esc(artName) + '</div>';
     h += '<div class="z-titel">' + esc(z.titel) + '</div>';
     h += '<div class="z-fuss">';
     if (z.kasten) {

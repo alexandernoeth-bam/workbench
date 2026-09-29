@@ -636,6 +636,91 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__notizNachApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank(); var r = {};'
+                 + '   nbAnlegen(); var b = DB.notizbuecher[0];'
+                 + '   var id = notizseitenKennung(b.id, 1);'
+                 + '   flaecheSetzen(id, "# Kopf\\ntext darunter");'
+                 + '   DB.gedanken = [{ id: "g1", titel: "Frei", text: "# Kopf\\ntext darunter", geaendert: 1 }];'
+                 + '   flaecheFuer = id; r.faltenNotiz = /fl-falt/.test(flaecheAnsichtHtml(flaecheText(id), "").html);'
+                 + '   flaecheFuer = "g:g1"; r.faltenFrei = /fl-falt/.test(flaecheAnsichtHtml(flaecheText("g:g1"), "").html);'
+                 + '   flaecheFuer = id; flaecheModus = "ansicht"; flaecheZeichnen();'
+                 + '   var kNotiz = document.getElementById("flaecheKopf").innerHTML;'
+                 + '   r.allesZuNotiz = /flaecheAlleZu/.test(kNotiz);'
+                 + '   r.kompakt = /fl-nur-schmal/.test(kNotiz) && /flaecheSucheUm\\(\\)/.test(kNotiz)'
+                 + '     && /fl-zurueck-klein/.test(kNotiz) && /fl-umschalter/.test(kNotiz);'
+                 + '   r.pinNotiz = /pinUm\\(/.test(kNotiz);'
+                 + '   flaecheFuer = "g:g1"; flaecheZeichnen();'
+                 + '   r.allesZuFrei = /flaecheAlleZu/.test(document.getElementById("flaecheKopf").innerHTML);'
+                 + '   var feld = function(text, stelle){ return { value: text, selectionStart: stelle, selectionEnd: stelle,'
+                 + '     setSelectionRange: function(x, y){ this.selectionStart = x; this.selectionEnd = y; }, focus: function(){} }; };'
+                 + '   var weiter = function(text, stelle){ var f = feld(text, stelle === undefined ? text.length : stelle);'
+                 + '     var ok = flaecheListeWeiter(f); return ok ? f.value : "(normal)"; };'
+                 + '   r.punkt = weiter("- Punkt");'
+                 + '   r.kasten = weiter("  [x] erledigt");'
+                 + '   r.kastenOhneLeer = weiter("[]Ohne");'
+                 + '   r.leerEndet = weiter("a\\n- ");'
+                 + '   r.text = weiter("Normaler Text");'
+                 + '   r.trenner = weiter("---");'
+                 + '   r.vorDemZeichen = weiter("- Punkt", 0);'
+                 + '   r.mitte = weiter("- AB", 3);'
+                 + '   var ev = { key: "Enter", target: feld("- x", 3), verhindert: false,'
+                 + '     preventDefault: function(){ this.verhindert = true; } };'
+                 + '   flaecheFuer = id; flaecheTaste(ev); r.taste = ev.verhindert && ev.target.value === "- x\\n- ";'
+                 + '   var ev2 = { inputType: "insertLineBreak", target: feld("[] y", 4), verhindert: false,'
+                 + '     preventDefault: function(){ this.verhindert = true; } };'
+                 + '   flaecheVorEingabe(ev2); r.vorEingabe = ev2.verhindert && ev2.target.value === "[] y\\n[] ";'
+                 + '   var ev3 = { key: "Enter", shiftKey: true, target: feld("- x", 3), verhindert: false,'
+                 + '     preventDefault: function(){ this.verhindert = true; } };'
+                 + '   flaecheTaste(ev3); r.umschalt = !ev3.verhindert;'
+                 + '   var merkExec = document.execCommand; var imFeld = null;'
+                 + '   document.execCommand = function(cmd, x, text){'
+                 + '     var v = imFeld.value; var a0 = imFeld.selectionStart;'
+                 + '     imFeld.value = v.slice(0, a0) + text + v.slice(imFeld.selectionEnd);'
+                 + '     var fehl = Math.max(0, a0 + text.length - 1);'
+                 + '     imFeld.selectionStart = imFeld.selectionEnd = fehl; return true; };'
+                 + '   var fc = feld("- eins", 6); fc.focus = function(){ imFeld = fc; };'
+                 + '   flaecheTaste({ key: "Enter", target: fc, preventDefault: function(){} });'
+                 + '   r.markeWeiter = fc.selectionStart === fc.value.length;'
+                 + '   var fd = feld("a\\n- ", 4); fd.focus = function(){ imFeld = fd; };'
+                 + '   flaecheTaste({ key: "Enter", target: fd, preventDefault: function(){} });'
+                 + '   r.markeEnde = fd.value === "a\\n" && fd.selectionStart === 2;'
+                 + '   document.execCommand = merkExec;'
+                 + '   var nk = b.id + ":1";'
+                 + '   r.verweisName = wbZielName("notiz", nk);'
+                 + '   WB_MUSTER.lastIndex = 0; r.muster = WB_MUSTER.test("[[notiz:" + nk + "|x]]"); WB_MUSTER.lastIndex = 0;'
+                 + '   r.verweisHtml = /wbSpringen\\(.notiz./.test(flaecheAuszeichnen("[[notiz:" + nk + "|x]]"));'
+                 + '   flaecheFuer = "g:g1"; wbWahlArt = "notiz"; var wl = wbWahlListe();'
+                 + '   r.wahl = wl.length === 1 && wl[0].id === nk && wl[0].titel === "Notizbuch 1, S. 1";'
+                 + '   flaecheFuer = id; r.nichtSelbst = wbWahlListe().length === 0; wbWahlArt = "projekt";'
+                 + '   r.wahlReiter = /wbWahlArtSetzen\\(.notiz.\\)/.test(wbWahlHtml());'
+                 + '   flaecheSetzen(id, "# Kopf\\ntext darunter");'
+                 + '   var pi = pinInhalt({ art: "flaeche", zielId: id });'
+                 + '   r.pin = pi.lebt === true && pi.titel === "Notizbuch 1, S. 1" && pi.fuss === "Kopf";'
+                 + '   var pt = pinInhalt({ art: "flaeche", zielId: "n:gibtsnicht:1" }); r.pinTot = pt.lebt === false;'
+                 + '   DB = alt; flaecheFuer = ""; flaecheModus = "ansicht";'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__suchFokusApi = {'
+                 + ' pruefe: function(){'
+                 + '   var alt = DB; DB = leereDatenbank(); var r = {};'
+                 + '   DB.gedanken = [{ id: "g2", titel: "Suche", text: "abc\\nabd", geaendert: 1 }];'
+                 + '   flaecheFuer = "g:g2"; flaecheModus = "ansicht";'
+                 + '   var suchfeld = document.getElementById("flaecheSuchfeld");'
+                 + '   var geholt = false; suchfeld.focus = function(){ geholt = true; };'
+                 + '   suchfeld.selectionStart = 2; suchfeld.selectionEnd = 2;'
+                 + '   var vorher = document.activeElement; document.activeElement = suchfeld;'
+                 + '   flaecheSuche = "ab"; flaecheZeichnen();'
+                 + '   r.fokus = geholt; r.stelle = suchfeld.selectionStart === 2;'
+                 + '   document.activeElement = null; geholt = false; flaecheZeichnen(); r.ohneFokus = !geholt;'
+                 + '   flaecheSucheAuf = false; flaecheSuche = "ab"; flaecheSucheUm();'
+                 + '   r.lupeZuLeert = flaecheSucheAuf === false && flaecheSuche === "";'
+                 + '   flaecheSucheUm(); r.lupeAuf = flaecheSucheAuf === true;'
+                 + '   document.activeElement = vorher; flaecheSucheAuf = false; flaecheSuche = "";'
+                 + '   DB = alt; flaecheFuer = "";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -12685,10 +12770,14 @@ console.log('\n143. Notizbücher');
   pruefe(zeichnen && /!nb && !flaecheSuche && flaecheAnsEnde\(flaecheFuer\)/.test(zeichnen[0]),
          'eine Notizseite öffnet oben — nicht am Ende wie eine Gedankenfläche');
 
+  let e = null;
   if (!nb) {
     warn('Notizbuch-Funktionen nicht auswertbar');
   } else {
-    const e = nb.pruefe();
+    try { e = nb.pruefe(); }
+    catch (x) { fail('Notizbuch-Funktionen laufen nicht: ' + x.message); }
+  }
+  if (nb && e) {
     pruefe(e.angelegt === true, 'ein neues Notizbuch bekommt einen Namen und ist nicht archiviert');
     pruefe(e.kennung === true, 'die Kennung n:<Buch>:<Seite> lässt sich hin und zurück lesen');
     pruefe(e.leerKeinSatz === true, 'Blättern auf eine leere Seite legt keinen Datensatz an');
@@ -12707,6 +12796,110 @@ console.log('\n143. Notizbücher');
     pruefe(e.beschriebenBleibt === true, 'ein beschriebenes Notizbuch lässt sich nicht löschen');
     pruefe(e.leerGeloescht === true, 'ein leeres wird gelöscht und bekommt einen Löschvermerk');
     pruefe(e.abgleich === true, 'der Abgleich mischt Seiten einzeln');
+  }
+}
+
+/* ============================================================
+   144. Notizseiten: Nachbesserungen aus dem ersten Test (v5.6.1)
+   Grund: Auf dem Pixel war der Kopf zu hoch, Überschriften klappten
+   auf Notizseiten ein, eine Liste musste man nach jedem Enter neu
+   beginnen, und eine Seite ließ sich weder verlinken noch anheften.
+   ============================================================ */
+console.log('\n144. Notizseiten: Nachbesserungen');
+{
+  const skript = hauptSkript();
+  const e0 = globalThis.__notizNachApi;
+
+  pruefe(/body:not\(\.breit\) \.fl-nur-schmal\{display:inline-flex\}/.test(QUELLE)
+         && /body:not\(\.breit\) \.fl-nur-breit\{display:none\}/.test(QUELLE),
+         'der kompakte Kopf hängt an der Körperklasse, nicht an einer Media-Abfrage');
+  pruefe(/body:not\(\.breit\) \.fl-arten\{display:none\}/.test(QUELLE)
+         && /body:not\(\.breit\) \.fl-arten\.suche-auf\{display:flex\}/.test(QUELLE),
+         'am Handy erscheinen die Filter erst mit der Lupe');
+  pruefe(/body:not\(\.breit\) \.fl-leiste\{flex-wrap:nowrap;overflow-x:auto/.test(QUELLE),
+         'am Handy läuft die Formatleiste in einer wischbaren Zeile');
+  pruefe(/onkeydown="flaecheTaste\(event\)"/.test(QUELLE.replace(/\\'/g, "'"))
+         || /onkeydown=\\"flaecheTaste\(event\)\\"/.test(skript)
+         || /onkeydown="flaecheTaste\(event\)" /.test(skript),
+         'das Schreibfeld hört auf Enter');
+  pruefe(/onbeforeinput="flaecheVorEingabe\(event\)"/.test(skript),
+         'und auf den Zeilenumbruch der Handy-Tastatur');
+
+  let e = null;
+  if (!e0) {
+    warn('Nachbesserungen nicht auswertbar');
+  } else {
+    try { e = e0.pruefe(); }
+    catch (x) { fail('Nachbesserungen laufen nicht: ' + x.message); }
+  }
+  if (e0 && e) {
+    pruefe(e.faltenNotiz === false, 'auf einer Notizseite klappen Überschriften nicht ein');
+    pruefe(e.faltenFrei === true, 'auf einer Gedankenfläche weiterhin schon');
+    pruefe(e.allesZuNotiz === false, 'auf Notizseiten gibt es kein „alles zu/auf“');
+    pruefe(e.allesZuFrei === true, 'auf Gedankenflächen bleibt es');
+    pruefe(e.kompakt === true, 'der Kopf bringt Umschalter, Lupe und Zurück-Pfeil für das Handy mit');
+    pruefe(e.pinNotiz === true, 'eine Notizseite lässt sich anheften');
+    pruefe(e.punkt === '- Punkt\n- ', 'Enter in einer Aufzählung setzt den nächsten Punkt');
+    pruefe(e.kasten === '  [x] erledigt\n  [] ', 'nach einem Kästchen kommt ein offenes, gleich eingerückt');
+    pruefe(e.kastenOhneLeer === '[]Ohne\n[] ', 'auch ohne Leerzeichen nach dem Kästchen');
+    pruefe(e.leerEndet === 'a\n', 'Enter in einem leeren Punkt beendet die Liste');
+    pruefe(e.text === '(normal)' && e.trenner === '(normal)',
+           'normaler Text und Trennlinien bleiben gewöhnliche Umbrüche');
+    pruefe(e.vorDemZeichen === '(normal)', 'steht die Marke vor dem Zeichen, bleibt es ein gewöhnlicher Umbruch');
+    pruefe(e.mitte === '- A\n- B', 'mitten im Punkt wird der Rest zum nächsten Punkt');
+    pruefe(e.taste === true, 'die Enter-Taste setzt fort und unterdrückt den eigenen Umbruch');
+    pruefe(e.vorEingabe === true, 'der Umbruch der Handy-Tastatur ebenso');
+    pruefe(e.umschalt === true, 'Umschalt+Enter bleibt ein schlichter Umbruch');
+    /* Chrome setzte nach dem Beenden einer Liste die Marke vor den
+       Zeilenumbruch — der nächste Text klebte an der vorigen Zeile. */
+    pruefe(e.markeWeiter === true, 'nach dem Fortsetzen steht die Marke hinter dem neuen Zeichen');
+    pruefe(e.markeEnde === true, 'nach dem Beenden steht die Marke auf der neuen, leeren Zeile');
+    pruefe(e.verweisName === 'Notizbuch 1, S. 1', 'ein Verweis nennt Notizbuch und Seite');
+    pruefe(e.muster === true && e.verweisHtml === true, 'der Verweis wird erkannt und springt zur Seite');
+    pruefe(e.wahl === true && e.nichtSelbst === true,
+           'die Auswahl bietet beschriebene Seiten an, nicht die eigene');
+    pruefe(e.wahlReiter === true, 'die Auswahl hat einen Reiter „Notizseiten“');
+    pruefe(e.pin === true, 'der Zettel zeigt Notizbuch, Seite und erste Zeile');
+    pruefe(e.pinTot === true, 'ein Zettel zu einem verschwundenen Notizbuch gilt als tot');
+  }
+  {
+    const zettel = skript.match(/var artName = \(p\.art === 'flaeche' && istNotizseite\(p\.zielId\)\) \? 'Notizseite'/);
+    pruefe(!!zettel, 'der Zettel einer Notizseite heißt „Notizseite“, nicht „Gedanken“');
+    const modus = skript.match(/function flaecheModusSetzen\([\s\S]*?\n\}/);
+    pruefe(modus && /m === 'ansicht' && istNotizseite\(flaecheFuer\)[\s\S]*?scrollTop = 0/.test(modus[0]),
+           'zurück in der Ansicht beginnt eine Notizseite wieder oben');
+  }
+}
+
+/* ============================================================
+   145. Das Suchfeld einer Fläche behält beim Tippen den Fokus
+   Grund: Der Kopf wird bei jedem Tastendruck neu gezeichnet. Seit
+   jeher verlor das Suchfeld dadurch nach dem ersten Buchstaben den
+   Fokus — man musste für jeden Buchstaben neu hineintippen.
+   ============================================================ */
+console.log('\n145. Suchfeld behält den Fokus');
+{
+  const skript = hauptSkript();
+  const f = globalThis.__suchFokusApi;
+  const zeichnen = skript.match(/function flaecheZeichnen\([\s\S]*?\n\}/);
+  pruefe(zeichnen && /document\.activeElement/.test(zeichnen[0])
+         && /getElementById\('flaecheSuchfeld'\)/.test(zeichnen[0]),
+         'flaecheZeichnen merkt sich den Fokus und holt ihn zurück');
+  pruefe((QUELLE.match(/id="flaecheSuchfeld"/g) || []).length === 1,
+         'das Suchfeld trägt eine feste Kennung');
+  let e = null;
+  if (!f) {
+    warn('Suchfeld nicht auswertbar');
+  } else {
+    try { e = f.pruefe(); }
+    catch (x) { fail('Suchfeld-Prüfung läuft nicht: ' + x.message); }
+  }
+  if (f && e) {
+    pruefe(e.fokus === true, 'nach dem Neuzeichnen hat das Suchfeld wieder den Fokus');
+    pruefe(e.stelle === true, 'und die Schreibmarke steht wieder an ihrer Stelle');
+    pruefe(e.ohneFokus === true, 'wer nicht im Suchfeld war, wird nicht hineingesetzt');
+    pruefe(e.lupeZuLeert === true, 'die Lupe schließt die Suche und leert sie');
+    pruefe(e.lupeAuf === true, 'und öffnet sie wieder');
   }
 }
 
