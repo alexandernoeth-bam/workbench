@@ -1195,6 +1195,42 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   erinnerungStand = merkStand; tagOffen = merkTag; sichtschutz = merkS; badgeZahl = -1;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__editorApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {};'
+                 + '   r.nummern = listenNummern(["1. a", "1. b", "3. c", "", "  1. x", "  1. y", "4. d", "Text", "5. e", "- p", "2) f"]).join(",");'
+                 + '   var az = flaecheAnsichtHtml("1. eins\\n1. zwei\\n7. drei", "").html;'
+                 + '   r.ansicht = (az.match(/<span class="fl-nr">(\\d+)\\.<\\/span>/g) || []).map(function(x){ return x.replace(/\\D/g, ""); }).join(",");'
+                 + '   r.text = /<span class="fl-text">zwei<\\/span>/.test(az);'
+                 + '   var feld = function(text, stelle){ return { value: text, selectionStart: stelle, selectionEnd: stelle,'
+                 + '     setSelectionRange: function(a, b){ this.selectionStart = a; this.selectionEnd = b; }, focus: function(){} }; };'
+                 + '   var weiter = function(t){ var f = feld(t, t.length); return flaecheListeWeiter(f) ? f.value : "(normal)"; };'
+                 + '   r.enter = weiter("1. eins") + "|" + weiter("  9) neun") + "|" + weiter("a\\n2. ");'
+                 + '   var merkF = flaecheFuer; flaecheFuer = "g:x"; DB.gedanken = DB.gedanken || [];'
+                 + '   var tf = document.getElementById("flaecheFeld"); tf.value = "Eier\\n- Milch\\n\\n[] Brot\\n## Mehl";'
+                 + '   tf.selectionStart = 0; tf.selectionEnd = tf.value.length; flaecheNummerieren(); r.knopf = tf.value;'
+                 + '   tf.value = "[Kletterrosen] (https://amazon.de/x) und [Lang "+"x".repeat(150)+"](https://a.de/y)";'
+                 + '   var al = flaecheAuszeichnen(tf.value);'
+                 + '   r.linkLeer = /<a href="https:\\/\\/amazon\\.de\\/x"[^>]*>Kletterrosen<\\/a>/.test(al);'
+                 + '   r.linkLang = /<a href="https:\\/\\/a\\.de\\/y"/.test(al);'
+                 + '   r.vorschau = flaecheVorschau("3. Dritter Punkt");'
+                 + '   tf.value = "Foo *fett* und Foo [text] (https://x.de) foo"; tf.selectionStart = tf.selectionEnd = 0;'
+                 + '   ersetzenStand = { auf: true, suchen: "foo", durch: "Bar", gross: false, muster: false };'
+                 + '   r.zahl = ersetzenZahl();'
+                 + '   ersetzenStand.gross = true; r.zahlGross = ersetzenZahl(); ersetzenStand.gross = false;'
+                 + '   ersetzenWeiter(); r.weiter = tf.selectionStart + "-" + tf.selectionEnd;'
+                 + '   ersetzenEinmal(); r.einmal = tf.value;'
+                 + '   r.alle = ersetzenAlle() + ":" + tf.value;'
+                 + '   ersetzenStand = { auf: true, suchen: "\\\\] \\\\(", durch: "](", gross: false, muster: true };'
+                 + '   r.muster = ersetzenAlle() + ":" + tf.value;'
+                 + '   ersetzenStand = { auf: true, suchen: "(", durch: "", gross: false, muster: true };'
+                 + '   r.musterFehler = ersetzenZahl() + ":" + ersetzenZahlText(ersetzenZahl());'
+                 + '   ersetzenStand = { auf: true, suchen: "", durch: "", gross: false, muster: false }; r.leer = ersetzenAlle();'
+                 + '   r.leiste = /id="ersetzenSuchen"/.test(ersetzenLeisteHtml()) && /ersetzenAlle\\(\\)/.test(ersetzenLeisteHtml());'
+                 + '   ersetzenStand.auf = false; r.zu = ersetzenLeisteHtml() === "";'
+                 + '   flaecheFuer = merkF;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -9492,7 +9528,8 @@ console.log('\n75. Gedankenfläche');
            'der Verweisknopf legt ein Gerüst an');
     pruefe(e.linkStrich === 17, 'und setzt den Strich hinter https://');
     pruefe(e.datumLang === 'Mo, 14.09.2026', 'das Datum trägt Wochentag und Jahr');
-    pruefe(e.knoepfe === 21, 'einundzwanzig Knöpfe in der Leiste');
+    /* Seit v5.14.0: dazu „1.“ und „Suchen und ersetzen“. */
+    pruefe(e.knoepfe === 23, 'dreiundzwanzig Knöpfe in der Leiste');
     pruefe(e.unter === 'Das <u>wichtig</u> hier', 'Pluszeichen unterstreichen');
     pruefe(e.doppelStern === 'Das ist <b>fett</b> so',
            'auch die gängige Markdown-Schreibweise mit zwei Sternen');
@@ -14106,6 +14143,67 @@ console.log('\n163. Aufzählungspunkt und Umbruch');
   const absatz = QUELLE.match(/\.fl-absatz\{[^}]*\}/);
   pruefe(text && /overflow-wrap:anywhere/.test(text[0]) && absatz && /overflow-wrap:anywhere/.test(absatz[0]),
          'lange Wörter und Adressen brechen um, statt in den Rand zu laufen');
+}
+
+/* ============================================================
+   164. Nummerierte Listen (v5.14.0)
+   ============================================================ */
+console.log('\n164. Nummerierte Listen');
+{
+  const t = globalThis.__editorApi;
+  let e = null;
+  if (!t) { warn('Editor nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Editor läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.nummern === '1,2,3,0,1,2,4,0,5,0,2',
+           'fortlaufend gezählt, je Einrückung für sich; eine Zeile ohne Nummer beendet die Liste, eine leere nicht; ein neuer Block beginnt mit seiner Nummer');
+    pruefe(e.ansicht === '1,2,3' && e.text === true, 'die Ansicht zeigt die fortlaufenden Nummern');
+    pruefe(e.enter === '1. eins\n2. |  9) neun\n  10) |a\n', 'Enter setzt die nächste Nummer, ein leerer Punkt beendet die Liste');
+    pruefe(e.knopf === '1. Eier\n2. Milch\n\n3. Brot\n4. Mehl', 'der Knopf „1.“ nummeriert die markierten Zeilen und ersetzt ihre Zeichen');
+    pruefe(e.vorschau === 'Dritter Punkt', 'Vorschau und Verzeichnis lassen die Nummer weg');
+  }
+}
+
+/* ============================================================
+   165. Suchen und ersetzen im Schreibfeld (v5.14.0)
+   ============================================================ */
+console.log('\n165. Suchen und ersetzen');
+{
+  const t = globalThis.__editorApi;
+  let e = null;
+  if (t) { try { e = t.pruefe(); } catch (x) { fail('Ersetzen läuft nicht: ' + x.message); } }
+  else { warn('Ersetzen nicht auswertbar'); }
+  if (e) {
+    pruefe(e.zahl === 3 && e.zahlGross === 1, 'die Treffer werden gezählt, wahlweise mit Groß/klein');
+    pruefe(e.weiter === '0-3', '„Weiter“ markiert den nächsten Treffer');
+    pruefe(e.einmal === 'Bar *fett* und Foo [text] (https://x.de) foo', '„Ersetzen“ tauscht den markierten Treffer');
+    pruefe(e.alle === '2:Bar *fett* und Bar [text] (https://x.de) Bar', '„Alle ersetzen“ tauscht alle übrigen');
+    pruefe(e.muster === '1:Bar *fett* und Bar [text](https://x.de) Bar', 'ein Muster rückt verbogenes Markdown gerade');
+    pruefe(e.musterFehler === '-2:Muster fehlerhaft', 'ein kaputtes Muster wird gemeldet, nicht ausgeführt');
+    pruefe(e.leer === 0, 'ohne Suchbegriff geschieht nichts');
+    pruefe(e.leiste === true && e.zu === true, 'die Leiste erscheint auf Knopfdruck und verschwindet wieder');
+  }
+}
+
+/* ============================================================
+   166. Links mit Leerzeichen, Verzeichnis überdeckt die Seite nicht (v5.14.0)
+   Grund: „[Text] (https://…)“ mit Leerzeichen blieb roh stehen, ebenso
+   ein Linktext über 80 Zeichen. Und bei 1000–1100 px Fensterbreite mit
+   Zoom über 100 % wuchs die Seite unter das Inhaltsverzeichnis.
+   ============================================================ */
+console.log('\n166. Links und Verzeichnis');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__editorApi;
+  const ein = skript.match(/function nbEinpassen\([\s\S]*?\n\}/);
+  pruefe(ein && /schirm\.classList\.add\('nb-schwebend'\)/.test(ein[0]),
+         'braucht die Seite den Platz, schwebt das Verzeichnis');
+  let e = null;
+  if (t) { try { e = t.pruefe(); } catch (x) { fail('Links laufen nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.linkLeer === true, 'ein Link mit Leerzeichen zwischen ] und ( zeigt nur seinen Text');
+    pruefe(e.linkLang === true, 'ein Linktext darf länger als 80 Zeichen sein');
+  }
 }
 
 /* ============================================================

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.13.2</title>
+<title>Workbench 5.14.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1281,6 +1281,18 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 /* Erinnerungen im Diagnose-Bildschirm */
 .er-reihe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
 .er-etikett{font-size:calc(var(--fs)*0.76);color:var(--grau);margin-right:4px}
+/* Nummerierte Listen (seit v5.14.0) */
+.fl-nr{flex:0 0 auto;min-width:1.6em;text-align:right;color:var(--weinrot);font-weight:600;
+  font-family:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;font-size:calc(var(--fs)*0.76)}
+.nb-inhalt .fl-nr{font-size:calc(var(--fs)*0.84)}
+/* Suchen und ersetzen im Schreibfeld (seit v5.14.0) */
+.fl-knopf.an{border-color:var(--weinrot);color:var(--weinrot)}
+.ers-leiste{margin:6px 0 4px;padding:8px 10px;border:1px solid var(--weinrot);border-radius:8px;background:var(--karte)}
+.ers-zeile{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:3px 0}
+.ers-zeile input[type=text]{flex:1 1 160px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.8);
+  padding:5px 8px;border:1px solid var(--linie);border-radius:6px;background:var(--karte);color:var(--tinte)}
+.ers-zeile label{font-size:calc(var(--fs)*0.72);color:var(--grau);display:inline-flex;gap:4px;align-items:center}
+.ers-zahl{font-size:calc(var(--fs)*0.72);color:var(--grau);min-width:90px}
 .fl-gruppe{border:1px solid var(--linie);border-radius:8px;overflow:hidden;background:var(--karte);
   align-items:center;flex:0 0 auto}
 .fl-gruppe button{border:0;background:none;height:32px;min-width:34px;padding:0 8px;cursor:pointer;
@@ -2610,7 +2622,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.13.2';
+var APP_VERSION = '5.14.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -15247,7 +15259,9 @@ function flaecheAuszeichnen(text) {
   t = t.replace(WB_MUSTER, function (ganz, art, id, titel) {
     return wbLinkHtml(art, id, titel);
   });
-  t = t.replace(/\[([^\]]{1,80})\]\((https?:\/\/[^\s)]+)\)/g,
+  /* „[Text] (https://…)" mit Leerzeichen kommt aus Chats und Mails oft
+     so — seit v5.14.0 gilt es auch; der Linktext darf 200 Zeichen haben. */
+  t = t.replace(/\[([^\]]{1,200})\] ?\((https?:\/\/[^\s)]+)\)/g,
                 '<a href="$2" target="_blank" rel="noopener">$1</a>');
   t = t.replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g,
                 '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
@@ -15444,7 +15458,7 @@ function tabelleEinfuegen() {
   flaecheSetzen(flaecheFuer, feld.value);
 }
 
-function flaecheZeileHtml(zeile, nr, suche, falte) {
+function flaecheZeileHtml(zeile, nr, suche, falte, nummer) {
   var roh = String(zeile);
   var tiefe = 0;
   var rest = roh;
@@ -15497,6 +15511,12 @@ function flaecheZeileHtml(zeile, nr, suche, falte) {
          + 'onclick="flaecheKastenUm(' + nr + ')"></button>'
          + '<span class="fl-text' + (an ? ' fertig' : '') + '">'
          + hervor(kasten[2]) + '</span></div>';
+  }
+  var nummeriert = rest.match(NUMMER_MUSTER);
+  if (nummeriert) {
+    return '<div class="fl-zeile"' + stil + '>'
+         + '<span class="fl-nr">' + (nummer || Number(nummeriert[1])) + '.</span>'
+         + '<span class="fl-text">' + hervor(nummeriert[2]) + '</span></div>';
   }
   var punkt = rest.match(/^[-•*]\s+(.*)$/);
   if (punkt) {
@@ -15574,6 +15594,7 @@ function flaecheAnsichtHtml(text, suche) {
   var i;
   var treffer = 0;
   var zuBis = 0;          /* solange die Stufe größer ist, wird versteckt */
+  var nummern = listenNummern(zeilen);
   for (i = 0; i < zeilen.length; i++) {
     var wort = (suche && suche.length >= 2)
             && zeilen[i].toLowerCase().indexOf(suche.toLowerCase()) >= 0;
@@ -15621,7 +15642,7 @@ function flaecheAnsichtHtml(text, suche) {
       continue;
     }
     var zeileH = flaecheZeileHtml(zeilen[i], i, suche,
-                                  faltenGilt ? { zu: false, drin: 0 } : null);
+                                  faltenGilt ? { zu: false, drin: 0 } : null, nummern[i]);
     h += nbZ ? nbHuelle(i, zeileH) : zeileH;
   }
   if (!String(text).trim().length) {
@@ -15714,7 +15735,8 @@ function flaecheListeWeiter(feld) {
   var zeile = text.slice(anfang, ende);
   var kasten = zeile.match(/^(\s*)(\[[ xX]?\])(\s*)(.*)$/);
   var punkt = kasten ? null : zeile.match(/^(\s*)([-•*])(\s+)(.*)$/);
-  var m = kasten || punkt;
+  var nummer = (kasten || punkt) ? null : zeile.match(/^(\s*)(\d{1,3}[.)])(\s+)(.*)$/);
+  var m = kasten || punkt || nummer;
   if (!m) { return false; }
   var vorne = m[1].length + m[2].length + m[3].length;
   /* Steht die Marke vor dem Zeichen, ist ein gewöhnlicher Umbruch gemeint. */
@@ -15724,7 +15746,9 @@ function flaecheListeWeiter(feld) {
     flaecheMarkeSetzen(feld, anfang);
     return true;
   }
-  var neu = '\n' + m[1] + (kasten ? '[] ' : (m[2] + ' '));
+  var zeichen = kasten ? '[] '
+              : (nummer ? ((parseInt(m[2], 10) + 1) + m[2].slice(-1) + ' ') : (m[2] + ' '));
+  var neu = '\n' + m[1] + zeichen;
   feldErsetzen(feld, a, a, neu);
   flaecheMarkeSetzen(feld, a + neu.length);
   return true;
@@ -15850,7 +15874,7 @@ function flaecheZeichen(was) {
   if (ende < 0) { ende = text.length; }
   var zeile = text.slice(anfang, ende);
   var einzug = (zeile.match(/^\s*/) || [''])[0];
-  var ohne = zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX]?\]\s*|[-•*]\s+)/, '');
+  var ohne = zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX]?\]\s*|[-•*]\s+|\d{1,3}[.)]\s+)/, '');
 
   var neu;
   if (was === 'einzug')      { neu = '  ' + zeile; }
@@ -15881,6 +15905,8 @@ function flaecheSinnbild(art) {
     h3:      '<text x="2" y="17" font-size="15" font-weight="600">H3</text>',
     kasten:  '<rect x="4" y="4" width="16" height="16" rx="2"></rect>'
            + '<path d="M8 12l3 3 5-6"></path>',
+    nummer:  '<text x="2" y="16" font-size="12" font-weight="700">1.</text><path d="M12 8h9M12 16h9"></path>',
+    ersetzen: '<circle cx="9" cy="9" r="5"></circle><path d="M13 13l3 3"></path><path d="M14 20h7M18 17l3 3-3 3"></path>',
     punkt:   '<rect x="3" y="5" width="5" height="5" rx="1"></rect>'
            + '<rect x="3" y="14" width="5" height="5" rx="1"></rect>'
            + '<path d="M12 7.5h9M12 16.5h9"></path>',
@@ -16176,6 +16202,9 @@ function flaecheLeisteHtml() {
   h += flaecheKnopf('zeile', 'h3', 'h3', 'Kleine Überschrift');
   h += flaecheKnopf('zeile', 'kasten', 'kasten', 'Kästchen zum Abhaken');
   h += flaecheKnopf('zeile', 'punkt', 'punkt', 'Aufzählung');
+  h += '<button class="fl-knopf" type="button" onclick="flaecheNummerieren()" '
+     + 'onmousedown="event.preventDefault()" '
+     + 'title="Nummerierte Liste" aria-label="Nummerierte Liste">' + flaecheSinnbild('nummer') + '</button>';
   h += '<span class="fl-teiler"></span>';
   h += flaecheKnopf('paar', '*', 'fett', 'Fett');
   h += flaecheKnopf('paar', '_', 'kursiv', 'Kursiv');
@@ -16204,6 +16233,10 @@ function flaecheLeisteHtml() {
      + flaecheSinnbild('tabelle') + '</button>';
   h += flaecheKnopf('zeile', 'trenner', 'trenner', 'Trennlinie');
   h += flaecheKnopf('zeile', 'datum', 'datum', 'Datum einfügen');
+  h += '<span class="fl-teiler"></span>';
+  h += '<button class="fl-knopf' + (ersetzenStand.auf ? ' an' : '') + '" type="button" onclick="ersetzenUm()" '
+     + 'title="Suchen und ersetzen" aria-label="Suchen und ersetzen" aria-expanded="'
+     + (ersetzenStand.auf ? 'true' : 'false') + '">' + flaecheSinnbild('ersetzen') + '</button>';
   h += '</div>';
   return h;
 }
@@ -16343,7 +16376,7 @@ function flaecheZeichnen() {
 
   var leiste = document.getElementById('flaecheLeiste');
   if (leiste) {
-    leiste.innerHTML = (flaecheModus === 'schreiben') ? flaecheLeisteHtml() : '';
+    leiste.innerHTML = (flaecheModus === 'schreiben') ? (flaecheLeisteHtml() + ersetzenLeisteHtml()) : '';
   }
   var springer = document.getElementById('flaecheSpringer');
   if (springer) { springer.innerHTML = nb ? nbInhaltKnopfHtml() : flaecheSpringerHtml(); }
@@ -16464,7 +16497,7 @@ function flaecheVorschau(text) {
   var zeilen = String(text || '').split('\n');
   var i;
   for (i = 0; i < zeilen.length; i++) {
-    var z = zeilen[i].replace(/^\s*(#{1,3}|\[[ xX]?\]|[-•*])\s*/, '').trim();
+    var z = zeilen[i].replace(/^\s*(#{1,3}|\[[ xX]?\]|[-•*]|\d{1,3}[.)])\s*/, '').trim();
     if (z.length) { return z.slice(0, 90); }
   }
   return '';
@@ -17942,6 +17975,17 @@ function nbEinpassen() {
   if (doppelt || !breit) { m = Math.min(m, 1); }
   if (breit) { m = m * nbZoom().faktor; }
   m = Math.max(0.3, Math.min(m, 3));
+  /* Wird die Seite durch den Zoom breiter als ihr Platz neben dem
+     Verzeichnis, schwebt das Verzeichnis — sonst läge es auf der Seite
+     (bis v5.13.2, bei 1000–1100 px und Zoom über 100 %). */
+  if (!schwebend && breite * m > flaeche.clientWidth - 40 - NB_INHALT_BREITE + 1 && schirm && schirm.classList) {
+    schirm.classList.add('nb-schwebend');
+    schwebend = true;
+    m = (flaeche.clientWidth - 40) / breite;
+    if (doppelt || !breit) { m = Math.min(m, 1); }
+    if (breit) { m = m * nbZoom().faktor; }
+    m = Math.max(0.3, Math.min(m, 3));
+  }
   mass.style.transform = 'translate(' + (doppelt ? Math.round(15 * m) : 0) + 'px,'
                        + Math.round(luft * m) + 'px) scale(' + m + ')';
   if (mass.setAttribute) { mass.setAttribute('data-m', String(m)); }
@@ -18639,6 +18683,198 @@ function uhrzeitPlus(zeit, minuten) {
   var t = String(zeit).split(':');
   var ges = Math.min(23 * 60 + 59, Number(t[0]) * 60 + Number(t[1] || 0) + Number(minuten || 0));
   return String(Math.floor(ges / 60)).padStart(2, '0') + ':' + String(ges % 60).padStart(2, '0');
+}
+
+
+/* ============================================================
+   Nummerierte Listen
+
+   „1. …", „2) …" sind Einträge einer nummerierten Liste. Gezeigt wird
+   fortlaufend wie in Markdown: Die erste Nummer eines Blocks gilt,
+   danach zählt es +1 weiter — auch wenn beim Einfügen zweimal „3." im
+   Text steht. Jede Einrückung zählt für sich; eine Zeile ohne Nummer
+   beendet die Liste auf ihrer Stufe und darunter, eine leere nicht.
+   ============================================================ */
+
+var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
+
+function listenNummern(zeilen) {
+  var aus = [];
+  var zaehler = {};
+  var i;
+  var k;
+  for (i = 0; i < zeilen.length; i++) {
+    var roh = String(zeilen[i]);
+    var tiefe = 0;
+    var rest = roh;
+    while (rest.indexOf('  ') === 0) { tiefe++; rest = rest.slice(2); }
+    if (!rest.trim().length) { aus.push(0); continue; }
+    var m = rest.match(NUMMER_MUSTER);
+    for (k in zaehler) {
+      if (Number(k) > tiefe || (!m && Number(k) >= tiefe)) { delete zaehler[k]; }
+    }
+    if (!m) { aus.push(0); continue; }
+    zaehler[tiefe] = (zaehler[tiefe] === undefined) ? Number(m[1]) : zaehler[tiefe] + 1;
+    aus.push(zaehler[tiefe]);
+  }
+  return aus;
+}
+
+/* Knopf „1.": die aktuelle Zeile oder alle markierten werden zu einer
+   nummerierten Liste. Leere Zeilen bleiben leer; vorhandene Zeichen
+   (Punkt, Kästchen, Nummer, Überschrift) werden ersetzt. */
+function flaecheNummerieren() {
+  var feld = document.getElementById('flaecheFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var von = (typeof feld.selectionStart === 'number') ? feld.selectionStart : text.length;
+  var bis = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : von;
+  var anfang = text.lastIndexOf('\n', von - 1) + 1;
+  var ende = text.indexOf('\n', bis);
+  if (ende < 0) { ende = text.length; }
+  var n = 0;
+  var block = text.slice(anfang, ende).split('\n').map(function (zeile) {
+    if (!zeile.trim().length) { return zeile; }
+    var einzug = (zeile.match(/^\s*/) || [''])[0];
+    n++;
+    return einzug + n + '. '
+         + zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX]?\]\s*|[-•*]\s+|\d{1,3}[.)]\s+)/, '');
+  }).join('\n');
+  feldErsetzen(feld, anfang, ende, block);
+  flaecheSetzen(flaecheFuer, feld.value);
+  if (typeof feld.setSelectionRange === 'function') {
+    feld.setSelectionRange(anfang + block.length, anfang + block.length);
+  }
+}
+
+/* ============================================================
+   Suchen und ersetzen im Schreibfeld
+
+   Eine Leiste über dem Schreibfeld: Suchen, Ersetzen durch, Treffer.
+   Wahlweise mit Groß/klein und als Muster (regulärer Ausdruck) — damit
+   lassen sich verbogene Markdown-Formate in einem Zug geraderücken.
+   Jede Ersetzung geht über feldErsetzen und ist mit Strg+Z zurückzuholen.
+   ============================================================ */
+
+var ersetzenStand = { auf: false, suchen: '', durch: '', gross: false, muster: false };
+
+function ersetzenUm() {
+  ersetzenStand.auf = !ersetzenStand.auf;
+  flaecheZeichnen();
+  if (ersetzenStand.auf) {
+    var f = document.getElementById('ersetzenSuchen');
+    if (f && f.focus) { f.focus(); }
+  }
+}
+
+function ersetzenLeisteHtml() {
+  var s = ersetzenStand;
+  if (!s.auf) { return ''; }
+  var n = ersetzenZahl();
+  return '<div class="ers-leiste" role="search">'
+    + '<div class="ers-zeile"><input type="text" id="ersetzenSuchen" placeholder="Suchen" '
+    + 'value="' + esc(s.suchen) + '" oninput="ersetzenFeld(\'suchen\', this.value)" aria-label="Suchen">'
+    + '<span class="ers-zahl" id="ersetzenZahl">' + esc(ersetzenZahlText(n)) + '</span></div>'
+    + '<div class="ers-zeile"><input type="text" id="ersetzenDurch" placeholder="Ersetzen durch" '
+    + 'value="' + esc(s.durch) + '" oninput="ersetzenFeld(\'durch\', this.value)" aria-label="Ersetzen durch"></div>'
+    + '<div class="ers-zeile">'
+    + '<label><input type="checkbox"' + (s.gross ? ' checked' : '') + ' onchange="ersetzenFeld(\'gross\', this.checked)"> '
+    + 'Groß/klein beachten</label>'
+    + '<label><input type="checkbox"' + (s.muster ? ' checked' : '') + ' onchange="ersetzenFeld(\'muster\', this.checked)"> '
+    + 'Muster (regulärer Ausdruck)</label></div>'
+    + '<div class="ers-zeile">'
+    + '<button type="button" class="sl-pille" onclick="ersetzenWeiter()">Weiter</button>'
+    + '<button type="button" class="sl-pille" onclick="ersetzenEinmal()">Ersetzen</button>'
+    + '<button type="button" class="sl-pille an" onclick="ersetzenAlle()">Alle ersetzen</button>'
+    + '<button type="button" class="sl-pille" onclick="ersetzenUm()">Schließen</button></div>'
+    + '</div>';
+}
+
+/* Tippen in die Felder zeichnet nichts neu — sonst verlöre das Feld die Marke. */
+function ersetzenFeld(was, wert) {
+  if (was === 'suchen' || was === 'durch') { ersetzenStand[was] = String(wert || ''); }
+  else if (was === 'gross' || was === 'muster') { ersetzenStand[was] = !!wert; }
+  else { return; }
+  var z = document.getElementById('ersetzenZahl');
+  if (z) { z.textContent = ersetzenZahlText(ersetzenZahl()); }
+}
+
+/* Das Suchmuster — oder null (leer), oder 'fehler' (kein gültiges Muster). */
+function ersetzenMuster() {
+  var s = ersetzenStand;
+  if (!s.suchen) { return null; }
+  try {
+    return new RegExp(s.muster ? s.suchen : s.suchen.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+                      s.gross ? 'g' : 'gi');
+  } catch (f) {
+    return 'fehler';
+  }
+}
+
+function ersetzenZahl() {
+  var m = ersetzenMuster();
+  if (m === null) { return -1; }
+  if (m === 'fehler') { return -2; }
+  var feld = document.getElementById('flaecheFeld');
+  var text = feld ? String(feld.value || '') : flaecheText(flaecheFuer);
+  return (text.match(m) || []).filter(function (x) { return x.length > 0; }).length;
+}
+
+function ersetzenZahlText(n) {
+  if (n === -1) { return ''; }
+  if (n === -2) { return 'Muster fehlerhaft'; }
+  return n === 1 ? '1 Treffer' : (n + ' Treffer');
+}
+
+/* Den nächsten Treffer hinter der Marke markieren, am Ende von vorn. */
+function ersetzenWeiter() {
+  var m = ersetzenMuster();
+  var feld = document.getElementById('flaecheFeld');
+  if (!m || m === 'fehler' || !feld) { return false; }
+  var text = String(feld.value || '');
+  m.lastIndex = (typeof feld.selectionEnd === 'number') ? feld.selectionEnd : 0;
+  var r = m.exec(text);
+  if (!r || !r[0].length) { m.lastIndex = 0; r = m.exec(text); }
+  if (!r || !r[0].length) { return false; }
+  if (feld.focus) { feld.focus(); }
+  if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(r.index, r.index + r[0].length); }
+  return true;
+}
+
+/* Ist ein Treffer markiert, wird er ersetzt; dann geht es zum nächsten. */
+function ersetzenEinmal() {
+  var m = ersetzenMuster();
+  var feld = document.getElementById('flaecheFeld');
+  if (!m || m === 'fehler' || !feld) { return; }
+  var von = feld.selectionStart;
+  var bis = feld.selectionEnd;
+  var markiert = String(feld.value || '').slice(von, bis);
+  var genau = new RegExp('^(?:' + m.source + ')$', ersetzenStand.gross ? '' : 'i');
+  if (markiert && genau.test(markiert)) {
+    var neu = markiert.replace(genau, ersetzenStand.durch);
+    feldErsetzen(feld, von, bis, neu);
+    if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(von + neu.length, von + neu.length); }
+    flaecheGetippt(feld.value);
+  }
+  ersetzenWeiter();
+  ersetzenFeld('suchen', ersetzenStand.suchen);
+}
+
+/* Alles auf einmal — als ein einziger Schritt, den Strg+Z zurückholt. */
+function ersetzenAlle() {
+  var m = ersetzenMuster();
+  var feld = document.getElementById('flaecheFeld');
+  if (!m || m === 'fehler' || !feld) { return 0; }
+  var alt = String(feld.value || '');
+  var n = ersetzenZahl();
+  if (n <= 0) { return 0; }
+  var neu = alt.replace(m, ersetzenStand.durch);
+  feldErsetzen(feld, 0, alt.length, neu);
+  flaecheGetippt(feld.value);
+  var z = document.getElementById('ersetzenZahl');
+  if (z) { z.textContent = n + ' ersetzt'; }
+  melde(n + (n === 1 ? ' Stelle' : ' Stellen') + ' ersetzt — Strg+Z holt sie zurück.', 'gut');
+  return n;
 }
 
 
