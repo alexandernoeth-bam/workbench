@@ -1082,6 +1082,87 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; tagOffen = merkTag;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__anmeldeApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var merkL = letzteErneuerung; var merkTimeout = window.setTimeout; var merkClear = window.clearTimeout;'
+                 + '   var uhren = []; window.setTimeout = function(fn, ms){ uhren.push({ fn: fn, ms: ms }); return uhren.length; };'
+                 + '   window.clearTimeout = function(){};'
+                 + '   var ergebnis = []; var fertig = function(g){ ergebnis.push(g); };'
+                 + '   var klient = { requestAccessToken: function(o){ this.gefragt = o; this.error_callback({ type: "popup_failed_to_open" }); } };'
+                 + '   anmeldeAnfragen(klient, true, "", fertig);'
+                 + '   r.fensterFehler = ergebnis.join(",") + "|" + (letzteErneuerung ? letzteErneuerung.grund : "") + "|" + anmeldungLaeuft;'
+                 + '   ergebnis = [];'
+                 + '   var stumm = { requestAccessToken: function(){} };'
+                 + '   anmeldeAnfragen(stumm, true, "", fertig);'
+                 + '   r.wartetNochLaeuft = ergebnis.length === 0 && anmeldungLaeuft === true;'
+                 + '   var grenze = uhren[uhren.length - 1]; r.zeitgrenzeMs = grenze.ms; grenze.fn();'
+                 + '   r.zeitgrenze = ergebnis.join(",") + "|" + letzteErneuerung.grund + "|" + anmeldungLaeuft;'
+                 + '   ergebnis = []; anmeldeAnfragen(stumm, false, "", fertig); r.vonHandMs = uhren[uhren.length - 1].ms;'
+                 + '   uhren[uhren.length - 1].fn(); r.vonHandErgebnis = ergebnis.join(",");'
+                 + '   ergebnis = [];'
+                 + '   var ablehnen = { requestAccessToken: function(){ this.callback({ error: "access_denied" }); } };'
+                 + '   anmeldeAnfragen(ablehnen, true, "", fertig); r.abgelehnt = ergebnis.join(",") + "|" + letzteErneuerung.grund;'
+                 + '   ergebnis = []; var doppelt = { requestAccessToken: function(){ this.error_callback({ type: "popup_closed" }); this.callback({ error: "x" }); } };'
+                 + '   anmeldeAnfragen(doppelt, true, "", fertig); r.einmal = ergebnis.length;'
+                 + '   window.setTimeout = merkTimeout; window.clearTimeout = merkClear; letzteErneuerung = merkL; anmeldungLaeuft = false;'
+                 + '   return r;'
+                 + ' },'
+                 + ' klick: function(){'
+                 + '   var r = {}; var merkV = anmeldeVersuch; var merkL = window.localStorage; var merkT = zugriffToken; var merkA = tokenAblauf;'
+                 + '   var aufrufe = 0; anmeldeVersuch = function(){ aufrufe++; return { then: function(){} }; };'
+                 + '   window.localStorage = { getItem: function(k){ return k === "workbench-war-angemeldet" ? "1" : null; }, setItem: function(){}, removeItem: function(){} };'
+                 + '   zugriffToken = "abc"; tokenAblauf = Date.now() - 1000; klickErneuerungFuer = ""; anmeldungLaeuft = false;'
+                 + '   var normal = { target: { closest: function(){ return null; } } };'
+                 + '   klickErneuern(normal); r.erster = aufrufe;'
+                 + '   klickErneuern(normal); klickErneuern(normal); r.nurEinmal = aufrufe;'
+                 + '   tokenAblauf = Date.now() - 500; klickErneuern(normal); r.neuerAblauf = aufrufe;'
+                 + '   tokenAblauf = Date.now() - 200; klickErneuern({ target: { closest: function(sel){ return /anmelden/.test(sel) ? {} : null; } } });'
+                 + '   r.knopfSelbst = aufrufe;'
+                 + '   tokenAblauf = Date.now() + 600000; klickErneuerungFuer = ""; klickErneuern(normal); r.gueltig = aufrufe;'
+                 + '   tokenAblauf = Date.now() - 100; klickErneuerungFuer = ""; anmeldungLaeuft = true; klickErneuern(normal); r.laeuft = aufrufe;'
+                 + '   anmeldungLaeuft = false;'
+                 + '   window.localStorage = { getItem: function(){ return null; }, setItem: function(){}, removeItem: function(){} };'
+                 + '   klickErneuern(normal); r.nieAngemeldet = aufrufe;'
+                 + '   anmeldeVersuch = merkV; window.localStorage = merkL; zugriffToken = merkT; tokenAblauf = merkA; klickErneuerungFuer = "";'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__erinnerungApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkL = window.localStorage; var merkN = globalThis.Notification;'
+                 + '   var merkS = sichtschutz; var merkF = tagFilter; var merkStand = erinnerungStand; DB = leereDatenbank();'
+                 + '   var ablage = {}; window.localStorage = { getItem: function(k){ return ablage[k] || null; },'
+                 + '     setItem: function(k, v){ ablage[k] = v; }, removeItem: function(k){ delete ablage[k]; } };'
+                 + '   erinnerungStand = null; r.voreinstellung = JSON.stringify(erinnerungEinstellung());'
+                 + '   var gezeigt = []; globalThis.Notification = function(t, o){ gezeigt.push(t); this.close = function(){}; };'
+                 + '   globalThis.Notification.permission = "granted";'
+                 + '   var is = isoDatum(); var jetzt = new Date();'
+                 + '   var um = function(minuten){ var d = new Date(jetzt.getTime() + minuten * 60000);'
+                 + '     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };'
+                 + '   var auf = function(id, titel, zeit, extra){ var a = { id: id, titel: titel, kontext: "beruflich", planung: is, uhrzeit: zeit,'
+                 + '     art: "haupt", status: "offen", wiederholung: null, geaendert: 1 }; var k; for (k in (extra || {})) { a[k] = extra[k]; }'
+                 + '     DB.aufgaben.push(a); planAufnehmen(is, id); };'
+                 + '   auf("a1", "Zahnarzt", um(-3)); auf("a2", "Später", um(30)); auf("a3", "Längst vorbei", um(-180));'
+                 + '   auf("a4", "Erledigt", um(-2), { status: "erledigt", erledigtAm: is }); auf("a5", "Privat", um(-1), { kontext: "privat" });'
+                 + '   auf("a6", "Gleich", um(8));'
+                 + '   r.ausGibtNichts = erinnerungPruefen();'
+                 + '   gezeigt = []; sichtschutz = true; tagFilter = "beruflich";'
+                 + '   erinnerungAn(true); r.an = erinnerungEinstellung().an;'
+                 + '   r.erster = gezeigt.length + ":" + gezeigt.map(function(t){ return t.split(" · ")[1]; }).sort().join(",");'
+                 + '   r.zweiter = erinnerungPruefen();'
+                 + '   erinnerungVorlauf(10); gezeigt = []; r.vorlauf = erinnerungPruefen() + ":" + gezeigt.join(",");'
+                 + '   erinnerungVorlauf(7); r.unsinnVorlauf = erinnerungEinstellung().vorlauf;'
+                 + '   r.gemerkt = JSON.parse(ablage["workbench-erinnerung"]).vorlauf === 10;'
+                 + '   sichtschutz = false; gezeigt = []; r.ohneSichtschutz = erinnerungPruefen() + ":" + gezeigt.join(",");'
+                 + '   globalThis.Notification.permission = "denied"; r.weg = erinnerungZeigen({ id: "x", titel: "T", zeit: "10:00" }, 0);'
+                 + '   globalThis.Notification.permission = "granted"; r.wegErlaubt = erinnerungZeigen({ id: "x", titel: "T", zeit: "10:00" }, 0);'
+                 + '   globalThis.Notification = function(){ throw new Error("nur Service Worker"); }; globalThis.Notification.permission = "granted";'
+                 + '   r.wegWirft = erinnerungZeigen({ id: "x", titel: "T", zeit: "10:00" }, 0);'
+                 + '   erinnerungStand = null; r.geladen = erinnerungEinstellung().an === true && erinnerungEinstellung().vorlauf === 10;'
+                 + '   var dia = document.getElementById("erinnerungWahl"); erinnerungWahlZeichnen();'
+                 + '   r.wahl = /erinnerungAn\\(true\\)/.test(dia.innerHTML) && /erinnerungVorlauf\\(15\\)/.test(dia.innerHTML) && /erinnerungTesten\\(\\)/.test(dia.innerHTML);'
+                 + '   DB = alt; window.localStorage = merkL; globalThis.Notification = merkN; sichtschutz = merkS; tagFilter = merkF; erinnerungStand = merkStand;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -5375,7 +5456,8 @@ console.log('\n16. Automatischer Abgleich');
          'nach dem lokalen Sichern wird ein Abgleich eingeplant');
 
   /* Nach der Anmeldung ebenso */
-  const anm = skript.match(/function anmeldeVersuch\([\s\S]*?\n\}\n/);
+  /* Seit v5.12.0 steckt der Kern der Anfrage in anmeldeAnfragen. */
+  const anm = skript.match(/function anmeldeAnfragen\([\s\S]*?\n\}\n/);
   pruefe(anm && /abgleichPlanen\(true\)/.test(anm[0]),
          'nach erfolgreicher Anmeldung wird sofort abgeglichen');
 
@@ -5912,7 +5994,8 @@ console.log('\n23. Aufrufe im Skript selbst');
     'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function', 'else', 'do',
     'Promise', 'Date', 'Number', 'String', 'Boolean', 'Array', 'Object', 'JSON', 'Math',
     'Error', 'RegExp', 'Set', 'Map', 'URL', 'FileReader', 'parseInt', 'parseFloat',
-    'isNaN', 'encodeURIComponent', 'decodeURIComponent', 'fetch', 'caches', 'eval'
+    'isNaN', 'encodeURIComponent', 'decodeURIComponent', 'fetch', 'caches', 'eval',
+    'Notification'
   ]);
 
   const fehlend = [];
@@ -6587,7 +6670,7 @@ console.log('\n34. Banner bei fehlender Verbindung');
          'es erscheint auch bei gültiger Uhr, aber toter Verbindung');
 
   /* Nach der Anmeldung muss es verschwinden */
-  const anv = skript.match(/function anmeldeVersuch\([\s\S]*?\n\}\n/);
+  const anv = skript.match(/function anmeldeAnfragen\([\s\S]*?\n\}\n/);
   pruefe(anv && /verbindungPruefen\(\)/.test(anv[0]),
          'nach erfolgreicher Anmeldung wird die Verbindung geprüft und das Banner geräumt');
 
@@ -13826,6 +13909,103 @@ console.log('\n158. Einfälle behalten ihre Uhrzeit');
   if (a) {
     pruefe(a.einfall === '14:00 Idee zu Gartenhaus morgen', 'Uhrzeit und Datum bleiben im Text eines Einfalls');
     pruefe(a.einfallPrivat === 'privat', '„p" wirkt auch bei Einfällen');
+  }
+}
+
+/* ============================================================
+   159. Die Anmeldung hängt nicht mehr (v5.12.0)
+   Grund: Scheiterte das Anmeldefenster selbst — vom Browser blockiert,
+   geschlossen —, meldete Google das über error_callback. Den gab es
+   nicht: Die stille Erneuerung wartete ewig, zählte nicht als
+   gescheitert, wiederholte nichts, und die Diagnose zeigte keinen
+   Grund. Nach einer Stunde war die Verbindung einfach weg.
+   ============================================================ */
+console.log('\n159. Anmeldung hängt nicht mehr');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__anmeldeApi;
+  const kv = skript.match(/function klientVorbereiten\([\s\S]*?\n\}/);
+  pruefe(kv && /error_callback:/.test(kv[0]), 'der Anmeldeklient hat einen Fehlerrückruf');
+  const aa = skript.match(/function anmeldeAnfragen\([\s\S]*?\n\}/);
+  pruefe(aa && /klient\.error_callback = function/.test(aa[0]) && /ANMELDE_ZEITGRENZE_MS/.test(aa[0]),
+         'jede Anfrage setzt Fehlerrückruf und Zeitgrenze');
+  let e = null;
+  if (!t) {
+    warn('Anmeldung nicht auswertbar');
+  } else {
+    try { e = t.pruefe(); }
+    catch (x) { fail('Anmeldung läuft nicht: ' + x.message); }
+  }
+  if (t && e) {
+    pruefe(e.fensterFehler === 'false|popup_failed_to_open|false',
+           'ein blockiertes Fenster zählt als gescheitert, mit Grund');
+    pruefe(e.wartetNochLaeuft === true, 'ohne Antwort läuft die Anfrage zunächst weiter');
+    pruefe(e.zeitgrenzeMs === 60000 && e.zeitgrenze === 'false|keine_antwort|false',
+           'still gilt sie nach einer Minute als gescheitert');
+    pruefe(e.vonHandMs === 300000 && e.vonHandErgebnis === 'false', 'von Hand darf es fünf Minuten dauern');
+    pruefe(e.abgelehnt === 'false|access_denied', 'eine Ablehnung kommt wie bisher über callback');
+    pruefe(e.einmal === 1, 'das Ergebnis wird genau einmal gemeldet');
+  }
+}
+
+/* ============================================================
+   160. Erneuern beim ersten Klick (v5.12.0)
+   ============================================================ */
+console.log('\n160. Erneuern beim ersten Klick');
+{
+  const t = globalThis.__anmeldeApi;
+  pruefe(/document\.addEventListener\('click', klickErneuern, true\)/.test(hauptSkript()),
+         'der erste Klick wird abgefangen, bevor die App ihn verarbeitet');
+  let e = null;
+  if (t && t.klick) {
+    try { e = t.klick(); } catch (x) { fail('Klick-Erneuerung läuft nicht: ' + x.message); }
+  } else {
+    warn('Klick-Erneuerung nicht auswertbar');
+  }
+  if (e) {
+    pruefe(e.erster === 1, 'nach Ablauf verbindet der nächste Klick neu');
+    pruefe(e.nurEinmal === 1, 'nur einmal je Ablauf, nicht bei jedem Klick');
+    pruefe(e.neuerAblauf === 2, 'nach einer neuen Anmeldung und neuem Ablauf wieder');
+    pruefe(e.knopfSelbst === 2, 'der Knopf „Neu verbinden“ erledigt es selbst');
+    pruefe(e.gueltig === 2, 'bei gültiger Anmeldung passiert nichts');
+    pruefe(e.laeuft === 2, 'läuft schon eine Anmeldung, auch nicht');
+    pruefe(e.nieAngemeldet === 2, 'wer nie angemeldet war, wird nicht behelligt');
+  }
+}
+
+/* ============================================================
+   161. Erinnerungen an Aufgaben mit Uhrzeit (v5.12.0)
+   Grund: Die App läuft am PC den ganzen Tag — sie soll sich zur Uhrzeit
+   einer Aufgabe melden. Einmal je Aufgabe, nichts Erledigtes, nichts
+   Verborgenes, und notfalls in der App statt als Systemmeldung.
+   ============================================================ */
+console.log('\n161. Erinnerungen');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__erinnerungApi;
+  pruefe(/id="dg-erinnerung"/.test(QUELLE) && /'aussehen', 'erinnerung', 'daten'/.test(skript),
+         'die Erinnerungen haben eine eigene Gruppe in den Einstellungen');
+  pruefe(/erinnerungStarten\(\);/.test(skript), 'die Prüfung startet mit der App');
+  const ms = skript.match(/function erinnerungMerken\([\s\S]*?\n\}/);
+  pruefe(ms && /localStorage/.test(ms[0]) && !/spaeterSichern/.test(ms[0]), 'die Einstellung gilt für dieses Gerät');
+  let e = null;
+  if (!t) {
+    warn('Erinnerungen nicht auswertbar');
+  } else {
+    try { e = t.pruefe(); } catch (x) { fail('Erinnerungen laufen nicht: ' + x.message); }
+  }
+  if (t && e) {
+    pruefe(e.voreinstellung === '{"an":false,"vorlauf":0}' && e.ausGibtNichts === 0, 'voreingestellt ist sie aus');
+    pruefe(e.an === true, 'sie lässt sich einschalten');
+    pruefe(e.erster === '1:Zahnarzt', 'fällig ist nur, was gerade ansteht — nichts Späteres, Erledigtes, Längstvergangenes, Verborgenes');
+    pruefe(e.zweiter === 0, 'jede Aufgabe meldet sich einmal');
+    pruefe(/^1:/.test(e.vorlauf) && /Gleich/.test(e.vorlauf), 'mit Vorlauf meldet sich eine Aufgabe früher');
+    pruefe(e.unsinnVorlauf === 10 && e.gemerkt === true, 'nur die angebotenen Vorläufe gelten, und sie werden gemerkt');
+    pruefe(/^1:/.test(e.ohneSichtschutz) && /Privat/.test(e.ohneSichtschutz), 'ohne Sichtschutz meldet sich auch Privates');
+    pruefe(e.weg === 'app' && e.wegErlaubt === 'system' && e.wegWirft === 'app',
+           'ohne Erlaubnis oder ohne Systemmeldung erscheint sie in der App');
+    pruefe(e.geladen === true, 'die Einstellung überlebt das Neuladen');
+    pruefe(e.wahl === true, 'die Einstellungen bieten An/Aus, Vorlauf und eine Probe');
   }
 }
 

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.11.0</title>
+<title>Workbench 5.12.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1273,6 +1273,9 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
    und Schreiben als Umschalter, Filter und Lesebänder als Menüs, die
    Nadel als Symbol, der Zoom am Ende — alles in einer Zeile. */
 .nb-nur-breit{display:none}
+/* Erinnerungen im Diagnose-Bildschirm */
+.er-reihe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.er-etikett{font-size:calc(var(--fs)*0.76);color:var(--grau);margin-right:4px}
 .fl-gruppe{border:1px solid var(--linie);border-radius:8px;overflow:hidden;background:var(--karte);
   align-items:center;flex:0 0 auto}
 .fl-gruppe button{border:0;background:none;height:32px;min-width:34px;padding:0 8px;cursor:pointer;
@@ -2324,6 +2327,21 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     </div>
   </div>
 
+  <div class="dg" id="dg-erinnerung">
+    <button type="button" class="dg-kopf" onclick="diagGruppeUm('erinnerung')">
+      <span class="dg-sym">🔔</span>
+      <span class="dg-text"><b>Erinnerungen</b><span id="dk-erinnerung"></span></span>
+      <svg class="dg-pfeil" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+    <div class="dg-inhalt">
+  <div class="abschnitt-titel"><span>Aufgaben mit Uhrzeit</span></div>
+  <div id="erinnerungWahl"></div>
+  <div class="feld-hinweis">Zur Uhrzeit einer heutigen, offenen Aufgabe meldet sich die
+    Workbench — solange sie offen ist. Gilt nur für dieses Gerät: Die Erlaubnis für
+    Benachrichtigungen erteilt jeder Browser selbst.</div>
+    </div>
+  </div>
+
   <div class="dg" id="dg-daten">
     <button type="button" class="dg-kopf" onclick="diagGruppeUm('daten')">
       <span class="dg-sym">🗂️</span>
@@ -2585,7 +2603,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.11.0';
+var APP_VERSION = '5.12.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -2659,6 +2677,10 @@ var erneuerungsUhr = null;
 var erneuerungVersuche = 0;
 var ERNEUERUNG_MAX = 6;
 var ERNEUERUNG_ABSTAND = 60000;
+/* Kommt auf eine stille Anfrage gar keine Antwort, gilt sie nach einer
+   Minute als gescheitert — sonst wartete die Erneuerung ewig (bis v5.11.0). */
+var ANMELDE_ZEITGRENZE_MS = 60 * 1000;
+var anmeldungLaeuft = false;
 var letzteErneuerung = null;   /* { zeit, ergebnis, grund } */
 var gisBereit = false;
 var driveDateiId = '';
@@ -3345,7 +3367,10 @@ function klientVorbereiten() {
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
-      callback: function () { /* wird je Anfrage überschrieben */ }
+      callback: function () { /* wird je Anfrage überschrieben */ },
+      /* Scheitert das Anmeldefenster selbst — blockiert, geschlossen —,
+         meldet Google das nur hier, nicht über callback. */
+      error_callback: function () { /* wird je Anfrage überschrieben */ }
     });
     return tokenClient;
   });
@@ -3363,43 +3388,72 @@ function anmelden(still) {
 function anmeldeVersuch(still, aufforderung) {
   return klientVorbereiten().then(function (klient) {
     return new Promise(function (fertig) {
-      klient.callback = function (antwort) {
-        if (antwort && antwort.access_token) {
-          tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
-          try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
-          verbindungOk = true;
-          letzteErneuerung = { zeit: isoZeit(), ergebnis: still ? 'still erneuert' : 'angemeldet',
-                               grund: '' };
-          abgleichPlanen(true);
-          termineHolen(false);
-          verbindungPruefen();
-          if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
-          zeichne();
-          fertig(true);
-          return;
-        }
-        var grund = (antwort && antwort.error) ? antwort.error : 'unbekannt';
-        letzteErneuerung = { zeit: isoZeit(),
-                             ergebnis: still ? 'still fehlgeschlagen' : 'abgebrochen',
-                             grund: grund };
-        if (still) {
-          melde('Die stille Erneuerung ist fehlgeschlagen (' + grund + ').\n'
-              + 'Bitte einmal auf „Anmelden" tippen.', 'warn');
-        } else {
-          melde('Anmeldung nicht abgeschlossen (' + grund + ').', 'warn');
-        }
-        zeichne();
-        fertig(false);
-      };
-      /* Auch von Hand zuerst ohne Rückfrage: Wer schon zugestimmt hat,
-         soll die Zustimmung nicht jedes Mal wieder erteilen müssen. */
-      klient.requestAccessToken({ prompt: aufforderung });
+      anmeldeAnfragen(klient, still, aufforderung, fertig);
     });
   }).catch(function (f) {
+    anmeldungLaeuft = false;
     melde('Anmeldung nicht möglich.\n' + (f ? f.message : ''), 'warn');
     zeichne();
     return false;
   });
+}
+
+/* Eine Anfrage an Google, mit drei Ausgängen: Schlüssel bekommen,
+   abgelehnt (callback) oder das Fenster scheiterte (error_callback).
+   Bleibt jede Antwort aus, entscheidet die Zeitgrenze. fertig wird
+   genau einmal gerufen. Kommt ein Schlüssel erst nach der Zeitgrenze,
+   wird er trotzdem genommen. */
+function anmeldeAnfragen(klient, still, aufforderung, fertig) {
+  var erledigt = false;
+  var uhr = null;
+  anmeldungLaeuft = true;
+  var abschliessen = function (gut) {
+    if (erledigt) { return; }
+    erledigt = true;
+    anmeldungLaeuft = false;
+    if (uhr) { window.clearTimeout(uhr); }
+    fertig(gut);
+  };
+  var gescheitert = function (grund) {
+    if (erledigt) { return; }
+    letzteErneuerung = { zeit: isoZeit(),
+                         ergebnis: still ? 'still fehlgeschlagen' : 'abgebrochen',
+                         grund: grund };
+    if (still) {
+      melde('Die stille Erneuerung ist fehlgeschlagen (' + grund + ').\n'
+          + 'Der nächste Klick in der App verbindet neu.', 'warn');
+    } else {
+      melde('Anmeldung nicht abgeschlossen (' + grund + ').', 'warn');
+    }
+    zeichne();
+    abschliessen(false);
+  };
+  klient.callback = function (antwort) {
+    if (antwort && antwort.access_token) {
+      tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+      try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
+      verbindungOk = true;
+      letzteErneuerung = { zeit: isoZeit(), ergebnis: still ? 'still erneuert' : 'angemeldet',
+                           grund: '' };
+      abgleichPlanen(true);
+      termineHolen(false);
+      verbindungPruefen();
+      if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
+      zeichne();
+      abschliessen(true);
+      return;
+    }
+    gescheitert((antwort && antwort.error) ? antwort.error : 'unbekannt');
+  };
+  klient.error_callback = function (fehler) {
+    gescheitert((fehler && fehler.type) ? fehler.type : 'fenster_fehler');
+  };
+  /* Von Hand darf es länger dauern — wer ein Konto wählt, braucht Zeit. */
+  uhr = window.setTimeout(function () { gescheitert('keine_antwort'); },
+                          still ? ANMELDE_ZEITGRENZE_MS : 5 * ANMELDE_ZEITGRENZE_MS);
+  /* Auch von Hand zuerst ohne Rückfrage: Wer schon zugestimmt hat,
+     soll die Zustimmung nicht jedes Mal wieder erteilen müssen. */
+  klient.requestAccessToken({ prompt: aufforderung });
 }
 
 function abmelden() {
@@ -9625,7 +9679,7 @@ function zeichneUmgebung() {
    Welche Gruppen offen sind, merkt sich die App.
    ============================================================ */
 
-var DIAG_GRUPPEN = ['verbindung', 'kalender', 'aussehen', 'daten', 'technik'];
+var DIAG_GRUPPEN = ['verbindung', 'kalender', 'aussehen', 'erinnerung', 'daten', 'technik'];
 
 function diagOffen(g) {
   var k = DB.einstellungen.diagOffen || {};
@@ -9678,6 +9732,9 @@ function diagGruppenZeichnen() {
     aussehen: 'Farbwelt ' + FARBWELTEN[farbweltName()].name + ' · '
             + (DB.einstellungen.darstellung === 'breit' ? 'breit'
                : (DB.einstellungen.darstellung === 'schmal' ? 'schmal' : 'automatisch')),
+    erinnerung: erinnerungEinstellung().an
+              ? ('an · ' + (erinnerungEinstellung().vorlauf ? erinnerungEinstellung().vorlauf + ' min vorher' : 'zur Uhrzeit'))
+              : 'aus',
     daten: (DB.jahrestermine || []).length + ' Jahrestermine · Ferien · Skizzen · Bestand',
     technik: 'Fassung ' + APP_VERSION + ' · Umgebung · Altbestand'
   };
@@ -9685,6 +9742,7 @@ function diagGruppenZeichnen() {
     var z = document.getElementById('dk-' + DIAG_GRUPPEN[i]);
     if (z) { z.textContent = kurz[DIAG_GRUPPEN[i]]; }
   }
+  erinnerungWahlZeichnen();
 }
 
 /* ------------------------------------------------------------
@@ -18262,6 +18320,234 @@ function nbBandKnopfHtml() {
 
 
 /* ============================================================
+   Erneuern beim ersten Klick
+
+   Scheitert die stille Erneuerung — am häufigsten, weil der Browser das
+   kurze Anmeldefenster ohne Klick nicht aufgehen lässt —, erneuert der
+   nächste Klick in der App die Verbindung. Aus einem Klick heraus lässt
+   der Browser das Fenster zu; es schließt sich von selbst, solange die
+   Google-Sitzung besteht. Einmal je abgelaufener Anmeldung, nicht bei
+   jedem Klick; der Knopf „Neu verbinden" erledigt es selbst.
+   ============================================================ */
+
+var klickErneuerungFuer = '';   /* für welchen Ablauf schon einmal per Klick erneuert wurde */
+
+function klickErneuern(e) {
+  if (anmeldungLaeuft || tokenGueltig() || !warAngemeldet()) { return; }
+  var ziel = e ? e.target : null;
+  if (ziel && ziel.closest && ziel.closest('[onclick^="anmelden"]')) { return; }
+  var schluessel = String(tokenAblauf || 'start');
+  if (klickErneuerungFuer === schluessel) { return; }
+  klickErneuerungFuer = schluessel;
+  anmeldeVersuch(true, '').then(function (gut) {
+    if (gut) { melde('Verbindung zu Google wiederhergestellt.', 'gut'); }
+  });
+}
+
+/* ============================================================
+   Erinnerungen an Aufgaben mit Uhrzeit
+
+   Die App läuft am PC den ganzen Tag. Sie sieht alle halbe Minute nach,
+   ob eine heutige, offene Aufgabe mit Uhrzeit fällig ist, und meldet
+   sie als Benachrichtigung des Systems — ist die nicht erlaubt oder gibt
+   es sie nicht, als Hinweis in der App. Was während eines Ruhezustands
+   fällig wurde, kommt beim Aufwachen einmal nach, bis zwei Stunden
+   später. Die Einstellung gilt für dieses Gerät: Die Erlaubnis für
+   Benachrichtigungen erteilt jeder Browser selbst.
+   ============================================================ */
+
+var ERINNERUNG_SCHLUESSEL = 'workbench-erinnerung';
+var ERINNERT_SCHLUESSEL = 'workbench-erinnert';
+var ERINNERUNG_NACHHOLEN_MIN = 120;
+var ERINNERUNG_VORLAEUFE = [0, 5, 10, 15];
+var erinnerungStand = null;
+var erinnerungUhr = null;
+
+function erinnerungEinstellung() {
+  if (!erinnerungStand) {
+    erinnerungStand = { an: false, vorlauf: 0 };
+    try {
+      var roh = window.localStorage ? window.localStorage.getItem(ERINNERUNG_SCHLUESSEL) : null;
+      var w = roh ? JSON.parse(roh) : null;
+      if (w && typeof w.an === 'boolean') { erinnerungStand.an = w.an; }
+      if (w && ERINNERUNG_VORLAEUFE.indexOf(w.vorlauf) >= 0) { erinnerungStand.vorlauf = w.vorlauf; }
+    } catch (f) { /* dann eben die Voreinstellung */ }
+  }
+  return erinnerungStand;
+}
+
+function erinnerungMerken() {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(ERINNERUNG_SCHLUESSEL, JSON.stringify(erinnerungEinstellung()));
+    }
+  } catch (f) { /* gilt dann bis zum Neuladen */ }
+}
+
+/* granted, denied, default — oder fehlt, wenn der Browser keine kennt. */
+function erinnerungErlaubnis() {
+  if (typeof Notification === 'undefined' || !Notification) { return 'fehlt'; }
+  return Notification.permission || 'default';
+}
+
+function erinnerungAn(an) {
+  var st = erinnerungEinstellung();
+  st.an = !!an;
+  erinnerungMerken();
+  /* Die Rückfrage des Browsers kommt nur aus einem Klick heraus — hier. */
+  if (st.an && erinnerungErlaubnis() === 'default' && typeof Notification.requestPermission === 'function') {
+    var frage = Notification.requestPermission();
+    if (frage && typeof frage.then === 'function') {
+      frage.then(function () { erinnerungWahlZeichnen(); diagGruppenZeichnen(); });
+    }
+  }
+  erinnerungWahlZeichnen();
+  diagGruppenZeichnen();
+  erinnerungPruefen();
+}
+
+function erinnerungVorlauf(minuten) {
+  var st = erinnerungEinstellung();
+  if (ERINNERUNG_VORLAEUFE.indexOf(minuten) < 0) { return; }
+  st.vorlauf = minuten;
+  erinnerungMerken();
+  erinnerungWahlZeichnen();
+  diagGruppenZeichnen();
+}
+
+/* Heute offene Aufgaben mit Uhrzeit — wie sie im Tagesplan stehen. Der
+   Filter Beruf/Privat der Tagesansicht gilt nicht (er ist nur eine
+   Ansicht), der Sichtschutz schon: Verborgenes meldet sich nicht. */
+function erinnerungKandidaten(is) {
+  var merkFilter = tagFilter;
+  tagFilter = 'alle';
+  var e = tagesEintraege(is);
+  tagFilter = merkFilter;
+  var aus = [];
+  var i;
+  for (i = 0; i < e.verlauf.length; i++) {
+    var v = e.verlauf[i];
+    if (v.art !== 'aufgabe' || !v.a || !v.zeit) { continue; }
+    if (istErledigtAn(v.a, is)) { continue; }
+    aus.push({ id: v.a.id, titel: v.a.titel, zeit: v.zeit });
+  }
+  return aus;
+}
+
+function erinnertLesen(is) {
+  try {
+    var roh = window.localStorage ? window.localStorage.getItem(ERINNERT_SCHLUESSEL) : null;
+    var w = roh ? JSON.parse(roh) : null;
+    if (w && w.datum === is && Array.isArray(w.schluessel)) { return w; }
+  } catch (f) { /* neu anfangen */ }
+  return { datum: is, schluessel: [] };
+}
+
+function erinnertMerken(stand) {
+  try {
+    if (window.localStorage) { window.localStorage.setItem(ERINNERT_SCHLUESSEL, JSON.stringify(stand)); }
+  } catch (f) { /* dann kann es doppelt kommen */ }
+}
+
+/* Sieht nach, was fällig ist, und meldet es — jede Aufgabe einmal je
+   Uhrzeit. Gibt zurück, wie viele gemeldet wurden. */
+function erinnerungPruefen() {
+  var st = erinnerungEinstellung();
+  if (!st.an) { return 0; }
+  var is = isoDatum();
+  var jetztMs = Date.now();
+  var stand = erinnertLesen(is);
+  var liste = erinnerungKandidaten(is);
+  var gemeldet = 0;
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var k = liste[i];
+    var schluessel = k.id + '@' + k.zeit;
+    if (stand.schluessel.indexOf(schluessel) >= 0) { continue; }
+    var um = new Date(is + 'T' + k.zeit + ':00').getTime();
+    var ab = um - st.vorlauf * 60000;
+    if (jetztMs < ab || jetztMs - ab > ERINNERUNG_NACHHOLEN_MIN * 60000) { continue; }
+    erinnerungZeigen(k, Math.round((um - jetztMs) / 60000));
+    stand.schluessel.push(schluessel);
+    gemeldet++;
+  }
+  if (gemeldet) { erinnertMerken(stand); }
+  return gemeldet;
+}
+
+/* Zeigt eine Erinnerung. Gibt zurück, auf welchem Weg: system oder app. */
+function erinnerungZeigen(k, inMinuten) {
+  var titel = k.zeit + ' · ' + k.titel;
+  var wann = (inMinuten > 0) ? ('in ' + inMinuten + (inMinuten === 1 ? ' Minute' : ' Minuten'))
+           : ((inMinuten < -1) ? ('seit ' + (-inMinuten) + ' Minuten') : 'jetzt');
+  if (erinnerungErlaubnis() === 'granted') {
+    try {
+      var n = new Notification(titel, { body: 'Workbench · ' + wann, tag: 'workbench-' + k.id });
+      n.onclick = function () {
+        try { window.focus(); } catch (f) { /* egal */ }
+        zeigeSchirm('Tag');
+        n.close();
+      };
+      return 'system';
+    } catch (f) {
+      /* Manche Browser erlauben Benachrichtigungen nur über den Service
+         Worker (Android) — dann eben in der App. */
+    }
+  }
+  melde('Erinnerung: ' + titel + ' (' + wann + ')', 'warn');
+  return 'app';
+}
+
+function erinnerungTesten() {
+  var st = erinnerungEinstellung();
+  var weg = erinnerungZeigen({ id: 'test', titel: 'So sieht eine Erinnerung aus', zeit: zeitJetzt() },
+                             st.vorlauf);
+  if (weg === 'app' && erinnerungErlaubnis() !== 'granted') {
+    window.setTimeout(function () {
+      melde('Benachrichtigungen des Systems sind hier nicht erlaubt — Erinnerungen erscheinen in der App.', null);
+    }, 4000);
+  }
+}
+
+function zeitJetzt() {
+  var d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function erinnerungStarten() {
+  if (erinnerungUhr) { return; }
+  erinnerungUhr = window.setInterval(erinnerungPruefen, 30000);
+  erinnerungPruefen();
+}
+
+function erinnerungWahlZeichnen() {
+  var el = document.getElementById('erinnerungWahl');
+  if (!el) { return; }
+  var st = erinnerungEinstellung();
+  var erl = erinnerungErlaubnis();
+  var pille = function (an, text, klick) {
+    return '<button type="button" class="sl-pille' + (an ? ' an' : '') + '" onclick="' + klick + '">' + text + '</button>';
+  };
+  var h = '<div class="er-reihe">'
+        + pille(st.an, 'An', 'erinnerungAn(true)') + pille(!st.an, 'Aus', 'erinnerungAn(false)') + '</div>';
+  h += '<div class="er-reihe"><span class="er-etikett">Wann</span>';
+  var i;
+  for (i = 0; i < ERINNERUNG_VORLAEUFE.length; i++) {
+    var v = ERINNERUNG_VORLAEUFE[i];
+    h += pille(st.vorlauf === v, v ? (v + ' min vorher') : 'zur Uhrzeit', 'erinnerungVorlauf(' + v + ')');
+  }
+  h += '</div>';
+  var zustand = (erl === 'granted') ? 'Benachrichtigungen des Systems sind erlaubt.'
+              : (erl === 'denied') ? 'Benachrichtigungen sind in diesem Browser gesperrt — Erinnerungen erscheinen in der App.'
+              : (erl === 'fehlt') ? 'Dieser Browser kennt keine Benachrichtigungen — Erinnerungen erscheinen in der App.'
+              : 'Beim Einschalten fragt der Browser, ob er Benachrichtigungen zeigen darf.';
+  h += '<div class="feld-hinweis">' + zustand + '</div>';
+  h += '<div class="er-reihe">' + pille(false, 'Probe zeigen', 'erinnerungTesten()') + '</div>';
+  el.innerHTML = h;
+}
+
+
+/* ============================================================
    Skizzen aus einem freigegebenen Drive-Ordner
 
    Am reMarkable entstehen die Skizzen, in Drive liegen sie. Die App
@@ -21968,6 +22254,8 @@ function starten() {
   window.addEventListener('resize', darstellungAnwenden);
   window.addEventListener('resize', nbPlatzPruefen);
   window.addEventListener('resize', nbRandZeichnen);
+  document.addEventListener('click', klickErneuern, true);
+  erinnerungStarten();
   document.addEventListener('keydown', nbTaste);
   wischenAnmelden();
   window.setInterval(anmeldeStreifenPruefen, 15000);
