@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.14.0</title>
+<title>Workbench 5.15.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1909,6 +1909,12 @@ body.breit .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
   border:1px solid var(--linie);background:var(--karte);cursor:pointer;margin:0 4px 4px 0}
 .d-ausnahme.zusatz{border-color:var(--petrol);color:var(--petrol)}
 .d-ausnahme.ausfall{border-color:var(--weinrot);color:var(--weinrot)}
+.d-ausnahme.zeit{border-color:var(--tinte);color:var(--tinte)}
+/* Nur diesmal (seit v5.15.0) */
+.d-diesmal-tag{font-size:calc(var(--fs)*0.78);color:var(--tinte);align-self:center;margin-right:4px}
+.d-diesmal-felder{display:flex;gap:8px;flex-wrap:wrap}
+.d-diesmal-felder input{flex:1 1 140px;min-width:0;font:inherit;font-size:calc(var(--fs)*0.85);
+  padding:6px 8px;border:1px solid var(--linie);border-radius:6px;background:var(--karte);color:var(--tinte)}
 .d-tag{font:inherit;font-size:calc(var(--fs)*0.74);padding:4px 0;width:32px;text-align:center;
   border-radius:5px;border:1px solid var(--linie);background:var(--karte);
   color:var(--grau);cursor:pointer}
@@ -2622,7 +2628,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.14.0';
+var APP_VERSION = '5.15.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4719,8 +4725,11 @@ function tagesEintraege(is) {
     if (a.wiederholung) {
       /* Erledigt zählt auch an einem Tag, an dem es nicht fällig war —
          wer einen Tag zu spät läuft, ist trotzdem gelaufen. */
+      /* Seit v5.15.0: die Uhrzeit dieses Tages — eine verlegte Ausführung
+         kann eine andere haben als die Regel. */
+      var zeitTag = aufgabeZeitAn(a, is);
       if (erledigt) {
-        if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
+        if (zeitTag) { verlauf.push({ art: 'aufgabe', zeit: zeitTag, a: a }); }
         else if (a.art === 'klein') { kleinFertig.push(a); }
         else { hauptFertig.push(a); }
         continue;
@@ -4728,7 +4737,7 @@ function tagesEintraege(is) {
       if (!aufgabeFaelligAn(a, is)) { continue; }
       /* Eine Routine steht ohne feste Zeit im Tag, auch wenn sie nicht
          eigens in den Plan genommen wurde. */
-      if (a.uhrzeit) { verlauf.push({ art: 'aufgabe', zeit: a.uhrzeit, a: a }); }
+      if (zeitTag) { verlauf.push({ art: 'aufgabe', zeit: zeitTag, a: a }); }
       else if (a.art === 'klein') { klein.push(a); }
       else { haupt.push(a); }
       continue;
@@ -5068,7 +5077,7 @@ function jetztKarteZeichnen(is, e) {
   var i;
   for (i = 0; i < e.verlauf.length; i++) {
     var v = e.verlauf[i];
-    var von = (v.art === 'termin') ? (v.t.von || '') : (v.a.uhrzeit || '');
+    var von = (v.art === 'termin') ? (v.t.von || '') : (v.zeit || v.a.uhrzeit || '');
     var bis = (v.art === 'termin') ? (v.t.bis || '') : '';
     var titel = (v.art === 'termin') ? v.t.titel : v.a.titel;
     if (v.art === 'aufgabe' && von && von <= jetztZ && !istErledigtAn(v.a, is)) {
@@ -5225,6 +5234,8 @@ function zusatzTagUm(id, is) {
   var liste = regulaerFaellig(a, is) ? a.ausfallTage : a.zusatzTage;
   var stelle = liste.indexOf(is);
   if (stelle >= 0) { liste.splice(stelle, 1); } else { liste.push(is); liste.sort(); }
+  /* Fällt der Tag aus oder geht der Zusatztag, geht seine Uhrzeit mit. */
+  if (a.zeitAusnahmen) { delete a.zeitAusnahmen[is]; }
   a.geaendert = jetzt();
   spaeterSichern();
 }
@@ -5242,6 +5253,12 @@ function ausnahmenAufraeumen() {
       var vorher = l[i][name].length;
       l[i][name] = l[i][name].filter(function (t) { return t >= grenze; });
       if (l[i][name].length !== vorher) { l[i].geaendert = jetzt(); }
+    }
+    if (l[i].zeitAusnahmen && typeof l[i].zeitAusnahmen === 'object') {
+      var zt;
+      for (zt in l[i].zeitAusnahmen) {
+        if (zt < grenze) { delete l[i].zeitAusnahmen[zt]; l[i].geaendert = jetzt(); }
+      }
     }
   }
 }
@@ -6021,7 +6038,7 @@ function belegteBloecke(is) {
                  titel: v.t.titel, fest: true, id: v.t.id, termin: v.t,
                  vorbei: eintragVorbei(v, is) });
     } else {
-      var von = minutenAus(v.a.uhrzeit);
+      var von = minutenAus(v.zeit || v.a.uhrzeit);
       aus.push({ von: von, bis: von + aufgabeDauer(v.a), titel: v.a.titel,
                  fest: false, id: v.a.id, vorbei: istErledigtAn(v.a, is) });
     }
@@ -8430,6 +8447,7 @@ function detailHtml(a) {
   h += '<input class="as-titelfeld" id="asTitel" type="text" value="' + esc(a.titel) + '" '
      + 'oninput="titelAendern(this.value)" onkeydown="titelTaste(event)">';
   h += '<div class="as-linie' + (a.kontext === 'privat' ? ' privat' : '') + '"></div>';
+  if (a.wiederholung) { h += diesmalHtml(a); }
 
   h += '<div class="d-feld"><div class="d-name">Kontext</div><div class="d-wert">';
   h += '<button class="d-wahl' + (a.kontext === 'beruflich' ? ' an' : '') + '" type="button" '
@@ -8557,12 +8575,19 @@ function detailHtml(a) {
        + '</div></div>';
     var zus = a.zusatzTage || [];
     var aus = a.ausfallTage || [];
-    if (zus.length || aus.length) {
+    if (zus.length || aus.length || Object.keys(a.zeitAusnahmen || {}).length) {
       h += '<div class="d-wert" style="justify-content:flex-start;flex-wrap:wrap">';
       var x;
+      var za = a.zeitAusnahmen || {};
       for (x = 0; x < zus.length; x++) {
         h += '<button class="d-ausnahme zusatz" type="button" onclick="dAusnahmeSetzen(\''
-           + zus[x] + '\')">+ ' + esc(kurzDatum(zus[x])) + ' ×</button>';
+           + zus[x] + '\')">+ ' + esc(kurzDatum(zus[x])) + (za[zus[x]] ? ' ' + esc(za[zus[x]]) : '') + ' ×</button>';
+      }
+      var zk;
+      for (zk in za) {
+        if (zus.indexOf(zk) >= 0) { continue; }
+        h += '<button class="d-ausnahme zeit" type="button" onclick="zeitAusnahmeWeg(\''
+           + esc(zk) + '\')">◷ ' + esc(kurzDatum(zk)) + ' ' + esc(za[zk]) + ' ×</button>';
       }
       for (x = 0; x < aus.length; x++) {
         h += '<button class="d-ausnahme ausfall" type="button" onclick="dAusnahmeSetzen(\''
@@ -18875,6 +18900,142 @@ function ersetzenAlle() {
   if (z) { z.textContent = n + ' ersetzt'; }
   melde(n + (n === 1 ? ' Stelle' : ' Stellen') + ' ersetzt — Strg+Z holt sie zurück.', 'gut');
   return n;
+}
+
+
+/* ============================================================
+   Nur diesmal: eine Ausführung auslassen oder verlegen
+
+   Eine wiederkehrende Aufgabe bleibt bei ihrer Regel. Einzelne
+   Ausführungen lassen sich aber auslassen (krank, Urlaub) — das ist
+   nicht dasselbe wie abhaken — oder verlegen (Feiertag): an einen
+   anderen Tag und, wenn gewünscht, auf eine andere Uhrzeit. Verlegen
+   ist Ausfall am alten Tag plus Zusatz am neuen; die Uhrzeit des einen
+   Tages steht in zeitAusnahmen { 'JJJJ-MM-TT': 'HH:MM' }. Alles gehört
+   zur Aufgabe und geht mit ihr durch den Abgleich.
+   ============================================================ */
+
+/* Die Uhrzeit einer Aufgabe an einem Tag — verlegt oder regulär. */
+function aufgabeZeitAn(a, is) {
+  if (!a) { return ''; }
+  var z = a.zeitAusnahmen && a.zeitAusnahmen[is];
+  return z || a.uhrzeit || '';
+}
+
+/* Welche Ausführung ist gemeint? Aus dem Tag heraus die dieses Tages,
+   sonst die nächste offene ab heute. */
+function diesmalTag(a) {
+  if (!a || !a.wiederholung) { return ''; }
+  if (schirmOffen === 'Tag' && aufgabeFaelligAn(a, tagOffen) && !istErledigtAn(a, tagOffen)) { return tagOffen; }
+  var heute = isoDatum();
+  var d;
+  for (d = 0; d <= 400; d++) {
+    var is = tagePlus(heute, d);
+    if (aufgabeFaelligAn(a, is) && !istErledigtAn(a, is)) { return is; }
+  }
+  return '';
+}
+
+/* Verlegt die Ausführung von „von" nach „zu", auf Wunsch mit anderer
+   Uhrzeit. von === zu ändert nur die Uhrzeit dieses einen Tages. */
+function ausfuehrungVerlegen(a, von, zu, zeit) {
+  if (!a || !a.wiederholung || !/^\d{4}-\d{2}-\d{2}$/.test(String(zu || ''))) { return false; }
+  if (zeit && !/^([01]\d|2[0-3]):[0-5]\d$/.test(zeit)) { return false; }
+  if (!Array.isArray(a.zusatzTage)) { a.zusatzTage = []; }
+  if (!Array.isArray(a.ausfallTage)) { a.ausfallTage = []; }
+  if (!a.zeitAusnahmen || typeof a.zeitAusnahmen !== 'object') { a.zeitAusnahmen = {}; }
+  if (von && von !== zu) {
+    if (regulaerFaellig(a, von)) {
+      if (a.ausfallTage.indexOf(von) < 0) { a.ausfallTage.push(von); }
+    } else {
+      a.zusatzTage = a.zusatzTage.filter(function (t) { return t !== von; });
+    }
+    delete a.zeitAusnahmen[von];
+    if (regulaerFaellig(a, zu)) {
+      a.ausfallTage = a.ausfallTage.filter(function (t) { return t !== zu; });
+    } else if (a.zusatzTage.indexOf(zu) < 0) {
+      a.zusatzTage.push(zu);
+    }
+  }
+  if (zeit && zeit !== a.uhrzeit) { a.zeitAusnahmen[zu] = zeit; } else { delete a.zeitAusnahmen[zu]; }
+  a.zusatzTage.sort();
+  a.ausfallTage.sort();
+  a.geaendert = jetzt();
+  spaeterSichern();
+  return true;
+}
+
+/* Lässt die Ausführung an diesem Tag ausfallen — ohne sie abzuhaken. */
+function ausfuehrungAuslassen(a, is) {
+  if (!a || !a.wiederholung || !is || !aufgabeFaelligAn(a, is)) { return false; }
+  if (!Array.isArray(a.zusatzTage)) { a.zusatzTage = []; }
+  if (!Array.isArray(a.ausfallTage)) { a.ausfallTage = []; }
+  if (regulaerFaellig(a, is)) {
+    if (a.ausfallTage.indexOf(is) < 0) { a.ausfallTage.push(is); a.ausfallTage.sort(); }
+  } else {
+    a.zusatzTage = a.zusatzTage.filter(function (t) { return t !== is; });
+  }
+  if (a.zeitAusnahmen) { delete a.zeitAusnahmen[is]; }
+  a.geaendert = jetzt();
+  spaeterSichern();
+  return true;
+}
+
+function diesmalAuslassen(is) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!ausfuehrungAuslassen(a, is)) { return; }
+  aktionenSchliessen();
+  melde(a.titel + ' fällt am ' + kurzDatum(is) + ' aus — die Regel bleibt.', 'gut');
+}
+
+function diesmalVerlegenZeigen() {
+  var f = document.getElementById('diesmalVerlegen');
+  if (f) { f.classList.toggle('auf'); }
+}
+
+function diesmalVerlegen(von) {
+  var a = aufgabeFinden(aktionFuer);
+  var tagFeld = document.getElementById('dmTag');
+  var zeitFeld = document.getElementById('dmZeit');
+  if (!a || !tagFeld) { return; }
+  var zu = String(tagFeld.value || '');
+  var zeit = zeitFeld ? String(zeitFeld.value || '') : '';
+  if (!ausfuehrungVerlegen(a, von, zu, zeit)) {
+    melde('Bitte einen Tag wählen.', 'warn');
+    return;
+  }
+  aktionenSchliessen();
+  melde(a.titel + ' diesmal am ' + kurzDatum(zu) + (aufgabeZeitAn(a, zu) ? ' um ' + aufgabeZeitAn(a, zu) : '')
+      + ' — die Regel bleibt.', 'gut');
+}
+
+function zeitAusnahmeWeg(is) {
+  var a = aufgabeFinden(aktionFuer);
+  if (!a || !a.zeitAusnahmen) { return; }
+  delete a.zeitAusnahmen[is];
+  a.geaendert = jetzt();
+  spaeterSichern();
+  detailNeuZeichnen();
+  tagZeichnen();
+  aufZeichnen();
+}
+
+/* Der Kopf der Details einer wiederkehrenden Aufgabe: „Nur diesmal". */
+function diesmalHtml(a) {
+  var is = diesmalTag(a);
+  if (!is) { return ''; }
+  var zeit = aufgabeZeitAn(a, is);
+  return '<div class="d-feld"><div class="d-name">Nur diesmal</div><div class="d-wert">'
+       + '<span class="d-diesmal-tag">' + esc(kurzDatum(is)) + (zeit ? ' · ' + esc(zeit) : '') + '</span>'
+       + '<button class="d-wahl" type="button" onclick="diesmalAuslassen(\'' + is + '\')">Auslassen</button>'
+       + '<button class="d-wahl" type="button" onclick="diesmalVerlegenZeigen()">Verlegen …</button>'
+       + '</div></div>'
+       + '<div class="d-neu" id="diesmalVerlegen">'
+       + '<div class="d-diesmal-felder"><input type="date" id="dmTag" value="' + is + '" aria-label="Neuer Tag">'
+       + '<input type="time" id="dmZeit" value="' + esc(zeit) + '" aria-label="Neue Uhrzeit"></div>'
+       + '<div class="d-reihe"><button type="button" onclick="diesmalVerlegen(\'' + is + '\')">Verlegen</button></div>'
+       + '<div class="d-hinweis">Nur diese Ausführung — die Regel bleibt, wie sie ist.</div>'
+       + '</div>';
 }
 
 

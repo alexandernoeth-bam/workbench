@@ -1231,6 +1231,52 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   flaecheFuer = merkF;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__diesmalApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkTag = tagOffen; var merkS = schirmOffen; DB = leereDatenbank();'
+                 + '   var heute = isoDatum(); var wt = ausIso(heute).getDay();'
+                 + '   var bis = function(ziel){ var n = (ziel - wt + 7) % 7; if (n === 0) { n = 7; } return tagePlus(heute, n); };'
+                 + '   var sa = bis(6); var fr = tagePlus(sa, -1); var saDanach = tagePlus(sa, 7);'
+                 + '   DB.aufgaben.push({ id: "e1", titel: "Einkaufen", kontext: "privat", planung: "", uhrzeit: "09:30", dauer: 60, art: "haupt",'
+                 + '     status: "offen", wiederholung: { takt: "woche", tage: [6], intervall: 1 }, geaendert: 1 });'
+                 + '   var a = DB.aufgaben[0];'
+                 + '   schirmOffen = "Tag"; tagOffen = sa; r.tagAusTag = diesmalTag(a) === sa;'
+                 + '   schirmOffen = "Aufgaben"; r.tagNaechster = diesmalTag(a) === sa;'
+                 + '   r.verlegt = ausfuehrungVerlegen(a, sa, fr, "16:00");'
+                 + '   r.saWeg = !aufgabeFaelligAn(a, sa) && aufgabeFaelligAn(a, fr);'
+                 + '   r.zeitFr = aufgabeZeitAn(a, fr) + "|" + aufgabeZeitAn(a, saDanach);'
+                 + '   var e = tagesEintraege(fr); var v = e.verlauf.filter(function(x){ return x.art === "aufgabe"; })[0];'
+                 + '   r.tagesplan = v ? v.zeit : "";'
+                 + '   r.saLeer = tagesEintraege(sa).verlauf.filter(function(x){ return x.art === "aufgabe"; }).length === 0;'
+                 + '   r.regelBleibt = aufgabeFaelligAn(a, saDanach) && a.uhrzeit === "09:30";'
+                 + '   r.nichtErledigt = !istErledigtAn(a, sa) && !istErledigtAn(a, fr);'
+                 + '   var bl = belegteBloecke(fr).filter(function(b){ return b.id === "e1"; })[0];'
+                 + '   r.block = bl ? bl.von : -1;'
+                 + '   r.falscheZeit = ausfuehrungVerlegen(a, fr, fr, "25:99");'
+                 + '   r.ohneTag = ausfuehrungVerlegen(a, fr, "", "10:00");'
+                 + '   ausfuehrungVerlegen(a, saDanach, saDanach, "11:00");'
+                 + '   r.nurZeit = aufgabeFaelligAn(a, saDanach) && aufgabeZeitAn(a, saDanach) === "11:00" && a.ausfallTage.indexOf(saDanach) < 0;'
+                 + '   ausfuehrungVerlegen(a, saDanach, saDanach, "09:30"); r.zeitZurueck = !(saDanach in a.zeitAusnahmen);'
+                 + '   zusatzTagUm("e1", fr); r.zusatzWegZeitWeg = !aufgabeFaelligAn(a, fr) && !(fr in a.zeitAusnahmen);'
+                 + '   var do_ = bis(4);'
+                 + '   DB.aufgaben.push({ id: "b1", titel: "Bericht", kontext: "beruflich", planung: "", uhrzeit: "", art: "haupt",'
+                 + '     status: "offen", wiederholung: { takt: "woche", tage: [4], intervall: 1 }, geaendert: 1 });'
+                 + '   var b = DB.aufgaben[1];'
+                 + '   r.auslassen = ausfuehrungAuslassen(b, do_) && !aufgabeFaelligAn(b, do_) && !istErledigtAn(b, do_);'
+                 + '   r.naechsterDo = diesmalTag(b) === tagePlus(do_, 7);'
+                 + '   r.nichtFaellig = ausfuehrungAuslassen(b, tagePlus(do_, 1)) === false;'
+                 + '   aktionFuer = "b1"; schirmOffen = "Aufgaben"; var dh = detailHtml(b);'
+                 + '   r.detail = /Nur diesmal/.test(dh) && /diesmalAuslassen\\(/.test(dh) && /id="dmTag"/.test(dh) && /id="dmZeit"/.test(dh)'
+                 + '     && /− /.test(dh);'
+                 + '   DB.aufgaben.push({ id: "n1", titel: "Einmalig", kontext: "beruflich", planung: heute, uhrzeit: "", art: "haupt", status: "offen", geaendert: 1 });'
+                 + '   r.nurWiederkehrend = !/Nur diesmal/.test(detailHtml(DB.aufgaben[2]));'
+                 + '   a.zeitAusnahmen = {}; a.zeitAusnahmen[tagePlus(heute, -30)] = "08:00"; a.zeitAusnahmen[saDanach] = "12:00";'
+                 + '   ausnahmenAufraeumen(); r.aufgeraeumt = Object.keys(a.zeitAusnahmen).join(",") === saDanach;'
+                 + '   var fremd = leereDatenbank(); var kopie = JSON.parse(JSON.stringify(a)); kopie.geaendert = jetzt() + 5000; fremd.aufgaben = [kopie];'
+                 + '   r.abgleich = zusammenfuehren(DB, fremd).db.aufgaben.filter(function(x){ return x.id === "e1"; })[0].zeitAusnahmen[saDanach] === "12:00";'
+                 + '   DB = alt; tagOffen = merkTag; schirmOffen = merkS; aktionFuer = "";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14203,6 +14249,45 @@ console.log('\n166. Links und Verzeichnis');
   if (e) {
     pruefe(e.linkLeer === true, 'ein Link mit Leerzeichen zwischen ] und ( zeigt nur seinen Text');
     pruefe(e.linkLang === true, 'ein Linktext darf länger als 80 Zeichen sein');
+  }
+}
+
+/* ============================================================
+   167. Nur diesmal: auslassen oder verlegen (v5.15.0)
+   Grund: Eine wiederkehrende Aufgabe ließ sich nur für einen ganzen Tag
+   ausfallen lassen oder dazuholen — versteckt in den Details — und nie
+   auf eine andere Uhrzeit legen. Wer krank war, hakte ab; das ist aber
+   „erledigt“, nicht „ausgefallen“.
+   ============================================================ */
+console.log('\n167. Nur diesmal');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__diesmalApi;
+  const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}/);
+  pruefe(te && /aufgabeZeitAn\(a, is\)/.test(te[0]), 'der Tag nimmt die Uhrzeit dieses Tages');
+  const jk = skript.match(/function jetztKarteZeichnen\([\s\S]*?\n\}/);
+  pruefe(jk && /v\.zeit \|\| v\.a\.uhrzeit/.test(jk[0]), 'die Jetzt-Zeile auch');
+  let e = null;
+  if (!t) { warn('Nur diesmal nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Nur diesmal läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.tagAusTag === true && e.tagNaechster === true, 'gemeint ist die Ausführung des offenen Tages, sonst die nächste');
+    pruefe(e.verlegt === true && e.saWeg === true, 'verlegt fällt der Samstag aus und der Freitag kommt dazu');
+    pruefe(e.zeitFr === '16:00|09:30', 'nur der Freitag bekommt die neue Uhrzeit');
+    pruefe(e.tagesplan === '16:00' && e.block === 960, 'Tagesplan und Stundenplan zeigen 16:00');
+    pruefe(e.saLeer === true, 'am Samstag steht sie nicht mehr');
+    pruefe(e.regelBleibt === true, 'die Regel bleibt samstags 9:30');
+    pruefe(e.nichtErledigt === true, 'verlegen ist nicht erledigen');
+    pruefe(e.falscheZeit === false && e.ohneTag === false, 'eine unmögliche Uhrzeit oder ein fehlender Tag werden abgewiesen');
+    pruefe(e.nurZeit === true && e.zeitZurueck === true, 'am selben Tag ändert sich nur die Uhrzeit — und wieder zurück');
+    pruefe(e.zusatzWegZeitWeg === true, 'wird der Zusatztag zurückgenommen, geht seine Uhrzeit mit');
+    pruefe(e.auslassen === true, 'auslassen nimmt die Ausführung heraus, ohne sie abzuhaken');
+    pruefe(e.naechsterDo === true, 'danach ist die nächste Ausführung gemeint');
+    pruefe(e.nichtFaellig === true, 'an einem Tag ohne Ausführung gibt es nichts auszulassen');
+    pruefe(e.detail === true, 'die Details bieten „Nur diesmal“: auslassen, verlegen, und zeigen den Ausfall');
+    pruefe(e.nurWiederkehrend === true, 'nur bei wiederkehrenden Aufgaben');
+    pruefe(e.aufgeraeumt === true, 'vergangene Uhrzeiten werden nach einer Woche weggeräumt');
+    pruefe(e.abgleich === true, 'verlegte Uhrzeiten gehen durch den Abgleich');
   }
 }
 
