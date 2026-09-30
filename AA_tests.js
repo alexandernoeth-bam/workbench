@@ -1049,6 +1049,39 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; flaecheFuer = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__deutungApi = {'
+                 + ' pruefe: function(saetze){'
+                 + '   var r = { heute: isoDatum(), saetze: {} };'
+                 + '   saetze.forEach(function(t){ r.saetze[t] = eingabeDeuten(t); });'
+                 + '   r.nurTitel = eingabeDeuten("14:00 Idee morgen p", true);'
+                 + '   return r;'
+                 + ' },'
+                 + ' ablauf: function(){'
+                 + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank(); var r = {};'
+                 + '   var h = isoDatum(); tagOffen = h; r.heute = h;'
+                 + '   var feld = document.getElementById("schnellFeld");'
+                 + '   feld.value = "Zahnarzt morgen 14:00"; schnellVorschau();'
+                 + '   r.vorschau = document.getElementById("schnellVorschauZeile").innerHTML;'
+                 + '   schnellAnlegen(); var a = DB.aufgaben[DB.aufgaben.length - 1];'
+                 + '   r.tag = { titel: a.titel, planung: a.planung, uhrzeit: a.uhrzeit, art: a.art,'
+                 + '     imPlan: planSatz(tagePlus(h, 1)).drin.indexOf(a.id) >= 0, nichtHeute: planSatz(h).drin.indexOf(a.id) < 0 };'
+                 + '   feld.value = "Bericht an Kerstin bis Fr"; schnellAnlegen(); a = DB.aufgaben[DB.aufgaben.length - 1];'
+                 + '   r.frist = { titel: a.titel, planung: a.planung, frist: a.frist };'
+                 + '   feld.value = "Rückruf Bergmann"; schnellAnlegen(); a = DB.aufgaben[DB.aufgaben.length - 1];'
+                 + '   r.ohne = { planung: a.planung, imPlan: planSatz(h).drin.indexOf(a.id) >= 0 };'
+                 + '   var wf = document.getElementById("wochenNeu"); wf.value = "Angebot prüfen übermorgen 9 Uhr";'
+                 + '   wochenAufgabeNeu(montagVon(h)); a = DB.aufgaben[DB.aufgaben.length - 1];'
+                 + '   r.woche = { titel: a.titel, planung: a.planung, uhrzeit: a.uhrzeit };'
+                 + '   DB.projekte = [{ id: "p1", name: "Haus", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   taetigFuer = { id: "p1", art: "projekt" }; var tf = document.getElementById("taetigNeu");'
+                 + '   tf.value = "Handwerker anrufen bis morgen"; taetigNeu(); a = DB.aufgaben[DB.aufgaben.length - 1];'
+                 + '   r.taetig = { titel: a.titel, planung: a.planung, frist: a.frist, projekt: a.projektId };'
+                 + '   einfallNeu("14:00 Idee zu Gartenhaus morgen"); var e = DB.einfaelle[DB.einfaelle.length - 1];'
+                 + '   r.einfall = e.titel;'
+                 + '   einfallNeu("Tomaten ziehen p"); r.einfallPrivat = DB.einfaelle[DB.einfaelle.length - 1].kontext;'
+                 + '   DB = alt; tagOffen = merkTag;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -13661,6 +13694,138 @@ console.log('\n156. Kopf, Zoom, alle Seiten');
     pruefe(e.leereSeite === 150 && e.hinterDemEnde === 150, 'man kann jede der 200 Seiten aufschlagen, nicht dahinter');
     pruefe(e.nichtsAngelegt === true, 'Blättern auf leere Seiten legt keine Datensätze an');
     pruefe(e.archiv === 1, 'im Archiv bleibt es beim Beschriebenen');
+  }
+}
+
+/* ============================================================
+   157. Datum und Uhrzeit in der Schnelleingabe (v5.11.0)
+   Grund: „Zahnarzt morgen 14:00" wurde ganz zum Titel, auf den offenen
+   Tag, ohne Uhrzeit. Jetzt wird erkannt, was eindeutig ist — und nur
+   das: zwei Daten oder zwei Uhrzeiten lassen den Text unberührt.
+   ============================================================ */
+console.log('\n157. Datum und Uhrzeit in der Schnelleingabe');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__deutungApi;
+  pruefe(/function zeitUndDatumDeuten\(text, zeitSuchen\)/.test(skript), 'die Deutung von Datum und Uhrzeit ist eine eigene Funktion');
+  const saetze = [
+    'Zahnarzt morgen 14:00', 'Reifen wechseln am 12.10.', 'Bericht an Kerstin bis Fr', 'Mo 9 Uhr Jour fixe p',
+    'Telefonat 14–15 Uhr übermorgen', 'Termin Mi auf Do verschieben', 'Version 5.6.1 prüfen', 'Joggen am Morgen',
+    'so schnell wie möglich antworten', 'Freitagsrunde vorbereiten', 'Abgabe bis morgen 12 Uhr', '14:00 Zahnarzt',
+    '16:30-17:15 Vorhänge aufhängen p', 'Anruf 14:00 und 16:00', 'Treffen am 31.02.', 'Präsentation freitag 10.30 Uhr',
+    'heute Morgen Brötchen holen', 'Rechnung zahlen 3.11.2026', 'Rückruf Bergmann', '!Konzept schreiben Do'
+  ];
+  let e = null;
+  if (!t) {
+    warn('Deutung nicht auswertbar');
+  } else {
+    try { e = t.pruefe(saetze); }
+    catch (x) { fail('Deutung läuft nicht: ' + x.message); }
+  }
+  if (t && e) {
+    const d = e.saetze;
+    const plus = function (n) {
+      const x = new Date(e.heute + 'T12:00:00'); x.setDate(x.getDate() + n);
+      return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+    };
+    const naechster = function (wtag) {
+      const x = new Date(e.heute + 'T12:00:00'); let n = (wtag - x.getDay() + 7) % 7; if (n === 0) { n = 7; } return plus(n);
+    };
+    const kommender = function (tag, monat) {
+      const jahr = Number(e.heute.slice(0, 4));
+      const iso = jahr + '-' + String(monat).padStart(2, '0') + '-' + String(tag).padStart(2, '0');
+      return iso < e.heute ? (jahr + 1) + iso.slice(4) : iso;
+    };
+    let x = d['Zahnarzt morgen 14:00'];
+    pruefe(x.titel === 'Zahnarzt' && x.datum === plus(1) && x.uhrzeit === '14:00' && x.art === 'haupt',
+           '„morgen 14:00" plant morgen um 14 Uhr, der Titel bleibt sauber');
+    x = d['Reifen wechseln am 12.10.'];
+    pruefe(x.titel === 'Reifen wechseln' && x.datum === kommender(12, 10) && x.art === 'klein',
+           'ein Datum ohne Jahr meint das nächste Vorkommen, „am" verschwindet mit');
+    x = d['Bericht an Kerstin bis Fr'];
+    pruefe(x.titel === 'Bericht an Kerstin' && x.frist === naechster(5) && x.datum === '',
+           '„bis Fr" setzt eine Frist, keinen Plantag');
+    x = d['Mo 9 Uhr Jour fixe p'];
+    pruefe(x.titel === 'Jour fixe' && x.datum === naechster(1) && x.uhrzeit === '09:00' && x.kontext === 'privat',
+           'Wochentag, „9 Uhr" und „p" zusammen');
+    x = d['Telefonat 14–15 Uhr übermorgen'];
+    pruefe(x.titel === 'Telefonat' && x.datum === plus(2) && x.uhrzeit === '14:00' && x.dauer === 60,
+           'eine Spanne in Stunden ergibt die Dauer');
+    x = d['Termin Mi auf Do verschieben'];
+    pruefe(x.titel === 'Termin Mi auf Do verschieben' && x.datum === '' && x.frist === '',
+           'zwei Daten sind nicht eindeutig — der Text bleibt');
+    x = d['Anruf 14:00 und 16:00'];
+    pruefe(x.titel === 'Anruf 14:00 und 16:00' && x.uhrzeit === '', 'zwei Uhrzeiten auch nicht');
+    pruefe(d['Version 5.6.1 prüfen'].datum === '' && d['Version 5.6.1 prüfen'].titel === 'Version 5.6.1 prüfen',
+           'eine Versionsnummer ist kein Datum');
+    pruefe(d['Joggen am Morgen'].datum === '' && d['Joggen am Morgen'].titel === 'Joggen am Morgen',
+           '„am Morgen" ist die Tageszeit, nicht morgen');
+    x = d['heute Morgen Brötchen holen'];
+    pruefe(x.datum === e.heute && x.titel === 'Morgen Brötchen holen', '„heute Morgen" plant heute');
+    pruefe(d['so schnell wie möglich antworten'].datum === '', 'das Wort „so" ist kein Sonntag');
+    pruefe(d['Freitagsrunde vorbereiten'].datum === '', 'ein Wochentag muss ein eigenes Wort sein');
+    x = d['Abgabe bis morgen 12 Uhr'];
+    pruefe(x.frist === plus(1) && x.uhrzeit === '', 'zu einer Frist wird keine Uhrzeit gelesen');
+    pruefe(d['14:00 Zahnarzt'].uhrzeit === '14:00' && d['14:00 Zahnarzt'].titel === 'Zahnarzt',
+           'die Uhrzeit vorn wirkt wie bisher');
+    x = d['16:30-17:15 Vorhänge aufhängen p'];
+    pruefe(x.uhrzeit === '16:30' && x.dauer === 45 && x.titel === 'Vorhänge aufhängen', 'die Spanne vorn wie bisher');
+    pruefe(d['Treffen am 31.02.'].datum === '' && d['Treffen am 31.02.'].titel === 'Treffen am 31.02.',
+           'ein unmögliches Datum wird nicht gedeutet');
+    x = d['Präsentation freitag 10.30 Uhr'];
+    pruefe(x.titel === 'Präsentation' && x.datum === naechster(5) && x.uhrzeit === '10:30',
+           'ausgeschriebene Wochentage auch klein, „10.30 Uhr" als Uhrzeit');
+    pruefe(d['Rechnung zahlen 3.11.2026'].datum === '2026-11-03', 'ein Datum mit Jahr gilt wie geschrieben');
+    x = d['Rückruf Bergmann'];
+    pruefe(x.titel === 'Rückruf Bergmann' && x.datum === '' && x.frist === '' && x.uhrzeit === '', 'ohne Datum bleibt alles wie früher');
+    x = d['!Konzept schreiben Do'];
+    pruefe(x.art === 'haupt' && x.titel === 'Konzept schreiben' && x.datum === naechster(4), '„!" und Wochentag zusammen');
+    pruefe(e.nurTitel.titel === '14:00 Idee morgen' && e.nurTitel.kontext === 'privat' && e.nurTitel.uhrzeit === '',
+           'ohne Datumsfeld wird nur „p" gedeutet');
+
+    let a = null;
+    try { a = t.ablauf(); }
+    catch (x2) { fail('Schnelleingabe läuft nicht: ' + x2.message); }
+    if (a) {
+      const plusA = function (n) {
+        const y = new Date(a.heute + 'T12:00:00'); y.setDate(y.getDate() + n);
+        return y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0');
+      };
+      pruefe(/14:00/.test(a.vorschau) && /Aufgabe/.test(a.vorschau), 'die Vorschau zeigt vor dem Enter, was erkannt wurde');
+      pruefe(a.tag.titel === 'Zahnarzt' && a.tag.planung === plusA(1) && a.tag.uhrzeit === '14:00' && a.tag.imPlan && a.tag.nichtHeute,
+             'am Tag angelegt, landet es auf dem erkannten Tag — in dessen Plan');
+      pruefe(a.frist.titel === 'Bericht an Kerstin' && a.frist.planung === a.heute && /^\d{4}-\d{2}-\d{2}$/.test(a.frist.frist),
+             'mit Frist bleibt es auf dem offenen Tag');
+      pruefe(a.ohne.planung === a.heute && a.ohne.imPlan === true, 'ohne Datum wie bisher auf dem offenen Tag');
+      pruefe(a.woche.titel === 'Angebot prüfen' && a.woche.planung === plusA(2) && a.woche.uhrzeit === '09:00',
+             'auch in der Woche gilt ein Datum vor der Woche');
+      pruefe(a.taetig.titel === 'Handwerker anrufen' && a.taetig.planung === 'backlog' && a.taetig.frist === plusA(1) && a.taetig.projekt === 'p1',
+             'auch bei Tätigkeiten eines Vorhabens');
+    }
+  }
+}
+
+/* ============================================================
+   158. Einfälle behalten ihre Uhrzeit (v5.11.0)
+   Grund: Ein Einfall hat kein Zeitfeld. Die Deutung nahm trotzdem eine
+   Uhrzeit vorn aus dem Text — „14:00 Idee zu X" wurde zu „Idee zu X",
+   die Zeit war weg.
+   ============================================================ */
+console.log('\n158. Einfälle behalten ihre Uhrzeit');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__deutungApi;
+  const ef = skript.match(/function einfallNeu\([\s\S]*?\n\}/);
+  pruefe(ef && /eingabeDeuten\(titel, true\)/.test(ef[0]), 'Einfälle werden ohne Datum und Uhrzeit gedeutet');
+  let a = null;
+  if (t) {
+    try { a = t.ablauf(); } catch (x) { fail('Einfälle laufen nicht: ' + x.message); }
+  } else {
+    warn('Einfälle nicht auswertbar');
+  }
+  if (a) {
+    pruefe(a.einfall === '14:00 Idee zu Gartenhaus morgen', 'Uhrzeit und Datum bleiben im Text eines Einfalls');
+    pruefe(a.einfallPrivat === 'privat', '„p" wirkt auch bei Einfällen');
   }
 }
 

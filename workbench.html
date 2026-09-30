@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.10.0</title>
+<title>Workbench 5.11.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2585,7 +2585,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.10.0';
+var APP_VERSION = '5.11.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8723,7 +8723,9 @@ function teilenUebernehmen() {
    Schnelleingabe
    ------------------------------------------------------------ */
 
-function eingabeDeuten(text) {
+/* nurTitel: Nur „!", „++" und „p" deuten, keine Uhrzeit und kein Datum —
+   für Eingaben ohne Datumsfeld (Einfälle), die sonst Text verlören. */
+function eingabeDeuten(text, nurTitel) {
   var roh = String(text).trim();
   var haupt = false;
   var privat = false;
@@ -8735,7 +8737,8 @@ function eingabeDeuten(text) {
   if (roh.charAt(0) === '!') { haupt = true; roh = roh.slice(1).trim(); }
   /* Eine Uhrzeit am Anfang macht daraus einen Block im Tagesplan —
      mit Spanne auch gleich mit der richtigen Dauer. */
-  var zeitM = roh.match(/^([0-2]?[0-9]):([0-5][0-9])(?:\s*[-–]\s*([0-2]?[0-9]):([0-5][0-9]))?\s+/);
+  var zeitM = nurTitel ? null
+            : roh.match(/^([0-2]?[0-9]):([0-5][0-9])(?:\s*[-–]\s*([0-2]?[0-9]):([0-5][0-9]))?\s+/);
   if (zeitM && Number(zeitM[1]) < 24) {
     uhrzeit = String(Number(zeitM[1])).padStart(2, '0') + ':' + zeitM[2];
     if (zeitM[3] && Number(zeitM[3]) < 24) {
@@ -8752,14 +8755,141 @@ function eingabeDeuten(text) {
     worte.pop();
     roh = worte.join(' ');
   }
+  /* Seit v5.11.0: Datum und Uhrzeit dürfen überall im Text stehen. */
+  var datum = '';
+  var frist = '';
+  if (!nurTitel) {
+    var zd = zeitUndDatumDeuten(roh, !uhrzeit);
+    roh = zd.rest;
+    datum = zd.datum;
+    frist = zd.frist;
+    if (!uhrzeit && zd.uhrzeit) { uhrzeit = zd.uhrzeit; dauer = zd.dauer; }
+  }
   return {
     titel: roh,
     art: (haupt || uhrzeit) ? 'haupt' : 'klein',
     kontext: privat ? 'privat' : 'beruflich',
     uhrzeit: uhrzeit,
     dauer: dauer,
-    schon: schon
+    schon: schon,
+    datum: datum,
+    frist: frist
   };
+}
+
+/* ------------------------------------------------------------
+   Datum und Uhrzeit aus einer Schnelleingabe
+
+   Gedeutet wird nur, was eindeutig ist: genau ein Datum und genau eine
+   Uhrzeit. Stehen zwei Daten oder zwei Uhrzeiten im Text („Termin Mi auf
+   Do verschieben"), bleibt der Text, wie er ist. Erkannt werden
+     heute, morgen, übermorgen
+     Wochentage — ausgeschrieben oder als Mo, Di, Mi, Do, Fr, Sa (groß
+       geschrieben; „So" nur mit Punkt oder nach am/bis, sonst ist es
+       das Wort „so"). Gemeint ist das nächste Vorkommen ab morgen.
+     Daten wie 12.10. oder 12.10.2026 — ohne Jahr das nächste Vorkommen
+     Uhrzeiten wie 14:00, 14 Uhr, 14.30 Uhr, auch als Spanne
+   „bis …" vor einem Datum setzt eine Frist statt des Plantags; zu einer
+   Frist wird keine Uhrzeit gelesen. „am Morgen" bleibt die Tageszeit.
+   ------------------------------------------------------------ */
+var WOCHENTAG_NUMMER = { montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5,
+                         samstag: 6, sonntag: 0, mo: 1, di: 2, mi: 3, 'do': 4, fr: 5, sa: 6, so: 0 };
+
+function zeitUndDatumDeuten(text, zeitSuchen) {
+  var s = String(text);
+  var heute = isoDatum();
+  var daten = [];
+  var zeiten = [];
+  var m;
+  var re;
+  var vorWort = function (bis) {
+    var davor = s.slice(0, bis).trim().split(/\s+/);
+    return String(davor[davor.length - 1] || '').toLowerCase();
+  };
+  var fund = function (liste, m, iso, extra) {
+    var start = m.index + m[1].length;
+    var eintrag = { start: start, ende: m.index + m[0].length, iso: iso,
+                    bis: /^bis\s/i.test(m[2] || '') };
+    var k;
+    for (k in extra) { eintrag[k] = extra[k]; }
+    liste.push(eintrag);
+  };
+
+  /* heute, morgen, übermorgen */
+  re = /(^|\s)((?:bis|am|ab)\s+)?(heute|morgen|übermorgen)(?=$|[\s,;!?])/gi;
+  while ((m = re.exec(s)) !== null) {
+    var wort = m[3];
+    if (wort === 'Morgen' && (/^am\s/i.test(m[2] || '')
+        || ['heute', 'jeden', 'guten', 'diesen', 'den'].indexOf(vorWort(m.index + m[1].length)) >= 0)) {
+      continue;   /* „am Morgen", „heute Morgen": die Tageszeit */
+    }
+    var versatz = { heute: 0, morgen: 1, 'übermorgen': 2 }[wort.toLowerCase()];
+    fund(daten, m, tagePlus(heute, versatz));
+  }
+
+  /* Wochentage */
+  var wochentag = function (m, name) {
+    var ziel = WOCHENTAG_NUMMER[name.toLowerCase()];
+    var abstand = (ziel - ausIso(heute).getDay() + 7) % 7;
+    fund(daten, m, tagePlus(heute, abstand === 0 ? 7 : abstand));
+  };
+  re = /(^|\s)((?:bis|am|ab)\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)(?=$|[\s,;!?.])/gi;
+  while ((m = re.exec(s)) !== null) { wochentag(m, m[3]); }
+  re = /(^|\s)((?:bis|am|ab)\s+)?(Mo|Di|Mi|Do|Fr|Sa|So)(\.?)(?=$|[\s,;!?])/g;
+  while ((m = re.exec(s)) !== null) {
+    if (m[3] === 'So' && !m[2] && !m[4]) { continue; }
+    wochentag(m, m[3]);
+  }
+
+  /* 12.10. und 12.10.2026 */
+  re = /(^|\s)((?:bis|am|ab)\s+)?(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?![\d.])/g;
+  while ((m = re.exec(s)) !== null) {
+    var tag = Number(m[3]);
+    var monat = Number(m[4]);
+    var jahr = m[5] ? Number(m[5].length === 2 ? '20' + m[5] : m[5]) : ausIso(heute).getFullYear();
+    var probe = new Date(jahr, monat - 1, tag);
+    if (probe.getMonth() !== monat - 1 || probe.getDate() !== tag) { continue; }
+    var iso = isoDatum(probe);
+    if (!m[5] && iso < heute) { iso = isoDatum(new Date(jahr + 1, monat - 1, tag)); }
+    fund(daten, m, iso);
+  }
+
+  /* Uhrzeiten — nur, wenn noch keine vorn stand */
+  var zeitFund = function (m, h1, m1, h2, m2) {
+    if (vorWort(m.index + m[1].length) === 'bis') { return; }
+    var von = Number(h1) * 60 + Number(m1 || 0);
+    var dauer = 0;
+    if (h2 !== undefined && h2 !== '') {
+      var bisMin = Number(h2) * 60 + Number(m2 || 0);
+      if (bisMin > von) { dauer = bisMin - von; }
+    }
+    fund(zeiten, m, '', { uhrzeit: String(Number(h1)).padStart(2, '0') + ':' + String(Number(m1 || 0)).padStart(2, '0'),
+                           dauer: dauer });
+  };
+  if (zeitSuchen) {
+    re = /(^|\s)((?:um|ab|von)\s+)?([01]?\d|2[0-3]):([0-5]\d)(?:\s*(?:-|–|bis)\s*([01]?\d|2[0-3]):([0-5]\d))?(?:\s*uhr)?(?=$|[\s,;!?])/gi;
+    while ((m = re.exec(s)) !== null) { zeitFund(m, m[3], m[4], m[5], m[6]); }
+    re = /(^|\s)((?:um|ab|von)\s+)?([01]?\d|2[0-3])(?:\.([0-5]\d))?(?:\s*[-–]\s*([01]?\d|2[0-3])(?:\.([0-5]\d))?)?\s*uhr(?=$|[\s,;!?])/gi;
+    while ((m = re.exec(s)) !== null) { zeitFund(m, m[3], m[4], m[5], m[6]); }
+  }
+
+  var aus = { rest: s, datum: '', frist: '', uhrzeit: '', dauer: 0 };
+  var weg = [];
+  if (daten.length === 1) {
+    if (daten[0].bis) { aus.frist = daten[0].iso; } else { aus.datum = daten[0].iso; }
+    weg.push(daten[0]);
+  }
+  /* Zu einer Frist gehört keine Uhrzeit — der Tag hat kein Fristfeld für sie. */
+  if (zeiten.length === 1 && !aus.frist) {
+    aus.uhrzeit = zeiten[0].uhrzeit;
+    aus.dauer = zeiten[0].dauer;
+    weg.push(zeiten[0]);
+  }
+  weg.sort(function (a, b) { return b.start - a.start; });
+  var i;
+  for (i = 0; i < weg.length; i++) { aus.rest = aus.rest.slice(0, weg[i].start) + aus.rest.slice(weg[i].ende); }
+  aus.rest = aus.rest.replace(/\s+/g, ' ').replace(/^[\s,;:–-]+|[\s,;:–-]+$/g, '').trim();
+  return aus;
 }
 
 /* Am Handy steht das Eingabefeld hinter dem Pluszeichen: Es ist der
@@ -8778,7 +8908,10 @@ function schnellVorschau() {
   if (wert.length === 0) { box.classList.remove('sichtbar'); box.innerHTML = ''; return; }
   var d = eingabeDeuten(wert);
   box.innerHTML = 'wird angelegt als <b>' + (d.art === 'haupt' ? 'Aufgabe' : 'Kleinigkeit')
-                + '</b> · <b>' + esc(kurzDatum(tagOffen)) + '</b> · <b>' + d.kontext + '</b>';
+                + '</b> · <b>' + esc(kurzDatum(d.datum || tagOffen)) + '</b>'
+                + (d.uhrzeit ? ' · <b>' + esc(d.uhrzeit) + (d.dauer ? ' (' + d.dauer + ' min)' : '') + '</b>' : '')
+                + (d.frist ? ' · <b>Frist ' + esc(kurzDatum(d.frist)) + '</b>' : '')
+                + ' · <b>' + d.kontext + '</b>';
   box.classList.add('sichtbar');
   aehnlichPruefen('schnellFeld', 'schnellAehnlich');
 }
@@ -8807,8 +8940,8 @@ function schnellAnlegen() {
     kontext: d.kontext,
     themaId: null,
     projektId: null,
-    frist: '',
-    planung: tagOffen,
+    frist: d.frist || '',
+    planung: d.datum || tagOffen,
     angelegtAm: tagOffen,
     uhrzeit: d.uhrzeit || '',
     dauer: d.dauer || 0,
@@ -8822,7 +8955,14 @@ function schnellAnlegen() {
   });
   /* Was tagsüber dazukommt, gehört in den Tag — mit Vermerk, damit der
      Rückblick geplant und geworden unterscheiden kann. */
-  planAufnehmen(tagOffen, DB.aufgaben[DB.aufgaben.length - 1].id);
+  var neuId = DB.aufgaben[DB.aufgaben.length - 1].id;
+  if (d.datum && d.datum !== tagOffen) {
+    /* Ein Datum im Text: geplant wird auf diesen Tag, nicht auf den offenen. */
+    planAufnehmen(d.datum, neuId);
+    melde('Geplant für ' + kurzDatum(d.datum) + '.', 'gut');
+  } else {
+    planAufnehmen(tagOffen, neuId);
+  }
   if (d.schon) { melde('Festgehalten — und gleich abgehakt.', 'gut'); }
   feld.value = '';
   schnellVorschau();
@@ -11782,6 +11922,11 @@ function wochenAufgabeNeu(mo) {
     art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
     zuletztErledigt: null, ablaufSchritt: null, geaendert: jetzt()
   };
+  /* Ein Datum im Text gilt vor der Woche; Uhrzeit und Frist kommen mit. */
+  if (g.datum) { wert = g.datum; }
+  a.uhrzeit = g.uhrzeit || '';
+  a.dauer = g.dauer || 0;
+  a.frist = g.frist || '';
   planungSetzen(a, wert);
   DB.aufgaben.push(a);
   feld.value = '';
@@ -13476,7 +13621,8 @@ function taetigNeu() {
     themaId: null,
     projektId: (taetigFuer.art === 'projekt') ? v.id : null,
     zielId: (taetigFuer.art === 'ziel') ? v.id : null,
-    frist: '', planung: 'backlog', uhrzeit: '', art: g.art, wiederholung: null,
+    frist: g.frist || '', planung: g.datum || 'backlog', uhrzeit: g.uhrzeit || '', dauer: g.dauer || 0,
+    art: g.art, wiederholung: null,
     status: 'offen', erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null,
     geaendert: jetzt()
   });
@@ -14406,7 +14552,9 @@ function einfallNeu(text) {
             : (feld ? feld.value.trim() : '');
   if (titel.length === 0) { return; }
   if (!Array.isArray(DB.einfaelle)) { DB.einfaelle = []; }
-  var gedeutet = eingabeDeuten(titel);
+  /* Ein Einfall hat kein Datums- oder Zeitfeld — gedeutet wird nur „p",
+     sonst ginge eine Uhrzeit aus dem Text verloren (bis v5.10.0). */
+  var gedeutet = eingabeDeuten(titel, true);
   DB.einfaelle.push({
     id: neueKennung(), titel: gedeutet.titel, notiz: '',
     kontext: gedeutet.kontext, stichwort: '', stand: 'offen',
