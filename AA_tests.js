@@ -14086,6 +14086,29 @@ console.log('\n162. Laufende Aufgaben und Fälliges am Symbol');
 }
 
 /* ============================================================
+   163. Aufzählungspunkt oben, lange Wörter brechen um (v5.13.2)
+   Grund: Punkt und Kästchen standen mittig zum ganzen Eintrag — bei
+   mehrzeiligen Einträgen rutschten sie nach unten. Und eine lange
+   Internetadresse ohne Leerzeichen lief über die Seite hinaus in den
+   Rand, weil nirgends umgebrochen werden durfte.
+   ============================================================ */
+console.log('\n163. Aufzählungspunkt und Umbruch');
+{
+  const punkt = QUELLE.match(/\.fl-punkt\{[^}]*\}/);
+  pruefe(punkt && /align-self:flex-start/.test(punkt[0]) && !/align-self:center/.test(punkt[0]),
+         'der Aufzählungspunkt steht an der ersten Zeile, nicht mittig');
+  const kasten = QUELLE.match(/\.fl-zeile \.tkasten\{[^}]*\}/);
+  pruefe(kasten && /align-self:flex-start/.test(kasten[0]) && !/align-self:center/.test(kasten[0]),
+         'das Kästchen auch');
+  pruefe(/\.nb-inhalt \.fl-punkt\{margin-top:8px\}/.test(QUELLE) && /\.nb-inhalt \.fl-zeile \.tkasten\{margin-top:3\.5px\}/.test(QUELLE),
+         'auf Notizseiten mittig zur ersten Kästchenzeile (24 px)');
+  const text = QUELLE.match(/\.fl-text\{[^}]*\}/);
+  const absatz = QUELLE.match(/\.fl-absatz\{[^}]*\}/);
+  pruefe(text && /overflow-wrap:anywhere/.test(text[0]) && absatz && /overflow-wrap:anywhere/.test(absatz[0]),
+         'lange Wörter und Adressen brechen um, statt in den Rand zu laufen');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
