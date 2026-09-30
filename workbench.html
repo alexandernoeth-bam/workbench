@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.13.0</title>
+<title>Workbench 5.13.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1705,15 +1705,6 @@ body.breit .ro-kacheln{grid-template-columns:1fr 1fr}
 .tag-jetzt div{font-size:calc(var(--fs)*0.72);color:var(--grau);margin-top:2px}
 .tag-jetzt .tj-parallel span{display:inline-block;border:1px solid var(--linie);border-radius:10px;
   padding:0 7px;margin-right:5px;font-size:calc(var(--fs)*0.62)}
-/* Fällig: offene Aufgaben mit Uhrzeit, deren Zeit gekommen ist (seit v5.13.0) */
-.tag-faellig{display:none}
-.tag-faellig.auf{display:block;margin:2px 0 8px;padding:7px 12px;border-radius:9px;
-  background:var(--karte);border:1px solid var(--weinrot)}
-.tf-kopf{font-size:calc(var(--fs)*0.68);font-weight:600;color:var(--weinrot);margin-bottom:3px}
-.tf-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-top:1px solid var(--linie)}
-.tf-zeile:first-of-type{border-top:0}
-.tf-text{flex:1 1 180px;min-width:0;font-size:calc(var(--fs)*0.84)}
-.tf-text small{color:var(--grau);margin-left:7px;font-size:calc(var(--fs)*0.7)}
 
 .tag-leitsatz{display:none}
 .tag-leitsatz.auf{display:block;margin:2px 0 8px;padding:7px 12px;
@@ -2057,7 +2048,6 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    <div class="tk-s-zeile" id="tkSchmalZeile"></div>
    <div class="tk-schutzband" id="tkSchutzband"></div>
    <div class="tag-leitsatz" id="tagLeitsatz"></div>
-   <div class="tag-faellig" id="tagFaellig"></div>
    <div class="tag-jetzt" id="tagJetzt"></div>
    <div class="tk-karte">
     <div class="tk-zeile">
@@ -2615,7 +2605,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.13.0';
+var APP_VERSION = '5.13.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5056,18 +5046,15 @@ function jetztKarteZeichnen(is, e) {
   var naechst = null;
   /* Seit v5.13.0 läuft auch eine Aufgabe: von ihrer Uhrzeit bis zum Ende
      ihrer Dauer, ohne Dauer bis sie abgehakt ist. Sie geht einem Termin
-     vor, der gleichzeitig läuft — der steht dann als „parallel" darunter.
-     Eine zurückgestellte Aufgabe tritt so lange zurück. */
+     vor, der gleichzeitig läuft — der steht dann als „parallel" darunter. */
   var aufgabeJetzt = null;
-  var zurueck = zurueckLesen(is);
   var i;
   for (i = 0; i < e.verlauf.length; i++) {
     var v = e.verlauf[i];
     var von = (v.art === 'termin') ? (v.t.von || '') : (v.a.uhrzeit || '');
     var bis = (v.art === 'termin') ? (v.t.bis || '') : '';
     var titel = (v.art === 'termin') ? v.t.titel : v.a.titel;
-    if (v.art === 'aufgabe' && von && von <= jetztZ && !istErledigtAn(v.a, is)
-        && !((zurueck.bis[v.a.id] || 0) > Date.now())) {
+    if (v.art === 'aufgabe' && von && von <= jetztZ && !istErledigtAn(v.a, is)) {
       var ende = v.a.dauer ? uhrzeitPlus(von, v.a.dauer) : '';
       if (!ende || jetztZ < ende) { aufgabeJetzt = { titel: titel, von: von, bis: ende }; }
     }
@@ -7935,7 +7922,6 @@ function tagZeichnen() {
   tagKopfSchmalZeichnen(is, e);
   leitsatzZeichnen();
   jetztKarteZeichnen(is, e);
-  faelligZeichnen(is);
 
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
@@ -18501,19 +18487,15 @@ function erinnerungPruefen() {
   var is = isoDatum();
   var jetztMs = Date.now();
   var stand = erinnertLesen(is);
-  var zurueck = zurueckLesen(is);
   var liste = erinnerungKandidaten(is);
   var gemeldet = 0;
   var i;
   for (i = 0; i < liste.length; i++) {
     var k = liste[i];
-    /* Zurückgestellt: bis dahin still, danach genau noch einmal. */
-    var zb = zurueck.bis[k.id] || 0;
-    if (zb > jetztMs) { continue; }
-    var schluessel = k.id + '@' + k.zeit + (zb ? ('#' + zb) : '');
+    var schluessel = k.id + '@' + k.zeit;
     if (stand.schluessel.indexOf(schluessel) >= 0) { continue; }
     var um = new Date(is + 'T' + k.zeit + ':00').getTime();
-    var ab = zb || (um - st.vorlauf * 60000);
+    var ab = um - st.vorlauf * 60000;
     if (jetztMs < ab || jetztMs - ab > ERINNERUNG_NACHHOLEN_MIN * 60000) { continue; }
     erinnerungZeigen(k, Math.round((um - jetztMs) / 60000));
     stand.schluessel.push(schluessel);
@@ -18605,101 +18587,26 @@ function erinnerungWahlZeichnen() {
    Fälliges
 
    Fällig ist eine heutige, offene Aufgabe mit Uhrzeit, deren Zeit
-   gekommen ist — genau das, was die Erinnerung gemeldet hat. Es steht
-   im Tag über der Jetzt-Zeile, bis es erledigt ist; „15 Min. später"
-   stellt es zurück und lässt die Erinnerung dann noch einmal kommen.
-   Wahlweise zeigen auch Fenstertitel und App-Symbol nur das Fällige.
-   Zurückstellen gilt für dieses Gerät, wie die Erinnerungen selbst.
+   gekommen ist — genau das, was die Erinnerung gemeldet hat. Es zeigt
+   sich am App-Symbol (Zahl) und im Fenstertitel („⏰ …"), bis es
+   erledigt ist. Seit v5.13.1 ohne eigene Leiste im Tag: Die Jetzt-Zeile
+   nennt die laufende Aufgabe ohnehin.
    ============================================================ */
 
-var ZURUECK_SCHLUESSEL = 'workbench-zurueck';
-var ZURUECK_MIN = 15;
 var badgeTitelVorn = '';
-
-function zurueckLesen(is) {
-  try {
-    var roh = window.localStorage ? window.localStorage.getItem(ZURUECK_SCHLUESSEL) : null;
-    var w = roh ? JSON.parse(roh) : null;
-    if (w && w.datum === is && w.bis && typeof w.bis === 'object') { return w; }
-  } catch (f) { /* neu anfangen */ }
-  return { datum: is, bis: {} };
-}
-
-function zurueckMerken(stand) {
-  try {
-    if (window.localStorage) { window.localStorage.setItem(ZURUECK_SCHLUESSEL, JSON.stringify(stand)); }
-  } catch (f) { /* gilt dann bis zum Neuladen nicht */ }
-}
 
 /* Die fälligen Aufgaben, die älteste zuerst. */
 function faelligeAufgaben(jetztMs) {
   var is = isoDatum();
   var jm = jetztMs || Date.now();
-  var zurueck = zurueckLesen(is);
   return erinnerungKandidaten(is).filter(function (k) {
-    if (new Date(is + 'T' + k.zeit + ':00').getTime() > jm) { return false; }
-    return !((zurueck.bis[k.id] || 0) > jm);
+    return new Date(is + 'T' + k.zeit + ':00').getTime() <= jm;
   }).sort(function (a, b) { return (a.zeit < b.zeit) ? -1 : ((a.zeit > b.zeit) ? 1 : 0); });
 }
 
-function faelligSpaeter(id) {
-  var is = isoDatum();
-  var zurueck = zurueckLesen(is);
-  zurueck.bis[id] = Date.now() + ZURUECK_MIN * 60000;
-  zurueckMerken(zurueck);
-  melde('Kommt in ' + ZURUECK_MIN + ' Minuten wieder.', null);
-  faelligAktualisieren();
-}
-
-/* Erledigt aus der Fällig-Leiste: abhaken und sofort nachführen. Die
-   Tagesliste behält ihre vier Sekunden Bedenkzeit — hier aber soll die
-   Aufgabe gleich aus Leiste und Titel verschwinden. */
-function faelligErledigt(id) {
-  aufgabeHaken(id);
-  faelligAktualisieren();
-}
-
-/* „seit 42 Min.", „seit 1 Std. 10 Min." */
-function seitText(zeit) {
-  var t = String(zeit).split(':');
-  var jetztD = new Date();
-  var um = new Date(jetztD.getFullYear(), jetztD.getMonth(), jetztD.getDate(), Number(t[0]), Number(t[1] || 0));
-  var min = Math.max(0, Math.round((jetztD - um) / 60000));
-  if (min < 1) { return 'gerade eben'; }
-  if (min < 60) { return 'seit ' + min + ' Min.'; }
-  var std = Math.floor(min / 60);
-  var rest = min % 60;
-  return 'seit ' + std + ' Std.' + (rest ? (' ' + rest + ' Min.') : '');
-}
-
-function faelligZeichnen(is) {
-  var el = document.getElementById('tagFaellig');
-  if (!el) { return; }
-  var liste = (is === isoDatum()) ? faelligeAufgaben() : [];
-  if (!liste.length) {
-    el.innerHTML = '';
-    el.className = 'tag-faellig';
-    return;
-  }
-  var h = '<div class="tf-kopf">⏰ Fällig</div>';
-  var i;
-  for (i = 0; i < liste.length; i++) {
-    var k = liste[i];
-    var kennung = esc(k.id);
-    h += '<div class="tf-zeile"><span class="tf-text">' + esc(k.zeit) + ' · ' + esc(k.titel)
-       + '<small>' + esc(seitText(k.zeit)) + '</small></span>'
-       + '<button type="button" class="sl-pille an" onclick="faelligErledigt(\'' + kennung + '\')">Erledigt</button>'
-       + '<button type="button" class="sl-pille" onclick="faelligSpaeter(\'' + kennung + '\')">'
-       + ZURUECK_MIN + ' Min. später</button></div>';
-  }
-  el.innerHTML = h;
-  el.className = 'tag-faellig auf';
-}
-
-/* Alle halbe Minute: Fälliges im Tag, die Jetzt-Zeile und Titel/Symbol. */
+/* Alle halbe Minute: die Jetzt-Zeile und Titel/Symbol nachführen. */
 function faelligAktualisieren() {
   if (schirmOffen === 'Tag' && tagOffen === isoDatum()) {
-    faelligZeichnen(tagOffen);
     jetztKarteZeichnen(tagOffen, tagesEintraege(tagOffen));
   }
   badgeSetzen();
