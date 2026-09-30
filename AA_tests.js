@@ -1163,6 +1163,54 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; window.localStorage = merkL; globalThis.Notification = merkN; sichtschutz = merkS; tagFilter = merkF; erinnerungStand = merkStand;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__faelligApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkL = window.localStorage; var merkN = globalThis.Notification;'
+                 + '   var merkStand = erinnerungStand; var merkTag = tagOffen; var merkS = sichtschutz; DB = leereDatenbank();'
+                 + '   var ablage = {}; window.localStorage = { getItem: function(k){ return ablage[k] || null; },'
+                 + '     setItem: function(k, v){ ablage[k] = v; }, removeItem: function(k){ delete ablage[k]; } };'
+                 + '   erinnerungStand = null; sichtschutz = false; var is = isoDatum(); tagOffen = is; var jetzt = new Date();'
+                 + '   var um = function(m){ var d = new Date(jetzt.getTime() + m * 60000);'
+                 + '     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };'
+                 + '   var auf = function(id, titel, zeit, dauer){ DB.aufgaben.push({ id: id, titel: titel, kontext: "beruflich", planung: is,'
+                 + '     uhrzeit: zeit, dauer: dauer || 0, art: "haupt", status: "offen", wiederholung: null, geaendert: 1 }); planAufnehmen(is, id); };'
+                 + '   termineNachTag = {};'
+                 + '   merkeTermin(is, { id: "g1", titel: "DFÜ-Freigabetest", zeit: um(-60), bis: um(120), ort: "", ganztags: false, quelle: "A", kontext: "beruflich" });'
+                 + '   var jk = function(){ jetztKarteZeichnen(is, tagesEintraege(is)); return document.getElementById("tagJetzt").innerHTML; };'
+                 + '   r.nurTermin = /Jetzt: DFÜ-Freigabetest/.test(jk());'
+                 + '   auf("a1", "Stellungnahme", um(-20), 60);'
+                 + '   var h = jk(); r.aufgabeVor = /Jetzt: Stellungnahme/.test(h) && /parallel<\\/span>DFÜ-Freigabetest/.test(h) && /noch (39|40) Min/.test(h);'
+                 + '   DB.aufgaben[0].dauer = 10; r.dauerVorbei = /Jetzt: DFÜ-Freigabetest/.test(jk());'
+                 + '   DB.aufgaben[0].dauer = 0; h = jk(); r.ohneDauer = /Jetzt: Stellungnahme/.test(h) && /fällig seit/.test(h);'
+                 + '   auf("a2", "Zahnarzt", um(-5)); auf("a3", "Später", um(30));'
+                 + '   var f = faelligeAufgaben(); r.faellig = f.map(function(x){ return x.titel; }).join(",");'
+                 + '   faelligZeichnen(is); var fl = document.getElementById("tagFaellig");'
+                 + '   r.leiste = /Stellungnahme/.test(fl.innerHTML) && /Zahnarzt/.test(fl.innerHTML) && !/Später/.test(fl.innerHTML)'
+                 + '     && /faelligErledigt\\(/.test(fl.innerHTML) && /faelligSpaeter\\(/.test(fl.innerHTML) && /tag-faellig auf/.test(fl.className);'
+                 + '   badgeZahl = -1; badgeSetzen(); r.titel = document.title;'
+                 + '   faelligSpaeter("a1"); r.nachSpaeter = faelligeAufgaben().map(function(x){ return x.titel; }).join(",");'
+                 + '   r.jetztNachSpaeter = !/Jetzt: Stellungnahme/.test(jk());'
+                 + '   r.titelNachSpaeter = document.title;'
+                 + '   var z = JSON.parse(ablage["workbench-zurueck"]); r.zurueckMin = Math.round((z.bis.a1 - Date.now()) / 60000);'
+                 + '   z.bis.a1 = Date.now() - 1000; ablage["workbench-zurueck"] = JSON.stringify(z);'
+                 + '   r.wieder = faelligeAufgaben().map(function(x){ return x.titel; }).join(",");'
+                 + '   var gezeigt = []; globalThis.Notification = function(t){ gezeigt.push(t); this.close = function(){}; };'
+                 + '   globalThis.Notification.permission = "granted";'
+                 + '   erinnerungStand.an = true; erinnerungStand.vorlauf = 0;'
+                 + '   var erinnertStand = { datum: is, schluessel: ["a1@" + DB.aufgaben[0].uhrzeit, "a2@" + DB.aufgaben[1].uhrzeit] };'
+                 + '   ablage["workbench-erinnert"] = JSON.stringify(erinnertStand);'
+                 + '   erinnerungPruefen(); r.erneutErinnert = gezeigt.join(",");'
+                 + '   gezeigt = []; erinnerungPruefen(); r.nurEinmal = gezeigt.length;'
+                 + '   var merkSchirm = schirmOffen; schirmOffen = "Tag"; faelligZeichnen(is);'
+                 + '   faelligErledigt("a2"); schirmOffen = merkSchirm; r.nachHaken = faelligeAufgaben().map(function(x){ return x.titel; }).join(",");'
+                 + '   r.titelSofort = document.title; r.leisteSofort = !/Zahnarzt/.test(document.getElementById("tagFaellig").innerHTML);'
+                 + '   erinnerungZahl("alles"); r.titelAlles = document.title; r.zahlGemerkt = JSON.parse(ablage["workbench-erinnerung"]).zahl;'
+                 + '   erinnerungZahl("unsinn"); r.zahlUnsinn = erinnerungEinstellung().zahl;'
+                 + '   r.plus = uhrzeitPlus("09:00", 90) + "," + uhrzeitPlus("23:30", 90); r.version = APP_VERSION;'
+                 + '   termineNachTag = {}; DB = alt; window.localStorage = merkL; globalThis.Notification = merkN;'
+                 + '   erinnerungStand = merkStand; tagOffen = merkTag; sichtschutz = merkS; badgeZahl = -1;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -4295,9 +4343,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var egal = offeneHeute();'
                  + '   tagFilter = \'alle\';'
                  + '   aufgabeErledigen(\'a1\'); aufgabeErledigen(\'a2\');'
+                 + '   var merkE = erinnerungStand;'
+                 + '   erinnerungStand = { an: false, vorlauf: 0, zahl: \'alles\' }; badgeZahl = -1;'
                  + '   badgeSetzen();'
                  + '   var nach = offeneHeute();'
-                 + '   var titel = document.title;'
+                 + '   var titel = document.title; erinnerungStand = merkE;'
                  + '   termineNachTag = {}; tagOffen = merkTag; tagFilter = merkF; DB = alt;'
                  + '   return { gesamt:gesamt, erledigtZaehltNicht:(gesamt === 5),'
                  + '            andererTagZaehltNicht:(gesamt === 5),'
@@ -13995,7 +14045,8 @@ console.log('\n161. Erinnerungen');
     try { e = t.pruefe(); } catch (x) { fail('Erinnerungen laufen nicht: ' + x.message); }
   }
   if (t && e) {
-    pruefe(e.voreinstellung === '{"an":false,"vorlauf":0}' && e.ausGibtNichts === 0, 'voreingestellt ist sie aus');
+    pruefe(e.voreinstellung === '{"an":false,"vorlauf":0,"zahl":"faellig"}' && e.ausGibtNichts === 0,
+           'voreingestellt ist sie aus, am Symbol zählt das Fällige');
     pruefe(e.an === true, 'sie lässt sich einschalten');
     pruefe(e.erster === '1:Zahnarzt', 'fällig ist nur, was gerade ansteht — nichts Späteres, Erledigtes, Längstvergangenes, Verborgenes');
     pruefe(e.zweiter === 0, 'jede Aufgabe meldet sich einmal');
@@ -14006,6 +14057,54 @@ console.log('\n161. Erinnerungen');
            'ohne Erlaubnis oder ohne Systemmeldung erscheint sie in der App');
     pruefe(e.geladen === true, 'die Einstellung überlebt das Neuladen');
     pruefe(e.wahl === true, 'die Einstellungen bieten An/Aus, Vorlauf und eine Probe');
+  }
+}
+
+/* ============================================================
+   162. Fälliges und laufende Aufgaben (v5.13.0)
+   Grund: Lief ein Termin, stand er in der Jetzt-Zeile — auch wenn
+   parallel eine Aufgabe dran war. Und nichts zeigte, dass eine Aufgabe
+   mit Uhrzeit fällig und noch offen ist.
+   ============================================================ */
+console.log('\n162. Fälliges und laufende Aufgaben');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__faelligApi;
+  pruefe(/id="tagFaellig"/.test(QUELLE), 'der Tag hat einen Platz für Fälliges');
+  const bs = skript.match(/function badgeSetzen\([\s\S]*?\n\}/);
+  pruefe(bs && /faelligeAufgaben\(\)/.test(bs[0]) && /offeneHeute\(\)/.test(bs[0]),
+         'Titel und Symbol zählen wahlweise Fälliges oder alles Offene');
+  pruefe(/erinnerungUhr = window\.setInterval\(erinnerungTakt, 30000\)/.test(skript),
+         'alle halbe Minute wird Fälliges nachgeführt');
+  let e = null;
+  if (!t) {
+    warn('Fälliges nicht auswertbar');
+  } else {
+    try { e = t.pruefe(); } catch (x) { fail('Fälliges läuft nicht: ' + x.message); }
+  }
+  if (t && e) {
+    pruefe(e.nurTermin === true, 'ohne Aufgabe steht der laufende Termin in der Jetzt-Zeile');
+    pruefe(e.aufgabeVor === true, 'eine laufende Aufgabe geht vor, der Termin steht als „parallel“ darunter');
+    pruefe(e.dauerVorbei === true, 'ist ihre Dauer um, tritt sie zurück');
+    pruefe(e.ohneDauer === true, 'ohne Dauer läuft sie, bis sie abgehakt ist');
+    pruefe(e.faellig === 'Stellungnahme,Zahnarzt', 'fällig ist, was begonnen hat und offen ist — die älteste zuerst');
+    pruefe(e.leiste === true, 'der Tag zeigt Fälliges mit „Erledigt“ und „15 Min. später“');
+    pruefe(e.titel === '⏰ Stellungnahme (+1) – Workbench ' + e.version, 'der Titel nennt die älteste und wie viele noch');
+    pruefe(e.nachSpaeter === 'Zahnarzt' && e.jetztNachSpaeter === true, 'zurückgestellt verschwindet sie aus Leiste und Jetzt-Zeile');
+    pruefe(e.titelNachSpaeter === '⏰ Zahnarzt – Workbench ' + e.version, 'und aus dem Titel');
+    pruefe(e.zurueckMin === 15, 'für 15 Minuten');
+    pruefe(e.wieder === 'Stellungnahme,Zahnarzt', 'danach ist sie wieder fällig');
+    pruefe(/Stellungnahme/.test(e.erneutErinnert) && !/Zahnarzt/.test(e.erneutErinnert),
+           'die Erinnerung kommt nach dem Zurückstellen noch einmal');
+    pruefe(e.nurEinmal === 0, 'aber nur einmal');
+    pruefe(e.nachHaken === 'Stellungnahme', 'abgehakt ist sie nicht mehr fällig');
+    /* „Erledigt“ in der Leiste wartete die vier Sekunden Bedenkzeit der
+       Tagesliste ab — Titel und Leiste zogen erst beim nächsten Takt nach. */
+    pruefe(!/Zahnarzt/.test(e.titelSofort) && e.leisteSofort === true,
+           '„Erledigt“ in der Leiste wirkt sofort auf Leiste und Titel');
+    pruefe(/^\(\d+\) Workbench /.test(e.titelAlles) && e.zahlGemerkt === 'alles', 'mit „alles Offene“ wie bisher, gemerkt');
+    pruefe(e.zahlUnsinn === 'alles', 'eine unbekannte Wahl wird abgewiesen');
+    pruefe(e.plus === '10:30,23:59', 'das Ende einer Dauer bleibt im Tag');
   }
 }
 

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.12.0</title>
+<title>Workbench 5.13.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1703,6 +1703,17 @@ body.breit .ro-kacheln{grid-template-columns:1fr 1fr}
 .tag-jetzt.laeuft{border-color:var(--heute)}
 .tag-jetzt b{font-size:calc(var(--fs)*0.86);font-weight:500}
 .tag-jetzt div{font-size:calc(var(--fs)*0.72);color:var(--grau);margin-top:2px}
+.tag-jetzt .tj-parallel span{display:inline-block;border:1px solid var(--linie);border-radius:10px;
+  padding:0 7px;margin-right:5px;font-size:calc(var(--fs)*0.62)}
+/* Fällig: offene Aufgaben mit Uhrzeit, deren Zeit gekommen ist (seit v5.13.0) */
+.tag-faellig{display:none}
+.tag-faellig.auf{display:block;margin:2px 0 8px;padding:7px 12px;border-radius:9px;
+  background:var(--karte);border:1px solid var(--weinrot)}
+.tf-kopf{font-size:calc(var(--fs)*0.68);font-weight:600;color:var(--weinrot);margin-bottom:3px}
+.tf-zeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-top:1px solid var(--linie)}
+.tf-zeile:first-of-type{border-top:0}
+.tf-text{flex:1 1 180px;min-width:0;font-size:calc(var(--fs)*0.84)}
+.tf-text small{color:var(--grau);margin-left:7px;font-size:calc(var(--fs)*0.7)}
 
 .tag-leitsatz{display:none}
 .tag-leitsatz.auf{display:block;margin:2px 0 8px;padding:7px 12px;
@@ -2046,6 +2057,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    <div class="tk-s-zeile" id="tkSchmalZeile"></div>
    <div class="tk-schutzband" id="tkSchutzband"></div>
    <div class="tag-leitsatz" id="tagLeitsatz"></div>
+   <div class="tag-faellig" id="tagFaellig"></div>
    <div class="tag-jetzt" id="tagJetzt"></div>
    <div class="tk-karte">
     <div class="tk-zeile">
@@ -2603,7 +2615,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.12.0';
+var APP_VERSION = '5.13.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5042,29 +5054,50 @@ function jetztKarteZeichnen(is, e) {
   var jetztZ = uhrzeitJetzt();
   var laufend = null;
   var naechst = null;
+  /* Seit v5.13.0 läuft auch eine Aufgabe: von ihrer Uhrzeit bis zum Ende
+     ihrer Dauer, ohne Dauer bis sie abgehakt ist. Sie geht einem Termin
+     vor, der gleichzeitig läuft — der steht dann als „parallel" darunter.
+     Eine zurückgestellte Aufgabe tritt so lange zurück. */
+  var aufgabeJetzt = null;
+  var zurueck = zurueckLesen(is);
   var i;
   for (i = 0; i < e.verlauf.length; i++) {
     var v = e.verlauf[i];
     var von = (v.art === 'termin') ? (v.t.von || '') : (v.a.uhrzeit || '');
     var bis = (v.art === 'termin') ? (v.t.bis || '') : '';
     var titel = (v.art === 'termin') ? v.t.titel : v.a.titel;
+    if (v.art === 'aufgabe' && von && von <= jetztZ && !istErledigtAn(v.a, is)
+        && !((zurueck.bis[v.a.id] || 0) > Date.now())) {
+      var ende = v.a.dauer ? uhrzeitPlus(von, v.a.dauer) : '';
+      if (!ende || jetztZ < ende) { aufgabeJetzt = { titel: titel, von: von, bis: ende }; }
+    }
     if (von && bis && von <= jetztZ && jetztZ < bis && !laufend) {
       laufend = { titel: titel, bis: bis };
     } else if (von && von > jetztZ && !naechst) {
       naechst = { titel: titel, von: von };
     }
   }
-  if (!laufend && !naechst) { el.innerHTML = ''; el.className = 'tag-jetzt'; return; }
+  if (!laufend && !naechst && !aufgabeJetzt) { el.innerHTML = ''; el.className = 'tag-jetzt'; return; }
+  var parallel = '';
+  if (aufgabeJetzt) {
+    if (laufend) {
+      parallel = '<div class="tj-parallel"><span>parallel</span>' + esc(laufend.titel)
+               + ' bis ' + esc(laufend.bis) + '</div>';
+    }
+    laufend = { titel: aufgabeJetzt.titel, bis: aufgabeJetzt.bis, seit: aufgabeJetzt.von };
+  }
   var kopf = laufend ? ('Jetzt: ' + esc(laufend.titel))
                      : ('Frei bis ' + esc(naechst.von));
   var unten = [];
-  if (laufend) { unten.push(esc(restMinutenText(laufend.bis))); }
+  if (laufend) {
+    unten.push(esc(laufend.bis ? restMinutenText(laufend.bis) : ('fällig seit ' + laufend.seit)));
+  }
   if (naechst) {
     unten.push((laufend ? 'danach ' : '') + esc(naechst.von) + ' ' + esc(naechst.titel));
   } else {
     unten.push('nichts mehr mit fester Zeit');
   }
-  el.innerHTML = '<b>' + kopf + '</b><div>' + unten.join(' · ') + '</div>';
+  el.innerHTML = '<b>' + kopf + '</b><div>' + unten.join(' · ') + '</div>' + parallel;
   el.className = 'tag-jetzt auf' + (laufend ? ' laeuft' : '');
 }
 
@@ -7778,14 +7811,23 @@ function offeneHeute() {
 }
 
 function badgeSetzen() {
-  var n = offeneHeute();
-  if (n === badgeZahl) { return; }
+  /* Seit v5.13.0 wählbar: alles heute Offene oder nur das Fällige. Beim
+     Fälligen nennt der Titel die älteste Aufgabe — sichtbar auch, wenn
+     die Workbench hinter anderen Fenstern liegt. */
+  var nurFaellig = (erinnerungEinstellung().zahl === 'faellig');
+  var faellig = nurFaellig ? faelligeAufgaben() : [];
+  var n = nurFaellig ? faellig.length : offeneHeute();
+  var vorn = faellig.length
+    ? ('⏰ ' + faellig[0].titel + (faellig.length > 1 ? (' (+' + (faellig.length - 1) + ')') : '') + ' – ')
+    : (n > 0 ? ('(' + n + ') ') : '');
+  if (n === badgeZahl && vorn === badgeTitelVorn) { return; }
   badgeZahl = n;
+  badgeTitelVorn = vorn;
   vorausAblegen();
 
   /* Der Fenstertitel trägt die Zahl mit — er ist der einzige Weg, der
      überall funktioniert, und in der Taskleiste sichtbar. */
-  document.title = (n > 0 ? ('(' + n + ') ') : '') + 'Workbench ' + APP_VERSION;
+  document.title = vorn + 'Workbench ' + APP_VERSION;
 
   if (!navigator || typeof navigator.setAppBadge !== 'function') { return; }
   try {
@@ -7893,6 +7935,7 @@ function tagZeichnen() {
   tagKopfSchmalZeichnen(is, e);
   leitsatzZeichnen();
   jetztKarteZeichnen(is, e);
+  faelligZeichnen(is);
 
   h += '<div class="tspalte tspalte-links">';
   var vorbeiZahl = 0;
@@ -9732,9 +9775,9 @@ function diagGruppenZeichnen() {
     aussehen: 'Farbwelt ' + FARBWELTEN[farbweltName()].name + ' · '
             + (DB.einstellungen.darstellung === 'breit' ? 'breit'
                : (DB.einstellungen.darstellung === 'schmal' ? 'schmal' : 'automatisch')),
-    erinnerung: erinnerungEinstellung().an
+    erinnerung: (erinnerungEinstellung().an
               ? ('an · ' + (erinnerungEinstellung().vorlauf ? erinnerungEinstellung().vorlauf + ' min vorher' : 'zur Uhrzeit'))
-              : 'aus',
+              : 'aus') + ' · Symbol: ' + (erinnerungEinstellung().zahl === 'faellig' ? 'Fälliges' : 'alles Offene'),
     daten: (DB.jahrestermine || []).length + ' Jahrestermine · Ferien · Skizzen · Bestand',
     technik: 'Fassung ' + APP_VERSION + ' · Umgebung · Altbestand'
   };
@@ -18365,12 +18408,13 @@ var erinnerungUhr = null;
 
 function erinnerungEinstellung() {
   if (!erinnerungStand) {
-    erinnerungStand = { an: false, vorlauf: 0 };
+    erinnerungStand = { an: false, vorlauf: 0, zahl: 'faellig' };
     try {
       var roh = window.localStorage ? window.localStorage.getItem(ERINNERUNG_SCHLUESSEL) : null;
       var w = roh ? JSON.parse(roh) : null;
       if (w && typeof w.an === 'boolean') { erinnerungStand.an = w.an; }
       if (w && ERINNERUNG_VORLAEUFE.indexOf(w.vorlauf) >= 0) { erinnerungStand.vorlauf = w.vorlauf; }
+      if (w && (w.zahl === 'alles' || w.zahl === 'faellig')) { erinnerungStand.zahl = w.zahl; }
     } catch (f) { /* dann eben die Voreinstellung */ }
   }
   return erinnerungStand;
@@ -18457,15 +18501,19 @@ function erinnerungPruefen() {
   var is = isoDatum();
   var jetztMs = Date.now();
   var stand = erinnertLesen(is);
+  var zurueck = zurueckLesen(is);
   var liste = erinnerungKandidaten(is);
   var gemeldet = 0;
   var i;
   for (i = 0; i < liste.length; i++) {
     var k = liste[i];
-    var schluessel = k.id + '@' + k.zeit;
+    /* Zurückgestellt: bis dahin still, danach genau noch einmal. */
+    var zb = zurueck.bis[k.id] || 0;
+    if (zb > jetztMs) { continue; }
+    var schluessel = k.id + '@' + k.zeit + (zb ? ('#' + zb) : '');
     if (stand.schluessel.indexOf(schluessel) >= 0) { continue; }
     var um = new Date(is + 'T' + k.zeit + ':00').getTime();
-    var ab = um - st.vorlauf * 60000;
+    var ab = zb || (um - st.vorlauf * 60000);
     if (jetztMs < ab || jetztMs - ab > ERINNERUNG_NACHHOLEN_MIN * 60000) { continue; }
     erinnerungZeigen(k, Math.round((um - jetztMs) / 60000));
     stand.schluessel.push(schluessel);
@@ -18516,8 +18564,8 @@ function zeitJetzt() {
 
 function erinnerungStarten() {
   if (erinnerungUhr) { return; }
-  erinnerungUhr = window.setInterval(erinnerungPruefen, 30000);
-  erinnerungPruefen();
+  erinnerungUhr = window.setInterval(erinnerungTakt, 30000);
+  erinnerungTakt();
 }
 
 function erinnerungWahlZeichnen() {
@@ -18543,7 +18591,142 @@ function erinnerungWahlZeichnen() {
               : 'Beim Einschalten fragt der Browser, ob er Benachrichtigungen zeigen darf.';
   h += '<div class="feld-hinweis">' + zustand + '</div>';
   h += '<div class="er-reihe">' + pille(false, 'Probe zeigen', 'erinnerungTesten()') + '</div>';
+  h += '<div class="er-reihe"><span class="er-etikett">Zahl am App-Symbol und im Fenstertitel</span>'
+     + pille(st.zahl === 'alles', 'alles Offene heute', 'erinnerungZahl(\'alles\')')
+     + pille(st.zahl === 'faellig', 'nur Fälliges', 'erinnerungZahl(\'faellig\')') + '</div>';
+  h += '<div class="feld-hinweis">„Nur Fälliges“ zählt Aufgaben mit Uhrzeit, deren Zeit gekommen ist und die '
+     + 'noch offen sind — der Titel nennt dann die älteste. Bei geschlossener App zeigt das Symbol am Handy '
+     + 'weiter die Tageszahl.</div>';
   el.innerHTML = h;
+}
+
+
+/* ============================================================
+   Fälliges
+
+   Fällig ist eine heutige, offene Aufgabe mit Uhrzeit, deren Zeit
+   gekommen ist — genau das, was die Erinnerung gemeldet hat. Es steht
+   im Tag über der Jetzt-Zeile, bis es erledigt ist; „15 Min. später"
+   stellt es zurück und lässt die Erinnerung dann noch einmal kommen.
+   Wahlweise zeigen auch Fenstertitel und App-Symbol nur das Fällige.
+   Zurückstellen gilt für dieses Gerät, wie die Erinnerungen selbst.
+   ============================================================ */
+
+var ZURUECK_SCHLUESSEL = 'workbench-zurueck';
+var ZURUECK_MIN = 15;
+var badgeTitelVorn = '';
+
+function zurueckLesen(is) {
+  try {
+    var roh = window.localStorage ? window.localStorage.getItem(ZURUECK_SCHLUESSEL) : null;
+    var w = roh ? JSON.parse(roh) : null;
+    if (w && w.datum === is && w.bis && typeof w.bis === 'object') { return w; }
+  } catch (f) { /* neu anfangen */ }
+  return { datum: is, bis: {} };
+}
+
+function zurueckMerken(stand) {
+  try {
+    if (window.localStorage) { window.localStorage.setItem(ZURUECK_SCHLUESSEL, JSON.stringify(stand)); }
+  } catch (f) { /* gilt dann bis zum Neuladen nicht */ }
+}
+
+/* Die fälligen Aufgaben, die älteste zuerst. */
+function faelligeAufgaben(jetztMs) {
+  var is = isoDatum();
+  var jm = jetztMs || Date.now();
+  var zurueck = zurueckLesen(is);
+  return erinnerungKandidaten(is).filter(function (k) {
+    if (new Date(is + 'T' + k.zeit + ':00').getTime() > jm) { return false; }
+    return !((zurueck.bis[k.id] || 0) > jm);
+  }).sort(function (a, b) { return (a.zeit < b.zeit) ? -1 : ((a.zeit > b.zeit) ? 1 : 0); });
+}
+
+function faelligSpaeter(id) {
+  var is = isoDatum();
+  var zurueck = zurueckLesen(is);
+  zurueck.bis[id] = Date.now() + ZURUECK_MIN * 60000;
+  zurueckMerken(zurueck);
+  melde('Kommt in ' + ZURUECK_MIN + ' Minuten wieder.', null);
+  faelligAktualisieren();
+}
+
+/* Erledigt aus der Fällig-Leiste: abhaken und sofort nachführen. Die
+   Tagesliste behält ihre vier Sekunden Bedenkzeit — hier aber soll die
+   Aufgabe gleich aus Leiste und Titel verschwinden. */
+function faelligErledigt(id) {
+  aufgabeHaken(id);
+  faelligAktualisieren();
+}
+
+/* „seit 42 Min.", „seit 1 Std. 10 Min." */
+function seitText(zeit) {
+  var t = String(zeit).split(':');
+  var jetztD = new Date();
+  var um = new Date(jetztD.getFullYear(), jetztD.getMonth(), jetztD.getDate(), Number(t[0]), Number(t[1] || 0));
+  var min = Math.max(0, Math.round((jetztD - um) / 60000));
+  if (min < 1) { return 'gerade eben'; }
+  if (min < 60) { return 'seit ' + min + ' Min.'; }
+  var std = Math.floor(min / 60);
+  var rest = min % 60;
+  return 'seit ' + std + ' Std.' + (rest ? (' ' + rest + ' Min.') : '');
+}
+
+function faelligZeichnen(is) {
+  var el = document.getElementById('tagFaellig');
+  if (!el) { return; }
+  var liste = (is === isoDatum()) ? faelligeAufgaben() : [];
+  if (!liste.length) {
+    el.innerHTML = '';
+    el.className = 'tag-faellig';
+    return;
+  }
+  var h = '<div class="tf-kopf">⏰ Fällig</div>';
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    var k = liste[i];
+    var kennung = esc(k.id);
+    h += '<div class="tf-zeile"><span class="tf-text">' + esc(k.zeit) + ' · ' + esc(k.titel)
+       + '<small>' + esc(seitText(k.zeit)) + '</small></span>'
+       + '<button type="button" class="sl-pille an" onclick="faelligErledigt(\'' + kennung + '\')">Erledigt</button>'
+       + '<button type="button" class="sl-pille" onclick="faelligSpaeter(\'' + kennung + '\')">'
+       + ZURUECK_MIN + ' Min. später</button></div>';
+  }
+  el.innerHTML = h;
+  el.className = 'tag-faellig auf';
+}
+
+/* Alle halbe Minute: Fälliges im Tag, die Jetzt-Zeile und Titel/Symbol. */
+function faelligAktualisieren() {
+  if (schirmOffen === 'Tag' && tagOffen === isoDatum()) {
+    faelligZeichnen(tagOffen);
+    jetztKarteZeichnen(tagOffen, tagesEintraege(tagOffen));
+  }
+  badgeSetzen();
+}
+
+function erinnerungTakt() {
+  erinnerungPruefen();
+  faelligAktualisieren();
+}
+
+/* Was zählen Titel und App-Symbol? alles — was heute offen ist (bis
+   v5.12.0), faellig — nur das Fällige. */
+function erinnerungZahl(art) {
+  if (art !== 'alles' && art !== 'faellig') { return; }
+  erinnerungEinstellung().zahl = art;
+  erinnerungMerken();
+  badgeZahl = -1;
+  badgeSetzen();
+  erinnerungWahlZeichnen();
+  diagGruppenZeichnen();
+}
+
+/* 09:00 + 90 → 10:30; über Mitternacht hinaus bleibt es beim Tagesende. */
+function uhrzeitPlus(zeit, minuten) {
+  var t = String(zeit).split(':');
+  var ges = Math.min(23 * 60 + 59, Number(t[0]) * 60 + Number(t[1] || 0) + Number(minuten || 0));
+  return String(Math.floor(ges / 60)).padStart(2, '0') + ':' + String(ges % 60).padStart(2, '0');
 }
 
 
