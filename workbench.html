@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.18.1</title>
+<title>Workbench 5.18.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1382,11 +1382,18 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 .apw-vh:first-child{border-top:0}
 .apw-vh-oben{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .apw-titel{font-size:calc(var(--fs)*0.86);font-weight:500;flex:1 1 160px;min-width:0}
-.apw-umfang{display:inline-flex;align-items:center;gap:4px}
-.apw-umfang button{border:1px solid var(--linie);background:var(--papier);border-radius:11px;width:24px;height:24px;padding:0;
-  font:inherit;cursor:pointer;color:var(--tinte)}
-.apw-umfang b{min-width:36px;text-align:center;font-size:calc(var(--fs)*0.8)}
 .apw-mziel{font-size:calc(var(--fs)*0.72);color:var(--grau);margin:3px 0 2px 16px}
+/* Seit v5.18.2: In der Woche zählt, dass ein Vorhaben Schwerpunkt ist — nicht wie viele Tage. */
+.apw-tage{font-size:calc(var(--fs)*0.68);color:var(--grau);white-space:nowrap}
+.apw-weg{border:0;background:none;font:inherit;font-size:calc(var(--fs)*1.05);line-height:1;color:var(--grau);
+  padding:2px 6px;cursor:pointer;border-radius:6px}
+.apw-weg:hover{color:var(--weinrot);background:var(--papier)}
+.apw-frage{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 2px 16px;padding:6px 10px;border-radius:8px;
+  border:1px solid var(--weinrot);font-size:calc(var(--fs)*0.74)}
+.apw-frage button{font:inherit;font-size:calc(var(--fs)*0.7);border:1px solid var(--linie);background:var(--karte);border-radius:12px;
+  padding:2px 10px;cursor:pointer;color:var(--tinte)}
+.apw-frage button.weg{border-color:var(--weinrot);color:var(--weinrot)}
+.apw-kap-hinweis{font-size:calc(var(--fs)*0.66);color:var(--grau);margin-top:4px}
 .apw-mziel b{font-weight:500;color:var(--tinte)}
 .apw-rueck{display:inline-flex;gap:4px;flex-wrap:wrap;margin:2px 0 0 94px}
 body:not(.breit) .apw-rueck{margin-left:0}
@@ -2759,7 +2766,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.18.1';
+var APP_VERSION = '5.18.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -19329,10 +19336,17 @@ function apSchritt(v, art, montag, richtung) {
   } else {
     w.tage = Math.max(0, Math.min(7, (Number(w.tage) || 0) + richtung * 0.5));
   }
-  if (!(Number(w.tage) || 0) && !(Number(w.mal) || 0)) { delete v.planWochen[montag]; }
+  /* Ein Schwerpunkt ohne Tage (fokus) bleibt, auch wenn die Menge null wird. */
+  if (!(Number(w.tage) || 0) && !(Number(w.mal) || 0) && !w.fokus) { delete v.planWochen[montag]; }
   else { v.planWochen[montag] = w; }
   v.geaendert = jetzt();
   spaeterSichern();
+}
+
+/* Ist das Vorhaben in dieser Woche Schwerpunkt — mit oder ohne Tage? */
+function apFokus(v, montag) {
+  var w = (v && v.planWochen) ? v.planWochen[montag] : null;
+  return !!(w && w.fokus);
 }
 
 /* Die Montage der Wochen, deren Donnerstag im Monat liegt. */
@@ -19493,7 +19507,7 @@ function apMonatsZeilen(m) {
   return apVorhaben().filter(function (x) {
     if (!passtZumKalender(x.v.kontext)) { return false; }
     if (apMonatsziel(x.v, m)) { return true; }
-    return montage.some(function (mo) { return apMenge(x.v, x.art, mo) > 0; });
+    return montage.some(function (mo) { return apMenge(x.v, x.art, mo) > 0 || apFokus(x.v, mo); });
   });
 }
 
@@ -19602,7 +19616,8 @@ function apMonatHtml(m) {
       var zz = apZustandAn(v, mo);
       h += '<td class="' + (mo === heuteMo ? 'pl-diese' : '') + '"><button type="button" class="pl-zelle' + (menge ? '' : ' leer') + (an ? ' gewaehlt' : '')
          + '" onclick="apWaehlen(\'' + mo + '\',\'' + esc(v.id) + '\',\'' + x.art + '\')" aria-label="' + esc(v.name || '') + ', KW ' + kalenderwoche(mo) + '">'
-         + '<span class="' + (apMass(v, x.art) === 'rhythmus' ? 'pl-mal' : '') + '">' + apMengeText(v, x.art, menge) + '</span>'
+         + '<span class="' + (apMass(v, x.art) === 'rhythmus' ? 'pl-mal' : '') + '">'
+         + ((!menge && apFokus(v, mo)) ? '<span title="Schwerpunkt ohne Tage">•</span>' : apMengeText(v, x.art, menge)) + '</span>'
          + (zz && zz.stand ? '<span class="pl-stand ' + zz.stand + '">' + AP_STAND_ZEICHEN[zz.stand] + '</span>' : '')
          + '</button></td>';
     });
@@ -19693,15 +19708,45 @@ function apZustandAn(v, montag) {
 var apWocheWahl = false;
 
 /* Wer steht in der Woche: mit Menge oder mit einem Zielzustand. */
+/* Schwerpunkt der Woche ist ein Vorhaben mit Tagen aus dem Monat, eines,
+   das eigens dazugeholt wurde (fokus), oder eines mit formuliertem
+   Zielzustand oder Rückblick. Ein leerer Zielzustand-Eintrag allein
+   reicht nicht — er erzeugte bis v5.18.1 Geister mit „0 T". */
 function apWochenVorhaben(montag) {
   return apVorhaben().filter(function (x) {
     if (!passtZumKalender(x.v.kontext)) { return false; }
-    return apMenge(x.v, x.art, montag) > 0 || !!apZustandAn(x.v, montag);
+    if (apMenge(x.v, x.art, montag) > 0 || apFokus(x.v, montag)) { return true; }
+    var z = apZustandAn(x.v, montag);
+    return !!(z && (String(z.satz || '').trim() || z.stand));
   });
 }
 
-function apUmfang(id, art, montag, richtung) {
-  apSchritt(vorhabenFinden(id, art), art, montag, richtung);
+var apWegFrage = '';       /* Vorhaben, bei dem das Herausnehmen nachfragt */
+
+/* Herausnehmen aus der Woche. Hängen Tage aus dem Monat oder ein
+   Zielzustand daran, wird erst nachgefragt (sicher). */
+function apWocheWeg(id, art, montag, sicher) {
+  var v = vorhabenFinden(id, art);
+  if (!v) { return; }
+  var z = apZustandAn(v, montag);
+  var gewicht = apMenge(v, art, montag) > 0 || !!(z && String(z.satz || '').trim());
+  if (gewicht && sicher !== true) {
+    apWegFrage = id;
+    kalZeichnen();
+    return;
+  }
+  if (v.planWochen) { delete v.planWochen[montag]; }
+  if (z && Array.isArray(v.zielzustaende)) {
+    v.zielzustaende = v.zielzustaende.filter(function (e) { return e !== z; });
+  }
+  apWegFrage = '';
+  v.geaendert = jetzt();
+  spaeterSichern();
+  kalZeichnen();
+}
+
+function apWegAbbrechen() {
+  apWegFrage = '';
   kalZeichnen();
 }
 
@@ -19728,13 +19773,16 @@ function apWochenStand(id, art, montag, stand) {
 }
 
 /* Ein Vorhaben kommt in die Woche: mit einem Tag oder einmal. */
+/* Ein Vorhaben wird Schwerpunkt der Woche — ohne Tage. Die verteilt der Monat. */
 function apWocheDazu(id, art, montag) {
   var v = vorhabenFinden(id, art);
-  if (!v) { return; }
-  if (!apMenge(v, art, montag)) {
-    apSchritt(v, art, montag, 1);
-    if (apMass(v, art) === 'tage') { apSchritt(v, art, montag, 1); }
-  }
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(String(montag || ''))) { return; }
+  if (!v.planWochen || typeof v.planWochen !== 'object') { v.planWochen = {}; }
+  var w = v.planWochen[montag] || { tage: 0, mal: 0 };
+  w.fokus = true;
+  v.planWochen[montag] = w;
+  v.geaendert = jetzt();
+  spaeterSichern();
   apWocheWahl = false;
   kalZeichnen();
 }
@@ -19783,7 +19831,7 @@ function apWocheHtml(montag) {
   if (kalFilter === 'alle' || kalFilter === 'privat') {
     h += apKapFeld('Privat', k.privat, apVergeben(montag, 'privat'), 'privat');
   }
-  h += '</div>';
+  h += '</div><div class="apw-kap-hinweis">Tage verteilst du im Monat — hier steht, was dort vorgesehen ist.</div>';
   var ev = apEreignisse(montag);
   if (ev.length) {
     h += '<div class="apw-merk">' + ev.map(function (e) {
@@ -19804,9 +19852,16 @@ function apWocheHtml(montag) {
     h += '<div class="apw-vh"><div class="apw-vh-oben"><span class="pl-punkt ' + esc(v.kontext || 'beruflich') + '"></span>'
        + '<span class="pl-art">' + (x.art === 'ziel' ? 'ZIEL' : 'PROJEKT') + '</span>'
        + '<span class="apw-titel">' + esc(v.name || '') + '</span>'
-       + '<span class="apw-umfang"><button type="button" onclick="apUmfang(' + kennung + ',-1)" aria-label="weniger">−</button>'
-       + '<b>' + (rh ? (menge + '×') : ((menge ? apZahl(menge) : '0') + ' T')) + '</b>'
-       + '<button type="button" onclick="apUmfang(' + kennung + ',1)" aria-label="mehr">+</button></span></div>';
+       + (menge ? '<span class="apw-tage">im Monat: ' + (rh ? (menge + '×') : (apZahl(menge) + ' T')) + '</span>' : '')
+       + '<button type="button" class="apw-weg" onclick="apWocheWeg(' + kennung + ')" '
+       + 'title="Aus dieser Woche nehmen" aria-label="' + esc(v.name || '') + ' aus dieser Woche nehmen">×</button></div>';
+    if (apWegFrage === v.id) {
+      h += '<div class="apw-frage"><span>'
+         + (menge ? ('Mit ' + (rh ? (menge + '× / Woche') : (apZahl(menge) + (menge === 1 ? ' Tag' : ' Tagen'))) + ' im Monat') : 'Mit Zielzustand')
+         + ' herausnehmen?</span>'
+         + '<button type="button" class="weg" onclick="apWocheWeg(' + kennung + ',true)">Herausnehmen</button>'
+         + '<button type="button" onclick="apWegAbbrechen()">Abbrechen</button></div>';
+    }
     if (mz && mz.satz) {
       h += '<div class="apw-mziel">Im ' + esc(MONATE_LANG[Number(m.slice(5, 7)) - 1]) + ': <b>' + esc(mz.satz) + '</b></div>';
     }

@@ -1375,7 +1375,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   apSatzSetzen("monat", m, "Fundament fertig"); apSatzSetzen("woche", mo, "Schalung stellen");'
                  + '   r.liste = apWochenVorhaben(mo).map(function(x){ return x.v.id; }).join(",");'
                  + '   apWocheDazu("z2", "ziel", mo); apWocheDazu("p1", "projekt", mo);'
-                 + '   r.dazu = apMenge(z2, "ziel", mo) + "," + apMenge(DB.projekte[1], "projekt", mo);'
+                 + '   r.dazu = apMenge(z2, "ziel", mo) + "," + apMenge(DB.projekte[1], "projekt", mo) + "," + apFokus(z2, mo) + "," + apFokus(DB.projekte[1], mo);'
                  + '   apZustandSetzen("p5", "projekt", mo, "  Schalung steht  ");'
                  + '   apZustandSetzen("p5", "projekt", naechste, "Beton gegossen");'
                  + '   r.zustaende = apZustandAn(p5, mo).satz + "|" + apZustandAn(p5, naechste).satz + "|" + p5.zielzustaende.length;'
@@ -1385,7 +1385,6 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   apWochenStand("p5", "projekt", mo, "teils"); r.standZurueck = apZustandAn(p5, mo).stand;'
                  + '   apWochenStand("z2", "ziel", naechste, "nein"); r.standOhneSatz = apZustandAn(z2, naechste).stand + "|" + apZustandAn(z2, naechste).satz;'
                  + '   r.nurMitZustand = apWochenVorhaben(naechste).map(function(x){ return x.v.id; }).sort().join(",");'
-                 + '   apUmfang("p5", "projekt", mo, -1); r.umfang = apMenge(p5, "projekt", mo);'
                  + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen();'
                  + '   var bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.blatt = /Fundament fertig/.test(bl) && /value="Schalung stellen"/.test(bl) && /Bauphase 2 abgeschlossen/.test(bl)'
@@ -1410,6 +1409,35 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var f = document.getElementById("wochenNeu"); f.value = "IBAN ändern"; wochenAufgabeNeu(mo);'
                  + '   r.neu = DB.aufgaben.some(function(a){ return a.titel === "IBAN ändern"; });'
                  + '   kalStufe = merkS; kalAnker = merkA; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__apwFokusApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = kalStufe; var merkA = kalAnker; var merkF = kalFilter; DB = leereDatenbank(); kalFilter = "alle";'
+                 + '   var mo = montagVon(isoDatum()); var m = tagePlus(mo, 3).slice(0, 7);'
+                 + '   DB.projekte = [{ id: "s1", name: "Solar und Wärmepumpe", kontext: "privat", status: "laufend", zielzustaende: [] },'
+                 + '     { id: "c1", name: "Carport", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   var s1 = DB.projekte[0], c1 = DB.projekte[1];'
+                 + '   s1.zielzustaende.push({ jahr: wochenSchluessel(mo).jahr, kw: wochenSchluessel(mo).kw, satz: "", erreicht: false });'
+                 + '   r.geist = apWochenVorhaben(mo).length === 0;'
+                 + '   apWocheDazu("s1", "projekt", mo);'
+                 + '   r.fokus = apWochenVorhaben(mo).map(function(x){ return x.v.id; }).join(",") + "|" + apMenge(s1, "projekt", mo);'
+                 + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen(); var bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.ohneZaehler = !/ T<\\/b>/.test(bl) && /apWocheWeg\\(/.test(bl) && !/im Monat: /.test(bl);'
+                 + '   apSchritt(c1, "projekt", mo, 1); apSchritt(c1, "projekt", mo, 1); kalZeichnen(); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.tageHinweis = /im Monat: 1 T/.test(bl);'
+                 + '   kalStufe = "monat"; kalAnker = m + "-01"; kalZeichnen(); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.monatPunkt = /Solar und Wärmepumpe/.test(bl) && /title="Schwerpunkt ohne Tage">•/.test(bl);'
+                 + '   kalStufe = "woche"; kalAnker = mo;'
+                 + '   apWocheWeg("s1", "projekt", mo); r.wegOhneFrage = !apFokus(s1, mo) && apWochenVorhaben(mo).every(function(x){ return x.v.id !== "s1"; });'
+                 + '   apWocheWeg("c1", "projekt", mo); r.frage = apWegFrage === "c1" && apMenge(c1, "projekt", mo) === 1;'
+                 + '   bl = document.getElementById("kalBlatt").innerHTML; r.frageText = /Mit 1 Tag im Monat herausnehmen\\?/.test(bl);'
+                 + '   apWegAbbrechen(); r.abgebrochen = apWegFrage === "" && apMenge(c1, "projekt", mo) === 1;'
+                 + '   apZustandSetzen("c1", "projekt", mo, "Fundament steht");'
+                 + '   apWocheWeg("c1", "projekt", mo, true); r.weg = !apMenge(c1, "projekt", mo) && !apZustandAn(c1, mo);'
+                 + '   apWocheDazu("c1", "projekt", mo); apSchritt(c1, "projekt", mo, 1); apSchritt(c1, "projekt", mo, -1);'
+                 + '   r.fokusBleibt = apFokus(c1, mo) && apMenge(c1, "projekt", mo) === 0;'
+                 + '   kalStufe = merkS; kalAnker = merkA; kalFilter = merkF; DB = alt; apWegFrage = "";'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
@@ -14542,14 +14570,14 @@ console.log('\n172. Absichtsplanung in der Woche');
   else { try { e = t.pruefe(); } catch (x) { fail('Wochenplanung läuft nicht: ' + x.message); } }
   if (e) {
     pruefe(e.liste === 'p5', 'in der Woche steht, wer dort Tage oder einen Zielzustand hat');
-    pruefe(e.dazu === '1,1', 'ein Vorhaben kommt mit einem Tag oder einmal dazu');
+    /* Seit v5.18.2 kommt ein Vorhaben ohne Tage als Schwerpunkt in die Woche. */
+    pruefe(e.dazu === '0,0,true,true', 'ein Vorhaben kommt als Schwerpunkt dazu — ohne Tage');
     pruefe(e.zustaende === 'Schalung steht|Beton gegossen|2', 'Zielzustände gelten je Woche, ohne sich zu überschreiben');
     pruefe(e.alteAnzeige === 'Schalung steht', 'die bisherigen Anzeigen der Vorhaben sehen denselben Zielzustand');
     pruefe(e.standJa === 'ja,true' && e.standTeils === 'teils,false' && e.standZurueck === '',
            'der Rückblick hat drei Stufen, erreicht bleibt im Gleichschritt, ein zweiter Tipp nimmt ihn zurück');
     pruefe(e.standOhneSatz === 'nein|', 'Rückblick geht auch ohne formulierten Zielzustand');
     pruefe(e.nurMitZustand === 'p5,z2', 'eine Woche zeigt auch Vorhaben, die nur einen Zielzustand haben');
-    pruefe(e.umfang === 0.5, 'der Umfang lässt sich in der Woche stellen');
     pruefe(e.blatt === true, 'die Woche zeigt Monatssatz, Wochensatz, Meilenstein, Zielzustand und Rückblick — ohne Tagesspalten');
     pruefe(e.vorgang === true && e.vorgangNurJetzt === true, 'laufende Vorgänge mit Vorhaben und Fortschritt, in der aktuellen Woche');
     pruefe(e.filter === 'p1', 'der Filter Beruf/Privat gilt auch hier');
@@ -14576,6 +14604,33 @@ console.log('\n173. Aufgaben in der Woche');
   if (e) {
     pruefe(e.liste === true, 'eine vorgemerkte Aufgabe erscheint in der Wochensicht');
     pruefe(e.neu === true, '„Vornehmen“ legt eine Aufgabe für diese Woche an');
+  }
+}
+
+/* ============================================================
+   174. Schwerpunkt der Woche ohne Tage (v5.18.2)
+   Grund: Die Woche zeigte einen Tages-Zähler je Vorhaben — und ein leerer
+   Zielzustand-Eintrag ließ Vorhaben mit „0 T“ erscheinen. In der Woche
+   zählt aber, dass ein Vorhaben Schwerpunkt ist, nicht wie viele Tage:
+   manchmal ist es eine Stunde, aber eine entscheidende.
+   ============================================================ */
+console.log('\n174. Schwerpunkt ohne Tage');
+{
+  const t = globalThis.__apwFokusApi;
+  let e = null;
+  if (!t) { warn('Schwerpunkt nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Schwerpunkt läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.geist === true, 'ein leerer Zielzustand-Eintrag macht kein Vorhaben zum Schwerpunkt — kein „0 T“ mehr');
+    pruefe(e.fokus === 's1|0', 'ein Vorhaben wird Schwerpunkt der Woche, ohne Tage');
+    pruefe(e.ohneZaehler === true, 'die Woche hat keinen Tages-Zähler, aber ein × zum Herausnehmen');
+    pruefe(e.tageHinweis === true, 'Tage aus dem Monat stehen als Hinweis da');
+    pruefe(e.monatPunkt === true, 'im Monat zeigt ein Punkt den Schwerpunkt ohne Tage');
+    pruefe(e.wegOhneFrage === true, 'ohne Tage und Zielzustand geht das Herausnehmen sofort');
+    pruefe(e.frage === true && e.frageText === true, 'mit Tagen im Monat wird erst nachgefragt');
+    pruefe(e.abgebrochen === true, 'abbrechen lässt alles stehen');
+    pruefe(e.weg === true, 'bestätigt gehen Tage und Zielzustand der Woche mit');
+    pruefe(e.fokusBleibt === true, 'ein Schwerpunkt bleibt, auch wenn seine Tage im Monat auf null gehen');
   }
 }
 
