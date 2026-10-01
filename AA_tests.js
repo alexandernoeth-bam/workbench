@@ -1300,6 +1300,105 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   window.localStorage = merkL;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__apApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkF = kalFilter; var merkS = kalStufe; var merkA = kalAnker;'
+                 + '   DB = leereDatenbank(); kalFilter = "alle";'
+                 + '   DB.projekte = [{ id: "p1", name: "Blick auf Kundensysteme", kontext: "beruflich", status: "laufend", ende: "2026-11-20", zielzustaende: [] },'
+                 + '     { id: "p5", name: "Carport bauen", kontext: "privat", status: "laufend", ende: "2027-04-30", zielzustaende: [] },'
+                 + '     { id: "px", name: "Fertig", kontext: "privat", status: "abgeschlossen", zielzustaende: [] }];'
+                 + '   DB.ziele = [{ id: "z2", name: "Abnehmen", kontext: "privat", status: "laufend", zieltermin: "2026-11-26", zielzustaende: [] }];'
+                 + '   DB.jahrestermine = [{ id: "u1", titel: "Urlaub", art: "urlaub", von: "2026-10-19", bis: "2026-10-23", kontext: "privat" },'
+                 + '     { id: "d1", titel: "Dienstreise Hamburg", art: "dienstreise", von: "2026-11-04", bis: "2026-11-05", kontext: "beruflich" },'
+                 + '     { id: "k1", titel: "krank", art: "krank", von: "2026-11-10", bis: "2026-11-10", kontext: "beruflich" }];'
+                 + '   r.montageOkt = apMontage("2026-10").join(",");'
+                 + '   r.montageNov = apMontage("2026-11").join(",");'
+                 + '   var k = function(mo){ var x = apKapazitaet(mo); return x.beruf + "/" + x.privat + "/" + x.reise; };'
+                 + '   r.kap = [k("2026-10-12"), k("2026-10-19"), k("2026-11-02"), k("2026-11-09"), k("2026-12-21")].join(" ");'
+                 + '   var p1 = DB.projekte[0], p5 = DB.projekte[1], z2 = DB.ziele[0];'
+                 + '   r.massStart = apMass(p1, "projekt") + "," + apMass(z2, "ziel");'
+                 + '   apSchritt(p5, "projekt", "2026-11-09", 1); apSchritt(p5, "projekt", "2026-11-09", 1); apSchritt(p5, "projekt", "2026-11-09", 1);'
+                 + '   apSchritt(z2, "ziel", "2026-11-09", 1); apSchritt(z2, "ziel", "2026-11-09", 1); apSchritt(z2, "ziel", "2026-11-09", 1);'
+                 + '   apSchritt(p1, "projekt", "2026-11-09", 1); apSchritt(p1, "projekt", "2026-11-09", 1);'
+                 + '   r.mengen = apMenge(p5, "projekt", "2026-11-09") + "," + apMenge(z2, "ziel", "2026-11-09") + "," + apMenge(p1, "projekt", "2026-11-09");'
+                 + '   r.vergeben = apVergeben("2026-11-09", "privat") + "," + apVergeben("2026-11-09", "beruflich");'
+                 + '   apSchritt(p1, "projekt", "2026-11-09", -1); apSchritt(p1, "projekt", "2026-11-09", -1);'
+                 + '   r.nullWeg = !("2026-11-09" in p1.planWochen);'
+                 + '   apSchritt(p1, "projekt", "kaputt", 1); r.kaputt = !p1.planWochen.kaputt;'
+                 + '   apMassSetzen("p5", "projekt", "rhythmus"); r.massGewechselt = apMass(p5, "projekt") === "rhythmus" && apVergeben("2026-11-09", "privat") === 0;'
+                 + '   apMassSetzen("p5", "projekt", "unsinn"); r.massUnsinn = apMass(p5, "projekt");'
+                 + '   apMassSetzen("p5", "projekt", "tage");'
+                 + '   apMonatszielSetzen("p5", "projekt", "2026-11", "  Bauphase 2 abgeschlossen  ");'
+                 + '   r.monatsziel = apMonatsziel(p5, "2026-11").satz;'
+                 + '   apMonatsStand("p5", "projekt", "2026-11", "ja"); r.standJa = apMonatsziel(p5, "2026-11").stand;'
+                 + '   apMonatsStand("p5", "projekt", "2026-11", "ja"); r.standZurueck = apMonatsziel(p5, "2026-11").stand;'
+                 + '   apMonatsStand("p5", "projekt", "2026-11", "vielleicht"); r.standUnsinn = apMonatsziel(p5, "2026-11").stand;'
+                 + '   apMonatDazu("p1", "projekt", "2026-12");'
+                 + '   r.zeilenNov = apMonatsZeilen("2026-11").map(function(x){ return x.v.id; }).sort().join(",");'
+                 + '   r.zeilenDez = apMonatsZeilen("2026-12").map(function(x){ return x.v.id; }).join(",");'
+                 + '   kalFilter = "beruflich"; r.zeilenBeruf = apMonatsZeilen("2026-12").map(function(x){ return x.v.id; }).join(",");'
+                 + '   kalFilter = "privat"; r.zeilenPrivat = apMonatsZeilen("2026-12").map(function(x){ return x.v.id; }).join(","); kalFilter = "alle";'
+                 + '   apSatzSetzen("monat", "2026-11", "Carport-Fundament fertig"); apSatzSetzen("woche", "2026-11-09", "Schalung");'
+                 + '   r.saetze = apSatz("monat", "2026-11") + "|" + apSatz("woche", "2026-11-09") + "|" + (DB.einstellungen.stempel > 0);'
+                 + '   apSatzSetzen("woche", "2026-11-09", "   "); r.satzLeer = !("2026-11-09" in DB.einstellungen.planung.wochen);'
+                 + '   r.ereignisse = apEreignisse("2026-11-02").map(function(e){ return e.art + ":" + e.text; }).join(",")'
+                 + '     + "|" + apEreignisse("2026-11-16").map(function(e){ return e.art + ":" + e.text; }).join(",")'
+                 + '     + "|" + apEreignisse("2026-11-23").map(function(e){ return e.art + ":" + e.text; }).join(",");'
+                 + '   kalStufe = "monat"; kalAnker = "2026-10-01"; kalZeichnen();'
+                 + '   var bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.tafeln = (bl.match(/class="pl-monat"/g) || []).length;'
+                 + '   r.tafelInhalt = /Carport bauen/.test(bl) && /Bauphase 2 abgeschlossen/.test(bl) && /apWaehlen\\(/.test(bl) && /KW 46 ›/.test(bl);'
+                 + '   apWaehlen("2026-11-09", "p5", "projekt"); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.stell = /pl-stell/.test(bl) && /apStellen\\(1\\)/.test(bl) && /apMassSetzen\\(/.test(bl);'
+                 + '   apStellen(1); r.gestellt = apMenge(p5, "projekt", "2026-11-09");'
+                 + '   apGewaehlt = null;'
+                 + '   var fremd = leereDatenbank(); var kopie = JSON.parse(JSON.stringify(p5)); kopie.planWochen["2026-11-16"] = { tage: 2, mal: 0 };'
+                 + '   kopie.geaendert = jetzt() + 5000; fremd.projekte = [kopie];'
+                 + '   var m = zusammenfuehren(DB, fremd).db.projekte.filter(function(x){ return x.id === "p5"; })[0];'
+                 + '   r.abgleich = m.planWochen["2026-11-16"].tage === 2 && m.monatsziele["2026-11"].satz === "Bauphase 2 abgeschlossen";'
+                 + '   var v = { zielzustaende: [] }; var diese = wochenSchluessel(isoDatum()); var vor = wochenSchluessel(tagePlus(isoDatum(), -7));'
+                 + '   zustandSetzen(v, "diese Woche"); zustandSetzen(v, "Vorwoche", vor);'
+                 + '   r.zustand = v.zielzustaende.map(function(z){ return (z.kw === diese.kw ? "D" : "V") + ":" + z.satz; }).sort().join(",");'
+                 + '   kalFilter = merkF; kalStufe = merkS; kalAnker = merkA; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__apwApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkF = kalFilter; var merkS = kalStufe; var merkA = kalAnker; DB = leereDatenbank(); kalFilter = "alle";'
+                 + '   var mo = montagVon(isoDatum()); var m = tagePlus(mo, 3).slice(0, 7); var naechste = tagePlus(mo, 7);'
+                 + '   DB.projekte = [{ id: "p5", name: "Carport bauen", kontext: "privat", status: "laufend", zielzustaende: [] },'
+                 + '     { id: "p1", name: "Blick auf Kundensysteme", kontext: "beruflich", status: "laufend", zielzustaende: [] }];'
+                 + '   DB.ziele = [{ id: "z2", name: "Abnehmen", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   var p5 = DB.projekte[0], z2 = DB.ziele[0];'
+                 + '   apSchritt(p5, "projekt", mo, 1); apSchritt(p5, "projekt", mo, 1);'
+                 + '   apMonatszielSetzen("p5", "projekt", m, "Bauphase 2 abgeschlossen");'
+                 + '   apSatzSetzen("monat", m, "Fundament fertig"); apSatzSetzen("woche", mo, "Schalung stellen");'
+                 + '   r.liste = apWochenVorhaben(mo).map(function(x){ return x.v.id; }).join(",");'
+                 + '   apWocheDazu("z2", "ziel", mo); apWocheDazu("p1", "projekt", mo);'
+                 + '   r.dazu = apMenge(z2, "ziel", mo) + "," + apMenge(DB.projekte[1], "projekt", mo);'
+                 + '   apZustandSetzen("p5", "projekt", mo, "  Schalung steht  ");'
+                 + '   apZustandSetzen("p5", "projekt", naechste, "Beton gegossen");'
+                 + '   r.zustaende = apZustandAn(p5, mo).satz + "|" + apZustandAn(p5, naechste).satz + "|" + p5.zielzustaende.length;'
+                 + '   r.alteAnzeige = zustandText(p5);'
+                 + '   apWochenStand("p5", "projekt", mo, "ja"); r.standJa = apZustandAn(p5, mo).stand + "," + apZustandAn(p5, mo).erreicht;'
+                 + '   apWochenStand("p5", "projekt", mo, "teils"); r.standTeils = apZustandAn(p5, mo).stand + "," + apZustandAn(p5, mo).erreicht;'
+                 + '   apWochenStand("p5", "projekt", mo, "teils"); r.standZurueck = apZustandAn(p5, mo).stand;'
+                 + '   apWochenStand("z2", "ziel", naechste, "nein"); r.standOhneSatz = apZustandAn(z2, naechste).stand + "|" + apZustandAn(z2, naechste).satz;'
+                 + '   r.nurMitZustand = apWochenVorhaben(naechste).map(function(x){ return x.v.id; }).sort().join(",");'
+                 + '   apUmfang("p5", "projekt", mo, -1); r.umfang = apMenge(p5, "projekt", mo);'
+                 + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen();'
+                 + '   var bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.blatt = /Fundament fertig/.test(bl) && /value="Schalung stellen"/.test(bl) && /Bauphase 2 abgeschlossen/.test(bl)'
+                 + '     && /value="Schalung steht"/.test(bl) && /apWochenStand\\(/.test(bl) && /Vorgänge/.test(bl) && !/wtag|wspalte/.test(bl);'
+                 + '   DB.ablaeufe = []; DB.durchlaeufe = [{ id: "d1", name: "Fundament gießen", kontext: "privat", projektId: "p5",'
+                 + '     schritte: [{ titel: "Schalung", fertig: true }, { titel: "Bewehrung", fertig: false }, { titel: "Beton", fertig: false }] }];'
+                 + '   kalZeichnen(); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.vorgang = /Fundament gießen/.test(bl) && /zu Carport bauen/.test(bl) && /1 von 3 Schritten/.test(bl);'
+                 + '   kalAnker = naechste; kalZeichnen(); r.vorgangNurJetzt = /aktuelle Woche/.test(document.getElementById("kalBlatt").innerHTML);'
+                 + '   kalFilter = "beruflich"; r.filter = apWochenVorhaben(mo).map(function(x){ return x.v.id; }).join(","); kalFilter = "alle";'
+                 + '   kalFilter = merkF; kalStufe = merkS; kalAnker = merkA; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -8628,8 +8727,9 @@ console.log('\n63. Monat in zwei Spalten');
          'beide Spalten beginnen oben');
 
   const zeichnen = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(zeichnen && /monatsraster/.test(zeichnen[0]),
-         'der Monat bekommt seinen Behälter');
+  /* Seit v5.17.0 zeigt der Monat die Absichtsplanung statt des Rasters. */
+  pruefe(zeichnen && /apMonateHtml\(m0\)/.test(zeichnen[0]),
+         'der Monat zeigt die Absichtsplanung');
 
   if (!m) {
     warn('Funktionen nicht auswertbar');
@@ -12323,8 +12423,10 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
   pruefe(/body\.breit\.weit \.tagblatt\{grid-template-columns:1fr 1fr 1fr/.test(QUELLE),
          'bei viel Platz stehen alle drei Flächen nebeneinander');
   const kz = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(kz && /heuteInSicht\(blatt\)/.test(kz[0]),
-         'die Woche rollt beim Öffnen zum heutigen Tag');
+  /* Seit v5.18.0 hat die Woche keine Tagesspalten mehr, zu denen sie
+     rollen könnte — sie zeigt die Absichtsplanung. */
+  pruefe(kz && /apWocheHtml\(mo\)/.test(kz[0]),
+         'die Woche zeigt die Absichtsplanung');
   pruefe(/\.ktag\.heute \.ktag-name\{color:var\(--heute\)\}/.test(QUELLE),
          'und hebt ihn im Signalton hervor');
 
@@ -14358,6 +14460,86 @@ console.log('\n169. Musik zur Morgenroutine');
     pruefe(e.nichtImBestand === true, 'er gilt nur für dieses Gerät und geht nicht in den Abgleich');
     pruefe(e.feld === true, 'mit Link gibt es „Ausprobieren“ und „Entfernen“');
     pruefe(e.geloescht === true && e.ohneKnoepfe === true, 'entfernt ist er weg, die Knöpfe auch');
+  }
+}
+
+/* ============================================================
+   170. Absichtsplanung im Monat (v5.17.0)
+   Grund: Die Monatssicht war ein Terminraster, das niemand nutzte.
+   Jetzt plant sie Absichten auf Ebene der Vorhaben: je Woche, wie viele
+   Tage beruflich und privat da sind und wofür sie vorgesehen sind.
+   ============================================================ */
+console.log('\n170. Absichtsplanung im Monat');
+{
+  const t = globalThis.__apApi;
+  let e = null;
+  if (!t) { warn('Absichtsplanung nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Absichtsplanung läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.montageOkt === '2026-09-28,2026-10-05,2026-10-12,2026-10-19,2026-10-26'
+           && e.montageNov === '2026-11-02,2026-11-09,2026-11-16,2026-11-23',
+           'eine Woche gehört zu dem Monat, in dem ihr Donnerstag liegt');
+    pruefe(e.kap === '5/2/0 0/7/0 5/2/2 4/2/0 4/3/0',
+           'Kapazität: normal 5/2, Urlaub 0/7, Dienstreise zählt beruflich (markiert), krank nirgends, Feiertag frei');
+    pruefe(e.massStart === 'tage,rhythmus', 'Projekte beginnen mit Tagen, Ziele mit Rhythmus');
+    pruefe(e.mengen === '1.5,3,1', 'Tage in halben Schritten, Rhythmus in ganzen');
+    pruefe(e.vergeben === '1.5,1', 'nur Tage verbrauchen Kapazität, je Kontext — ein Rhythmus nicht');
+    pruefe(e.nullWeg === true && e.kaputt === true, 'null nimmt die Woche heraus, ein falscher Schlüssel wird abgewiesen');
+    pruefe(e.massGewechselt === true && e.massUnsinn === 'rhythmus', 'das Maß lässt sich umstellen, Unsinn nicht');
+    pruefe(e.monatsziel === 'Bauphase 2 abgeschlossen', 'der Zielzustand des Monats wird gemerkt');
+    pruefe(e.standJa === 'ja' && e.standZurueck === '' && e.standUnsinn === '', 'der Monatsrückblick lässt sich setzen und zurücknehmen');
+    pruefe(e.zeilenNov === 'p5,z2' && e.zeilenDez === 'p1', 'eine Zeile hat, wer Menge oder Zielzustand im Monat hat — abgeschlossene nie');
+    pruefe(e.zeilenBeruf === 'p1' && e.zeilenPrivat === '', 'der Filter Beruf/Privat gilt');
+    pruefe(e.saetze === 'Carport-Fundament fertig|Schalung|true' && e.satzLeer === true, 'Monats- und Wochensatz werden gemerkt, leer gelöscht');
+    pruefe(/dienstreise:Dienstreise Hamburg/.test(e.ereignisse) && /grenze:Ende Fr/.test(e.ereignisse) && /grenze:Ziel Do/.test(e.ereignisse),
+           'was die Woche prägt: Reise, Ende eines Projekts, Zieltermin');
+    pruefe(e.tafeln === 3 && e.tafelInhalt === true, 'der Monat zeigt drei Monate als Tafeln mit Vorhaben und Wochen');
+    pruefe(e.stell === true && e.gestellt === 2, 'eine Zelle wird über die Stellleiste geändert');
+    pruefe(e.abgleich === true, 'Planung und Monatsziele gehen mit dem Vorhaben durch den Abgleich');
+  }
+}
+
+/* ============================================================
+   171. Zielzustand einer anderen Woche (v5.17.0)
+   Grund: zustandSetzen suchte den vorhandenen Eintrag immer in der
+   laufenden Woche. Der Rückblick auf die Vorwoche überschrieb so den
+   Zielzustand von dieser Woche.
+   ============================================================ */
+console.log('\n171. Zielzustand einer anderen Woche');
+{
+  const t = globalThis.__apApi;
+  let e = null;
+  if (t) { try { e = t.pruefe(); } catch (x) { fail('Zielzustand läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.zustand === 'D:diese Woche,V:Vorwoche', 'der Zielzustand der Vorwoche lässt den von dieser Woche stehen');
+  }
+}
+
+/* ============================================================
+   172. Absichtsplanung in der Woche (v5.18.0)
+   Grund: Die Woche zeigte Tagesspalten mit Terminen. Für die Planung
+   zählt aber, wofür die Woche da ist: Satz, Kapazität, Vorhaben mit
+   Zielzustand und Rückblick, laufende Vorgänge.
+   ============================================================ */
+console.log('\n172. Absichtsplanung in der Woche');
+{
+  const t = globalThis.__apwApi;
+  let e = null;
+  if (!t) { warn('Wochenplanung nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Wochenplanung läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.liste === 'p5', 'in der Woche steht, wer dort Tage oder einen Zielzustand hat');
+    pruefe(e.dazu === '1,1', 'ein Vorhaben kommt mit einem Tag oder einmal dazu');
+    pruefe(e.zustaende === 'Schalung steht|Beton gegossen|2', 'Zielzustände gelten je Woche, ohne sich zu überschreiben');
+    pruefe(e.alteAnzeige === 'Schalung steht', 'die bisherigen Anzeigen der Vorhaben sehen denselben Zielzustand');
+    pruefe(e.standJa === 'ja,true' && e.standTeils === 'teils,false' && e.standZurueck === '',
+           'der Rückblick hat drei Stufen, erreicht bleibt im Gleichschritt, ein zweiter Tipp nimmt ihn zurück');
+    pruefe(e.standOhneSatz === 'nein|', 'Rückblick geht auch ohne formulierten Zielzustand');
+    pruefe(e.nurMitZustand === 'p5,z2', 'eine Woche zeigt auch Vorhaben, die nur einen Zielzustand haben');
+    pruefe(e.umfang === 0.5, 'der Umfang lässt sich in der Woche stellen');
+    pruefe(e.blatt === true, 'die Woche zeigt Monatssatz, Wochensatz, Meilenstein, Zielzustand und Rückblick — ohne Tagesspalten');
+    pruefe(e.vorgang === true && e.vorgangNurJetzt === true, 'laufende Vorgänge mit Vorhaben und Fortschritt, in der aktuellen Woche');
+    pruefe(e.filter === 'p1', 'der Filter Beruf/Privat gilt auch hier');
   }
 }
 
