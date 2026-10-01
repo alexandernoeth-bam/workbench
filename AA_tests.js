@@ -1263,7 +1263,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     status: "offen", wiederholung: { takt: "woche", tage: [4], intervall: 1 }, geaendert: 1 });'
                  + '   var b = DB.aufgaben[1];'
                  + '   r.auslassen = ausfuehrungAuslassen(b, do_) && !aufgabeFaelligAn(b, do_) && !istErledigtAn(b, do_);'
-                 + '   r.naechsterDo = diesmalTag(b) === tagePlus(do_, 7);'
+                 + '   r.naechsterDo = diesmalTag(b) === (wt === 4 ? heute : tagePlus(do_, 7));'
                  + '   r.nichtFaellig = ausfuehrungAuslassen(b, tagePlus(do_, 1)) === false;'
                  + '   aktionFuer = "b1"; schirmOffen = "Aufgaben"; var dh = detailHtml(b);'
                  + '   r.detail = /Nur diesmal/.test(dh) && /diesmalAuslassen\\(/.test(dh) && /id="dmTag"/.test(dh) && /id="dmZeit"/.test(dh)'
@@ -14282,13 +14282,30 @@ console.log('\n167. Nur diesmal');
     pruefe(e.nurZeit === true && e.zeitZurueck === true, 'am selben Tag ändert sich nur die Uhrzeit — und wieder zurück');
     pruefe(e.zusatzWegZeitWeg === true, 'wird der Zusatztag zurückgenommen, geht seine Uhrzeit mit');
     pruefe(e.auslassen === true, 'auslassen nimmt die Ausführung heraus, ohne sie abzuhaken');
-    pruefe(e.naechsterDo === true, 'danach ist die nächste Ausführung gemeint');
+    /* Bis v5.15.0 hing diese Prüfung vom Wochentag ab: An einem Donnerstag
+       ist die nächste offene Ausführung heute, nicht in einer Woche. */
+    pruefe(e.naechsterDo === true, 'danach ist die nächste offene Ausführung gemeint — an jedem Wochentag');
     pruefe(e.nichtFaellig === true, 'an einem Tag ohne Ausführung gibt es nichts auszulassen');
     pruefe(e.detail === true, 'die Details bieten „Nur diesmal“: auslassen, verlegen, und zeigen den Ausfall');
     pruefe(e.nurWiederkehrend === true, 'nur bei wiederkehrenden Aufgaben');
     pruefe(e.aufgeraeumt === true, 'vergangene Uhrzeiten werden nach einer Woche weggeräumt');
     pruefe(e.abgleich === true, 'verlegte Uhrzeiten gehen durch den Abgleich');
   }
+}
+
+/* ============================================================
+   168. Tagesplan aufstellen am Handy (v5.15.1)
+   Grund: Jede Zeile stand einreihig, der Titel durfte nicht umbrechen —
+   neben Datumsschild und zwei Knöpfen blieben am Pixel drei Buchstaben.
+   ============================================================ */
+console.log('\n168. Tagesplan aufstellen am Handy');
+{
+  pruefe(/body:not\(\.breit\) \.p-kandidat\{flex-wrap:wrap/.test(QUELLE),
+         'am Handy dürfen Planungszeilen umbrechen');
+  pruefe(/body:not\(\.breit\) \.p-k-titel\{flex:1 1 100%;white-space:normal/.test(QUELLE),
+         'der Titel steht dort in einer eigenen Zeile, ganz');
+  const breit = QUELLE.match(/\n\.p-k-titel\{[^}]*\}/);
+  pruefe(breit && /white-space:nowrap/.test(breit[0]), 'am großen Bildschirm bleibt die Zeile einreihig');
 }
 
 /* ============================================================
