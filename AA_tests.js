@@ -14779,6 +14779,23 @@ console.log('\n177. Vorhabenkarten ohne Knöpfe');
 }
 
 /* ============================================================
+   178. Gedanken auf der Vorhabenseite in voller Länge (v5.19.2)
+   Grund: Die eingebetteten Gedanken hatten eine Höchsthöhe mit eigenem
+   Rollbalken und endeten mitten auf der Seite.
+   ============================================================ */
+console.log('\n178. Gedanken in voller Länge');
+{
+  const regel = QUELLE.match(/\.tg-g-ansicht\{[^}]*\}/);
+  pruefe(regel && !/max-height/.test(regel[0]) && !/overflow/.test(regel[0]),
+         'die Gedanken haben keine Höchsthöhe und keinen eigenen Rollbalken');
+  const feld = QUELLE.match(/\.tg-g-feld\{[^}]*\}/);
+  pruefe(feld && /min-height:60vh/.test(feld[0]), 'zum Schreiben steht ein großes Feld bereit');
+  const tz = hauptSkript().match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /taetigAlleTermine \? kommend : kommend\.slice\(0, 6\)/.test(tz[0]) && /alle ' \+ kommend\.length \+ ' kommenden/.test(tz[0]),
+         'Termine: sechs direkt, der Rest auf Knopfdruck — keine stille Grenze');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
