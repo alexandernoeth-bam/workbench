@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.19.0</title>
+<title>Workbench 5.19.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1506,11 +1506,6 @@ body.breit #schirmFlaeche.als-notizbuch .fl-arten{display:none;position:absolute
   border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16)}
 body.breit #schirmFlaeche.als-notizbuch .fl-arten.menue-auf{display:flex}
 
-.vk-flaeche{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
-  font:inherit;font-size:calc(var(--fs)*0.7);padding:2px 10px;
-  border:1px solid var(--linie);border-radius:20px;background:var(--karte);
-  color:var(--grau);cursor:pointer}
-.vk-flaeche.voll{border-color:var(--weinrot);color:var(--weinrot)}
 
 /* Abläufe: Karten nach Zustand, der Ring zeigt den Fortschritt. */
 .ab-gruppe{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
@@ -1534,6 +1529,7 @@ body.breit .ab-raster{grid-template-columns:repeat(2,minmax(0,1fr))}
   font-weight:500}
 .ab-naechster{font-size:calc(var(--fs)*0.76);line-height:1.35}
 .ab-naechster span{color:var(--grau)}
+.vk-schilder{margin-top:8px}
 .ab-fuss{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .ab-marke{font-size:calc(var(--fs)*0.66);color:var(--grau);background:var(--papier);
   border-radius:20px;padding:1px 8px;max-width:190px;overflow:hidden;text-overflow:ellipsis;
@@ -1581,7 +1577,6 @@ body.breit .ab-pfeile{display:none}
 .toast.auf{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.warn{background:var(--weinrot)}
 .vk-knoepfe{display:flex;flex-wrap:wrap;gap:6px}
-.vk-taetig.voll{border-color:var(--petrol);color:var(--petrol)}
 /* Tageswechsel */
 #tagwBlatt{max-width:560px}
 .tw-punkte{display:flex;gap:6px;justify-content:center;margin:6px 0 12px}
@@ -1999,7 +1994,6 @@ body:not(.breit) .tzeile-termin .t-ablauf-paar{display:none}
   border-radius:20px;padding:0 7px;background:var(--papier);color:var(--grau);
   vertical-align:middle}
 .tv-inhalt[onclick],.tganz-titel[onclick]{cursor:pointer}
-.vk-punkt{width:5px;height:5px;border-radius:50%;background:var(--weinrot)}
 
 .vh-bereich{display:flex;width:100%;align-items:center;gap:9px;background:none;
   border:0;border-bottom:1.5px solid var(--tinte);font:inherit;
@@ -2816,7 +2810,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.19.0';
+var APP_VERSION = '5.19.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -13665,8 +13659,7 @@ function zielKarteHtml(z) {
   h += restZeitHtml(z.zieltermin);
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
-  h += '<div class="vk-knoepfe">' + flaecheKnopfHtml(z) + taetigKnopfHtml(z, 'ziel')
-     + '</div>';
+  h += vhSchilderHtml(z, 'ziel');
   h += '</div>';
   return h;
 }
@@ -13731,14 +13724,6 @@ function vhTaetigkeiten(art, id) {
 function vhTaetigZahl(art, id) {
   var t = vhTaetigkeiten(art, id);
   return t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
-}
-
-function taetigKnopfHtml(v, art) {
-  var n = vhTaetigZahl(art, v.id);
-  return '<button class="vk-flaeche vk-taetig' + (n ? ' voll' : '') + '" type="button" '
-       + 'onclick="event.stopPropagation();taetigOeffnen(\'' + art + '\',\'' + esc(v.id) + '\')" '
-       + 'title="Tätigkeiten dieses Vorhabens">Tätigkeiten' + (n ? (' · ' + n) : '')
-       + '</button>';
 }
 
 function taetigOeffnen(art, id) {
@@ -14302,14 +14287,21 @@ function vhTermine(art, id) {
   return aus;
 }
 
-/* Der Weg zur Gedankenfläche des Vorhabens. Ein Punkt zeigt an, dass
-   dort etwas steht. */
-function flaecheKnopfHtml(v) {
-  var text = String(v.flaeche || '').trim();
-  return '<button class="vk-flaeche' + (text ? ' voll' : '') + '" type="button" '
-       + 'onclick="event.stopPropagation();flaecheOeffnen(\'' + esc(v.id) + '\')" '
-       + 'title="Gedankenfläche">Gedanken'
-       + (text ? ('<span class="vk-punkt"></span>') : '') + '</button>';
+/* Hat das Vorhaben Gedanken? Dann trägt seine Karte das Schild
+   „Gedanken" — seit v5.19.1 statt eines eigenen Knopfs. */
+function vhHatGedanken(v) {
+  return !!String((v && v.flaeche) || '').trim();
+}
+
+/* Die schmalen Karten (Ziele, Projekte) bekommen eine Schilderzeile:
+   wie viele Tätigkeiten offen sind, und ob es Gedanken gibt. */
+function vhSchilderHtml(v, art) {
+  var n = vhTaetigZahl(art, v.id);
+  var marken = [];
+  if (n) { marken.push(n + (n === 1 ? ' Tätigkeit' : ' Tätigkeiten')); }
+  if (vhHatGedanken(v)) { marken.push('Gedanken'); }
+  if (!marken.length) { return ''; }
+  return '<div class="ab-fuss vk-schilder"><span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span></div>';
 }
 
 /* Wie viel Zeit bleibt? Die Einheit wächst mit dem Abstand: Bei zehn
@@ -14472,6 +14464,9 @@ function vhKarteHtml(v, art) {
   if (offen) { marken.push(offen + ' offen'); }
   if (t.erledigt.length) { marken.push(t.erledigt.length + ' erledigt'); }
   if (ende) { marken.push('bis ' + kurzDatum(ende)); }
+  /* Seit v5.19.1 ohne Knöpfe — die Karte öffnet die Seite mit Tätigkeiten
+     und Gedanken. Dass es Gedanken gibt, sagt ein Schild. */
+  if (vhHatGedanken(v)) { marken.push('Gedanken'); }
   h += '<span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span>';
   h += '<span style="flex:1"></span>';
   h += '<span class="ab-pfeile">'
@@ -14480,7 +14475,6 @@ function vhKarteHtml(v, art) {
      + '<button type="button" onclick="event.stopPropagation();vhSchiebenId(\'' + esc(v.id)
      + '\',1)" aria-label="nach hinten">›</button></span>';
   h += '</div>';
-  h += '<div class="vk-knoepfe">' + flaecheKnopfHtml(v) + taetigKnopfHtml(v, art) + '</div>';
   h += '</div>';
   return h;
 }
@@ -14501,8 +14495,7 @@ function projektKarteHtml(p) {
   h += restZeitHtml(p.ende);
   h += '<div class="vk-satz' + (satz ? '' : ' leer') + '">'
      + esc(satz || 'noch kein Zielzustand für diese Woche') + '</div>';
-  h += '<div class="vk-knoepfe">' + flaecheKnopfHtml(p) + taetigKnopfHtml(p, 'projekt')
-     + '</div>';
+  h += vhSchilderHtml(p, 'projekt');
   h += '</div>';
   return h;
 }

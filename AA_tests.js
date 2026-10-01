@@ -1490,6 +1490,20 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; schirmOffen = merkS; tgReiter = "woche"; tgGedankenModus = "ansicht";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__vkApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id: "h1", name: "Halbmarathon", kontext: "privat", status: "laufend", ende: "2027-06-20", zielzustaende: [], flaeche: "## Trainingsplan" },'
+                 + '     { id: "h2", name: "Ohne alles", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   DB.aufgaben.push({ id: "a1", titel: "Anmelden", kontext: "privat", projektId: "h1", planung: "backlog", art: "haupt", status: "offen", geaendert: 1 });'
+                 + '   var k1 = projektKarteHtml(DB.projekte[0]), k2 = projektKarteHtml(DB.projekte[1]);'
+                 + '   r.keineKnoepfe = !/vk-knoepfe/.test(k1) && !/flaecheOeffnen/.test(k1) && !/>Tätigkeiten/.test(k1);'
+                 + '   r.schilder = /<span class="ab-marke">1 Tätigkeit<\\/span><span class="ab-marke">Gedanken<\\/span>/.test(k1);'
+                 + '   r.leer = !/vk-schilder/.test(k2);'
+                 + '   r.oeffnet = /onclick="taetigOeffnen\\(.projekt.,.h1.\\)"/.test(k1);'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -9692,7 +9706,7 @@ console.log('\n75. Gedankenfläche');
   ['flaecheText', 'flaecheSetzen', 'flaecheName', 'flaecheZeileHtml',
    'flaecheAnsichtHtml', 'flaecheKastenUm', 'flaecheModusSetzen',
    'flaecheGetippt', 'flaecheZeichen', 'flaecheSuchen', 'flaecheOeffnen',
-   'flaecheZeichnen', 'flaecheKnopfHtml'].forEach(function (fn) {
+   'flaecheZeichnen', 'vhHatGedanken'].forEach(function (fn) {
     pruefe(new RegExp('function\\s+' + fn + '\\s*\\(').test(skript),
            'Funktion ' + fn + ' ist definiert');
   });
@@ -11482,7 +11496,7 @@ console.log('\n103. Tätigkeiten');
   const skript = hauptSkript();
   const t = globalThis.__taetigApi;
 
-  ['gehoertZu', 'vhTaetigkeiten', 'vhTaetigZahl', 'taetigKnopfHtml', 'taetigOeffnen',
+  ['gehoertZu', 'vhTaetigkeiten', 'vhTaetigZahl', 'vhSchilderHtml', 'taetigOeffnen',
    'taetigErledigtUm', 'taetigHaken', 'taetigZeileHtml', 'taetigAblaufHtml',
    'taetigZeichnen', 'taetigNeu', 'vorhabenWahlHtml', 'dVorhaben', 'zielKontext']
     .forEach(function (f) {
@@ -11493,9 +11507,10 @@ console.log('\n103. Tätigkeiten');
          'die alte Projektwahl ist ersetzt, nicht verdoppelt');
   pruefe(/id="schirmTaetigkeiten"/.test(QUELLE), 'es gibt eine eigene Seite');
   const pk = skript.match(/function projektKarteHtml\([\s\S]*?\n\}\n/);
-  pruefe(pk && /taetigKnopfHtml\(p, 'projekt'\)/.test(pk[0]), 'die Projektkarte hat den Knopf');
+  /* Seit v5.19.1 öffnet die Karte selbst die Seite — statt eines Knopfs ein Schild. */
+  pruefe(pk && /vhSchilderHtml\(p, 'projekt'\)/.test(pk[0]), 'die Projektkarte zeigt Tätigkeiten und Gedanken als Schild');
   const zk = skript.match(/function zielKarteHtml\([\s\S]*?\n\}\n/);
-  pruefe(zk && /taetigKnopfHtml\(z, 'ziel'\)/.test(zk[0]), 'die Zielkarte ebenso');
+  pruefe(zk && /vhSchilderHtml\(z, 'ziel'\)/.test(zk[0]), 'die Zielkarte ebenso');
   const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
   pruefe(dh && /vorhabenWahlHtml\(a\)/.test(dh[0]),
          'im Aufgabenblatt stehen Projekte und Ziele zur Wahl');
@@ -14737,6 +14752,29 @@ console.log('\n176. Vorhaben auf einer Seite');
     pruefe(e.reiter === true, 'am Handy wählt ein Reiter den Teil');
     pruefe(e.karte === true && e.springen === true, 'Karte und Verweis führen auf die Seite statt ins Blatt');
     pruefe(e.geloescht === true, 'Löschen aus dem Menü führt zurück zu den Vorhaben');
+  }
+}
+
+/* ============================================================
+   177. Vorhabenkarten ohne Knöpfe (v5.19.1)
+   Grund: Seit v5.19.0 öffnet die Karte die Seite mit Tätigkeiten und
+   Gedanken — die Knöpfe „Gedanken“ und „Tätigkeiten“ führten nur noch
+   doppelt dorthin. Dass es Gedanken gibt, zeigt jetzt ein Schild.
+   ============================================================ */
+console.log('\n177. Vorhabenkarten ohne Knöpfe');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__vkApi;
+  pruefe(!/function flaecheKnopfHtml\(/.test(skript) && !/function taetigKnopfHtml\(/.test(skript), 'die alten Knopf-Funktionen sind entfernt');
+  pruefe(/\.vk-knoepfe\{/.test(QUELLE) && /durchlaufStarten\(/.test(skript), 'die Knöpfe der Ablauf-Vorlagen behalten ihren Stil');
+  let e = null;
+  if (!t) { warn('Karten nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Karten laufen nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.keineKnoepfe === true, 'die Karte hat keine Knöpfe mehr');
+    pruefe(e.schilder === true, 'Tätigkeiten und Gedanken stehen als Schild');
+    pruefe(e.leer === true, 'ohne beides keine leere Schilderzeile');
+    pruefe(e.oeffnet === true, 'die Karte öffnet die Seite');
   }
 }
 
