@@ -1504,6 +1504,26 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__zielRuhtApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; DB = leereDatenbank();'
+                 + '   DB.ziele = [{ id: "z1", name: "Gewicht 73 kg", kontext: "privat", status: "laufend", zieltermin: "2027-06-30", zielzustaende: [] }];'
+                 + '   DB.projekte = [{ id: "p1", name: "Terrassendach", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   var z = DB.ziele[0], p = DB.projekte[0];'
+                 + '   r.zielOhne = vhZustand(z, "ziel") + "|" + vhZustandText(z, "ziel").split(" · ")[0];'
+                 + '   r.projektOhne = vhZustand(p, "projekt");'
+                 + '   z.status = "ruht"; p.status = "ruht";'
+                 + '   r.vonHand = vhZustand(z, "ziel") + "," + vhZustand(p, "projekt") + "|" + vhZustandText(z, "ziel").split(" · ")[0];'
+                 + '   z.status = "abgeschlossen"; r.erreicht = vhZustand(z, "ziel") + "|" + vhZustandText(z, "ziel");'
+                 + '   z.status = "laufend"; z.zieltermin = isoDatum(); r.heute = vhZustand(z, "ziel");'
+                 + '   z.status = "ruht"; r.ruhtImPlan = apVorhaben().some(function(x){ return x.v.id === "z1"; });'
+                 + '   taetigFuer = { art: "ziel", id: "z1" }; var k = tgKopfHtml(z, []);'
+                 + '   r.knoepfe = /tgFeld\\(.status.,.ruht.\\)">ruhend</.test(k) && />erreicht<\\/button>/.test(k)'
+                 + '     && /class="an" onclick="tgFeld\\(.status.,.ruht.\\)"/.test(k);'
+                 + '   taetigFuer = { art: "projekt", id: "p1" }; r.projektKnopf = />abgeschlossen<\\/button>/.test(tgKopfHtml(p, []));'
+                 + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14793,6 +14813,29 @@ console.log('\n178. Gedanken in voller Länge');
   const tz = hauptSkript().match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tz && /taetigAlleTermine \? kommend : kommend\.slice\(0, 6\)/.test(tz[0]) && /alle ' \+ kommend\.length \+ ' kommenden/.test(tz[0]),
          'Termine: sechs direkt, der Rest auf Knopfdruck — keine stille Grenze');
+}
+
+/* ============================================================
+   179. Ziele ruhen nicht von selbst (v5.19.3)
+   Grund: Ein Ziel ohne Tätigkeit stand unter „Ruht“ — wie ein Projekt,
+   das stillsteht. Ein Ziel läuft aber, bis es erreicht ist oder von
+   Hand ruhen gelassen wird.
+   ============================================================ */
+console.log('\n179. Ziele ruhen nicht von selbst');
+{
+  const t = globalThis.__zielRuhtApi;
+  let e = null;
+  if (!t) { warn('Zielzustand nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Zielzustand läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.zielOhne === 'laeuft|läuft', 'ein Ziel ohne Tätigkeiten läuft');
+    pruefe(e.projektOhne === 'ruht', 'ein Projekt ohne Tätigkeiten ruht weiterhin');
+    pruefe(e.vonHand === 'ruht,ruht|ruht', 'von Hand „ruhend“ gilt für Ziele und Projekte');
+    pruefe(e.erreicht === 'fertig|erreicht', 'ein abgeschlossenes Ziel heißt „erreicht“');
+    pruefe(e.heute === 'heute', 'am Zieltermin ist es heute dran');
+    pruefe(e.ruhtImPlan === true, 'ein ruhendes Vorhaben bleibt in der Planung erreichbar');
+    pruefe(e.knoepfe === true && e.projektKnopf === true, 'der Kopf bietet laufend · ruhend · erreicht bzw. abgeschlossen');
+  }
 }
 
 /* ============================================================

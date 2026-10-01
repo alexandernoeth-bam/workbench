@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.19.2</title>
+<title>Workbench 5.19.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2811,7 +2811,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.19.2';
+var APP_VERSION = '5.19.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -14380,9 +14380,12 @@ var VH_GRUPPEN = [['heute', 'Heute dran'], ['laeuft', 'Läuft'], ['ruht', 'Ruht'
                   ['fertig', 'Abgeschlossen']];
 
 /* Der Zustand kommt aus den Tätigkeiten: Was heute fällig ist, was
-   offen ist, und was seit einer Woche keine Regung zeigt. */
+   offen ist, und was seit einer Woche keine Regung zeigt.
+   Seit v5.19.3: Von Hand „ruhend“ gilt immer. Ein Ziel ruht nie von
+   selbst — es läuft, bis es erreicht ist, auch ohne Tätigkeiten. */
 function vhZustand(v, art) {
   if (v.status === 'abgeschlossen') { return 'fertig'; }
+  if (v.status === 'ruht') { return 'ruht'; }
   var heute = isoDatum();
   var t = vhTaetigkeiten(art, v.id);
   var i;
@@ -14398,6 +14401,7 @@ function vhZustand(v, art) {
   }
   var ende = (art === 'ziel') ? v.zieltermin : v.ende;
   if (ende && ende <= heute) { return 'heute'; }
+  if (art === 'ziel') { return 'laeuft'; }
   var offen = t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
   if (!offen) { return 'ruht'; }
   if (letzteRegung(art, v.id) < Date.now() - TAGW_TAGE * 86400000) { return 'ruht'; }
@@ -14408,7 +14412,7 @@ function vhZustandText(v, art) {
   var heute = isoDatum();
   var ende = (art === 'ziel') ? v.zieltermin : v.ende;
   var zustand = vhZustand(v, art);
-  if (zustand === 'fertig') { return 'abgeschlossen'; }
+  if (zustand === 'fertig') { return (art === 'ziel') ? 'erreicht' : 'abgeschlossen'; }
   var t = vhTaetigkeiten(art, v.id);
   var teile = [];
   if (zustand === 'heute') {
@@ -14418,7 +14422,7 @@ function vhZustandText(v, art) {
     teile.push(zahl ? (zahl + ' heute fällig') : 'heute dran');
   } else if (zustand === 'ruht') {
     var offen = t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
-    teile.push(offen ? 'seit über einer Woche nichts' : 'keine Tätigkeiten');
+    teile.push((v.status === 'ruht') ? 'ruht' : (offen ? 'seit über einer Woche nichts' : 'keine Tätigkeiten'));
   } else {
     teile.push('läuft');
   }
@@ -20179,8 +20183,9 @@ function tgKopfHtml(v, zahlen) {
      + '<span>bis</span><input type="date" value="' + esc(ende) + '" aria-label="Termin" onchange="tgFeld(\'' + endeFeld + '\',this.value)">'
      + (ende ? '<span>· ' + esc(restZeitText(isoDatum(), ende)) + '</span>' : '')
      + '<span class="tg-gruppe" role="group" aria-label="Status">'
-     + '<button type="button" class="' + (v.status !== 'abgeschlossen' ? 'an' : '') + '" onclick="tgFeld(\'status\',\'laufend\')">laufend</button>'
-     + '<button type="button" class="' + (v.status === 'abgeschlossen' ? 'an' : '') + '" onclick="tgFeld(\'status\',\'abgeschlossen\')">abgeschlossen</button></span>'
+     + '<button type="button" class="' + ((v.status !== 'abgeschlossen' && v.status !== 'ruht') ? 'an' : '') + '" onclick="tgFeld(\'status\',\'laufend\')">laufend</button>'
+     + '<button type="button" class="' + (v.status === 'ruht' ? 'an' : '') + '" onclick="tgFeld(\'status\',\'ruht\')">ruhend</button>'
+     + '<button type="button" class="' + (v.status === 'abgeschlossen' ? 'an' : '') + '" onclick="tgFeld(\'status\',\'abgeschlossen\')">' + (istZiel ? 'erreicht' : 'abgeschlossen') + '</button></span>'
      + '</div>';
   if (zahlen.length) { h += '<div class="tg-zahlen"><span>' + zahlen.join('</span><span>') + '</span></div>'; }
   /* Angeheftet als Vorhaben — ein Zettel aus dem früheren Detailblatt
