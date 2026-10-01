@@ -1440,6 +1440,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   kalStufe = merkS; kalAnker = merkA; kalFilter = merkF; DB = alt; apWegFrage = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__apKaertchenApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = kalStufe; var merkA = kalAnker; var merkF = kalFilter; DB = leereDatenbank(); kalFilter = "alle";'
+                 + '   DB.projekte = [{ id: "s1", name: "Solar und Wärmepumpe einbauen lassen", kontext: "privat", status: "laufend", ende: "2026-12-10", zielzustaende: [] }];'
+                 + '   var k = apEreignisHtml({ art: "grenze", text: "Ende Do 10.12.", titel: "Solar und Wärmepumpe einbauen lassen" });'
+                 + '   r.kaertchen = /<b>Ende Do 10\\.12\\.<\\/b><span class="pl-ereignis-name">Solar und Wärmepumpe einbauen lassen<\\/span>/.test(k);'
+                 + '   r.ohneName = apEreignisHtml({ art: "urlaub", text: "Urlaub" }) === \'<span class="pl-ereignis urlaub">Urlaub</span>\';'
+                 + '   kalStufe = "monat"; kalAnker = "2026-12-01"; kalZeichnen();'
+                 + '   r.tafel = /pl-ereignis-name">Solar und Wärmepumpe einbauen lassen</.test(document.getElementById("kalBlatt").innerHTML);'
+                 + '   kalStufe = "woche"; kalAnker = "2026-12-07"; kalZeichnen();'
+                 + '   var bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   r.woche = /pl-ereignis-name">Solar und Wärmepumpe einbauen lassen</.test(bl) && !/>Ende Do 10\\.12\\. · Solar/.test(bl);'
+                 + '   kalStufe = merkS; kalAnker = merkA; kalFilter = merkF; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14532,7 +14547,7 @@ console.log('\n170. Absichtsplanung im Monat');
     pruefe(e.zeilenNov === 'p5,z2' && e.zeilenDez === 'p1', 'eine Zeile hat, wer Menge oder Zielzustand im Monat hat — abgeschlossene nie');
     pruefe(e.zeilenBeruf === 'p1' && e.zeilenPrivat === '', 'der Filter Beruf/Privat gilt');
     pruefe(e.saetze === 'Carport-Fundament fertig|Schalung|true' && e.satzLeer === true, 'Monats- und Wochensatz werden gemerkt, leer gelöscht');
-    pruefe(/dienstreise:Dienstreise Hamburg/.test(e.ereignisse) && /grenze:Ende Fr/.test(e.ereignisse) && /grenze:Ziel Do/.test(e.ereignisse),
+    pruefe(/dienstreise:Dienstreise Hamburg/.test(e.ereignisse) && /grenze:Ende Fr 20\.11\./.test(e.ereignisse) && /grenze:Zieltermin Do 26\.11\./.test(e.ereignisse),
            'was die Woche prägt: Reise, Ende eines Projekts, Zieltermin');
     pruefe(e.tafeln === 3 && e.tafelInhalt === true, 'der Monat zeigt drei Monate als Tafeln mit Vorhaben und Wochen');
     pruefe(e.stell === true && e.gestellt === 2, 'eine Zelle wird über die Stellleiste geändert');
@@ -14631,6 +14646,25 @@ console.log('\n174. Schwerpunkt ohne Tage');
     pruefe(e.abgebrochen === true, 'abbrechen lässt alles stehen');
     pruefe(e.weg === true, 'bestätigt gehen Tage und Zielzustand der Woche mit');
     pruefe(e.fokusBleibt === true, 'ein Schwerpunkt bleibt, auch wenn seine Tage im Monat auf null gehen');
+  }
+}
+
+/* ============================================================
+   175. Wessen Ende? Das Kärtchen sagt es (v5.18.3)
+   Grund: „Ende Do“ stand allein im Kärtchen; welches Vorhaben endet,
+   verriet nur der Hinweis beim Darüberfahren — den es am Handy nicht gibt.
+   ============================================================ */
+console.log('\n175. Kärtchen mit Namen');
+{
+  const t = globalThis.__apKaertchenApi;
+  let e = null;
+  if (!t) { warn('Kärtchen nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Kärtchen laufen nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.kaertchen === true, 'das Kärtchen nennt Tag, Datum und das Vorhaben sichtbar');
+    pruefe(e.ohneName === true, 'Kärtchen ohne Vorhaben bleiben schlicht');
+    pruefe(e.tafel === true, 'in der Monatstafel steht der Name im Kärtchen');
+    pruefe(e.woche === true, 'in der Woche ebenso — ohne den Namen doppelt zu nennen');
   }
 }
 

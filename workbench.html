@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.18.2</title>
+<title>Workbench 5.18.3</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1317,6 +1317,11 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 .pl-ereignis.urlaub{background:color-mix(in srgb, #5C6B3A 18%, var(--karte))}
 .pl-ereignis.reise{background:color-mix(in srgb, #2E4A62 16%, var(--karte))}
 .pl-ereignis.grenze{background:color-mix(in srgb, var(--weinrot) 14%, var(--karte));color:var(--weinrot)}
+/* Seit v5.18.3 nennt das Kärtchen, wessen Ende es ist — am Handy gibt es kein Darüberfahren. */
+.pl-ereignis.mit-name{display:block;white-space:normal;max-width:160px;text-align:center;line-height:1.25;padding:2px 7px;border-radius:7px}
+.pl-ereignis .pl-ereignis-name{display:block;font-weight:400;opacity:.85;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.apw-merk .pl-ereignis.mit-name{max-width:none;text-align:left}
 .pl-wsatz{font-style:italic;white-space:normal;line-height:1.3;max-width:140px;margin:0 auto}
 .pl-vh{display:flex;gap:6px;align-items:center;font-weight:500}
 .pl-punkt{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:#2E4A62;display:inline-block}
@@ -2766,7 +2771,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.18.2';
+var APP_VERSION = '5.18.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -19426,7 +19431,8 @@ function apEreignisse(montag) {
   apVorhaben().forEach(function (x) {
     var grenze = (x.art === 'ziel') ? (x.v.zieltermin || '') : (x.v.ende || '');
     if (!grenze || grenze < montag || grenze > bis || !passtZumKalender(x.v.kontext)) { return; }
-    aus.push({ art: 'grenze', text: ((x.art === 'ziel') ? 'Ziel ' : 'Ende ') + wochentagKurz(grenze), titel: x.v.name });
+    aus.push({ art: 'grenze', text: ((x.art === 'ziel') ? 'Zieltermin ' : 'Ende ') + wochentagKurz(grenze) + ' ' + kurzDatum(grenze).replace(/^\S+\s/, ''),
+               titel: x.v.name });
   });
   return aus;
 }
@@ -19561,9 +19567,16 @@ function apKapText(verf, verg) {
   return '<span class="' + klasse + '">' + (verg ? apZahl(verg) : '0') + '/' + verf + '</span>';
 }
 
+/* Ein Kärtchen dafür, was die Woche prägt. Gehört es zu einem Vorhaben,
+   steht dessen Name sichtbar darunter — nicht nur im Hinweis beim
+   Darüberfahren, den es am Handy nicht gibt (bis v5.18.2). */
 function apEreignisHtml(e) {
   var klasse = { urlaub: 'urlaub', krank: 'urlaub', dienstreise: 'reise', abwesend: 'reise', grenze: 'grenze' }[e.art] || '';
-  return '<span class="pl-ereignis ' + klasse + '"' + (e.titel ? ' title="' + esc(e.titel) + '"' : '') + '>' + esc(e.text) + '</span>';
+  if (e.titel) {
+    return '<span class="pl-ereignis mit-name ' + klasse + '" title="' + esc(e.text + ' · ' + e.titel) + '">'
+         + '<b>' + esc(e.text) + '</b><span class="pl-ereignis-name">' + esc(e.titel) + '</span></span>';
+  }
+  return '<span class="pl-ereignis ' + klasse + '">' + esc(e.text) + '</span>';
 }
 
 function apMonatHtml(m) {
@@ -19835,7 +19848,7 @@ function apWocheHtml(montag) {
   var ev = apEreignisse(montag);
   if (ev.length) {
     h += '<div class="apw-merk">' + ev.map(function (e) {
-      return apEreignisHtml(e.titel ? { art: e.art, text: e.text + ' · ' + e.titel } : e);
+      return apEreignisHtml(e);
     }).join('') + '</div>';
   }
 
