@@ -1277,6 +1277,29 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; tagOffen = merkTag; schirmOffen = merkS; aktionFuer = "";'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__musikApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var merkL = window.localStorage; var ablage = {};'
+                 + '   window.localStorage = { getItem: function(k){ return ablage[k] || null; },'
+                 + '     setItem: function(k, v){ ablage[k] = v; }, removeItem: function(k){ delete ablage[k]; } };'
+                 + '   r.ohne = routineMusikOeffnen() === false;'
+                 + '   var pl = "https://music.amazon.de/playlists/B0ABCDEF12?ref=dm_sh_xyz";'
+                 + '   r.android = routineMusikAdresse(pl, true);'
+                 + '   r.pc = routineMusikAdresse(pl, false);'
+                 + '   r.fremd = routineMusikAdresse("https://open.spotify.com/playlist/37i9", true);'
+                 + '   r.http = routineMusikSetzen("http://music.amazon.de/x") === false && !ablage["workbench-routine-musik"];'
+                 + '   r.unsinn = routineMusikSetzen("meine Playlist") === false;'
+                 + '   r.gesetzt = routineMusikSetzen("  " + pl + "  ") === true && routineMusikLink() === pl;'
+                 + '   r.nichtImBestand = JSON.stringify(DB).indexOf("B0ABCDEF12") < 0;'
+                 + '   var el = document.getElementById("routineMusik"); routineMusikZeichnen();'
+                 + '   r.feld = /id="routineMusikFeld"/.test(el.innerHTML) && /routineMusikOeffnen\\(\\)/.test(el.innerHTML) && /Amazon Music/.test(el.innerHTML);'
+                 + '   r.geloescht = routineMusikSetzen("") === true && routineMusikLink() === "";'
+                 + '   routineMusikZeichnen(); r.ohneKnoepfe = !/routineMusikOeffnen/.test(el.innerHTML);'
+                 + '   r.amazonFormen = [istAmazonMusik("https://music.amazon.com/albums/B1"), istAmazonMusik("https://www.amazon.de/music/player/playlists/X"),'
+                 + '     istAmazonMusik("https://www.amazon.de/dp/B0HKJFC7XT")].join(",");'
+                 + '   window.localStorage = merkL;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14306,6 +14329,36 @@ console.log('\n168. Tagesplan aufstellen am Handy');
          'der Titel steht dort in einer eigenen Zeile, ganz');
   const breit = QUELLE.match(/\n\.p-k-titel\{[^}]*\}/);
   pruefe(breit && /white-space:nowrap/.test(breit[0]), 'am großen Bildschirm bleibt die Zeile einreihig');
+}
+
+/* ============================================================
+   169. Musik zum Start der Morgenroutine (v5.16.0)
+   ============================================================ */
+console.log('\n169. Musik zur Morgenroutine');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__musikApi;
+  const rs = skript.match(/function routineStarten\([\s\S]*?\n\}/);
+  pruefe(rs && /routineMusikOeffnen\(\);[\s\S]*zeigeSchirm\('Routine'\)/.test(rs[0]),
+         'der Start der Routine öffnet zuerst die Musik — im selben Tipp');
+  pruefe(/id="routineMusik"/.test(QUELLE), 'die Einstellungen haben ein Feld dafür');
+  let e = null;
+  if (!t) { warn('Musik nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Musik läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.ohne === true, 'ohne Link geschieht nichts');
+    pruefe(e.android === 'intent://music.amazon.de/playlists/B0ABCDEF12?ref=dm_sh_xyz#Intent;scheme=https;package=com.amazon.mp3;end',
+           'unter Android öffnet ein App-Link die Amazon-Music-App');
+    pruefe(!/browser_fallback_url/.test(e.android), 'ohne Rückfalladresse — die würde die Workbench verlassen');
+    pruefe(e.pc === 'https://music.amazon.de/playlists/B0ABCDEF12?ref=dm_sh_xyz', 'am PC der Link selbst');
+    pruefe(e.fremd === 'https://open.spotify.com/playlist/37i9', 'andere Dienste bekommen ihren Link unverändert');
+    pruefe(e.amazonFormen === 'true,true,false', 'Amazon Music wird erkannt, ein Shop-Artikel nicht');
+    pruefe(e.http === true && e.unsinn === true, 'nur https-Links werden angenommen');
+    pruefe(e.gesetzt === true, 'der Link wird gemerkt, Leerzeichen fallen weg');
+    pruefe(e.nichtImBestand === true, 'er gilt nur für dieses Gerät und geht nicht in den Abgleich');
+    pruefe(e.feld === true, 'mit Link gibt es „Ausprobieren“ und „Entfernen“');
+    pruefe(e.geloescht === true && e.ohneKnoepfe === true, 'entfernt ist er weg, die Knöpfe auch');
+  }
 }
 
 /* ============================================================

@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.15.1</title>
+<title>Workbench 5.16.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1281,6 +1281,9 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 /* Erinnerungen im Diagnose-Bildschirm */
 .er-reihe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
 .er-etikett{font-size:calc(var(--fs)*0.76);color:var(--grau);margin-right:4px}
+/* Musik zum Start der Morgenroutine (seit v5.16.0) */
+.rm-name{display:block;font-size:calc(var(--fs)*0.78);color:var(--grau);margin:12px 0 4px}
+.rm-feld{width:100%}
 /* Nummerierte Listen (seit v5.14.0) */
 .fl-nr{flex:0 0 auto;min-width:1.6em;text-align:right;color:var(--weinrot);font-weight:600;
   font-family:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;font-size:calc(var(--fs)*0.76)}
@@ -2341,9 +2344,11 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 
   <div class="abschnitt-titel"><span>Morgenroutine</span></div>
   <div id="routineListe"></div>
+  <div id="routineMusik"></div>
   <div class="feld-hinweis">Ein fester Ablauf, mit dem der Tag beginnt. Vormittags
     zeigt der Tageskopf eine Sonne, solange sie aussteht — aufschlagen tut sie sich
-    nicht von selbst.</div>
+    nicht von selbst. Ein Link bei „Musik zum Start“ öffnet sich mit der Routine,
+    nur auf dem Gerät, auf dem er eingetragen ist.</div>
 
   <div class="abschnitt-titel"><span>Eigener Satz im Tag</span></div>
   <textarea id="leitsatzFeld" class="d-text" rows="2"
@@ -2635,7 +2640,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.15.1';
+var APP_VERSION = '5.16.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -6513,6 +6518,8 @@ function routineFaellig(is) {
 }
 
 function routineStarten() {
+  /* Musik zuerst — der Tipp auf die Sonne erlaubt das Öffnen einer App. */
+  routineMusikOeffnen();
   zeigeSchirm('Routine');
 }
 
@@ -6687,6 +6694,7 @@ function routineLeitsatz(text) {
 }
 
 function zeichneRoutine() {
+  routineMusikZeichnen();
   var ziel = document.getElementById('routineListe');
   if (!ziel) { return; }
   /* Wer gerade in einem dieser Felder schreibt, verliert sonst den
@@ -19043,6 +19051,93 @@ function diesmalHtml(a) {
        + '<div class="d-reihe"><button type="button" onclick="diesmalVerlegen(\'' + is + '\')">Verlegen</button></div>'
        + '<div class="d-hinweis">Nur diese Ausführung — die Regel bleibt, wie sie ist.</div>'
        + '</div>';
+}
+
+
+/* ============================================================
+   Musik zum Start der Morgenroutine
+
+   Ein Link (etwa eine Amazon-Music-Playlist), der sich öffnet, wenn die
+   Morgenroutine beginnt. Er gilt nur für das Gerät, auf dem er
+   eingetragen ist — am Handy Musik, am Arbeits-PC keine. Unter Android
+   spricht ein App-Link die Amazon-Music-App direkt an; ob sie sofort
+   abspielt, entscheidet die App selbst. Der Start ist ein Tipp auf die
+   Sonne — nur aus einem Tipp heraus darf eine Seite eine App öffnen.
+   ============================================================ */
+
+var ROUTINE_MUSIK_SCHLUESSEL = 'workbench-routine-musik';
+var AMAZON_MUSIC_PAKET = 'com.amazon.mp3';
+
+function routineMusikLink() {
+  try {
+    return (window.localStorage && window.localStorage.getItem(ROUTINE_MUSIK_SCHLUESSEL)) || '';
+  } catch (f) {
+    return '';
+  }
+}
+
+/* Nur https-Adressen; leer löscht den Link. Gibt zurück, ob es gilt. */
+function routineMusikSetzen(wert) {
+  var url = String(wert || '').trim();
+  if (url && !/^https:\/\/[^\s]+$/i.test(url)) {
+    melde('Bitte einen Link einfügen, der mit https:// beginnt.', 'warn');
+    return false;
+  }
+  try {
+    if (window.localStorage) {
+      if (url) { window.localStorage.setItem(ROUTINE_MUSIK_SCHLUESSEL, url); }
+      else { window.localStorage.removeItem(ROUTINE_MUSIK_SCHLUESSEL); }
+    }
+  } catch (f) { return false; }
+  routineMusikZeichnen();
+  return true;
+}
+
+function istAmazonMusik(url) {
+  return /^https:\/\/(music\.amazon\.[a-z.]+|(www\.)?amazon\.[a-z.]+\/music)\//i.test(String(url || ''));
+}
+
+/* Die Adresse, die geöffnet wird: unter Android für Amazon Music ein
+   App-Link (ohne Rückfalladresse — die würde die Workbench verlassen),
+   sonst der Link selbst. */
+function routineMusikAdresse(url, android) {
+  if (!url) { return ''; }
+  if (android && istAmazonMusik(url)) {
+    return 'intent://' + url.replace(/^https:\/\//i, '') + '#Intent;scheme=https;package='
+         + AMAZON_MUSIC_PAKET + ';end';
+  }
+  return url;
+}
+
+function routineMusikOeffnen() {
+  var url = routineMusikLink();
+  if (!url) { return false; }
+  var android = istAndroid();
+  var adresse = routineMusikAdresse(url, android);
+  if (android) {
+    adresseAnklicken(adresse);
+  } else {
+    window.open(adresse, '_blank', 'noopener');
+  }
+  return true;
+}
+
+function routineMusikZeichnen() {
+  var el = document.getElementById('routineMusik');
+  if (!el || imFeldGeschrieben(el)) { return; }
+  var url = routineMusikLink();
+  /* Bezeichnung über dem Feld: am Handy wäre neben dem Feld kein Platz. */
+  var h = '<label class="rm-name" for="routineMusikFeld">Musik zum Start</label>'
+        + '<input type="url" class="d-text rm-feld" id="routineMusikFeld" placeholder="Link zur Playlist (https://…)" '
+        + 'value="' + esc(url) + '" onchange="routineMusikSetzen(this.value)">';
+  if (url) {
+    h += '<div class="er-reihe">'
+       + '<button type="button" class="sl-pille" onclick="routineMusikOeffnen()">Ausprobieren</button>'
+       + '<button type="button" class="sl-pille" onclick="routineMusikSetzen(\'\')">Entfernen</button>'
+       + '<span class="er-etikett">' + (istAmazonMusik(url) ? 'Amazon Music' : 'Link') + ' · nur auf diesem Gerät</span>'
+       + '</div>';
+  }
+  el.innerHTML = h;
 }
 
 
