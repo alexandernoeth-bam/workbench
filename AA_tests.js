@@ -1455,6 +1455,41 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   kalStufe = merkS; kalAnker = merkA; kalFilter = merkF; DB = alt;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__tgApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = schirmOffen; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id: "h1", name: "Halbmarathon Fürth", kontext: "beruflich", status: "laufend", ende: "2027-06-20", zielzustaende: [] }];'
+                 + '   DB.aufgaben.push({ id: "a1", titel: "Anmeldung Wieland Lauf", kontext: "privat", projektId: "h1", planung: "backlog", art: "haupt", status: "offen", geaendert: 1 });'
+                 + '   var v = DB.projekte[0];'
+                 + '   taetigOeffnen("projekt", "h1");'
+                 + '   r.vorbereitet = vhDetail === "h1" && vhDetailArt === "projekt" && schirmOffen === "Taetigkeiten";'
+                 + '   taetigZeichnen(); var bl = document.getElementById("taetigBlatt").innerHTML;'
+                 + '   r.kopf = /id="tgName"[^>]*value="Halbmarathon Fürth"/.test(bl) && /tgFeld\\(.kontext.,.privat.\\)/.test(bl)'
+                 + '     && /type="date" value="2027-06-20"/.test(bl) && /tgFeld\\(.status.,.abgeschlossen.\\)/.test(bl) && /tgMenueUm\\(\\)/.test(bl);'
+                 + '   r.teile = /data-tg="woche"/.test(bl) && /data-tg="taetig"/.test(bl) && /data-tg="termine"/.test(bl) && /data-tg="gedanken"/.test(bl)'
+                 + '     && /tgReiterSetzen\\(/.test(bl) && /Was tue ich diese Woche dafür\\?/.test(bl) && /apWochenStand\\(/.test(bl);'
+                 + '   r.nadeln = /tgAufgabePin\\(.a1.\\)/.test(bl) && /pinUm\\(.flaeche.,.h1.\\)/.test(bl) && /pinUm\\(.taetigkeiten.,.p:h1.\\)/.test(bl);'
+                 + '   tgFeld("kontext", "privat"); r.kontext = v.kontext;'
+                 + '   tgFeld("status", "abgeschlossen"); r.status = v.status; tgFeld("status", "laufend");'
+                 + '   tgName("Fürth Metropol Halbmarathon"); r.name = v.name;'
+                 + '   tgZustand("3× laufen"); r.zustand = zustandText(v);'
+                 + '   var sheet = document.getElementById("aktionSheet"); sheet.classList.remove("auf");'
+                 + '   tgAufgabePin("a1"); r.pinAn = !!pinFinden("aufgabe", "a1") && !sheet.classList.contains("auf");'
+                 + '   tgAufgabePin("a1"); r.pinAus = !pinFinden("aufgabe", "a1");'
+                 + '   flaecheSetzen("h1", "## Trainingsplan\\n[] Lauf 6 km\\n[] Lauf 8 km");'
+                 + '   tgGedankenModus = "ansicht"; taetigZeichnen(); bl = document.getElementById("taetigBlatt").innerHTML;'
+                 + '   r.gedanken = /tgKastenUm\\(1\\)/.test(bl) && !/flaecheKastenUm\\(/.test(bl) && /Trainingsplan/.test(bl);'
+                 + '   tgKastenUm(1); r.kasten = flaecheText("h1").split("\\n")[1];'
+                 + '   tgGedankenModusSetzen("schreiben"); bl = document.getElementById("taetigBlatt").innerHTML;'
+                 + '   r.schreiben = /class="tg-g-feld"/.test(bl) && /oninput="tgGedankenSetzen\\(this\\.value\\)"/.test(bl);'
+                 + '   tgGedankenSetzen("Neu"); r.gesetzt = flaecheText("h1"); tgGedankenModusSetzen("ansicht");'
+                 + '   tgReiterSetzen("gedanken"); r.reiter = /data-reiter="gedanken"/.test(document.getElementById("taetigBlatt").innerHTML);'
+                 + '   r.karte = /onclick="taetigOeffnen\\(.projekt.,.h1.\\)"/.test(projektKarteHtml(v));'
+                 + '   schirmOffen = "Tag"; wbSpringen("projekt", "h1"); r.springen = schirmOffen === "Taetigkeiten";'
+                 + '   tgLoeschen(); r.geloescht = DB.projekte.length === 0 && schirmOffen === "Vorhaben";'
+                 + '   DB = alt; schirmOffen = merkS; tgReiter = "woche"; tgGedankenModus = "ansicht";'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -11559,9 +11594,12 @@ console.log('\n105. Tätigkeiten anheften');
   pruefe(/taetigkeiten: 'Tätigkeiten'/.test(skript), 'die Pinnwand kennt die neue Art');
   pruefe(new RegExp('function\\s+terminIstVorbei\\s*\\(').test(skript),
          'Funktion terminIstVorbei ist definiert');
-  const tz = skript.match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && /pinKnopfHtml\('taetigkeiten', pinSchl\)/.test(tz[0]),
+  /* Seit v5.19.0 sitzt der Anheftknopf im Kopf der Seite (tgKopfHtml);
+     ein Zettel aus dem früheren Detailblatt gilt dort weiter. */
+  const tk = skript.match(/function tgKopfHtml\([\s\S]*?\n\}\n/);
+  pruefe(tk && /pinKnopfHtml\(art, schl\)/.test(tk[0]) && /'taetigkeiten'/.test(tk[0]),
          'die Seite hat den Anheftknopf');
+  const tz = skript.match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tz && /!terminIstVorbei\(x\)/.test(tz[0]),
          'kommend ist, was nicht vorbei ist — auch innerhalb von heute');
   const po = skript.match(/function pinOeffnen\([\s\S]*?\n\}/);
@@ -14665,6 +14703,40 @@ console.log('\n175. Kärtchen mit Namen');
     pruefe(e.ohneName === true, 'Kärtchen ohne Vorhaben bleiben schlicht');
     pruefe(e.tafel === true, 'in der Monatstafel steht der Name im Kärtchen');
     pruefe(e.woche === true, 'in der Woche ebenso — ohne den Namen doppelt zu nennen');
+  }
+}
+
+/* ============================================================
+   176. Ein Vorhaben auf einer Seite (v5.19.0)
+   Grund: Ein Vorhaben verteilte sich auf drei Fenster — Seite, Detail-
+   blatt, Gedankenfläche. Jetzt steht alles auf einer Seite; angeheftet
+   wird weiter getrennt: Vorhaben, Gedanken, jede Tätigkeit.
+   ============================================================ */
+console.log('\n176. Vorhaben auf einer Seite');
+{
+  const skript = hauptSkript();
+  const t = globalThis.__tgApi;
+  const pb = skript.match(/function pinBlattNeu\([\s\S]*?\n\}/);
+  pruefe(pb && /schirmOffen === 'Taetigkeiten'/.test(pb[0]), 'nach dem Anheften zeichnet sich die Seite nach');
+  pruefe(/if \(p\.art === 'projekt' \|\| p\.art === 'ziel'\) \{ taetigOeffnen\(p\.art, p\.zielId\); return; \}/.test(skript),
+         'ein Zettel des Vorhabens öffnet die Seite');
+  let e = null;
+  if (!t) { warn('Vorhabenseite nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Vorhabenseite läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.vorbereitet === true, 'die Seite öffnet sich und kennt ihr Vorhaben');
+    pruefe(e.kopf === true, 'der Kopf trägt Name, Kontext, Termin, Status und das Menü ⋯');
+    pruefe(e.teile === true, 'Woche, Tätigkeiten, Termine und Gedanken stehen auf der Seite, mit Reitern fürs Handy');
+    pruefe(e.nadeln === true, 'Vorhaben, Gedanken und jede Tätigkeit haben ihre eigene Nadel');
+    pruefe(e.kontext === 'privat' && e.status === 'abgeschlossen' && e.name === 'Fürth Metropol Halbmarathon',
+           'Kontext, Status und Name lassen sich auf der Seite ändern');
+    pruefe(e.zustand === '3× laufen', 'der Zielzustand der Woche wird auf der Seite gepflegt');
+    pruefe(e.pinAn === true && e.pinAus === true, 'eine Tätigkeit wird angeheftet, ohne dass sich ihr Blatt öffnet');
+    pruefe(e.gedanken === true && e.kasten === '[x] Lauf 6 km', 'die eingebetteten Gedanken lassen sich abhaken');
+    pruefe(e.schreiben === true && e.gesetzt === 'Neu', 'und direkt auf der Seite schreiben');
+    pruefe(e.reiter === true, 'am Handy wählt ein Reiter den Teil');
+    pruefe(e.karte === true && e.springen === true, 'Karte und Verweis führen auf die Seite statt ins Blatt');
+    pruefe(e.geloescht === true, 'Löschen aus dem Menü führt zurück zu den Vorhaben');
   }
 }
 
