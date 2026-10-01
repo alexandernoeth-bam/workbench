@@ -1399,6 +1399,19 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   kalFilter = merkF; kalStufe = merkS; kalAnker = merkA; DB = alt;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__apwAufgabenApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = kalStufe; var merkA = kalAnker; DB = leereDatenbank();'
+                 + '   var mo = montagVon(isoDatum());'
+                 + '   DB.aufgaben.push({ id: "w1", titel: "Reisekostenantrag stellen", kontext: "beruflich", planung: "woche", art: "haupt",'
+                 + '     status: "offen", angelegtAm: isoDatum(), geaendert: 1 });'
+                 + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen();'
+                 + '   r.liste = /Reisekostenantrag stellen/.test(document.getElementById("kalBlatt").innerHTML);'
+                 + '   var f = document.getElementById("wochenNeu"); f.value = "IBAN ändern"; wochenAufgabeNeu(mo);'
+                 + '   r.neu = DB.aufgaben.some(function(a){ return a.titel === "IBAN ändern"; });'
+                 + '   kalStufe = merkS; kalAnker = merkA; DB = alt;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14540,6 +14553,29 @@ console.log('\n172. Absichtsplanung in der Woche');
     pruefe(e.blatt === true, 'die Woche zeigt Monatssatz, Wochensatz, Meilenstein, Zielzustand und Rückblick — ohne Tagesspalten');
     pruefe(e.vorgang === true && e.vorgangNurJetzt === true, 'laufende Vorgänge mit Vorhaben und Fortschritt, in der aktuellen Woche');
     pruefe(e.filter === 'p1', 'der Filter Beruf/Privat gilt auch hier');
+  }
+}
+
+/* ============================================================
+   173. Die Woche zeigt ihre Aufgaben (v5.18.1)
+   Grund: Mit den Tagesspalten fielen in 5.18.0 auch die Aufgaben der
+   Woche weg — Liste, „Vornehmen“ und Kleinigkeiten. Abbestellt waren
+   nur die Tage.
+   ============================================================ */
+console.log('\n173. Aufgaben in der Woche');
+{
+  const skript = hauptSkript();
+  const aw = skript.match(/function apWocheHtml\([\s\S]*?\n\}/);
+  pruefe(aw && /wochenListeHtml\(montag\)/.test(aw[0]), 'die Woche zeigt ihre Aufgaben');
+  pruefe(aw && /id="wochenNeu"/.test(aw[0]) && /wochenAufgabeNeu\(/.test(aw[0]), 'man kann sich dort Aufgaben vornehmen');
+  pruefe(aw && /wochenKleinHtml\(montag\)/.test(aw[0]), 'und sieht die Kleinigkeiten der Woche');
+  const t = globalThis.__apwAufgabenApi;
+  let e = null;
+  if (t) { try { e = t.pruefe(); } catch (x) { fail('Wochenaufgaben laufen nicht: ' + x.message); } }
+  else { warn('Wochenaufgaben nicht auswertbar'); }
+  if (e) {
+    pruefe(e.liste === true, 'eine vorgemerkte Aufgabe erscheint in der Wochensicht');
+    pruefe(e.neu === true, '„Vornehmen“ legt eine Aufgabe für diese Woche an');
   }
 }
 
