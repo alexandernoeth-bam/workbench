@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.19.4</title>
+<title>Workbench 5.19.5</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1288,7 +1288,7 @@ body:not(.breit) .nb-such-kopf .fl-arten{display:flex}
 .pl-monat-name{font-size:calc(var(--fs)*0.95);font-weight:600;display:flex;gap:10px;align-items:baseline}
 .pl-monat-name small{font-size:calc(var(--fs)*0.7);font-weight:400;color:var(--grau)}
 .pl-satz{display:flex;gap:8px;align-items:center;margin:5px 0}
-.pl-etikett{font-size:calc(var(--fs)*0.62);letter-spacing:.05em;font-weight:600;color:var(--grau);text-transform:uppercase;
+.pl-etikett{font-size:calc(var(--fs)*0.62);letter-spacing:.05em;font-weight:600;color:var(--tinte);text-transform:uppercase;
   flex:0 0 auto;min-width:86px}
 .pl-satz input{flex:1;min-width:0;font:inherit;border:1px solid transparent;background:transparent;border-radius:6px;
   padding:4px 6px;color:var(--tinte)}
@@ -1415,6 +1415,14 @@ body:not(.breit) .tg-seite[data-reiter="gedanken"] [data-tg="gedanken"]{display:
 .apw{max-width:860px}
 .apw-lesen{font-size:calc(var(--fs)*0.8);color:var(--grau)}
 .apw-merk{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+/* Kompakte Vorhabenkachel der Woche (seit v5.19.5) */
+.apw-vh{padding:6px 0 4px}
+.apw .apw-titel{font-size:calc(var(--fs)*0.85)}
+.apw-zeile2{display:flex;gap:6px;align-items:flex-start;margin-top:2px}
+.apw-zfeld{flex:1;padding-left:2px}
+.apw-rueck.apw-rueck-kurz{display:inline-flex;gap:3px;margin:2px 0 0;flex:0 0 auto}
+.apw-rueck-kurz button{width:28px;height:26px;padding:0;font-size:calc(var(--fs)*0.75);line-height:1;text-align:center}
+.apw-mziel{margin:2px 0 0 16px}
 /* Seit v5.19.4: einheitliche Schrift in der Woche — Felder erben nicht
    mehr eine größere Grundschrift; am Handy steht die Bezeichnung über dem
    Feld, damit der Satz die ganze Breite hat. */
@@ -1431,7 +1439,7 @@ body:not(.breit) .tg-seite[data-reiter="gedanken"] [data-tg="gedanken"]{display:
 body:not(.breit) .apw .pl-satz{flex-direction:column;align-items:stretch;gap:2px;margin:8px 0}
 body:not(.breit) .apw .pl-etikett{min-width:0}
 body:not(.breit) .apw-vh .pl-satz{margin:6px 0 2px}
-.apw-abschnitt{font-size:calc(var(--fs)*0.62);letter-spacing:.06em;color:var(--grau);font-weight:600;text-transform:uppercase;margin:16px 0 6px}
+.apw-abschnitt{font-size:calc(var(--fs)*0.62);letter-spacing:.06em;color:var(--tinte);font-weight:600;text-transform:uppercase;margin:16px 0 6px}
 .apw-block{background:var(--karte);border:1px solid var(--linie);border-radius:10px;padding:4px 12px}
 .apw-vh{border-top:1px solid var(--linie);padding:8px 0 6px}
 .apw-vh:first-child{border-top:0}
@@ -2814,7 +2822,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.19.4';
+var APP_VERSION = '5.19.5';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -19878,7 +19886,7 @@ function apWocheHtml(montag) {
     var mz = apMonatsziel(v, m);
     var kennung = '\'' + esc(v.id) + '\',\'' + x.art + '\',\'' + montag + '\'';
     h += '<div class="apw-vh"><div class="apw-vh-oben"><span class="pl-punkt ' + esc(v.kontext || 'beruflich') + '"></span>'
-       + '<span class="pl-art">' + (x.art === 'ziel' ? 'ZIEL' : 'PROJEKT') + '</span>'
+       + '<span class="pl-art" title="' + (x.art === 'ziel' ? 'Ziel' : 'Projekt') + '">' + (x.art === 'ziel' ? 'Z' : 'P') + '</span>'
        + '<span class="apw-titel">' + esc(v.name || '') + '</span>'
        + (menge ? '<span class="apw-tage">im Monat: ' + (rh ? (menge + '×') : (apZahl(menge) + ' T')) + '</span>' : '')
        + '<button type="button" class="apw-weg" onclick="apWocheWeg(' + kennung + ')" '
@@ -19893,15 +19901,18 @@ function apWocheHtml(montag) {
     if (mz && mz.satz) {
       h += '<div class="apw-mziel">Im ' + esc(MONATE_LANG[Number(m.slice(5, 7)) - 1]) + ': <b>' + esc(mz.satz) + '</b></div>';
     }
-    h += '<div class="pl-satz apw-zustand"><span class="pl-etikett">Zielzustand</span>'
-       + '<textarea class="apw-feld" rows="1" placeholder="Wo soll es am Ende der Woche stehen?" '
+    /* Seit v5.19.5 kompakt: Zielzustand und Rückblick in einer Zeile,
+       ohne eigene Bezeichnungszeile; die Wörter stehen im Hinweis. */
+    h += '<div class="apw-zeile2">'
+       + '<textarea class="apw-feld apw-zfeld" rows="1" placeholder="Zielzustand: Wo soll es am Freitag stehen?" '
        + 'aria-label="Zielzustand ' + esc(v.name || '') + '" onchange="apZustandSetzen(' + kennung + ',this.value)">'
-       + esc(z.satz || '') + '</textarea></div>'
-       + '<div class="apw-rueck" role="group" aria-label="Rückblick auf die Woche">'
+       + esc(z.satz || '') + '</textarea>'
+       + '<span class="apw-rueck apw-rueck-kurz" role="group" aria-label="Rückblick auf die Woche">'
        + AP_STAENDE.map(function (st) {
-           return '<button type="button" class="' + st + (z.stand === st ? ' an' : '') + '" onclick="apWochenStand(' + kennung + ',\'' + st + '\')">'
-                + AP_STAND_ZEICHEN[st] + ' ' + { ja: 'erreicht', teils: 'teilweise', nein: 'nicht' }[st] + '</button>';
-         }).join('') + '</div></div>';
+           var wort = { ja: 'erreicht', teils: 'teilweise', nein: 'nicht erreicht' }[st];
+           return '<button type="button" class="' + st + (z.stand === st ? ' an' : '') + '" onclick="apWochenStand(' + kennung + ',\'' + st + '\')" '
+                + 'title="' + wort + '" aria-label="' + wort + '">' + AP_STAND_ZEICHEN[st] + '</button>';
+         }).join('') + '</span></div></div>';
   });
   h += '</div>';
   h += '<button type="button" class="pl-neu" onclick="apWocheWahlUm()" aria-expanded="' + (apWocheWahl ? 'true' : 'false') + '">+ Vorhaben in diese Woche</button>';

@@ -1533,10 +1533,24 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   apSatzSetzen("woche", mo, "Solaranlage ist geklärt und beauftragt, Wärmepumpe angefragt");'
                  + '   var h = apWocheHtml(mo);'
                  + '   r.ohneZaehler = !/von \\d+ Tagen?/.test(h) && !/apw-kap/.test(h) && !/Tage verteilst du/.test(h);'
-                 + '   r.felder = (h.match(/<textarea class="apw-feld"/g) || []).length;'
+                 + '   r.felder = (h.match(/<textarea class="apw-feld[ "]/g) || []).length;'
                  + '   r.ganzerSatz = /beauftragt, Wärmepumpe angefragt<\\/textarea>/.test(h);'
                  + '   r.hinweisBleibt = /im Monat: 2 T/.test(h);'
                  + '   DB = alt; kalStufe = merkS; kalAnker = merkA;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__apwKompaktApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; DB = leereDatenbank();'
+                 + '   var mo = montagVon(isoDatum());'
+                 + '   DB.projekte = [{ id: "s1", name: "Solar und Wärmepumpe", kontext: "privat", status: "laufend", zielzustaende: [], planWochen: {} }];'
+                 + '   DB.projekte[0].planWochen[mo] = { tage: 0, mal: 0, fokus: true };'
+                 + '   var h = apWocheHtml(mo);'
+                 + '   var kachel = (h.match(/<div class="apw-vh">[\\s\\S]*?<\\/span><\\/div><\\/div>/) || [""])[0];'
+                 + '   r.kurz = />P<\\/span>/.test(kachel) && !/PROJEKT/.test(kachel) && !/>Zielzustand<\\/span>/.test(kachel);'
+                 + '   r.eineZeile = /<div class="apw-zeile2"><textarea[\\s\\S]*?<\\/textarea><span class="apw-rueck apw-rueck-kurz"/.test(kachel);'
+                 + '   r.woerter = /title="erreicht" aria-label="erreicht">✓</.test(kachel) && /aria-label="nicht erreicht">✗</.test(kachel);'
+                 + '   DB = alt;'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
@@ -14878,6 +14892,27 @@ console.log('\n180. Woche am Pixel');
     pruefe(e.felder === 2, 'Wochensatz und Zielzustand sind umbrechende Felder');
     pruefe(e.ganzerSatz === true, 'ein langer Satz steht vollständig da');
     pruefe(e.hinweisBleibt === true, 'der Hinweis auf Tage aus dem Monat bleibt beim Vorhaben');
+  }
+}
+
+/* ============================================================
+   181. Kompakte Vorhabenkachel, dunklere Überschriften (v5.19.5)
+   Grund: Die Kachel eines Vorhabens in der Woche war am Pixel riesig —
+   vier Zeilen mit „PROJEKT“, Bezeichnung „Zielzustand“ und langen
+   Rückblick-Knöpfen. Die Überschriften waren zu blass.
+   ============================================================ */
+console.log('\n181. Kompakte Vorhabenkachel');
+{
+  const t = globalThis.__apwKompaktApi;
+  pruefe(/\.pl-etikett\{[^}]*color:var\(--tinte\)/.test(QUELLE) && /\.apw-abschnitt\{[^}]*color:var\(--tinte\)/.test(QUELLE),
+         'Überschriften stehen in Textfarbe, nicht grau');
+  let e = null;
+  if (!t) { warn('Kachel nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Kachel läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.kurz === true, 'kurzes P statt „PROJEKT“, keine eigene Zeile „Zielzustand“');
+    pruefe(e.eineZeile === true, 'Zielzustand und Rückblick stehen in einer Zeile');
+    pruefe(e.woerter === true, 'die Rückblick-Knöpfe nennen ihre Bedeutung im Hinweis und für Bildschirmleser');
   }
 }
 
