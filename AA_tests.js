@@ -1387,8 +1387,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.nurMitZustand = apWochenVorhaben(naechste).map(function(x){ return x.v.id; }).sort().join(",");'
                  + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen();'
                  + '   var bl = document.getElementById("kalBlatt").innerHTML;'
-                 + '   r.blatt = /Fundament fertig/.test(bl) && /value="Schalung stellen"/.test(bl) && /Bauphase 2 abgeschlossen/.test(bl)'
-                 + '     && /value="Schalung steht"/.test(bl) && /apWochenStand\\(/.test(bl) && /Vorgänge/.test(bl) && !/wtag|wspalte/.test(bl);'
+                 + '   r.blatt = /Fundament fertig/.test(bl) && />Schalung stellen<\\/textarea>/.test(bl) && /Bauphase 2 abgeschlossen/.test(bl)'
+                 + '     && />Schalung steht<\\/textarea>/.test(bl) && /apWochenStand\\(/.test(bl) && /Vorgänge/.test(bl) && !/wtag|wspalte/.test(bl);'
                  + '   DB.ablaeufe = []; DB.durchlaeufe = [{ id: "d1", name: "Fundament gießen", kontext: "privat", projektId: "p5",'
                  + '     schritte: [{ titel: "Schalung", fertig: true }, { titel: "Bewehrung", fertig: false }, { titel: "Beton", fertig: false }] }];'
                  + '   kalZeichnen(); bl = document.getElementById("kalBlatt").innerHTML;'
@@ -1522,6 +1522,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     && /class="an" onclick="tgFeld\\(.status.,.ruht.\\)"/.test(k);'
                  + '   taetigFuer = { art: "projekt", id: "p1" }; r.projektKnopf = />abgeschlossen<\\/button>/.test(tgKopfHtml(p, []));'
                  + '   DB = alt;'
+                 + '   return r;'
+                 + ' } };'
+                 + 'globalThis.__apwPixelApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = kalStufe; var merkA = kalAnker; DB = leereDatenbank();'
+                 + '   var mo = montagVon(isoDatum());'
+                 + '   DB.projekte = [{ id: "s1", name: "Solar und Wärmepumpe einbauen lassen", kontext: "privat", status: "laufend", zielzustaende: [], planWochen: {} }];'
+                 + '   DB.projekte[0].planWochen[mo] = { tage: 2, mal: 0 };'
+                 + '   apSatzSetzen("woche", mo, "Solaranlage ist geklärt und beauftragt, Wärmepumpe angefragt");'
+                 + '   var h = apWocheHtml(mo);'
+                 + '   r.ohneZaehler = !/von \\d+ Tagen?/.test(h) && !/apw-kap/.test(h) && !/Tage verteilst du/.test(h);'
+                 + '   r.felder = (h.match(/<textarea class="apw-feld"/g) || []).length;'
+                 + '   r.ganzerSatz = /beauftragt, Wärmepumpe angefragt<\\/textarea>/.test(h);'
+                 + '   r.hinweisBleibt = /im Monat: 2 T/.test(h);'
+                 + '   DB = alt; kalStufe = merkS; kalAnker = merkA;'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
@@ -14835,6 +14850,34 @@ console.log('\n179. Ziele ruhen nicht von selbst');
     pruefe(e.heute === 'heute', 'am Zieltermin ist es heute dran');
     pruefe(e.ruhtImPlan === true, 'ein ruhendes Vorhaben bleibt in der Planung erreichbar');
     pruefe(e.knoepfe === true && e.projektKnopf === true, 'der Kopf bietet laufend · ruhend · erreicht bzw. abgeschlossen');
+  }
+}
+
+/* ============================================================
+   180. Woche am Pixel: ohne Tageszähler, stimmige Schrift (v5.19.4)
+   Grund: Die Woche zeigte noch Kapazitätsbalken („0 von 5 Tagen“), obwohl
+   sie dort nicht gebraucht werden. Am Handy standen Bezeichnungen neben
+   den Feldern, Sätze wurden abgeschnitten, und die Felder erbten eine
+   größere Schrift als der Rest.
+   ============================================================ */
+console.log('\n180. Woche am Pixel');
+{
+  const t = globalThis.__apwPixelApi;
+  const feld = QUELLE.match(/\.apw-feld\{[^}]*\}/);
+  pruefe(feld && /font-size:calc\(var\(--fs\)\*0\.85\)/.test(feld[0]) && /field-sizing:content/.test(feld[0]),
+         'die Felder haben eine feste, stimmige Schriftgröße und wachsen mit dem Text');
+  pruefe(/body:not\(\.breit\) \.apw \.pl-satz\{flex-direction:column/.test(QUELLE),
+         'am Handy steht die Bezeichnung über dem Feld');
+  pruefe(!/function apKapFeld\(/.test(hauptSkript()) && !/function apBalken\(/.test(hauptSkript()),
+         'die Balken-Funktionen der Woche sind entfernt');
+  let e = null;
+  if (!t) { warn('Woche nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Woche läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.ohneZaehler === true, 'die Woche zeigt keine Tageszähler');
+    pruefe(e.felder === 2, 'Wochensatz und Zielzustand sind umbrechende Felder');
+    pruefe(e.ganzerSatz === true, 'ein langer Satz steht vollständig da');
+    pruefe(e.hinweisBleibt === true, 'der Hinweis auf Tage aus dem Monat bleibt beim Vorhaben');
   }
 }
 

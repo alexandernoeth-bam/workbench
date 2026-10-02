@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.19.3</title>
+<title>Workbench 5.19.4</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1414,19 +1414,23 @@ body:not(.breit) .tg-seite[data-reiter="gedanken"] [data-tg="gedanken"]{display:
 /* Absichtsplanung in der Woche (seit v5.18.0) */
 .apw{max-width:860px}
 .apw-lesen{font-size:calc(var(--fs)*0.8);color:var(--grau)}
-.apw-kap{display:flex;gap:12px;margin:10px 0 2px;flex-wrap:wrap}
-.apw-kap-feld{flex:1 1 200px;min-width:0}
-.apw-kap-zeile{display:flex;justify-content:space-between;font-size:calc(var(--fs)*0.72);color:var(--grau);margin-bottom:3px}
-.apw-kap-zeile b{color:var(--tinte);font-weight:500}
-.apw-balken{display:flex;gap:2px;height:9px}
-.apw-balken i{flex:1;border-radius:2px;background:var(--papier);border:1px solid var(--linie)}
-.apw-balken i.voll.beruf{background:#2E4A62;border-color:#2E4A62}
-.apw-balken i.voll.privat{background:#5C6B3A;border-color:#5C6B3A}
-.apw-balken i.halb.beruf{background:linear-gradient(90deg,#2E4A62 50%,var(--papier) 50%)}
-.apw-balken i.halb.privat{background:linear-gradient(90deg,#5C6B3A 50%,var(--papier) 50%)}
-.apw-balken i.ueber{background:var(--weinrot);border-color:var(--weinrot)}
-.apw-balken.leer{opacity:.5}
 .apw-merk{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+/* Seit v5.19.4: einheitliche Schrift in der Woche — Felder erben nicht
+   mehr eine größere Grundschrift; am Handy steht die Bezeichnung über dem
+   Feld, damit der Satz die ganze Breite hat. */
+.apw .pl-ereignis{border:1px solid var(--linie)}
+.apw-feld{flex:1;min-width:0;width:100%;font:inherit;font-size:calc(var(--fs)*0.85);line-height:1.4;color:var(--tinte);
+  border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;resize:none;
+  field-sizing:content;min-height:1.9em;overflow:hidden}
+.apw-feld:hover{border-color:var(--linie);background:var(--karte)}
+.apw-feld:focus{border-color:var(--weinrot);background:var(--karte)}
+.apw-feld::placeholder{color:var(--grau);opacity:.7;font-style:italic}
+.pl-satz-woche .apw-feld{font-style:italic}
+.apw .apw-lesen{font-size:calc(var(--fs)*0.85)}
+.apw .apw-titel{font-size:calc(var(--fs)*0.9);font-weight:600}
+body:not(.breit) .apw .pl-satz{flex-direction:column;align-items:stretch;gap:2px;margin:8px 0}
+body:not(.breit) .apw .pl-etikett{min-width:0}
+body:not(.breit) .apw-vh .pl-satz{margin:6px 0 2px}
 .apw-abschnitt{font-size:calc(var(--fs)*0.62);letter-spacing:.06em;color:var(--grau);font-weight:600;text-transform:uppercase;margin:16px 0 6px}
 .apw-block{background:var(--karte);border:1px solid var(--linie);border-radius:10px;padding:4px 12px}
 .apw-vh{border-top:1px solid var(--linie);padding:8px 0 6px}
@@ -1444,7 +1448,6 @@ body:not(.breit) .tg-seite[data-reiter="gedanken"] [data-tg="gedanken"]{display:
 .apw-frage button{font:inherit;font-size:calc(var(--fs)*0.7);border:1px solid var(--linie);background:var(--karte);border-radius:12px;
   padding:2px 10px;cursor:pointer;color:var(--tinte)}
 .apw-frage button.weg{border-color:var(--weinrot);color:var(--weinrot)}
-.apw-kap-hinweis{font-size:calc(var(--fs)*0.66);color:var(--grau);margin-top:4px}
 .apw-mziel b{font-weight:500;color:var(--tinte)}
 .apw-rueck{display:inline-flex;gap:4px;flex-wrap:wrap;margin:2px 0 0 94px}
 body:not(.breit) .apw-rueck{margin-left:0}
@@ -2811,7 +2814,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.19.3';
+var APP_VERSION = '5.19.4';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -19845,46 +19848,18 @@ function apWocheWahlUm() {
   kalZeichnen();
 }
 
-function apBalken(verf, verg, art) {
-  var n = Math.max(Math.ceil(verf), Math.ceil(verg));
-  if (!n) { return '<div class="apw-balken leer"><i></i></div>'; }
-  var h = '<div class="apw-balken">';
-  var i;
-  for (i = 0; i < n; i++) {
-    var c = '';
-    if (i >= verf) { c = (i < verg) ? 'ueber' : ''; }
-    else if (verg >= i + 1) { c = 'voll ' + art; }
-    else if (verg > i) { c = 'halb ' + art; }
-    h += '<i class="' + c + '"></i>';
-  }
-  return h + '</div>';
-}
-
-function apKapFeld(name, verf, verg, art) {
-  var zuviel = verg > verf;
-  return '<div class="apw-kap-feld"><div class="apw-kap-zeile"><span>' + esc(name) + '</span><b class="' + (zuviel ? 'pl-zuviel' : '') + '">'
-       + (verg ? apZahl(verg) : '0') + ' von ' + verf + (verf === 1 ? ' Tag' : ' Tagen') + (zuviel ? ' · zu viel' : '') + '</b></div>'
-       + apBalken(verf, verg, art) + '</div>';
-}
-
 function apWocheHtml(montag) {
   var m = tagePlus(montag, 3).slice(0, 7);
-  var k = apKapazitaet(montag);
   var heuteMo = montagVon(isoDatum());
   var h = '<div class="apw">';
   h += '<div class="pl-satz"><span class="pl-etikett">' + esc(MONATE_LANG[Number(m.slice(5, 7)) - 1]) + '</span>'
      + '<span class="apw-lesen">' + esc(apSatz('monat', m) || '— noch kein Monatssatz —') + '</span></div>';
+  /* Seit v5.19.4 ohne Tageszähler — die Woche plant, wofür, nicht wie
+     viele Tage. Sätze brechen um, statt abgeschnitten zu werden. */
   h += '<div class="pl-satz pl-satz-woche"><span class="pl-etikett">Wochensatz</span>'
-     + '<input type="text" value="' + esc(apSatz('woche', montag)) + '" placeholder="Wofür ist diese Woche da?" '
-     + 'aria-label="Wochensatz" onchange="apSatzSetzen(\'woche\',\'' + montag + '\',this.value)"></div>';
-  h += '<div class="apw-kap">';
-  if (kalFilter === 'alle' || kalFilter === 'beruflich') {
-    h += apKapFeld('Beruf' + (k.reise ? ' · ' + k.reise + (k.reise === 1 ? ' Reisetag' : ' Reisetage') : ''), k.beruf, apVergeben(montag, 'beruflich'), 'beruf');
-  }
-  if (kalFilter === 'alle' || kalFilter === 'privat') {
-    h += apKapFeld('Privat', k.privat, apVergeben(montag, 'privat'), 'privat');
-  }
-  h += '</div><div class="apw-kap-hinweis">Tage verteilst du im Monat — hier steht, was dort vorgesehen ist.</div>';
+     + '<textarea class="apw-feld" rows="1" placeholder="Wofür ist diese Woche da?" '
+     + 'aria-label="Wochensatz" onchange="apSatzSetzen(\'woche\',\'' + montag + '\',this.value)">'
+     + esc(apSatz('woche', montag)) + '</textarea></div>';
   var ev = apEreignisse(montag);
   if (ev.length) {
     h += '<div class="apw-merk">' + ev.map(function (e) {
@@ -19919,8 +19894,9 @@ function apWocheHtml(montag) {
       h += '<div class="apw-mziel">Im ' + esc(MONATE_LANG[Number(m.slice(5, 7)) - 1]) + ': <b>' + esc(mz.satz) + '</b></div>';
     }
     h += '<div class="pl-satz apw-zustand"><span class="pl-etikett">Zielzustand</span>'
-       + '<input type="text" value="' + esc(z.satz || '') + '" placeholder="Wo soll es am Ende der Woche stehen?" '
-       + 'aria-label="Zielzustand ' + esc(v.name || '') + '" onchange="apZustandSetzen(' + kennung + ',this.value)"></div>'
+       + '<textarea class="apw-feld" rows="1" placeholder="Wo soll es am Ende der Woche stehen?" '
+       + 'aria-label="Zielzustand ' + esc(v.name || '') + '" onchange="apZustandSetzen(' + kennung + ',this.value)">'
+       + esc(z.satz || '') + '</textarea></div>'
        + '<div class="apw-rueck" role="group" aria-label="Rückblick auf die Woche">'
        + AP_STAENDE.map(function (st) {
            return '<button type="button" class="' + st + (z.stand === st ? ' an' : '') + '" onclick="apWochenStand(' + kennung + ',\'' + st + '\')">'
