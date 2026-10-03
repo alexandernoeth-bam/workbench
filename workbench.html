@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.19.6</title>
+<title>Workbench 5.19.7</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2541,6 +2541,14 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
   <div class="feld-hinweis">Steht den ganzen Tag über dem Tagesplan, auf jedem
     Gerät gleich. Voreingestellt ist er aus.</div>
 
+  <div class="abschnitt-titel"><span>Notizbücher</span></div>
+  <div class="er-reihe" id="nbBereichWahl" role="group" aria-label="Notizbücher zeigen">
+    <button type="button" class="sl-pille" id="nbBereichAn" onclick="nbBereichSetzen(true)">zeigen</button>
+    <button type="button" class="sl-pille" id="nbBereichAus" onclick="nbBereichSetzen(false)">ausblenden</button>
+  </div>
+  <div class="feld-hinweis">Ausgeblendet verschwindet der Knopf unten, auf jedem Gerät.
+    Die Notizbücher selbst bleiben erhalten; angeheftete Seiten öffnen sich weiter.</div>
+
   <!-- Der Schalter für den Begrüßungsstreifen ist mit v4.5.0 entfallen:
        Wer einen eigenen Satz über dem Plan haben will, schreibt ihn oben
        hinein. Zwei Wege für dieselbe Zeile waren einer zu viel. -->
@@ -2823,7 +2831,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.19.6';
+var APP_VERSION = '5.19.7';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -4878,6 +4886,7 @@ function verborgenZahl() {
 }
 
 function allesZeichnen() {
+  nbBereichAnwenden();
   tagZeichnen();
   kalZeichnen();
   aufZeichnen();
@@ -9457,6 +9466,9 @@ function handleVergessen() {
 }
 
 function zeigeSchirm(name) {
+  /* Ausgeblendete Notizbücher (seit v5.19.7): die Liste führt in den Tag. */
+  if ((name === 'Notizbuecher' || name === 'Notizsuche') && !nbBereichAn()) { name = 'Tag'; }
+  nbBereichAnwenden();
   schirmOffen = name;
   var alle = ['Tag', 'Kalender', 'Vorhaben', 'Ablaeufe', 'Aufgaben',
               'Flaeche', 'Gedanken', 'Taetigkeiten', 'Tagwechsel', 'Rueckblick',
@@ -20200,6 +20212,42 @@ function tgReiterHtml(nA, nT) {
     return '<button type="button" role="tab" aria-selected="' + (tgReiter === x[0] ? 'true' : 'false') + '" '
          + 'class="' + (tgReiter === x[0] ? 'an' : '') + '" onclick="tgReiterSetzen(\'' + x[0] + '\')">' + esc(x[1]) + '</button>';
   }).join('') + '</div>';
+}
+
+
+/* ============================================================
+   Notizbücher ausblenden (seit v5.19.7)
+
+   Wer die Notizbücher nicht nutzt, blendet den Bereich aus: Der Knopf
+   unten verschwindet. Die Einstellung liegt im Bestand (einstellungen)
+   und geht durch den Abgleich — sie gilt auf allen Geräten. Die
+   Notizbücher selbst bleiben unberührt.
+   ============================================================ */
+
+function nbBereichAn() {
+  return !(DB && DB.einstellungen && DB.einstellungen.notizbuecherAus === true);
+}
+
+function nbBereichSetzen(an) {
+  DB.einstellungen.notizbuecherAus = !an;
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  if (!an && (schirmOffen === 'Notizbuecher' || schirmOffen === 'Notizsuche')) {
+    zeigeSchirm('Tag');
+    return;
+  }
+  nbBereichAnwenden();
+}
+
+/* Knopf unten und Wahl in den Einstellungen nach dem Stand ausrichten. */
+function nbBereichAnwenden() {
+  var an = nbBereichAn();
+  var knopf = document.getElementById('navNotizbuecher');
+  if (knopf) { knopf.style.display = an ? '' : 'none'; }
+  var ja = document.getElementById('nbBereichAn');
+  var nein = document.getElementById('nbBereichAus');
+  if (ja) { ja.classList.toggle('an', an); }
+  if (nein) { nein.classList.toggle('an', !an); }
 }
 
 

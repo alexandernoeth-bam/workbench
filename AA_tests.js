@@ -1553,6 +1553,26 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt;'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__nbAusApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = schirmOffen; DB = leereDatenbank();'
+                 + '   DB.notizbuecher = [{ id: "n1", name: "Arbeit", seiten: 200, geaendert: 1 }];'
+                 + '   var knopf = document.getElementById("navNotizbuecher");'
+                 + '   r.start = nbBereichAn() && knopf.style.display === "";'
+                 + '   zeigeSchirm("Notizbuecher"); nbBereichSetzen(false);'
+                 + '   r.aus = !nbBereichAn() && knopf.style.display === "none" && schirmOffen === "Tag";'
+                 + '   r.gespeichert = DB.einstellungen.notizbuecherAus === true && DB.einstellungen.stempel > 0;'
+                 + '   zeigeSchirm("Notizbuecher"); r.umgeleitet = schirmOffen === "Tag";'
+                 + '   r.datenDa = DB.notizbuecher.length === 1;'
+                 + '   nbBereichSetzen(true); r.wiederAn = nbBereichAn() && knopf.style.display === "";'
+                 + '   zeigeSchirm("Notizbuecher"); r.offen = schirmOffen === "Notizbuecher";'
+                 + '   var fremd = leereDatenbank(); fremd.einstellungen = JSON.parse(JSON.stringify(DB.einstellungen));'
+                 + '   fremd.einstellungen.notizbuecherAus = true; fremd.einstellungen.stempel = jetzt() + 5000;'
+                 + '   DB = zusammenfuehren(DB, fremd).db; allesZeichnen();'
+                 + '   r.abgleich = !nbBereichAn() && knopf.style.display === "none";'
+                 + '   DB = alt; schirmOffen = merkS; nbBereichAnwenden();'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14935,6 +14955,27 @@ console.log('\n182. Tagesplan am Handy kompakter');
   const sp = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   pruefe(sp && /var proStunde = stundeHoch\(\);/.test(sp[0]) && !/\* STUNDE_HOCH\b/.test(sp[0]),
          'der Tagesplan rechnet mit der Stundenhöhe des Geräts');
+}
+
+/* ============================================================
+   183. Notizbücher ausblendbar (v5.19.7)
+   ============================================================ */
+console.log('\n183. Notizbücher ausblendbar');
+{
+  const t = globalThis.__nbAusApi;
+  pruefe(/id="nbBereichWahl"/.test(QUELLE) && /nbBereichSetzen\(false\)/.test(QUELLE), 'die Einstellungen bieten zeigen/ausblenden');
+  let e = null;
+  if (!t) { warn('Ausblenden nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Ausblenden läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.start === true, 'voreingestellt sind die Notizbücher sichtbar');
+    pruefe(e.aus === true, 'ausgeblendet verschwindet der Knopf, die offene Liste führt in den Tag');
+    pruefe(e.gespeichert === true, 'die Einstellung liegt im Bestand und bekommt einen Stempel für den Abgleich');
+    pruefe(e.umgeleitet === true, 'ein Sprung zur Liste führt dann in den Tag');
+    pruefe(e.datenDa === true, 'die Notizbücher selbst bleiben erhalten');
+    pruefe(e.wiederAn === true && e.offen === true, 'wieder eingeblendet ist alles wie vorher');
+    pruefe(e.abgleich === true, 'die Einstellung kommt über den Abgleich auf das andere Gerät');
+  }
 }
 
 /* ============================================================
