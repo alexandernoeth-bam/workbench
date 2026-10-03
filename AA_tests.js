@@ -1241,7 +1241,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     status: "offen", wiederholung: { takt: "woche", tage: [6], intervall: 1 }, geaendert: 1 });'
                  + '   var a = DB.aufgaben[0];'
                  + '   schirmOffen = "Tag"; tagOffen = sa; r.tagAusTag = diesmalTag(a) === sa;'
-                 + '   schirmOffen = "Aufgaben"; r.tagNaechster = diesmalTag(a) === sa;'
+                 + '   schirmOffen = "Aufgaben"; r.tagNaechster = diesmalTag(a) === (wt === 6 ? heute : sa);'
                  + '   r.verlegt = ausfuehrungVerlegen(a, sa, fr, "16:00");'
                  + '   r.saWeg = !aufgabeFaelligAn(a, sa) && aufgabeFaelligAn(a, fr);'
                  + '   r.zeitFr = aufgabeZeitAn(a, fr) + "|" + aufgabeZeitAn(a, saDanach);'
@@ -12271,7 +12271,7 @@ console.log('\n117. Termine als Einzeiler');
   const sp2 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   /* Seit v4.0.0 ist der Tag ein maßstäblicher Stundenplan: Ein Block,
      der doppelt so lange dauert, ist doppelt so hoch. */
-  pruefe(sp2 && /STUNDE_HOCH/.test(sp2[0]) && /dauer \/ 60/.test(sp2[0]),
+  pruefe(sp2 && /proStunde/.test(sp2[0]) && /dauer \/ 60/.test(sp2[0]),
          'die Höhe eines Blocks folgt seiner Dauer');
   /* Seit v4.7.0 88 Pixel je Stunde: Bei 64 war eine halbe Stunde
      niedriger als die Mindesthöhe, und kurze Blöcke überlappten. */
@@ -12284,7 +12284,8 @@ console.log('\n117. Termine als Einzeiler');
   pruefe(new RegExp('function\\s+planRollenSpaeter\\s*\\(').test(skript),
          'und springt beim Öffnen auf die jetzige Zeit');
   const spm = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
-  pruefe(spm && /Math\.max\(BLOCK_MIN, \(dauer \/ 60\) \* STUNDE_HOCH\)/.test(spm[0]),
+  /* Seit v5.19.6 je Gerät: blockMin() und stundeHoch(). */
+  pruefe(spm && /Math\.max\(blockMin\(\), \(dauer \/ 60\) \* proStunde\)/.test(spm[0]),
          'unter einer Viertelstunde greift eine Mindesthöhe');
   pruefe(/var BLOCK_MIN = 20;/.test(skript)
          && /var STUNDE_HOCH = 88;/.test(skript),
@@ -14914,6 +14915,26 @@ console.log('\n181. Kompakte Vorhabenkachel');
     pruefe(e.eineZeile === true, 'Zielzustand und Rückblick stehen in einer Zeile');
     pruefe(e.woerter === true, 'die Rückblick-Knöpfe nennen ihre Bedeutung im Hinweis und für Bildschirmleser');
   }
+}
+
+/* ============================================================
+   182. Tagesplan am Handy kompakter (v5.19.6)
+   Grund: Am Pixel war eine Stunde 88 px hoch — man sah kaum den halben
+   Tag. Jetzt 64 px; die Mindesthöhe kurzer Blöcke bleibt höchstens eine
+   Viertelstunde, damit nichts überlappt.
+   ============================================================ */
+console.log('\n182. Tagesplan am Handy kompakter');
+{
+  const skript = hauptSkript();
+  pruefe(/var STUNDE_HOCH_HANDY = 64;/.test(skript) && /body:not\(\.breit\) \.splan-stunde\{height:64px\}/.test(QUELLE),
+         'am Handy ist eine Stunde 64 px hoch — Raster und Rechnung stimmen überein');
+  pruefe(/\.splan-stunde\{display:flex;align-items:flex-start;height:88px;/.test(QUELLE) && /var STUNDE_HOCH = 88;/.test(skript),
+         'am großen Bildschirm bleibt es bei 88 px');
+  const mh = skript.match(/var BLOCK_MIN_HANDY = (\d+);/);
+  pruefe(mh && Number(mh[1]) <= 64 / 4, 'die Mindesthöhe am Handy liegt nicht über einer Viertelstunde');
+  const sp = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
+  pruefe(sp && /var proStunde = stundeHoch\(\);/.test(sp[0]) && !/\* STUNDE_HOCH\b/.test(sp[0]),
+         'der Tagesplan rechnet mit der Stundenhöhe des Geräts');
 }
 
 /* ============================================================
