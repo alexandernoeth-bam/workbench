@@ -1573,6 +1573,20 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; schirmOffen = merkS; nbBereichAnwenden();'
                  + '   return r;'
                  + ' } };'
+                 + 'globalThis.__tgErledigtApi = {'
+                 + ' pruefe: function(){'
+                 + '   var r = {}; var alt = DB; var merkS = schirmOffen; DB = leereDatenbank();'
+                 + '   DB.projekte = [{ id: "c1", name: "Carport", kontext: "privat", status: "laufend", zielzustaende: [] }];'
+                 + '   DB.aufgaben.push({ id: "o1", titel: "Firmen anschreiben", kontext: "privat", projektId: "c1", planung: "backlog", art: "haupt", status: "offen", geaendert: 1 });'
+                 + '   DB.aufgaben.push({ id: "e1", titel: "Maße nehmen", kontext: "privat", projektId: "c1", planung: "backlog", art: "haupt", status: "erledigt", erledigtAm: isoDatum(), geaendert: 1 });'
+                 + '   taetigOeffnen("projekt", "c1"); var bl = document.getElementById("taetigBlatt").innerHTML;'
+                 + '   r.sichtbar = /Firmen anschreiben/.test(bl) && /Maße nehmen/.test(bl) && /⌄ Erledigt · 1/.test(bl);'
+                 + '   taetigErledigtUm(); bl = document.getElementById("taetigBlatt").innerHTML;'
+                 + '   r.zu = !/Maße nehmen/.test(bl) && /› Erledigt · 1/.test(bl);'
+                 + '   taetigOeffnen("projekt", "c1"); r.wiederAuf = /Maße nehmen/.test(document.getElementById("taetigBlatt").innerHTML);'
+                 + '   DB = alt; schirmOffen = merkS;'
+                 + '   return r;'
+                 + ' } };'
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -14975,6 +14989,22 @@ console.log('\n183. Notizbücher ausblendbar');
     pruefe(e.datenDa === true, 'die Notizbücher selbst bleiben erhalten');
     pruefe(e.wiederAn === true && e.offen === true, 'wieder eingeblendet ist alles wie vorher');
     pruefe(e.abgleich === true, 'die Einstellung kommt über den Abgleich auf das andere Gerät');
+  }
+}
+
+/* ============================================================
+   184. Erledigte Aufgaben im Vorhaben sichtbar (v5.19.8)
+   ============================================================ */
+console.log('\n184. Erledigte im Vorhaben sichtbar');
+{
+  const t = globalThis.__tgErledigtApi;
+  let e = null;
+  if (!t) { warn('Erledigte nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Erledigte laufen nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.sichtbar === true, 'beim Öffnen stehen die erledigten Aufgaben unter den offenen');
+    pruefe(e.zu === true, 'ein Tipp klappt sie ein');
+    pruefe(e.wiederAuf === true, 'beim nächsten Öffnen sind sie wieder zu sehen');
   }
 }
 
