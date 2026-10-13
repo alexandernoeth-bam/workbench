@@ -8197,8 +8197,9 @@ console.log('\n51. Vergangene Termine');
      was der Tag war — auch das Vergangene. */
   const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(tag && !/vorbei-falt/.test(tag[0]), 'es gibt keine Faltzeile mehr');
-  pruefe(tag && /planMarkeHtml\(is\)/.test(tag[0]),
-         'im Kopf steht stattdessen, ob der Plan schon steht');
+  /* Seit v5.23.0 ohne „Plan aufstellen" im Tag. */
+  pruefe(tag && !/planMarkeHtml\(/.test(tag[0]) && !/nachzueglerMarke\(/.test(tag[0]),
+         'kein Knopf „Plan aufstellen" und kein Liegengeblieben-Hinweis in den Köpfen');
 
   pruefe(/\n\.tverlauf\.vorbei,\.tzeile-termin\.vorbei\{display:none\}/.test(QUELLE),
          'Vergangenes ist eingeklappt');
@@ -12570,8 +12571,8 @@ console.log('\n120. Zweizeilige Einträge');
   pruefe(welten === zahlWelten && welten > 0,
          'jede Farbwelt bringt ihren eigenen Signalton mit');
   const ks = skript.match(/function tagKopfSchmalZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(ks && /is === isoDatum\(\) && tagwFaellig\(\)/.test(ks[0]),
-         'der Punkt hängt am Tageswechsel, nicht am Zahnrad');
+  pruefe(ks && !/tagwFaellig\(\)/.test(ks[0]) && !/tk-s-punkt/.test(ks[0]),
+         'kein Punkt mehr am Datum — den Tageswechsel gibt es im Tag nicht mehr');
   pruefe(/\.tmarke\{display:inline-block/.test(QUELLE),
          'die Marke steht unter dem Titel, nicht daneben');
   const te = skript.match(/function tagesEintraege\([\s\S]*?\n\}\n/);
@@ -12594,7 +12595,7 @@ console.log('\n120. Zweizeilige Einträge');
     pruefe(e.markeAblauf === 'Workshop: CTS mit minimalem Testdatenbestand',
            'ihr Ablauf steht als Marke darunter');
     pruefe(e.heuteKlasse === true, 'das heutige Datum ist als heute gekennzeichnet');
-    pruefe(e.punktDa === true, 'mit Punkt, weil der Tageswechsel noch aussteht');
+    pruefe(e.punktDa === false, 'ohne Punkt — der Tageswechsel meldet sich nicht mehr');
     pruefe(e.ohneZaehler === true, 'keine Zähler mehr an den Überschriften');
   }
 }
@@ -12860,8 +12861,8 @@ console.log('\n126. Begrüßungsstreifen');
          'die drei Funktionen des Schalters sind ganz entfernt');
   pruefe(!/id="grussWahl"/.test(QUELLE), 'in der Diagnose steht er nicht mehr');
   const nz = skript.match(/function nachzueglerZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(nz && /if \(!istBreit\(\)\) \{/.test(nz[0]),
-         'der Streifen hängt nur noch an der Breite');
+  pruefe(nz && !/sichtbar'\)\s*;\s*\n[^}]*classList\.add/.test(nz[0]) && !/classList\.add\('sichtbar'\)/.test(nz[0]),
+         'der Streifen über dem Tag erscheint nicht mehr');
   pruefe(/id="leitsatzFeld"/.test(QUELLE),
          'wer eine eigene Zeile will, schreibt sie in den eigenen Satz');
   /* Seit v4.5.0 steht die Versionsprüfung bei der Technik, nicht mehr
@@ -12872,10 +12873,10 @@ console.log('\n126. Begrüßungsstreifen');
   const datei = (QUELLE.split('id="dg-technik"')[0] || '');
   pruefe(datei.indexOf('versionPruefen') < 0,
          'und nicht mehr bei den Dateiknöpfen');
-  /* Der Weg zum Tageswechsel hängt am Datum, nicht am Streifen. */
-  pruefe(/tagwStarten|tagwFaellig/.test(String(skript.match(
+  /* Seit v5.23.0 führt das Datum nur noch zu heute. */
+  pruefe(!/tagwStarten|tagwFaellig/.test(String(skript.match(
            /function tagKopfSchmalZeichnen\([\s\S]*?\n\}\n/) || '')),
-         'der Weg zum Tageswechsel bleibt am Datum');
+         'das Datum führt nur noch zu heute, nicht zum Tageswechsel');
 }
 
 /* ============================================================
@@ -15103,6 +15104,24 @@ console.log('\n185. Tag mit Woche');
     pruefe(e.zielWeg === true, 'ein gelöschtes Ziel lässt seine Aufgaben stehen');
     pruefe(e.abgleich === true, 'der Abgleich führt die Woche nach Stempel zusammen');
   }
+}
+
+/* ============================================================
+   186. Ohne Tageswechsel und Planknopf (v5.23.0)
+   Kein Streifen über dem Tag, kein Punkt am Datum, kein „Plan
+   aufstellen" — und keine Zeile „Liegengeblieben".
+   ============================================================ */
+console.log('\n186. Ohne Tageswechsel und Planknopf');
+{
+  const skript = hauptSkript();
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && !/planMarkeHtml\(/.test(tz[0]), 'im Tag gibt es keinen Knopf „Plan aufstellen“');
+  pruefe(tz && !/liegengeblieben\(/.test(tz[0]) && !/'[^'\n]*Liegengeblieben/.test(tz[0]),
+         'keine Zeile „Liegengeblieben“ in den Verbindlichkeiten');
+  const nz = skript.match(/function nachzueglerZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(nz && !/tagwFaellig|Tageswechsel'|nz-wort/.test(nz[0]), 'der Streifen bietet keinen Tageswechsel mehr an');
+  const ks = skript.match(/function tagKopfSchmalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(ks && /datum\.onclick = tagHeute;/.test(ks[0]), 'am Pixel führt das Datum zu heute');
 }
 
 /* ============================================================

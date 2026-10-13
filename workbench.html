@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.22.0</title>
+<title>Workbench 5.23.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2895,7 +2895,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.22.0';
+var APP_VERSION = '5.23.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5845,12 +5845,12 @@ function tagKopfSchmalZeichnen(is, e) {
     /* Heute in Signalfarbe, und ein Punkt, solange der Tageswechsel
        offen ist. */
     datum.className = 'tk-s-datum' + ((is === isoDatum()) ? ' heute' : '');
+    /* Seit v5.23.0 ohne Punkt für den Tageswechsel: Ein Tipp aufs Datum
+       führt immer zu heute. */
     datum.innerHTML = esc(TAGE_KURZ[d.getDay()] + ' ' + d.getDate() + '.'
                       + (d.getMonth() + 1) + '.')
-                    + '<i class="tk-s-kw">KW ' + kalenderwoche(is) + '</i>'
-                    + ((is === isoDatum() && tagwFaellig())
-                       ? '<i class="tk-s-punkt" title="Tageswechsel steht an"></i>' : '');
-    datum.onclick = (is === isoDatum() && tagwFaellig()) ? tagwStarten : tagHeute;
+                    + '<i class="tk-s-kw">KW ' + kalenderwoche(is) + '</i>';
+    datum.onclick = tagHeute;
   }
   var auge = document.getElementById('tkAugeBild');
   if (auge) { auge.innerHTML = sichtschutz ? AUGE_ZU : AUGE_AUF; }
@@ -5905,32 +5905,13 @@ function tagZahlenZeichnen(is, e) {
   el.innerHTML = '';
 }
 
+/* Seit v5.23.0 ohne Streifen über dem Tag: kein Tageswechsel, kein
+   Hinweis auf Liegengebliebenes. Der Platz bleibt leer. */
 function nachzueglerZeichnen(is) {
   var el = document.getElementById('tkNachzuegler');
   if (!el) { return; }
-  var liste = liegengeblieben(is);
-  /* Der Streifen über allem ist weg: Am Handy verbrauchte er zwei
-     Zeilen für eine Begrüßung. Der Tageswechsel meldet sich als Punkt
-     am Datum, das Liegengebliebene als Marke im Aufgabenkopf. */
-  if (!istBreit()) {
-    el.classList.remove('sichtbar');
-    el.innerHTML = '';
-    return;
-  }
-  if (is === isoDatum() && tagwFaellig()) {
-    el.innerHTML = '<span>' + esc(tagwGruss()) + ' '
-                 + (liste.length ? (liste.length
-                     + (liste.length === 1 ? ' Sache ist' : ' Sachen sind')
-                     + ' von gestern offen.') : 'Nichts liegengeblieben.')
-                 + '</span><span class="nz-wort">Tageswechsel</span>';
-    el.classList.add('sichtbar');
-    return;
-  }
-  if (!liste.length) { el.classList.remove('sichtbar'); el.innerHTML = ''; return; }
-  el.innerHTML = '<span>' + liste.length
-               + (liste.length === 1 ? ' Eintrag liegt' : ' Einträge liegen')
-               + ' seit früheren Tagen offen</span><span class="nz-wort">Ansehen</span>';
-  el.classList.add('sichtbar');
+  el.classList.remove('sichtbar');
+  el.innerHTML = '';
 }
 
 function nachzueglerOeffnen() {
@@ -8273,8 +8254,10 @@ function tagZeichnen() {
   }
 
   var zieleKarte = wkZieleKarteHtml(is);
-  var terminKarte = tagBlockHtml('Termine heute', termin, planMarkeHtml(is));
-  var verbKarte = tagBlockHtml('Verbindlichkeiten heute', verb, nachzueglerMarke(is));
+  /* Seit v5.23.0 ohne „Plan aufstellen" und ohne Hinweis auf
+     Liegengebliebenes in den Köpfen. */
+  var terminKarte = tagBlockHtml('Termine heute', termin, '');
+  var verbKarte = tagBlockHtml('Verbindlichkeiten heute', verb, '');
   var kleinKarte = kleinTeil ? tagBlockHtml('Kleinigkeiten', kleinTeil, '') : '';
 
   /* Am Rechner zwei Spalten: links Woche und Verbindlichkeiten, rechts
