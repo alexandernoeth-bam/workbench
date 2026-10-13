@@ -1685,6 +1685,40 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
    DB = alt; aufFilter = merkF; aktionFuer = merkA; listeNeuIn = ''; listeAnlegenAuf = false;
    return r;
  } };`
+                 + `globalThis.__vhListeApi = {
+ pruefe: function(){
+   var r = {}; var alt = DB; var merkF = vhFilter; DB = leereDatenbank(); vhFilter = 'alle';
+   DB.einstellungen.vhGruppenZu = {};
+   var jahr = Number(isoDatum().slice(0, 4)) + 1;
+   DB.ziele = [{ id: 'z1', name: 'Gewicht 73 kg', kontext: 'privat', status: 'laufend', zieltermin: jahr + '-06-30', zielzustaende: [], einzahler: [] }];
+   DB.projekte = [{ id: 'p1', name: 'SMAX', kontext: 'beruflich', status: 'laufend', ende: jahr + '-02-01', zielzustaende: [] },
+                  { id: 'p2', name: 'Carport', kontext: 'privat', status: 'ruht', ende: '', zielzustaende: [] },
+                  { id: 'p3', name: 'Alt', kontext: 'privat', status: 'abgeschlossen', zielzustaende: [] }];
+   DB.aufgaben = [{ id: 'a1', titel: 'x', kontext: 'beruflich', projektId: 'p1', status: 'offen', art: 'haupt', planung: 'backlog', geaendert: jetzt() }];
+   DB.einfaelle = [{ id: 'e1', titel: 'Gartenhaus', kontext: 'privat', stand: 'offen' }, { id: 'e2', titel: 'Podcast', kontext: 'beruflich', stand: 'offen' },
+                   { id: 'e3', titel: 'Boot', kontext: 'privat', stand: 'verworfen' }];
+   DB.einstellungen.vhGruppenZu = { fertig: false };
+   vhZeichnen();
+   var b = document.getElementById('vhBlatt').innerHTML;
+   r.gruppen = (b.match(/ab-gruppe[^>]*><span>([^<]*)/g) || []).map(function(x){ return x.replace(/.*<span>/, ''); }).join(',');
+   r.zeilen = (b.match(/class="vl-z/g) || []).length;
+   r.angaben = b.indexOf('vl-art">Ziel<') >= 0 && b.indexOf('vl-art">Projekt<') >= 0 && b.indexOf('vl-art">Einfall<') >= 0
+     && b.indexOf('bis Mo 1.2.' + String(jahr).slice(2)) >= 0 && b.indexOf('ohne Deadline') >= 0;
+   r.keineKarte = b.indexOf('vkarte') < 0 && b.indexOf('ab-marke') < 0;
+   r.eingabe = b.indexOf('id="einfallNeu"') >= 0;
+   r.verworfen = b.indexOf('Boot') > b.indexOf('Erledigt') && b.indexOf('verworfen') >= 0;
+   var reihe = function(){ var h = document.getElementById('vhBlatt').innerHTML; var l = h.split('Läuft')[1].split('Ruht')[0]; return (l.match(/vl-name">([^<]*)/g) || []).map(function(x){ return x.slice(9); }).join(','); };
+   var vorher = reihe();
+   vhSchiebenId(vorher.split(',')[1] === 'SMAX' ? 'p1' : 'z1', -1);
+   r.gemischt = reihe() !== vorher && reihe().split(',').length === 2;
+   var e1 = function(){ var h = document.getElementById('vhBlatt').innerHTML; var l = h.split('Einfälle')[1].split('Erledigt')[0]; return (l.match(/vl-name">([^<]*)/g) || []).map(function(x){ return x.slice(9); }).join(','); };
+   var ev = e1(); einfallSchiebenId(ev.split(',')[1] === 'Podcast' ? 'e2' : 'e1', -1);
+   r.einfallSortiert = e1() !== ev;
+   einfallNeu('Werkbank bauen p');
+   r.neuerEinfall = /Werkbank bauen/.test(document.getElementById('vhBlatt').innerHTML) && /3 Einfälle/.test(document.getElementById('vhZahl').textContent);
+   DB = alt; vhFilter = merkF; DB.einstellungen.vhGruppenZu = {};
+   return r;
+ } };`
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -2856,8 +2890,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.text = vhZustandText(DB.projekte[0], \'projekt\').split(\' · \')[0];'
                  + '   var karte = vhKarteHtml(DB.projekte[0], \'projekt\');'
                  + '   r.ohneRing = (karte.indexOf(\'class="ring\') < 0);'
-                 + '   r.marken = (karte.match(/ab-marke">([^<]*)/g) || []).slice(0, 2)'
-                 + '     .map(function(x){ return x.slice(10); }).join(\',\');'
+                 + '   r.marken = (karte.match(/vl-art">([^<]*)/g) || []).slice(0, 2)'
+                 + '     .map(function(x){ return x.slice(8); }).join(\',\');'
                  + '   vhFilter = \'alle\'; vhStufe = \'vorhaben\';'
                  + '   DB.einstellungen.vhGruppenZu = {};'
                  + '   vhZeichnen();'
@@ -4582,11 +4616,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB.einstellungen.vhGruppenZu = {};'
                  + '   vhZeichnen();'
                  + '   var h = document.getElementById(\'vhBlatt\').innerHTML;'
-                 + '   var r = { beideKoepfe: (h.indexOf(\'Abgeschlossen\') >= 0'
+                 + '   var r = { beideKoepfe: (h.indexOf(\'Erledigt\') >= 0'
                  + '               && h.indexOf(\'Ruht\') >= 0),'
                  + '             berufZuerst: (h.indexOf(\'Ruht\')'
-                 + '               < h.indexOf(\'Abgeschlossen\')) };'
-                 + '   r.nachEinklappen = (h.match(/class="vkarte/g) || []).length;'
+                 + '               < h.indexOf(\'Erledigt\')) };'
+                 + '   r.nachEinklappen = (h.match(/class="vl-z/g) || []).length;'
                  + '   DB.einstellungen.vhGruppenZu = { fertig: false };'
                  + '   vhZeichnen();'
                  + '   h = document.getElementById(\'vhBlatt\').innerHTML;'
@@ -9591,8 +9625,8 @@ console.log('\n72. Einfälle');
 
   /* Der Reiter */
   const stufe = skript.match(/function setVhStufe\([\s\S]*?\n\}\n/);
-  pruefe(stufe && /einfaelleGesehen = isoDatum\(\)/.test(stufe[0]),
-         'beim Öffnen wird vermerkt, wann zuletzt hingesehen wurde');
+  pruefe(!/id="vhStufeEinfaelle"/.test(QUELLE),
+         'die Einfälle haben keinen eigenen Reiter mehr — sie stehen in der Liste');
   pruefe(stufe && /plus\.style\.display/.test(stufe[0]),
          'der Plusknopf für Vorhaben verschwindet im Einfallreiter');
 
@@ -9756,7 +9790,7 @@ console.log('\n74. Bereiche nach Kontext');
   /* Seit v2.5.0 ordnet die Vorhabenübersicht wie die Abläufe nach
      Zustand; Beruf und Privat trennt der Filter und die Randfarbe. */
   const z = skript.match(/function vhZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(z && /VH_GRUPPEN/.test(z[0]) && /vhZustand\(e\.v, e\.art\) === name/.test(z[0]),
+  pruefe(z && /VH_GRUPPEN/.test(z[0]) && /gruppeVon\(e\) === name/.test(z[0]),
          'die Übersicht ordnet nach Zustand');
   pruefe(z && /vhFilter === 'alle' \|\| e\.v\.kontext === vhFilter/.test(z[0]),
          'bei gesetztem Filter bleibt nur der gewählte Bereich');
@@ -9775,8 +9809,8 @@ console.log('\n74. Bereiche nach Kontext');
          'das Umschalten räumt eingeklappte Bereiche auf');
 
   const e = skript.match(/function einfaelleZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(e && /vhBereichKopf\(/.test(e[0]),
-         'die Einfälle folgen derselben Ordnung');
+  pruefe(e && /vhZeichnen\(\)/.test(e[0]),
+         'die Einfälle stehen in der Vorhabenliste');
 
   /* Die Abläufe ebenso */
   ['abKontextUm', 'abKontextOffen', 'abBereichKopf'].forEach(function (f) {
@@ -9805,9 +9839,8 @@ console.log('\n74. Bereiche nach Kontext');
   pruefe(/#abBlatt \.vh-bereich,#abBlatt \.gruppenkopf\{grid-column:1 \/ -1\}/
          .test(QUELLE),
          'die Überschriften laufen über die ganze Breite');
-  pruefe(/id="einfallBlatt"[^>]*class="[^"]*einfachliste|einfachliste[^"]*"\s+id="einfallBlatt"/
-         .test(QUELLE) || /class="vhblatt einfachliste" id="einfallBlatt"/.test(QUELLE),
-         'ihr Blatt ist als einfache Liste gekennzeichnet');
+  pruefe(/\['einfaelle', 'Einfälle'\]/.test(skript) && !/id="einfallBlatt"/.test(QUELLE),
+         'die Einfälle sind eine Gruppe der Vorhabenliste, kein eigenes Blatt');
   pruefe(/body\.breit \.vhblatt\.einfachliste\{display:block\}/.test(QUELLE),
          'es benutzt nicht mehr das Kachelraster — daher kamen die Spalten');
 
@@ -9816,9 +9849,9 @@ console.log('\n74. Bereiche nach Kontext');
   } else {
     const r = v.pruefeBereiche();
     pruefe(r.beideKoepfe === true, 'die Gruppen tragen ihre Namen');
-    pruefe(r.berufZuerst === true, 'Abgeschlossenes steht ganz unten');
+    pruefe(r.berufZuerst === true, 'Erledigtes steht ganz unten');
     pruefe(r.nachEinklappen === 1,
-           'zugeklappt zeigt „Abgeschlossen" seine Karte nicht');
+           'zugeklappt zeigt „Erledigt“ seine Zeile nicht');
     pruefe(r.fertigAufKlappbar === true, 'aufgeklappt schon');
     pruefe(r.nurEinerBeiFilter === true,
            'auf Privat geschaltet steht das Berufliche nicht mehr da');
@@ -11901,8 +11934,8 @@ console.log('\n108. Reihenfolge und Kästchen in Zellen');
   pruefe(no && /1e9/.test(no[0]),
          'wer keine Zahl hat, steht hinten und behält seine Stelle');
   const za = skript.match(/function ziehAb\([\s\S]*?\n\}/);
-  pruefe(za && /gleicheGruppe\(ziehVon\.id, id\)/.test(za[0]),
-         'gezogen wird nur innerhalb der Gruppe');
+  pruefe(za && /vhAnzeigeGruppe\(id\)/.test(za[0]) && /vg\.some\(/.test(za[0]),
+         'gezogen wird nur innerhalb der Gruppe, wie sie in der Liste steht');
   pruefe(/body\.breit \.z-schieben\{display:none\}/.test(QUELLE),
          'die Schiebeknöpfe stehen nur am Handy — am Rechner wird gezogen');
   pruefe(/\.fl-tab td \.tkasten\{display:inline-block;width:17px;height:17px/.test(QUELLE),
@@ -12280,8 +12313,8 @@ console.log('\n115. Ablaufseite und Vorhaben');
          'links die Arbeit, rechts die Angaben');
   pruefe(seite && /ringHtml\(fertig, l\.length\)/.test(seite[0]),
          'der Ring steht in der Kopfkarte');
-  pruefe(/\['heute', 'Heute dran'\], \['laeuft', 'Läuft'\], \['ruht', 'Ruht'\],\s*\['fertig', 'Abgeschlossen'\]/
-         .test(skript), 'die Vorhaben kennen dieselben vier Gruppen');
+  pruefe(/\['laeuft', 'Läuft'\], \['ruht', 'Ruht'\], \['einfaelle', 'Einfälle'\],\s*\['fertig', 'Erledigt'\]/
+         .test(skript), 'die Vorhaben kennen Läuft, Ruht, Einfälle und Erledigt');
 
   if (!v) {
     warn('Funktionen nicht auswertbar');
@@ -12297,9 +12330,9 @@ console.log('\n115. Ablaufseite und Vorhaben');
     /* Seit v2.6.0 ohne Ring am Vorhaben: Er stand auf hundert Prozent,
        sobald das Bisherige abgehakt war. */
     pruefe(e.ohneRing === true, 'am Vorhaben steht kein Ring mehr');
-    pruefe(e.marken === 'Projekt,2 offen', 'der Fuß nennt Art und Umfang');
-    pruefe(e.gruppen === 'Heute dran · 1,Läuft · 1,Ruht · 2,Abgeschlossen · 1',
-           'die Übersicht ordnet danach');
+    pruefe(e.marken === 'Projekt', 'die Zeile nennt, ob es ein Projekt oder Ziel ist');
+    pruefe(e.gruppen === 'Läuft · 2,Ruht · 2,Einfälle · 0,Erledigt · 1',
+           'die Liste ordnet danach — „heute dran“ steht bei „Läuft“');
   }
 }
 
@@ -15184,6 +15217,34 @@ console.log('\n189. Vorhaben ohne Woche und Termine');
   pruefe(bh && !/d-name">Vorhaben/.test(bh[0]), 'das Terminblatt hat keine Zeile „Vorhaben“');
   pruefe(/function apWocheHtml\(/.test(skript) && /apZustandAn\(v, montag\)/.test(skript),
          'die Wochenplanung im Kalender behält den Zielzustand');
+}
+
+/* ============================================================
+   190. Vorhaben als Liste mit Einfällen (v5.27.0)
+   Eine Zeile je Vorhaben: Name, Projekt/Ziel, Deadline; Gruppen Läuft,
+   Ruht, Einfälle, Erledigt; Sortieren von Hand innerhalb der Gruppe;
+   kein Wochenrückblick-Knopf, kein Einfälle-Reiter.
+   ============================================================ */
+console.log('\n190. Vorhaben als Liste');
+{
+  pruefe(!/onclick="rueckblickOeffnen\(\)">Wochenrückblick<\/button>/.test(QUELLE) && !/id="vhRueckblickReihe"/.test(QUELLE),
+         'der Knopf „Wochenrückblick“ ist von der Seite verschwunden');
+  pruefe(!/id="vhStufeEinfaelle"/.test(QUELLE) && !/id="einfallBlatt"/.test(QUELLE), 'kein eigener Reiter und kein eigenes Blatt für Einfälle');
+  const t = globalThis.__vhListeApi;
+  let e = null;
+  if (!t) { warn('Vorhabenliste nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Vorhabenliste läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.gruppen === 'Läuft · 2,Ruht · 1,Einfälle · 2,Erledigt · 2', 'Gruppen: Läuft, Ruht, Einfälle, Erledigt (mit verworfenen Einfällen)');
+    pruefe(e.zeilen === 7, 'jede Zeile ein Eintrag');
+    pruefe(e.angaben === true, 'jede Zeile nennt Projekt, Ziel oder Einfall und die Deadline — oder „ohne Deadline“');
+    pruefe(e.keineKarte === true, 'keine Karten, keine Zähler mehr');
+    pruefe(e.eingabe === true, 'in der Gruppe „Einfälle“ lässt sich ein Einfall gleich merken');
+    pruefe(e.verworfen === true, 'verworfene Einfälle stehen unter „Erledigt“');
+    pruefe(e.gemischt === true, 'Ziele und Projekte lassen sich innerhalb einer Gruppe gegeneinander sortieren');
+    pruefe(e.einfallSortiert === true, 'Einfälle lassen sich von Hand sortieren');
+    pruefe(e.neuerEinfall === true, 'ein neuer Einfall steht sofort in der Liste und im Kopf');
+  }
 }
 
 /* ============================================================

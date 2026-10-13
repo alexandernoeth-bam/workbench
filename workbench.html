@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.26.0</title>
+<title>Workbench 5.27.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2263,6 +2263,32 @@ body.breit .wk-auswahl{border-radius:14px}
 .ls-menue{margin-left:0}
 .d-gehoert{max-width:100%}
 
+/* ---------- Vorhaben als Liste (seit v5.27.0) ---------- */
+.vl-liste{background:var(--karte);border:1px solid var(--linie);border-radius:10px;overflow:hidden;margin:0 0 6px}
+.vl-z{display:flex;align-items:center;gap:10px;padding:9px 12px 9px 10px;border-bottom:1px solid var(--linie);
+  border-left:3px solid var(--weinrot);cursor:pointer}
+.vl-z:last-child{border-bottom:0}
+.vl-z.privat{border-left-color:var(--petrol)}
+.vl-z.ruht .vl-name{color:var(--grau)}
+.vl-z.ziehziel{background:var(--papier)}
+.vl-griff{flex:0 0 14px;color:var(--grau-hell);font-size:14px;cursor:grab;letter-spacing:-2px}
+.vl-text{flex:1;min-width:0;display:flex;align-items:center;gap:10px}
+.vl-name{flex:1;min-width:0;font-size:calc(var(--fs)*0.88)}
+.vl-meta{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.vl-art{font-size:calc(var(--fs)*0.66);border:1px solid var(--linie);border-radius:10px;padding:0 7px;color:var(--grau)}
+.vl-bis{min-width:104px;text-align:right;font-size:calc(var(--fs)*0.74);color:var(--grau);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.vl-pf{display:inline-flex;gap:3px;flex:0 0 auto}
+.vl-pf button{border:1px solid var(--linie);background:var(--karte);border-radius:6px;width:26px;height:26px;
+  font-size:12px;color:var(--grau);padding:0;cursor:pointer}
+body.breit .vl-pf{display:none}
+body:not(.breit) .vl-griff{display:none}
+body:not(.breit) .vl-text{flex-direction:column;align-items:flex-start;gap:3px}
+body:not(.breit) .vl-bis{min-width:0;text-align:left}
+.vl-neu{display:flex;gap:8px;align-items:center;margin:0 0 8px}
+.vl-neu .v-feld{flex:1;min-width:0}
+#vhBlatt.vhblatt{display:block}
+
 /* ---------- Fussleiste ---------- */
 .fuss{flex:0 0 auto;display:flex;background:var(--karte);border-top:1px solid var(--linie);
   padding-bottom:env(safe-area-inset-bottom)}
@@ -2738,7 +2764,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
 <div class="schirm" id="schirmVorhaben">
   <div class="vh-kopf">
     <div class="vh-zeile">
-      <span id="vhZahl"></span><span id="einfallZahl"></span>
+      <span id="vhZahl"></span>
       <span class="vh-luecke"></span>
       <button type="button" id="vAlle" class="pille aktiv" onclick="setVhFilter('alle')">Alle</button>
       <button type="button" id="vBeruf" class="pille" onclick="setVhFilter('beruflich')">Beruf</button>
@@ -2747,18 +2773,12 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
     <div class="stufen">
       <button type="button" id="vhStufeVorhaben" class="aktiv"
               onclick="setVhStufe('vorhaben')">Vorhaben</button>
-      <button type="button" id="vhStufeEinfaelle"
-              onclick="setVhStufe('einfaelle')">Einfälle</button>
       <button type="button" id="vhStufeGedanken"
               onclick="zeigeSchirm('Gedanken')">Notizen</button>
-    </div>
-    <div class="knopfreihe" style="margin-top:9px" id="vhRueckblickReihe">
-      <button type="button" onclick="rueckblickOeffnen()">Wochenrückblick</button>
     </div>
   </div>
 
   <div class="vhblatt einfachliste" id="vhBlatt"></div>
-  <div class="vhblatt einfachliste" id="einfallBlatt" style="display:none"></div>
 
   <button class="plusknopf" type="button" id="vhPlus" onclick="vorhabenNeu()"
           aria-label="Neues Vorhaben">
@@ -2881,7 +2901,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.26.0';
+var APP_VERSION = '5.27.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -13720,7 +13740,7 @@ function setVhFilter(art) {
   vhKontextZu = {};
   if (vhStufe === 'einfaelle') {
     markiere([['alle', 'vAlle'], ['beruflich', 'vBeruf'], ['privat', 'vPrivat']], art);
-    einfaelleZeichnen();
+    vhZeichnen();
     return;
   }
   markiere([['alle', 'vAlle'], ['beruflich', 'vBeruf'], ['privat', 'vPrivat']], art);
@@ -13981,9 +14001,12 @@ function ziehAb(e, art, id) {
       });
       if (ordnungVerschieben(gruppe, ziehVon.id, id)) { abZeichnen(); }
     }
+  } else if (art === 'einfall') {
+    if (ordnungVerschieben(einfaelleSichtbar('offen'), ziehVon.id, id)) { vhZeichnen(); }
   } else if (art === 'vorhaben') {
-    if (gleicheGruppe(ziehVon.id, id)
-        && ordnungVerschieben(vorhabenGruppe(id), ziehVon.id, id)) {
+    var vg = vhAnzeigeGruppe(id);
+    if (vg.some(function (x) { return x.id === ziehVon.id; })
+        && ordnungVerschieben(vg, ziehVon.id, id)) {
       vhZeichnen();
     }
   }
@@ -14752,8 +14775,10 @@ function restZeitHtml(bis) {
    Zustand, mit Ring und eingeklapptem Abgeschlossenem.
    ============================================================ */
 
-var VH_GRUPPEN = [['heute', 'Heute dran'], ['laeuft', 'Läuft'], ['ruht', 'Ruht'],
-                  ['fertig', 'Abgeschlossen']];
+/* Seit v5.27.0 eine Liste: Läuft (samt „heute dran“), Ruht, Einfälle,
+   Erledigt. */
+var VH_GRUPPEN = [['laeuft', 'Läuft'], ['ruht', 'Ruht'], ['einfaelle', 'Einfälle'],
+                  ['fertig', 'Erledigt']];
 
 /* Der Zustand kommt aus den Tätigkeiten: Was heute fällig ist, was
    offen ist, und was seit einer Woche keine Regung zeigt.
@@ -14821,47 +14846,81 @@ function vhGruppeUm(name) {
 }
 
 
+/* Seit v5.27.0 eine Zeile statt einer Karte: Name, Projekt oder Ziel,
+   Deadline. Sortiert wird am Rechner durch Ziehen, am Handy mit ↑ ↓. */
 function vhKarteHtml(v, art) {
-  var satz = zustandText(v);
   var zustand = vhZustand(v, art);
   var ende = (art === 'ziel') ? v.zieltermin : v.ende;
-  var t = vhTaetigkeiten(art, v.id);
-  var offen = t.haupt.length + t.klein.length + t.wieder.length + t.ablaeufe.length;
-  var h = '<div class="vkarte ablauf' + (v.kontext === 'privat' ? ' privat' : '')
-        + ((zustand === 'ruht' || zustand === 'fertig') ? ' ruht' : '') + '"'
-        + ziehAttribute('vorhaben', v.id)
-        + ' onclick="taetigOeffnen(\'' + art + '\',\'' + esc(v.id) + '\')">';
-  /* Kein Ring am Vorhaben: Er zählte erledigte von allen Tätigkeiten und
-     stand auf hundert Prozent, sobald das Bisherige abgehakt war — bei
-     einem Projekt über Monate sagt das nichts. Was zählt, steht in der
-     Marke und im Fuß. */
-  h += '<div class="ab-oben"><span class="ab-name">' + esc(v.name) + '</span></div>';
-  h += '<span class="ab-stand' + ((zustand === 'heute') ? ' faellig' : '')
-     + ((zustand === 'laeuft') ? ' laeuft' : '') + '">' + esc(vhZustandText(v, art))
-     + '</span>';
-  if (satz) { h += '<div class="ab-naechster">Diese Woche: ' + esc(satz) + '</div>'; }
-  h += '<div class="ab-fuss">';
-  var marken = [(art === 'ziel') ? 'Ziel' : 'Projekt'];
-  if (offen) { marken.push(offen + ' offen'); }
-  if (t.erledigt.length) { marken.push(t.erledigt.length + ' erledigt'); }
-  if (ende) { marken.push('bis ' + kurzDatum(ende)); }
-  /* Seit v5.19.1 ohne Knöpfe — die Karte öffnet die Seite mit Tätigkeiten
-     und Gedanken. Dass es Gedanken gibt, sagt ein Schild. */
-  if (vhHatGedanken(v)) { marken.push('Notizen'); }
-  h += '<span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span>';
-  h += '<span style="flex:1"></span>';
-  h += '<span class="ab-pfeile">'
-     + '<button type="button" onclick="event.stopPropagation();vhSchiebenId(\'' + esc(v.id)
-     + '\',-1)" aria-label="nach vorn">‹</button>'
-     + '<button type="button" onclick="event.stopPropagation();vhSchiebenId(\'' + esc(v.id)
-     + '\',1)" aria-label="nach hinten">›</button></span>';
-  h += '</div>';
+  return vlZeileHtml({
+    klasse: (v.kontext === 'privat' ? ' privat' : '') + ((zustand === 'ruht' || zustand === 'fertig') ? ' ruht' : ''),
+    zieh: ziehAttribute('vorhaben', v.id),
+    oeffnen: 'taetigOeffnen(\'' + art + '\',\'' + esc(v.id) + '\')',
+    name: v.name,
+    art: (art === 'ziel') ? 'Ziel' : 'Projekt',
+    bis: ende ? ('bis ' + kurzDatumJahr(ende)) : 'ohne Deadline',
+    schieben: 'vhSchiebenId(\'' + esc(v.id) + '\','
+  });
+}
+
+function vhEinfallZeileHtml(e) {
+  var offen = (e.stand || 'offen') === 'offen';
+  var bis = '';
+  if (e.stand === 'verfolgt') { bis = 'wurde ' + (e.wurde === 'ziel' ? 'ein Ziel' : 'ein Projekt'); }
+  else if (e.stand === 'verworfen') { bis = 'verworfen'; }
+  return vlZeileHtml({
+    klasse: (e.kontext === 'privat' ? ' privat' : '') + (offen ? '' : ' ruht'),
+    zieh: offen ? ziehAttribute('einfall', e.id) : '',
+    oeffnen: 'einfallOeffnen(\'' + esc(e.id) + '\')',
+    name: e.titel,
+    art: 'Einfall',
+    bis: bis,
+    schieben: offen ? ('einfallSchiebenId(\'' + esc(e.id) + '\',') : ''
+  });
+}
+
+function vlZeileHtml(z) {
+  var h = '<div class="vl-z' + z.klasse + '"' + z.zieh + ' onclick="' + z.oeffnen + '">';
+  h += '<span class="vl-griff" aria-hidden="true">' + (z.zieh ? '⋮⋮' : '') + '</span>';
+  h += '<span class="vl-text"><span class="vl-name">' + esc(z.name) + '</span>'
+     + '<span class="vl-meta"><span class="vl-art">' + esc(z.art) + '</span>'
+     + '<span class="vl-bis">' + esc(z.bis) + '</span></span></span>';
+  if (z.schieben) {
+    h += '<span class="vl-pf">'
+       + '<button type="button" onclick="event.stopPropagation();' + z.schieben + '-1)" aria-label="nach oben">↑</button>'
+       + '<button type="button" onclick="event.stopPropagation();' + z.schieben + '1)" aria-label="nach unten">↓</button></span>';
+  }
   h += '</div>';
   return h;
 }
 
+/* „Mo 1.2.27“ — mit Jahr, wenn es nicht dieses ist. */
+function kurzDatumJahr(is) {
+  if (!is) { return ''; }
+  var t = kurzDatum(is);
+  return (is.slice(0, 4) === isoDatum().slice(0, 4)) ? t : (t + is.slice(2, 4));
+}
+
+function einfallSchiebenId(id, richtung) {
+  if (ordnungSchieben(einfaelleSichtbar('offen'), id, richtung)) { vhZeichnen(); }
+}
+
 function vhSchiebenId(id, richtung) {
-  if (ordnungSchieben(vorhabenGruppe(id), id, richtung)) { vhZeichnen(); }
+  if (ordnungSchieben(vhAnzeigeGruppe(id), id, richtung)) { vhZeichnen(); }
+}
+
+/* Sortiert wird innerhalb der Gruppe, wie sie in der Liste steht —
+   Ziele und Projekte gemischt, im gewählten Filter. */
+function vhAnzeigeGruppe(id) {
+  var alle = (DB.ziele || []).map(function (z) { return { v: z, art: 'ziel' }; })
+    .concat((DB.projekte || []).map(function (p) { return { v: p, art: 'projekt' }; }))
+    .filter(function (e) {
+      return !kontextVerborgen(e.v.kontext) && (vhFilter === 'alle' || e.v.kontext === vhFilter);
+    });
+  var gruppe = function (e) { var z = vhZustand(e.v, e.art); return (z === 'heute') ? 'laeuft' : z; };
+  var ich = alle.filter(function (e) { return e.v.id === id; })[0];
+  if (!ich) { return []; }
+  var g = gruppe(ich);
+  return alle.filter(function (e) { return gruppe(e) === g; }).map(function (e) { return e.v; });
 }
 
 function projektKarteHtml(p) {
@@ -14886,28 +14945,14 @@ function projektKarteHtml(p) {
    ringen. */
 var vhStufe = 'vorhaben';
 
+/* Seit v5.27.0 stehen die Einfälle in der Liste — es gibt nur noch die
+   Stufe „Vorhaben“. */
 function setVhStufe(name) {
-  vhStufe = name;
-  markiere([['vorhaben', 'vhStufeVorhaben'], ['einfaelle', 'vhStufeEinfaelle']], name);
-
-  var vh = document.getElementById('vhBlatt');
-  var ein = document.getElementById('einfallBlatt');
-  var rueck = document.getElementById('vhRueckblickReihe');
+  vhStufe = 'vorhaben';
+  markiere([['vorhaben', 'vhStufeVorhaben']], 'vorhaben');
   var plus = document.getElementById('vhPlus');
-  if (vh)    { vh.style.display    = (name === 'einfaelle') ? 'none' : ''; }
-  if (ein)   { ein.style.display   = (name === 'einfaelle') ? '' : 'none'; }
-  if (rueck) { rueck.style.display = (name === 'einfaelle') ? 'none' : ''; }
-  if (plus)  { plus.style.display  = (name === 'einfaelle') ? 'none' : ''; }
-
-  if (name === 'einfaelle') {
-    /* Nicht als Mahnung, sondern als Antwort auf die Frage, die man
-       sich beim Öffnen stellt: Ist das hier noch aktuell? */
-    DB.einstellungen.einfaelleGesehen = isoDatum();
-    spaeterSichern();
-    einfaelleZeichnen();
-  } else {
-    vhZeichnen();
-  }
+  if (plus) { plus.style.display = ''; }
+  vhZeichnen();
 }
 
 /* Bei „Alle" stehen Beruf und Privat getrennt, jeder Bereich
@@ -14950,34 +14995,61 @@ function vhZeichnen() {
     });
   var ziele = vhSichtbar(DB.ziele || []);
   var projekte = vhSichtbar(DB.projekte || []);
+  var einfaelle = einfaelleSichtbar('offen').filter(function (e) { return !kontextVerborgen(e.kontext); });
+  var gewesen = einfaelleSichtbar('verfolgt').concat(einfaelleSichtbar('verworfen'))
+    .filter(function (e) { return !kontextVerborgen(e.kontext); });
+  var gruppeVon = function (e) {
+    var z = vhZustand(e.v, e.art);
+    return (z === 'heute') ? 'laeuft' : z;
+  };
   var h = '';
   var g, i;
   for (g = 0; g < VH_GRUPPEN.length; g++) {
     var name = VH_GRUPPEN[g][0];
-    var drin = alle.filter(function (e) { return vhZustand(e.v, e.art) === name; });
-    if (!drin.length) { continue; }
-    var geordnet = nachOrdnung(drin.map(function (e) { return e.v; }));
+    var zeilen = '';
+    var zahl = 0;
+    if (name === 'einfaelle') {
+      var geordnetE = nachOrdnung(einfaelle);
+      zahl = geordnetE.length;
+      for (i = 0; i < geordnetE.length; i++) { zeilen += vhEinfallZeileHtml(geordnetE[i]); }
+    } else {
+      var drin = alle.filter(function (e) { return gruppeVon(e) === name; });
+      var geordnet = nachOrdnung(drin.map(function (e) { return e.v; }));
+      zahl = drin.length;
+      for (i = 0; i < geordnet.length; i++) {
+        var art = drin.filter(function (e) { return e.v === geordnet[i]; })[0].art;
+        zeilen += vhKarteHtml(geordnet[i], art);
+      }
+      if (name === 'fertig') {
+        zahl += gewesen.length;
+        for (i = 0; i < gewesen.length; i++) { zeilen += vhEinfallZeileHtml(gewesen[i]); }
+      }
+    }
+    if (!zahl && name !== 'einfaelle') { continue; }
     var auf = vhGruppeOffen(name);
     h += '<button class="ab-gruppe' + (auf ? ' auf' : '') + '" type="button" '
        + 'onclick="vhGruppeUm(\'' + name + '\')"><span>' + VH_GRUPPEN[g][1] + ' · '
-       + drin.length + '</span>'
+       + zahl + '</span>'
        + '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></button>';
     if (!auf) { continue; }
-    h += '<div class="ab-raster">';
-    for (i = 0; i < geordnet.length; i++) {
-      var art = drin.filter(function (e) { return e.v === geordnet[i]; })[0].art;
-      h += vhKarteHtml(geordnet[i], art);
+    if (name === 'einfaelle') {
+      /* Ein Einfall wird hier gemerkt — ohne Datum, ohne Verpflichtung. */
+      h += '<div class="vl-neu"><input class="v-feld" type="text" id="einfallNeu" '
+         + 'placeholder="Was fällt dir ein? (p = privat)" '
+         + 'onkeydown="if(event.key===\'Enter\'){einfallNeu();}">'
+         + '<button class="ms-wort" type="button" onclick="einfallNeu()">Merken</button></div>';
     }
-    h += '</div>';
+    if (zeilen) { h += '<div class="vl-liste">' + zeilen + '</div>'; }
   }
-  if (!alle.length) { h += '<div class="tleer">Noch kein Vorhaben.</div>'; }
+  if (!alle.length && !einfaelle.length && !gewesen.length) { h += '<div class="tleer">Noch kein Vorhaben.</div>'; }
 
   blatt.innerHTML = h;
-  var zahl = document.getElementById('vhZahl');
-  if (zahl && vhStufe !== 'einfaelle') {
-    zahl.textContent = ziele.length + (ziele.length === 1 ? ' Ziel' : ' Ziele')
-                     + ' · ' + projekte.length
-                     + (projekte.length === 1 ? ' Projekt' : ' Projekte');
+  var zahlEl = document.getElementById('vhZahl');
+  if (zahlEl) {
+    zahlEl.textContent = ziele.length + (ziele.length === 1 ? ' Ziel' : ' Ziele')
+                       + ' · ' + projekte.length
+                       + (projekte.length === 1 ? ' Projekt' : ' Projekte')
+                       + ' · ' + einfaelle.length + (einfaelle.length === 1 ? ' Einfall' : ' Einfälle');
   }
 }
 
@@ -15354,58 +15426,9 @@ function einfallZeileHtml(e) {
   return h;
 }
 
+/* Seit v5.27.0 zeichnet die Vorhabenliste die Einfälle mit. */
 function einfaelleZeichnen() {
-  var blatt = document.getElementById('einfallBlatt');
-  if (!blatt) { return; }
-  var offen = einfaelleSichtbar('offen');
-  var verfolgt = einfaelleSichtbar('verfolgt');
-  var verworfen = einfaelleSichtbar('verworfen');
-
-  var h = '<div class="ms-unten" style="padding-left:0;margin:0 0 10px">'
-        + '<input class="v-feld" type="text" id="einfallNeu" '
-        + 'placeholder="Was fällt dir ein? (p = privat)" '
-        + 'onkeydown="if(event.key===\'Enter\'){einfallNeu();}">'
-        + '<button class="ms-wort" type="button" onclick="einfallNeu()">Merken</button>'
-        + '</div>';
-
-  if (!offen.length) {
-    h += '<div class="tleer" style="padding-left:0">Noch nichts gemerkt. '
-       + 'Hier darf alles stehen, was du vielleicht einmal tun willst — '
-       + 'ohne Datum, ohne Verpflichtung.</div>';
-  }
-  var bereiche = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
-  var b, i;
-  for (b = 0; b < bereiche.length; b++) {
-    var k = bereiche[b][0];
-    if (vhFilter !== 'alle' && vhFilter !== k) { continue; }
-    var drin = offen.filter(function (e) { return e.kontext === k; });
-    if (!drin.length && vhFilter === 'alle') { continue; }
-    h += vhBereichKopf(k, bereiche[b][1], drin.length);
-    if (!vhKontextOffen(k)) { continue; }
-    for (i = 0; i < drin.length; i++) { h += einfallZeileHtml(drin[i]); }
-  }
-
-  var alt = verfolgt.length + verworfen.length;
-  if (alt) {
-    h += '<button class="tfalt" type="button" onclick="einfallGeschichteUm()">'
-       + '<span>Geschichte · ' + verfolgt.length + ' verfolgt, '
-       + verworfen.length + ' verworfen</span>'
-       + '<svg class="' + (einfallGeschichteAuf ? 'auf' : '') + '" viewBox="0 0 24 24">'
-       + '<path d="M6 9l6 6 6-6"></path></svg></button>';
-    if (einfallGeschichteAuf) {
-      for (i = 0; i < verfolgt.length; i++) { h += einfallZeileHtml(verfolgt[i]); }
-      for (i = 0; i < verworfen.length; i++) { h += einfallZeileHtml(verworfen[i]); }
-    }
-  }
-
-  blatt.innerHTML = h;
-
-  var zahl = document.getElementById('einfallZahl');
-  if (zahl) {
-    var g = DB.einstellungen.einfaelleGesehen;
-    zahl.textContent = offen.length + (offen.length === 1 ? ' Einfall' : ' Einfälle')
-                     + (g ? (' · zuletzt angesehen ' + kurzDatum(g)) : '');
-  }
+  vhZeichnen();
 }
 
 function einfallGeschichteUm() {
