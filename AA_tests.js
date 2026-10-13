@@ -1059,16 +1059,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' ablauf: function(){'
                  + '   var alt = DB; var merkTag = tagOffen; DB = leereDatenbank(); var r = {};'
                  + '   var h = isoDatum(); tagOffen = h; r.heute = h;'
-                 + '   var feld = document.getElementById("schnellFeld");'
-                 + '   feld.value = "Zahnarzt morgen 14:00"; schnellVorschau();'
-                 + '   r.vorschau = document.getElementById("schnellVorschauZeile").innerHTML;'
-                 + '   schnellAnlegen(); var a = DB.aufgaben[DB.aufgaben.length - 1];'
-                 + '   r.tag = { titel: a.titel, planung: a.planung, uhrzeit: a.uhrzeit, art: a.art,'
-                 + '     imPlan: planSatz(tagePlus(h, 1)).drin.indexOf(a.id) >= 0, nichtHeute: planSatz(h).drin.indexOf(a.id) < 0 };'
-                 + '   feld.value = "Bericht an Kerstin bis Fr"; schnellAnlegen(); a = DB.aufgaben[DB.aufgaben.length - 1];'
-                 + '   r.frist = { titel: a.titel, planung: a.planung, frist: a.frist };'
-                 + '   feld.value = "Rückruf Bergmann"; schnellAnlegen(); a = DB.aufgaben[DB.aufgaben.length - 1];'
-                 + '   r.ohne = { planung: a.planung, imPlan: planSatz(h).drin.indexOf(a.id) >= 0 };'
+                 + '   var a;'
+                 + '   r.ohneSchnell = (typeof schnellAnlegen === "undefined");'
                  + '   var wf = document.getElementById("wochenNeu"); wf.value = "Angebot prüfen übermorgen 9 Uhr";'
                  + '   wochenAufgabeNeu(montagVon(h)); a = DB.aufgaben[DB.aufgaben.length - 1];'
                  + '   r.woche = { titel: a.titel, planung: a.planung, uhrzeit: a.uhrzeit };'
@@ -1175,7 +1167,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var auf = function(id, titel, zeit, dauer){ DB.aufgaben.push({ id: id, titel: titel, kontext: "beruflich", planung: is,'
                  + '     uhrzeit: zeit, dauer: dauer || 0, art: "haupt", status: "offen", wiederholung: null, geaendert: 1 }); planAufnehmen(is, id); };'
                  + '   termineNachTag = {};'
-                 + '   merkeTermin(is, { id: "g1", titel: "DFÜ-Freigabetest", zeit: um(-60), bis: um(120), ort: "", ganztags: false, quelle: "A", kontext: "beruflich" });'
+                 + '   merkeTermin(is, { id: "g1", titel: "DFÜ-Freigabetest", zeit: um(-60), bis: (um(120) > um(0) ? um(120) : "23:59"), ort: "", ganztags: false, quelle: "A", kontext: "beruflich" });'
                  + '   var jk = function(){ jetztKarteZeichnen(is, tagesEintraege(is)); return document.getElementById("tagJetzt").innerHTML; };'
                  + '   r.nurTermin = /Jetzt: DFÜ-Freigabetest/.test(jk());'
                  + '   auf("a1", "Stellungnahme", um(-20), 60);'
@@ -1652,6 +1644,47 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
    DB = alt; tagOffen = merkT; tagFilter = merkF;
    return r;
  } };`
+                 + `globalThis.__listenApi = {
+ pruefe: function(){
+   var r = {}; var alt = DB; var merkF = aufFilter; var merkA = aktionFuer;
+   DB = leereDatenbank(); aufFilter = 'alle';
+   var l = listeAnlegen('Haus & Werkstatt', 'privat');
+   r.liste = !!l && l.kontext === 'privat' && DB.themen.length === 1 && listeNeuIn === l.id;
+   r.keineDoppelte = listeAnlegen('Haus & Werkstatt', 'privat') === l && DB.themen.length === 1;
+   var a = listeAufgabeAnlegen(l.id, 'Kellerregal aufbauen', 'haupt');
+   var k = listeAufgabeAnlegen(l.id, 'Batterien kaufen', 'klein');
+   r.anlegen = a.themaId === l.id && a.kontext === 'privat' && a.planung === 'backlog' && k.art === 'klein';
+   r.leerNichts = listeAufgabeAnlegen(l.id, '   ', 'haupt') === null;
+   DB.aufgaben.push({ id: 'o1', titel: 'Lose Sache', kontext: 'beruflich', status: 'offen', art: 'haupt', planung: 'backlog', geaendert: 1 });
+   DB.projekte = [{ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', zielzustaende: [] }];
+   DB.aufgaben.push({ id: 'v1', titel: 'Holzrahmen', kontext: 'privat', status: 'offen', art: 'haupt', planung: 'backlog', projektId: 'p1', themaId: l.id, geaendert: 1 });
+   listeNeuIn = ''; aufZeichnen();
+   var bl = document.getElementById('aufBlatt').innerHTML;
+   r.karte = /data-kurz="Haus &amp; Werkstatt"/.test(bl) && /Kellerregal aufbauen/.test(bl) && /Batterien kaufen/.test(bl);
+   r.ohne = /data-kurz="Ohne Zuordnung"/.test(bl) && /Lose Sache/.test(bl);
+   r.vorhabenNicht = !/Holzrahmen/.test(bl);
+   r.plus = bl.indexOf("listeNeuZeigen('" + l.id + "','klein')") >= 0;
+   r.zahl = document.getElementById('aufZahl').innerHTML.indexOf('+ Liste') >= 0;
+   aktionFuer = 'o1'; dGehoert('t:' + l.id);
+   var o1 = aufgabeFinden('o1');
+   r.gehoert = o1.themaId === l.id && o1.kontext === 'privat';
+   dGehoert('p:p1'); o1 = aufgabeFinden('o1');
+   r.gehoertVorhaben = o1.projektId === 'p1' && o1.themaId === null && o1.kontext === 'privat';
+   dGehoert(''); o1 = aufgabeFinden('o1');
+   r.gehoertOhne = !o1.themaId && !o1.projektId && !o1.zielId;
+   aufZeichnen(); r.ohneWieder = /Ohne Zuordnung/.test(document.getElementById('aufBlatt').innerHTML);
+   listeKontextUm(l.id);
+   r.kontextZieht = l.kontext === 'beruflich' && aufgabeFinden(a.id).kontext === 'beruflich' && aufgabeFinden('v1').kontext === 'privat';
+   listeLoeschen(l.id);
+   r.loeschen = DB.themen.length === 0 && aufgabeFinden(a.id).themaId === null && DB.grabsteine.some(function(g){ return g.s === 'themen'; });
+   taetigFuer = { id: 'p1', art: 'projekt' }; tgNeuArt = 'klein';
+   document.getElementById('taetigNeu').value = 'Schrauben besorgen'; taetigNeu();
+   var n = DB.aufgaben[DB.aufgaben.length - 1];
+   r.vorhabenNeu = n.titel === 'Schrauben besorgen' && n.art === 'klein' && n.projektId === 'p1' && n.kontext === 'privat';
+   tgNeuArt = 'haupt';
+   DB = alt; aufFilter = merkF; aktionFuer = merkA; listeNeuIn = ''; listeAnlegenAuf = false;
+   return r;
+ } };`
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -1996,11 +2029,14 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     spanne: kurz(\'16:30-17:15 Vorhänge aufhängen p\'),'
                  + '     ohneZeit: kurz(\'Brief einwerfen p\'),'
                  + '     schonGetan: eingabeDeuten(\'++ Telefonat p\').schon };'
-                 + '   var feld = document.getElementById(\'schnellFeld\');'
+                 + '   var anlegen = function(t){ var d = eingabeDeuten(t); var id = neueKennung();'
+                 + '     DB.aufgaben.push({ id: id, titel: d.titel, beschreibung: \'\', kontext: d.kontext, themaId: null, projektId: null,'
+                 + '       frist: d.frist || \'\', planung: h, angelegtAm: h, uhrzeit: d.uhrzeit || \'\', dauer: d.dauer || 0, art: d.art,'
+                 + '       wiederholung: null, status: d.schon ? \'erledigt\' : \'offen\', erledigtAm: d.schon ? h : null,'
+                 + '       zuletztErledigt: null, ablaufSchritt: null, geaendert: jetzt() }); planAufnehmen(h, id); };'
                  + '   [\'16:30-17:15 Vorhänge aufhängen p\','
                  + '    \'++ Telefonat Heizung p\','
-                 + '    \'Brief einwerfen p\'].forEach(function(t){'
-                 + '     feld.value = t; schnellAnlegen(); });'
+                 + '    \'Brief einwerfen p\'].forEach(anlegen);'
                  + '   var e = tagesEintraege(h);'
                  + '   r.imStundenplan = e.verlauf.map(function(v){'
                  + '     return v.a.titel + \' \' + v.a.uhrzeit + \' \''
@@ -2391,34 +2427,17 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       aufgabeId:\'v1\' }, { titel:\'b\', aufgabeId:\'v2\' }] }];'
                  + '   DB.einstellungen.darstellung = \'breit\';'
                  + '   aufZeichnen();'
-                 + '   var links = document.getElementById(\'aufBlatt\').innerHTML'
-                 + '     .split(\'auf-rechts\')[0];'
-                 + '   /* Seit v3.9.0 tragen Abschnitte und Sektionen dieselbe'
-                 + '      einklappbare Überschrift. */'
-                 + '   var bloecke = links.split(\'<button class="tunter\')'
-                 + '     .slice(1).map(function(t){'
-                 + '       return { name: (t.match(/<\\/svg>([^<]*)/) || [])[1] || \'\','
-                 + '                titel: (t.match(/ttitel">([^<]*)/g) || [])'
-                 + '                  .map(function(x){ return x.slice(8); }) }; });'
-                 + '   var namen = bloecke.map(function(x){ return x.name; });'
-                 + '   var reihe = function(n){'
-                 + '     var i = namen.indexOf(n);'
-                 + '     return (i < 0) ? [] : bloecke[i].titel; };'
-                 + '   var r = { aufgabenLose: reihe(\'Aufgaben\').join(\',\'),'
-                 + '     sektionen: namen.filter(function(n){'
-                 + '       return n !== \'Aufgaben\' && n !== \'Kleinigkeiten\''
-                 + '         && n !== \'Wiederkehrend\'; }).join(\',\') };'
-                 + '   r.imVorgang = reihe(\'Workshop\').join(\',\');'
-                 + '   var wieder = bloecke.filter(function(x){'
-                 + '     return x.name === \'Wiederkehrend\'; });'
-                 + '   r.wiederAufgaben = wieder.length'
-                 + '     ? wieder[0].titel.join(\',\') : \'\';'
-                 + '   r.wiederKlein = (wieder.length > 1)'
-                 + '     ? wieder[1].titel.join(\',\') : \'\';'
-                 + '   r.kleinLose = reihe(\'Kleinigkeiten\').join(\',\');'
-                 + '   r.kleinOhneVorgang = (reihe(\'Kleinigkeiten\')'
-                 + '     .indexOf(\'Einladung\') < 0);'
-                 + '   r.wiederNichtOben = (reihe(\'Aufgaben\').indexOf(\'Oskar\') < 0);'
+                 + '   var bl = document.getElementById(\'aufBlatt\').innerHTML;'
+                 + '   var karten = bl.split(\'class="tabschnitt ls-karte\').slice(1).map(function(t){'
+                 + '     var teile = t.split(\'wk-gruppe2">Kleinigkeiten\');'
+                 + '     var titel = function(x){ return (x.match(/ttitel">([^<]*)/g) || []).map(function(y){ return y.slice(8); }); };'
+                 + '     return { name: (t.match(/data-kurz="([^"]*)"/) || [])[1] || \'\', haupt: titel(teile[0]), klein: teile[1] ? titel(teile[1]) : [] }; });'
+                 + '   var karte = function(n){ return karten.filter(function(k){ return k.name === n; })[0] || { haupt: [], klein: [] }; };'
+                 + '   var r = { karten: karten.map(function(k){ return k.name; }).join(\',\'),'
+                 + '     ohneHaupt: karte(\'Ohne Zuordnung\').haupt.join(\',\'),'
+                 + '     ohneKlein: karte(\'Ohne Zuordnung\').klein.join(\',\'),'
+                 + '     liste: karte(\'Finanzen\').haupt.join(\',\') };'
+                 + '   r.vorhabenNicht = !/Gang|Schränke/.test(bl);'
                  + '   DB.einstellungen.darstellung = merkD; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -2467,28 +2486,17 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var b = document.getElementById(\'aufBlatt\').innerHTML;'
                  + '   var r = { spalten: (b.match(/class="auf-spalte ([^"]*)"/g) || [])'
                  + '     .map(function(x){ return x.slice(18, -1); }).join(\',\') };'
-                 + '   var links = b.split(\'auf-rechts\')[0];'
-                 + '   /* Seit v3.9.0 eine Sorte Kopf für Abschnitte und'
-                 + '      Sektionen — beide einklappbar. */'
-                 + '   var bloecke = links.split(\'<button class="tunter\')'
-                 + '     .slice(1).map(function(t){'
-                 + '       return { name: (t.match(/<\\/svg>([^<]*)/) || [])[1] || \'\','
-                 + '                titel: (t.match(/ttitel">([^<]*)/g) || [])'
-                 + '                  .map(function(x){ return x.slice(8); }) }; });'
-                 + '   var namen = bloecke.map(function(x){ return x.name; });'
-                 + '   var reihe = function(n){'
-                 + '     var i = namen.indexOf(n);'
-                 + '     return (i < 0) ? [] : bloecke[i].titel; };'
-                 + '   r.sektionen = namen.filter(function(n){'
-                 + '     return n !== \'Aufgaben\' && n !== \'Kleinigkeiten\''
-                 + '       && n !== \'Wiederkehrend\'; }).join(\',\');'
-                 + '   r.imVorgang = reihe(\'Workshop\').join(\',\');'
-                 + '   r.imThema = reihe(\'Finanzen\').join(\',\');'
-                 + '   r.loseNachDatum = reihe(\'Aufgaben\')'
-                 + '     .filter(function(x){ return x === \'Heute\''
-                 + '       || x === \'Morgen\' || x === \'Ohne\'; }).join(\',\');'
-                 + '   r.kleinGetrennt = (reihe(\'Kleinigkeiten\')'
-                 + '     .indexOf(\'Morgenstart\') >= 0);'
+                 + '   var bl = document.getElementById(\'aufBlatt\').innerHTML;'
+                 + '   var karten = bl.split(\'class="tabschnitt ls-karte\').slice(1).map(function(t){'
+                 + '     var teile = t.split(\'wk-gruppe2">Kleinigkeiten\');'
+                 + '     var titel = function(x){ return (x.match(/ttitel">([^<]*)/g) || []).map(function(y){ return y.slice(8); }); };'
+                 + '     return { name: (t.match(/data-kurz="([^"]*)"/) || [])[1] || \'\', haupt: titel(teile[0]), klein: teile[1] ? titel(teile[1]) : [] }; });'
+                 + '   var karte = function(n){ return karten.filter(function(k){ return k.name === n; })[0] || { haupt: [], klein: [] }; };'
+                 + '   r.karten = karten.map(function(k){ return k.name; }).join(\',\');'
+                 + '   r.imListe = karte(\'Finanzen\').haupt.join(\',\');'
+                 + '   r.ohneOrdnung = karte(\'Ohne Zuordnung\').haupt.join(\',\');'
+                 + '   r.kleinGetrennt = (karte(\'Ohne Zuordnung\').klein.join(\',\') === \'Morgenstart\');'
+                 + '   r.vorhabenNicht = !/Schränke|>Gang</.test(bl);'
                  + '   r.vorgaengeRechts = (b.indexOf(\'auf-rechts\') >= 0);'
                  + '   DB.durchlaeufe.push({ id:\'d9\', name:\'Haus\','
                  + '     kontext:\'privat\', schritte:[{ titel:\'x\' }] });'
@@ -3375,7 +3383,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     kontext:\'privat\', projektId:\'p1\','
                  + '     schritte:[{ titel:\'A\', fertig:true }, { titel:\'B\' }] }];'
                  + '   aktionFuer = \'l1\';'
-                 + '   dVorhaben(\'z:z1\');'
+                 + '   dGehoert(\'z:z1\');'
                  + '   var l = aufgabeFinden(\'l1\');'
                  + '   var t = vhTaetigkeiten(\'projekt\', \'p1\');'
                  + '   var r = { zahl: vhTaetigZahl(\'projekt\', \'p1\'),'
@@ -5846,7 +5854,7 @@ console.log('\n15. Tagesplan');
   const skript = hauptSkript();
 
   const noetig = ['tagZeichnen', 'tagBlaettern', 'tagHeute', 'tagesform', 'faelligAn',
-                  'tagesEintraege', 'aufgabeHaken', 'schnellAnlegen', 'eingabeDeuten',
+                  'tagesEintraege', 'aufgabeHaken', 'eingabeDeuten',
                   'feiertagAn', 'urlaubAn', 'monatsende', 'kalenderwoche', 'wochenIndex',
                   'streifenPruefen', 'istErledigtAn', 'esc'];
   noetig.forEach(function (f) {
@@ -6288,12 +6296,12 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
 
   const noetig = ['aufZeichnen', 'setAufFilter', 'aufGruppeVon',
                   'aufReihenfolge', 'aufMetaText', 'regelText', 'planungText',
-                  'planungKlasse', 'planungWeiter', 'aufgabeErledigen', 'aufgabeNeu',
+                  'planungKlasse', 'planungWeiter', 'aufgabeErledigen',
                   'themenFuer', 'projekteFuer', 'wochenEnde',
                   'detailHtml', 'detailNeuZeichnen', 'detailGeaendert',
-                  'dKontext', 'dArt', 'dThema', 'dVorhaben', 'dFrist', 'dPlanung',
+                  'dGehoert', 'gehoertWahlHtml', 'dArt', 'dFrist', 'dPlanung',
                   'dZeit', 'dBeschreibung', 'dWdh', 'dWdhIntervall', 'dWdhTag',
-                  'dWdhMonatstag', 'themaNeuZeigen', 'themaAnlegen',
+                  'dWdhMonatstag',
                   'themaKontext', 'projektKontext'];
   noetig.forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
@@ -6341,7 +6349,7 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
            'die Monatsregel wird lesbar beschrieben');
 
     /* Planung weiterschalten */
-    pruefe(api.planungText({ planung: 'backlog' }) === 'Backlog', 'Beschriftung Backlog');
+    pruefe(api.planungText({ planung: 'backlog' }) === 'Offen', 'Beschriftung Offen (früher Backlog)');
     pruefe(api.planungText({ planung: 'woche' }) === 'Woche', 'Beschriftung Woche');
     pruefe(api.planungKlasse({ planung: heute }) === ' tag', 'ein Tag wird hervorgehoben');
   }
@@ -6353,10 +6361,11 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
   pruefe(geaendert && /spaeterSichern\(\)/.test(geaendert[0]),
          'jede Feldänderung wird gesichert und abgeglichen');
 
-  /* Kontextwechsel räumt fremde Zuordnungen weg */
-  const kontext = skript.match(/function dKontext\([\s\S]*?\n\}/);
-  pruefe(kontext && /themaId = null/.test(kontext[0]) && /projektId = null/.test(kontext[0]),
-         'ein Kontextwechsel entfernt Thema und Projekt des anderen Kontexts');
+  /* Seit v5.25.0: „Gehört zu" setzt genau eine Zuordnung und übernimmt deren Kontext. */
+  const gehoert = skript.match(/function dGehoert\([\s\S]*?\n\}/);
+  pruefe(gehoert && /a\.themaId = null; a\.projektId = null; a\.zielId = null;/.test(gehoert[0])
+         && /a\.kontext = k/.test(gehoert[0]),
+         '„Gehört zu“ setzt genau eine Zuordnung und übernimmt deren Kontext');
 
   /* Regel ohne Wochentag schaltet sich ab */
   const wdhTag = skript.match(/function dWdhTag\([\s\S]*?\n\}/);
@@ -6368,8 +6377,8 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
          'Aufteilen ist ganz entfernt — samt seiner Felder');
 
   /* Erledigtes verschwindet aus der Liste */
-  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(zeichnen && /status === 'erledigt'/.test(zeichnen[0]),
+  const offen = skript.match(/function aufOffen\([\s\S]*?\n\}\n/);
+  pruefe(offen && /a\.status !== 'erledigt'/.test(offen[0]),
          'erledigte Aufgaben stehen nicht in der Liste');
 }
 
@@ -6532,8 +6541,8 @@ console.log('\n24. Status wiederkehrender Aufgaben');
   pruefe(stempeln && /zuletztErledigt/.test(stempeln[0]),
          'das Erledigtdatum wandert dabei nach zuletztErledigt');
 
-  const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(zeichnen && /!alle\[i\]\.wiederholung && alle\[i\]\.status === 'erledigt'/.test(zeichnen[0]),
+  const offen2 = skript.match(/function aufOffen\([\s\S]*?\n\}\n/);
+  pruefe(offen2 && /!!a\.wiederholung \|\| a\.status !== 'erledigt'/.test(offen2[0]),
          'die Liste blendet nur einmalige erledigte Aufgaben aus');
 
   const api = globalThis.__aufApi;
@@ -6667,23 +6676,14 @@ console.log('\n27. Aufgabe anlegen');
 {
   const skript = hauptSkript();
 
-  pruefe(new RegExp('function\\s+aufgabeNeu\\s*\\(').test(skript), 'Funktion aufgabeNeu ist definiert');
-  pruefe(/class="plusknopf"/.test(QUELLE), 'der Plusknopf liegt im Aufgabenbildschirm');
-  pruefe(/onclick="aufgabeNeu\(\)"/.test(QUELLE), 'der Plusknopf legt eine Aufgabe an');
-  pruefe(/aria-label="Neue Aufgabe"/.test(QUELLE), 'der Knopf ist beschriftet');
-  pruefe(/\.plusknopf\{[^}]*position:fixed/.test(QUELLE), 'der Knopf liegt fest über der Liste');
-
-  const neu = skript.match(/function aufgabeNeu\([\s\S]*?\n\}/);
-  pruefe(neu && /aufgabeAktionen\(/.test(neu[0]),
-         'nach dem Anlegen öffnet sich sofort die Detailfläche');
-  pruefe(neu && /frischAngelegt = /.test(neu[0]),
-         'die Neuanlage wird vermerkt');
-  pruefe(neu && /planung: 'backlog'/.test(neu[0]),
-         'eine neue Aufgabe landet im Backlog');
-  pruefe(neu && /aufFilter === 'privat'/.test(neu[0]),
-         'der gewählte Filter bestimmt den Kontext');
-  pruefe(neu && /focus\(\)/.test(neu[0]),
-         'der Schreibbalken steht im Titelfeld');
+  /* Seit v5.25.0 kein Plusknopf mehr: Angelegt wird in einer Liste. */
+  pruefe(!/onclick="aufgabeNeu\(\)"/.test(QUELLE) && !new RegExp('function\\s+aufgabeNeu\\s*\\(').test(skript),
+         'kein Plusknopf mehr auf der Listenseite');
+  const la = skript.match(/function listeAufgabeAnlegen\([\s\S]*?\n\}/);
+  pruefe(la && /themaId: t\.id/.test(la[0]) && /kontext: t\.kontext/.test(la[0]),
+         'eine in der Liste angelegte Aufgabe gehört zur Liste und trägt ihren Kontext');
+  pruefe(la && /planung: 'backlog'/.test(la[0]), 'sie ist zunächst offen, ohne Tag');
+  pruefe(la && /if \(!t \|\| !n\) \{ return null; \}/.test(la[0]), 'ohne Titel entsteht nichts');
 
   const schliessen = skript.match(/function aktionenSchliessen\([\s\S]*?\n\}/);
   pruefe(schliessen && /aktionFuer === frischAngelegt/.test(schliessen[0]),
@@ -6695,8 +6695,8 @@ console.log('\n27. Aufgabe anlegen');
   pruefe(schliessen && /frischAngelegt = ''/.test(schliessen[0]),
          'der Vermerk wird danach zurückgesetzt');
 
-  /* Im Tagesplan bleibt die Schnelleingabe */
-  pruefe(/id="schnellFeld"/.test(QUELLE), 'der Tagesplan behält seine Schnelleingabe');
+  /* Seit v5.25.0 auch im Tag keine Schnelleingabe */
+  pruefe(!/id="schnellFeld"/.test(QUELLE), 'der Tag hat keine Schnelleingabe mehr');
   pruefe(!/id="aufFeld"/.test(QUELLE), 'die Aufgabenfläche hat keine Schnelleingabe mehr');
 }
 
@@ -8423,11 +8423,9 @@ console.log('\n56. Gruppen und Art');
          'die beiden Leisten sind weg');
 
   const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(zeichnen && /a\.art !== 'klein'/.test(zeichnen[0])
-         && /a\.art === 'klein'/.test(zeichnen[0]),
-         'die Liste teilt sich in Aufgaben und Kleinigkeiten');
-  pruefe(zeichnen && (zeichnen[0].match(/unterKopf\(/g) || []).length === 2,
-         'beide lassen sich einklappen');
+  const lz = skript.match(/function listeZeilenHtml\([\s\S]*?\n\}\n/);
+  pruefe(lz && /a\.art === 'klein'/.test(lz[0]) && /Kleinigkeiten<\/div>/.test(lz[0]),
+         'eine Liste teilt sich in Aufgaben und darunter Kleinigkeiten');
   /* Seit v5.22.0 ohne Vorgänge-Spalte auf der Aufgabenseite. */
   pruefe(zeichnen && !/ablaufListeHtml\(/.test(zeichnen[0]) && !/auf-rechts/.test(zeichnen[0]),
          'auf der Aufgabenseite stehen keine Vorgänge mehr');
@@ -10424,7 +10422,7 @@ console.log('\n82. Ähnliche Aufgaben');
   pruefe(pr && /ziel\.innerHTML =/.test(pr[0]),
          'nachgezogen wird nur der Hinweis, nicht der ganze Bildschirm — sonst '
          + 'verlöre das Feld bei jedem Zeichen den Strich');
-  pruefe(/id="schnellAehnlich"/.test(QUELLE), 'im Tagesplan steht der Hinweis');
+  pruefe(/id="taetigAehnlich"/.test(skript), 'im Vorhaben steht der Hinweis');
   pruefe(/id="wochenAehnlich"/.test(skript), 'in der Wochensicht ebenso');
 
   if (!a) {
@@ -11637,7 +11635,7 @@ console.log('\n103. Tätigkeiten');
 
   ['gehoertZu', 'vhTaetigkeiten', 'vhTaetigZahl', 'vhSchilderHtml', 'taetigOeffnen',
    'taetigErledigtUm', 'taetigHaken', 'taetigZeileHtml', 'taetigAblaufHtml',
-   'taetigZeichnen', 'taetigNeu', 'vorhabenWahlHtml', 'dVorhaben', 'zielKontext']
+   'taetigZeichnen', 'taetigNeu', 'gehoertWahlHtml', 'dGehoert', 'zielKontext']
     .forEach(function (f) {
       pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
              'Funktion ' + f + ' ist definiert');
@@ -11651,11 +11649,11 @@ console.log('\n103. Tätigkeiten');
   const zk = skript.match(/function zielKarteHtml\([\s\S]*?\n\}\n/);
   pruefe(zk && /vhSchilderHtml\(z, 'ziel'\)/.test(zk[0]), 'die Zielkarte ebenso');
   const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
-  pruefe(dh && /vorhabenWahlHtml\(a\)/.test(dh[0]),
-         'im Aufgabenblatt stehen Projekte und Ziele zur Wahl');
-  const dk = skript.match(/function dKontext\([\s\S]*?\n\}/);
-  pruefe(dk && /zielKontext\(a\.zielId\) !== wert/.test(dk[0]),
-         'ein Kontextwechsel löst auch eine unpassende Zielzuordnung');
+  pruefe(dh && /gehoertWahlHtml\(a\)/.test(dh[0]),
+         'im Aufgabenblatt stehen Listen, Projekte und Ziele in einer Wahl');
+  const gw = skript.match(/function gehoertWahlHtml\([\s\S]*?\n\}\n/);
+  pruefe(gw && /Listen · /.test(gw[0]) && /Vorhaben · /.test(gw[0]) && /— ohne Zuordnung —/.test(gw[0]),
+         'gruppiert nach Listen und Vorhaben, dazu „ohne Zuordnung“');
   const as = skript.match(/function aktionenSchliessen\([\s\S]*?\n\}/);
   pruefe(as && /schirmOffen === 'Taetigkeiten'\) \{ taetigZeichnen\(\)/.test(as[0]),
          'nach dem Schließen eines Blattes steht die Liste frisch da');
@@ -11701,9 +11699,8 @@ console.log('\n104. Termine an Vorhaben');
   const fs = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
   pruefe(fs && /grabsteinSetzen\('kalenderzuordnung', schluessel\)/.test(fs[0]),
          'eine gelöschte Zuordnung hinterlässt einen Grabstein');
-  const vw = skript.match(/function vorhabenWahlHtml\([\s\S]*?\n\}/);
-  pruefe(vw && /vorhabenOptionenHtml\(/.test(vw[0]),
-         'Aufgaben und Termine teilen sich die Vorhabenwahl');
+  pruefe(/function vorhabenOptionenHtml\(/.test(skript) && /vorhabenOptionenHtml\('', terminVorhaben\(t\)\)/.test(skript),
+         'Termine wählen ihr Vorhaben weiterhin aus derselben Liste');
   const sp2 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   const sp3 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   pruefe(sp3 && /terminBlattOeffnen\(/.test(sp3[0]),
@@ -12339,7 +12336,7 @@ console.log('\n116. Kompakte Schritte');
   } else {
     const e = k.pruefe();
     pruefe(e.kurzZeilen === 3, 'kompakt steht jeder Schritt in einer Zeile');
-    pruefe(e.kurzMeta === 'Fr 25.9. · Aufgabe · Backlog',
+    pruefe(e.kurzMeta === 'Fr 25.9. · Aufgabe · Offen',
            'mit Datum und der tragenden Aufgabe');
     pruefe(e.kurzOhneFelder === true, 'ohne Eingabefelder');
     pruefe(e.langMitFeldern === true, 'nach „Bearbeiten" sind die Felder da');
@@ -12424,7 +12421,7 @@ console.log('\n118. Sichtschutz am Pixel');
   const s = globalThis.__sichtApi;
 
   ['sichtschutzLaden', 'sichtschutzUm', 'kontextVerborgen', 'verborgenZahl',
-   'allesZeichnen', 'tagKopfSchmalZeichnen', 'eingabeZeigen'].forEach(function (f) {
+   'allesZeichnen', 'tagKopfSchmalZeichnen'].forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
@@ -12443,17 +12440,11 @@ console.log('\n118. Sichtschutz am Pixel');
          'am Handy tritt er an die Stelle der Kopfkarte');
   /* Seit v4.9.0 gilt das auch am Rechner: Die Zeile lief über die
      ganze Breite und nahm dem Tagesplan die Höhe. */
-  pruefe(/\n\.eingabe-zone\{display:none\}/.test(QUELLE)
-         && /\n\.eingabe-fab\{display:flex/.test(QUELLE),
-         'das Eingabefeld steckt hinter dem Pluszeichen, auf beiden Geräten');
-  pruefe(/body\.eingabe-auf \.eingabe-zone\{display:block\}/.test(QUELLE),
-         'das Pluszeichen klappt es auf');
+  /* Seit v5.25.0 ohne Eingabefeld und Pluszeichen im Tag. */
+  pruefe(!/eingabe-zone|eingabe-fab/.test(QUELLE), 'kein Eingabefeld und kein Pluszeichen mehr im Tag');
   const prs = skript.match(/function planRollenSpaeter\([\s\S]*?\n\}/);
   pruefe(prs && /getElementById\('tagBlatt'\)/.test(prs[0]),
          'gerollt wird die Tagesseite, an die Jetzt-Linie');
-  pruefe(/\.eingabe-fab\{[^}]*bottom:calc\(env\(safe-area-inset-bottom,0px\) \+ 78px\)/
-         .test(QUELLE),
-         'das Pluszeichen steht über der Leiste, nicht darin');
   pruefe(/body\.breit \.tk-karte\{padding:7px 12px 8px\}/.test(QUELLE),
          'der Kopf ist dafür enger gesetzt — ohne kleinere Schrift');
   pruefe(!/tk-schmal[\s\S]{0,400}tagBlaettern/.test(QUELLE),
@@ -12731,15 +12722,13 @@ console.log('\n123. Aktivitäten und Vorgänge');
   } else {
     const e = s.pruefe();
     pruefe(e.spalten === 'auf-links', 'eine Spalte, auch am Rechner');
-    pruefe(e.sektionen === 'Haus,Finanzen,Workshop',
-           'Sektionen in der Rangfolge: Vorhaben, Thema, Vorgang');
-    pruefe(e.imVorgang === 'Fragebogen,Einladung,GitLab',
-           'im Vorgang zählt die Schrittfolge, nicht die Aufgabenliste');
-    pruefe(e.imThema === 'Steuer,Belege',
-           'im Thema das Datum — die überfällige zuerst');
-    pruefe(e.loseNachDatum === 'Heute,Morgen,Ohne',
-           'lose Aufgaben stehen nach Datum, Undatiertes zuletzt');
-    pruefe(e.kleinGetrennt === true, 'Kleinigkeiten stehen für sich');
+    /* Seit v5.25.0: Karten je Liste, davor „Ohne Zuordnung“; Vorhaben stehen beim Vorhaben. */
+    pruefe(e.karten === 'Ohne Zuordnung,Finanzen', 'je Liste eine Karte, „Ohne Zuordnung“ zuerst');
+    pruefe(e.imListe === 'Steuer,Belege', 'in der Liste nach Datum — die überfällige zuerst');
+    pruefe(e.ohneOrdnung === 'Einladung,Fragebogen,Heute,Morgen,GitLab,Ohne',
+           'ohne Zuordnung ebenso nach Datum, Undatiertes zuletzt');
+    pruefe(e.kleinGetrennt === true, 'Kleinigkeiten stehen darunter für sich');
+    pruefe(e.vorhabenNicht === true, 'Aufgaben eines Vorhabens stehen nicht auf der Listenseite');
     pruefe(e.vorgaengeRechts === false, 'keine Vorgänge auf der Aufgabenseite');
     /* Der Filter der Aufgabenseite muss auch dort greifen: Er saß vorher
        nur an der Vorgangsseite. */
@@ -12797,7 +12786,7 @@ console.log('\n125. Wiederkehrendes und Vorgänge');
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
-  const az = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
+  const az = skript.match(/function listeZeilenHtml\([\s\S]*?\n\}\n/);
   pruefe(az && /!a\.wiederholung/.test(az[0]) && /!!a\.wiederholung/.test(az[0]),
          'einmalige und wiederkehrende werden getrennt');
   /* Seit v3.9.0 eine Sorte Überschrift: Abschnitte, Sektionen und das
@@ -12820,29 +12809,20 @@ console.log('\n125. Wiederkehrendes und Vorgänge');
   pruefe(uu && /schirmOffen === 'Aufgaben'/.test(uu[0]),
          'gezeichnet wird die Seite, auf der man steht — dieselben Köpfe stehen in '
          + 'beiden');
-  pruefe(az && /a\.art !== 'klein' \|\| inVorgang\(a\)/.test(az[0]),
-         'eine Kleinigkeit aus einem Vorgang wandert zu ihm nach oben');
-  pruefe(az && (az[0].match(/wiederTeilHtml\(/g) || []).length === 2,
-         'jeder der beiden Bereiche endet mit seinem Wiederkehrenden');
+  pruefe(az && /return einmal\.concat\(wieder\);/.test(az[0]),
+         'Aufgaben und Kleinigkeiten enden je mit ihrem Wiederkehrenden');
 
   if (!s) {
     warn('Funktionen nicht auswertbar');
   } else {
     const e = s.pruefe();
-    pruefe(e.aufgabenLose === 'Weidner,Wien',
-           'oben die einzelnen Aufgaben nach Datum');
-    pruefe(e.sektionen === 'Haus,Finanzen,Workshop',
-           'dann die Sektionen: Vorhaben, Thema, Vorgang');
-    pruefe(e.imVorgang === 'Fragebogen,Einladung',
-           'der Vorgang trägt auch seine Kleinigkeit');
-    pruefe(e.wiederAufgaben === 'AzDO,Oskar',
-           'am Fuß das Wiederkehrende, nach Namen');
-    pruefe(e.kleinLose === 'Brief', 'bei den Kleinigkeiten dasselbe Bild');
-    pruefe(e.wiederKlein === 'Pflanzen', 'auch dort das Wiederkehrende am Fuß');
-    pruefe(e.kleinOhneVorgang === true,
-           'die Kleinigkeit des Vorgangs steht nicht doppelt da');
-    pruefe(e.wiederNichtOben === true,
-           'und keine wiederkehrende Aufgabe steht zwischen den einmaligen');
+    pruefe(e.karten === 'Ohne Zuordnung,Finanzen', 'je Liste eine Karte');
+    pruefe(e.ohneHaupt === 'Fragebogen,Weidner,Wien,AzDO,Oskar',
+           'oben die einmaligen nach Datum, am Fuß das Wiederkehrende nach Namen');
+    pruefe(e.ohneKlein === 'Brief,Einladung,Pflanzen',
+           'bei den Kleinigkeiten dasselbe Bild');
+    pruefe(e.liste === 'Steuer,Belege', 'in einer Liste ebenso');
+    pruefe(e.vorhabenNicht === true, 'Aufgaben eines Vorhabens stehen beim Vorhaben');
   }
 }
 
@@ -13155,9 +13135,6 @@ console.log('\n131. Der Tag ist der Plan');
   pruefe(gt && /if \(!planGilt\(is\)\) \{ return true; \}/.test(gt[0]),
          'ohne aufgestellten Plan bleibt es wie früher — sonst stünde die '
          + 'Vergangenheit leer da');
-  const sa = skript.match(/function schnellAnlegen\([\s\S]*?\n\}/);
-  pruefe(sa && /planAufnehmen\(tagOffen/.test(sa[0]),
-         'was tagsüber dazukommt, geht in den Plan');
   const ss = skript.match(/function stundenSpanne\([\s\S]*?\n\}/);
   pruefe(ss && /PLAN_MIN_VON/.test(ss[0]) && /PLAN_MIN_BIS/.test(ss[0]),
          'die Skala reicht mindestens von 8 bis 18 Uhr und weiter, wenn nötig');
@@ -14366,12 +14343,8 @@ console.log('\n157. Datum und Uhrzeit in der Schnelleingabe');
         const y = new Date(a.heute + 'T12:00:00'); y.setDate(y.getDate() + n);
         return y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0');
       };
-      pruefe(/14:00/.test(a.vorschau) && /Aufgabe/.test(a.vorschau), 'die Vorschau zeigt vor dem Enter, was erkannt wurde');
-      pruefe(a.tag.titel === 'Zahnarzt' && a.tag.planung === plusA(1) && a.tag.uhrzeit === '14:00' && a.tag.imPlan && a.tag.nichtHeute,
-             'am Tag angelegt, landet es auf dem erkannten Tag — in dessen Plan');
-      pruefe(a.frist.titel === 'Bericht an Kerstin' && a.frist.planung === a.heute && /^\d{4}-\d{2}-\d{2}$/.test(a.frist.frist),
-             'mit Frist bleibt es auf dem offenen Tag');
-      pruefe(a.ohne.planung === a.heute && a.ohne.imPlan === true, 'ohne Datum wie bisher auf dem offenen Tag');
+      /* Seit v5.25.0 ohne Schnelleingabe im Tag — angelegt wird in Listen und Vorhaben. */
+      pruefe(a.ohneSchnell === true, 'die Schnelleingabe im Tag gibt es nicht mehr');
       pruefe(a.woche.titel === 'Angebot prüfen' && a.woche.planung === plusA(2) && a.woche.uhrzeit === '09:00',
              'auch in der Woche gilt ein Datum vor der Woche');
       pruefe(a.taetig.titel === 'Handwerker anrufen' && a.taetig.planung === 'backlog' && a.taetig.frist === plusA(1) && a.taetig.projekt === 'p1',
@@ -15149,6 +15122,46 @@ console.log('\n187. Notizen, Seiten, schlankes Aufgabenblatt');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
   pruefe(/var tagKleinAuf = false;/.test(skript) && tz && /tagKleinAuf \? kleinTeil : ''/.test(tz[0]),
          'die Kleinigkeiten im Tag beginnen eingeklappt');
+}
+
+/* ============================================================
+   188. Listen statt Themen, Anlegen in Liste und Vorhaben (v5.25.0)
+   Die Seite „Listen“ zeigt je Liste eine Karte mit „+ Aufgabe“ und
+   „+ Kleinigkeit“; was nirgends hingehört, steht in „Ohne Zuordnung“.
+   Das Aufgabenblatt hat „Gehört zu“ statt Kontext, Thema, Vorhaben.
+   Die Schnellerfassung ist entfallen.
+   ============================================================ */
+console.log('\n188. Listen statt Themen');
+{
+  pruefe(/<span>Listen<\/span>/.test(QUELLE) && !/<span>Aufgaben<\/span>/.test(QUELLE),
+         'die Fußleiste sagt „Listen“');
+  pruefe(/onclick="zeigeSchirm\('Aufgaben'\)">Listen<\/button>/.test(QUELLE), 'der Reiter heißt „Listen“');
+  pruefe(!/id="schnellFeld"/.test(QUELLE) && !/class="eingabe-fab"/.test(QUELLE) && !/onclick="aufgabeNeu\(\)"/.test(QUELLE),
+         'weder Schnellerfassung im Tag noch Plusknopf auf der Listenseite');
+  const dh = hauptSkript().match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(dh && /Gehört zu/.test(dh[0]) && !/d-name">Kontext/.test(dh[0]) && !/d-name">Thema/.test(dh[0]) && !/d-name">Vorhaben/.test(dh[0]),
+         'im Aufgabenblatt „Gehört zu“ statt Kontext, Thema und Vorhaben');
+  pruefe(dh && />Offen<\/button>/.test(dh[0]), 'die Planung heißt „Offen“ statt „Backlog“');
+  const t = globalThis.__listenApi;
+  let e = null;
+  if (!t) { warn('Listen nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Listen laufen nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.liste === true, '„+ Liste“ legt eine Liste mit Kontext an und öffnet gleich die Eingabe');
+    pruefe(e.keineDoppelte === true, 'derselbe Name im selben Kontext ergibt keine zweite Liste');
+    pruefe(e.anlegen === true, 'in der Liste angelegt: gehört zur Liste, trägt ihren Kontext, ist offen');
+    pruefe(e.leerNichts === true, 'ein leerer Titel legt nichts an');
+    pruefe(e.karte === true, 'jede Liste ist eine Karte mit ihren Aufgaben und Kleinigkeiten');
+    pruefe(e.ohne === true, 'was nirgends hingehört, steht in „Ohne Zuordnung“');
+    pruefe(e.vorhabenNicht === true, 'Aufgaben eines Vorhabens stehen nicht auf der Listenseite');
+    pruefe(e.plus === true && e.zahl === true, 'jede Karte hat „+ Kleinigkeit“, der Kopf „+ Liste“');
+    pruefe(e.gehoert === true, '„Gehört zu“ eine Liste übernimmt deren Kontext');
+    pruefe(e.gehoertVorhaben === true, 'ein Vorhaben ersetzt die Liste und bringt seinen Kontext mit');
+    pruefe(e.gehoertOhne === true && e.ohneWieder === true, 'ohne Zuordnung landet sie wieder in „Ohne Zuordnung“');
+    pruefe(e.kontextZieht === true, 'wechselt die Liste den Kontext, ziehen ihre Aufgaben mit — Vorhaben-Aufgaben nicht');
+    pruefe(e.loeschen === true, 'eine gelöschte Liste hinterlässt einen Grabstein, ihre Aufgaben bleiben');
+    pruefe(e.vorhabenNeu === true, 'im Vorhaben wählt ein Schalter Aufgabe oder Kleinigkeit');
+  }
 }
 
 /* ============================================================
