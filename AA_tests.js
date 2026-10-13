@@ -1458,8 +1458,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   taetigZeichnen(); var bl = document.getElementById("taetigBlatt").innerHTML;'
                  + '   r.kopf = /id="tgName"[^>]*value="Halbmarathon Fürth"/.test(bl) && /tgFeld\\(.kontext.,.privat.\\)/.test(bl)'
                  + '     && /type="date" value="2027-06-20"/.test(bl) && /tgFeld\\(.status.,.abgeschlossen.\\)/.test(bl) && /tgMenueUm\\(\\)/.test(bl);'
-                 + '   r.teile = /data-tg="woche"/.test(bl) && /data-tg="taetig"/.test(bl) && /data-tg="termine"/.test(bl) && /data-tg="gedanken"/.test(bl)'
-                 + '     && /tgReiterSetzen\\(/.test(bl) && /Was tue ich diese Woche dafür\\?/.test(bl) && /apWochenStand\\(/.test(bl);'
+                 + '   r.teile = /data-tg="taetig"/.test(bl) && /data-tg="gedanken"/.test(bl) && !/data-tg="woche"/.test(bl) && !/data-tg="termine"/.test(bl)'
+                 + '     && /tgReiterSetzen\\(/.test(bl) && !/Was tue ich diese Woche dafür/.test(bl);'
                  + '   r.nadeln = /tgAufgabePin\\(.a1.\\)/.test(bl) && /pinUm\\(.flaeche.,.h1.\\)/.test(bl) && /pinUm\\(.taetigkeiten.,.p:h1.\\)/.test(bl);'
                  + '   tgFeld("kontext", "privat"); r.kontext = v.kontext;'
                  + '   tgFeld("status", "abgeschlossen"); r.status = v.status; tgFeld("status", "laufend");'
@@ -11699,8 +11699,8 @@ console.log('\n104. Termine an Vorhaben');
   const fs = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
   pruefe(fs && /grabsteinSetzen\('kalenderzuordnung', schluessel\)/.test(fs[0]),
          'eine gelöschte Zuordnung hinterlässt einen Grabstein');
-  pruefe(/function vorhabenOptionenHtml\(/.test(skript) && /vorhabenOptionenHtml\('', terminVorhaben\(t\)\)/.test(skript),
-         'Termine wählen ihr Vorhaben weiterhin aus derselben Liste');
+  pruefe(!/vorhabenOptionenHtml\('', terminVorhaben\(t\)\)/.test(skript),
+         'Termine werden keinem Vorhaben mehr zugeordnet (seit v5.26.0)');
   const sp2 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   const sp3 = skript.match(/function stundenplanHtml\([\s\S]*?\n\}\n/);
   pruefe(sp3 && /terminBlattOeffnen\(/.test(sp3[0]),
@@ -11751,8 +11751,8 @@ console.log('\n105. Tätigkeiten anheften');
   pruefe(tk && /pinKnopfHtml\(art, schl\)/.test(tk[0]) && /'taetigkeiten'/.test(tk[0]),
          'die Seite hat den Anheftknopf');
   const tz = skript.match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && /!terminIstVorbei\(x\)/.test(tz[0]),
-         'kommend ist, was nicht vorbei ist — auch innerhalb von heute');
+  pruefe(tz && !/vhTermine\(/.test(tz[0]) && !/terminIstVorbei\(/.test(tz[0]),
+         'die Vorhabenseite zeigt keine Termine mehr (seit v5.26.0)');
   const po = skript.match(/function pinOeffnen\([\s\S]*?\n\}/);
   pruefe(po && /taetigOeffnen\(/.test(po[0]), 'der Zettel öffnet die Seite');
 
@@ -11792,8 +11792,8 @@ console.log('\n106. Kontext eines Termins');
          && /terminKontextUeber\(satz\) \|\| satz\.kontext/.test(mt[0]),
          'die Überstimmung gilt schon beim Einsortieren — dann überall');
   const bh = skript.match(/function terminBlattHtml\([\s\S]*?\n\}\n/);
-  pruefe(bh && /vorhabenOptionenHtml\('', terminVorhaben\(t\)\)/.test(bh[0]),
-         'im Terminblatt stehen Vorhaben beider Kontexte zur Wahl');
+  pruefe(bh && !/terminBlattVorhaben\(/.test(bh[0]),
+         'im Terminblatt gibt es keine Vorhabenwahl mehr');
   pruefe(bh && /Kalender sagt/.test(bh[0]),
          'ist der Kontext überstimmt, steht dabei, was der Kalender sagt');
   const fs = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
@@ -11804,8 +11804,7 @@ console.log('\n106. Kontext eines Termins');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = k.pruefe();
-    pruefe(e.gruppen === 'Beruflich · Projekte|Privat · Ziele',
-           'die Wahl trennt nach Kontext');
+    pruefe(e.gruppen === '', 'das Terminblatt bietet keine Vorhaben mehr an');
     pruefe(e.serienweise === 'privat,privat,privat',
            'ein privates Vorhaben macht die ganze Serie privat');
     pruefe(e.andererBleibt === 'beruflich',
@@ -14855,7 +14854,7 @@ console.log('\n176. Vorhaben auf einer Seite');
   if (e) {
     pruefe(e.vorbereitet === true, 'die Seite öffnet sich und kennt ihr Vorhaben');
     pruefe(e.kopf === true, 'der Kopf trägt Name, Kontext, Termin, Status und das Menü ⋯');
-    pruefe(e.teile === true, 'Woche, Tätigkeiten, Termine und Gedanken stehen auf der Seite, mit Reitern fürs Handy');
+    pruefe(e.teile === true, 'Tätigkeiten und Notizen stehen auf der Seite, mit Reitern fürs Handy — ohne Woche und Termine');
     pruefe(e.nadeln === true, 'Vorhaben, Gedanken und jede Tätigkeit haben ihre eigene Nadel');
     pruefe(e.kontext === 'privat' && e.status === 'abgeschlossen' && e.name === 'Fürth Metropol Halbmarathon',
            'Kontext, Status und Name lassen sich auf der Seite ändern');
@@ -14905,8 +14904,7 @@ console.log('\n178. Gedanken in voller Länge');
   const feld = QUELLE.match(/\.tg-g-feld\{[^}]*\}/);
   pruefe(feld && /min-height:60vh/.test(feld[0]), 'zum Schreiben steht ein großes Feld bereit');
   const tz = hauptSkript().match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && /taetigAlleTermine \? kommend : kommend\.slice\(0, 6\)/.test(tz[0]) && /alle ' \+ kommend\.length \+ ' kommenden/.test(tz[0]),
-         'Termine: sechs direkt, der Rest auf Knopfdruck — keine stille Grenze');
+  pruefe(tz && !/kommend/.test(tz[0]), 'auf der Vorhabenseite stehen keine Termine mehr');
 }
 
 /* ============================================================
@@ -15162,6 +15160,30 @@ console.log('\n188. Listen statt Themen');
     pruefe(e.loeschen === true, 'eine gelöschte Liste hinterlässt einen Grabstein, ihre Aufgaben bleiben');
     pruefe(e.vorhabenNeu === true, 'im Vorhaben wählt ein Schalter Aufgabe oder Kleinigkeit');
   }
+}
+
+/* ============================================================
+   189. Vorhaben ohne Woche und Termine (v5.26.0)
+   Die Vorhabenseite zeigt nur noch Tätigkeiten und Notizen; Termine
+   werden keinem Vorhaben mehr zugeordnet. Die Wochenplanung im
+   Kalender behält ihren Zielzustand.
+   ============================================================ */
+console.log('\n189. Vorhaben ohne Woche und Termine');
+{
+  const skript = hauptSkript();
+  const tz = skript.match(/function taetigZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && !/tgWocheHtml\(/.test(tz[0]) && !/data-tg="termine"/.test(tz[0]),
+         'keine Karte „Diese Woche“ und keine Termine auf der Vorhabenseite');
+  const rh = skript.match(/function tgReiterHtml\([\s\S]*?\n\}\n/);
+  pruefe(rh && !/'woche'/.test(rh[0]) && !/'termine'/.test(rh[0]) && /'taetig'/.test(rh[0]) && /'gedanken'/.test(rh[0]),
+         'am Handy nur noch die Reiter Tätigkeiten und Notizen');
+  pruefe(/var tgReiter = 'taetig';/.test(skript) && /tgReiter = 'taetig';/.test(skript.match(/function taetigOeffnen\([\s\S]*?\n\}/)[0]),
+         'die Seite öffnet auf den Tätigkeiten');
+  pruefe(!/\[data-reiter="woche"\]|\[data-reiter="termine"\]/.test(QUELLE), 'keine Reiter-Regeln mehr für Woche und Termine');
+  const bh = skript.match(/function terminBlattHtml\([\s\S]*?\n\}\n/);
+  pruefe(bh && !/d-name">Vorhaben/.test(bh[0]), 'das Terminblatt hat keine Zeile „Vorhaben“');
+  pruefe(/function apWocheHtml\(/.test(skript) && /apZustandAn\(v, montag\)/.test(skript),
+         'die Wochenplanung im Kalender behält den Zielzustand');
 }
 
 /* ============================================================

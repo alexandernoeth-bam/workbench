@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.25.0</title>
+<title>Workbench 5.26.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -1377,9 +1377,7 @@ body:not(.breit) .tg-reiter{display:flex}
 .tg-reiter button{flex:0 0 auto;font:inherit;font-size:calc(var(--fs)*0.78);padding:5px 12px;border:1px solid var(--linie);border-radius:16px;background:var(--karte);cursor:pointer;color:var(--tinte)}
 .tg-reiter button.an{border-color:var(--tinte);font-weight:500}
 body:not(.breit) .tg-raster [data-tg]{display:none}
-body:not(.breit) .tg-seite[data-reiter="woche"] [data-tg="woche"],
 body:not(.breit) .tg-seite[data-reiter="taetig"] [data-tg="taetig"],
-body:not(.breit) .tg-seite[data-reiter="termine"] [data-tg="termine"],
 body:not(.breit) .tg-seite[data-reiter="gedanken"] [data-tg="gedanken"]{display:block}
 .tg-mziel{font-size:calc(var(--fs)*0.72);color:var(--grau);margin:0 0 6px}
 .tg-mziel b{color:var(--tinte);font-weight:500}
@@ -2883,7 +2881,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.25.0';
+var APP_VERSION = '5.26.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -14135,7 +14133,7 @@ function vhTaetigZahl(art, id) {
 function taetigOeffnen(art, id) {
   taetigFuer = { art: art, id: id };
   taetigErledigtAuf = true;
-  tgReiter = 'woche';
+  tgReiter = 'taetig';
   tgMenueAuf = false;
   vhHistorieAuf = false;
   vhDetail = id;
@@ -14242,24 +14240,20 @@ function taetigZeichnen() {
   }
   tgVorbereiten();
   var t = vhTaetigkeiten(taetigFuer.art, taetigFuer.id);
-  var termine = vhTermine(taetigFuer.art, taetigFuer.id);
-  var kommend = termine.filter(function (x) { return !terminIstVorbei(x); });
-  var vergangen = termine.filter(function (x) { return terminIstVorbei(x); }).reverse();
 
   var zahlen = [];
   var nA = t.haupt.length + t.klein.length + t.wieder.length;
   if (nA) { zahlen.push(nA + (nA === 1 ? ' Aufgabe' : ' Aufgaben')); }
   if (t.ablaeufe.length) { zahlen.push(t.ablaeufe.length + (t.ablaeufe.length === 1 ? ' Ablauf' : ' Abläufe')); }
-  if (kommend.length) { zahlen.push(kommend.length + (kommend.length === 1 ? ' Termin' : ' Termine')); }
   if (t.erledigt.length) { zahlen.push(t.erledigt.length + ' erledigt'); }
 
-  /* Seit v5.19.0 eine Seite: Kopf (früher Detailblatt), links Woche,
-     Tätigkeiten und Termine, rechts die Gedanken. Am Handy Reiter. */
+  /* Seit v5.19.0 eine Seite: Kopf (früher Detailblatt), links die
+     Tätigkeiten, rechts die Notizen. Am Handy Reiter. Seit v5.26.0 ohne
+     „Diese Woche“ und ohne Termine. */
   var h = '<div class="tg-seite" data-reiter="' + esc(tgReiter) + '">';
   h += tgKopfHtml(v, zahlen);
-  h += tgReiterHtml(nA + t.ablaeufe.length, kommend.length);
+  h += tgReiterHtml(nA + t.ablaeufe.length);
   h += '<div class="tg-raster"><div class="tg-links">';
-  h += tgWocheHtml(v);
 
   var block = function (titel, liste, zeile) {
     if (!liste.length) { return ''; }
@@ -14300,29 +14294,6 @@ function taetigZeichnen() {
                                                : taetigAblaufHtml(t.erledigt[i].satz);
       }
       h += '</div>';
-    }
-  }
-  h += '</div>';
-
-  h += '<div class="tg-block" data-tg="termine"><div class="tg-bkopf">Termine<span>' + kommend.length
-     + '</span></div>';
-  if (!kommend.length && !vergangen.length) {
-    h += '<div class="tg-leer" style="padding:8px 0">Noch keine Termine. Tippe im Tagesplan '
-       + 'auf einen Termin und wähle dort dieses Vorhaben.</div>';
-  }
-  var zeigen = taetigAlleTermine ? kommend : kommend.slice(0, 6);
-  for (i = 0; i < zeigen.length; i++) { h += taetigTerminHtml(zeigen[i]); }
-  if (kommend.length > 6) {
-    h += '<button class="tg-falt" type="button" onclick="taetigAlleTermineUm()">'
-       + (taetigAlleTermine ? 'weniger zeigen' : ('alle ' + kommend.length + ' kommenden'))
-       + '</button>';
-  }
-  if (vergangen.length) {
-    h += '<button class="tg-falt" type="button" onclick="taetigVergangenUm()">'
-       + (taetigVergangenAuf ? '⌄ ' : '› ') + 'Vergangene Termine · ' + vergangen.length
-       + '</button>';
-    if (taetigVergangenAuf) {
-      for (i = 0; i < vergangen.length; i++) { h += taetigTerminHtml(vergangen[i]); }
     }
   }
   h += '</div>';
@@ -14630,9 +14601,8 @@ function terminBlattHtml() {
      + ((t.kontext !== kal) ? ('<span class="d-hinweis">Kalender sagt ' + esc(kal) + '</span>')
                             : '')
      + '</div></div>';
-  h += '<div class="d-feld"><div class="d-name">Vorhaben</div><div class="d-wert">'
-     + '<select onchange="terminBlattVorhaben(this.value)">'
-     + vorhabenOptionenHtml('', terminVorhaben(t)) + '</select></div></div>';
+  /* Seit v5.26.0 ohne Vorhabenwahl: Termine werden keinem Vorhaben mehr
+     zugeordnet. Frühere Zuordnungen bleiben unangetastet im Bestand. */
   if (terminBlattHinweis) {
     h += '<div class="d-hinweis" style="text-align:left;color:var(--weinrot)">'
        + esc(terminBlattHinweis) + '</div>';
@@ -20370,7 +20340,7 @@ function apWocheHtml(montag) {
    nicht mehr geöffnet; seine Funktionen (vh…) arbeiten für die Seite.
    ============================================================ */
 
-var tgReiter = 'woche';
+var tgReiter = 'taetig';
 var tgGedankenModus = 'ansicht';
 var tgMenueAuf = false;
 
@@ -20578,9 +20548,8 @@ function tgKopfHtml(v, zahlen) {
   return h + '</div>';
 }
 
-function tgReiterHtml(nA, nT) {
-  var r = [['woche', 'Woche'], ['taetig', 'Tätigkeiten' + (nA ? ' · ' + nA : '')],
-           ['termine', 'Termine' + (nT ? ' · ' + nT : '')], ['gedanken', 'Notizen']];
+function tgReiterHtml(nA) {
+  var r = [['taetig', 'Tätigkeiten' + (nA ? ' · ' + nA : '')], ['gedanken', 'Notizen']];
   return '<div class="tg-reiter" role="tablist">' + r.map(function (x) {
     return '<button type="button" role="tab" aria-selected="' + (tgReiter === x[0] ? 'true' : 'false') + '" '
          + 'class="' + (tgReiter === x[0] ? 'an' : '') + '" onclick="tgReiterSetzen(\'' + x[0] + '\')">' + esc(x[1]) + '</button>';
