@@ -1596,10 +1596,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
    neu('a1', 'Agenda entwerfen', '', heute);
    neu('a2', 'Steuer abgeben', fr, '');
    neu('a3', 'Nächste Woche fällig', tagePlus(mo, 9), '');
-   neu('a4', 'Übungen ausarbeiten', fr, '');
+   neu('a4', 'Übungen ausarbeiten', fr, 'woche');
+   neu('w1', 'Wochenaufgabe', '', 'woche');
+   neu('d1', 'Anderer Tag', '', tagePlus(heute, 1));
+   neu('kw', 'Wochenkleinigkeit', '', 'woche', 'klein');
    neu('a5', 'Rückmeldung an Moni', '', heute);
    neu('k1', 'Folien drucken', '', heute, 'klein');
-   neu('a6', 'Alte Verbindlichkeit', '', '');
    tagOffen = heute; tagZeichnen();
    var bl = function(){ return document.getElementById('tagBlatt').innerHTML; };
    var karte = function(name){
@@ -1615,14 +1617,13 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
    r.kennung = !!w && w.id === 'kw-' + mo && wkHolen(mo) === w && DB.wochen.length === 1 && wkMontag === mo;
    var zid = w.ziele[0].id;
    wkAuswahlOeffnen(zid); wkZuordnen('a1'); wkZuordnen('a4'); wkZuordnen('k1'); wkZuordnen('a5'); wkAuswahlSchliessen();
-   w.verbindlich = ['a6'];
    tagZeichnen();
    var ziele = karte('Was diese Woche'); var verb = karte('Verbindlichkeiten heute'); var klein = karte('Kleinigkeiten');
    r.nurImZiel = /Agenda entwerfen/.test(ziele) && !/Agenda entwerfen/.test(verb);
    r.kleinNurImZiel = /Folien drucken/.test(ziele) && !/Folien drucken/.test(klein);
-   r.faellig = /Noch diese Woche fällig/.test(verb) && /Steuer abgeben/.test(verb)
-     && !/Nächste Woche fällig/.test(verb) && !/Übungen ausarbeiten/.test(verb);
-   r.alteVerbindlichkeit = /Alte Verbindlichkeit/.test(verb);
+   r.woche = /Für die Woche/.test(verb) && /Wochenaufgabe/.test(verb) && !/Übungen ausarbeiten/.test(verb);
+   r.nurAmTag = !/Anderer Tag/.test(bl()) && !/Steuer abgeben/.test(verb) && !/Nächste Woche fällig/.test(verb);
+   r.kleinWoche = /Wochenkleinigkeit/.test(klein);
    wkLoesen('a5');
    r.loesen = /Rückmeldung an Moni/.test(karte('Verbindlichkeiten heute')) && !/Rückmeldung an Moni/.test(karte('Was diese Woche'));
    aufgabeHaken('a1');
@@ -2486,15 +2487,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '       || x === \'Morgen\' || x === \'Ohne\'; }).join(\',\');'
                  + '   r.kleinGetrennt = (reihe(\'Kleinigkeiten\')'
                  + '     .indexOf(\'Morgenstart\') >= 0);'
-                 + '   r.vorgaengeRechts = (b.indexOf(\'Vorgänge\')'
-                 + '     > b.indexOf(\'auf-rechts\'));'
+                 + '   r.vorgaengeRechts = (b.indexOf(\'auf-rechts\') >= 0);'
                  + '   DB.durchlaeufe.push({ id:\'d9\', name:\'Haus\','
                  + '     kontext:\'privat\', schritte:[{ titel:\'x\' }] });'
                  + '   var merkF = aufFilter;'
                  + '   var namen = function(){'
-                 + '     aufZeichnen();'
-                 + '     var teil = (document.getElementById(\'aufBlatt\').innerHTML'
-                 + '       .split(\'auf-rechts\')[1] || \'\');'
+                 + '     var teil = ablaufListeHtml(aufFilter, true);'
                  + '     return (teil.match(/ab-name">([^<]*)/g) || [])'
                  + '       .map(function(x){ return x.slice(9); }).join(\',\'); };'
                  + '   setAufFilter(\'alle\');'
@@ -2725,7 +2723,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   sichtschutzUm(); sichtschutzUm();'
                  + '   window.localStorage.setItem = merkSetz;'
                  + '   r.geschrieben = (notiert === \'an\');'
-                 + '   r.einTermin = /1 Termin[^e]/.test('
+                 + '   r.einTermin = !/Termin/.test('
                  + '     document.getElementById(\'tkSchmalZeile\').innerHTML);'
                  + '   sichtschutzUm();'
                  + '   r.zurueck = stand();'
@@ -8431,10 +8429,9 @@ console.log('\n56. Gruppen und Art');
          'die Liste teilt sich in Aufgaben und Kleinigkeiten');
   pruefe(zeichnen && (zeichnen[0].match(/unterKopf\(/g) || []).length === 2,
          'beide lassen sich einklappen');
-  pruefe(zeichnen && /ablaufListeHtml\(aufFilter, true\)/.test(zeichnen[0])
-         && /istBreit\(\)/.test(zeichnen[0]),
-         'am Rechner stehen die Vorgänge rechts daneben — mit dem Filter der '
-         + 'Aufgabenseite');
+  /* Seit v5.22.0 ohne Vorgänge-Spalte auf der Aufgabenseite. */
+  pruefe(zeichnen && !/ablaufListeHtml\(/.test(zeichnen[0]) && !/auf-rechts/.test(zeichnen[0]),
+         'auf der Aufgabenseite stehen keine Vorgänge mehr');
   /* Seit v5.0.1 zeigt die Spalte immer das Laufende, nie die Vorlagen:
      Die Stufe gilt auf der Vorgangsseite, nicht hier. */
   const alh = skript.match(/function ablaufListeHtml\([\s\S]*?\n\}\n/);
@@ -8443,8 +8440,8 @@ console.log('\n56. Gruppen und Art');
   const dsa = skript.match(/function durchlaufStartenAusDetail\([\s\S]*?\n\}/);
   pruefe(dsa && /abDetailOeffnen\(neu\.id, 'durchlauf'\)/.test(dsa[0]),
          '„Jetzt starten" springt zum neuen Vorgang — sonst sähe man nichts');
-  pruefe(zeichnen && /kopf-hin[\s\S]*?zeigeSchirm\(\\?'Ablaeufe\\?'\)/.test(zeichnen[0]),
-         'und ein Weg führt von dort zur Vorgangsseite mit Vorlagen und Erledigtem');
+  pruefe(/id="stufeAblaeufe"[\s\S]{0,40}zeigeSchirm\('Ablaeufe'\)/.test(QUELLE),
+         'der Weg zu den Vorgängen führt über den Reiter');
   const liste = skript.match(/function aufListeHtml\([\s\S]*?\n\}\n/);
   pruefe(liste && /x\.rang - y\.rang/.test(liste[0]),
          'erst Vorgänge, dann Vorhaben, dann Themen');
@@ -12129,9 +12126,8 @@ console.log('\n112. Tagessicht in Karten');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = t.pruefe();
-    pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 3 Aufgaben · 3 Kleinigkeiten'
-           + ' · 1 erledigt',
-           'der Kopf sagt, wie voll der Tag ist — der Ablaufschritt zählt als Kleinigkeit');
+    /* Seit v5.22.0 ohne Zählerzeile. */
+    pruefe(e.zaehler === '', 'im Kopf steht keine Zählerzeile mehr');
     /* Die Wochenziele tragen „KW n" im Kopf und zählen hier nicht mit. */
     pruefe(e.gruppen === 'Verbindlichkeiten heute,Termine heute,Kleinigkeiten',
            'am Rechner unter den Wochenzielen: Verbindlichkeiten, Termine, Kleinigkeiten');
@@ -12478,7 +12474,7 @@ console.log('\n118. Sichtschutz am Pixel');
            'der Zustand wird ins Gerät geschrieben — er überlebt einen Neustart');
     pruefe(e.zurueck === 'Dienstlich,Whiskey Club|Beruflich,Privates|Beruflich,Privat',
            'ausgeschaltet ist alles wieder da');
-    pruefe(e.einTermin === true, 'die Kopfzeile zählt richtig, auch bei einem Termin');
+    pruefe(e.einTermin === true, 'die Zeile unter dem Datum zählt keine Termine mehr');
   }
 }
 
@@ -12734,7 +12730,7 @@ console.log('\n123. Aktivitäten und Vorgänge');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = s.pruefe();
-    pruefe(e.spalten === 'auf-links,auf-rechts', 'zwei Spalten am Rechner');
+    pruefe(e.spalten === 'auf-links', 'eine Spalte, auch am Rechner');
     pruefe(e.sektionen === 'Haus,Finanzen,Workshop',
            'Sektionen in der Rangfolge: Vorhaben, Thema, Vorgang');
     pruefe(e.imVorgang === 'Fragebogen,Einladung,GitLab',
@@ -12744,7 +12740,7 @@ console.log('\n123. Aktivitäten und Vorgänge');
     pruefe(e.loseNachDatum === 'Heute,Morgen,Ohne',
            'lose Aufgaben stehen nach Datum, Undatiertes zuletzt');
     pruefe(e.kleinGetrennt === true, 'Kleinigkeiten stehen für sich');
-    pruefe(e.vorgaengeRechts === true, 'die Vorgänge stehen in der rechten Spalte');
+    pruefe(e.vorgaengeRechts === false, 'keine Vorgänge auf der Aufgabenseite');
     /* Der Filter der Aufgabenseite muss auch dort greifen: Er saß vorher
        nur an der Vorgangsseite. */
     pruefe(e.filterAlle === 'Workshop,Haus', 'ohne Filter stehen alle Vorgänge da');
@@ -12779,11 +12775,11 @@ console.log('\n124. Fenstergröße und Reiter');
   pruefe(bh && /clearTimeout\(breiteUhr\)/.test(bh[0]),
          'beim Ziehen am Fensterrand wird nicht bei jedem Pixel gezeichnet');
   pruefe(/breiteHorchen\(\);/.test(skript), 'der Horcher wird beim Start angemeldet');
-  pruefe(/body\.breit #schirmAufgaben > \.stufen\{display:none\}/.test(QUELLE),
-         'am Rechner keine Reiterzeile über den Aufgaben');
+  pruefe(!/body\.breit #schirmAufgaben > \.stufen\{display:none\}/.test(QUELLE),
+         'auch am Rechner steht der Reiter zu den Vorgängen über den Aufgaben');
   pruefe(/body\.breit\.weit \.tagblatt\{[^}]*max-width:1800px/.test(QUELLE)
-         && /body\.breit #aufBlatt\{[^}]*max-width:1800px/.test(QUELLE),
-         'beide Seiten nutzen die Breite eines großen Bildschirms');
+         && /body\.breit #aufBlatt\{[^}]*max-width:1000px/.test(QUELLE),
+         'der Tag nutzt die ganze Breite, die einspaltige Aufgabenliste bleibt lesbar schmal');
 }
 
 /* ============================================================
@@ -15095,8 +15091,9 @@ console.log('\n185. Tag mit Woche');
     pruefe(e.kennung === true, 'je Montag genau ein Wochensatz mit fester Kennung — die Woche des offenen Tags');
     pruefe(e.nurImZiel === true, 'eine Aufgabe am Wochenziel steht nicht noch einmal bei den Verbindlichkeiten');
     pruefe(e.kleinNurImZiel === true, 'eine Kleinigkeit am Wochenziel steht nicht noch einmal bei den Kleinigkeiten');
-    pruefe(e.faellig === true, '„Noch diese Woche fällig" zeigt Fristen bis Sonntag ohne Tag — ohne Ziel-Aufgaben');
-    pruefe(e.alteVerbindlichkeit === true, 'eine Verbindlichkeit aus v5.20.0 erscheint dort, solange sie offen ist');
+    pruefe(e.woche === true, 'die Verbindlichkeiten zeigen auch die Aufgaben für die Woche — ohne Ziel-Aufgaben');
+    pruefe(e.nurAmTag === true, 'auf einen anderen Tag Geplantes und Aufgaben nur mit Frist stehen nicht da');
+    pruefe(e.kleinWoche === true, 'Kleinigkeiten für die Woche stehen bei den Kleinigkeiten');
     pruefe(e.loesen === true, 'vom Ziel gelöst steht eine Aufgabe wieder bei den Verbindlichkeiten');
     pruefe(e.haken === true && e.durchgestrichen === true, 'unter dem Ziel abgehakt ist abgehakt — und durchgestrichen');
     pruefe(e.erreicht === true, 'ein Ziel wird von Hand als erreicht durchgestrichen');

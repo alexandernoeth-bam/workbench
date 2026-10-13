@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.21.0</title>
+<title>Workbench 5.22.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -748,12 +748,8 @@ body.breit.weit .tspalte-rechts{display:contents}
 body.breit.weit .tspalte-rechts > .tabschnitt:first-child{grid-column:2}
 body.breit.weit .tspalte-rechts > .tabschnitt:nth-child(2){grid-column:3}
 
-/* Die Aufgabenseite: am Rechner links die Aktivitäten, rechts die
-   Vorgänge; am Handy nur die Aktivitäten, die Vorgänge hinter dem
-   Reiter. */
-/* Am Rechner brauchen die Aufgaben keine Reiterzeile: Die Vorgänge
-   stehen rechts daneben. */
-body.breit #schirmAufgaben > .stufen{display:none}
+/* Die Aufgabenseite: nur die Aktivitäten, die Vorgänge stehen auf jedem
+   Gerät hinter dem Reiter (seit v5.22.0). */
 /* Der Weg von der Spalte zur ganzen Vorgangsseite. */
 .kopf-hin{margin-left:auto;padding:0;border:0;background:none;font:inherit;
   font-size:calc(var(--fs)*0.68);color:var(--grau);letter-spacing:0;
@@ -763,10 +759,9 @@ body.breit #schirmAufgaben > .stufen{display:none}
 .sek-hin{display:block;margin:0 0 2px 20px;padding:0;border:0;background:none;
   font:inherit;font-size:calc(var(--fs)*0.66);color:var(--grau-hell);cursor:pointer}
 .auf-spalte{display:block}
-body.breit #aufBlatt{display:grid;grid-template-columns:1.35fr 1fr;gap:0 20px;
-  align-items:start;max-width:1800px}
+body.breit #aufBlatt{display:grid;grid-template-columns:minmax(0,1fr);gap:0 20px;
+  align-items:start;max-width:1000px}
 body.breit .auf-links{grid-column:1}
-body.breit .auf-rechts{grid-column:2}
 #aufBlatt .tabschnitt{background:var(--karte);border:1px solid var(--linie);
   border-radius:10px;padding:4px 14px 10px;margin:0 0 12px}
 #aufBlatt .ab-raster{grid-template-columns:minmax(0,1fr)}
@@ -1709,6 +1704,7 @@ body.breit .tg-spalten{grid-template-columns:repeat(2,minmax(0,1fr))}
 .tk-sym.an{border-color:var(--petrol);color:var(--petrol);background:var(--papier)}
 .tk-s-zeile{display:none;gap:8px;font-size:calc(var(--fs)*0.7);color:var(--grau);padding:0 0 6px}
 .tk-s-rest{flex:1;text-align:right}
+.tk-zahlen:empty{display:none}
 /* Die Morgenroutine */
 .ro-sheet h3{font-size:calc(var(--fs)*1.2)}
 .ro-kacheln{display:grid;grid-template-columns:1fr;gap:10px;margin:4px 0 2px}
@@ -2899,7 +2895,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.21.0';
+var APP_VERSION = '5.22.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -5866,15 +5862,8 @@ function tagKopfSchmalZeichnen(is, e) {
   var zeile = document.getElementById('tkSchmalZeile');
   if (zeile) {
     var form = tagesform(is);
-    var teile = [];
-    var termine = e.verlauf.filter(function (x) { return x.art === 'termin'; });
-    if (termine.length) {
-      teile.push(termine.length + (termine.length === 1 ? ' Termin' : ' Termine'));
-    }
-    var offen = e.haupt.length + offeneKleine(e, is);
-    if (offen) { teile.push(offen + ' offen'); }
-    zeile.innerHTML = '<span>' + esc(form.form) + '</span><span class="tk-s-rest">'
-                    + esc(teile.join(' · ')) + '</span>';
+    /* Seit v5.22.0 ohne Zähler — nur die Tagesform. */
+    zeile.innerHTML = '<span>' + esc(form.form) + '</span>';
   }
   /* Der Mond erscheint erst am späten Nachmittag — und verschwindet,
      wenn der Tag abgeschlossen ist. */
@@ -5908,32 +5897,12 @@ function tagKopfSchmalZeichnen(is, e) {
   }
 }
 
+/* Seit v5.22.0 ohne Zählerzeile: Termine, belegte Stunden, Aufgaben und
+   Erledigtes stehen ohnehin darunter — die Zeile bleibt leer. */
 function tagZahlenZeichnen(is, e) {
   var el = document.getElementById('tkZahlen');
   if (!el) { return; }
-  var termine = e.verlauf.filter(function (x) { return x.art === 'termin'; });
-  var belegt = 0;
-  var i;
-  for (i = 0; i < termine.length; i++) {
-    var t = termine[i].t;
-    if (!t || t.ganztags || !t.von || !t.bis) { continue; }
-    belegt += Math.max(0, minutenAus(t.bis) - minutenAus(t.von));
-  }
-  var teile = [];
-  if (termine.length) {
-    teile.push(termine.length + (termine.length === 1 ? ' Termin' : ' Termine'));
-  }
-  if (belegt >= 30) {
-    teile.push(Math.floor(belegt / 60) + ' Std. '
-             + (belegt % 60 ? ((belegt % 60) + ' ') : '') + 'belegt');
-  }
-  if (e.haupt.length) {
-    teile.push(e.haupt.length + (e.haupt.length === 1 ? ' Aufgabe' : ' Aufgaben'));
-  }
-  if (e.klein.length) { teile.push(e.klein.length + ' Kleinigkeiten'); }
-  var fertig = e.hauptFertig.length + e.kleinFertig.length;
-  if (fertig) { teile.push(fertig + ' erledigt'); }
-  el.innerHTML = teile.length ? ('<span>' + teile.join('</span><span>') + '</span>') : '';
+  el.innerHTML = '';
 }
 
 function nachzueglerZeichnen(is) {
@@ -8268,8 +8237,8 @@ function tagZeichnen() {
   }
   termin += terminListeHtml(is, e);
 
-  /* Verbindlichkeiten: die Aufgaben dieses Tags, darunter, was noch
-     in dieser Woche fällig ist und auf keinem Tag liegt. */
+  /* Verbindlichkeiten: die Aufgaben dieses Tags, darunter die für die
+     Woche (ohne bestimmten Tag). Seit v5.22.0. */
   var haupt = e.haupt.filter(frei);
   var hauptFertig = e.hauptFertig.filter(frei);
   var schonDa = {};
@@ -8277,25 +8246,30 @@ function tagZeichnen() {
   for (k in anZiel) { if (Object.prototype.hasOwnProperty.call(anZiel, k)) { schonDa[k] = true; } }
   e.haupt.concat(e.hauptFertig, e.klein, e.kleinFertig).forEach(function (a) { if (a && a.id) { schonDa[a.id] = true; } });
   e.verlauf.forEach(function (v) { if (v.a && v.a.id) { schonDa[v.a.id] = true; } });
-  var spaeter = nochFaelligListe(is, schonDa);
+  var woche = wochenPlanListe(is, 'haupt', schonDa);
   var verb = '';
-  if (!haupt.length && !hauptFertig.length && !spaeter.length) {
+  if (!haupt.length && !hauptFertig.length && !woche.length) {
     verb += '<div class="tleer">Für heute nichts eingeplant.</div>';
   }
   verb += listeMitSektionenHtml(haupt, is, false);
   for (i = 0; i < hauptFertig.length; i++) { verb += zeileHtml(hauptFertig[i], is, false); }
-  if (spaeter.length) {
-    verb += '<div class="wk-gruppe2">Noch diese Woche fällig</div>';
-    for (i = 0; i < spaeter.length; i++) { verb += wkAufgabeHtml(spaeter[i], is, false); }
+  if (woche.length) {
+    verb += '<div class="wk-gruppe2">Für die Woche</div>';
+    for (i = 0; i < woche.length; i++) { verb += wkAufgabeHtml(woche[i], is, false); }
   }
 
   /* Kleinigkeiten ganz unten. */
   var klein = e.klein.filter(frei);
   var kleinFertig = e.kleinFertig.filter(frei);
+  var kleinWoche = wochenPlanListe(is, 'klein', schonDa);
   var kleinTeil = '';
   if (klein.length || kleinFertig.length) {
     kleinTeil = listeMitSektionenHtml(klein, is, true);
     for (i = 0; i < kleinFertig.length; i++) { kleinTeil += zeileHtml(kleinFertig[i], is, true); }
+  }
+  if (kleinWoche.length) {
+    kleinTeil += '<div class="wk-gruppe2">Für die Woche</div>';
+    for (i = 0; i < kleinWoche.length; i++) { kleinTeil += wkAufgabeHtml(kleinWoche[i], is, false); }
   }
 
   var zieleKarte = wkZieleKarteHtml(is);
@@ -9408,8 +9382,8 @@ function tagHeute() {
    Datenform, je Woche ein Satz in DB.wochen:
      { id: 'kw-<Montag>', montag, ziele: [{ id, text, erreicht, aufgaben: [ids] }],
        verbindlich: [ids], geaendert }
-   verbindlich stammt aus v5.20.0 und wird nur noch gelesen: Was dort
-   offen steht, erscheint unter „Noch diese Woche fällig".
+   verbindlich stammt aus v5.20.0 und wird nicht mehr angezeigt; beim
+   Zuordnen wird es nur noch bereinigt.
    Die feste Kennung je Montag sorgt dafür, dass zwei Geräte dieselbe
    Woche nicht doppelt anlegen. Gelöschte Aufgaben fallen beim Zeichnen
    still heraus — so kommen sie mit „Rückgängig" auch wieder.
@@ -9868,29 +9842,35 @@ function terminListeHtml(is, e) {
   return h;
 }
 
-/* Noch diese Woche fällig: offene Aufgaben mit Frist bis Sonntag, die
-   auf keinem Tag liegen — dazu, was in v5.20.0 von Hand als
-   Verbindlichkeit eingetragen wurde. Was an einem Wochenziel hängt oder
-   heute ohnehin dasteht, kommt hier nicht noch einmal. */
-function nochFaelligListe(is, schonDa) {
+/* Die Aufgaben für die Woche: Planung „Diese Woche" (oder „Nächste
+   Woche", wenn der offene Tag dort liegt) — ohne bestimmten Tag. Was auf
+   einen Tag geplant ist, steht nur an diesem Tag. Erledigtes bleibt die
+   Woche über durchgestrichen stehen. art wählt Aufgaben oder
+   Kleinigkeiten. */
+function wochenPlanListe(is, art, schonDa) {
   var montag = montagVon(is);
   var sonntag = tagePlus(montag, 6);
-  var w = wkFinden(montag);
-  var alt = {};
-  (w ? (w.verbindlich || []) : []).forEach(function (id) { alt[id] = true; });
+  var dieseWoche = montagVon(isoDatum());
+  var marke = (montag === dieseWoche) ? 'woche' : ((montag === tagePlus(dieseWoche, 7)) ? 'naechste' : '');
+  if (!marke) { return []; }
   var liste = (DB.aufgaben || []).filter(function (a) {
-    if (!a || a.wiederholung || a.status === 'erledigt') { return false; }
+    if (!a || a.wiederholung || a.planung !== marke) { return false; }
+    if ((art === 'klein') !== (a.art === 'klein')) { return false; }
     if (schonDa[a.id]) { return false; }
     if (!passtZumTag(a.kontext)) { return false; }
-    var aufTag = !!(a.planung && /^\d{4}-\d{2}-\d{2}$/.test(a.planung));
-    if (alt[a.id]) { return !aufTag || a.planung !== is; }
-    if (!a.frist || a.frist > sonntag) { return false; }
-    return !aufTag;
+    if (a.status === 'erledigt') {
+      return !!(a.erledigtAm && a.erledigtAm >= montag && a.erledigtAm <= sonntag);
+    }
+    return true;
   });
   liste.sort(function (x, y) {
+    var ex = (x.status === 'erledigt') ? 1 : 0;
+    var ey = (y.status === 'erledigt') ? 1 : 0;
+    if (ex !== ey) { return ex - ey; }
     var fx = x.frist || '9999';
     var fy = y.frist || '9999';
-    return fx < fy ? -1 : (fx > fy ? 1 : 0);
+    if (fx !== fy) { return fx < fy ? -1 : 1; }
+    return String(x.titel) < String(y.titel) ? -1 : 1;
   });
   return liste;
 }
@@ -24032,18 +24012,8 @@ function aufZeichnen() {
   h += erledigtBlockHtml();
   h += '</div>';
 
-  /* Am Rechner stehen die Vorgänge rechts daneben; am Handy führt der
-     Reiter zu ihrer eigenen Seite. */
-  if (istBreit()) {
-    h += '<div class="auf-spalte auf-rechts">';
-    /* Von hier führt ein Weg zur Vorgangsseite: Dort stehen auch die
-       Vorlagen und das Erledigte. */
-    h += '<div class="tabschnitt"><div class="tabschnitt-titel"><span>Vorgänge</span>'
-       + '<button class="kopf-hin" type="button" onclick="zeigeSchirm(\'Ablaeufe\')">'
-       + 'Alle und Vorlagen →</button></div>';
-    h += ablaufListeHtml(aufFilter, true);
-    h += '</div></div>';
-  }
+  /* Seit v5.22.0 ohne Vorgänge-Spalte: Die Vorgänge erreicht man auf
+     jedem Gerät über den Reiter. */
 
   blatt.innerHTML = h;
 
