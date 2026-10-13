@@ -1589,69 +1589,64 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' } };'
                  + `globalThis.__dieseWocheApi = {
  pruefe: function(){
-   var r = {}; var alt = DB; var merkT = tagOffen; var merkS = tagSicht; var merkM = wkMontag; var merkF = tagFilter;
+   var r = {}; var alt = DB; var merkT = tagOffen; var merkF = tagFilter;
    DB = leereDatenbank(); tagFilter = 'alle';
-   var heute = isoDatum(); var mo = montagVon(heute);
-   function neu(id, t, k, f){ DB.aufgaben.push({ id: id, titel: t, kontext: k, frist: f || '', planung: '', art: 'haupt', status: 'offen', erledigtAm: null, wiederholung: null, geaendert: 1 }); }
-   neu('a1', 'Agenda entwerfen', 'beruflich', tagePlus(mo, 2));
-   neu('a2', 'Steuer abgeben', 'privat', tagePlus(mo, 4));
-   neu('a3', 'Reifen wechseln', 'privat', '');
-   tagOffen = tagePlus(heute, -1);
-   tagSichtSetzen('woche');
+   var heute = isoDatum(); var mo = montagVon(heute); var fr = tagePlus(mo, 4);
+   function neu(id, t, f, pl, art){ DB.aufgaben.push({ id: id, titel: t, kontext: 'beruflich', frist: f || '', planung: pl || '', art: art || 'haupt', status: 'offen', erledigtAm: null, wiederholung: null, uhrzeit: '', geaendert: 1 }); }
+   neu('a1', 'Agenda entwerfen', '', heute);
+   neu('a2', 'Steuer abgeben', fr, '');
+   neu('a3', 'Nächste Woche fällig', tagePlus(mo, 9), '');
+   neu('a4', 'Übungen ausarbeiten', fr, '');
+   neu('a5', 'Rückmeldung an Moni', '', heute);
+   neu('k1', 'Folien drucken', '', heute, 'klein');
+   neu('a6', 'Alte Verbindlichkeit', '', '');
+   tagOffen = heute; tagZeichnen();
    var bl = function(){ return document.getElementById('tagBlatt').innerHTML; };
-   r.sicht = tagSicht === 'woche' && wkMontag === montagVon(tagOffen)
-     && /Was diese Woche Substanz schafft/.test(bl()) && /Verbindlichkeiten/.test(bl());
+   var karte = function(name){
+     var h = bl(); var i = h.indexOf('<span>' + name);
+     if (i < 0) { return ''; }
+     var j = h.indexOf('class="tabschnitt', i);
+     return j < 0 ? h.slice(i) : h.slice(i, j); };
+   r.karten = /Was diese Woche Substanz schafft/.test(bl()) && /KW /.test(karte('Was diese Woche'))
+     && !!karte('Termine heute') && !!karte('Verbindlichkeiten heute') && !!karte('Kleinigkeiten');
    r.ohneZaehler = !/von 3/.test(bl());
-   r.version = document.getElementById('tkMonat').textContent.indexOf('v' + APP_VERSION) >= 0;
-   tagHeute();
    wkZielAnlegen('Workshop-Konzept steht');
    var w = wkFinden(mo);
-   r.kennung = !!w && w.id === 'kw-' + mo && wkHolen(mo) === w && DB.wochen.length === 1;
-   r.ziel = !!w && w.ziele.length === 1 && w.ziele[0].text === 'Workshop-Konzept steht' && w.ziele[0].erreicht === false;
+   r.kennung = !!w && w.id === 'kw-' + mo && wkHolen(mo) === w && DB.wochen.length === 1 && wkMontag === mo;
    var zid = w.ziele[0].id;
-   wkAuswahlOeffnen(zid); wkZuordnen('a1');
-   r.zugeordnet = w.ziele[0].aufgaben.join() === 'a1' && /Agenda entwerfen/.test(bl());
-   wkAuswahlZiel = 'verbindlich'; wkZuordnen('a1'); wkZuordnen('a2');
-   r.einmal = w.ziele[0].aufgaben.length === 0 && w.verbindlich.join() === 'a1,a2';
-   wkAuswahlZiel = zid; wkZuordnen('a1'); wkAuswahlSchliessen();
-   var vorT = tagOffen;
-   wkHaken('a1');
-   var a1 = DB.aufgaben[0];
-   r.haken = a1.status === 'erledigt' && a1.erledigtAm === heute && tagOffen === vorT;
+   wkAuswahlOeffnen(zid); wkZuordnen('a1'); wkZuordnen('a4'); wkZuordnen('k1'); wkZuordnen('a5'); wkAuswahlSchliessen();
+   w.verbindlich = ['a6'];
    tagZeichnen();
-   r.durchgestrichen = /tzeile wk-a erledigt/.test(bl());
+   var ziele = karte('Was diese Woche'); var verb = karte('Verbindlichkeiten heute'); var klein = karte('Kleinigkeiten');
+   r.nurImZiel = /Agenda entwerfen/.test(ziele) && !/Agenda entwerfen/.test(verb);
+   r.kleinNurImZiel = /Folien drucken/.test(ziele) && !/Folien drucken/.test(klein);
+   r.faellig = /Noch diese Woche fällig/.test(verb) && /Steuer abgeben/.test(verb)
+     && !/Nächste Woche fällig/.test(verb) && !/Übungen ausarbeiten/.test(verb);
+   r.alteVerbindlichkeit = /Alte Verbindlichkeit/.test(verb);
+   wkLoesen('a5');
+   r.loesen = /Rückmeldung an Moni/.test(karte('Verbindlichkeiten heute')) && !/Rückmeldung an Moni/.test(karte('Was diese Woche'));
+   aufgabeHaken('a1');
+   r.haken = aufgabeFinden('a1').status === 'erledigt';
+   tagZeichnen();
+   r.durchgestrichen = /tzeile wk-a erledigt/.test(karte('Was diese Woche'));
    wkZielErreicht(zid);
    r.erreicht = w.ziele[0].erreicht === true && /wk-ziel erreicht/.test(bl());
-   wkLoesen('a2');
-   r.loesen = w.verbindlich.length === 0 && DB.aufgaben.length === 3;
-   wkAuswahlZiel = 'verbindlich'; wkZuordnen('a3'); wkAuswahlSchliessen();
-   DB.aufgaben = DB.aufgaben.filter(function(a){ return a.id !== 'a3'; });
-   var ok = true; try { tagZeichnen(); } catch (e) { ok = false; }
-   r.geloeschtStill = ok && !/Reifen wechseln/.test(bl());
-   tagFilter = 'beruflich'; tagZeichnen();
-   r.filter = /Agenda entwerfen/.test(bl()) && /Workshop-Konzept steht/.test(bl());
-   tagFilter = 'alle';
-   var vorTag = tagOffen;
-   tagBlaettern(1);
-   r.blaettern = wkMontag === tagePlus(mo, 7) && tagOffen === vorTag;
-   r.keineUebernahme = !wkFinden(tagePlus(mo, 7)) && !/Workshop-Konzept/.test(bl());
-   tagBlaettern(-1);
-   document.getElementById('wkAufgabeTitel').value = 'Rückmeldung an Moni';
-   document.getElementById('wkAufgabeFrist').value = '';
-   wkNeueAufgabeAnlegen();
-   var neuA = DB.aufgaben[DB.aufgaben.length - 1];
-   r.neueAufgabe = neuA.titel === 'Rückmeldung an Moni' && neuA.frist === tagePlus(mo, 4)
-     && neuA.planung === '' && w.verbindlich.indexOf(neuA.id) >= 0;
+   tagOffen = tagePlus(mo, 7); tagZeichnen();
+   r.folgeWoche = wkMontag === tagePlus(mo, 7) && !/Workshop-Konzept/.test(bl()) && !wkFinden(tagePlus(mo, 7));
+   tagOffen = heute; tagZeichnen();
+   var morgen = tagePlus(heute, 1);
+   DB.aufgaben.push({ id: 'z1', titel: 'Mit Uhrzeit', kontext: 'beruflich', frist: '', planung: morgen, art: 'haupt', status: 'offen', uhrzeit: '09:00', dauer: 30, wiederholung: null, geaendert: 1 });
+   var tl = terminListeHtml(morgen, tagesEintraege(morgen));
+   r.terminListe = /tzeile tm-z/.test(tl) && /tm-uhr">09:00</.test(tl) && tl.indexOf("aufgabeHaken('z1')") >= 0;
+   r.frei = /class="tm-frei">frei /.test(tl);
    wkZielLoeschen(zid);
-   r.zielWeg = w.ziele.length === 0 && DB.aufgaben.length === 3;
+   r.zielWeg = w.ziele.length === 0 && !!aufgabeFinden('a4') && /Übungen ausarbeiten/.test(karte('Verbindlichkeiten heute'));
    var l = leereDatenbank(); var f = leereDatenbank();
    l.wochen = [{ id: 'kw-' + mo, montag: mo, ziele: [{ id: 'x', text: 'alt', erreicht: false, aufgaben: [] }], verbindlich: [], geaendert: 10 }];
    f.wochen = [{ id: 'kw-' + mo, montag: mo, ziele: [{ id: 'x', text: 'neu', erreicht: true, aufgaben: [] }], verbindlich: [], geaendert: 20 }];
    var m = zusammenfuehren(l, f).db;
    r.abgleich = m.wochen.length === 1 && m.wochen[0].ziele[0].text === 'neu';
-   tagSichtSetzen('tag');
-   r.zurueck = tagSicht === 'tag' && document.getElementById('tkHeute').textContent === 'Heute';
-   DB = alt; tagOffen = merkT; tagSicht = merkS; wkMontag = merkM; tagFilter = merkF;
+   DB = alt; tagOffen = merkT; tagFilter = merkF;
    return r;
  } };`
                  + 'globalThis.__vorlagenArtApi = {'
@@ -1805,8 +1800,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     end:{ dateTime: h + \'T10:00:00\' + zo } }], \'Alex\','
                  + '     \'beruflich\');'
                  + '   tagOffen = h; tagZeichnen();'
-                 + '   var rechts = document.getElementById(\'tagBlatt\').innerHTML'
-                 + '     .split(\'tspalte-rechts\')[1] || \'\';'
+                 + '   var rechts = document.getElementById(\'tagBlatt\').innerHTML;'
                  + '   var teile = rechts.split(\'tabschnitt-titel\').slice(1);'
                  + '   var kachel = function(name){'
                  + '     var t = teile.filter(function(x){'
@@ -1814,12 +1808,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     if (!t) { return \'\'; }'
                  + '     return (t.match(/ttitel">([^<]*)/g) || [])'
                  + '       .map(function(x){ return x.slice(8); }).join(\',\'); };'
-                 + '   var r = { mitZeit: kachel(\'Mit fester Zeit\'),'
-                 + '     ohneZeit: kachel(\'Ohne feste Zeit\'),'
+                 + '   var r = { mitZeit: kachel(\'Termine heute\'),'
+                 + '     ohneZeit: kachel(\'Verbindlichkeiten heute\'),'
                  + '     klein: kachel(\'Kleinigkeiten\') };'
                  + '   r.keineTermine = (r.mitZeit.indexOf(\'Weekly\') < 0);'
                  + '   aufgabeErledigen(\'a1\'); tagZeichnen();'
-                 + '   r.hakenWirkt = /splan-sym an/.test('
+                 + '   r.hakenWirkt = /tzeile tm-z erledigt/.test('
                  + '     document.getElementById(\'tagBlatt\').innerHTML);'
                  + '   termineNachTag = {}; kalenderListe = [];'
                  + '   tagOffen = merkTag; DB = alt;'
@@ -1866,13 +1860,10 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     nichtInVorn: !k.vorn.concat(k.backlog).some(function(a){'
                  + '       return a.id === \'s1\'; }),'
                  + '     klein: namen(k.klein) };'
-                 + '   tagZeichnen();'
-                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var b = stundenplanHtml(tagOffen, tagesEintraege(tagOffen));'
                  + '   r.hakenSchalter = /splan-haken[^>]*aufgabeErledigen/.test(b);'
                  + '   aufgabeErledigen(\'b1\');'
-                 + '   tagZeichnen();'
-                 + '   r.nachHaken = /splan-sym an/.test('
-                 + '     document.getElementById(\'tagBlatt\').innerHTML);'
+                 + '   r.nachHaken = /splan-sym an/.test(stundenplanHtml(tagOffen, tagesEintraege(tagOffen)));'
                  + '   tagOffen = merkTag; DB = alt;'
                  + '   return r;'
                  + ' } };'
@@ -1900,7 +1891,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     kleinDauer: aufgabeDauer(aufgabeFinden(\'a1\')),'
                  + '     hauptDauer: aufgabeDauer(aufgabeFinden(\'a2\')),'
                  + '     eigeneDauerGilt: aufgabeDauer(aufgabeFinden(\'a3\')) };'
-                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var b = stundenplanHtml(tagOffen, tagesEintraege(tagOffen));'
                  + '   var re = /style="top:(\\d+)px;height:(\\d+)px/g;'
                  + '   var m; var liste = [];'
                  + '   while ((m = re.exec(b)) !== null) {'
@@ -1964,8 +1955,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var r = { entfallen: weg.map(function(x){'
                  + '     return x.von + \' \' + x.titel; }).join(\',\') };'
                  + '   tagZeichnen();'
-                 + '   r.dazuBlock = /splan-blk[^"]*dazu/.test('
-                 + '     document.getElementById(\'tagBlatt\').innerHTML);'
+                 + '   r.dazuBlock = /splan-blk[^"]*dazu/.test(stundenplanHtml(h, tagesEintraege(h)));'
                  + '   rueckStarten();'
                  + '   var blatt = document.getElementById(\'rueckBlatt\').innerHTML;'
                  + '   r.entfallenKarte = /r-karte entfallen/.test(blatt);'
@@ -2135,8 +2125,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.draussen = imPlan(h, \'a3\');'
                  + '   r.nochInDerListe = !!aufgabeFinden(\'a3\');'
                  + '   r.kopfNachher = planMarkeHtml(h);'
-                 + '   tagZeichnen();'
-                 + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
+                 + '   var b = stundenplanHtml(tagOffen, tagesEintraege(tagOffen));'
                  + '   var hh = (b.match(/height:(\\d+)px/g) || [])'
                  + '     .map(function(x){ return Number(x.slice(7, -2)); });'
                  + '   r.eineStunde = hh.length ? hh[hh.length - 1] : 0;'
@@ -2629,7 +2618,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     \'Familienevents\', \'privat\');'
                  + '   tagOffen = h; tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
-                 + '   var m = b.match(/splan-lab">([^<]*)/);'
+                 + '   var m = b.match(/tm-uhr">([^<]*)/);'
                  + '   var r = { zeit: m ? m[1] : \'\','
                  + '     dauer: /splan-blk[^"]*kurz/.test(b) };'
                  + '   r.ohneKalender = (b.indexOf(\'Familienevents\') < 0);'
@@ -2780,7 +2769,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   artImJahrUm(\'termin\');'
                  + '   tagOffen = h; tagZeichnen();'
                  + '   var b = document.getElementById(\'tagBlatt\').innerHTML;'
-                 + '   var r = { zeilen: (b.match(/class="splan-blk/g) || []).length };'
+                 + '   var r = { zeilen: (b.match(/class="tm-z[ "]/g) || []).length };'
                  + '   r.kalender = (b.indexOf(\'Alex\') >= 0) ? \'Alex\' : \'\';'
                  + '   r.keinOrt = (b.indexOf(\'Rasta-Dome\') < 0'
                  + '     && b.indexOf(\'Saisonplan\') < 0);'
@@ -8161,9 +8150,12 @@ console.log('\n50. Spalten auf dem großen Bildschirm');
      daneben — abhaken geht dort wie im Stundenplan. */
   /* Seit v4.11.0 ohne eigenen Block fürs Nebenbei-Erledigte: Zwei
      Blöcke für Erledigtes waren einer zu viel. */
-  const erwarteteFolge = ['[links]', 'Tagesplan', '[rechts]',
-                          'Mit fester Zeit', 'Ohne feste Zeit', 'Kleinigkeiten',
-                          'Aktivitäten'];
+  /* Seit v5.21.0 beginnt der Tag mit der Woche: Wochenziele, Termine als
+     Liste, Verbindlichkeiten, Kleinigkeiten. Die Karten entstehen zuerst,
+     dann werden sie je nach Breite auf zwei Spalten oder eine Folge
+     verteilt. */
+  const erwarteteFolge = ['Termine heute', 'Verbindlichkeiten heute', 'Kleinigkeiten',
+                          '[links]', '[rechts]', '[links]', '[rechts]'];
   pruefe(folge.join(',') === erwarteteFolge.join(','),
          'die Abschnitte stehen in der vereinbarten Folge und Spalte'
          + (folge.join(',') === erwarteteFolge.join(',') ? '' : ' — ist: ' + folge.join(' → ')));
@@ -8391,7 +8383,7 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
   pruefe(!/\.tganz\{[^}]*tv-schiene/.test(QUELLE) && /\.tganz\{display:flex/.test(QUELLE),
          'sie tragen keine Zeitspalte');
   const stelleGanz = tag ? tag[0].indexOf('class="tganz') : -1;
-  const stelleZeit = tag ? tag[0].indexOf('stundenplanHtml(') : -1;
+  const stelleZeit = tag ? tag[0].indexOf('terminListeHtml(') : -1;
   pruefe(stelleGanz > -1 && stelleZeit > -1 && stelleGanz < stelleZeit,
          'sie stehen ganz oben, vor allem mit Uhrzeit');
 
@@ -11611,7 +11603,8 @@ console.log('\n102. Erledigtes je Tag');
   pruefe(te && /hauptFertig\.push\(a\)/.test(te[0]) && /kleinFertig\.push\(a\)/.test(te[0]),
          'Erledigtes landet in seinem eigenen Abschnitt');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && tz[0].indexOf('e.haupt.length; i++') < tz[0].indexOf('e.hauptFertig.length; i++'),
+  pruefe(tz && tz[0].indexOf('listeMitSektionenHtml(haupt') > -1
+         && tz[0].indexOf('listeMitSektionenHtml(haupt') < tz[0].indexOf('hauptFertig.length; i++'),
          'unter den offenen Einträgen');
   const tb = skript.match(/function tagBlaettern\([\s\S]*?\n\}/);
   pruefe(tb && !/erledigtOffen/.test(tb[0]),
@@ -12097,27 +12090,27 @@ console.log('\n112. Tagessicht in Karten');
   /* Seit v4.3.0 kommt „Nebenbei erledigt" als vierter Baustein dazu —
      nur, wenn es etwas zu zeigen gibt. */
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 4,
-         'die Flächen entstehen aus einem Baustein — am Rechner drei, am Handy eine');
-  pruefe(tz && (tz[0].match(/unterKopf\(/g) || []).length === 3,
-         'die drei Teile stehen als Zwischenüberschrift darin');
-  pruefe(tz && (tz[0].match(/unterOffen\(/g) || []).length === 3,
-         'und lassen sich einzeln zuklappen');
-  pruefe(tz && /v\.art === 'aufgabe'/.test(tz[0]) && /Mit fester Zeit/.test(tz[0]),
-         'die Liste „Mit fester Zeit" zeigt, was im Stundenplan als Block steht');
+  /* Seit v5.21.0: Termine, Verbindlichkeiten und Kleinigkeiten je eine
+     Karte aus dem Baustein, die Wochenziele aus ihrer eigenen Karte. */
+  pruefe(tz && (tz[0].match(/tagBlockHtml\(/g) || []).length === 3,
+         'die Flächen entstehen aus einem Baustein — Termine, Verbindlichkeiten, Kleinigkeiten');
+  pruefe(tz && !/unterKopf\(/.test(tz[0]) && !/unterOffen\(/.test(tz[0]),
+         'keine Zwischenüberschriften mehr — jede Gruppe hat ihre Karte');
+  pruefe(tz && /terminListeHtml\(is, e\)/.test(tz[0]),
+         'die Aufgaben mit fester Zeit stehen in der Terminliste');
   const mz = globalThis.__mitZeitApi;
   if (!mz) {
     warn('Funktionen nicht auswertbar');
   } else {
     const e2 = mz.pruefe();
     pruefe(e2.mitZeit === 'Fragebogen,Einladung',
-           'in der Kachel stehen die Aufgaben mit Uhrzeit');
-    pruefe(e2.ohneZeit === 'Schränke', 'daneben die ohne');
+           'in der Terminliste stehen die Aufgaben mit Uhrzeit');
+    pruefe(e2.ohneZeit === 'Schränke', 'bei den Verbindlichkeiten die ohne');
     pruefe(e2.klein === 'Splunk', 'und die Kleinigkeiten');
     pruefe(e2.keineTermine === true,
            'Kalendertermine stehen nicht in der Kachel — sie sind keine Aufgaben');
     pruefe(e2.hakenWirkt === true,
-           'ein Haken in der Kachel erscheint auch im Stundenplan');
+           'abgehakt steht sie in der Terminliste durchgestrichen');
   }
   const zh = skript.match(/function zeileHtml\([\s\S]*?\n\}\n/);
   pruefe(zh && /nebenbei\(a, is\)/.test(zh[0]) && /tmarke neben/.test(zh[0]),
@@ -12139,8 +12132,9 @@ console.log('\n112. Tagessicht in Karten');
     pruefe(e.zaehler === '3 Termine · 3 Std. 30 belegt · 3 Aufgaben · 3 Kleinigkeiten'
            + ' · 1 erledigt',
            'der Kopf sagt, wie voll der Tag ist — der Ablaufschritt zählt als Kleinigkeit');
-    pruefe(e.gruppen === 'Tagesplan,Ohne feste Zeit,Kleinigkeiten',
-           'am Rechner drei Flächen: Tagesplan, Ohne feste Zeit, Kleinigkeiten');
+    /* Die Wochenziele tragen „KW n" im Kopf und zählen hier nicht mit. */
+    pruefe(e.gruppen === 'Verbindlichkeiten heute,Termine heute,Kleinigkeiten',
+           'am Rechner unter den Wochenzielen: Verbindlichkeiten, Termine, Kleinigkeiten');
     pruefe(e.zahlen === '0,0,0', 'ohne Zähler an den Überschriften');
     pruefe(e.leererTag === '', 'an einem leeren Tag steht keine Zahl im Kopf');
     pruefe(e.keineZahlOhneEintrag === true,
@@ -12412,7 +12406,7 @@ console.log('\n117. Termine als Einzeiler');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = t.pruefe();
-    pruefe(e.zeilen === 3, 'jeder Termin ein Block');
+    pruefe(e.zeilen === 3, 'jeder Termin eine Zeile in der Liste');
     pruefe(e.kalender === '', 'der Kalendername steht nirgends mehr');
     pruefe(e.keinOrt === true, 'Ort und Beschreibung stehen nicht in der Zeile');
     pruefe(e.ohnePunkt === true, 'kein Artpunkt mehr vor dem Titel');
@@ -12593,7 +12587,7 @@ console.log('\n120. Zweizeilige Einträge');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = s.pruefe();
-    pruefe(e.zeit === '07:00', 'die Stundenskala beginnt beim ersten Block');
+    pruefe(e.zeit === '07:00–07:30', 'die Terminliste beginnt mit dem ersten Termin, mit Von und Bis');
     pruefe(e.dauer === false,
            'ein halbstündiger Block zeigt jetzt auch seine Zeitspanne');
     pruefe(e.ohneKalender === true, 'kein Kalendername in der Zeile');
@@ -12694,12 +12688,12 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
     warn('Funktionen nicht auswertbar');
   } else {
     const e = w.pruefe();
-    pruefe(e.schmal === 'Tagesplan,Aktivitäten',
-           'am Handy eine Fläche für die Aktivitäten');
-    pruefe(e.schmalUnter === 'Aufgaben,Kleinigkeiten',
-           'mit beiden Arten als Zwischenüberschrift');
-    pruefe(e.breit === 'Tagesplan,Ohne feste Zeit,Kleinigkeiten',
-           'am Rechner drei eigene Kacheln');
+    pruefe(e.schmal === 'Wochenziele,Termine heute,Verbindlichkeiten heute,Kleinigkeiten',
+           'am Handy von oben: Wochenziele, Termine, Verbindlichkeiten, Kleinigkeiten');
+    pruefe(e.schmalUnter === '',
+           'ohne Zwischenüberschriften');
+    pruefe(e.breit === 'Wochenziele,Verbindlichkeiten heute,Termine heute,Kleinigkeiten',
+           'am Rechner links Woche und Verbindlichkeiten, rechts Termine und Kleinigkeiten');
     pruefe(e.breitOhneUnter === true, 'dort ohne Zwischenüberschriften');
     pruefe(e.weitAb1150 === true, 'die dritte Spalte ab 1150 Pixeln');
     pruefe(e.nichtWeitDarunter === true, 'darunter zwei Spalten');
@@ -12974,8 +12968,8 @@ console.log('\n128. Die Jetzt-Linie');
   pruefe(sp && /planSymbolHtml\(b\)/.test(sp[0]),
          'das Zeichen steht vor dem Titel');
   const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tz && /stundenplanHtml\(is, e\)/.test(tz[0]),
-         'der Tag zeichnet den Stundenplan');
+  pruefe(tz && /terminListeHtml\(is, e\)/.test(tz[0]) && !/stundenplanHtml\(/.test(tz[0]),
+         'der Tag zeigt die Termine als Liste, nicht mehr als Stundenplan');
   pruefe(/id="tagJetzt"/.test(QUELLE) && /\.tag-jetzt\.auf\{display:block/.test(QUELLE),
          'die Karte hat ihren Platz über dem Tagesplan');
 
@@ -15076,42 +15070,41 @@ console.log('\n184. Erledigte im Vorhaben sichtbar');
 }
 
 /* ============================================================
-   185. Diese Woche (v5.20.0)
-   Umschalter Tag | Woche, Wochenziele mit zugeordneten Aufgaben,
-   Verbindlichkeiten als Aufgaben, keine Übernahme in die Folgewoche.
+   185. Tag mit Woche (v5.20.0 Wochenziele, v5.21.0 im Tag)
+   Wochenziele oben, Termine als Liste mit freier Zeit, Verbindlichkeiten
+   heute samt „Noch diese Woche fällig", Kleinigkeiten unten. Was an
+   einem Wochenziel hängt, steht nur dort. Keine Übernahme in die
+   Folgewoche.
    ============================================================ */
-console.log('\n185. Diese Woche');
+console.log('\n185. Tag mit Woche');
 {
-  pruefe(/id="tkSicht"/.test(QUELLE) && /id="tkHeute"/.test(QUELLE) && /id="wkAuswahl"/.test(QUELLE),
-         'Platz für den Umschalter, den Heute-Knopf und die Auswahl steht im HTML');
-  pruefe(/sichtSchalterHtml\(\) \+ '<span>' \+ esc\(form\.form\)/.test(hauptSkript()),
-         'am Handy sitzt der Umschalter in der Zeile unter dem Datum');
-  pruefe(/if \(tagSicht === 'woche'\) \{ wocheZeichnen\(\); return; \}/.test(hauptSkript()),
-         'tagZeichnen gibt in der Wochensicht an die Woche ab');
+  pruefe(/id="wkAuswahl"/.test(QUELLE) && !/id="tkSicht"/.test(QUELLE),
+         'die Auswahl hat ihren Platz, den Umschalter Tag | Woche gibt es nicht mehr');
+  pruefe(!/\btagSicht\b/.test(hauptSkript()) && !/function wocheZeichnen\(/.test(hauptSkript()),
+         'keine zweite Sicht mehr: der Tag zeichnet die Woche mit');
+  const tl = hauptSkript().match(/function terminListeHtml\([\s\S]*?\n\}\n/);
+  pruefe(tl && /var von = Math\.max\(f\.von, ab\);/.test(tl[0]) && /Math\.ceil\(jetztMin \/ 15\) \* 15/.test(tl[0]),
+         'heute beginnt freie Zeit nicht in der Vergangenheit, sondern bei der nächsten Viertelstunde');
   const t = globalThis.__dieseWocheApi;
   let e = null;
-  if (!t) { warn('Woche nicht auswertbar'); }
-  else { try { e = t.pruefe(); } catch (x) { fail('Woche läuft nicht: ' + x.message); } }
+  if (!t) { warn('Tag mit Woche nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Tag mit Woche läuft nicht: ' + x.message); } }
   if (e) {
-    pruefe(e.sicht === true, 'der Umschalter zeigt die Woche des offenen Tags mit beiden Abschnitten');
-    pruefe(e.ohneZaehler === true, 'keine Zähler bei Substanz und Verbindlichkeiten');
-    pruefe(e.version === true, 'auch in der Wochensicht steht die Version im Kopf');
-    pruefe(e.kennung === true, 'je Montag genau ein Wochensatz mit fester Kennung');
-    pruefe(e.ziel === true, 'ein Wochenziel ist freier Text, zunächst nicht erreicht');
-    pruefe(e.zugeordnet === true, 'eine Aufgabe lässt sich einem Ziel zuordnen');
-    pruefe(e.einmal === true, 'eine Aufgabe steht je Woche nur an einer Stelle — neu zuordnen verschiebt');
-    pruefe(e.haken === true, 'Abhaken in der Woche hakt die Aufgabe selbst ab, ohne den offenen Tag zu verstellen');
-    pruefe(e.durchgestrichen === true, 'erledigte Aufgaben stehen durchgestrichen da');
+    pruefe(e.karten === true, 'Wochenziele mit KW, Termine, Verbindlichkeiten und Kleinigkeiten stehen im Tag');
+    pruefe(e.ohneZaehler === true, 'keine Zähler bei den Wochenzielen');
+    pruefe(e.kennung === true, 'je Montag genau ein Wochensatz mit fester Kennung — die Woche des offenen Tags');
+    pruefe(e.nurImZiel === true, 'eine Aufgabe am Wochenziel steht nicht noch einmal bei den Verbindlichkeiten');
+    pruefe(e.kleinNurImZiel === true, 'eine Kleinigkeit am Wochenziel steht nicht noch einmal bei den Kleinigkeiten');
+    pruefe(e.faellig === true, '„Noch diese Woche fällig" zeigt Fristen bis Sonntag ohne Tag — ohne Ziel-Aufgaben');
+    pruefe(e.alteVerbindlichkeit === true, 'eine Verbindlichkeit aus v5.20.0 erscheint dort, solange sie offen ist');
+    pruefe(e.loesen === true, 'vom Ziel gelöst steht eine Aufgabe wieder bei den Verbindlichkeiten');
+    pruefe(e.haken === true && e.durchgestrichen === true, 'unter dem Ziel abgehakt ist abgehakt — und durchgestrichen');
     pruefe(e.erreicht === true, 'ein Ziel wird von Hand als erreicht durchgestrichen');
-    pruefe(e.loesen === true, 'Lösen nimmt nur die Zuordnung weg, die Aufgabe bleibt');
-    pruefe(e.geloeschtStill === true, 'eine gelöschte Aufgabe fällt still heraus');
-    pruefe(e.filter === true, 'der Filter Beruf/Privat gilt für die Aufgaben, die Ziele bleiben');
-    pruefe(e.blaettern === true, 'in der Woche blättern die Pfeile wochenweise');
-    pruefe(e.keineUebernahme === true, 'nicht erreichte Ziele bleiben in ihrer Woche — keine Übernahme');
-    pruefe(e.neueAufgabe === true, 'eine neue Verbindlichkeit ist eine Aufgabe mit Frist (Freitag), ohne Tag im Plan');
+    pruefe(e.folgeWoche === true, 'in der Folgewoche stehen ihre eigenen Ziele — nichts wird übernommen');
+    pruefe(e.terminListe === true, 'Aufgaben mit Uhrzeit stehen mit Kästchen in der Terminliste');
+    pruefe(e.frei === true, 'freie Zeit ab einer Stunde steht als leise Zeile darin');
     pruefe(e.zielWeg === true, 'ein gelöschtes Ziel lässt seine Aufgaben stehen');
     pruefe(e.abgleich === true, 'der Abgleich führt die Woche nach Stempel zusammen');
-    pruefe(e.zurueck === true, 'zurück auf Tag ist alles wie vorher');
   }
 }
 
