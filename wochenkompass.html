@@ -1,0 +1,2321 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wochenkompass 1.0.0</title>
+<meta name="theme-color" content="#F4F2EE">
+<link rel="manifest" href="./wochenkompass.webmanifest">
+<link rel="icon" href="./wochenkompass-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./wochenkompass-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--papier:#EFEDE8;--leiste:#F4F2EE;--karte:#FFFFFF;--blatt:#FDFCFA;--tinte:#2E2C29;--grau:#645F58;
+  --linie:#D4D0C8;--zart:#EEEBE5;--weinrot:#8A0B22;--petrol:#19525A;--gruen:#3F6B3A;--fs:16px}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:var(--fs);
+  background:var(--papier);color:var(--tinte);overflow:hidden}
+button{font:inherit;cursor:pointer;color:var(--tinte)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--weinrot);outline-offset:2px}
+
+.app{display:grid;grid-template-rows:auto 1fr;grid-template-columns:minmax(0,1fr);height:100%}
+.kopf{display:flex;align-items:center;gap:10px;padding:10px 16px;padding-top:max(10px, env(safe-area-inset-top));
+  border-bottom:1px solid var(--linie);background:var(--papier)}
+.marke{display:flex;align-items:center;gap:8px;font-weight:600;font-size:17px;white-space:nowrap;min-width:0;overflow:hidden}
+.marke svg{flex:0 0 22px}
+.marke svg{width:22px;height:22px;stroke:var(--weinrot);fill:none;stroke-width:1.8}
+.marke small{font-weight:400;color:var(--grau);font-size:12px}
+.marke .titel{min-width:0;overflow:hidden;text-overflow:ellipsis}
+body:not(.breit) .marke{flex:0 0 auto}
+body:not(.breit) .marke svg{display:none}
+body:not(.breit) .marke small{display:block;line-height:1.1}
+.luecke{flex:1}
+.stand{font-size:12px;color:var(--grau);border:1px solid var(--linie);border-radius:14px;padding:3px 10px;background:var(--karte);
+  max-width:46vw;min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stand.warn{color:var(--weinrot);border-color:var(--weinrot)}
+.knopf-rund{flex:0 0 auto;border:1px solid var(--linie);background:var(--karte);border-radius:8px;min-width:36px;height:32px;font-size:17px;line-height:1}
+#leisteKnopf{display:inline-block}
+body.breit #leisteKnopf{display:none}
+
+.rumpf{display:grid;grid-template-columns:minmax(0,1fr);min-height:0;position:relative}
+body.breit .rumpf{grid-template-columns:280px minmax(0,1fr)}
+
+/* Seitenleiste — am Handy eine Schublade */
+.leiste{overflow:auto;padding:12px 10px 40px;background:var(--leiste);border-right:1px solid var(--linie);
+  position:absolute;z-index:30;top:0;bottom:0;left:0;width:300px;max-width:86vw;box-shadow:4px 0 20px rgba(0,0,0,.18);
+  transform:translateX(-105%);transition:transform .2s ease}
+.leiste.auf{transform:none}
+body.breit .leiste{position:static;transform:none;box-shadow:none;width:auto;max-width:none}
+.schleier{position:absolute;inset:0;background:rgba(0,0,0,.25);z-index:25;display:none}
+.schleier.auf{display:block}
+body.breit .schleier{display:none}
+.gruppe{display:flex;align-items:center;margin:16px 6px 4px;font-size:11px;letter-spacing:.07em;font-weight:600;
+  text-transform:uppercase;color:var(--tinte);border:0;background:none;padding:0;width:calc(100% - 12px);text-align:left}
+.gruppe span{flex:1}
+.gruppe.leise{color:var(--grau);margin-top:12px}
+.plus{border:0;background:none;color:var(--grau);font-size:19px;line-height:1;padding:0 6px;border-radius:6px}
+.plus:hover{color:var(--weinrot);background:var(--karte)}
+.eintrag{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;text-align:left;padding:8px 8px;border-radius:8px;font-size:14px}
+.eintrag:hover{background:var(--karte)}
+.eintrag.an{background:var(--karte);box-shadow:inset 3px 0 0 var(--weinrot);font-weight:500}
+.eintrag .zeichen{width:18px;text-align:center;color:var(--weinrot);flex:0 0 18px}
+.eintrag .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eintrag.ruht{color:var(--grau)}
+.eintrag.ruht .zeichen{color:var(--grau)}
+.stern{font-size:15px}
+.marke-klein{font-size:10px;padding:0 6px;border-radius:8px;border:1px solid var(--linie);color:var(--grau);white-space:nowrap}
+.leer-hinweis{font-size:12px;color:var(--grau);padding:4px 8px 6px;line-height:1.6}
+.neu-feld{display:flex;gap:6px;margin:4px 6px 6px}
+.neu-feld input{flex:1;min-width:0;font:inherit;font-size:14px;border:1px solid var(--weinrot);border-radius:7px;padding:5px 8px;background:var(--karte);color:var(--tinte)}
+.wahlzeile{display:flex;gap:6px;flex-wrap:wrap;margin:0 6px 8px}
+
+/* Seite */
+.seite{overflow:auto;padding:16px 22px 60px;min-width:0}
+body:not(.breit) .seite{padding:12px 12px 60px}
+.innen{max-width:860px}
+.seitenkopf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.seitenkopf h1{margin:0;font-size:20px;font-weight:600;flex:1 1 240px}
+.seitenkopf .unter{display:block;font-size:12px;font-weight:400;color:var(--grau);margin-top:2px}
+.titelfeld{flex:1 1 240px;min-width:0;font:inherit;font-size:20px;font-weight:600;color:var(--tinte);
+  border:1px solid transparent;border-radius:6px;padding:2px 6px;background:transparent}
+.titelfeld:hover{border-color:var(--linie)}
+.titelfeld:focus{border-color:var(--weinrot);background:var(--karte)}
+.pille{font-size:13px;padding:4px 12px;border:1px solid var(--linie);border-radius:14px;background:var(--karte)}
+.pille.voll{background:var(--tinte);color:#fff;border-color:var(--tinte)}
+.pille.weg{border-color:var(--weinrot);color:var(--weinrot)}
+.pille.klein{font-size:12px;padding:2px 10px;margin-top:4px}
+.umschalter,.gruppe-knopf{display:inline-flex;border:1px solid var(--linie);border-radius:14px;overflow:hidden}
+.umschalter button,.gruppe-knopf button{border:0;background:var(--karte);font-size:13px;padding:4px 11px;color:var(--grau)}
+.gruppe-knopf button{font-size:12px;padding:3px 10px}
+.umschalter button.an{background:#FBF1F3;color:var(--weinrot);font-weight:500}
+.gruppe-knopf button.an{background:var(--tinte);color:#fff}
+.eigen{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px 6px;font-size:13px;color:var(--grau)}
+.eigen input[type=date]{font:inherit;font-size:12px;border:1px solid var(--linie);border-radius:14px;padding:2px 8px;background:var(--karte);color:var(--tinte)}
+.mehr-h{position:relative}
+.mehr{border:1px solid var(--linie);background:var(--karte);border-radius:8px;width:36px;height:30px;font-size:17px;line-height:1}
+.mehr-menue{position:absolute;right:0;top:34px;z-index:20;background:var(--karte);border:1px solid var(--linie);border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px;min-width:240px;display:flex;flex-direction:column}
+.mehr-menue button{border:0;background:none;text-align:left;padding:8px 10px;border-radius:6px;font-size:14px}
+.mehr-menue button:hover{background:var(--papier)}
+.mehr-menue .weg{color:var(--weinrot)}
+.mehr-menue small{display:block;font-size:11px;color:var(--grau)}
+.frage{border:1px solid var(--weinrot);border-radius:10px;background:var(--karte);padding:10px 12px;margin-bottom:10px;font-size:14px}
+.frage p{margin:0 0 8px}
+.knoepfe{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Werkzeugleiste — wie auf der Gedankenfläche, ohne Kästchen und Datum */
+.werkzeug{display:flex;flex-wrap:wrap;gap:5px;padding:7px;background:#E8E5DF;border:1px solid var(--linie);border-radius:10px;margin-bottom:8px}
+.fk{min-width:36px;height:36px;border:1px solid var(--linie);border-radius:7px;background:var(--karte);font-size:14px;font-weight:600;padding:0 8px}
+.fk s{font-size:16px;text-decoration-thickness:2px}
+.fk-durch{border-color:var(--weinrot);color:var(--weinrot)}
+.teiler{width:1px;background:var(--linie);margin:3px 2px}
+.feld{display:block;width:100%;min-height:62vh;field-sizing:content;font:15px/1.65 ui-monospace,Menlo,Consolas,monospace;
+  border:1px solid var(--linie);border-radius:6px;padding:12px;background:var(--karte);color:var(--tinte);resize:vertical}
+
+/* Blatt: ruhige Schrift */
+.blatt{background:var(--blatt);border:1px solid var(--linie);border-radius:6px;padding:22px 30px 30px;font-size:16px;line-height:1.7;
+  overflow-wrap:anywhere}
+body:not(.breit) .blatt{padding:14px 14px 24px;font-size:15.5px}
+.blatt h1{font-family:"Source Serif 4",Georgia,serif;font-size:26px;line-height:1.3;margin:0 0 12px;font-weight:600;
+  padding-bottom:8px;border-bottom:1px solid var(--linie)}
+.blatt h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;line-height:1.4;color:var(--weinrot);margin:22px 0 6px;
+  font-weight:600;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.blatt h3{font-size:15px;margin:14px 0 4px;font-weight:600}
+.blatt p{margin:0}
+.blatt hr{border:0;border-top:1px solid var(--linie);margin:14px 0}
+.blatt a{color:var(--weinrot)}
+.blatt del{color:#9B958B}
+.zaehler{font-size:11px;font-weight:500;color:var(--grau);border:1px solid var(--linie);border-radius:10px;padding:0 7px;
+  background:var(--karte);text-transform:none;letter-spacing:0}
+.zaehler.voll{color:var(--weinrot);border-color:var(--weinrot)}
+.z{display:flex;gap:10px;align-items:flex-start;padding:2px 0}
+.z.ein{padding-left:26px}
+.z .pkt{color:var(--weinrot);flex:0 0 14px;text-align:center}
+.z .nr{color:var(--weinrot);flex:0 0 24px;text-align:right;font-size:14px;font-weight:600}
+.z .t{flex:1;min-width:0}
+.frist{font-size:12px;color:var(--weinrot);border:1px solid #E4C5CB;border-radius:9px;padding:0 6px;white-space:nowrap}
+.kontext{font-size:12px;color:var(--petrol);border:1px solid #BCD3D5;border-radius:9px;padding:0 6px;margin-right:6px}
+.leer{height:10px}
+.tabelle{overflow-x:auto;margin:8px 0}
+.tabelle table{border-collapse:collapse;font-size:14px;min-width:100%}
+.tabelle th,.tabelle td{border:1px solid var(--linie);padding:4px 8px;text-align:left;vertical-align:top}
+.tabelle th{background:#F6F5F2}
+.leer-blatt{color:var(--grau)}
+.leer-blatt p{margin:0 0 10px}
+.leer-blatt .klein{font-size:13px;margin-top:10px}
+.hinweis{font-size:12px;color:var(--grau);margin-top:8px}
+.hinweis b{color:var(--tinte);font-weight:500}
+.archiv{margin-top:14px;font-size:14px}
+.archiv summary{cursor:pointer;color:var(--grau);padding:4px 0}
+.archiv button{display:block;border:0;background:none;padding:5px 0;font-size:14px;text-align:left}
+.archiv button.an{color:var(--weinrot);font-weight:500}
+
+/* Einstellungen */
+.einst .karte{background:var(--karte);border:1px solid var(--linie);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.einst h3{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.einst .reihe{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--zart);font-size:14px}
+.einst .reihe:first-of-type{border-top:0}
+.einst .reihe span:last-child{color:var(--grau);text-align:right;overflow-wrap:anywhere}
+.einst .reihe .gut{color:var(--gruen)}
+.einst .reihe .warn{color:var(--weinrot)}
+.einst .knoepfe{margin-top:8px}
+.einst p{font-size:13px;color:var(--grau);margin:8px 0 0}
+
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--tinte);color:#fff;
+  border-radius:10px;padding:9px 14px;font-size:13px;display:none;gap:14px;align-items:center;z-index:50;max-width:92vw;white-space:pre-line}
+.toast.auf{display:flex}
+.toast.warn{background:var(--weinrot)}
+.toast button{border:0;background:none;color:#F3C9D1;font-weight:600;padding:0}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="kopf">
+    <button type="button" class="knopf-rund" id="leisteKnopf" onclick="leisteUm()" aria-label="Seitenleiste">☰</button>
+    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v1.0.0</small></span></span>
+    <span class="luecke"></span>
+    <button type="button" class="stand" id="standPille" onclick="standGeklickt()" title="Anmelden oder abgleichen">nur auf diesem Gerät</button>
+    <button type="button" class="knopf-rund" onclick="oeffne('einst','')" aria-label="Einstellungen" title="Speicher, Anmeldung, Abgleich">⚙</button>
+  </header>
+  <div class="rumpf">
+    <nav class="leiste" id="leiste" aria-label="Seiten"></nav>
+    <div class="schleier" id="schleier" onclick="leisteUm()"></div>
+    <main class="seite"><div class="innen" id="seite"></div></main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" id="toastRueck" onclick="rueckgaengig()">Rückgängig</button></div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   Grunddaten
+
+   Der Bestand ist derselbe wie in der Workbench (workbench.json).
+   Gerätespeicher, Anmeldemerker und Sitzungsschlüssel haben eigene
+   Namen: Liegen beide Apps auf derselben Adresse, teilen sie sich sonst
+   den Browserspeicher und überschrieben einander. Zusammen kommen sie
+   nur über Drive, wo der Abgleich nach Stempeln zusammenführt.
+   ============================================================ */
+
+var APP_VERSION = '1.0.0';
+var DATEINAME   = 'workbench.json';
+var IDB_NAME    = 'wochenkompass-speicher';
+var IDB_STORE   = 'handles';
+var IDB_KEY     = 'datendatei';
+var LS_KEY      = 'wochenkompass-daten';
+var OPFS_NAME   = 'wochenkompass.json';
+/* Dieselbe Google-Anwendung wie die Workbench: Nur so sieht der
+   Wochenkompass mit dem Recht drive.file dieselbe workbench.json. */
+var CLIENT_ID   = '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
+var REDIRECT_URI = 'https://alexandernoeth-bam.github.io/workbench/workbench.html';
+var SCOPES = 'https://www.googleapis.com/auth/drive.file';
+var GIS_URL   = 'https://accounts.google.com/gsi/client';
+var TOKEN_KEY = 'wochenkompass-zugriff';
+var ANMELDE_MERKER = 'wochenkompass-war-angemeldet';
+var ABGLEICH_VERZUG  = 4000;
+var ABGLEICH_MINDEST = 20000;
+var ABGLEICH_TAKT    = 30000;
+var DRIVE_DATEI = 'workbench.json';
+var VORLAUF_MS = 5 * 60 * 1000;
+var GRABSTEIN_TAGE = 180;
+
+/* Alle Sammlungen der Workbench — auch die, die der Wochenkompass nicht
+   zeigt: Sie gehen unverändert durch Laden, Speichern und Abgleich. */
+var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
+                  'jahrestermine','ferien','einfaelle','gedanken','pinnwand',
+                  'kalenderzuordnung','notizbuecher','notizseiten'];
+
+var speicherWeg = 'keiner';
+var dateiHandle = null;
+var dateiName = '';
+var rechteStand = 'unbekannt';
+var letzterSchreibvorgang = null;
+var tokenClient = null;
+var zugriffToken = null;
+var tokenAblauf = 0;
+var erneuerungsUhr = null;
+var erneuerungVersuche = 0;
+var ERNEUERUNG_MAX = 6;
+var ERNEUERUNG_ABSTAND = 60000;
+var ANMELDE_ZEITGRENZE_MS = 60 * 1000;
+var anmeldungLaeuft = false;
+var letzteErneuerung = null;
+var gisBereit = false;
+var driveDateiId = '';
+var driveStand = '';
+var letzteUebertragung = null;
+var letzterAbgleich = null;
+var letzterBericht = null;
+var abgleichUhr = null;
+var abgleichLaeuft = false;
+var abgleichZuletztMs = 0;
+var verbindungOk = null;
+var verbindungUhr = null;
+var VERBINDUNG_TAKT = 60000;
+var abgleichFehler = '';
+var lokalOffen = false;
+var taktUhr = null;
+
+var DB = leereDatenbank();
+
+/* ============================================================
+   Unterbau aus der Workbench 5.19.8 — wörtlich übernommen:
+   Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke.
+   ============================================================ */
+
+function leereDatenbank() {
+  return {
+    version:           APP_VERSION,
+    aufgaben:          [],
+    ziele:             [],
+    themen:            [],
+    projekte:          [],
+    ablaeufe:          [],
+    durchlaeufe:       [],
+    jahrestermine:     [],
+    ferien:            [],
+    einfaelle:         [],
+    gedanken:          [],
+    pinnwand:          [],
+    kalenderzuordnung: {},
+    notizbuecher:      [],
+    notizseiten:       [],
+    grabsteine:        [],
+    einstellungen: {
+      clientId:      CLIENT_ID,
+      redirectUri:   REDIRECT_URI,
+      kalender:      [],
+      ferienZeigen:  true,
+      darstellung:   'automatisch',
+      gespeichert:   null,
+      stempel:       0
+    }
+  };
+}
+
+function zwei(n) { return (n < 10 ? '0' : '') + n; }
+
+function isoDatum(d) {
+  var x = d || new Date();
+  return x.getFullYear() + '-' + zwei(x.getMonth() + 1) + '-' + zwei(x.getDate());
+}
+
+function isoZeit(d) {
+  var x = d || new Date();
+  return isoDatum(x) + ' ' + zwei(x.getHours()) + ':' + zwei(x.getMinutes()) + ':' + zwei(x.getSeconds());
+}
+
+function esc(text) {
+  return String(text === null || text === undefined ? '' : text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function ausIso(is) {
+  var p = String(is).split('-');
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+
+function tagePlus(is, n) {
+  var d = ausIso(is);
+  d.setDate(d.getDate() + n);
+  return isoDatum(d);
+}
+
+function montagVon(is) {
+  var d = ausIso(is);
+  var wt = (d.getDay() === 0) ? 7 : d.getDay();
+  return tagePlus(is, 1 - wt);
+}
+
+function kalenderwoche(is) {
+  var d = ausIso(is);
+  var ziel = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  ziel.setDate(ziel.getDate() + 3 - ((ziel.getDay() + 6) % 7));
+  var ersterDonnerstag = new Date(ziel.getFullYear(), 0, 4);
+  ersterDonnerstag.setDate(ersterDonnerstag.getDate() + 3 - ((ersterDonnerstag.getDay() + 6) % 7));
+  return 1 + Math.round((ziel - ersterDonnerstag) / (7 * 86400000));
+}
+
+function fsApiDa()   { return (typeof window.showOpenFilePicker === 'function'); }
+
+function opfsDa()    { return !!(navigator.storage && navigator.storage.getDirectory); }
+
+function idbDa()     { return !!window.indexedDB; }
+
+function localDa() {
+  try {
+    window.localStorage.setItem('__probe__', '1');
+    window.localStorage.removeItem('__probe__');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function idbOeffnen() {
+  return new Promise(function (fertig, fehler) {
+    if (!idbDa()) { fehler(new Error('IndexedDB nicht verfügbar')); return; }
+    var anfrage = window.indexedDB.open(IDB_NAME, 1);
+    anfrage.onupgradeneeded = function () {
+      var db = anfrage.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) { db.createObjectStore(IDB_STORE); }
+    };
+    anfrage.onsuccess = function () { fertig(anfrage.result); };
+    anfrage.onerror   = function () { fehler(anfrage.error); };
+  });
+}
+
+function idbSchreiben(schluessel, wert) {
+  return idbOeffnen().then(function (db) {
+    return new Promise(function (fertig, fehler) {
+      var t = db.transaction(IDB_STORE, 'readwrite');
+      t.objectStore(IDB_STORE).put(wert, schluessel);
+      t.oncomplete = function () { db.close(); fertig(true); };
+      t.onerror    = function () { db.close(); fehler(t.error); };
+    });
+  });
+}
+
+function idbLesen(schluessel) {
+  return idbOeffnen().then(function (db) {
+    return new Promise(function (fertig, fehler) {
+      var t = db.transaction(IDB_STORE, 'readonly');
+      var a = t.objectStore(IDB_STORE).get(schluessel);
+      a.onsuccess = function () { db.close(); fertig(a.result || null); };
+      a.onerror   = function () { db.close(); fehler(a.error); };
+    });
+  });
+}
+
+function idbLoeschen(schluessel) {
+  return idbOeffnen().then(function (db) {
+    return new Promise(function (fertig, fehler) {
+      var t = db.transaction(IDB_STORE, 'readwrite');
+      t.objectStore(IDB_STORE).delete(schluessel);
+      t.oncomplete = function () { db.close(); fertig(true); };
+      t.onerror    = function () { db.close(); fehler(t.error); };
+    });
+  });
+}
+
+function rechtePruefen(handle) {
+  if (!handle || typeof handle.queryPermission !== 'function') {
+    return Promise.resolve('unbekannt');
+  }
+  return handle.queryPermission({ mode: 'readwrite' })
+    .then(function (stand) { return stand; })
+    .catch(function () { return 'unbekannt'; });
+}
+
+function rechteAnfragen(handle) {
+  if (!handle || typeof handle.requestPermission !== 'function') {
+    return Promise.resolve('unbekannt');
+  }
+  return handle.requestPermission({ mode: 'readwrite' })
+    .then(function (stand) { return stand; })
+    .catch(function () { return 'denied'; });
+}
+
+function dateiSchreiben(handle, text) {
+  return handle.createWritable().then(function (strom) {
+    return strom.write(text).then(function () { return strom.close(); });
+  });
+}
+
+function dateiLesen(handle) {
+  return handle.getFile().then(function (f) { return f.text(); });
+}
+
+function opfsHandle(anlegen) {
+  return navigator.storage.getDirectory().then(function (ordner) {
+    return ordner.getFileHandle(OPFS_NAME, { create: !!anlegen });
+  });
+}
+
+function opfsSchreiben(text) {
+  return opfsHandle(true).then(function (h) { return dateiSchreiben(h, text); });
+}
+
+function opfsLesen() {
+  return opfsHandle(false).then(function (h) { return dateiLesen(h); });
+}
+
+function localSchreiben(text) {
+  window.localStorage.setItem(LS_KEY, text);
+  return Promise.resolve(true);
+}
+
+function localLesen() {
+  return Promise.resolve(window.localStorage.getItem(LS_KEY));
+}
+
+function jetzt() { return Date.now(); }
+
+function neueKennung() {
+  return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function grabsteinSetzen(sammlung, id) {
+  if (!Array.isArray(DB.grabsteine)) { DB.grabsteine = []; }
+  var i;
+  for (i = 0; i < DB.grabsteine.length; i++) {
+    if (DB.grabsteine[i].s === sammlung && DB.grabsteine[i].id === id) {
+      DB.grabsteine[i].z = jetzt();
+      return DB.grabsteine[i];
+    }
+  }
+  var g = { s: sammlung, id: id, z: jetzt() };
+  DB.grabsteine.push(g);
+  return g;
+}
+
+function grabsteinZeit(steine, sammlung, id) {
+  var i;
+  for (i = 0; i < steine.length; i++) {
+    if (steine[i].s === sammlung && steine[i].id === id) { return steine[i].z || 0; }
+  }
+  return 0;
+}
+
+function grabsteineAufraeumen(steine) {
+  var grenze = jetzt() - (GRABSTEIN_TAGE * 24 * 60 * 60 * 1000);
+  var frisch = [];
+  var i;
+  for (i = 0; i < steine.length; i++) {
+    if ((steine[i].z || 0) >= grenze) { frisch.push(steine[i]); }
+  }
+  return frisch;
+}
+
+function zusammenfuehren(lokal, fremd) {
+  var bericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+  var ergebnis = leereDatenbank();
+
+  var steine = grabsteineAufraeumen(
+    (Array.isArray(lokal.grabsteine) ? lokal.grabsteine : [])
+      .concat(Array.isArray(fremd.grabsteine) ? fremd.grabsteine : [])
+  );
+  /* Doppelte Vermerke auf den jüngsten zusammenziehen */
+  var karteS = {};
+  var i, s, k;
+  for (i = 0; i < steine.length; i++) {
+    var sl = steine[i].s + '|' + steine[i].id;
+    if (!karteS[sl] || (steine[i].z || 0) > karteS[sl].z) {
+      karteS[sl] = { s: steine[i].s, id: steine[i].id, z: steine[i].z || 0 };
+    }
+  }
+  var steineFrisch = [];
+  for (k in karteS) {
+    if (Object.prototype.hasOwnProperty.call(karteS, k)) { steineFrisch.push(karteS[k]); }
+  }
+  ergebnis.grabsteine = steineFrisch;
+
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    s = SAMMLUNGEN[i];
+
+    if (s === 'kalenderzuordnung') {
+      var a = lokal[s] || {};
+      var b = fremd[s] || {};
+      var alle = {};
+      for (k in a) { if (Object.prototype.hasOwnProperty.call(a, k)) { alle[k] = true; } }
+      for (k in b) { if (Object.prototype.hasOwnProperty.call(b, k)) { alle[k] = true; } }
+      for (k in alle) {
+        if (!Object.prototype.hasOwnProperty.call(alle, k)) { continue; }
+        var wa = a[k] || null;
+        var wb = b[k] || null;
+        var tot = grabsteinZeit(steineFrisch, s, k);
+        var neuster = Math.max(wa ? (wa.geaendert || 0) : 0, wb ? (wb.geaendert || 0) : 0);
+        if (tot && tot >= neuster) { bericht.entfernt++; continue; }
+        if (wa && wb) {
+          if ((wb.geaendert || 0) > (wa.geaendert || 0)) {
+            ergebnis[s][k] = wb; bericht.ersetzt++;
+            if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'fremd' }); }
+          } else {
+            ergebnis[s][k] = wa; bericht.behalten++;
+            if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'lokal' }); }
+          }
+        } else if (wb) {
+          ergebnis[s][k] = wb; bericht.neu++;
+        } else {
+          ergebnis[s][k] = wa; bericht.behalten++;
+        }
+      }
+      continue;
+    }
+
+    var listeA = Array.isArray(lokal[s]) ? lokal[s] : [];
+    var listeB = Array.isArray(fremd[s]) ? fremd[s] : [];
+    var karte = {};
+    var j;
+    for (j = 0; j < listeA.length; j++) { karte[listeA[j].id] = { a: listeA[j], b: null }; }
+    for (j = 0; j < listeB.length; j++) {
+      if (karte[listeB[j].id]) { karte[listeB[j].id].b = listeB[j]; }
+      else { karte[listeB[j].id] = { a: null, b: listeB[j] }; }
+    }
+
+    var kennung;
+    for (kennung in karte) {
+      if (!Object.prototype.hasOwnProperty.call(karte, kennung)) { continue; }
+      var paar = karte[kennung];
+      var za = paar.a ? (paar.a.geaendert || 0) : 0;
+      var zb = paar.b ? (paar.b.geaendert || 0) : 0;
+      var totZeit = grabsteinZeit(steineFrisch, s, kennung);
+
+      if (totZeit && totZeit >= Math.max(za, zb)) { bericht.entfernt++; continue; }
+
+      if (paar.a && paar.b) {
+        if (zb > za) {
+          ergebnis[s].push(paar.b); bericht.ersetzt++;
+          if (za > 0 && zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'fremd' }); }
+        } else if (za > zb) {
+          ergebnis[s].push(paar.a); bericht.behalten++;
+          if (zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'lokal' }); }
+        } else {
+          ergebnis[s].push(paar.a); bericht.behalten++;
+        }
+      } else if (paar.b) {
+        ergebnis[s].push(paar.b); bericht.neu++;
+      } else {
+        ergebnis[s].push(paar.a); bericht.behalten++;
+      }
+    }
+  }
+
+  /* Einstellungen wurden bisher als Ganzes ersetzt: Wer den jüngeren
+     Stempel hatte, bestimmte alles. Damit verschwand eine Einstellung,
+     die das andere Gerät gar nicht kannte — etwa eine neu freigegebene
+     Art fürs Jahresraster. Jetzt wird je Schlüssel zusammengeführt:
+     Der jüngere Stand gewinnt, aber er löscht nichts, was er nicht
+     kennt. */
+  var ea = (lokal.einstellungen && lokal.einstellungen.stempel) || 0;
+  var eb = (fremd.einstellungen && fremd.einstellungen.stempel) || 0;
+  var aelter = (eb > ea) ? (lokal.einstellungen || {}) : (fremd.einstellungen || {});
+  var juenger = (eb > ea) ? (fremd.einstellungen || {}) : (lokal.einstellungen || {});
+
+  /* Diese Einstellungen sind Verzeichnisse: Dort wird je Eintrag
+     verschmolzen, sonst verlöre man die Wahl des anderen Geräts. */
+  var VERZEICHNISSE = ['artenImJahr', 'flaecheOben', 'skizzenVorschau'];
+
+  var e;
+  for (e in aelter) {
+    if (Object.prototype.hasOwnProperty.call(aelter, e)) {
+      ergebnis.einstellungen[e] = aelter[e];
+    }
+  }
+  for (e in juenger) {
+    if (!Object.prototype.hasOwnProperty.call(juenger, e)) { continue; }
+    if (VERZEICHNISSE.indexOf(e) >= 0) {
+      var zus = {};
+      var q, k2;
+      for (q = 0; q < 2; q++) {
+        var vz = (q === 0) ? (aelter[e] || {}) : (juenger[e] || {});
+        for (k2 in vz) {
+          if (Object.prototype.hasOwnProperty.call(vz, k2)) { zus[k2] = vz[k2]; }
+        }
+      }
+      ergebnis.einstellungen[e] = zus;
+      continue;
+    }
+    ergebnis.einstellungen[e] = juenger[e];
+  }
+  ergebnis.einstellungen.clientId = CLIENT_ID;
+  ergebnis.einstellungen.redirectUri = REDIRECT_URI;
+  ergebnis.version = APP_VERSION;
+
+  return { db: ergebnis, bericht: bericht };
+}
+
+function alsText() {
+  DB.version = APP_VERSION;
+  if (!DB.einstellungen) { DB.einstellungen = leereDatenbank().einstellungen; }
+  DB.einstellungen.gespeichert = isoZeit();
+  if (!DB.einstellungen.stempel) { DB.einstellungen.stempel = jetzt(); }
+  if (!Array.isArray(DB.grabsteine)) { DB.grabsteine = []; }
+  return JSON.stringify(DB, null, 2);
+}
+
+function uebernehmen(text) {
+  if (!text) { return false; }
+  var gelesen;
+  try {
+    gelesen = JSON.parse(text);
+  } catch (e) {
+    melde('Die Datei enthält kein gültiges JSON: ' + e.message, 'warn');
+    return false;
+  }
+  if (!gelesen || typeof gelesen !== 'object') { return false; }
+
+  var frisch = leereDatenbank();
+  var i;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    var name = SAMMLUNGEN[i];
+    if (name === 'kalenderzuordnung') {
+      if (gelesen[name] && typeof gelesen[name] === 'object') { frisch[name] = gelesen[name]; }
+    } else if (Array.isArray(gelesen[name])) {
+      frisch[name] = gelesen[name];
+    }
+  }
+  if (gelesen.einstellungen && typeof gelesen.einstellungen === 'object') {
+    var e;
+    for (e in gelesen.einstellungen) {
+      if (Object.prototype.hasOwnProperty.call(gelesen.einstellungen, e)) {
+        frisch.einstellungen[e] = gelesen.einstellungen[e];
+      }
+    }
+  }
+  if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
+  frisch.einstellungen.clientId    = CLIENT_ID;
+  frisch.einstellungen.redirectUri = REDIRECT_URI;
+  bestandStempeln(frisch);
+  DB = frisch;
+  return true;
+}
+
+function speichern() {
+  var text = alsText();
+
+  if (speicherWeg === 'datei' && dateiHandle) {
+    return dateiSchreiben(dateiHandle, text).then(function () {
+      letzterSchreibvorgang = isoZeit();
+      return 'datei';
+    }).catch(function (f) {
+      melde('Schreiben in die Datei fehlgeschlagen, weiche auf den Notweg aus.\n' + f.message, 'warn');
+      return notwegSchreiben(text);
+    });
+  }
+  return notwegSchreiben(text);
+}
+
+function notwegSchreiben(text) {
+  if (opfsDa()) {
+    return opfsSchreiben(text).then(function () {
+      speicherWeg = 'opfs';
+      letzterSchreibvorgang = isoZeit();
+      return 'opfs';
+    }).catch(function () {
+      return localNotweg(text);
+    });
+  }
+  return localNotweg(text);
+}
+
+function localNotweg(text) {
+  if (!localDa()) {
+    speicherWeg = 'keiner';
+    return Promise.reject(new Error('Kein Speicherweg verfügbar'));
+  }
+  return localSchreiben(text).then(function () {
+    speicherWeg = 'local';
+    letzterSchreibvorgang = isoZeit();
+    return 'local';
+  });
+}
+
+function laden() {
+  if (dateiHandle) {
+    return rechtePruefen(dateiHandle).then(function (stand) {
+      rechteStand = stand;
+      if (stand !== 'granted') { return null; }
+      return dateiLesen(dateiHandle).then(function (text) {
+        if (uebernehmen(text)) { speicherWeg = 'datei'; return 'datei'; }
+        return null;
+      });
+    }).then(function (ergebnis) {
+      if (ergebnis) { return ergebnis; }
+      return notwegLesen();
+    }).catch(function () {
+      return notwegLesen();
+    });
+  }
+  return notwegLesen();
+}
+
+function notwegLesen() {
+  if (opfsDa()) {
+    return opfsLesen().then(function (text) {
+      if (uebernehmen(text)) { speicherWeg = 'opfs'; return 'opfs'; }
+      return localNotwegLesen();
+    }).catch(function () {
+      return localNotwegLesen();
+    });
+  }
+  return localNotwegLesen();
+}
+
+function localNotwegLesen() {
+  if (!localDa()) { speicherWeg = 'keiner'; return Promise.resolve(null); }
+  return localLesen().then(function (text) {
+    if (uebernehmen(text)) { speicherWeg = 'local'; return 'local'; }
+    speicherWeg = localDa() ? 'local' : 'keiner';
+    return null;
+  });
+}
+
+function gisLaden() {
+  if (gisBereit) { return Promise.resolve(true); }
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+    gisBereit = true;
+    return Promise.resolve(true);
+  }
+  return new Promise(function (fertig, fehler) {
+    var vorhanden = document.getElementById('gisSkript');
+    if (vorhanden) {
+      vorhanden.addEventListener('load', function () { gisBereit = true; fertig(true); });
+      return;
+    }
+    var s = document.createElement('script');
+    s.id = 'gisSkript';
+    s.src = GIS_URL;
+    s.async = true;
+    s.onload = function () { gisBereit = true; fertig(true); };
+    s.onerror = function () { fehler(new Error('Die Anmeldebibliothek ließ sich nicht laden.')); };
+    document.head.appendChild(s);
+  });
+}
+
+function tokenMerken(token, gueltigSek) {
+  zugriffToken = token;
+  tokenAblauf = Date.now() + (gueltigSek * 1000);
+  try {
+    window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ t: token, a: tokenAblauf }));
+  } catch (e) {
+    /* ohne sessionStorage lebt der Schlüssel nur bis zum Neuladen */
+  }
+  erneuerungPlanen();
+}
+
+function tokenAusSitzung() {
+  try {
+    var roh = window.sessionStorage.getItem(TOKEN_KEY);
+    if (!roh) { return false; }
+    var w = JSON.parse(roh);
+    if (!w || !w.t || !w.a || w.a <= Date.now()) { return false; }
+    zugriffToken = w.t;
+    tokenAblauf = w.a;
+    erneuerungPlanen();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function tokenVergessen() {
+  zugriffToken = null;
+  tokenAblauf = 0;
+  if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
+  try { window.sessionStorage.removeItem(TOKEN_KEY); } catch (e) { /* egal */ }
+}
+
+function tokenGueltig() {
+  return !!zugriffToken && tokenAblauf > Date.now();
+}
+
+function restMinuten() {
+  if (!tokenGueltig()) { return 0; }
+  return Math.max(0, Math.round((tokenAblauf - Date.now()) / 60000));
+}
+
+function erneuerungPlanen() {
+  if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
+  if (!tokenAblauf) { return; }
+  erneuerungVersuche = 0;
+  var wartezeit = tokenAblauf - Date.now() - VORLAUF_MS;
+  if (wartezeit < 1000) { wartezeit = 1000; }
+  erneuerungsUhr = window.setTimeout(erneuerungLaufen, wartezeit);
+}
+
+function erneuerungLaufen() {
+  erneuerungsUhr = null;
+  erneuerungVersuche++;
+  anmelden(true).then(function (gut) {
+    if (gut) { return; }
+    if (erneuerungVersuche >= ERNEUERUNG_MAX) { return; }
+    erneuerungsUhr = window.setTimeout(erneuerungLaufen, ERNEUERUNG_ABSTAND);
+  });
+}
+
+function erneuerungPruefen() {
+  if (!tokenGueltig()) { return; }
+  if (erneuerungsUhr) { return; }
+  if (restMinuten() > 10) { return; }
+  erneuerungVersuche = 0;
+  erneuerungLaufen();
+}
+
+function klientVorbereiten() {
+  if (tokenClient) { return Promise.resolve(tokenClient); }
+  return gisLaden().then(function () {
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: function () { /* wird je Anfrage überschrieben */ },
+      /* Scheitert das Anmeldefenster selbst — blockiert, geschlossen —,
+         meldet Google das nur hier, nicht über callback. */
+      error_callback: function () { /* wird je Anfrage überschrieben */ }
+    });
+    return tokenClient;
+  });
+}
+
+function anmelden(still) {
+  return anmeldeVersuch(still, still ? '' : '').then(function (gut) {
+    if (gut || still) { return gut; }
+    return anmeldeVersuch(false, 'consent');
+  });
+}
+
+function anmeldeVersuch(still, aufforderung) {
+  return klientVorbereiten().then(function (klient) {
+    return new Promise(function (fertig) {
+      anmeldeAnfragen(klient, still, aufforderung, fertig);
+    });
+  }).catch(function (f) {
+    anmeldungLaeuft = false;
+    melde('Anmeldung nicht möglich.\n' + (f ? f.message : ''), 'warn');
+    zeichne();
+    return false;
+  });
+}
+
+function abmelden() {
+  var alt = zugriffToken;
+  try { window.localStorage.removeItem(ANMELDE_MERKER); } catch (e) { /* egal */ }
+  tokenVergessen();
+  driveDateiId = '';
+  driveStand = '';
+  if (alt && window.google && window.google.accounts && window.google.accounts.oauth2) {
+    try { window.google.accounts.oauth2.revoke(alt, function () { return null; }); }
+    catch (e) { /* Widerruf ist Beiwerk */ }
+  }
+  melde('Abgemeldet. Die lokalen Daten bleiben erhalten.', null);
+  anmeldeStreifenPruefen();
+  zeichne();
+}
+
+function warAngemeldet() {
+  try { return window.localStorage.getItem(ANMELDE_MERKER) === '1'; }
+  catch (e) { return false; }
+}
+
+function driveKopf(zusatz) {
+  var k = { 'Authorization': 'Bearer ' + zugriffToken };
+  if (zusatz) {
+    var n;
+    for (n in zusatz) {
+      if (Object.prototype.hasOwnProperty.call(zusatz, n)) { k[n] = zusatz[n]; }
+    }
+  }
+  return k;
+}
+
+function dienstAusAdresse(url) {
+  var text = String(url || '');
+  if (text.indexOf('/calendar/') >= 0) { return 'Der Kalender'; }
+  if (text.indexOf('/drive/') >= 0 || text.indexOf('/upload/drive/') >= 0) { return 'Drive'; }
+  return 'Google';
+}
+
+function antwortPruefen(a) {
+  if (a.ok) { return a; }
+  var dienst = dienstAusAdresse(a.url);
+  if (a.status === 401) {
+    tokenVergessen();
+    throw new Error('Der Zugriff ist abgelaufen. Bitte neu anmelden.');
+  }
+  return a.text().then(function (t) {
+    /* Eine nicht freigeschaltete Schnittstelle sieht aus wie ein
+       Rechtefehler, ist aber eine Einstellung im Google-Projekt. */
+    if (a.status === 403 && /has not been used|is disabled|SERVICE_DISABLED/i.test(t)) {
+      throw new Error(dienst + ' ist im Google-Projekt noch nicht freigeschaltet.\n'
+        + 'Cloud Console öffnen, Projekt wählen, unter „APIs & Dienste – Bibliothek" '
+        + 'die passende Schnittstelle aktivieren und ein bis zwei Minuten warten.');
+    }
+    if (a.status === 403) {
+      throw new Error(dienst + ' verweigert den Zugriff (403).\n' + t.slice(0, 200));
+    }
+    throw new Error(dienst + ' antwortete mit ' + a.status + ': ' + t.slice(0, 200));
+  });
+}
+
+function driveSuchen() {
+  var url = 'https://www.googleapis.com/drive/v3/files'
+          + '?q=' + encodeURIComponent("name='" + DRIVE_DATEI + "' and trashed=false")
+          + '&fields=' + encodeURIComponent('files(id,name,modifiedTime)')
+          + '&pageSize=10';
+  return window.fetch(url, { headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      var liste = (d && d.files) ? d.files : [];
+      if (!liste.length) { return null; }
+      driveDateiId = liste[0].id;
+      driveStand = liste[0].modifiedTime || '';
+      return liste[0];
+    });
+}
+
+function driveAnlegen() {
+  return window.fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: driveKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name: DRIVE_DATEI, mimeType: 'application/json' })
+  }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      driveDateiId = d.id;
+      return d.id;
+    });
+}
+
+function driveHochladen() {
+  var text = alsText();
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : driveAnlegen(); });
+  return los.then(function (id) {
+    return window.fetch('https://www.googleapis.com/upload/drive/v3/files/' + id
+                        + '?uploadType=media&fields=id,modifiedTime', {
+      method: 'PATCH',
+      headers: driveKopf({ 'Content-Type': 'application/json' }),
+      body: text
+    });
+  }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      driveStand = d.modifiedTime || '';
+      letzteUebertragung = isoZeit();
+      return true;
+    });
+}
+
+function driveHerunterladen() {
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : null; });
+  return los.then(function (id) {
+    if (!id) { return null; }
+    return window.fetch('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', {
+      headers: driveKopf()
+    }).then(antwortPruefen)
+      .then(function (a) { return a.text(); });
+  });
+}
+
+function textZuBestand(text) {
+  var gelesen;
+  try {
+    gelesen = JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+  if (!gelesen || typeof gelesen !== 'object') { return null; }
+  var frisch = leereDatenbank();
+  var i, name;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    name = SAMMLUNGEN[i];
+    if (name === 'kalenderzuordnung') {
+      if (gelesen[name] && typeof gelesen[name] === 'object') { frisch[name] = gelesen[name]; }
+    } else if (Array.isArray(gelesen[name])) {
+      frisch[name] = gelesen[name];
+    }
+  }
+  if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
+  if (gelesen.einstellungen && typeof gelesen.einstellungen === 'object') {
+    var e;
+    for (e in gelesen.einstellungen) {
+      if (Object.prototype.hasOwnProperty.call(gelesen.einstellungen, e)) {
+        frisch.einstellungen[e] = gelesen.einstellungen[e];
+      }
+    }
+  }
+  bestandStempeln(frisch);
+  return frisch;
+}
+
+function berichtText(b) {
+  if (!b) { return 'kein Abgleich gelaufen'; }
+  var t = b.neu + ' neu · ' + b.ersetzt + ' ersetzt · ' + b.behalten + ' behalten · '
+        + b.entfernt + ' entfernt';
+  if (b.konflikte.length) { t += ' · ' + b.konflikte.length + ' Konflikt(e)'; }
+  return t;
+}
+
+function abgleichen() {
+  if (!tokenGueltig()) { return Promise.reject(new Error('Nicht angemeldet.')); }
+  bestandStempeln(DB);
+  return driveHerunterladen().then(function (text) {
+    var fremd = text ? textZuBestand(text) : null;
+    if (!fremd) {
+      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+      return driveHochladen();
+    }
+    var ergebnis = zusammenfuehren(DB, fremd);
+    DB = ergebnis.db;
+    letzterBericht = ergebnis.bericht;
+    return speichern().then(function () { return driveHochladen(); });
+  }).then(function () {
+    letzterAbgleich = isoZeit();
+    return letzterBericht;
+  });
+}
+
+function abgleichPlanen(sofort) {
+  if (!tokenGueltig()) { return; }
+  if (abgleichUhr) { window.clearTimeout(abgleichUhr); }
+  abgleichUhr = window.setTimeout(abgleichStill, sofort ? 300 : ABGLEICH_VERZUG);
+}
+
+function taktPruefen() {
+  if (document.hidden) { return; }
+  anmeldeStreifenPruefen();
+  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  if (lokalOffen) { abgleichStill(); return; }
+  var vorher = driveStand;
+  driveSuchen().then(function (treffer) {
+    if (treffer && treffer.modifiedTime && treffer.modifiedTime !== vorher) {
+      abgleichStill();
+    }
+  }).catch(function () {
+    return null;
+  });
+}
+
+function taktStarten() {
+  if (taktUhr) { window.clearInterval(taktUhr); }
+  taktUhr = window.setInterval(taktPruefen, ABGLEICH_TAKT);
+}
+
+function verbindungTaktStarten() {
+  if (verbindungUhr) { window.clearInterval(verbindungUhr); }
+  verbindungUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    verbindungPruefen();
+  }, VERBINDUNG_TAKT);
+}
+
+function abgleichenJetzt() {
+  if (!tokenGueltig()) { melde('Bitte zuerst anmelden.', 'warn'); return; }
+  melde('Abgleich läuft …', null);
+  abgleichen().then(function (b) {
+    var art = (b && b.konflikte.length) ? null : 'gut';
+    melde('Abgleich fertig.\n' + berichtText(b), art);
+    zeichne();
+  }).catch(function (f) {
+    abgleichFehler = f ? f.message : 'unbekannter Fehler';
+    melde('Abgleich fehlgeschlagen.\n' + abgleichFehler, 'warn');
+    standZeichnen();
+    zeichne();
+  });
+}
+
+function wegText(weg) {
+  if (weg === 'datei') { return 'Datei auf dem Gerät'; }
+  if (weg === 'opfs')  { return 'geräteeigener Speicher'; }
+  if (weg === 'local') { return 'lokaler Browserspeicher'; }
+  return 'keiner';
+}
+
+function dateiWaehlen() {
+  if (!fsApiDa()) {
+    melde('Dieser Browser kennt die Datei-Schnittstelle nicht. '
+        + 'Es wird ' + (opfsDa() ? 'der geräteeigene Speicher' : 'der lokale Speicher') + ' benutzt.', 'warn');
+    return;
+  }
+  window.showOpenFilePicker({
+    multiple: false,
+    types: [{ description: 'Workbench-Daten', accept: { 'application/json': ['.json'] } }]
+  }).then(function (liste) {
+    dateiHandle = liste[0];
+    dateiName = dateiHandle.name;
+    return rechteAnfragen(dateiHandle);
+  }).then(function (stand) {
+    rechteStand = stand;
+    if (stand !== 'granted') {
+      melde('Zugriff auf die Datei wurde nicht erteilt.', 'warn');
+      zeichne();
+      return null;
+    }
+    return idbSchreiben(IDB_KEY, dateiHandle).then(function () { return laden(); });
+  }).then(function (weg) {
+    if (weg) {
+      melde('Datei geöffnet und gelesen: ' + dateiName + '\nSpeicherweg: ' + wegText(weg), 'gut');
+    }
+    zeichne();
+  }).catch(function (f) {
+    if (f && f.name === 'AbortError') { melde('Auswahl abgebrochen.'); return; }
+    melde('Datei konnte nicht geöffnet werden.\n' + (f ? f.message : ''), 'warn');
+  });
+}
+
+function dateiAnlegen() {
+  if (typeof window.showSaveFilePicker !== 'function') {
+    melde('Dieser Browser kann keine Datei anlegen. Es wird intern gespeichert.', 'warn');
+    return;
+  }
+  window.showSaveFilePicker({
+    suggestedName: DATEINAME,
+    types: [{ description: 'Workbench-Daten', accept: { 'application/json': ['.json'] } }]
+  }).then(function (handle) {
+    dateiHandle = handle;
+    dateiName = handle.name;
+    return rechteAnfragen(dateiHandle);
+  }).then(function (stand) {
+    rechteStand = stand;
+    if (stand !== 'granted') {
+      melde('Schreibrecht wurde nicht erteilt.', 'warn');
+      zeichne();
+      return null;
+    }
+    speicherWeg = 'datei';
+    return idbSchreiben(IDB_KEY, dateiHandle).then(function () { return speichern(); });
+  }).then(function (weg) {
+    if (weg) { melde('Datei angelegt: ' + dateiName, 'gut'); }
+    zeichne();
+  }).catch(function (f) {
+    if (f && f.name === 'AbortError') { melde('Anlegen abgebrochen.'); return; }
+    melde('Datei konnte nicht angelegt werden.\n' + (f ? f.message : ''), 'warn');
+  });
+}
+
+function dateiAnbieten(name, text) {
+  try {
+    var brocken = new window.Blob([text], { type: 'application/json' });
+    var adresse = window.URL.createObjectURL(brocken);
+    var a = document.createElement('a');
+    a.href = adresse;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(function () { window.URL.revokeObjectURL(adresse); }, 4000);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* Aus der Workbench — ohne termineHolen: Der Wochenkompass hat keine Termine. */
+function anmeldeAnfragen(klient, still, aufforderung, fertig) {
+  var erledigt = false;
+  var uhr = null;
+  anmeldungLaeuft = true;
+  var abschliessen = function (gut) {
+    if (erledigt) { return; }
+    erledigt = true;
+    anmeldungLaeuft = false;
+    if (uhr) { window.clearTimeout(uhr); }
+    fertig(gut);
+  };
+  var gescheitert = function (grund) {
+    if (erledigt) { return; }
+    letzteErneuerung = { zeit: isoZeit(),
+                         ergebnis: still ? 'still fehlgeschlagen' : 'abgebrochen',
+                         grund: grund };
+    if (still) {
+      melde('Die stille Erneuerung ist fehlgeschlagen (' + grund + ').\n'
+          + 'Der nächste Klick in der App verbindet neu.', 'warn');
+    } else {
+      melde('Anmeldung nicht abgeschlossen (' + grund + ').', 'warn');
+    }
+    zeichne();
+    abschliessen(false);
+  };
+  klient.callback = function (antwort) {
+    if (antwort && antwort.access_token) {
+      tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+      try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
+      verbindungOk = true;
+      letzteErneuerung = { zeit: isoZeit(), ergebnis: still ? 'still erneuert' : 'angemeldet',
+                           grund: '' };
+      abgleichPlanen(true);
+      verbindungPruefen();
+      if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
+      zeichne();
+      abschliessen(true);
+      return;
+    }
+    gescheitert((antwort && antwort.error) ? antwort.error : 'unbekannt');
+  };
+  klient.error_callback = function (fehler) {
+    gescheitert((fehler && fehler.type) ? fehler.type : 'fenster_fehler');
+  };
+  /* Von Hand darf es länger dauern — wer ein Konto wählt, braucht Zeit. */
+  uhr = window.setTimeout(function () { gescheitert('keine_antwort'); },
+                          still ? ANMELDE_ZEITGRENZE_MS : 5 * ANMELDE_ZEITGRENZE_MS);
+  /* Auch von Hand zuerst ohne Rückfrage: Wer schon zugestimmt hat,
+     soll die Zustimmung nicht jedes Mal wieder erteilen müssen. */
+  klient.requestAccessToken({ prompt: aufforderung });
+}
+
+/* ============================================================
+   Wochenkompass — eigener Teil
+
+   Eine Dokumenten-App mit drei Bereichen: ★ Diese Woche, Projekte
+   (Projekte und Ziele) und Stille Listen. Jede Seite ist Text in
+   Markdown, aufgebaut wie die Gedankenfläche der Workbench.
+   Die Daten liegen im selben Bestand wie die der Workbench:
+     Wochenseite   DB.gedanken  { kompass: 'woche', woche: Montag, id: 'kw-<Montag>' }
+     Stille Liste  DB.gedanken  { kompass: 'liste', rang }
+     Projektseite  DB.projekte[].flaeche / DB.ziele[].flaeche
+   Neue Sammlungen gibt es bewusst nicht — die Workbench würde sie beim
+   Abgleich verwerfen. Ohne Workbench arbeitet der Wochenkompass allein.
+   ============================================================ */
+
+var speicherUhr = null;
+var zurueckHolen = null;
+var klickVersucht = false;
+
+/* Was gerade offen ist und wie */
+var kp = {
+  art: 'woche',          /* woche | vorhaben | liste | einst */
+  id: '',                /* bei woche: kw-<Montag>; leer = laufende Woche */
+  va: '',                /* bei vorhaben: projekt | ziel */
+  modus: 'ansicht',      /* ansicht | schreiben */
+  leisteAuf: false,
+  neuIn: '',             /* vorhaben | liste — offenes Eingabefeld */
+  neuArt: 'projekt',
+  neuKontext: 'privat',
+  menueAuf: false,
+  frage: '',             /* loeschen | abschliessen */
+  fertigAuf: false
+};
+
+/* ---------- Bestand ---------- */
+
+/* Nur Kennung und Stempel nachtragen. Die Umbauten der Workbench an
+   ihren eigenen Daten (Aufgaben, Meilensteine) gehören nicht hierher. */
+function bestandStempeln(db) {
+  var i, s;
+  var nachgetragen = 0;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    s = SAMMLUNGEN[i];
+    if (s === 'kalenderzuordnung') { continue; }
+    var liste = db[s] || [];
+    var j;
+    for (j = 0; j < liste.length; j++) {
+      if (!liste[j].id) { liste[j].id = neueKennung(); nachgetragen++; }
+      if (typeof liste[j].geaendert !== 'number') { liste[j].geaendert = 0; nachgetragen++; }
+    }
+  }
+  if (!Array.isArray(db.grabsteine)) { db.grabsteine = []; }
+  return nachgetragen;
+}
+
+function grabsteinWeg(sammlung, id) {
+  DB.grabsteine = (DB.grabsteine || []).filter(function (g) { return !(g.s === sammlung && g.id === id); });
+}
+
+/* ---------- Wochen ---------- */
+
+function kpHeuteMontag() { return montagVon(isoDatum()); }
+
+function kpWocheKennung(montag) { return 'kw-' + montag; }
+
+function kpKurz(is) {
+  var d = ausIso(is);
+  return d.getDate() + '.' + (d.getMonth() + 1) + '.';
+}
+
+function kpWochenTitel(montag) {
+  return 'KW ' + kalenderwoche(montag) + ' · ' + kpKurz(montag) + ' – ' + kpKurz(tagePlus(montag, 6));
+}
+
+function kpWochen() {
+  return (DB.gedanken || []).filter(function (g) { return g && g.kompass === 'woche' && g.woche; })
+    .sort(function (a, b) { return (a.woche < b.woche) ? 1 : ((a.woche > b.woche) ? -1 : 0); });
+}
+
+function kpWocheFinden(montag) {
+  var id = kpWocheKennung(montag);
+  var l = DB.gedanken || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].id === id) { return l[i]; } }
+  return null;
+}
+
+function kpWocheGeruest(montag) {
+  return '# Woche ' + kalenderwoche(montag) + ' · ' + kpKurz(montag) + ' – ' + kpKurz(tagePlus(montag, 6)) + '\n\n'
+       + '## Was diese Woche Substanz schafft\n- \n\n'
+       + '## Verbindlichkeiten\n- ';
+}
+
+/* Eine Wochenseite hat eine feste Kennung je Woche: Legen zwei Geräte
+   dieselbe Woche an, meinen sie dieselbe Seite — keine Doppelten. */
+function kpWocheAnlegen(montag) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(montag || ''))) { return null; }
+  var g = kpWocheFinden(montag);
+  if (g) { return g; }
+  if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+  g = { id: kpWocheKennung(montag), titel: kpWochenTitel(montag), text: kpWocheGeruest(montag),
+        kompass: 'woche', woche: montag, geaendert: jetzt() };
+  DB.gedanken.push(g);
+  grabsteinWeg('gedanken', g.id);
+  spaeterSichern();
+  return g;
+}
+
+/* ---------- Stille Listen ---------- */
+
+function kpListen() {
+  return (DB.gedanken || []).filter(function (g) { return g && g.kompass === 'liste'; })
+    .sort(function (a, b) { return (Number(a.rang) || 0) - (Number(b.rang) || 0); });
+}
+
+function kpListeAnlegen(name) {
+  var titel = String(name || '').trim().slice(0, 120);
+  if (!titel) { return null; }
+  if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+  var rang = kpListen().reduce(function (m, g) { return Math.max(m, Number(g.rang) || 0); }, 0) + 1;
+  var g = { id: neueKennung(), titel: titel, text: '', kompass: 'liste', rang: rang, geaendert: jetzt() };
+  DB.gedanken.push(g);
+  spaeterSichern();
+  return g;
+}
+
+var KP_VORSCHLAEGE = ['Haus & Werkstatt', 'Büro & Admin', 'Routinen'];
+
+function kpVorschlaegeAnlegen() {
+  KP_VORSCHLAEGE.forEach(function (n) { kpListeAnlegen(n); });
+  zeichne();
+}
+
+/* ---------- Vorhaben: Projekte und Ziele ---------- */
+
+function kpVorhaben() {
+  var aus = [];
+  (DB.projekte || []).forEach(function (p) { aus.push({ v: p, art: 'projekt' }); });
+  (DB.ziele || []).forEach(function (z) { aus.push({ v: z, art: 'ziel' }); });
+  return aus;
+}
+
+function kpVorhabenFinden(id, art) {
+  var l = (art === 'ziel') ? (DB.ziele || []) : (DB.projekte || []);
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].id === id) { return l[i]; } }
+  return null;
+}
+
+/* Dieselben Felder, mit denen die Workbench ein Vorhaben anlegt. */
+function kpVorhabenAnlegen(art, name, kontext) {
+  var titel = String(name || '').trim().slice(0, 200);
+  if (!titel || (art !== 'projekt' && art !== 'ziel')) { return null; }
+  var k = (kontext === 'beruflich') ? 'beruflich' : 'privat';
+  var v;
+  if (art === 'ziel') {
+    v = { id: neueKennung(), name: titel, kontext: k, beschreibung: '', zieltermin: '',
+          status: 'laufend', zielzustaende: [], einzahler: [], flaeche: '', geaendert: jetzt() };
+    if (!Array.isArray(DB.ziele)) { DB.ziele = []; }
+    DB.ziele.push(v);
+  } else {
+    v = { id: neueKennung(), name: titel, kontext: k, beschreibung: '', start: '', ende: '',
+          status: 'laufend', meilensteine: [], zielzustaende: [], anlagen: [], flaeche: '', geaendert: jetzt() };
+    if (!Array.isArray(DB.projekte)) { DB.projekte = []; }
+    DB.projekte.push(v);
+  }
+  spaeterSichern();
+  return v;
+}
+
+var KP_GERUEST_PROJEKT = '## Aktuelle Phase\n\n\n## Etappen\n1. \n\n## Eckdaten & Festlegungen\n- \n\n'
+                       + '## Kontakte & Angebote\n- \n\n## Notizen\n- ';
+
+/* ---------- Die offene Seite ---------- */
+
+/* Liefert, was gerade offen ist: Art, Satz, Titel, Text. */
+function kpSeite() {
+  if (kp.art === 'woche') {
+    var montag = kp.id ? kp.id.slice(3) : kpHeuteMontag();
+    return { art: 'woche', montag: montag, satz: kpWocheFinden(montag) };
+  }
+  if (kp.art === 'vorhaben') {
+    return { art: 'vorhaben', va: kp.va, satz: kpVorhabenFinden(kp.id, kp.va) };
+  }
+  if (kp.art === 'liste') {
+    var l = DB.gedanken || [];
+    var i;
+    for (i = 0; i < l.length; i++) { if (l[i].id === kp.id && l[i].kompass === 'liste') { return { art: 'liste', satz: l[i] }; } }
+    return { art: 'liste', satz: null };
+  }
+  return { art: 'einst', satz: null };
+}
+
+function kpText(seite) {
+  if (!seite || !seite.satz) { return ''; }
+  return String((seite.art === 'vorhaben') ? (seite.satz.flaeche || '') : (seite.satz.text || ''));
+}
+
+function kpTextSetzen(text) {
+  var s = kpSeite();
+  if (!s.satz) { return; }
+  if (s.art === 'vorhaben') { s.satz.flaeche = String(text); } else { s.satz.text = String(text); }
+  s.satz.geaendert = jetzt();
+  spaeterSichern();
+}
+
+function kpTitelSetzen(wert) {
+  var s = kpSeite();
+  var t = String(wert || '').trim().slice(0, 200);
+  if (!s.satz || !t || s.art === 'woche') { leisteZeichnen(); return; }
+  if (s.art === 'vorhaben') { s.satz.name = t; } else { s.satz.titel = t; }
+  s.satz.geaendert = jetzt();
+  spaeterSichern();
+  leisteZeichnen();
+}
+
+/* Eigenschaften eines Vorhabens: Kontext, Termin, Status. */
+function kpFeld(feld, wert) {
+  var s = kpSeite();
+  if (s.art !== 'vorhaben' || !s.satz) { return; }
+  var v = s.satz;
+  if (feld === 'kontext' && (wert === 'beruflich' || wert === 'privat')) { v.kontext = wert; }
+  else if (feld === 'status' && ['laufend', 'ruht', 'abgeschlossen'].indexOf(wert) >= 0) { v.status = wert; }
+  else if (feld === 'termin') {
+    var d = String(wert || '');
+    if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) { return; }
+    if (s.va === 'ziel') { v.zieltermin = d; } else { v.ende = d; }
+  } else { return; }
+  v.geaendert = jetzt();
+  spaeterSichern();
+  zeichne();
+}
+
+function oeffne(art, id, va) {
+  kp.art = art;
+  kp.id = id || '';
+  kp.va = va || '';
+  kp.modus = 'ansicht';
+  kp.menueAuf = false;
+  kp.frage = '';
+  kp.leisteAuf = false;
+  zeichne(true);
+  var rolle = (typeof document.querySelector === 'function') ? document.querySelector('.seite') : null;
+  if (rolle) { rolle.scrollTop = 0; }
+}
+
+function modusSetzen(m) {
+  if (m !== 'ansicht' && m !== 'schreiben') { return; }
+  kp.modus = m;
+  seiteZeichnen(true);
+  if (m === 'schreiben') {
+    var f = document.getElementById('kpFeld');
+    if (f && f.focus) { f.focus(); }
+  }
+}
+
+/* ---------- Anlegen ---------- */
+
+function neuOeffnen(was) {
+  kp.neuIn = (kp.neuIn === was) ? '' : was;
+  leisteZeichnen();
+  var f = document.getElementById('neuName');
+  if (f && f.focus) { f.focus(); }
+}
+
+function neuWahl(feld, wert) {
+  if (feld === 'art' && (wert === 'projekt' || wert === 'ziel')) { kp.neuArt = wert; }
+  if (feld === 'kontext' && (wert === 'beruflich' || wert === 'privat')) { kp.neuKontext = wert; }
+  var f = document.getElementById('neuName');
+  var merk = f ? f.value : '';
+  leisteZeichnen();
+  f = document.getElementById('neuName');
+  if (f) { f.value = merk; if (f.focus) { f.focus(); } }
+}
+
+function anlegen() {
+  var f = document.getElementById('neuName');
+  var name = f ? String(f.value || '').trim() : '';
+  if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  if (kp.neuIn === 'vorhaben') {
+    var v = kpVorhabenAnlegen(kp.neuArt, name, kp.neuKontext);
+    kp.neuIn = '';
+    if (v) { oeffne('vorhaben', v.id, kp.neuArt); }
+    return;
+  }
+  if (kp.neuIn === 'liste') {
+    var g = kpListeAnlegen(name);
+    kp.neuIn = '';
+    if (g) { oeffne('liste', g.id); modusSetzen('schreiben'); }
+  }
+}
+
+function neuTaste(e) {
+  if (e.key === 'Enter') { e.preventDefault(); anlegen(); }
+  if (e.key === 'Escape') { kp.neuIn = ''; leisteZeichnen(); }
+}
+
+function naechsteWocheAufsetzen() {
+  var montag = tagePlus(kpHeuteMontag(), 7);
+  kpWocheAnlegen(montag);
+  oeffne('woche', kpWocheKennung(montag));
+  modusSetzen('schreiben');
+  melde('Nächste Woche aufgesetzt. Ab Montag ist sie „Diese Woche“, die laufende wandert ins Archiv.', 'gut');
+}
+
+function dieseWocheAufsetzen() {
+  var montag = kp.id ? kp.id.slice(3) : kpHeuteMontag();
+  kpWocheAnlegen(montag);
+  zeichne(true);
+  modusSetzen('schreiben');
+}
+
+/* ---------- Abschließen, Löschen, Rückgängig ---------- */
+
+function menueUm() { kp.menueAuf = !kp.menueAuf; seiteZeichnen(true); }
+
+function fragen(was) { kp.frage = was; kp.menueAuf = false; seiteZeichnen(true); }
+
+function frageWeg() { kp.frage = ''; seiteZeichnen(true); }
+
+function kpAbschliessen() {
+  var s = kpSeite();
+  if (s.art !== 'vorhaben' || !s.satz) { return; }
+  zurueckHolen = { art: 'status', satz: s.satz, status: s.satz.status || 'laufend' };
+  s.satz.status = 'abgeschlossen';
+  s.satz.geaendert = jetzt();
+  spaeterSichern();
+  var name = s.satz.name || 'ohne Namen';
+  kp.frage = '';
+  oeffne('woche', '');
+  melde('„' + name + '“ ' + (s.va === 'ziel' ? 'erreicht' : 'abgeschlossen') + ' — unter „Abgeschlossen“.', 'gut', true);
+}
+
+/* Löscht die offene Seite. Wie in der Workbench: Ein Vorhaben bekommt
+   einen Löschvermerk, Aufgaben und Abläufe verlieren nur ihre Zuordnung. */
+function kpLoeschen() {
+  var s = kpSeite();
+  if (!s.satz) { return; }
+  if (s.art === 'woche' && s.montag === kpHeuteMontag()) { return; }
+  var sammlungName, liste, name;
+  if (s.art === 'vorhaben') {
+    sammlungName = (s.va === 'ziel') ? 'ziele' : 'projekte';
+    name = s.satz.name || 'ohne Namen';
+  } else {
+    sammlungName = 'gedanken';
+    name = s.satz.titel || 'ohne Titel';
+  }
+  liste = DB[sammlungName];
+  var stelle = liste.indexOf(s.satz);
+  if (stelle < 0) { return; }
+  var geloest = [];
+  if (s.art === 'vorhaben') {
+    var feld = (s.va === 'ziel') ? 'zielId' : 'projektId';
+    [DB.aufgaben || [], DB.ablaeufe || [], DB.durchlaeufe || []].forEach(function (l) {
+      l.forEach(function (x) {
+        if (x[feld] === s.satz.id) { geloest.push({ satz: x, feld: feld }); x[feld] = null; x.geaendert = jetzt(); }
+      });
+    });
+  }
+  liste.splice(stelle, 1);
+  grabsteinSetzen(sammlungName, s.satz.id);
+  zurueckHolen = { art: 'loeschen', sammlung: sammlungName, satz: s.satz, stelle: stelle, geloest: geloest };
+  spaeterSichern();
+  kp.frage = '';
+  oeffne('woche', '');
+  melde('Gelöscht: ' + name, null, true);
+}
+
+function rueckgaengig() {
+  var z = zurueckHolen;
+  if (!z) { return; }
+  zurueckHolen = null;
+  if (z.art === 'status') {
+    z.satz.status = z.status;
+    z.satz.geaendert = jetzt();
+  } else if (z.art === 'loeschen') {
+    var liste = DB[z.sammlung];
+    liste.splice(Math.min(z.stelle, liste.length), 0, z.satz);
+    grabsteinWeg(z.sammlung, z.satz.id);
+    z.satz.geaendert = jetzt();
+    z.geloest.forEach(function (g) { g.satz[g.feld] = z.satz.id; g.satz.geaendert = jetzt(); });
+  }
+  spaeterSichern();
+  var t = document.getElementById('toast');
+  if (t) { t.className = 'toast'; }
+  if (z.satz.kompass === 'liste') { oeffne('liste', z.satz.id); }
+  else if (z.satz.kompass === 'woche') { oeffne('woche', z.satz.id); }
+  else { oeffne('vorhaben', z.satz.id, (z.sammlung === 'ziele' || (DB.ziele || []).indexOf(z.satz) >= 0) ? 'ziel' : 'projekt'); }
+}
+
+/* ---------- Editor: Schreiben ---------- */
+
+/* Ersetzt einen Bereich so, dass Strg+Z ihn zurückholt. */
+function feldErsetzen(feld, von, bis, neu) {
+  if (feld.focus) { feld.focus(); }
+  if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(von, bis); }
+  var gut = false;
+  try {
+    gut = !!(document.execCommand && document.execCommand('insertText', false, neu));
+  } catch (f) {
+    gut = false;
+  }
+  if (!gut || feld.value.slice(von, von + neu.length) !== neu) {
+    var t = String(feld.value || '');
+    feld.value = t.slice(0, von) + neu + t.slice(bis);
+    if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(von + neu.length, von + neu.length); }
+  }
+  kpTextSetzen(feld.value);
+}
+
+var KP_PRAEFIX = /^(\s*)(#{1,3}\s+|[-•*]\s+|\d{1,3}[.)]\s+|\[[ xX]?\]\s+)/;
+
+/* Überschrift, Aufzählung, Nummern: wirkt auf alle markierten Zeilen.
+   Tragen schon alle diese Art, wird sie entfernt. */
+function zeilenArt(art) {
+  var feld = document.getElementById('kpFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var a = text.lastIndexOf('\n', feld.selectionStart - 1) + 1;
+  var e = text.indexOf('\n', feld.selectionEnd);
+  if (e < 0) { e = text.length; }
+  var zeilen = text.slice(a, e).split('\n');
+  var muster = { h1: /^#\s/, h2: /^##\s/, punkt: /^[-•*]\s/, nummer: /^\d{1,3}[.)]\s/ }[art];
+  if (!muster) { return; }
+  var gefuellt = zeilen.filter(function (z) { return z.trim().length; });
+  var alleSchon = gefuellt.length > 0 && gefuellt.every(function (z) { return muster.test(z.replace(/^\s*/, '')); });
+  var n = 0;
+  var neu = zeilen.map(function (z) {
+    var einzug = (z.match(/^\s*/) || [''])[0];
+    var rest = z.slice(einzug.length).replace(KP_PRAEFIX, '');
+    if (alleSchon) { return einzug + rest; }
+    if (!z.trim().length && zeilen.length > 1) { return z; }
+    n++;
+    var vor = { h1: '# ', h2: '## ', punkt: '- ', nummer: n + '. ' }[art];
+    return einzug + vor + rest;
+  }).join('\n');
+  feldErsetzen(feld, a, e, neu);
+}
+
+/* Fett und Durchstreichen. Ohne Auswahl wirkt es auf die ganze Zeile —
+   ein Tipp auf „Durchstreichen“ hakt so eine Zeile ab. */
+function umschliessen(zeichen) {
+  var feld = document.getElementById('kpFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var von = feld.selectionStart;
+  var bis = feld.selectionEnd;
+  if (von === bis) {
+    var a = text.lastIndexOf('\n', von - 1) + 1;
+    var e = text.indexOf('\n', von);
+    if (e < 0) { e = text.length; }
+    var zeile = text.slice(a, e);
+    var p = (zeile.match(KP_PRAEFIX) || [''])[0];
+    von = a + p.length;
+    bis = e;
+    if (von >= bis) { return; }
+  }
+  var inhalt = text.slice(von, bis);
+  var z = zeichen.length;
+  var neu;
+  if (inhalt.length > 2 * z && inhalt.slice(0, z) === zeichen && inhalt.slice(-z) === zeichen) {
+    neu = inhalt.slice(z, -z);
+  } else if (text.slice(von - z, von) === zeichen && text.slice(bis, bis + z) === zeichen) {
+    von -= z;
+    bis += z;
+    neu = inhalt;
+  } else {
+    neu = zeichen + inhalt + zeichen;
+  }
+  feldErsetzen(feld, von, bis, neu);
+}
+
+function verweisEinfuegen() {
+  var feld = document.getElementById('kpFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var von = feld.selectionStart;
+  var bis = feld.selectionEnd;
+  var wort = text.slice(von, bis) || 'Text';
+  var neu = '[' + wort + '](https://)';
+  feldErsetzen(feld, von, bis, neu);
+  var stelle = von + wort.length + 3;
+  if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(stelle, stelle + 8); }
+}
+
+function trennerEinfuegen() {
+  var feld = document.getElementById('kpFeld');
+  if (!feld) { return; }
+  var text = String(feld.value || '');
+  var e = text.indexOf('\n', feld.selectionEnd);
+  if (e < 0) { e = text.length; }
+  feldErsetzen(feld, e, e, '\n---\n');
+}
+
+/* Enter in einer Liste setzt sie fort; ein leerer Punkt beendet sie. */
+function feldTaste(e) {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) { return; }
+  var feld = e.target;
+  if (feld.selectionStart !== feld.selectionEnd) { return; }
+  var text = String(feld.value || '');
+  var pos = feld.selectionStart;
+  var a = text.lastIndexOf('\n', pos - 1) + 1;
+  var zeile = text.slice(a, pos);
+  var m = zeile.match(/^(\s*)([-•*]|\d{1,3}[.)])(\s+)(.*)$/);
+  if (!m || text.slice(pos, (text.indexOf('\n', pos) < 0 ? text.length : text.indexOf('\n', pos))).trim()) { return; }
+  e.preventDefault();
+  if (!m[4].trim()) {
+    feldErsetzen(feld, a, pos, '');
+    return;
+  }
+  var zeichen = /^\d/.test(m[2]) ? ((parseInt(m[2], 10) + 1) + m[2].slice(-1)) : m[2];
+  feldErsetzen(feld, pos, pos, '\n' + m[1] + zeichen + ' ');
+}
+
+var KP_WERKZEUG = [
+  ['zeilenArt(\'h1\')', 'H1', 'Überschrift'],
+  ['zeilenArt(\'h2\')', 'H2', 'Abschnitt'],
+  ['zeilenArt(\'punkt\')', '•', 'Aufzählung'],
+  ['zeilenArt(\'nummer\')', '1.', 'Nummerierte Liste'],
+  '|',
+  ['umschliessen(\'**\')', '<b>B</b>', 'Fett'],
+  ['umschliessen(\'~~\')', '<s>S</s>', 'Durchstreichen — ohne Auswahl die ganze Zeile'],
+  '|',
+  ['verweisEinfuegen()', '🔗', 'Link'],
+  ['trennerEinfuegen()', '—', 'Trennlinie']
+];
+
+function werkzeugHtml() {
+  return '<div class="werkzeug" role="toolbar" aria-label="Werkzeuge">' + KP_WERKZEUG.map(function (w) {
+    if (w === '|') { return '<span class="teiler"></span>'; }
+    return '<button type="button" class="fk' + (/Durchstreichen/.test(w[2]) ? ' fk-durch' : '') + '" '
+         + 'onmousedown="event.preventDefault()" onclick="' + w[0] + '" title="' + w[2] + '" aria-label="' + w[2] + '">'
+         + w[1] + '</button>';
+  }).join('') + '</div>';
+}
+
+/* ---------- Ansicht: Markdown wie auf der Gedankenfläche ---------- */
+
+function kpInline(roh) {
+  var t = esc(roh);
+  t = t.replace(/\[([^\]]{1,200})\] ?\((https?:\/\/[^\s)]+)\)/g, function (_, wort, url) {
+    return '<a href="' + url + '" target="_blank" rel="noopener">' + wort + '</a>';
+  });
+  t = t.replace(/(^|\s)(https?:\/\/[^\s<]+)/g, function (_, vor, url) {
+    return vor + '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+  });
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  t = t.replace(/~~(.+?)~~/g, '<del>$1</del>');
+  t = t.replace(/\((bis [^)]{1,30})\)/g, '<span class="frist">$1</span>');
+  return t;
+}
+
+function kpPunktText(roh) {
+  var m = String(roh).match(/^\[([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß &\-]{0,24})\]:?\s+(.*)$/);
+  if (m) { return '<span class="kontext">' + esc(m[1]) + '</span>' + kpInline(m[2]); }
+  return kpInline(roh);
+}
+
+function kpTabelleHtml(zeilen) {
+  var reihen = zeilen.filter(function (z) { return !/^\|?\s*:?-{2,}/.test(z.replace(/\|/g, '|').trim().replace(/^\|/, '')); })
+    .map(function (z) { return z.trim().replace(/^\|/, '').replace(/\|$/, '').split('|'); });
+  if (!reihen.length) { return ''; }
+  var h = '<div class="tabelle"><table><tr>' + reihen[0].map(function (c) { return '<th>' + kpInline(c.trim()) + '</th>'; }).join('') + '</tr>';
+  reihen.slice(1).forEach(function (r) {
+    h += '<tr>' + r.map(function (c) { return '<td>' + kpInline(c.trim()) + '</td>'; }).join('') + '</tr>';
+  });
+  return h + '</table></div>';
+}
+
+function kpAnsichtHtml(text, istWoche) {
+  var zeilen = String(text || '').split('\n');
+  var h = '';
+  var nr = 0;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var z = zeilen[i];
+    var m;
+    if (/^\s*\|/.test(z)) {
+      var block = [];
+      while (i < zeilen.length && /^\s*\|/.test(zeilen[i])) { block.push(zeilen[i]); i++; }
+      i--;
+      h += kpTabelleHtml(block);
+      nr = 0;
+      continue;
+    }
+    var einzug = (z.match(/^\s*/) || [''])[0].length >= 2 ? ' ein' : '';
+    var rest = z.replace(/^\s+/, '');
+    if (!/^\d{1,3}[.)]\s/.test(rest)) { nr = 0; }
+    if ((m = rest.match(/^#\s+(.*)$/))) { h += '<h1>' + kpInline(m[1]) + '</h1>'; continue; }
+    if ((m = rest.match(/^##\s+(.*)$/))) {
+      var zaehler = '';
+      if (istWoche) {
+        var n = 0;
+        var k;
+        for (k = i + 1; k < zeilen.length && !/^\s*#{1,3}\s/.test(zeilen[k]); k++) {
+          if (/^\s*([-•*]|\d{1,3}[.)])\s+\S/.test(zeilen[k])) { n++; }
+        }
+        zaehler = '<span class="zaehler' + (n > 3 ? ' voll' : '') + '" title="Höchstens drei Zeilen">' + n + ' von 3</span>';
+      }
+      h += '<h2>' + kpInline(m[1]) + zaehler + '</h2>';
+      continue;
+    }
+    if ((m = rest.match(/^###\s+(.*)$/))) { h += '<h3>' + kpInline(m[1]) + '</h3>'; continue; }
+    if (/^(-{3,}|_{3,}|\*{3,})$/.test(rest.trim())) { h += '<hr>'; continue; }
+    if ((m = rest.match(/^(\d{1,3})[.)]\s+(.*)$/))) {
+      nr = nr ? nr + 1 : Number(m[1]);
+      if (!m[2].trim()) { continue; }
+      h += '<div class="z' + einzug + '"><span class="nr">' + nr + '.</span><span class="t">' + kpPunktText(m[2]) + '</span></div>';
+      continue;
+    }
+    if ((m = rest.match(/^\[([ xX]?)\]\s+(.*)$/))) {
+      var fertig = /x/i.test(m[1]);
+      h += '<div class="z' + einzug + '"><span class="pkt">•</span><span class="t">'
+         + (fertig ? '<del>' + kpInline(m[2]) + '</del>' : kpPunktText(m[2])) + '</span></div>';
+      continue;
+    }
+    if ((m = rest.match(/^[-•*]\s+(.*)$/))) {
+      if (!m[1].trim()) { continue; }
+      h += '<div class="z' + einzug + '"><span class="pkt">•</span><span class="t">' + kpPunktText(m[1]) + '</span></div>';
+      continue;
+    }
+    if (/^[-•*]$/.test(rest.trim())) { continue; }
+    h += rest.trim() ? '<p>' + kpInline(rest) + '</p>' : '<div class="leer"></div>';
+  }
+  return h;
+}
+
+/* ---------- Seitenleiste ---------- */
+
+function eintragHtml(an, aufruf, zeichen, name, extra, klasse) {
+  return '<button type="button" class="eintrag' + (an ? ' an' : '') + (klasse ? ' ' + klasse : '') + '" onclick="' + aufruf + '"'
+       + (an ? ' aria-current="page"' : '') + '>'
+       + '<span class="zeichen">' + zeichen + '</span><span class="name">' + esc(name) + '</span>' + (extra || '') + '</button>';
+}
+
+function neuFeldHtml() {
+  var h = '<div class="neu-feld"><input id="neuName" type="text" maxlength="200" '
+        + 'placeholder="' + (kp.neuIn === 'liste' ? 'Name der Liste' : 'Name des Vorhabens') + '" onkeydown="neuTaste(event)">'
+        + '<button type="button" class="pille" onclick="anlegen()">Anlegen</button></div>';
+  if (kp.neuIn === 'vorhaben') {
+    h += '<div class="wahlzeile">'
+       + '<span class="gruppe-knopf"><button type="button" class="' + (kp.neuArt === 'projekt' ? 'an' : '') + '" onclick="neuWahl(\'art\',\'projekt\')">Projekt</button>'
+       + '<button type="button" class="' + (kp.neuArt === 'ziel' ? 'an' : '') + '" onclick="neuWahl(\'art\',\'ziel\')">Ziel</button></span>'
+       + '<span class="gruppe-knopf"><button type="button" class="' + (kp.neuKontext === 'beruflich' ? 'an' : '') + '" onclick="neuWahl(\'kontext\',\'beruflich\')">Beruf</button>'
+       + '<button type="button" class="' + (kp.neuKontext === 'privat' ? 'an' : '') + '" onclick="neuWahl(\'kontext\',\'privat\')">Privat</button></span></div>';
+  }
+  return h;
+}
+
+function leisteZeichnen() {
+  var el = document.getElementById('leiste');
+  if (!el) { return; }
+  var heute = kpHeuteMontag();
+  var naechste = tagePlus(heute, 7);
+  var offenId = (kp.art === 'woche') ? (kp.id || kpWocheKennung(heute)) : kp.id;
+  var h = eintragHtml(kp.art === 'woche' && offenId === kpWocheKennung(heute), 'oeffne(\'woche\',\'\')',
+                      '<span class="stern">★</span>', 'Diese Woche', '<span class="marke-klein">KW ' + kalenderwoche(heute) + '</span>');
+  if (kpWocheFinden(naechste)) {
+    h += eintragHtml(kp.art === 'woche' && offenId === kpWocheKennung(naechste), 'oeffne(\'woche\',\'' + kpWocheKennung(naechste) + '\')',
+                     '→', 'Nächste Woche', '<span class="marke-klein">KW ' + kalenderwoche(naechste) + '</span>');
+  }
+
+  h += '<div class="gruppe"><span>Projekte</span><button type="button" class="plus" onclick="neuOeffnen(\'vorhaben\')" '
+     + 'title="Neues Projekt oder Ziel" aria-label="Neues Projekt oder Ziel" aria-expanded="' + (kp.neuIn === 'vorhaben') + '">+</button></div>';
+  if (kp.neuIn === 'vorhaben') { h += neuFeldHtml(); }
+  var alle = kpVorhaben();
+  var zk = function (x) { return x.art === 'ziel' ? '<span class="marke-klein" title="Ziel">Z</span>' : ''; };
+  var gruppe = function (status) { return alle.filter(function (x) { return (x.v.status || 'laufend') === status; }); };
+  var laufend = gruppe('laufend');
+  var ruhend = gruppe('ruht');
+  var fertig = gruppe('abgeschlossen');
+  var vhEintrag = function (x, zeichen, klasse) {
+    return eintragHtml(kp.art === 'vorhaben' && kp.id === x.v.id, 'oeffne(\'vorhaben\',\'' + esc(x.v.id) + '\',\'' + x.art + '\')',
+                       zeichen, x.v.name || 'ohne Namen', zk(x), klasse);
+  };
+  if (!alle.length) { h += '<div class="leer-hinweis">Noch keine Projekte. Mit + anlegen.</div>'; }
+  laufend.forEach(function (x) { h += vhEintrag(x, '●', ''); });
+  if (ruhend.length) {
+    h += '<div class="gruppe leise"><span>Ruhend</span></div>';
+    ruhend.forEach(function (x) { h += vhEintrag(x, '○', 'ruht'); });
+  }
+  if (fertig.length) {
+    var offenFertig = kp.fertigAuf || (kp.art === 'vorhaben' && fertig.some(function (x) { return x.v.id === kp.id; }));
+    h += '<button type="button" class="gruppe leise klapp" onclick="kp.fertigAuf=!kp.fertigAuf;leisteZeichnen()" aria-expanded="' + offenFertig + '">'
+       + '<span>' + (offenFertig ? '⌄ ' : '› ') + 'Abgeschlossen · ' + fertig.length + '</span></button>';
+    if (offenFertig) { fertig.forEach(function (x) { h += vhEintrag(x, '✓', 'ruht'); }); }
+  }
+
+  h += '<div class="gruppe"><span>Stille Listen</span><button type="button" class="plus" onclick="neuOeffnen(\'liste\')" '
+     + 'title="Neue Liste" aria-label="Neue Liste" aria-expanded="' + (kp.neuIn === 'liste') + '">+</button></div>';
+  if (kp.neuIn === 'liste') { h += neuFeldHtml(); }
+  var listen = kpListen();
+  listen.forEach(function (g) {
+    h += eintragHtml(kp.art === 'liste' && kp.id === g.id, 'oeffne(\'liste\',\'' + esc(g.id) + '\')', '≡', g.titel || 'ohne Titel', '', '');
+  });
+  if (!listen.length) {
+    h += '<div class="leer-hinweis">Noch keine Listen.<br><button type="button" class="pille klein" onclick="kpVorschlaegeAnlegen()">'
+       + 'Haus &amp; Werkstatt · Büro &amp; Admin · Routinen anlegen</button></div>';
+  }
+  el.innerHTML = h;
+  el.classList.toggle('auf', kp.leisteAuf);
+  var schleier = document.getElementById('schleier');
+  if (schleier) { schleier.classList.toggle('auf', kp.leisteAuf); }
+}
+
+function leisteUm() {
+  kp.leisteAuf = !kp.leisteAuf;
+  leisteZeichnen();
+}
+
+/* ---------- Seite ---------- */
+
+function mehrHtml(s) {
+  var kannLoeschen = (s.art !== 'woche') || (s.satz && s.montag !== kpHeuteMontag());
+  var kannAbschliessen = (s.art === 'vorhaben' && s.satz && s.satz.status !== 'abgeschlossen');
+  if (!kannLoeschen && !kannAbschliessen) { return ''; }
+  var h = '<span class="mehr-h"><button type="button" class="mehr" onclick="menueUm()" aria-label="Weitere Aktionen" '
+        + 'aria-expanded="' + kp.menueAuf + '">⋯</button>';
+  if (kp.menueAuf) {
+    h += '<span class="mehr-menue">';
+    if (kannAbschliessen) {
+      h += '<button type="button" onclick="fragen(\'abschliessen\')">' + (s.va === 'ziel' ? 'Als erreicht abschließen' : 'Abschließen')
+         + '<small>wandert unter „Abgeschlossen“, lässt sich zurückholen</small></button>';
+    }
+    if (kannLoeschen) { h += '<button type="button" class="weg" onclick="fragen(\'loeschen\')">Löschen …</button>'; }
+    h += '</span>';
+  }
+  return h + '</span>';
+}
+
+function frageHtml(s) {
+  var name = (s.art === 'vorhaben') ? (s.satz.name || 'ohne Namen') : (s.satz.titel || 'ohne Titel');
+  if (kp.frage === 'loeschen') {
+    var folge = (s.art === 'vorhaben')
+      ? 'Seite und ' + (s.va === 'ziel' ? 'Ziel' : 'Projekt') + ' sind weg — nutzt du die Workbench, auch dort; Aufgaben dort bleiben, ohne Zuordnung.'
+      : ((s.art === 'liste') ? 'Die Liste ist weg — nutzt du die Workbench, auch aus deren Gedanken.' : 'Die Wochenseite ist weg.');
+    return '<div class="frage" role="alertdialog"><p><b>„' + esc(name) + '“ löschen?</b> ' + folge + '</p><div class="knoepfe">'
+         + '<button type="button" class="pille weg" onclick="kpLoeschen()">Löschen</button>'
+         + ((s.art === 'vorhaben' && s.satz.status !== 'abgeschlossen') ? '<button type="button" class="pille" onclick="fragen(\'abschliessen\')">Lieber abschließen</button>' : '')
+         + '<button type="button" class="pille" onclick="frageWeg()">Abbrechen</button></div></div>';
+  }
+  if (kp.frage === 'abschliessen') {
+    return '<div class="frage" role="alertdialog"><p><b>„' + esc(name) + '“ ' + (s.va === 'ziel' ? 'als erreicht abschließen' : 'abschließen') + '?</b> '
+         + 'Es wandert unter „Abgeschlossen“ und lässt sich dort jederzeit wieder auf aktiv stellen.</p><div class="knoepfe">'
+         + '<button type="button" class="pille voll" onclick="kpAbschliessen()">Abschließen</button>'
+         + '<button type="button" class="pille" onclick="frageWeg()">Abbrechen</button></div></div>';
+  }
+  return '';
+}
+
+function modusKnoepfe() {
+  return '<span class="umschalter" role="group" aria-label="Ansicht oder Schreiben">'
+       + '<button type="button" class="' + (kp.modus === 'ansicht' ? 'an' : '') + '" onclick="modusSetzen(\'ansicht\')">Ansicht</button>'
+       + '<button type="button" class="' + (kp.modus === 'schreiben' ? 'an' : '') + '" onclick="modusSetzen(\'schreiben\')">Schreiben</button></span>';
+}
+
+function eigenschaftenHtml(s) {
+  var v = s.satz;
+  var istZiel = (s.va === 'ziel');
+  var termin = istZiel ? (v.zieltermin || '') : (v.ende || '');
+  var st = v.status || 'laufend';
+  return '<div class="eigen">' + (istZiel ? 'Ziel' : 'Projekt')
+    + '<span class="gruppe-knopf"><button type="button" class="' + (v.kontext === 'beruflich' ? 'an' : '') + '" onclick="kpFeld(\'kontext\',\'beruflich\')">Beruf</button>'
+    + '<button type="button" class="' + (v.kontext !== 'beruflich' ? 'an' : '') + '" onclick="kpFeld(\'kontext\',\'privat\')">Privat</button></span>'
+    + '<label>' + (istZiel ? 'Zieltermin' : 'bis') + ' <input type="date" value="' + esc(termin) + '" onchange="kpFeld(\'termin\',this.value)"></label>'
+    + '<span class="gruppe-knopf"><button type="button" class="' + (st === 'laufend' ? 'an' : '') + '" onclick="kpFeld(\'status\',\'laufend\')">aktiv</button>'
+    + '<button type="button" class="' + (st === 'ruht' ? 'an' : '') + '" onclick="kpFeld(\'status\',\'ruht\')">ruhend</button>'
+    + '<button type="button" class="' + (st === 'abgeschlossen' ? 'an' : '') + '" onclick="kpFeld(\'status\',\'abgeschlossen\')">' + (istZiel ? 'erreicht' : 'abgeschlossen') + '</button></span>'
+    + '</div>';
+}
+
+function archivHtml(montagOffen) {
+  var heute = kpHeuteMontag();
+  var alte = kpWochen().filter(function (g) { return g.woche < heute; });
+  if (!alte.length && montagOffen === heute) { return ''; }
+  if (!alte.length) {
+    return '<div class="archiv"><button type="button" onclick="oeffne(\'woche\',\'\')">← zurück zu dieser Woche</button></div>';
+  }
+  var h = '<details class="archiv"' + (montagOffen < heute ? ' open' : '') + '><summary>Frühere Wochen · ' + alte.length + '</summary>';
+  if (montagOffen !== heute) { h += '<button type="button" onclick="oeffne(\'woche\',\'\')">← zurück zu dieser Woche</button>'; }
+  alte.forEach(function (g) {
+    h += '<button type="button" class="' + (g.woche === montagOffen ? 'an' : '') + '" onclick="oeffne(\'woche\',\'' + esc(g.id) + '\')">'
+       + esc(kpWochenTitel(g.woche)) + '</button>';
+  });
+  return h + '</details>';
+}
+
+/* zeichnen: Ein offenes Schreibfeld wird nicht überschrieben, solange
+   darin getippt wird — es sei denn, es ist ausdrücklich verlangt. */
+function seiteZeichnen(erzwingen) {
+  var el = document.getElementById('seite');
+  if (!el) { return; }
+  var aktiv = document.activeElement;
+  if (!erzwingen && aktiv && (aktiv.id === 'kpFeld' || aktiv.id === 'kpTitel')) { return; }
+  if (kp.art === 'einst') { el.innerHTML = einstHtml(); return; }
+  var s = kpSeite();
+  var h = '';
+
+  if (s.art === 'woche') {
+    var heute = kpHeuteMontag();
+    var istJetzt = (s.montag === heute);
+    var istNaechste = (s.montag === tagePlus(heute, 7));
+    h += '<div class="seitenkopf"><h1>' + (istJetzt ? '★ Diese Woche' : (istNaechste ? '→ Nächste Woche' : 'Frühere Woche'))
+       + '<span class="unter">' + esc(kpWochenTitel(s.montag)) + '</span></h1>';
+    if (istJetzt && !kpWocheFinden(tagePlus(heute, 7))) {
+      h += '<button type="button" class="pille" onclick="naechsteWocheAufsetzen()">Nächste Woche aufsetzen</button>';
+    }
+    if (s.satz) { h += modusKnoepfe() + mehrHtml(s); }
+    h += '</div>';
+    if (s.satz && kp.frage) { h += frageHtml(s); }
+    if (!s.satz) {
+      h += '<div class="blatt leer-blatt"><p>Diese Woche ist noch nicht aufgesetzt.</p>'
+         + '<button type="button" class="pille voll" onclick="dieseWocheAufsetzen()">Woche aufsetzen</button>'
+         + '<p class="klein">Mit Gerüst: „Was diese Woche Substanz schafft“ und „Verbindlichkeiten“ — je höchstens drei Zeilen.</p></div>';
+    } else {
+      h += blattHtml(s, true);
+      h += '<div class="hinweis"><b>Regel:</b> je höchstens drei Zeilen, keine Unteraufgaben. Erledigtes durchstreichen.</div>';
+    }
+    h += archivHtml(s.montag);
+    el.innerHTML = h;
+    return;
+  }
+
+  if (!s.satz) {
+    el.innerHTML = '<div class="blatt leer-blatt"><p>Diese Seite gibt es nicht mehr.</p>'
+                 + '<button type="button" class="pille" onclick="oeffne(\'woche\',\'\')">Zur Woche</button></div>';
+    return;
+  }
+  var name = (s.art === 'vorhaben') ? (s.satz.name || '') : (s.satz.titel || '');
+  h += '<div class="seitenkopf"><input id="kpTitel" class="titelfeld" type="text" maxlength="200" value="' + esc(name) + '" '
+     + 'aria-label="Name" onchange="kpTitelSetzen(this.value)" onkeydown="if(event.key===\'Enter\'){this.blur();}">'
+     + modusKnoepfe() + mehrHtml(s) + '</div>';
+  if (s.art === 'vorhaben') { h += eigenschaftenHtml(s); }
+  else { h += '<div class="eigen">Stille Liste</div>'; }
+  if (kp.frage) { h += frageHtml(s); }
+  if (s.art === 'vorhaben' && !kpText(s).trim() && kp.modus === 'ansicht') {
+    h += '<div class="blatt leer-blatt"><p>Diese Seite ist noch leer.</p>'
+       + '<button type="button" class="pille" onclick="geruestEinfuegen()">Gerüst einfügen: Phase · Etappen · Eckdaten · Kontakte · Notizen</button></div>';
+  } else {
+    h += blattHtml(s, false);
+  }
+  h += '<div class="hinweis">' + ((s.art === 'vorhaben')
+       ? 'Nutzt du auch die Workbench, steht diese Seite dort als Gedanken des Vorhabens.'
+       : 'Nutzt du auch die Workbench, steht diese Liste dort unter Gedanken.') + '</div>';
+  el.innerHTML = h;
+}
+
+function blattHtml(s, istWoche) {
+  if (kp.modus === 'schreiben') {
+    return werkzeugHtml()
+         + '<textarea id="kpFeld" class="feld" spellcheck="true" aria-label="Seite schreiben" '
+         + 'oninput="kpTextSetzen(this.value)" onkeydown="feldTaste(event)">' + esc(kpText(s)) + '</textarea>';
+  }
+  var text = kpText(s);
+  if (!text.trim()) {
+    return '<div class="blatt leer-blatt"><p>Noch leer. „Schreiben“ füllt die Seite.</p></div>';
+  }
+  return '<div class="blatt">' + kpAnsichtHtml(text, istWoche) + '</div>';
+}
+
+function geruestEinfuegen() {
+  var s = kpSeite();
+  if (s.art !== 'vorhaben' || !s.satz) { return; }
+  if (!String(s.satz.flaeche || '').trim()) {
+    s.satz.flaeche = KP_GERUEST_PROJEKT;
+    s.satz.geaendert = jetzt();
+    spaeterSichern();
+  }
+  modusSetzen('schreiben');
+}
+
+/* ---------- Einstellungen ---------- */
+
+function einstHtml() {
+  var angemeldet = tokenGueltig();
+  return '<div class="einst"><div class="seitenkopf"><h1>Einstellungen'
+    + '<span class="unter">Der Wochenkompass arbeitet allein — die Workbench ist nicht nötig.</span></h1>'
+    + '<button type="button" class="pille" onclick="oeffne(\'woche\',\'\')">Zurück</button></div>'
+    + '<section class="karte"><h3>Speicher</h3>'
+    + '<div class="reihe"><span>Gespeichert über</span><span>' + esc(wegText(speicherWeg)) + '</span></div>'
+    + (dateiName ? '<div class="reihe"><span>Datei</span><span>' + esc(dateiName) + '</span></div>' : '')
+    + '<div class="reihe"><span>Zuletzt gespeichert</span><span>' + esc(letzterSchreibvorgang || '—') + '</span></div>'
+    + '<div class="knoepfe">'
+    + (fsApiDa() ? '<button type="button" class="pille" onclick="dateiWaehlen()">Datei öffnen …</button>'
+                 + '<button type="button" class="pille" onclick="dateiAnlegen()">Neue Datei anlegen …</button>' : '')
+    + '<button type="button" class="pille" onclick="sicherungLaden()">Sicherung herunterladen</button></div>'
+    + '<p>Ohne Datei speichert der Wochenkompass im geräteeigenen Speicher. Eine Datei heißt wie bei der Workbench '
+    + DATEINAME + ' — beide Apps können sie lesen.</p></section>'
+    + '<section class="karte"><h3>Google Drive</h3>'
+    + '<div class="reihe"><span>Anmeldung</span><span class="' + (angemeldet ? 'gut' : 'warn') + '">'
+    + (angemeldet ? 'angemeldet · noch ' + restMinuten() + ' Min.' : (warAngemeldet() ? 'abgelaufen' : 'nicht angemeldet')) + '</span></div>'
+    + '<div class="reihe"><span>Letzter Abgleich</span><span>' + esc(letzterAbgleich || '—') + '</span></div>'
+    + '<div class="reihe"><span>Ergebnis</span><span>' + esc(berichtText(letzterBericht)) + '</span></div>'
+    + (abgleichFehler ? '<div class="reihe"><span>Letzter Fehler</span><span class="warn">' + esc(abgleichFehler) + '</span></div>' : '')
+    + '<div class="knoepfe">'
+    + '<button type="button" class="pille' + (angemeldet ? '' : ' voll') + '" onclick="anmelden(false)">Anmelden</button>'
+    + '<button type="button" class="pille" onclick="abgleichenJetzt()"' + (angemeldet ? '' : ' disabled') + '>Jetzt abgleichen</button>'
+    + '<button type="button" class="pille" onclick="abmelden()"' + (angemeldet ? '' : ' disabled') + '>Abmelden</button></div>'
+    + '<p>Gibt es in deinem Drive noch keine ' + DRIVE_DATEI + ', legt der Wochenkompass sie an. '
+    + 'Nutzt du auch die Workbench, teilen sich beide diese Datei.</p></section>'
+    + '<section class="karte"><h3>Über</h3><div class="reihe"><span>Version</span><span>Wochenkompass ' + APP_VERSION + '</span></div></section>'
+    + '</div>';
+}
+
+function sicherungLaden() {
+  var name = 'wochenkompass-sicherung-' + isoDatum() + '.json';
+  if (dateiAnbieten(name, alsText())) { melde('Sicherung bereitgestellt: ' + name, 'gut'); }
+  else { melde('Die Sicherung ließ sich nicht bereitstellen.', 'warn'); }
+}
+
+/* ---------- Stand und Rückmeldungen ---------- */
+
+var toastZeit = 0;
+
+function melde(text, art, mitRueckgaengig) {
+  var t = document.getElementById('toast');
+  var tt = document.getElementById('toastText');
+  var tr = document.getElementById('toastRueck');
+  if (!t || !tt) { return; }
+  tt.textContent = String(text || '');
+  if (tr) { tr.style.display = mitRueckgaengig ? '' : 'none'; }
+  t.className = 'toast auf' + (art ? ' ' + art : '');
+  if (toastZeit) { window.clearTimeout(toastZeit); }
+  toastZeit = window.setTimeout(function () {
+    var el = document.getElementById('toast');
+    if (el) { el.className = 'toast'; }
+    toastZeit = 0;
+  }, mitRueckgaengig ? 9000 : ((art === 'warn') ? 7000 : 4000));
+}
+
+function standText() {
+  if (!tokenGueltig()) {
+    return warAngemeldet() ? { text: 'Anmeldung abgelaufen — neu anmelden', warn: true }
+                           : { text: 'nur auf diesem Gerät', warn: false };
+  }
+  if (abgleichFehler) { return { text: 'Abgleich fehlgeschlagen', warn: true }; }
+  if (verbindungOk === false) { return { text: 'keine Verbindung — lokal gespeichert', warn: true }; }
+  if (abgleichLaeuft) { return { text: 'gleicht ab …', warn: false }; }
+  if (letzterAbgleich) { return { text: DRIVE_DATEI + ' · abgeglichen ' + letzterAbgleich.slice(11, 16), warn: false }; }
+  return { text: 'angemeldet', warn: false };
+}
+
+function standZeichnen() {
+  var el = document.getElementById('standPille');
+  if (!el) { return; }
+  var s = standText();
+  el.textContent = s.text;
+  el.className = 'stand' + (s.warn ? ' warn' : '');
+}
+
+/* Die Workbench-Funktionen rufen diesen Namen — hier ist es die Pille. */
+function anmeldeStreifenPruefen() { standZeichnen(); }
+
+function standGeklickt() {
+  if (!tokenGueltig()) { anmelden(false); return; }
+  abgleichenJetzt();
+}
+
+function zeichne(erzwingen) {
+  leisteZeichnen();
+  seiteZeichnen(erzwingen === true);
+  standZeichnen();
+  document.title = 'Wochenkompass ' + APP_VERSION;
+}
+
+/* ---------- Speichern und Abgleich ---------- */
+
+function spaeterSichern() {
+  if (speicherUhr) { window.clearTimeout(speicherUhr); }
+  lokalOffen = true;
+  speicherUhr = window.setTimeout(function () {
+    speicherUhr = null;
+    speichern().then(function () {
+      standZeichnen();
+      abgleichPlanen(false);
+    }).catch(function () { return null; });
+  }, 1500);
+}
+
+/* Wie in der Workbench — nur ohne deren Termine und Wochenumstellung. */
+function abgleichStill() {
+  abgleichUhr = null;
+  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  abgleichLaeuft = true;
+  standZeichnen();
+  abgleichen().then(function (b) {
+    abgleichZuletztMs = Date.now();
+    abgleichFehler = '';
+    lokalOffen = false;
+    verbindungOk = true;
+    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); }
+    abgleichLaeuft = false;
+    zeichne();
+  }).catch(function (f) {
+    abgleichFehler = f ? f.message : 'unbekannter Fehler';
+    abgleichLaeuft = false;
+    standZeichnen();
+  });
+}
+
+function verbindungPruefen() {
+  if (!tokenGueltig()) { verbindungOk = false; standZeichnen(); return; }
+  window.fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: driveKopf() })
+    .then(function (a) {
+      if (a.ok) { verbindungOk = true; }
+      else if (a.status === 401 || a.status === 403) { tokenVergessen(); verbindungOk = false; }
+      standZeichnen();
+    }).catch(function () {
+      verbindungOk = false;
+      standZeichnen();
+    });
+}
+
+function rueckkehrPruefen() {
+  erneuerungPruefen();
+  if (document.hidden) { return; }
+  zeichne();
+  if (!tokenGueltig()) { return; }
+  if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
+  abgleichPlanen(true);
+}
+
+/* Nach abgelaufener Anmeldung erneuert der nächste Klick still — einmal. */
+function klickErneuern() {
+  if (tokenGueltig() || klickVersucht || anmeldungLaeuft || !warAngemeldet()) { return; }
+  klickVersucht = true;
+  anmelden(true).then(function (gut) { if (gut) { klickVersucht = false; } });
+}
+
+/* ---------- Start ---------- */
+
+function breiteSetzen() {
+  document.body.classList.toggle('breit', (window.innerWidth || 0) >= 900);
+}
+
+function swAnmelden() {
+  if (!navigator.serviceWorker || typeof navigator.serviceWorker.register !== 'function') { return; }
+  if (!/^https?:/.test(String(window.location && window.location.protocol))) { return; }
+  /* Eigener Bereich: Der Service Worker der Workbench (Bereich ./)
+     bleibt unberührt. */
+  navigator.serviceWorker.register('./sw-wochenkompass.js', { scope: './wochenkompass' })
+    .catch(function () { return null; });
+}
+
+function start() {
+  breiteSetzen();
+  window.addEventListener('resize', breiteSetzen);
+  tokenAusSitzung();
+  var los = idbDa()
+    ? idbLesen(IDB_KEY).then(function (h) { if (h) { dateiHandle = h; dateiName = h.name || ''; } }).catch(function () { return null; })
+    : Promise.resolve(null);
+  los.then(function () { return laden(); }).then(function () {
+    zeichne(true);
+    if (tokenGueltig()) { abgleichPlanen(true); verbindungPruefen(); }
+    taktStarten();
+    verbindungTaktStarten();
+  }).catch(function (f) {
+    melde('Laden fehlgeschlagen: ' + (f ? f.message : ''), 'warn');
+    zeichne(true);
+  });
+  document.addEventListener('visibilitychange', rueckkehrPruefen);
+  document.addEventListener('click', klickErneuern, true);
+  swAnmelden();
+}
+
+window.addEventListener('DOMContentLoaded', start);
+
+</script>
+</body>
+</html>
