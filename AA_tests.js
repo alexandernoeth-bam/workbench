@@ -1498,7 +1498,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB.aufgaben.push({ id: "a1", titel: "Anmelden", kontext: "privat", projektId: "h1", planung: "backlog", art: "haupt", status: "offen", geaendert: 1 });'
                  + '   var k1 = projektKarteHtml(DB.projekte[0]), k2 = projektKarteHtml(DB.projekte[1]);'
                  + '   r.keineKnoepfe = !/vk-knoepfe/.test(k1) && !/flaecheOeffnen/.test(k1) && !/>Tätigkeiten/.test(k1);'
-                 + '   r.schilder = /<span class="ab-marke">1 Tätigkeit<\\/span><span class="ab-marke">Gedanken<\\/span>/.test(k1);'
+                 + '   r.schilder = /<span class="ab-marke">1 Tätigkeit<\\/span><span class="ab-marke">Notizen<\\/span>/.test(k1);'
                  + '   r.leer = !/vk-schilder/.test(k2);'
                  + '   r.oeffnet = /onclick="taetigOeffnen\\(.projekt.,.h1.\\)"/.test(k1);'
                  + '   DB = alt;'
@@ -1590,7 +1590,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + `globalThis.__dieseWocheApi = {
  pruefe: function(){
    var r = {}; var alt = DB; var merkT = tagOffen; var merkF = tagFilter;
-   DB = leereDatenbank(); tagFilter = 'alle';
+   DB = leereDatenbank(); tagFilter = 'alle'; tagKleinAuf = true;
    var heute = isoDatum(); var mo = montagVon(heute); var fr = tagePlus(mo, 4);
    function neu(id, t, f, pl, art){ DB.aufgaben.push({ id: id, titel: t, kontext: 'beruflich', frist: f || '', planung: pl || '', art: art || 'haupt', status: 'offen', erledigtAm: null, wiederholung: null, uhrzeit: '', geaendert: 1 }); }
    neu('a1', 'Agenda entwerfen', '', heute);
@@ -1647,6 +1647,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
    f.wochen = [{ id: 'kw-' + mo, montag: mo, ziele: [{ id: 'x', text: 'neu', erreicht: true, aufgaben: [] }], verbindlich: [], geaendert: 20 }];
    var m = zusammenfuehren(l, f).db;
    r.abgleich = m.wochen.length === 1 && m.wochen[0].ziele[0].text === 'neu';
+   tagKleinAuf = false;
+   tagZeichnen(); r.kleinZu = !/Folien drucken|Wochenkleinigkeit/.test(karte('Kleinigkeiten')) && /tk-klappe/.test(karte('Kleinigkeiten'));
    DB = alt; tagOffen = merkT; tagFilter = merkF;
    return r;
  } };`
@@ -1800,7 +1802,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     start:{ dateTime: h + \'T09:00:00\' + zo },'
                  + '     end:{ dateTime: h + \'T10:00:00\' + zo } }], \'Alex\','
                  + '     \'beruflich\');'
-                 + '   tagOffen = h; tagZeichnen();'
+                 + '   tagKleinAuf = true; tagOffen = h; tagZeichnen();'
                  + '   var rechts = document.getElementById(\'tagBlatt\').innerHTML;'
                  + '   var teile = rechts.split(\'tabschnitt-titel\').slice(1);'
                  + '   var kachel = function(name){'
@@ -1817,7 +1819,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.hakenWirkt = /tzeile tm-z erledigt/.test('
                  + '     document.getElementById(\'tagBlatt\').innerHTML);'
                  + '   termineNachTag = {}; kalenderListe = [];'
-                 + '   tagOffen = merkTag; DB = alt;'
+                 + '   tagKleinAuf = false; tagOffen = merkTag; DB = alt;'
                  + '   return r;'
                  + ' } };'
                  + 'globalThis.__auswahlApi = {'
@@ -6292,7 +6294,6 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
                   'dKontext', 'dArt', 'dThema', 'dVorhaben', 'dFrist', 'dPlanung',
                   'dZeit', 'dBeschreibung', 'dWdh', 'dWdhIntervall', 'dWdhTag',
                   'dWdhMonatstag', 'themaNeuZeigen', 'themaAnlegen',
-                  'teilenZeigen', 'teilenTippen', 'teilenUebernehmen',
                   'themaKontext', 'projektKontext'];
   noetig.forEach(function (f) {
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
@@ -6362,12 +6363,9 @@ console.log('\n22. Aufgabenfläche und Detailfläche');
   pruefe(wdhTag && /tage\.length === 0/.test(wdhTag[0]) && /wiederholung = null/.test(wdhTag[0]),
          'der letzte abgewählte Wochentag schaltet die Regel ab');
 
-  /* Aufteilen hinterlässt einen Löschvermerk */
-  const teilen = skript.match(/function teilenUebernehmen\([\s\S]*?\n\}/);
-  pruefe(teilen && /grabsteinSetzen\('aufgaben'/.test(teilen[0]),
-         'beim Aufteilen bekommt die ursprüngliche Aufgabe einen Löschvermerk');
-  pruefe(teilen && /vorlage\.kontext/.test(teilen[0]),
-         'die neuen Aufgaben erben den Kontext');
+  /* Seit v5.24.0 gibt es kein Aufteilen mehr. */
+  pruefe(!/function teilen(Zeigen|Tippen|Uebernehmen)\(/.test(skript) && !/\bTEILE\b/.test(skript),
+         'Aufteilen ist ganz entfernt — samt seiner Felder');
 
   /* Erledigtes verschwindet aus der Liste */
   const zeichnen = skript.match(/function aufZeichnen\([\s\S]*?\n\}\n/);
@@ -11141,7 +11139,7 @@ console.log('\n94. Pinnwand');
 
   /* Der Knopf in allen fünf Blättern */
   const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
-  pruefe(dh && /pinKnopfHtml\('aufgabe'/.test(dh[0]), 'im Blatt einer Aufgabe');
+  pruefe(dh && !/pinKnopfHtml\('aufgabe'/.test(dh[0]), 'im Blatt einer Aufgabe nicht mehr (seit v5.24.0)');
   const ah = skript.match(/function abhakHtml\([\s\S]*?\n\}\n/);
   pruefe(ah && /pinKnopfHtml\('durchlauf'/.test(ah[0]), 'im Abhakblatt eines Ablaufs');
   const ad = [abSeiteQuelle()];
@@ -12156,10 +12154,11 @@ console.log('\n113. Vorgänge');
            'Funktion ' + f + ' ist definiert');
   });
   const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
-  pruefe(dh && /vorgangAusAufgabe\(\)/.test(dh[0]),
-         'der Einstieg steht im Aufgabenblatt');
-  pruefe(dh && /if \(!a\.wiederholung\) \{/.test(dh[0]),
-         'aber nicht bei einer wiederkehrenden Aufgabe');
+  /* Seit v5.24.0 bleibt im Aufgabenblatt unten nur „Löschen". */
+  pruefe(dh && !/vorgangAusAufgabe\(\)/.test(dh[0]),
+         'das Aufgabenblatt bietet keinen Vorgang mehr an');
+  pruefe(dh && /aufgabeLoeschen\(\)/.test(dh[0]) && !/aufgabeSchieben\(|aufgabeInsBacklog\(|teilenZeigen\(/.test(dh[0]),
+         'unten steht nur noch „Löschen“');
   const ad = [abSeiteQuelle()];
   pruefe(ad && /vorgangErgebnisSetzen/.test(ad[0])
          && /flaecheOeffnen\(\\?'d:/.test(ad[0]),
@@ -13811,8 +13810,8 @@ console.log('\n144. Notizseiten: Nachbesserungen');
     pruefe(e.pinTot === true, 'ein Zettel zu einem verschwundenen Notizbuch gilt als tot');
   }
   {
-    const zettel = skript.match(/var artName = \(p\.art === 'flaeche' && istNotizseite\(p\.zielId\)\) \? 'Notizseite'/);
-    pruefe(!!zettel, 'der Zettel einer Notizseite heißt „Notizseite“, nicht „Gedanken“');
+    const zettel = skript.match(/var artName = \(p\.art === 'flaeche' && istNotizseite\(p\.zielId\)\) \? 'Seite'/);
+    pruefe(!!zettel, 'der Zettel einer Seite im Notizbuch heißt „Seite“, nicht „Notiz“');
     const modus = skript.match(/function flaecheModusSetzen\([\s\S]*?\n\}/);
     pruefe(modus && /m === 'ansicht' && istNotizseite\(flaecheFuer\)[\s\S]*?scrollTop = 0/.test(modus[0]),
            'zurück in der Ansicht beginnt eine Notizseite wieder oben');
@@ -14914,7 +14913,7 @@ console.log('\n177. Vorhabenkarten ohne Knöpfe');
   else { try { e = t.pruefe(); } catch (x) { fail('Karten laufen nicht: ' + x.message); } }
   if (e) {
     pruefe(e.keineKnoepfe === true, 'die Karte hat keine Knöpfe mehr');
-    pruefe(e.schilder === true, 'Tätigkeiten und Gedanken stehen als Schild');
+    pruefe(e.schilder === true, 'Tätigkeiten und Notizen stehen als Schild');
     pruefe(e.leer === true, 'ohne beides keine leere Schilderzeile');
     pruefe(e.oeffnet === true, 'die Karte öffnet die Seite');
   }
@@ -15103,6 +15102,7 @@ console.log('\n185. Tag mit Woche');
     pruefe(e.frei === true, 'freie Zeit ab einer Stunde steht als leise Zeile darin');
     pruefe(e.zielWeg === true, 'ein gelöschtes Ziel lässt seine Aufgaben stehen');
     pruefe(e.abgleich === true, 'der Abgleich führt die Woche nach Stempel zusammen');
+    pruefe(e.kleinZu === true, 'die Kleinigkeiten stehen eingeklappt, der Kopf klappt auf');
   }
 }
 
@@ -15122,6 +15122,33 @@ console.log('\n186. Ohne Tageswechsel und Planknopf');
   pruefe(nz && !/tagwFaellig|Tageswechsel'|nz-wort/.test(nz[0]), 'der Streifen bietet keinen Tageswechsel mehr an');
   const ks = skript.match(/function tagKopfSchmalZeichnen\([\s\S]*?\n\}\n/);
   pruefe(ks && /datum\.onclick = tagHeute;/.test(ks[0]), 'am Pixel führt das Datum zu heute');
+}
+
+/* ============================================================
+   187. Notizen, Seiten, schlankes Aufgabenblatt (v5.24.0)
+   Gedanken heißen sichtbar „Notizen“, Notizseiten „Seiten“; das
+   Aufgabenblatt hat unten nur „Löschen“; die Kleinigkeiten im Tag
+   stehen eingeklappt.
+   ============================================================ */
+console.log('\n187. Notizen, Seiten, schlankes Aufgabenblatt');
+{
+  const skript = hauptSkript();
+  const sichtbar = [];
+  const re = /'(?:[^'\\\n]|\\.)*'/g;
+  let m;
+  while ((m = re.exec(skript)) !== null) {
+    if (/Gedanke|Notizseite/.test(m[0]) && !/^'[A-Za-z]*'$/.test(m[0]) && !/onclick=|oninput=|zeigeSchirm|istNotizseite/.test(m[0])) { sichtbar.push(m[0]); }
+  }
+  pruefe(sichtbar.length === 0, 'kein sichtbarer Text sagt mehr „Gedanken“ oder „Notizseite“'
+         + (sichtbar.length ? ' — noch: ' + sichtbar.slice(0, 3).join(' | ') : ''));
+  pruefe(/onclick="zeigeSchirm\('Gedanken'\)">Notizen<\/button>/.test(QUELLE), 'der Reiter im Vorhaben heißt „Notizen“');
+  pruefe(/SAMMLUNGEN = \[[^\]]*'gedanken'/.test(skript), 'die Daten heißen weiter „gedanken“ — der Abgleich bleibt verträglich');
+  const dh = skript.match(/function detailHtml\([\s\S]*?\n\}\n/);
+  pruefe(dh && (dh[0].match(/<button type="button"[^>]*onclick="(aufgabeSchieben|aufgabeInsBacklog|vorgangAusAufgabe|teilenZeigen)/g) || []).length === 0,
+         'im Aufgabenblatt kein Verschieben, Backlog, Vorgang oder Aufteilen');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(/var tagKleinAuf = false;/.test(skript) && tz && /tagKleinAuf \? kleinTeil : ''/.test(tz[0]),
+         'die Kleinigkeiten im Tag beginnen eingeklappt');
 }
 
 /* ============================================================

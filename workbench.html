@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 5.23.0</title>
+<title>Workbench 5.24.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2761,7 +2761,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
       <button type="button" id="vhStufeEinfaelle"
               onclick="setVhStufe('einfaelle')">Einfälle</button>
       <button type="button" id="vhStufeGedanken"
-              onclick="zeigeSchirm('Gedanken')">Gedanken</button>
+              onclick="zeigeSchirm('Gedanken')">Notizen</button>
     </div>
     <div class="knopfreihe" style="margin-top:9px" id="vhRueckblickReihe">
       <button type="button" onclick="rueckblickOeffnen()">Wochenrückblick</button>
@@ -2895,7 +2895,7 @@ body.breit .schirm{padding-left:32px;padding-right:32px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '5.23.0';
+var APP_VERSION = '5.24.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8173,6 +8173,14 @@ function badgeTaktStarten() {
   badgeUhr = window.setInterval(badgeSetzen, BADGE_TAKT);
 }
 
+/* Die Kleinigkeiten im Tag stehen eingeklappt — bei jedem Start neu. */
+var tagKleinAuf = false;
+
+function tagKleinUm() {
+  tagKleinAuf = !tagKleinAuf;
+  tagZeichnen();
+}
+
 function tagZeichnen() {
   if (!tagOffen) { tagOffen = isoDatum(); }
   var is = tagOffen;
@@ -8258,7 +8266,16 @@ function tagZeichnen() {
      Liegengebliebenes in den Köpfen. */
   var terminKarte = tagBlockHtml('Termine heute', termin, '');
   var verbKarte = tagBlockHtml('Verbindlichkeiten heute', verb, '');
-  var kleinKarte = kleinTeil ? tagBlockHtml('Kleinigkeiten', kleinTeil, '') : '';
+  /* Seit v5.24.0 eingeklappt: Der Kopf sagt, wie viele offen sind, ein
+     Tipp klappt auf. */
+  var kleinOffen = klein.length + kleinWoche.filter(function (a) { return a.status !== 'erledigt'; }).length;
+  var kleinKarte = '';
+  if (kleinTeil) {
+    kleinKarte = tagBlockHtml('Kleinigkeiten', tagKleinAuf ? kleinTeil : '',
+      '<button class="t-rueck tk-klappe" type="button" onclick="tagKleinUm()" aria-expanded="'
+      + (tagKleinAuf ? 'true' : 'false') + '">'
+      + (tagKleinAuf ? 'einklappen ⌃' : (kleinOffen ? (kleinOffen + ' offen ⌄') : 'zeigen ⌄')) + '</button>');
+  }
 
   /* Am Rechner zwei Spalten: links Woche und Verbindlichkeiten, rechts
      Termine und Kleinigkeiten. Am Handy eine Folge von oben nach unten. */
@@ -8635,7 +8652,6 @@ function rueckgaengig() {
    ============================================================ */
 
 var TAKTE_TAGE = [[1, 'Mo'], [2, 'Di'], [3, 'Mi'], [4, 'Do'], [5, 'Fr'], [6, 'Sa'], [0, 'So']];
-var TEILE = [];
 
 function neueRegel(takt) {
   return { takt: takt, intervall: 1, tage: [1], tag: 1 };
@@ -8646,7 +8662,6 @@ function aufgabeAktionen(id) {
   if (!a) { return; }
   aktionFuer = id;
   titelVorher = a.titel;
-  TEILE = [''];
   var sheet = document.getElementById('aktionSheet');
   var hg = document.getElementById('aktionHg');
   if (!sheet || !hg) { return; }
@@ -8815,29 +8830,10 @@ function detailHtml(a) {
   h += '<textarea class="d-text" placeholder="Beschreibung …" '
      + 'oninput="dBeschreibung(this.value)">' + esc(a.beschreibung || '') + '</textarea>';
 
-  if (!a.wiederholung) {
-    h += '<div class="d-reihe">'
-       + '<button type="button" onclick="vorgangAusAufgabe()">'
-       + 'Daraus einen Vorgang machen</button></div>'
-       + '<div class="d-hinweis" style="text-align:left">Wird aus der Aufgabe mehr, '
-       + 'bekommt sie Schritte. Sie selbst bleibt der erste davon.</div>';
-  }
-
+  /* Seit v5.24.0 bleibt unten nur „Löschen": Verschieben geht über die
+     Planung, Vorgang, Anheften und Aufteilen entfallen. */
   h += '<div class="d-reihe">';
-  h += '<button type="button" onclick="aufgabeSchieben(1)">Auf morgen</button>';
-  h += '<button type="button" onclick="aufgabeInsBacklog()">Ins Backlog</button>';
-  h += '</div>';
-  h += pinKnopfHtml('aufgabe', a.id);
-  h += '<div class="d-reihe">';
-  h += '<button type="button" onclick="teilenZeigen()">Aufteilen</button>';
   h += '<button type="button" class="gefahr" onclick="aufgabeLoeschen()">Löschen</button>';
-  h += '</div>';
-
-  h += '<div class="d-neu" id="teilen">';
-  h += '<div id="teilfelder"><input type="text" placeholder="Erste Aufgabe" '
-     + 'oninput="teilenTippen(0,this.value)"></div>';
-  h += '<div class="d-reihe"><button type="button" onclick="teilenUebernehmen()">'
-     + 'Übernehmen</button></div>';
   h += '</div>';
 
   var laeufe = durchlaeufeZuAufgabe(a.id);
@@ -9006,55 +9002,6 @@ function themaAnlegen() {
   DB.themen.push(neu);
   a.themaId = neu.id;
   detailGeaendert(true);
-}
-
-function teilenZeigen() {
-  var t = document.getElementById('teilen');
-  if (t) { t.classList.toggle('auf'); }
-}
-
-function teilenTippen(i, wert) {
-  TEILE[i] = wert;
-  if (i !== TEILE.length - 1) { return; }
-  if (String(wert).trim().length === 0) { return; }
-  TEILE.push('');
-  var behaelter = document.getElementById('teilfelder');
-  if (!behaelter) { return; }
-  var feld = document.createElement('input');
-  feld.type = 'text';
-  feld.placeholder = 'Weitere Aufgabe';
-  feld.setAttribute('oninput', 'teilenTippen(' + (TEILE.length - 1) + ',this.value)');
-  behaelter.appendChild(feld);
-}
-
-function teilenUebernehmen() {
-  var vorlage = aufgabeFinden(aktionFuer);
-  if (!vorlage) { return; }
-  var neue = [];
-  var i;
-  for (i = 0; i < TEILE.length; i++) {
-    var wert = TEILE[i] ? String(TEILE[i]).trim() : '';
-    if (wert.length === 0) { continue; }
-    neue.push({
-      id: neueKennung(), titel: wert, beschreibung: '', kontext: vorlage.kontext,
-      themaId: vorlage.themaId, projektId: vorlage.projektId, frist: vorlage.frist,
-      planung: vorlage.planung, uhrzeit: '', art: vorlage.art, wiederholung: null,
-      status: 'offen', erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null,
-      geaendert: jetzt()
-    });
-  }
-  if (!neue.length) { return; }
-
-  var stelle = DB.aufgaben.indexOf(vorlage);
-  if (stelle >= 0) { DB.aufgaben.splice(stelle, 1); }
-  grabsteinSetzen('aufgaben', vorlage.id);
-  DB.aufgaben = DB.aufgaben.concat(neue);
-
-  aktionenSchliessen();
-  aufZeichnen();
-  zeichne();
-  spaeterSichern();
-  melde('Aus einer Aufgabe wurden ' + neue.length + '.', 'gut');
 }
 
 /* ------------------------------------------------------------
@@ -10416,7 +10363,7 @@ function zeichneBestand() {
     aufgaben: 'Aufgaben', ziele: 'Ziele', themen: 'Themen', projekte: 'Projekte',
     ablaeufe: 'Abläufe', durchlaeufe: 'Durchläufe', jahrestermine: 'Jahrestermine',
     kalenderzuordnung: 'Kalenderzuordnungen', termine: 'Berufliche Termine',
-    notizbuecher: 'Notizbücher', notizseiten: 'Notizseiten', wochen: 'Wochen'
+    notizbuecher: 'Notizbücher', notizseiten: 'Seiten', wochen: 'Wochen'
   };
   var h = '';
   var i;
@@ -14841,7 +14788,7 @@ function vhSchilderHtml(v, art) {
   var n = vhTaetigZahl(art, v.id);
   var marken = [];
   if (n) { marken.push(n + (n === 1 ? ' Tätigkeit' : ' Tätigkeiten')); }
-  if (vhHatGedanken(v)) { marken.push('Gedanken'); }
+  if (vhHatGedanken(v)) { marken.push('Notizen'); }
   if (!marken.length) { return ''; }
   return '<div class="ab-fuss vk-schilder"><span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span></div>';
 }
@@ -15012,7 +14959,7 @@ function vhKarteHtml(v, art) {
   if (ende) { marken.push('bis ' + kurzDatum(ende)); }
   /* Seit v5.19.1 ohne Knöpfe — die Karte öffnet die Seite mit Tätigkeiten
      und Gedanken. Dass es Gedanken gibt, sagt ein Schild. */
-  if (vhHatGedanken(v)) { marken.push('Gedanken'); }
+  if (vhHatGedanken(v)) { marken.push('Notizen'); }
   h += '<span class="ab-marke">' + marken.join('</span><span class="ab-marke">') + '</span>';
   h += '<span style="flex:1"></span>';
   h += '<span class="ab-pfeile">'
@@ -15907,7 +15854,7 @@ function wbLinkHtml(art, id, titel) {
   var lebt = wbZielName(art, id);
   var zeigen = lebt || titel;
   var marken = { projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Fläche',
-                 aufgabe: 'Aufgabe', notiz: 'Notizseite' };
+                 aufgabe: 'Aufgabe', notiz: 'Seite' };
   if (!lebt) {
     return '<span class="wb-tot" title="Das Ziel gibt es nicht mehr">'
          + esc(zeigen) + '</span>';
@@ -15988,7 +15935,7 @@ function wbWahlHtml() {
   h += '<div class="as-linie"></div>';
   h += '<div class="sl-pillen">';
   var arten = [['projekt', 'Projekte'], ['ziel', 'Ziele'],
-               ['flaeche', 'Flächen'], ['notiz', 'Notizseiten'], ['aufgabe', 'Aufgaben']];
+               ['flaeche', 'Notizen'], ['notiz', 'Seiten'], ['aufgabe', 'Aufgaben']];
   var i;
   for (i = 0; i < arten.length; i++) {
     h += '<button class="sl-pille' + (wbWahlArt === arten[i][0] ? ' an' : '')
@@ -17208,7 +17155,7 @@ function gedankenUebernehmen() {
   var frei = String(DB.einstellungen.flaecheFrei || '').trim();
   if (!frei.length) { return 0; }
   if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
-  DB.gedanken.push({ id: neueKennung(), titel: 'Gedanken',
+  DB.gedanken.push({ id: neueKennung(), titel: 'Notizen',
                      text: DB.einstellungen.flaecheFrei, geaendert: jetzt() });
   DB.einstellungen.flaecheFrei = '';
   spaeterSichern();
@@ -17316,7 +17263,7 @@ function gedankenZeichnen() {
 
   var h = '<button class="neu-zeile" type="button" onclick="gedankeNeu()">'
         + '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>'
-        + 'Neue Fläche</button>';
+        + 'Neue Notiz</button>';
 
   var karte = function (e) {
     var vor = flaecheVorschau(e.text);
@@ -20615,18 +20562,18 @@ function tgAbschnittUm(nr) {
 
 function tgGedankenHtml(v) {
   var text = flaecheText(v.id);
-  var h = '<div class="tg-block tg-gedanken" data-tg="gedanken"><div class="tg-bkopf">Gedanken</div>'
+  var h = '<div class="tg-block tg-gedanken" data-tg="gedanken"><div class="tg-bkopf">Notizen</div>'
         + '<div class="tg-g-leiste">'
         + '<button type="button" class="tg-pille' + (tgGedankenModus === 'ansicht' ? ' an' : '') + '" onclick="tgGedankenModusSetzen(\'ansicht\')">Ansicht</button>'
         + '<button type="button" class="tg-pille' + (tgGedankenModus === 'schreiben' ? ' an' : '') + '" onclick="tgGedankenModusSetzen(\'schreiben\')">Schreiben</button>'
         + '<button type="button" class="tg-pille" onclick="flaecheOeffnen(\'' + esc(v.id) + '\')">Groß öffnen ↗</button>'
         + '<span class="tg-luecke"></span>' + pinKnopfHtml('flaeche', v.id) + '</div>';
   if (tgGedankenModus === 'schreiben') {
-    h += '<textarea class="tg-g-feld" aria-label="Gedanken schreiben" '
-       + 'placeholder="Gedanken, Pläne, Tabellen — Markdown wie auf jeder Fläche" '
+    h += '<textarea class="tg-g-feld" aria-label="Notizen schreiben" '
+       + 'placeholder="Notizen, Pläne, Tabellen — Markdown wie auf jeder Fläche" '
        + 'oninput="tgGedankenSetzen(this.value)">' + esc(text) + '</textarea>';
   } else if (!String(text).trim()) {
-    h += '<div class="tg-leer" style="padding:10px 0">Noch keine Gedanken. „Schreiben“ beginnt eine.</div>';
+    h += '<div class="tg-leer" style="padding:10px 0">Noch keine Notizen. „Schreiben“ beginnt welche.</div>';
   } else {
     var merk = flaecheFuer;
     var merkArt = flaecheArt;
@@ -20715,7 +20662,7 @@ function tgKopfHtml(v, zahlen) {
 
 function tgReiterHtml(nA, nT) {
   var r = [['woche', 'Woche'], ['taetig', 'Tätigkeiten' + (nA ? ' · ' + nA : '')],
-           ['termine', 'Termine' + (nT ? ' · ' + nT : '')], ['gedanken', 'Gedanken']];
+           ['termine', 'Termine' + (nT ? ' · ' + nT : '')], ['gedanken', 'Notizen']];
   return '<div class="tg-reiter" role="tablist">' + r.map(function (x) {
     return '<button type="button" role="tab" aria-selected="' + (tgReiter === x[0] ? 'true' : 'false') + '" '
          + 'class="' + (tgReiter === x[0] ? 'an' : '') + '" onclick="tgReiterSetzen(\'' + x[0] + '\')">' + esc(x[1]) + '</button>';
@@ -21157,7 +21104,7 @@ var PIN_FARBEN = ['gelb', 'orange', 'rosa', 'lila',
    Kennung trägt die Art vorn — „p:" oder „z:" —, wie bei der
    Vorhabenwahl. */
 var PIN_ARTEN = { aufgabe: 'Aufgabe', durchlauf: 'Ablauf', vorlage: 'Vorlage',
-                  projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Gedanken',
+                  projekt: 'Projekt', ziel: 'Ziel', flaeche: 'Notiz',
                   taetigkeiten: 'Tätigkeiten' };
 var pinFilter = 'alle';
 
@@ -21428,7 +21375,7 @@ function pinnwandZeichnen() {
     h += '<button class="z-weg" type="button" '
        + 'onclick="event.stopPropagation();pinWeg(\'' + esc(p.id) + '\')" '
        + 'aria-label="Abnehmen" title="Abnehmen">×</button>';
-    var artName = (p.art === 'flaeche' && istNotizseite(p.zielId)) ? 'Notizseite'
+    var artName = (p.art === 'flaeche' && istNotizseite(p.zielId)) ? 'Seite'
                 : (PIN_ARTEN[p.art] || '');
     h += '<div class="z-art">' + esc(artName) + '</div>';
     /* Noch ohne Beruf/Privat: steht unter beiden Filtern — und sagt es. */
@@ -21448,7 +21395,7 @@ function pinnwandZeichnen() {
   }
   if (!gezeigt) {
     h = '<div class="z-leer">Noch nichts angeheftet. In jedem Blatt — Aufgabe, '
-      + 'Ablauf, Projekt, Ziel, Gedankenfläche — hängt „📌 Anheften" es hierher.</div>';
+      + 'Ablauf, Projekt, Ziel, Notiz — hängt „📌 Anheften" es hierher.</div>';
   }
   blatt.innerHTML = h;
   var zahl = document.getElementById('pinZahl');
@@ -22863,7 +22810,7 @@ function abSeiteHtml() {
 
   h += '<div class="ab-kk-knoepfe">';
   if (!istVorlage) {
-    h += '<button type="button" onclick="flaecheOeffnen(\'d:' + esc(a.id) + '\')">Gedanken'
+    h += '<button type="button" onclick="flaecheOeffnen(\'d:' + esc(a.id) + '\')">Notizen'
        + (String(a.flaeche || '').trim().length ? ' ·' : '') + '</button>';
   }
   h += pinKnopfHtml(istVorlage ? 'vorlage' : 'durchlauf', a.id);
