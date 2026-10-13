@@ -252,7 +252,7 @@ console.log('\n6. Datenmodell');
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
                     'durchlaeufe', 'jahrestermine', 'ferien', 'einfaelle',
                     'gedanken', 'pinnwand', 'kalenderzuordnung',
-                    'notizbuecher', 'notizseiten'];
+                    'notizbuecher', 'notizseiten', 'wochen'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -1587,6 +1587,73 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; schirmOffen = merkS;'
                  + '   return r;'
                  + ' } };'
+                 + `globalThis.__dieseWocheApi = {
+ pruefe: function(){
+   var r = {}; var alt = DB; var merkT = tagOffen; var merkS = tagSicht; var merkM = wkMontag; var merkF = tagFilter;
+   DB = leereDatenbank(); tagFilter = 'alle';
+   var heute = isoDatum(); var mo = montagVon(heute);
+   function neu(id, t, k, f){ DB.aufgaben.push({ id: id, titel: t, kontext: k, frist: f || '', planung: '', art: 'haupt', status: 'offen', erledigtAm: null, wiederholung: null, geaendert: 1 }); }
+   neu('a1', 'Agenda entwerfen', 'beruflich', tagePlus(mo, 2));
+   neu('a2', 'Steuer abgeben', 'privat', tagePlus(mo, 4));
+   neu('a3', 'Reifen wechseln', 'privat', '');
+   tagOffen = tagePlus(heute, -1);
+   tagSichtSetzen('woche');
+   var bl = function(){ return document.getElementById('tagBlatt').innerHTML; };
+   r.sicht = tagSicht === 'woche' && wkMontag === montagVon(tagOffen)
+     && /Was diese Woche Substanz schafft/.test(bl()) && /Verbindlichkeiten/.test(bl());
+   r.ohneZaehler = !/von 3/.test(bl());
+   r.version = document.getElementById('tkMonat').textContent.indexOf('v' + APP_VERSION) >= 0;
+   tagHeute();
+   wkZielAnlegen('Workshop-Konzept steht');
+   var w = wkFinden(mo);
+   r.kennung = !!w && w.id === 'kw-' + mo && wkHolen(mo) === w && DB.wochen.length === 1;
+   r.ziel = !!w && w.ziele.length === 1 && w.ziele[0].text === 'Workshop-Konzept steht' && w.ziele[0].erreicht === false;
+   var zid = w.ziele[0].id;
+   wkAuswahlOeffnen(zid); wkZuordnen('a1');
+   r.zugeordnet = w.ziele[0].aufgaben.join() === 'a1' && /Agenda entwerfen/.test(bl());
+   wkAuswahlZiel = 'verbindlich'; wkZuordnen('a1'); wkZuordnen('a2');
+   r.einmal = w.ziele[0].aufgaben.length === 0 && w.verbindlich.join() === 'a1,a2';
+   wkAuswahlZiel = zid; wkZuordnen('a1'); wkAuswahlSchliessen();
+   var vorT = tagOffen;
+   wkHaken('a1');
+   var a1 = DB.aufgaben[0];
+   r.haken = a1.status === 'erledigt' && a1.erledigtAm === heute && tagOffen === vorT;
+   tagZeichnen();
+   r.durchgestrichen = /tzeile wk-a erledigt/.test(bl());
+   wkZielErreicht(zid);
+   r.erreicht = w.ziele[0].erreicht === true && /wk-ziel erreicht/.test(bl());
+   wkLoesen('a2');
+   r.loesen = w.verbindlich.length === 0 && DB.aufgaben.length === 3;
+   wkAuswahlZiel = 'verbindlich'; wkZuordnen('a3'); wkAuswahlSchliessen();
+   DB.aufgaben = DB.aufgaben.filter(function(a){ return a.id !== 'a3'; });
+   var ok = true; try { tagZeichnen(); } catch (e) { ok = false; }
+   r.geloeschtStill = ok && !/Reifen wechseln/.test(bl());
+   tagFilter = 'beruflich'; tagZeichnen();
+   r.filter = /Agenda entwerfen/.test(bl()) && /Workshop-Konzept steht/.test(bl());
+   tagFilter = 'alle';
+   var vorTag = tagOffen;
+   tagBlaettern(1);
+   r.blaettern = wkMontag === tagePlus(mo, 7) && tagOffen === vorTag;
+   r.keineUebernahme = !wkFinden(tagePlus(mo, 7)) && !/Workshop-Konzept/.test(bl());
+   tagBlaettern(-1);
+   document.getElementById('wkAufgabeTitel').value = 'Rückmeldung an Moni';
+   document.getElementById('wkAufgabeFrist').value = '';
+   wkNeueAufgabeAnlegen();
+   var neuA = DB.aufgaben[DB.aufgaben.length - 1];
+   r.neueAufgabe = neuA.titel === 'Rückmeldung an Moni' && neuA.frist === tagePlus(mo, 4)
+     && neuA.planung === '' && w.verbindlich.indexOf(neuA.id) >= 0;
+   wkZielLoeschen(zid);
+   r.zielWeg = w.ziele.length === 0 && DB.aufgaben.length === 3;
+   var l = leereDatenbank(); var f = leereDatenbank();
+   l.wochen = [{ id: 'kw-' + mo, montag: mo, ziele: [{ id: 'x', text: 'alt', erreicht: false, aufgaben: [] }], verbindlich: [], geaendert: 10 }];
+   f.wochen = [{ id: 'kw-' + mo, montag: mo, ziele: [{ id: 'x', text: 'neu', erreicht: true, aufgaben: [] }], verbindlich: [], geaendert: 20 }];
+   var m = zusammenfuehren(l, f).db;
+   r.abgleich = m.wochen.length === 1 && m.wochen[0].ziele[0].text === 'neu';
+   tagSichtSetzen('tag');
+   r.zurueck = tagSicht === 'tag' && document.getElementById('tkHeute').textContent === 'Heute';
+   DB = alt; tagOffen = merkT; tagSicht = merkS; wkMontag = merkM; tagFilter = merkF;
+   return r;
+ } };`
                  + 'globalThis.__vorlagenArtApi = {'
                  + ' pruefe: function(){'
                  + '   var alt = DB; DB = leereDatenbank();'
@@ -15005,6 +15072,46 @@ console.log('\n184. Erledigte im Vorhaben sichtbar');
     pruefe(e.sichtbar === true, 'beim Öffnen stehen die erledigten Aufgaben unter den offenen');
     pruefe(e.zu === true, 'ein Tipp klappt sie ein');
     pruefe(e.wiederAuf === true, 'beim nächsten Öffnen sind sie wieder zu sehen');
+  }
+}
+
+/* ============================================================
+   185. Diese Woche (v5.20.0)
+   Umschalter Tag | Woche, Wochenziele mit zugeordneten Aufgaben,
+   Verbindlichkeiten als Aufgaben, keine Übernahme in die Folgewoche.
+   ============================================================ */
+console.log('\n185. Diese Woche');
+{
+  pruefe(/id="tkSicht"/.test(QUELLE) && /id="tkHeute"/.test(QUELLE) && /id="wkAuswahl"/.test(QUELLE),
+         'Platz für den Umschalter, den Heute-Knopf und die Auswahl steht im HTML');
+  pruefe(/sichtSchalterHtml\(\) \+ '<span>' \+ esc\(form\.form\)/.test(hauptSkript()),
+         'am Handy sitzt der Umschalter in der Zeile unter dem Datum');
+  pruefe(/if \(tagSicht === 'woche'\) \{ wocheZeichnen\(\); return; \}/.test(hauptSkript()),
+         'tagZeichnen gibt in der Wochensicht an die Woche ab');
+  const t = globalThis.__dieseWocheApi;
+  let e = null;
+  if (!t) { warn('Woche nicht auswertbar'); }
+  else { try { e = t.pruefe(); } catch (x) { fail('Woche läuft nicht: ' + x.message); } }
+  if (e) {
+    pruefe(e.sicht === true, 'der Umschalter zeigt die Woche des offenen Tags mit beiden Abschnitten');
+    pruefe(e.ohneZaehler === true, 'keine Zähler bei Substanz und Verbindlichkeiten');
+    pruefe(e.version === true, 'auch in der Wochensicht steht die Version im Kopf');
+    pruefe(e.kennung === true, 'je Montag genau ein Wochensatz mit fester Kennung');
+    pruefe(e.ziel === true, 'ein Wochenziel ist freier Text, zunächst nicht erreicht');
+    pruefe(e.zugeordnet === true, 'eine Aufgabe lässt sich einem Ziel zuordnen');
+    pruefe(e.einmal === true, 'eine Aufgabe steht je Woche nur an einer Stelle — neu zuordnen verschiebt');
+    pruefe(e.haken === true, 'Abhaken in der Woche hakt die Aufgabe selbst ab, ohne den offenen Tag zu verstellen');
+    pruefe(e.durchgestrichen === true, 'erledigte Aufgaben stehen durchgestrichen da');
+    pruefe(e.erreicht === true, 'ein Ziel wird von Hand als erreicht durchgestrichen');
+    pruefe(e.loesen === true, 'Lösen nimmt nur die Zuordnung weg, die Aufgabe bleibt');
+    pruefe(e.geloeschtStill === true, 'eine gelöschte Aufgabe fällt still heraus');
+    pruefe(e.filter === true, 'der Filter Beruf/Privat gilt für die Aufgaben, die Ziele bleiben');
+    pruefe(e.blaettern === true, 'in der Woche blättern die Pfeile wochenweise');
+    pruefe(e.keineUebernahme === true, 'nicht erreichte Ziele bleiben in ihrer Woche — keine Übernahme');
+    pruefe(e.neueAufgabe === true, 'eine neue Verbindlichkeit ist eine Aufgabe mit Frist (Freitag), ohne Tag im Plan');
+    pruefe(e.zielWeg === true, 'ein gelöschtes Ziel lässt seine Aufgaben stehen');
+    pruefe(e.abgleich === true, 'der Abgleich führt die Woche nach Stempel zusammen');
+    pruefe(e.zurueck === true, 'zurück auf Tag ist alles wie vorher');
   }
 }
 
