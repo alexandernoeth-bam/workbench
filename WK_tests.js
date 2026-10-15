@@ -790,12 +790,61 @@ if (WK) {
 }
 
 /* ============================================================
+   19. Automatische Anmeldung und Streifen — wie in der Workbench
+   Grund: Beim Öffnen und sobald die App merkt, dass sie nicht verbunden
+   ist, meldet sie sich still neu an; misslingt das, zeigt der Streifen
+   „Neu verbinden“.
+   ============================================================ */
+console.log('\n19. Automatische Anmeldung');
+if (WK) {
+  pruefe(/id="anmeldeStreifen"[\s\S]*?onclick="anmelden\(false\)">Neu verbinden/.test(QUELLE), 'der Streifen „Neu verbinden“ steht in der Seite');
+  pruefe(/\.app>\.anmeldebanner\{grid-row:2\}/.test(QUELLE), 'er hat seine eigene Rasterzeile');
+  pruefe(/stillAnmelden\('start'\)/.test(funktionText(SKRIPT, 'start') || ''), 'beim Öffnen wird still angemeldet');
+  pruefe(/stillAnmelden\(/.test(funktionText(SKRIPT, 'rueckkehrPruefen') || '') && /stillAnmelden\(/.test(funktionText(SKRIPT, 'verbindungPruefen') || ''),
+         'auch beim Zurückkehren und wenn die Verbindung verloren geht');
+  if (WB_SKRIPT) {
+    pruefe(funktionText(SKRIPT, 'klickErneuern') === funktionText(WB_SKRIPT, 'klickErneuern'), 'der nächste Klick erneuert wie in der Workbench');
+  }
+  const alt = WK.anmelden;
+  const rufe = [];
+  let antwort = true;
+  WK.anmelden = function (still) { rufe.push(still); return Promise.resolve(antwort); };
+  const kl = [];
+  WK.document.getElementById('anmeldeStreifen').classList = { add(k) { kl.push('+' + k); }, remove(k) { kl.push('-' + k); } };
+  WK.localStorage.setItem(WK.ANMELDE_MERKER, '1');
+  WK.zugriffToken = null; WK.tokenAblauf = 0; WK.stillVersuchtMs = 0; WK.anmeldungLaeuft = false;
+  WK.stillAnmelden('start').then(function (gut) {
+    pruefe(gut === true && rufe.length === 1 && rufe[0] === true, 'still heißt: ohne Fenster, wenn die Google-Sitzung besteht');
+    return WK.stillAnmelden('verbindung');
+  }).then(function (gut) {
+    pruefe(gut === false && rufe.length === 1, 'höchstens einmal je Minute — kein flackerndes Fenster');
+    WK.stillVersuchtMs = 0; antwort = false;
+    return WK.stillAnmelden('verbindung');
+  }).then(function (gut) {
+    pruefe(gut === false && WK.verbindungOk === false && kl[kl.length - 1] === '+sichtbar'
+           && /abgelaufen/.test(WK.document.getElementById('anmeldeText').textContent), 'misslingt es, zeigt der Streifen „abgelaufen — bitte neu anmelden“');
+    WK.localStorage.removeItem(WK.ANMELDE_MERKER);
+    WK.stillVersuchtMs = 0;
+    return WK.stillAnmelden('start');
+  }).then(function (gut) {
+    pruefe(gut === false && rufe.length === 2, 'wer nie angemeldet war, wird nicht gefragt');
+    WK.anmeldebannerZeichnen();
+    pruefe(/Noch nicht bei Google angemeldet/.test(WK.document.getElementById('anmeldeText').textContent), 'dann sagt der Streifen: nur lokal gespeichert');
+    WK.zugriffToken = 'x'; WK.tokenAblauf = Date.now() + 3600000; WK.verbindungOk = true;
+    WK.anmeldebannerZeichnen();
+    pruefe(kl[kl.length - 1] === '-sichtbar', 'verbunden: kein Streifen');
+    WK.zugriffToken = null; WK.tokenAblauf = 0;
+    WK.anmelden = alt;
+  });
+}
+
+/* ============================================================
    18. Neue Fassung suchen und laden — wie in der Workbench
    ============================================================ */
 console.log('\n18. Neue Fassung');
 if (WK) {
   pruefe(/id="neuStreifen"[^>]*onclick="neuLaden\(\)"/.test(QUELLE) && /id="neuText"/.test(QUELLE), 'der Streifen „Neue Fassung“ steht in der Seite');
-  pruefe(/\.app>\.rumpf\{grid-row:3\}/.test(QUELLE), 'der versteckte Streifen verschiebt das Raster nicht');
+  pruefe(/\.app>\.rumpf\{grid-row:4\}/.test(QUELLE) && /\.app>\.neustreifen\{grid-row:3\}/.test(QUELLE), 'der versteckte Streifen verschiebt das Raster nicht');
   pruefe(/'\.\/wochenkompass\.html\?stand='/.test(SKRIPT) && /cache: 'no-store'/.test(SKRIPT), 'gefragt wird die eigene Datei, am Vorrat vorbei');
   pruefe(/getRegistration\('\.\/wochenkompass'\)/.test(SKRIPT), 'neu geladen wird über den eigenen Service Worker');
   pruefe(/versionPruefen\(false\);\n  versionTaktStarten\(\);/.test(SKRIPT), 'geprüft wird beim Start und danach im Takt');
@@ -816,8 +865,11 @@ if (WK) {
     WK.seiteZeichnen(true);
     pruefe(/versionPruefen\(true\)/.test(seiteHtml()), 'in den Einstellungen: „Auf neue Fassung prüfen“');
     WK.fetch = alt;
-    console.log('\nERGEBNIS   ok: ' + anzOk + '   FAIL: ' + anzFail + '   warn: ' + anzWarn);
-    process.exitCode = anzFail ? 1 : 0;
+    /* Erst wenn auch die übrigen Prüfungen mit Versprechen durch sind. */
+    setTimeout(function () {
+      console.log('\nERGEBNIS   ok: ' + anzOk + '   FAIL: ' + anzFail + '   warn: ' + anzWarn);
+      process.exitCode = anzFail ? 1 : 0;
+    }, 50);
   });
 }
 

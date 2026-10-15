@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Wochenkompass 2.2.0</title>
+<title>Wochenkompass 2.3.0</title>
 <meta name="theme-color" content="#F4F2EE">
 <link rel="manifest" href="./wochenkompass.webmanifest">
 <link rel="icon" href="./wochenkompass-192.png" sizes="192x192" type="image/png">
@@ -21,10 +21,16 @@ button{font:inherit;cursor:pointer;color:var(--tinte)}
 button:disabled{opacity:.45;cursor:default}
 button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--weinrot);outline-offset:2px}
 
-.app{display:grid;grid-template-rows:auto auto minmax(0,1fr);grid-template-columns:minmax(0,1fr);height:100%}
+.app{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);grid-template-columns:minmax(0,1fr);height:100%}
 .app>.kopf{grid-row:1}
-.app>.neustreifen{grid-row:2}
-.app>.rumpf{grid-row:3}
+.app>.anmeldebanner{grid-row:2}
+.app>.neustreifen{grid-row:3}
+.app>.rumpf{grid-row:4}
+.anmeldebanner{display:none;align-items:center;gap:12px;padding:11px 16px 11px 20px;background:var(--weinrot);color:#fff;font-size:13.5px;line-height:1.35}
+.anmeldebanner.sichtbar{display:flex}
+#anmeldeText{flex:1;min-width:0}
+.anmeldebanner button{flex:0 0 auto;font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border:1px solid rgba(255,255,255,.75);
+  border-radius:6px;background:transparent;color:#fff;white-space:nowrap}
 .neustreifen{display:none;align-items:center;gap:10px;padding:10px 20px;background:var(--petrol);border:0;font:inherit;font-size:13.5px;
   color:#fff;width:100%;text-align:left;cursor:pointer}
 .neustreifen.sichtbar{display:flex}
@@ -247,11 +253,15 @@ body:not(.breit) .wt{font-size:16.5px}
 <div class="app">
   <header class="kopf">
     <button type="button" class="knopf-rund" id="leisteKnopf" onclick="leisteUm()" aria-label="Seitenleiste">☰</button>
-    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.2.0</small></span></span>
+    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.3.0</small></span></span>
     <span class="luecke"></span>
     <button type="button" class="stand" id="standPille" onclick="standGeklickt()" title="Anmelden oder abgleichen">nur auf diesem Gerät</button>
     <button type="button" class="knopf-rund" onclick="oeffne('einst','')" aria-label="Einstellungen" title="Speicher, Anmeldung, Abgleich">⚙</button>
   </header>
+  <div class="anmeldebanner" id="anmeldeStreifen">
+    <span id="anmeldeText">Keine Verbindung zu Google.</span>
+    <button type="button" onclick="anmelden(false)">Neu verbinden</button>
+  </div>
   <button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
     <span id="neuText"></span>
     <span class="neu-wort">Jetzt laden</span>
@@ -277,7 +287,7 @@ body:not(.breit) .wt{font-size:16.5px}
    darf 2.0 nie schreiben.
    ============================================================ */
 
-var APP_VERSION = '2.2.0';
+var APP_VERSION = '2.3.0';
 var DATEINAME   = 'kompass.json';
 var IDB_NAME    = 'kompass-speicher';
 var IDB_STORE   = 'handles';
@@ -1241,6 +1251,18 @@ function dateiAnbieten(name, text) {
   }
 }
 
+function klickErneuern(e) {
+  if (anmeldungLaeuft || tokenGueltig() || !warAngemeldet()) { return; }
+  var ziel = e ? e.target : null;
+  if (ziel && ziel.closest && ziel.closest('[onclick^="anmelden"]')) { return; }
+  var schluessel = String(tokenAblauf || 'start');
+  if (klickErneuerungFuer === schluessel) { return; }
+  klickErneuerungFuer = schluessel;
+  anmeldeVersuch(true, '').then(function (gut) {
+    if (gut) { melde('Verbindung zu Google wiederhergestellt.', 'gut'); }
+  });
+}
+
 function langDatum(is) {
   var d = ausIso(is);
   var tage = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -1541,7 +1563,9 @@ function anmeldeAnfragen(klient, still, aufforderung, fertig) {
 
 var speicherUhr = null;
 var zurueckHolen = null;
-var klickVersucht = false;
+var klickErneuerungFuer = '';   /* für welchen Ablauf schon einmal per Klick erneuert wurde */
+var stillVersuchtMs = 0;        /* wann zuletzt still angemeldet wurde */
+var STILL_ABSTAND = 60000;
 
 /* Was gerade offen ist und wie */
 var kp = {
@@ -3240,14 +3264,60 @@ function standText() {
 
 function standZeichnen() {
   var el = document.getElementById('standPille');
-  if (!el) { return; }
-  var s = standText();
-  el.textContent = s.text;
-  el.className = 'stand' + (s.warn ? ' warn' : '');
+  if (el) {
+    var s = standText();
+    el.textContent = s.text;
+    el.className = 'stand' + (s.warn ? ' warn' : '');
+  }
+  anmeldebannerZeichnen();
 }
 
-/* Die Workbench-Funktionen rufen diesen Namen — hier ist es die Pille. */
+/* Wie in der Workbench: Ein Streifen oben meldet sich nur, wenn keine
+   Verbindung zu Google besteht — mit „Neu verbinden". */
+function anmeldebannerZeichnen() {
+  var streifen = document.getElementById('anmeldeStreifen');
+  var text = document.getElementById('anmeldeText');
+  if (!streifen || !text) { return; }
+  if (tokenGueltig() && verbindungOk !== false) {
+    streifen.classList.remove('sichtbar');
+    return;
+  }
+  if (!tokenGueltig()) {
+    text.textContent = warAngemeldet()
+      ? 'Die Anmeldung bei Google ist abgelaufen — bitte neu anmelden.'
+      : 'Noch nicht bei Google angemeldet — es wird nur lokal gespeichert.';
+  } else {
+    text.textContent = 'Keine Verbindung zu Google — es wird nur lokal gespeichert.';
+  }
+  streifen.classList.add('sichtbar');
+}
+
+/* Die Workbench-Funktionen rufen diesen Namen. */
 function anmeldeStreifenPruefen() { standZeichnen(); }
+
+/* Wer schon einmal angemeldet war, wird still neu angemeldet: beim Start
+   und sobald die App merkt, dass sie nicht verbunden ist. Google erneuert
+   ohne Nachfrage, solange die Sitzung im Browser besteht; erst wenn das
+   misslingt, bleibt der Streifen mit „Neu verbinden". Höchstens einmal
+   je Minute, damit kein Fenster flackert. */
+function stillAnmelden(grund) {
+  if (anmeldungLaeuft || tokenGueltig() || !warAngemeldet()) { return Promise.resolve(false); }
+  if (Date.now() - stillVersuchtMs < STILL_ABSTAND) { return Promise.resolve(false); }
+  stillVersuchtMs = Date.now();
+  return anmelden(true).then(function (gut) {
+    if (gut) {
+      verbindungOk = true;
+      if (grund !== 'start') { melde('Verbindung zu Google wiederhergestellt.', 'gut'); }
+      else { melde('Anmeldung im Hintergrund erneuert.', 'gut'); }
+      abgleichPlanen(true);
+    } else {
+      verbindungOk = false;
+      melde('Die Anmeldung ließ sich nicht im Hintergrund erneuern.\nBitte oben auf „Neu verbinden“ tippen.', 'warn');
+    }
+    zeichne();
+    return gut;
+  });
+}
 
 function standGeklickt() {
   if (!tokenGueltig()) { anmelden(false); return; }
@@ -3297,11 +3367,11 @@ function abgleichStill() {
 }
 
 function verbindungPruefen() {
-  if (!tokenGueltig()) { verbindungOk = false; standZeichnen(); return; }
+  if (!tokenGueltig()) { verbindungOk = false; standZeichnen(); stillAnmelden('verbindung'); return; }
   window.fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: driveKopf() })
     .then(function (a) {
       if (a.ok) { verbindungOk = true; }
-      else if (a.status === 401 || a.status === 403) { tokenVergessen(); verbindungOk = false; }
+      else if (a.status === 401 || a.status === 403) { tokenVergessen(); verbindungOk = false; stillAnmelden('verbindung'); }
       standZeichnen();
     }).catch(function () {
       verbindungOk = false;
@@ -3314,17 +3384,11 @@ function rueckkehrPruefen() {
   if (document.hidden) { return; }
   versionPruefen(false);
   zeichne();
-  if (!tokenGueltig()) { return; }
+  if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
   abgleichPlanen(true);
 }
 
-/* Nach abgelaufener Anmeldung erneuert der nächste Klick still — einmal. */
-function klickErneuern() {
-  if (tokenGueltig() || klickVersucht || anmeldungLaeuft || !warAngemeldet()) { return; }
-  klickVersucht = true;
-  anmelden(true).then(function (gut) { if (gut) { klickVersucht = false; } });
-}
 
 /* ---------- Neue Fassung suchen und laden — wie in der Workbench ----------
 
@@ -3425,7 +3489,12 @@ function start() {
   kpFilterLaden();
   document.addEventListener('keydown', tasteGlobal);
   window.addEventListener('resize', breiteSetzen);
-  tokenAusSitzung();
+  standZeichnen();
+  if (tokenAusSitzung()) {
+    melde('Anmeldung aus dieser Sitzung übernommen, noch ' + restMinuten() + ' Minuten gültig.', null);
+  } else {
+    stillAnmelden('start');
+  }
   var los = idbDa()
     ? idbLesen(IDB_KEY).then(function (h) { if (h) { dateiHandle = h; dateiName = h.name || ''; } }).catch(function () { return null; })
     : Promise.resolve(null);
@@ -3441,6 +3510,9 @@ function start() {
   });
   document.addEventListener('visibilitychange', rueckkehrPruefen);
   document.addEventListener('click', klickErneuern, true);
+  window.addEventListener('focus', standZeichnen);
+  window.addEventListener('focus', erneuerungPruefen);
+  window.setInterval(standZeichnen, 15000);
   swAnmelden();
   versionPruefen(false);
   versionTaktStarten();
