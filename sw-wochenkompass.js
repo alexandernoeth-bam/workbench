@@ -12,7 +12,7 @@
 
 'use strict';
 
-var VORRAT = 'wochenkompass-vorrat-2';
+var VORRAT = 'wochenkompass-vorrat-3';
 var PRAEFIX = 'wochenkompass-';
 var GRUNDLAGE = [
   './wochenkompass.html',
@@ -29,6 +29,11 @@ self.addEventListener('install', function (ereignis) {
       return vorrat.addAll(GRUNDLAGE).catch(function () { return null; });
     })
   );
+});
+
+/* „Jetzt laden“ in der App: eine wartende Fassung sofort übernehmen. */
+self.addEventListener('message', function (ereignis) {
+  if (ereignis.data === 'sofort-uebernehmen') { self.skipWaiting(); }
 });
 
 self.addEventListener('activate', function (ereignis) {

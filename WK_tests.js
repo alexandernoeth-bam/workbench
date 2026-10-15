@@ -238,7 +238,7 @@ if (WK) {
   WK.leisteZeichnen();
   const le = WK.document.getElementById('leiste').innerHTML;
   pruefe(/Vorhaben/.test(le) && /Listen/.test(le) && /Notizen/.test(le) && /Ruht/.test(le), 'die Seitenleiste hat Vorhaben (mit „Ruht“), Listen und Notizen');
-  pruefe(/Umzug Büro<\/span><span class="zahl">2<\/span>/.test(le), 'die Seitenleiste zählt die offenen Aufgaben');
+  pruefe(!/class="zahl"/.test(le), 'die Seitenleiste zählt keine offenen Aufgaben');
   WK.kp.art = 'seite'; WK.kp.id = v.id; WK.kp.modus = 'ansicht';
   WK.seiteZeichnen(true);
   let h = seiteHtml();
@@ -258,7 +258,7 @@ if (WK) {
   WK.seiteZeichnen(true);
   let h = seiteHtml();
   pruefe(!/kpEinplanen\(/.test(h) && !/class="drin"/.test(h), 'der Text bleibt ruhig: kein S/V und keine Marke in den Zeilen');
-  pruefe(/onclick="kpOaUm\(\)"/.test(h) && /Offene Aufgaben<b>2<\/b>/.test(h), 'über dem Text der Knopf „Offene Aufgaben“ mit Zahl');
+  pruefe(/onclick="kpOaUm\(\)"/.test(h) && /Offene Aufgaben<\/button>/.test(h), 'über dem Text der Knopf „Offene Aufgaben“ — ohne Zahl');
   WK.kpOaUm();
   h = seiteHtml();
   pruefe(/class="oa-fenster" role="dialog"/.test(h), 'der Knopf öffnet das Fenster');
@@ -293,12 +293,12 @@ if (WK) {
 }
 
 /* ============================================================
-   6. Die ruhige Woche
-   Grund: Die Wochenseite zeigt nur Substanz und Verbindlichkeiten —
-   kein Editor, keine Kästchen. Ein Klick streicht durch und hakt die
-   Zeile in der Quelle ab; ↗ springt dorthin.
+   6. Die Woche als Notiz
+   Grund: Die Woche ist frei beschreibbar. Eingeplante Aufgaben sind
+   Zeilen unter „Bringt mich substanziell weiter“ und „Verbindlichkeiten“;
+   ein Klick streicht durch und hakt in der Quelle ab, ↗ springt dorthin.
    ============================================================ */
-console.log('\n6. Ruhige Woche');
+console.log('\n6. Woche als Notiz');
 if (WK) {
   frisch();
   const s = WK.kpSeiteAnlegen('vorhaben', 'Umzug', 'Notiz\n[] Firma anfragen\n[] Lager kündigen');
@@ -307,39 +307,76 @@ if (WK) {
   WK.kpEinplanen(2, 'v');
   const mo = WK.kpHeuteMontag();
   const w = WK.kpWocheFinden(mo);
-  WK.kp.art = 'woche'; WK.kp.id = '';
+  pruefe(w.text === '## Bringt mich substanziell weiter\n[] Firma anfragen\n\n## Verbindlichkeiten\n[] Lager kündigen\n',
+         'S und V hängen die Aufgabe als Zeile unter die passende Überschrift');
+  WK.kp.art = 'woche'; WK.kp.id = ''; WK.kp.modus = 'ansicht';
   WK.seiteZeichnen(true);
   let h = seiteHtml();
-  pruefe(/>Substanz</.test(h) && />Verbindlichkeiten</.test(h), 'die Woche zeigt Substanz und Verbindlichkeiten');
-  pruefe(!/tkasten/.test(h) && !/<textarea/.test(h) && !/fl-leiste/.test(h) && !/modusSetzen/.test(h), 'keine Kästchen, kein Editor, keine Werkzeugleiste');
-  pruefe(h.indexOf('Firma anfragen') < h.indexOf('>Verbindlichkeiten<') && h.indexOf('Lager kündigen') > h.indexOf('>Verbindlichkeiten<'),
-         'jede Aufgabe steht in ihrem Abschnitt');
-  pruefe((h.match(/kpSprung\(/g) || []).length === 2 && /title="Zu „Umzug“"/.test(h), 'hinter jeder Aufgabe ein ↗ zur Quelle');
-  const e1 = w.eintraege[0];
-  WK.kpEintragUm(mo, e1.id);
-  pruefe(/\[x\] Firma anfragen/.test(s.text), 'ein Klick streicht durch — und hakt die Zeile in der Quelle ab');
+  pruefe(/>Bringt mich substanziell weiter</.test(h) && />Verbindlichkeiten</.test(h) && !/>Substanz</.test(h), 'die Überschrift heißt „Bringt mich substanziell weiter“');
+  pruefe(!/tkasten/.test(h) && !/<textarea/.test(h) && /modusSetzen\('schreiben'\)/.test(h), 'in der Ansicht keine Kästchen und kein Feld — aber „Schreiben“');
+  pruefe((h.match(/kpWocheSprung\(/g) || []).length === 2 && /title="Zu „Umzug“"/.test(h), 'hinter eingeplanten Aufgaben ein ↗ zur Quelle');
+  WK.kpWocheZeileUm(1);
+  pruefe(/\[x\] Firma anfragen/.test(s.text) && /\[x\] Firma anfragen/.test(w.text), 'ein Klick streicht durch — und hakt die Zeile in der Quelle ab');
   WK.seiteZeichnen(true);
   pruefe(/class="wz erl"/.test(seiteHtml()), 'die Zeile steht in der Woche durchgestrichen');
-  WK.kpEintragUm(mo, e1.id);
-  pruefe(/\[\] Firma anfragen/.test(s.text) && !e1.erledigt, 'ein zweiter Klick nimmt beides zurück');
-  WK.kpSprung(mo, e1.id);
+  WK.kpWocheZeileUm(1);
+  pruefe(/\[\] Firma anfragen/.test(s.text) && /\[\] Firma anfragen/.test(w.text), 'ein zweiter Klick nimmt beides zurück');
+
+  WK.modusSetzen('schreiben');
+  h = seiteHtml();
+  pruefe(/<textarea id="kpFeld"/.test(h) && /fl-leiste/.test(h), 'im Schreiben-Modus Feld und Werkzeugleiste wie bei Notizen');
+  WK.kpTextSetzen('Messe am Mittwoch.\n\n' + w.text.replace('[] Lager kündigen', '[] Lager kündigen\nFreitag: Reisekosten\n[] Reifen wechseln'));
+  WK.modusSetzen('ansicht');
+  h = seiteHtml();
+  pruefe(/Messe am Mittwoch/.test(h) && /Freitag: Reisekosten/.test(h), 'frei Geschriebenes steht in der Woche — auch zwischen den Aufgaben');
+  pruefe(/kpWocheZeileUm\(\d+\)[^>]*>Reifen wechseln/.test(h) && (h.match(/kpWocheSprung\(/g) || []).length === 2,
+         'eine selbst geschriebene Aufgabe lässt sich durchstreichen — ohne ↗');
+  const zeilen = w.text.split('\n');
+  const nrR = zeilen.indexOf('[] Reifen wechseln');
+  WK.kpWocheZeileUm(nrR);
+  pruefe(w.text.indexOf('[x] Reifen wechseln') >= 0, 'und wird durchgestrichen');
+
+  WK.kpWocheSprung(w.text.split('\n').indexOf('[] Firma anfragen'));
   pruefe(WK.kp.art === 'seite' && WK.kp.id === s.id && WK.kp.hervor === 'Firma anfragen', '↗ öffnet die Quelle');
-  pruefe(/id="kpHervor"/.test(seiteHtml()) && (seiteHtml().match(/id="kpHervor"/g) || []).length === 1, 'die Zeile ist dort hervorgehoben');
+  pruefe((seiteHtml().match(/id="kpHervor"/g) || []).length === 1, 'die Zeile ist dort hervorgehoben');
+
   s.text = 'Notiz\n[] Firma anrufen\n[] Lager kündigen';
-  WK.kpEintragUm(mo, e1.id);
-  pruefe(e1.erledigt === true && s.text.indexOf('[x]') < 0, 'umformuliert: Durchstreichen wirkt nur in der Woche, die Quelle bleibt');
-  WK.kpEintragUm(mo, e1.id);
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.kpWocheZeileUm(w.text.split('\n').indexOf('[] Firma anfragen'));
+  pruefe(w.text.indexOf('[x] Firma anfragen') >= 0 && s.text.indexOf('[x]') < 0, 'umformuliert: Durchstreichen wirkt nur in der Woche, die Quelle bleibt');
   WK.DB.seiten = [];
-  WK.kp.art = 'woche'; WK.kp.id = '';
   WK.seiteZeichnen(true);
-  pruefe(!/kpSprung\(/.test(seiteHtml()) && /Firma anfragen/.test(seiteHtml()), 'ohne Quelle bleibt die Aufgabe stehen — ohne ↗');
-  WK.kpEintragUm(mo, e1.id);
-  pruefe(e1.erledigt === true, 'auch ohne Quelle lässt sie sich durchstreichen');
+  pruefe(!/kpWocheSprung\(/.test(seiteHtml()) && /Lager kündigen/.test(seiteHtml()), 'ohne Quelle bleibt die Aufgabe stehen — ohne ↗');
+
   frisch();
-  WK.kp.art = 'woche'; WK.kp.id = '';
+  const q = WK.kpSeiteAnlegen('liste', 'L', '[] eins');
+  WK.kp.art = 'seite'; WK.kp.id = q.id;
+  WK.kpEinplanen(0, 'v');
+  const w2 = WK.kpWocheFinden(mo);
+  w2.text = w2.text.replace('[] eins\n', '');
+  pruefe(WK.kpEintragFinden(q.id, 'eins') === null, 'in der Woche gelöscht: die Marke an der Quelle verschwindet');
+  WK.kp.art = 'seite'; WK.kp.id = q.id;
+  WK.kpEinplanen(0, 's');
+  pruefe(w2.eintraege.length === 1 && /## Bringt mich substanziell weiter\n\[\] eins/.test(w2.text), 'und sie lässt sich neu einplanen — ohne verwaisten Eintrag');
+  WK.kpAusplanen(mo, w2.eintraege[0].id);
+  pruefe(w2.eintraege.length === 0 && w2.text.indexOf('eins') < 0 && q.text === '[] eins', '„KW · S ×“ nimmt die Zeile aus der Woche, die Quelle bleibt');
+  w2.text = 'Eigenes\n## Ohne Abschnitte';
+  WK.kp.art = 'seite'; WK.kp.id = q.id;
+  WK.kpEinplanen(0, 'v');
+  pruefe(/## Ohne Abschnitte\n\n## Verbindlichkeiten\n\[\] eins$/.test(w2.text), 'fehlt die Überschrift, wird sie angelegt');
+  w2.text = '## Mein substanzielles Zeug\nx\n\n## Termine';
+  w2.eintraege = [];
+  WK.kpEinplanen(0, 's');
+  pruefe(w2.text === '## Mein substanzielles Zeug\nx\n[] eins\n\n## Termine', 'eine umbenannte Überschrift wird an „substanz“ erkannt');
+
+  frisch();
+  WK.kp.art = 'woche'; WK.kp.id = ''; WK.kp.modus = 'ansicht';
   WK.seiteZeichnen(true);
   pruefe(WK.DB.wochen.length === 0, 'eine Woche ansehen legt sie nicht an');
-  pruefe(/S und V/.test(seiteHtml()) && /oeffne\('einst',''\)/.test(seiteHtml()), 'eine leere Woche sagt, wo geplant wird — und bietet die Übernahme an');
+  pruefe(/S oder V/.test(seiteHtml()) && /oeffne\('einst',''\)/.test(seiteHtml()), 'eine leere Woche sagt, wo geplant wird — und bietet die Übernahme an');
+  WK.kp.modus = 'schreiben';
+  WK.kpTextSetzen('Hallo');
+  pruefe(WK.kpWocheFinden(mo) && WK.kpWocheFinden(mo).text === 'Hallo', 'wer in der Woche schreibt, legt sie an');
 }
 
 /* ============================================================
@@ -355,10 +392,10 @@ if (WK) {
   const e = WK.kpWocheFinden(mo).eintraege[0];
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpKastenUm(0);
-  pruefe(s.text === '[x] Unterlagen schicken' && e.erledigt === true, 'abhaken auf der Seite streicht auch in der Woche durch');
-  pruefe(WK.kpEintragStand(e).erledigt === true, 'der Stand in der Woche kommt aus der Quelle');
+  pruefe(s.text === '[x] Unterlagen schicken' && e.erledigt === true && /\[x\] Unterlagen schicken/.test(WK.kpWocheFinden(mo).text),
+         'abhaken auf der Seite streicht auch in der Woche durch');
   WK.kpKastenUm(0);
-  pruefe(s.text === '[] Unterlagen schicken' && e.erledigt === false, 'und zurück');
+  pruefe(s.text === '[] Unterlagen schicken' && e.erledigt === false && /\[\] Unterlagen schicken/.test(WK.kpWocheFinden(mo).text), 'und zurück');
   s.text = '  [ ] eingerückt';
   WK.kpKastenUm(0);
   pruefe(s.text === '  [x] eingerückt', 'die Einrückung bleibt beim Abhaken');
@@ -500,6 +537,8 @@ if (WK) {
   const z2 = WK.kpMigAusfuehren();
   pruefe(z2.seiten === 2 && z2.wochen === 0, 'eine zweite Übernahme legt nur an, was noch fehlt (hier die Notizen)');
   pruefe(WK.DB.seiten.length === 10, 'keine Doppelten');
+  pruefe(/\[x\] Fertig/.test(WK.kpWocheFinden(mo).text) && /## Verbindlichkeiten\n\[\] Becker anrufen/.test(WK.kpWocheFinden(mo).text),
+         'eine Woche aus Kompass 1.0 kommt als Text an');
   pruefe(WK.kpMigAusText('{"x":1}', 'Test') === false && WK.kpMigAusText('kein json', 'Test') === false, 'fremde Dateien werden abgewiesen');
   pruefe(Array.isArray(wb.aufgaben) && wb.aufgaben.length === 13 && wb.projekte[0].flaeche === 'Bis Ende November.\n\n', 'die Workbench-Daten bleiben unverändert');
   WK.kp.art = 'einst';
@@ -611,7 +650,7 @@ if (WK) {
   const c = WK.kpSeiteAnlegen('notiz', 'Garten', '');
   pruefe(a.kontext === '' && b.kontext === 'beruflich' && c.kontext === 'privat', 'eine neue Seite bekommt den gerade gewählten Filter');
   pruefe(WK.localStorage.getItem('kompass-filter') === 'privat', 'der Filter wird auf dem Gerät gemerkt');
-  WK.kp.filter = 'alle'; WK.kpFilterLaden();
+  WK.kp.filter = 'alle'; WK.kpFilterLaden(); WK.kp.notizenAuf = true;
   pruefe(WK.kp.filter === 'privat', 'und beim Start wieder geladen');
   WK.leisteZeichnen();
   let le = WK.document.getElementById('leiste').innerHTML;
@@ -646,8 +685,8 @@ if (WK) {
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpEinplanen(3, 'v');
   const mo = WK.kpHeuteMontag();
-  const e = WK.kpWocheFinden(mo).eintraege[0];
-  WK.kpSprung(mo, e.id);
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.kpWocheSprung(WK.kpWocheFinden(mo).text.split('\n').indexOf('[] Lager kündigen'));
   pruefe(WK.kp.modus === 'ansicht' && WK.kp.hervor === 'Lager kündigen', '↗ öffnet die Seite in der Ansicht, nicht im Schreiben-Modus');
   const f = WK.document.getElementById('kpFeld');
   f.value = s.text; f.selectionStart = 0; f.selectionEnd = 0;
@@ -702,7 +741,90 @@ if (WK) {
 }
 
 /* ============================================================
+   16. Wochen aus 2.0/2.1 werden zu Text
+   ============================================================ */
+console.log('\n16. Alte Wochen umstellen');
+if (WK) {
+  frisch();
+  const mo = WK.kpHeuteMontag();
+  WK.DB.wochen.push({ id: 'kw-' + mo, montag: mo, geaendert: 1, eintraege: [
+    { id: 'e1', abschnitt: 's', text: 'Konzept', quelle: 'x', erledigt: false },
+    { id: 'e2', abschnitt: 'v', text: 'Becker', quelle: '', erledigt: true }] });
+  WK.DB.wochen.push({ id: 'kw-2026-01-05', montag: '2026-01-05', geaendert: 1, eintraege: [] });
+  const n = WK.kpWochenUmstellen();
+  pruefe(n === 2 && WK.kpWocheFinden(mo).text === '## Bringt mich substanziell weiter\n[] Konzept\n\n## Verbindlichkeiten\n[x] Becker\n',
+         'die Einträge werden einmal zu Text — Erledigtes mit [x]');
+  pruefe(WK.kpWocheFinden(mo).geaendert > 1, 'mit neuem Stempel, damit der Abgleich es mitnimmt');
+  pruefe(WK.kpWochenUmstellen() === 0, 'ein zweites Mal ändert nichts');
+}
+
+/* ============================================================
+   17. Seitenleiste: eingeklappt und ohne Zählung
+   ============================================================ */
+console.log('\n17. Seitenleiste eingeklappt');
+if (WK) {
+  frisch();
+  WK.kp.filter = 'alle'; WK.kp.notizenAuf = false; WK.kp.ruhtAuf = false; WK.kp.fertigAuf = false;
+  const n = WK.kpSeiteAnlegen('notiz', 'Geheime Notiz', '[] a\n[] b');
+  const r = WK.kpSeiteAnlegen('vorhaben', 'Ruhendes', '');
+  r.zustand = 'ruht';
+  const f = WK.kpSeiteAnlegen('vorhaben', 'Fertiges', '');
+  f.zustand = 'erledigt';
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.leisteZeichnen();
+  let le = WK.document.getElementById('leiste').innerHTML;
+  pruefe(!/Geheime Notiz/.test(le) && /klappUm\('notiz'\)/.test(le), 'Notizen sind beim Start eingeklappt — der Kopf klappt auf');
+  pruefe(!/Ruhendes/.test(le) && /› Ruht · 1/.test(le), '„Ruht“ ist eingeklappt wie „Erledigt“');
+  pruefe(!/Fertiges/.test(le) && /› Erledigt · 1/.test(le), '„Erledigt“ bleibt eingeklappt');
+  WK.klappUm('notiz'); WK.klappUm('ruht');
+  le = WK.document.getElementById('leiste').innerHTML;
+  pruefe(/Geheime Notiz/.test(le) && /Ruhendes/.test(le), 'aufgeklappt zeigen sie ihre Seiten');
+  WK.kp.notizenAuf = false; WK.kp.ruhtAuf = false;
+  WK.kp.art = 'seite'; WK.kp.id = n.id;
+  WK.leisteZeichnen();
+  pruefe(/Geheime Notiz/.test(WK.document.getElementById('leiste').innerHTML), 'ist eine Notiz offen, sind die Notizen aufgeklappt');
+  WK.klappUm('quatsch');
+  pruefe(!/class="zahl"/.test(WK.document.getElementById('leiste').innerHTML), 'keine Zählung offener Aufgaben in der Seitenleiste');
+  WK.seiteZeichnen(true);
+  pruefe(!/Offene Aufgaben<b>/.test(seiteHtml()), 'keine Zählung am Knopf „Offene Aufgaben“');
+}
+
+/* ============================================================
+   18. Neue Fassung suchen und laden — wie in der Workbench
+   ============================================================ */
+console.log('\n18. Neue Fassung');
+if (WK) {
+  pruefe(/id="neuStreifen"[^>]*onclick="neuLaden\(\)"/.test(QUELLE) && /id="neuText"/.test(QUELLE), 'der Streifen „Neue Fassung“ steht in der Seite');
+  pruefe(/\.app>\.rumpf\{grid-row:3\}/.test(QUELLE), 'der versteckte Streifen verschiebt das Raster nicht');
+  pruefe(/'\.\/wochenkompass\.html\?stand='/.test(SKRIPT) && /cache: 'no-store'/.test(SKRIPT), 'gefragt wird die eigene Datei, am Vorrat vorbei');
+  pruefe(/getRegistration\('\.\/wochenkompass'\)/.test(SKRIPT), 'neu geladen wird über den eigenen Service Worker');
+  pruefe(/versionPruefen\(false\);\n  versionTaktStarten\(\);/.test(SKRIPT), 'geprüft wird beim Start und danach im Takt');
+  pruefe(/function rueckkehrPruefen\(\) \{[\s\S]*?versionPruefen\(false\)/.test(SKRIPT), 'und beim Zurückkehren zur App');
+  pruefe(/'sofort-uebernehmen'/.test(SW_QUELLE) && /skipWaiting/.test(SW_QUELLE), 'der Service Worker übernimmt auf Zuruf sofort');
+  const alt = WK.fetch;
+  const klassen = [];
+  WK.document.getElementById('neuStreifen').classList = { add(k) { klassen.push('+' + k); }, remove(k) { klassen.push('-' + k); } };
+  WK.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve("var APP_VERSION = '9.9.9';") });
+  WK.versionPruefen(false).then(function (v) {
+    pruefe(v === '9.9.9' && WK.neueVersion === '9.9.9' && klassen.indexOf('+sichtbar') >= 0, 'eine neuere Fassung zeigt den Streifen');
+    pruefe(/Neue Fassung 9\.9\.9 verfügbar/.test(WK.document.getElementById('neuText').textContent), 'mit beiden Versionsnummern');
+    WK.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve("var APP_VERSION = '" + WK.APP_VERSION + "';") });
+    return WK.versionPruefen(false);
+  }).then(function () {
+    pruefe(WK.neueVersion === '' && klassen[klassen.length - 1] === '-sichtbar', 'die laufende Fassung blendet ihn wieder aus');
+    WK.kp.art = 'einst';
+    WK.seiteZeichnen(true);
+    pruefe(/versionPruefen\(true\)/.test(seiteHtml()), 'in den Einstellungen: „Auf neue Fassung prüfen“');
+    WK.fetch = alt;
+    console.log('\nERGEBNIS   ok: ' + anzOk + '   FAIL: ' + anzFail + '   warn: ' + anzWarn);
+    process.exitCode = anzFail ? 1 : 0;
+  });
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
-console.log('\nERGEBNIS   ok: ' + anzOk + '   FAIL: ' + anzFail + '   warn: ' + anzWarn);
-process.exitCode = anzFail ? 1 : 0;
+if (!WK) {
+  console.log('\nERGEBNIS   ok: ' + anzOk + '   FAIL: ' + anzFail + '   warn: ' + anzWarn);
+  process.exitCode = anzFail ? 1 : 0;
+}
