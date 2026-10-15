@@ -911,6 +911,59 @@ if (WK) {
 }
 
 /* ============================================================
+   21. Ergänzte Zeilen bleiben verbunden
+   Grund: Aus „… beschreiben“ wurde in der Woche „… beschreiben (Fr)“
+   — und ↗ war weg. Hinten Angehängtes hält jetzt die Verbindung, in
+   der Woche wie in der Quelle.
+   ============================================================ */
+console.log('\n21. Ergänzte Zeilen');
+if (WK) {
+  pruefe(WK.kpPasst('Offering beschreiben', 'Offering beschreiben') === 2, 'wörtlich gleich');
+  pruefe(WK.kpPasst('Offering beschreiben (Fr)', 'Offering beschreiben') === 1 && WK.kpPasst('Anrufen – bis 12 Uhr', 'Anrufen') === 1
+         && WK.kpPasst('Anrufen ✔', 'Anrufen') === 1 && WK.kpPasst('Anrufen, dann mailen', 'Anrufen') === 1, 'hinten angehängt passt');
+  pruefe(WK.kpPasst('Anrufer', 'Anrufen') === 0 && WK.kpPasst('Anrufens', 'Anrufen') === 0 && WK.kpPasst('Bitte Anrufen', 'Anrufen') === 0,
+         'mitten im Wort oder vorne geändert passt nicht');
+  frisch();
+  const s = WK.kpSeiteAnlegen('liste', 'Büro', '[] Anrufen\n[] Offering beschreiben');
+  WK.kp.art = 'seite'; WK.kp.id = s.id;
+  WK.kpEinplanen(1, 'v');
+  const mo = WK.kpHeuteMontag();
+  const w = WK.kpWocheFinden(mo);
+  w.text = w.text.replace('[] Offering beschreiben', '[] Offering beschreiben (Fr)');
+  WK.kp.art = 'woche'; WK.kp.id = ''; WK.kp.modus = 'ansicht';
+  WK.seiteZeichnen(true);
+  pruefe(/kpWocheSprung\(/.test(seiteHtml()), 'in der Woche um „(Fr)“ ergänzt: ↗ bleibt');
+  const nr = w.text.split('\n').indexOf('[] Offering beschreiben (Fr)');
+  WK.kpWocheZeileUm(nr);
+  pruefe(/\[x\] Offering beschreiben \(Fr\)/.test(w.text) && /\[x\] Offering beschreiben$/.test(s.text), 'Durchstreichen hakt die Quelle weiter ab');
+  WK.kpWocheZeileUm(nr);
+  WK.kp.art = 'seite'; WK.kp.id = s.id;
+  pruefe(WK.kpEintragFinden(s.id, 'Offering beschreiben') !== null, 'an der Quelle bleibt die Marke „KW“');
+  s.text = '[] Anrufen\n[] Offering beschreiben – Entwurf an Jana';
+  pruefe(WK.kpEintragFinden(s.id, 'Offering beschreiben – Entwurf an Jana') !== null, 'auch in der Quelle darf hinten etwas dazukommen');
+  WK.kpKastenUm(1);
+  pruefe(/\[x\] Offering beschreiben \(Fr\)/.test(w.text), 'abhaken in der Quelle streicht die ergänzte Zeile in der Woche durch');
+  WK.kpKastenUm(1);
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.kpWocheSprung(nr);
+  pruefe(WK.kp.art === 'seite' && /id="kpHervor"[^>]*>|class="fl-zeile aufgabe hervor" id="kpHervor"/.test(seiteHtml())
+         && (seiteHtml().match(/id="kpHervor"/g) || []).length === 1, '↗ hebt die ergänzte Zeile in der Quelle hervor');
+  frisch();
+  const q = WK.kpSeiteAnlegen('liste', 'L', '[] Anrufen\n[] Anrufen Becker');
+  WK.kp.art = 'seite'; WK.kp.id = q.id;
+  WK.kpEinplanen(0, 's');
+  WK.kp.art = 'seite'; WK.kp.id = q.id;
+  WK.kpEinplanen(1, 's');
+  const w2 = WK.kpWocheFinden(mo);
+  pruefe(w2.eintraege.length === 2, '„Anrufen Becker“ ist nicht schon durch „Anrufen“ eingeplant');
+  const nrB = w2.text.split('\n').indexOf('[] Anrufen Becker');
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.kpWocheZeileUm(nrB);
+  pruefe(/\[x\] Anrufen Becker/.test(q.text) && /\[\] Anrufen$/m.test(q.text), 'wörtlich gleiche Zeilen gehen vor — die richtige wird abgehakt');
+  pruefe(WK.kpWocheEintrag(w2, 'Anrufen Becker').text === 'Anrufen Becker', 'zur Zeile gehört der genaueste Eintrag');
+}
+
+/* ============================================================
    18. Neue Fassung suchen und laden — wie in der Workbench
    ============================================================ */
 console.log('\n18. Neue Fassung');

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Wochenkompass 2.4.0</title>
+<title>Wochenkompass 2.4.1</title>
 <meta name="theme-color" content="#F4F2EE">
 <link rel="manifest" href="./wochenkompass.webmanifest">
 <link rel="icon" href="./wochenkompass-192.png" sizes="192x192" type="image/png">
@@ -265,7 +265,7 @@ body:not(.breit) .wt{font-size:16.5px}
 <div class="app">
   <header class="kopf">
     <button type="button" class="knopf-rund" id="leisteKnopf" onclick="leisteUm()" aria-label="Seitenleiste">☰</button>
-    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.4.0</small></span></span>
+    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.4.1</small></span></span>
     <span class="luecke"></span>
     <button type="button" class="stand" id="standPille" onclick="standGeklickt()" title="Anmelden oder abgleichen">nur auf diesem Gerät</button>
     <button type="button" class="knopf-rund" onclick="oeffne('einst','')" aria-label="Einstellungen" title="Speicher, Anmeldung, Abgleich">⚙</button>
@@ -299,7 +299,7 @@ body:not(.breit) .wt{font-size:16.5px}
    darf 2.0 nie schreiben.
    ============================================================ */
 
-var APP_VERSION = '2.4.0';
+var APP_VERSION = '2.4.1';
 var DATEINAME   = 'kompass.json';
 var IDB_NAME    = 'kompass-speicher';
 var IDB_STORE   = 'handles';
@@ -1568,9 +1568,10 @@ function anmeldeAnfragen(klient, still, aufforderung, fertig) {
    streicht durch — und hakt die Zeile in der Quelle ab. ↗ springt an
    die Zeile; wer danach auf „Schreiben“ wechselt, hat die Schreibmarke dort.
 
-   Die Woche merkt sich eine Aufgabe über Seite und Text. Wird die
-   Zeile in der Quelle umformuliert, findet die Woche sie nicht mehr:
-   ↗ öffnet dann nur die Seite, Durchstreichen wirkt nur in der Woche.
+   Die Woche merkt sich eine Aufgabe über Seite und Text. Hinten etwas
+   anhängen („(Fr)“) ist erlaubt, in der Woche wie in der Quelle. Wird
+   Anfang oder Mitte umformuliert, findet die Woche sie nicht mehr:
+   ↗ fehlt dann, Durchstreichen wirkt nur in der Woche.
    ============================================================ */
 
 var speicherUhr = null;
@@ -1850,18 +1851,47 @@ function kpOffeneZahl(seite) {
 
 /* Sucht die Zeile einer Aufgabe. Mit „vorzug" (true = erledigt,
    false = offen) wird eine Zeile in diesem Stand bevorzugt. */
+/* Passt eine Zeile zu einer gemerkten Aufgabe? 2 = wörtlich gleich,
+   1 = die Zeile beginnt damit und hat hinten etwas angehängt („(Fr)“,
+   „– bis 12 Uhr“, „✔“), 0 = nein. Angehängt heißt: nach einem
+   Leerzeichen oder Satzzeichen — „Anrufen“ passt nicht zu „Anrufer“. */
+function kpPasst(zeilenText, gemerkt) {
+  var z = String(zeilenText || '');
+  var g = String(gemerkt || '');
+  if (!g) { return 0; }
+  if (z === g) { return 2; }
+  if (z.length > g.length && z.indexOf(g) === 0 && /[\s(\[,.;:!?\-–—✔→]/.test(z.charAt(g.length))) { return 1; }
+  return 0;
+}
+
+/* Gibt es auf der Seite eine Aufgabenzeile mit genau diesem Text? Dann
+   gehört ein gleichlautender Eintrag zu ihr — nicht zu einer anderen
+   Zeile, die nur gleich anfängt („Anrufen“ / „Anrufen Becker“). */
+function kpHatWoertlich(seite, text) {
+  if (!seite) { return false; }
+  return String(seite.text || '').split('\n').some(function (z) {
+    var a = kpAufgabe(z);
+    return !!(a && a.text === text);
+  });
+}
+
+/* Sucht die Zeile einer Aufgabe. Wörtlich gleiche Zeilen gehen vor
+   ergänzten; mit „vorzug" (true = erledigt, false = offen) wird
+   außerdem eine Zeile in diesem Stand bevorzugt. */
 function kpZeileSuchen(seite, text, vorzug) {
   if (!seite) { return null; }
   var zeilen = String(seite.text || '').split('\n');
-  var erste = null;
+  var beste = null;
+  var besteWert = 0;
   var i;
   for (i = 0; i < zeilen.length; i++) {
     var a = kpAufgabe(zeilen[i]);
-    if (!a || a.text !== text) { continue; }
-    if (typeof vorzug !== 'boolean' || a.erledigt === vorzug) { return { nr: i, erledigt: a.erledigt }; }
-    if (!erste) { erste = { nr: i, erledigt: a.erledigt }; }
+    var p = a ? kpPasst(a.text, text) : 0;
+    if (!p) { continue; }
+    var wert = p * 2 + ((typeof vorzug !== 'boolean' || a.erledigt === vorzug) ? 1 : 0);
+    if (wert > besteWert) { beste = { nr: i, erledigt: a.erledigt }; besteWert = wert; }
   }
-  return erste;
+  return beste;
 }
 
 /* Setzt das Kästchen einer Zeile. */
@@ -1881,14 +1911,19 @@ function kpEintragFinden(seiteId, text) {
   var heute = kpHeuteMontag();
   var wochen = (DB.wochen || []).filter(function (w) { return w && w.montag >= heute; })
     .sort(function (a, b) { return (a.montag < b.montag) ? -1 : ((a.montag > b.montag) ? 1 : 0); });
+  var beste = null;
+  var besteWert = 0;
   var i, j;
   for (i = 0; i < wochen.length; i++) {
     var l = wochen[i].eintraege || [];
     for (j = 0; j < l.length; j++) {
-      if (l[j].quelle === seiteId && l[j].text === text && kpZeileSuchen(wochen[i], text)) { return { woche: wochen[i], eintrag: l[j] }; }
+      if (l[j].quelle !== seiteId) { continue; }
+      var p = kpPasst(text, l[j].text);
+      if (p === 1 && kpHatWoertlich(kpSeiteFinden(seiteId), l[j].text)) { p = 0; }
+      if (p > besteWert && kpZeileSuchen(wochen[i], l[j].text)) { beste = { woche: wochen[i], eintrag: l[j] }; besteWert = p; }
     }
   }
-  return null;
+  return beste;
 }
 
 function kpEintragHolen(montag, id) {
@@ -1904,11 +1939,18 @@ function kpEintragHolen(montag, id) {
    Quelle noch gibt. Selbst geschriebene Zeilen haben keinen. */
 function kpWocheEintrag(w, text) {
   var l = (w && w.eintraege) || [];
+  var beste = null;
+  var besteWert = 0;
   var i;
   for (i = 0; i < l.length; i++) {
-    if (l[i].text === text && l[i].quelle && kpSeiteFinden(l[i].quelle)) { return l[i]; }
+    if (!l[i].quelle || !kpSeiteFinden(l[i].quelle)) { continue; }
+    /* wörtlich vor ergänzt, bei Ergänzungen der längere gemerkte Text */
+    var p = kpPasst(text, l[i].text);
+    if (p === 1 && kpHatWoertlich(w, l[i].text)) { p = 0; }
+    var wert = p ? p * 1000 + String(l[i].text).length : 0;
+    if (wert > besteWert) { beste = l[i]; besteWert = wert; }
   }
-  return null;
+  return beste;
 }
 
 /* S oder V auf einer Seite: Die Aufgabe kommt als Zeile unter die
@@ -1969,7 +2011,7 @@ function kpWocheZeileUm(nr) {
   var e = a.text ? kpWocheEintrag(w, a.text) : null;
   if (e) {
     var quelle = kpSeiteFinden(e.quelle);
-    var z = kpZeileSuchen(quelle, a.text, a.erledigt);
+    var z = kpZeileSuchen(quelle, e.text, a.erledigt);
     if (z && z.erledigt !== neu) { kpKastenSetzen(quelle, z.nr, neu); }
     e.erledigt = neu;
   }
@@ -2030,7 +2072,7 @@ function kpKastenUm(nr) {
   kpKastenSetzen(s, nr, !a.erledigt);
   var f = a.text ? kpEintragFinden(s.id, a.text) : null;
   if (f) {
-    var z = kpZeileSuchen(f.woche, a.text, a.erledigt);
+    var z = kpZeileSuchen(f.woche, f.eintrag.text, a.erledigt);
     if (z && z.erledigt !== !a.erledigt) { kpKastenSetzen(f.woche, z.nr, !a.erledigt); }
     f.eintrag.erledigt = !a.erledigt;
     f.woche.geaendert = jetzt();
@@ -2561,7 +2603,7 @@ function kpZeileHtml(seite, zeile, nr, nummer, woche) {
   var a = kpAufgabe(rest);
   if (a) {
     var kasten = rest.match(KP_KASTEN);
-    var hervor = (kp.hervor && a.text === kp.hervor);
+    var hervor = !!(kp.hervor && kpZeileSuchen(seite, kp.hervor) && kpZeileSuchen(seite, kp.hervor).nr === nr);
     return '<div class="fl-zeile aufgabe' + (hervor ? ' hervor' : '') + '"' + (hervor ? ' id="kpHervor"' : '') + stil + '>'
          + '<button class="tkasten' + (a.erledigt ? ' an' : '') + '" type="button" onclick="kpKastenUm(' + nr + ')" aria-label="Abhaken"></button>'
          + '<span class="fl-text' + (a.erledigt ? ' fertig' : '') + '">' + kpAuszeichnen(kasten[3]) + '</span></div>';
