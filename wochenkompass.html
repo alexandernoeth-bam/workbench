@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Wochenkompass 2.3.0</title>
+<title>Wochenkompass 2.4.0</title>
 <meta name="theme-color" content="#F4F2EE">
 <link rel="manifest" href="./wochenkompass.webmanifest">
 <link rel="icon" href="./wochenkompass-192.png" sizes="192x192" type="image/png">
@@ -79,6 +79,18 @@ body.breit .schleier{display:none}
 .eintrag .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .eintrag.ruht{color:var(--grau)}
 .eintrag.ruht .zeichen{color:var(--grau)}
+/* Manuell sortieren: am PC ziehen, am Handy ▲ ▼ im Sortiermodus */
+.eintrag[draggable="true"]{cursor:pointer}
+.eintrag.zieh-vor{box-shadow:inset 0 2px 0 var(--weinrot)}
+.eintrag.zieh-nach{box-shadow:inset 0 -2px 0 var(--weinrot)}
+.sortier-knopf{border:0;background:none;color:var(--grau);font:inherit;font-size:10.5px;letter-spacing:.04em;text-transform:none;
+  font-weight:500;padding:2px 6px;border-radius:6px}
+.sortier-knopf.an{color:var(--weinrot);background:var(--karte)}
+body.breit .sortier-knopf{display:none}
+.sort-zeile{display:flex;align-items:center;gap:2px}
+.sort-zeile .eintrag{flex:1;min-width:0}
+.sort-pfeil{flex:0 0 34px;height:34px;border:1px solid var(--linie);background:var(--karte);border-radius:7px;font-size:12px;color:var(--grau)}
+.gruppe .klapp-kopf{flex:1;text-align:left}
 .stern{font-size:15px}
 .marke-klein{font-size:10px;padding:0 6px;border-radius:8px;border:1px solid var(--linie);color:var(--grau);white-space:nowrap}
 .leer-hinweis{font-size:12px;color:var(--grau);padding:4px 8px 6px;line-height:1.6}
@@ -253,7 +265,7 @@ body:not(.breit) .wt{font-size:16.5px}
 <div class="app">
   <header class="kopf">
     <button type="button" class="knopf-rund" id="leisteKnopf" onclick="leisteUm()" aria-label="Seitenleiste">☰</button>
-    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.3.0</small></span></span>
+    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.4.0</small></span></span>
     <span class="luecke"></span>
     <button type="button" class="stand" id="standPille" onclick="standGeklickt()" title="Anmelden oder abgleichen">nur auf diesem Gerät</button>
     <button type="button" class="knopf-rund" onclick="oeffne('einst','')" aria-label="Einstellungen" title="Speicher, Anmeldung, Abgleich">⚙</button>
@@ -287,7 +299,7 @@ body:not(.breit) .wt{font-size:16.5px}
    darf 2.0 nie schreiben.
    ============================================================ */
 
-var APP_VERSION = '2.3.0';
+var APP_VERSION = '2.4.0';
 var DATEINAME   = 'kompass.json';
 var IDB_NAME    = 'kompass-speicher';
 var IDB_STORE   = 'handles';
@@ -1579,6 +1591,7 @@ var kp = {
   fertigAuf: false,
   ruhtAuf: false,
   notizenAuf: false,     /* beim Start eingeklappt */
+  sortieren: '',         /* Gruppe im Sortiermodus (Handy): vorhaben-laeuft | … | liste | notiz */
   hervor: '',            /* Aufgabentext, der nach einem Sprung hervorgehoben wird */
   zielWoche: 'diese',    /* diese | naechste — wohin S und V planen */
   oaAuf: false,          /* Fenster „Offene Aufgaben“ */
@@ -2072,6 +2085,7 @@ function kpZustand(wert) {
   var s = kpSeite();
   if (!s || s.art !== 'vorhaben') { return; }
   if (['laeuft', 'ruht', 'erledigt'].indexOf(wert) < 0) { return; }
+  if (s.zustand !== wert) { s.rang = kpNaechsterRang(); }   /* in der neuen Gruppe unten */
   s.zustand = wert;
   s.geaendert = jetzt();
   kp.frage = '';
@@ -2593,9 +2607,135 @@ function neuFeldHtml() {
        + '<button type="button" class="pille" onclick="anlegen()">Anlegen</button></div>';
 }
 
+/* Ein Eintrag der Seitenleiste. Am PC lässt er sich innerhalb seiner
+   Gruppe ziehen; im Sortiermodus (Handy) bekommt er ▲ ▼. */
 function seitenEintragHtml(s, klasse) {
-  return eintragHtml(kp.art === 'seite' && kp.id === s.id, 'oeffne(\'seite\',\'' + esc(s.id) + '\')',
-                     KP_ARTEN[s.art].zeichen, s.titel || 'ohne Titel', '', klasse);
+  var id = esc(s.id);
+  var h = eintragHtml(kp.art === 'seite' && kp.id === s.id, 'oeffne(\'seite\',\'' + id + '\')',
+                      KP_ARTEN[s.art].zeichen, s.titel || 'ohne Titel', '', klasse);
+  h = h.replace('<button type="button" class="eintrag', '<button type="button" draggable="true" data-id="' + id + '" '
+      + 'ondragstart="kpZiehStart(event,\'' + id + '\')" ondragover="kpZiehUeber(event,\'' + id + '\')" '
+      + 'ondragleave="kpZiehWeg(event)" ondrop="kpZiehAb(event,\'' + id + '\')" ondragend="kpZiehEnde()" class="eintrag');
+  if (kp.sortieren !== kpGruppenSchluessel(s)) { return h; }
+  return '<div class="sort-zeile">' + h
+       + '<button type="button" class="sort-pfeil" onclick="kpSchieben(\'' + id + '\',-1)" aria-label="Nach oben">▲</button>'
+       + '<button type="button" class="sort-pfeil" onclick="kpSchieben(\'' + id + '\',1)" aria-label="Nach unten">▼</button></div>';
+}
+
+/* ---------- Manuell sortieren ----------
+
+   Sortiert wird nur innerhalb einer Gruppe: Vorhaben „läuft“, „ruht“,
+   „erledigt“, Listen, Notizen. Die Ränge der Gruppe werden unter ihren
+   Einträgen neu verteilt — die anderen Gruppen bleiben unberührt. */
+
+function kpGruppenSchluessel(s) {
+  return (s.art === 'vorhaben') ? 'vorhaben-' + (s.zustand || 'laeuft') : s.art;
+}
+
+function kpGruppe(schluessel) {
+  return (DB.seiten || []).filter(function (s) { return kpGruppenSchluessel(s) === schluessel; })
+    .sort(function (a, b) { return (Number(a.rang) || 0) - (Number(b.rang) || 0); });
+}
+
+/* Setzt „id“ vor oder hinter „zielId“ (wo: 'vor' | 'nach'). */
+function kpVerschieben(id, zielId, wo) {
+  var s = kpSeiteFinden(id);
+  var z = kpSeiteFinden(zielId);
+  if (!s || !z || s === z || kpGruppenSchluessel(s) !== kpGruppenSchluessel(z)) { return false; }
+  var gruppe = kpGruppe(kpGruppenSchluessel(s));
+  var raenge = gruppe.map(function (x) { return Number(x.rang) || 0; });
+  /* Gleiche oder fehlende Ränge (alte Daten) erst auseinanderziehen. */
+  var eindeutig = raenge.every(function (r, i) { return i === 0 || r > raenge[i - 1]; });
+  if (!eindeutig) {
+    var basis = kpNaechsterRang();
+    raenge = gruppe.map(function (x, i) { return basis + i; });
+  }
+  var neu = gruppe.filter(function (x) { return x !== s; });
+  var stelle = neu.indexOf(z) + (wo === 'nach' ? 1 : 0);
+  neu.splice(stelle, 0, s);
+  neu.forEach(function (x, i) {
+    if (x.rang !== raenge[i]) { x.rang = raenge[i]; x.geaendert = jetzt(); }
+  });
+  spaeterSichern();
+  leisteZeichnen();
+  return true;
+}
+
+/* ▲ ▼: mit dem nächsten sichtbaren Eintrag der Gruppe tauschen — unter
+   einem Filter bleiben die ausgeblendeten an ihrem Platz. */
+function kpSchieben(id, richtung) {
+  var s = kpSeiteFinden(id);
+  if (!s || (richtung !== -1 && richtung !== 1)) { return; }
+  var sichtbar = kpGruppe(kpGruppenSchluessel(s)).filter(kpSichtbar);
+  var i = sichtbar.indexOf(s);
+  var nachbar = sichtbar[i + richtung];
+  if (i < 0 || !nachbar) { return; }
+  kpVerschieben(id, nachbar.id, richtung < 0 ? 'vor' : 'nach');
+}
+
+function kpSortierenUm(schluessel) {
+  kp.sortieren = (kp.sortieren === schluessel) ? '' : schluessel;
+  leisteZeichnen();
+}
+
+function sortierKnopfHtml(schluessel) {
+  var an = (kp.sortieren === schluessel);
+  return '<button type="button" class="sortier-knopf' + (an ? ' an' : '') + '" onclick="kpSortierenUm(\'' + schluessel + '\')">'
+       + (an ? 'Fertig' : 'Sortieren') + '</button>';
+}
+
+var kpGezogen = '';
+
+function kpZiehStart(e, id) {
+  kpGezogen = id;
+  if (e && e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', id); } catch (f) { /* manche Browser wollen das nicht */ }
+  }
+}
+
+function kpZiehMarkeWeg() {
+  var alle = (typeof document.querySelectorAll === 'function') ? document.querySelectorAll('.zieh-vor, .zieh-nach') : [];
+  var i;
+  for (i = 0; i < alle.length; i++) { alle[i].classList.remove('zieh-vor'); alle[i].classList.remove('zieh-nach'); }
+}
+
+/* Wohin es fällt: obere Hälfte davor, untere dahinter. */
+function kpZiehStelle(e) {
+  var el = e.currentTarget;
+  if (!el || typeof el.getBoundingClientRect !== 'function') { return 'nach'; }
+  var r = el.getBoundingClientRect();
+  return (e.clientY - r.top < r.height / 2) ? 'vor' : 'nach';
+}
+
+function kpZiehUeber(e, id) {
+  var s = kpSeiteFinden(kpGezogen);
+  var z = kpSeiteFinden(id);
+  if (!s || !z || s === z || kpGruppenSchluessel(s) !== kpGruppenSchluessel(z)) { return; }
+  e.preventDefault();
+  if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move'; }
+  kpZiehMarkeWeg();
+  if (e.currentTarget && e.currentTarget.classList) { e.currentTarget.classList.add(kpZiehStelle(e) === 'vor' ? 'zieh-vor' : 'zieh-nach'); }
+}
+
+function kpZiehWeg(e) {
+  if (e.currentTarget && e.currentTarget.classList) {
+    e.currentTarget.classList.remove('zieh-vor');
+    e.currentTarget.classList.remove('zieh-nach');
+  }
+}
+
+function kpZiehAb(e, id) {
+  e.preventDefault();
+  var wo = kpZiehStelle(e);
+  var gezogen = kpGezogen;
+  kpZiehEnde();
+  kpVerschieben(gezogen, id, wo);
+}
+
+function kpZiehEnde() {
+  kpGezogen = '';
+  kpZiehMarkeWeg();
 }
 
 /* Eine einklappbare Gruppe: Kopf mit Pfeil, offen auch dann, wenn die
@@ -2604,8 +2744,10 @@ function klappGruppeHtml(was, titel, seiten, klasse) {
   if (!seiten.length) { return ''; }
   var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf' }[was];
   var auf = kp[feld] || (kp.art === 'seite' && seiten.some(function (s) { return s.id === kp.id; }));
-  var h = '<button type="button" class="gruppe leise klapp" onclick="klappUm(\'' + was + '\')" aria-expanded="' + auf + '">'
-        + '<span>' + (auf ? '⌄ ' : '› ') + titel + ' · ' + seiten.length + '</span></button>';
+  var schluessel = (was === 'ruht') ? 'vorhaben-ruht' : 'vorhaben-erledigt';
+  var h = '<div class="gruppe leise"><button type="button" class="klapp-kopf" onclick="klappUm(\'' + was + '\')" aria-expanded="' + auf + '">'
+        + (auf ? '⌄ ' : '› ') + titel + ' · ' + seiten.length + '</button>'
+        + (auf && seiten.length > 1 ? sortierKnopfHtml(schluessel) : '') + '</div>';
   if (auf) { seiten.forEach(function (s) { h += seitenEintragHtml(s, klasse); }); }
   return h;
 }
@@ -2624,7 +2766,10 @@ function gruppeKopfHtml(art) {
     titel = '<button type="button" class="klapp-kopf" onclick="klappUm(\'notiz\')" aria-expanded="' + auf + '">'
           + (auf ? '⌄ ' : '› ') + titel + '</button>';
   }
-  return '<div class="gruppe"><span>' + titel + '</span><button type="button" class="plus" onclick="neuOeffnen(\'' + art + '\')" '
+  var schluessel = (art === 'vorhaben') ? 'vorhaben-laeuft' : art;
+  var sortierbar = (art !== 'notiz' || kpNotizenAuf()) && kpGruppe(schluessel).filter(kpSichtbar).length > 1;
+  return '<div class="gruppe"><span>' + titel + '</span>' + (sortierbar ? sortierKnopfHtml(schluessel) : '')
+       + '<button type="button" class="plus" onclick="neuOeffnen(\'' + art + '\')" '
        + 'title="Neu: ' + KP_ARTEN[art].name + '" aria-label="Neu: ' + KP_ARTEN[art].name + '" aria-expanded="' + (kp.neuIn === art) + '">+</button></div>'
        + (kp.neuIn === art ? neuFeldHtml() : '');
 }

@@ -132,7 +132,7 @@ console.log('\n1. Aufbau der Datei');
 
   const code = SKRIPT.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const definiert = new Set(fns);
-  const aufrufe = new Set([...code.matchAll(/on(?:click|input|change|keydown|mousedown|beforeinput)=\\?["'](?:[^"']*?;)?\s*([A-Za-z_]\w*)\(/g)].map(m => m[1])
+  const aufrufe = new Set([...code.matchAll(/on(?:click|input|change|keydown|mousedown|beforeinput|dragstart|dragover|dragleave|drop|dragend)=\\?["'](?:[^"']*?;)?\s*([A-Za-z_]\w*)\(/g)].map(m => m[1])
     .concat([...QUELLE.replace(/<script>[\s\S]*?<\/script>/g, '').matchAll(/on(?:click|input|change|keydown|mousedown)="([A-Za-z_]\w*)\(/g)].map(m => m[1])));
   const fremd = [...aufrufe].filter(a => !definiert.has(a) && ['event', 'if'].indexOf(a) < 0);
   pruefe(fremd.length === 0, 'Bedienelemente rufen nur Funktionen, die es gibt' + (fremd.length ? ' — fehlt: ' + fremd.join(', ') : ''));
@@ -836,6 +836,78 @@ if (WK) {
     WK.zugriffToken = null; WK.tokenAblauf = 0;
     WK.anmelden = alt;
   });
+}
+
+/* ============================================================
+   20. Manuell sortieren — nur innerhalb einer Gruppe
+   ============================================================ */
+console.log('\n20. Manuell sortieren');
+if (WK) {
+  frisch();
+  WK.kp.filter = 'alle'; WK.kp.sortieren = ''; WK.kp.ruhtAuf = false; WK.kp.notizenAuf = false;
+  const a = WK.kpSeiteAnlegen('liste', 'A', '');
+  const b = WK.kpSeiteAnlegen('vorhaben', 'V1', '');
+  const c = WK.kpSeiteAnlegen('liste', 'B', '');
+  const d = WK.kpSeiteAnlegen('liste', 'C', '');
+  const namen = schl => WK.kpGruppe(schl).map(x => x.titel).join(',');
+  pruefe(namen('liste') === 'A,B,C', 'Ausgang: A, B, C');
+  pruefe(WK.kpVerschieben(d.id, a.id, 'vor') && namen('liste') === 'C,A,B', 'ziehen vor einen Eintrag');
+  WK.kpVerschieben(d.id, b.id, 'nach');
+  pruefe(namen('liste') === 'C,A,B' && WK.kpVerschieben(d.id, b.id, 'nach') === false, 'zwischen Gruppen wird nicht verschoben');
+  WK.kpVerschieben(d.id, c.id, 'nach');
+  pruefe(namen('liste') === 'A,B,C', 'ziehen hinter einen Eintrag');
+  const rB = b.rang;
+  pruefe(WK.kpGruppe('vorhaben-laeuft')[0].rang === rB, 'die andere Gruppe behält ihren Rang');
+  WK.kpSchieben(d.id, -1);
+  pruefe(namen('liste') === 'A,C,B', '▲ tauscht mit dem Nachbarn darüber');
+  WK.kpSchieben(a.id, -1);
+  pruefe(namen('liste') === 'A,C,B', 'ganz oben bleibt ▲ ohne Wirkung');
+  c.kontext = 'beruflich'; a.kontext = 'privat'; d.kontext = 'privat';
+  WK.kp.filter = 'privat';
+  WK.kpSchieben(d.id, -1);
+  pruefe(namen('liste') === 'C,A,B', 'unter einem Filter wird mit dem nächsten sichtbaren getauscht');
+  pruefe(WK.kpGruppe('liste').filter(x => x.kontext === 'beruflich').length === 1, 'ausgeblendete Einträge bleiben erhalten');
+  WK.kp.filter = 'alle';
+  const g1 = WK.kpSeiteAnlegen('notiz', 'N1', ''); g1.rang = 5;
+  const g2 = WK.kpSeiteAnlegen('notiz', 'N2', ''); g2.rang = 5;
+  pruefe(WK.kpVerschieben(g2.id, g1.id, 'vor') && namen('notiz') === 'N2,N1', 'auch alte Daten mit gleichem Rang lassen sich sortieren');
+  WK.kp.art = 'seite'; WK.kp.id = b.id;
+  const v2 = WK.kpSeiteAnlegen('vorhaben', 'V2', '');
+  const v3 = WK.kpSeiteAnlegen('vorhaben', 'V3', '');
+  v3.zustand = 'ruht';
+  WK.kp.id = v2.id; WK.kpZustand('ruht');
+  pruefe(namen('vorhaben-ruht') === 'V3,V2', 'wer den Zustand wechselt, steht in der neuen Gruppe unten');
+
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.leisteZeichnen();
+  let le = WK.document.getElementById('leiste').innerHTML;
+  pruefe(/draggable="true" data-id="[^"]+" ondragstart="kpZiehStart\(event,'/.test(le) && /ondrop="kpZiehAb\(event,'/.test(le), 'am PC lässt sich jeder Eintrag ziehen');
+  pruefe(/kpSortierenUm\('liste'\)/.test(le) && !/kpSortierenUm\('vorhaben-laeuft'\)/.test(le) && !/kpSortierenUm\('notiz'\)/.test(le)
+         && !/kpSortierenUm\('vorhaben-ruht'\)/.test(le),
+         'jede Gruppe mit mehreren Einträgen hat „Sortieren“ — mit einem Eintrag oder eingeklappt nicht');
+  WK.klappUm('ruht');
+  pruefe(/kpSortierenUm\('vorhaben-ruht'\)/.test(WK.document.getElementById('leiste').innerHTML), 'aufgeklappt hat auch „Ruht“ seinen Knopf');
+  WK.klappUm('ruht');
+  WK.kpSortierenUm('liste');
+  le = WK.document.getElementById('leiste').innerHTML;
+  pruefe((le.match(/kpSchieben\('[^']+',-1\)/g) || []).length === 3 && /Fertig/.test(le), 'im Sortiermodus haben die Einträge der Gruppe ▲ ▼');
+  pruefe(!new RegExp("kpSchieben\\('" + b.id + "'").test(le), 'die anderen Gruppen nicht');
+  WK.kpSortierenUm('liste');
+  pruefe(WK.kp.sortieren === '', '„Fertig“ beendet den Sortiermodus');
+  pruefe(/body\.breit \.sortier-knopf\{display:none\}/.test(QUELLE), 'am PC wird gezogen, der Knopf „Sortieren“ ist dem Handy vorbehalten');
+
+  const marken = [];
+  const ziel = { classList: { add(k) { marken.push(k); }, remove() {} }, getBoundingClientRect() { return { top: 100, height: 30 }; } };
+  let verhindert = false;
+  WK.kpZiehStart({ dataTransfer: { setData() {} } }, a.id);
+  WK.kpZiehUeber({ currentTarget: ziel, clientY: 105, preventDefault() { verhindert = true; } }, d.id);
+  pruefe(verhindert && marken[0] === 'zieh-vor', 'über der oberen Hälfte zeigt die Linie „davor“');
+  verhindert = false;
+  WK.kpZiehUeber({ currentTarget: ziel, clientY: 105, preventDefault() { verhindert = true; } }, b.id);
+  pruefe(!verhindert, 'über einer anderen Gruppe darf nicht abgelegt werden');
+  WK.kpZiehAb({ currentTarget: ziel, clientY: 125, preventDefault() {} }, d.id);
+  const l = namen('liste').split(',');
+  pruefe(l.indexOf('A') === l.indexOf('C') + 1 && WK.kpGezogen === '', 'ablegen in der unteren Hälfte setzt dahinter');
 }
 
 /* ============================================================
