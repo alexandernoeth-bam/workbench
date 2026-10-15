@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Wochenkompass 2.0.0</title>
+<title>Wochenkompass 2.1.0</title>
 <meta name="theme-color" content="#F4F2EE">
 <link rel="manifest" href="./wochenkompass.webmanifest">
 <link rel="icon" href="./wochenkompass-192.png" sizes="192x192" type="image/png">
@@ -160,7 +160,29 @@ body:not(.breit) .blatt{padding:14px 14px 22px}
 .leer-blatt p{margin:0 0 10px}
 .art-marke{font-size:11px;border:1px solid var(--linie);border-radius:8px;padding:1px 8px;background:var(--karte)}
 .eigen .leise{font-size:12px}
-.ziel-woche{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.filter{display:flex;border:1px solid var(--linie);border-radius:14px;overflow:hidden;margin:12px 6px 4px}
+.filter button{flex:1;border:0;background:var(--karte);font-size:12.5px;padding:5px 0;color:var(--grau)}
+.filter button.an{background:var(--tinte);color:#fff}
+
+/* Offene Aufgaben: Knopf über dem Text, Fenster darüber */
+.oa{margin:0 0 8px}
+.oa-knopf{border:1.5px solid var(--weinrot);color:var(--weinrot);background:var(--karte);border-radius:16px;padding:5px 14px;font-size:13.5px;font-weight:500}
+.oa-knopf b{background:var(--weinrot);color:#fff;border-radius:9px;padding:0 7px;margin-left:7px;font-size:12px}
+.oa-schleier{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.28);display:flex;align-items:flex-start;justify-content:center;
+  padding:max(60px, env(safe-area-inset-top)) 12px 12px}
+.oa-fenster{background:var(--karte);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.3);width:580px;max-width:100%;max-height:80vh;
+  display:flex;flex-direction:column;overflow:hidden}
+.oa-kopf{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--linie)}
+.oa-kopf h3{margin:0;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oa-zu{border:0;background:none;font-size:22px;line-height:1;color:var(--grau);padding:0 4px}
+.oa-zw{display:flex;align-items:center;gap:8px;padding:9px 16px;background:#F7F5F1;font-size:12.5px;color:var(--grau);border-bottom:1px solid var(--zart)}
+.oa-liste{overflow:auto}
+.oa-zeile{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--zart);font-size:15px}
+.oa-zeile .tkasten{margin-top:0;align-self:center}
+.oa-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.oa-hin{border:0;background:none;color:var(--grau);font-size:15px;padding:2px 6px;border-radius:6px}
+.oa-hin:hover{color:var(--weinrot);background:#FBF1F3}
+.oa-leer{padding:14px 16px;color:var(--grau);font-size:14px;margin:0}
 
 /* Die ruhige Woche */
 .ruhig{max-width:640px;margin:6px auto 0;background:var(--blatt);border:1px solid var(--linie);border-radius:8px;padding:26px 36px 32px}
@@ -215,7 +237,7 @@ body:not(.breit) .wt{font-size:16.5px}
 <div class="app">
   <header class="kopf">
     <button type="button" class="knopf-rund" id="leisteKnopf" onclick="leisteUm()" aria-label="Seitenleiste">☰</button>
-    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.0.0</small></span></span>
+    <span class="marke"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span class="titel">Wochenkompass <small>v2.1.0</small></span></span>
     <span class="luecke"></span>
     <button type="button" class="stand" id="standPille" onclick="standGeklickt()" title="Anmelden oder abgleichen">nur auf diesem Gerät</button>
     <button type="button" class="knopf-rund" onclick="oeffne('einst','')" aria-label="Einstellungen" title="Speicher, Anmeldung, Abgleich">⚙</button>
@@ -241,7 +263,7 @@ body:not(.breit) .wt{font-size:16.5px}
    darf 2.0 nie schreiben.
    ============================================================ */
 
-var APP_VERSION = '2.0.0';
+var APP_VERSION = '2.1.0';
 var DATEINAME   = 'kompass.json';
 var IDB_NAME    = 'kompass-speicher';
 var IDB_STORE   = 'handles';
@@ -1475,8 +1497,10 @@ function anmeldeAnfragen(klient, still, aufforderung, fertig) {
    nur zwei Dinge:
 
      Seite   DB.seiten  { id, art: 'vorhaben' | 'liste' | 'notiz',
-                          titel, text, rang, zustand (nur Vorhaben:
-                          'laeuft' | 'ruht' | 'erledigt'), typ, termin }
+                          titel, text, rang, kontext: 'beruflich' |
+                          'privat' | '' (leer = unter jedem Filter),
+                          zustand (nur Vorhaben: 'laeuft' | 'ruht' |
+                          'erledigt'), typ, termin }
      Woche   DB.wochen  { id: 'kw-<Montag>', montag,
                           eintraege: [{ id, abschnitt: 's' | 'v', text,
                                         quelle: Seiten-Kennung, erledigt }] }
@@ -1485,9 +1509,11 @@ function anmeldeAnfragen(klient, still, aufforderung, fertig) {
    Editor der Workbench. Eine Aufgabe ist eine Zeile, die mit [] oder
    [ ] beginnt; [x] ist erledigt. Alles andere ist Fließtext.
 
-   Geplant wird auf der Seite selbst: Jede offene Aufgabe hat S und V.
+   Geplant wird aus der Seite heraus: Der Knopf „Offene Aufgaben“ über
+   dem Text öffnet ein Fenster mit S und V. Der Text selbst bleibt ruhig.
    Die Wochenseite zeigt nur Substanz und Verbindlichkeiten. Ein Klick
-   streicht durch — und hakt die Zeile in der Quelle ab. ↗ springt dorthin.
+   streicht durch — und hakt die Zeile in der Quelle ab. ↗ springt an
+   die Zeile; wer danach auf „Schreiben“ wechselt, hat die Schreibmarke dort.
 
    Die Woche merkt sich eine Aufgabe über Seite und Text. Wird die
    Zeile in der Quelle umformuliert, findet die Woche sie nicht mehr:
@@ -1510,8 +1536,13 @@ var kp = {
   fertigAuf: false,
   hervor: '',            /* Aufgabentext, der nach einem Sprung hervorgehoben wird */
   zielWoche: 'diese',    /* diese | naechste — wohin S und V planen */
+  oaAuf: false,          /* Fenster „Offene Aufgaben“ */
+  filter: 'alle',        /* alle | beruflich | privat — Seitenleiste */
   mig: null              /* Vorschau der Übernahme aus der Workbench */
 };
+
+var KP_FILTER_KEY = 'kompass-filter';
+var KP_KONTEXTE = [['beruflich', 'Beruf'], ['privat', 'Privat']];
 
 var KP_ARTEN = {
   vorhaben: { zeichen: '◎', name: 'Vorhaben', gruppe: 'Vorhaben', neu: 'Name des Vorhabens' },
@@ -1635,11 +1666,41 @@ function kpSeiteAnlegen(art, name, text) {
   var titel = String(name || '').trim().slice(0, 200);
   if (!titel || !KP_ARTEN[art]) { return null; }
   if (!Array.isArray(DB.seiten)) { DB.seiten = []; }
-  var s = { id: neueKennung(), art: art, titel: titel, text: String(text || ''), rang: kpNaechsterRang(), geaendert: jetzt() };
+  var s = { id: neueKennung(), art: art, titel: titel, text: String(text || ''), rang: kpNaechsterRang(),
+            kontext: (kp.filter === 'beruflich' || kp.filter === 'privat') ? kp.filter : '', geaendert: jetzt() };
   if (art === 'vorhaben') { s.zustand = 'laeuft'; }
   DB.seiten.push(s);
   spaeterSichern();
   return s;
+}
+
+/* ---------- Beruf und Privat ---------- */
+
+/* Eine Seite ohne Zuordnung steht unter jedem Filter. */
+function kpSichtbar(s) {
+  return kp.filter === 'alle' || !s.kontext || s.kontext === kp.filter;
+}
+
+function kpFilterSetzen(f) {
+  if (f !== 'alle' && f !== 'beruflich' && f !== 'privat') { return; }
+  kp.filter = f;
+  try { window.localStorage.setItem(KP_FILTER_KEY, f); } catch (e) { /* ohne Speicher eben nur für jetzt */ }
+  leisteZeichnen();
+}
+
+function kpFilterLaden() {
+  var f = null;
+  try { f = window.localStorage.getItem(KP_FILTER_KEY); } catch (e) { f = null; }
+  if (f === 'alle' || f === 'beruflich' || f === 'privat') { kp.filter = f; }
+}
+
+function kpKontext(wert) {
+  var s = kpSeite();
+  if (!s || (wert !== 'beruflich' && wert !== 'privat')) { return; }
+  s.kontext = wert;
+  s.geaendert = jetzt();
+  spaeterSichern();
+  zeichne(true);
 }
 
 /* ---------- Aufgabenzeilen ---------- */
@@ -1786,11 +1847,38 @@ function kpSprung(montag, id) {
   var seite = f.eintrag.quelle ? kpSeiteFinden(f.eintrag.quelle) : null;
   if (!seite) { melde('Die Seite dieser Aufgabe gibt es nicht mehr.', 'warn'); return; }
   oeffne('seite', seite.id);
-  kp.hervor = f.eintrag.text;
+  if (!kpZeileSuchen(seite, f.eintrag.text)) {
+    melde('Die Zeile wurde umformuliert — sie steht nicht mehr wörtlich auf der Seite.', null);
+    return;
+  }
+  kpHervorZeigen(f.eintrag.text);
+}
+
+/* Hebt eine Aufgabe in der Ansicht hervor und rollt sie in die Mitte.
+   Wechselt man danach auf „Schreiben“, steht die Schreibmarke dort. */
+function kpHervorZeigen(text) {
+  kp.hervor = text;
   seiteZeichnen(true);
   var el = document.getElementById('kpHervor');
   if (el && typeof el.scrollIntoView === 'function') { el.scrollIntoView({ block: 'center' }); }
-  else if (!kpZeileSuchen(seite, f.eintrag.text)) { melde('Die Zeile wurde umformuliert — sie steht nicht mehr wörtlich auf der Seite.', null); }
+}
+
+/* Setzt die Schreibmarke an den Anfang einer Zeile, markiert sie und
+   rollt sie in die Mitte des Bildschirms. */
+function kpMarkeAnZeile(feld, nr) {
+  var zeilen = String(feld.value || '').split('\n');
+  if (nr < 0 || nr >= zeilen.length) { return; }
+  var a = 0;
+  var i;
+  for (i = 0; i < nr; i++) { a += zeilen[i].length + 1; }
+  if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(a, a + zeilen[nr].length); }
+  var rolle = (typeof document.querySelector === 'function') ? document.querySelector('.seite') : null;
+  if (!rolle || typeof feld.getBoundingClientRect !== 'function' || typeof window.getComputedStyle !== 'function') { return; }
+  var zeilenHoehe = parseFloat(window.getComputedStyle(feld).lineHeight) || 24;
+  var oben = parseFloat(window.getComputedStyle(feld).paddingTop) || 0;
+  var r = feld.getBoundingClientRect();
+  var ziel = r.top + oben + nr * zeilenHoehe;
+  rolle.scrollTop += ziel - (window.innerHeight || 800) / 2;
 }
 
 /* Ein Kästchen auf der Seite: Die Woche zieht mit. */
@@ -1856,6 +1944,7 @@ function oeffne(art, id) {
   kp.menueAuf = false;
   kp.frage = '';
   kp.hervor = '';
+  kp.oaAuf = false;
   kp.leisteAuf = false;
   zeichne(true);
   var rolle = (typeof document.querySelector === 'function') ? document.querySelector('.seite') : null;
@@ -1864,12 +1953,17 @@ function oeffne(art, id) {
 
 function modusSetzen(m) {
   if (m !== 'ansicht' && m !== 'schreiben') { return; }
+  var merk = kp.hervor;
+  var s = kpSeite();
+  var z = (merk && s) ? kpZeileSuchen(s, merk) : null;
   kp.modus = m;
   kp.hervor = '';
+  kp.oaAuf = false;
   seiteZeichnen(true);
   if (m === 'schreiben') {
     var f = document.getElementById('kpFeld');
     if (f && f.focus) { f.focus(); }
+    if (f && z) { kpMarkeAnZeile(f, z.nr); }
   }
 }
 
@@ -2204,7 +2298,7 @@ function kpPlanHtml(seite, nr, a) {
   var f = kpEintragFinden(seite.id, a.text);
   if (f) {
     return '<button type="button" class="drin" onclick="kpAusplanen(\'' + f.woche.montag + '\',\'' + esc(f.eintrag.id) + '\')" '
-         + 'title="Aus der Woche nehmen">KW ' + kalenderwoche(f.woche.montag) + ' · ' + (f.eintrag.abschnitt === 's' ? 'S' : 'V') + '</button>';
+         + 'title="Aus der Woche nehmen">KW ' + kalenderwoche(f.woche.montag) + ' · ' + (f.eintrag.abschnitt === 's' ? 'S' : 'V') + ' ×</button>';
   }
   if (a.erledigt) { return ''; }
   var kw = 'KW ' + kalenderwoche(kpZielMontag());
@@ -2212,6 +2306,65 @@ function kpPlanHtml(seite, nr, a) {
        + '<button type="button" class="sv" onclick="kpEinplanen(' + nr + ',\'s\')" title="In ' + kw + ': Substanz" aria-label="In ' + kw + ': Substanz">S</button>'
        + '<button type="button" class="sv" onclick="kpEinplanen(' + nr + ',\'v\')" title="In ' + kw + ': Verbindlichkeit" aria-label="In ' + kw + ': Verbindlichkeit">V</button>'
        + '</span>';
+}
+
+/* ---------- Fenster „Offene Aufgaben“ ---------- */
+
+function kpOaUm() {
+  kp.oaAuf = !kp.oaAuf;
+  seiteZeichnen(true);
+}
+
+function kpOaSchleier(e) {
+  if (e && e.target && e.currentTarget && e.target !== e.currentTarget) { return; }
+  kp.oaAuf = false;
+  seiteZeichnen(true);
+}
+
+/* ↘ im Fenster: schließen und zur Zeile im Text. */
+function kpOaSprung(nr) {
+  var s = kpSeite();
+  if (!s) { return; }
+  var a = kpAufgabe(String(s.text || '').split('\n')[nr] || '');
+  kp.oaAuf = false;
+  if (kp.modus === 'schreiben') {
+    seiteZeichnen(true);
+    var f = document.getElementById('kpFeld');
+    if (f && f.focus) { f.focus(); }
+    if (f) { kpMarkeAnZeile(f, nr); }
+    return;
+  }
+  kpHervorZeigen(a ? a.text : '');
+}
+
+function kpOaKnopfHtml(s) {
+  var n = kpOffeneZahl(s);
+  return '<div class="oa"><button type="button" class="oa-knopf" onclick="kpOaUm()" aria-haspopup="dialog" aria-expanded="' + kp.oaAuf + '">'
+       + '☐ Offene Aufgaben<b>' + n + '</b></button></div>';
+}
+
+function kpOaHtml(s) {
+  var zeilen = String(s.text || '').split('\n');
+  var heute = kpHeuteMontag();
+  var h = '<div class="oa-schleier" onclick="kpOaSchleier(event)"><div class="oa-fenster" role="dialog" aria-label="Offene Aufgaben">'
+        + '<div class="oa-kopf"><h3>Offene Aufgaben · ' + esc(s.titel || '') + '</h3>'
+        + '<button type="button" class="oa-zu" onclick="kpOaUm()" aria-label="Schließen">×</button></div>'
+        + '<div class="oa-zw">Planen in <span class="gruppe-knopf" role="group" aria-label="S und V planen in">'
+        + '<button type="button" class="' + (kp.zielWoche === 'diese' ? 'an' : '') + '" onclick="kpZielWocheSetzen(\'diese\')">KW ' + kalenderwoche(heute) + '</button>'
+        + '<button type="button" class="' + (kp.zielWoche === 'naechste' ? 'an' : '') + '" onclick="kpZielWocheSetzen(\'naechste\')">KW ' + kalenderwoche(tagePlus(heute, 7)) + '</button>'
+        + '</span></div><div class="oa-liste">';
+  var n = 0;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var a = kpAufgabe(zeilen[i]);
+    if (!a || a.erledigt || !a.text) { continue; }
+    n++;
+    h += '<div class="oa-zeile"><button class="tkasten" type="button" onclick="kpKastenUm(' + i + ')" aria-label="Abhaken"></button>'
+       + '<span class="oa-text">' + kpAuszeichnen(a.text) + '</span>' + kpPlanHtml(s, i, a)
+       + '<button type="button" class="oa-hin" onclick="kpOaSprung(' + i + ')" title="Zur Stelle im Text" aria-label="Zur Stelle im Text">↘</button></div>';
+  }
+  if (!n) { h += '<p class="oa-leer">Keine offenen Aufgaben. Eine Zeile mit [] davor ist eine Aufgabe.</p>'; }
+  return h + '</div></div></div>';
 }
 
 function kpZeileHtml(seite, zeile, nr, nummer) {
@@ -2233,8 +2386,7 @@ function kpZeileHtml(seite, zeile, nr, nummer) {
     var hervor = (kp.hervor && a.text === kp.hervor);
     return '<div class="fl-zeile aufgabe' + (hervor ? ' hervor' : '') + '"' + (hervor ? ' id="kpHervor"' : '') + stil + '>'
          + '<button class="tkasten' + (a.erledigt ? ' an' : '') + '" type="button" onclick="kpKastenUm(' + nr + ')" aria-label="Abhaken"></button>'
-         + '<span class="fl-text' + (a.erledigt ? ' fertig' : '') + '">' + kpAuszeichnen(kasten[3]) + '</span>'
-         + kpPlanHtml(seite, nr, a) + '</div>';
+         + '<span class="fl-text' + (a.erledigt ? ' fertig' : '') + '">' + kpAuszeichnen(kasten[3]) + '</span></div>';
   }
   var nummeriert = rest.match(NUMMER_MUSTER);
   if (nummeriert) {
@@ -2300,12 +2452,19 @@ function leisteZeichnen() {
   h += eintragHtml(offen === naechste, 'oeffne(\'woche\',\'' + naechste + '\')', '→', 'Nächste Woche',
                    '<span class="marke-klein">KW ' + kalenderwoche(naechste) + '</span>');
 
+  h += '<div class="filter" role="group" aria-label="Beruf oder Privat">'
+     + [['alle', 'Alle'], ['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (p) {
+       return '<button type="button" class="' + (kp.filter === p[0] ? 'an' : '') + '" onclick="kpFilterSetzen(\'' + p[0] + '\')">' + p[1] + '</button>';
+     }).join('') + '</div>';
+  var leerText = function (wort) {
+    return '<div class="leer-hinweis">' + (kp.filter === 'alle' ? 'Noch keine ' + wort + '.' : 'Keine ' + wort + ' unter diesem Filter.') + '</div>';
+  };
   h += gruppeKopfHtml('vorhaben');
-  var vh = kpSeiten('vorhaben');
+  var vh = kpSeiten('vorhaben').filter(kpSichtbar);
   var laeuft = vh.filter(function (s) { return (s.zustand || 'laeuft') === 'laeuft'; });
   var ruht = vh.filter(function (s) { return s.zustand === 'ruht'; });
   var fertig = vh.filter(function (s) { return s.zustand === 'erledigt'; });
-  if (!vh.length) { h += '<div class="leer-hinweis">Noch keine Vorhaben.</div>'; }
+  if (!vh.length) { h += leerText('Vorhaben'); }
   laeuft.forEach(function (s) { h += seitenEintragHtml(s, ''); });
   if (ruht.length) {
     h += '<div class="gruppe leise"><span>Ruht</span></div>';
@@ -2319,13 +2478,13 @@ function leisteZeichnen() {
   }
 
   h += gruppeKopfHtml('liste');
-  var listen = kpSeiten('liste');
-  if (!listen.length) { h += '<div class="leer-hinweis">Noch keine Listen.</div>'; }
+  var listen = kpSeiten('liste').filter(kpSichtbar);
+  if (!listen.length) { h += leerText('Listen'); }
   listen.forEach(function (s) { h += seitenEintragHtml(s, ''); });
 
   h += gruppeKopfHtml('notiz');
-  var notizen = kpSeiten('notiz');
-  if (!notizen.length) { h += '<div class="leer-hinweis">Noch keine Notizen.</div>'; }
+  var notizen = kpSeiten('notiz').filter(kpSichtbar);
+  if (!notizen.length) { h += leerText('Notizen'); }
   notizen.forEach(function (s) { h += seitenEintragHtml(s, ''); });
 
   el.innerHTML = h;
@@ -2432,6 +2591,9 @@ function modusKnoepfe() {
 
 function eigenschaftenHtml(s) {
   var h = '<div class="eigen"><span class="art-marke">' + KP_ARTEN[s.art].name + '</span>';
+  h += '<span class="gruppe-knopf" role="group" aria-label="Beruf oder Privat">' + KP_KONTEXTE.map(function (p) {
+    return '<button type="button" class="' + (s.kontext === p[0] ? 'an' : '') + '" onclick="kpKontext(\'' + p[0] + '\')">' + p[1] + '</button>';
+  }).join('') + '</span>';
   if (s.art === 'vorhaben') {
     var z = s.zustand || 'laeuft';
     if (s.typ || s.termin) {
@@ -2441,13 +2603,6 @@ function eigenschaftenHtml(s) {
     h += '<span class="gruppe-knopf" role="group" aria-label="Zustand">' + KP_ZUSTAENDE.map(function (p) {
       return '<button type="button" class="' + (z === p[0] ? 'an' : '') + '" onclick="kpZustand(\'' + p[0] + '\')">' + p[1] + '</button>';
     }).join('') + '</span>';
-  }
-  if (kp.modus === 'ansicht' && kpOffeneZahl(s)) {
-    var heute = kpHeuteMontag();
-    h += '<span class="ziel-woche">S/V in <span class="gruppe-knopf" role="group" aria-label="S und V planen in">'
-       + '<button type="button" class="' + (kp.zielWoche === 'diese' ? 'an' : '') + '" onclick="kpZielWocheSetzen(\'diese\')">KW ' + kalenderwoche(heute) + '</button>'
-       + '<button type="button" class="' + (kp.zielWoche === 'naechste' ? 'an' : '') + '" onclick="kpZielWocheSetzen(\'naechste\')">KW ' + kalenderwoche(tagePlus(heute, 7)) + '</button>'
-       + '</span></span>';
   }
   return h + '</div>';
 }
@@ -2485,7 +2640,9 @@ function seiteZeichnen(erzwingen) {
         + modusKnoepfe() + mehrHtml() + '</div>';
   h += eigenschaftenHtml(s);
   if (kp.frage) { h += frageHtml(); }
+  h += kpOaKnopfHtml(s);
   h += blattHtml(s);
+  if (kp.oaAuf) { h += kpOaHtml(s); }
   el.innerHTML = h;
 }
 
@@ -2508,6 +2665,10 @@ function kpMigOffen(a) {
 
 function kpMigZeile(t) {
   return String(t || '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+function kpMigKontext(k) {
+  return (k === 'beruflich' || k === 'privat') ? k : '';
 }
 
 function kpMigZustand(status) {
@@ -2604,7 +2765,7 @@ function kpMigPlan(wb) {
     }
     plan.vorhaben.aufgaben += eigene.length;
     plan.vorhaben.seiten.push({ id: v.id, art: 'vorhaben', titel: kpMigZeile(v.name) || 'ohne Namen', text: text,
-                                zustand: kpMigZustand(v.status), typ: typ,
+                                zustand: kpMigZustand(v.status), typ: typ, kontext: kpMigKontext(v.kontext),
                                 termin: String((typ === 'ziel' ? v.zieltermin : v.ende) || '') });
   };
   projekte.forEach(function (v) { if (v && v.id) { vorhabenSeite(v, 'projekt'); } });
@@ -2613,43 +2774,53 @@ function kpMigPlan(wb) {
   var frei = einmal.filter(function (a) {
     return !((a.projektId && vhIds[a.projektId]) || (a.zielId && vhIds[a.zielId]));
   });
-  if (frei.length) {
+  /* Verteilen und Routine je für Beruf und Privat — nach dem Kontext der
+     einzelnen Aufgabe; ohne Angabe gilt Privat. */
+  var KONTEXTE = [['beruflich', 'Beruf', 'beruf'], ['privat', 'Privat', 'privat']];
+  var vonKontext = function (l, k) {
+    return l.filter(function (a) { return ((a.kontext === 'beruflich') ? 'beruflich' : 'privat') === k; });
+  };
+  KONTEXTE.forEach(function (k) {
+    var teil = vonKontext(frei, k[0]);
+    if (!teil.length) { return; }
     var bloecke = [];
     var verbraucht = {};
     themen.forEach(function (t) {
-      var drin = frei.filter(function (a) { return a.themaId === t.id; });
+      var drin = teil.filter(function (a) { return a.themaId === t.id; });
       if (!drin.length) { return; }
       drin.forEach(function (a) { verbraucht[a.id] = true; });
       bloecke.push('## ' + (kpMigZeile(t.name) || 'Liste') + '\n' + drin.map(function (a) { return '[] ' + kpMigZeile(a.titel); }).join('\n'));
     });
-    var rest = frei.filter(function (a) { return !verbraucht[a.id]; });
+    var rest = teil.filter(function (a) { return !verbraucht[a.id]; });
     if (rest.length) {
       bloecke.push('## Ohne Liste\n' + rest.map(function (a) { return '[] ' + kpMigZeile(a.titel); }).join('\n'));
     }
-    plan.verteilen.aufgaben = frei.length;
-    plan.verteilen.listen = bloecke.length;
-    plan.verteilen.seiten.push({ id: 'wb-verteilen', art: 'liste', titel: 'Verteilen', text: bloecke.join('\n\n') });
-  }
+    plan.verteilen.aufgaben += teil.length;
+    plan.verteilen.listen += bloecke.length;
+    plan.verteilen.seiten.push({ id: 'wb-verteilen-' + k[2], art: 'liste', titel: 'Verteilen · ' + k[1], kontext: k[0], text: bloecke.join('\n\n') });
+  });
 
-  if (routine.length) {
-    plan.routine.zahl = routine.length;
-    plan.routine.seiten.push({ id: 'wb-routine', art: 'liste', titel: 'Routine', text: routine.map(function (a) {
+  KONTEXTE.forEach(function (k) {
+    var teil = vonKontext(routine, k[0]);
+    if (!teil.length) { return; }
+    plan.routine.zahl += teil.length;
+    plan.routine.seiten.push({ id: 'wb-routine-' + k[2], art: 'liste', titel: 'Routine · ' + k[1], kontext: k[0], text: teil.map(function (a) {
       var f = kpFrequenz(a.wiederholung);
       return (kpMigZeile(a.titel) || 'ohne Namen') + (f ? '\n' + f : '');
     }).join('\n\n') });
-  }
+  });
 
   gedanken.forEach(function (g) {
     if (!g || !g.id) { return; }
     if (g.kompass === 'liste') {
-      plan.listen.seiten.push({ id: g.id, art: 'liste', titel: kpMigZeile(g.titel) || 'Liste', text: String(g.text || '') });
+      plan.listen.seiten.push({ id: g.id, art: 'liste', titel: kpMigZeile(g.titel) || 'Liste', text: String(g.text || ''), kontext: kpMigKontext(g.kontext) });
     } else if (g.kompass === 'woche') {
       var mo = String(g.woche || '');
       var e = kpMigWoche(g.text);
       if (/^\d{4}-\d{2}-\d{2}$/.test(mo) && e.length) { plan.wochen.wochen.push({ montag: mo, eintraege: e }); }
     } else if (!g.kompass && String(g.text || '').trim()) {
       var erste = kpMigZeile(String(g.text || '').split('\n')[0]).replace(/^#{1,3}\s*/, '').slice(0, 80);
-      plan.notizen.seiten.push({ id: g.id, art: 'notiz', titel: kpMigZeile(g.titel) || erste || 'Notiz', text: String(g.text || '') });
+      plan.notizen.seiten.push({ id: g.id, art: 'notiz', titel: kpMigZeile(g.titel) || erste || 'Notiz', text: String(g.text || ''), kontext: kpMigKontext(g.kontext) });
     }
   });
   return plan;
@@ -2676,6 +2847,14 @@ function kpMigBeschreibung(teil, p) {
   if (teil === 'routine') { return kpZahlWort(p.zahl, 'wiederkehrende Aufgabe', 'wiederkehrende Aufgaben') + ' mit Frequenz'; }
   if (teil === 'wochen') { return kpZahlWort(p.wochen.length, 'Woche', 'Wochen'); }
   return kpZahlWort(p.seiten.length, 'Seite', 'Seiten');
+}
+
+/* „Verteilen“ und „Routine“ aus 2.0 waren ungeteilt. Gibt es sie noch,
+   wird nicht zusätzlich aufgeteilt — sonst stünden Aufgaben doppelt. */
+function kpMigAltDa(id) {
+  if (String(id).indexOf('wb-verteilen-') === 0) { return !!kpSeiteFinden('wb-verteilen'); }
+  if (String(id).indexOf('wb-routine-') === 0) { return !!kpSeiteFinden('wb-routine'); }
+  return false;
 }
 
 function kpMigSchonDa(teil, p) {
@@ -2714,7 +2893,7 @@ function kpMigAusfuehren() {
   if (!kp.mig) { return { seiten: 0, wochen: 0 }; }
   var plan = kp.mig.plan;
   var wahl = kp.mig.wahl;
-  var zahl = { seiten: 0, wochen: 0 };
+  var zahl = { seiten: 0, wochen: 0, kontext: 0, alt: 0 };
   if (!Array.isArray(DB.seiten)) { DB.seiten = []; }
   if (!Array.isArray(DB.wochen)) { DB.wochen = []; }
   var rang = kpNaechsterRang();
@@ -2730,8 +2909,14 @@ function kpMigAusfuehren() {
       return;
     }
     plan[t[0]].seiten.forEach(function (s) {
-      if (kpSeiteFinden(s.id)) { return; }
-      var neu = { id: s.id, art: s.art, titel: s.titel, text: s.text, rang: rang++, geaendert: jetzt() };
+      var da = kpSeiteFinden(s.id);
+      if (da) {
+        /* Schon übernommen (2.0 kannte Beruf/Privat noch nicht): nur nachtragen. */
+        if (!da.kontext && s.kontext) { da.kontext = s.kontext; da.geaendert = jetzt(); zahl.kontext++; }
+        return;
+      }
+      if (kpMigAltDa(s.id)) { zahl.alt++; return; }
+      var neu = { id: s.id, art: s.art, titel: s.titel, text: s.text, rang: rang++, kontext: s.kontext || '', geaendert: jetzt() };
       if (s.art === 'vorhaben') {
         neu.zustand = s.zustand || 'laeuft';
         if (s.typ) { neu.typ = s.typ; }
@@ -2745,7 +2930,8 @@ function kpMigAusfuehren() {
   kp.mig = null;
   spaeterSichern();
   zeichne(true);
-  melde('Übernommen: ' + zahl.seiten + ' Seiten, ' + zahl.wochen + ' Wochen.', 'gut');
+  melde('Übernommen: ' + kpZahlWort(zahl.seiten, 'Seite', 'Seiten') + ', ' + kpZahlWort(zahl.wochen, 'Woche', 'Wochen')
+        + (zahl.kontext ? ' · Beruf/Privat bei ' + kpZahlWort(zahl.kontext, 'Seite', 'Seiten') + ' nachgetragen' : '') + '.', 'gut');
   return zahl;
 }
 
@@ -2814,7 +3000,10 @@ function migHtml() {
       var da = kpMigSchonDa(t[0], teil);
       h += '<button type="button" class="mig-zeile' + (kp.mig.wahl[t[0]] ? ' an' : '') + '" onclick="kpMigWahlUm(\'' + t[0] + '\')" '
          + 'aria-pressed="' + !!kp.mig.wahl[t[0]] + '"><span class="mig-kasten"></span><span><b>' + t[1] + '</b> · '
-         + kpMigBeschreibung(t[0], teil) + (da ? ' <small>(' + da + ' schon da)</small>' : '') + '</span></button>';
+         + kpMigBeschreibung(t[0], teil) + (da ? ' <small>(' + da + ' schon da)</small>' : '')
+         + (teil.seiten && teil.seiten.some(function (x) { return kpMigAltDa(x.id); })
+            ? ' <small>(die ungeteilte Liste aus 2.0 besteht noch — zum Aufteilen erst löschen)</small>' : '')
+         + '</span></button>';
     });
     if (!irgendwas) { h += '<p>Nichts zu übernehmen.</p>'; }
     h += '<div class="knoepfe">'
@@ -2996,8 +3185,14 @@ function swAnmelden() {
     .catch(function () { return null; });
 }
 
+function tasteGlobal(e) {
+  if (e && e.key === 'Escape' && kp.oaAuf) { kp.oaAuf = false; seiteZeichnen(true); }
+}
+
 function start() {
   breiteSetzen();
+  kpFilterLaden();
+  document.addEventListener('keydown', tasteGlobal);
   window.addEventListener('resize', breiteSetzen);
   tokenAusSitzung();
   var los = idbDa()

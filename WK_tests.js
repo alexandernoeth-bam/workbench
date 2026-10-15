@@ -254,11 +254,16 @@ console.log('\n5. Planen mit S und V');
 if (WK) {
   frisch();
   const s = WK.kpSeiteAnlegen('liste', 'Büro', 'Einleitung\n[] Reisekosten einreichen\n[] Steuerberater anrufen\n[x] Erledigtes');
-  WK.kp.art = 'seite'; WK.kp.id = s.id; WK.kp.modus = 'ansicht';
+  WK.kp.art = 'seite'; WK.kp.id = s.id; WK.kp.modus = 'ansicht'; WK.kp.oaAuf = false;
   WK.seiteZeichnen(true);
   let h = seiteHtml();
+  pruefe(!/kpEinplanen\(/.test(h) && !/class="drin"/.test(h), 'der Text bleibt ruhig: kein S/V und keine Marke in den Zeilen');
+  pruefe(/onclick="kpOaUm\(\)"/.test(h) && /Offene Aufgaben<b>2<\/b>/.test(h), 'über dem Text der Knopf „Offene Aufgaben“ mit Zahl');
+  WK.kpOaUm();
+  h = seiteHtml();
+  pruefe(/class="oa-fenster" role="dialog"/.test(h), 'der Knopf öffnet das Fenster');
   pruefe((h.match(/kpEinplanen\(\d+,'s'\)/g) || []).length === 2 && (h.match(/kpEinplanen\(\d+,'v'\)/g) || []).length === 2,
-         'jede offene Aufgabe hat S und V — erledigte und Fließtext nicht');
+         'im Fenster hat jede offene Aufgabe S und V — erledigte und Fließtext stehen nicht drin');
   pruefe(/kpEinplanen\(1,'s'\)/.test(h), 'S und V tragen die Zeilennummer der Aufgabe');
   WK.kpEinplanen(1, 's');
   const mo = WK.kpHeuteMontag();
@@ -267,10 +272,11 @@ if (WK) {
          && w.eintraege[0].quelle === s.id, 'S gibt die Aufgabe als Substanz in die laufende Woche — mit Text und Quelle');
   WK.kpEinplanen(1, 'v');
   pruefe(w.eintraege.length === 1, 'dieselbe Aufgabe kommt nicht zweimal in die Woche');
-  WK.seiteZeichnen(true);
   h = seiteHtml();
-  pruefe(new RegExp('class="drin"[^>]*>KW ' + WK.kalenderwoche(mo) + ' · S<').test(h), 'an der Zeile steht danach „KW nn · S“');
-  pruefe((h.match(/kpEinplanen\(\d+,'s'\)/g) || []).length === 1, 'die eingeplante Zeile hat kein S und V mehr');
+  pruefe(WK.kp.oaAuf === true && /oa-fenster/.test(h), 'nach S bleibt das Fenster offen — man plant weiter');
+  pruefe(new RegExp('class="drin"[^>]*>KW ' + WK.kalenderwoche(mo) + ' · S ×<').test(h), 'im Fenster steht danach „KW nn · S ×“');
+  pruefe((h.match(/kpEinplanen\(\d+,'s'\)/g) || []).length === 1, 'die eingeplante Aufgabe hat kein S und V mehr');
+  pruefe(/kpZielWocheSetzen\('naechste'\)/.test(h) && /kpOaSprung\(1\)/.test(h), 'im Fenster: Wahl der Woche und ↘ zur Zeile');
   WK.kpAusplanen(mo, w.eintraege[0].id);
   pruefe(w.eintraege.length === 0 && /\[\] Reisekosten/.test(s.text), 'ein Tipp auf die Marke nimmt sie aus der Woche — die Zeile in der Quelle bleibt');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
@@ -422,7 +428,7 @@ if (WK) {
   frisch();
   const mo = WK.kpHeuteMontag();
   const wb = {
-    projekte: [{ id: 'p1', name: 'Umzug Büro', status: 'laufend', flaeche: 'Bis Ende November.\n\n', ende: '2026-11-30', ordnung: 2 },
+    projekte: [{ id: 'p1', name: 'Umzug Büro', status: 'laufend', kontext: 'beruflich', flaeche: 'Bis Ende November.\n\n', ende: '2026-11-30', ordnung: 2 },
                { id: 'p2', name: 'Website', status: 'ruht', flaeche: '', ordnung: 1 }],
     ziele: [{ id: 'z1', name: 'Fit', status: 'erreicht', flaeche: '[[projekt:p1|Umzug]]', zieltermin: '2026-12-31' }],
     themen: [{ id: 't1', name: 'Büro' }, { id: 't2', name: 'Haus' }, { id: 't3', name: 'Leer' }],
@@ -430,11 +436,11 @@ if (WK) {
       { id: 'a1', titel: 'Firma anfragen', status: 'offen', projektId: 'p1' },
       { id: 'a2', titel: 'Erledigt', status: 'erledigt', projektId: 'p1' },
       { id: 'a3', titel: 'Laufen', status: 'offen', zielId: 'z1' },
-      { id: 'a4', titel: 'Reisekosten', status: 'offen', themaId: 't1' },
+      { id: 'a4', titel: 'Reisekosten', status: 'offen', themaId: 't1', kontext: 'beruflich' },
       { id: 'a5', titel: 'Dachrinne', status: 'offen', themaId: 't2' },
       { id: 'a6', titel: 'Lose\nZeile', status: 'offen' },
       { id: 'a7', titel: 'Verloren', status: 'offen', projektId: 'gibtsnicht' },
-      { id: 'a8', titel: 'Steuerunterlagen sortieren', status: 'offen', projektId: 'p1',
+      { id: 'a8', titel: 'Steuerunterlagen sortieren', status: 'offen', projektId: 'p1', kontext: 'beruflich',
         wiederholung: { takt: 'woche', intervall: 1, tage: [1, 3, 5, 0], tag: 1 } },
       { id: 'a9', titel: 'Blumen', status: 'offen', wiederholung: { takt: 'woche', intervall: 2, tage: [4, 1], tag: 1 } },
       { id: 'a10', titel: 'Miete', status: 'offen', wiederholung: { takt: 'monat', intervall: 1, tage: [], tag: 15 } },
@@ -461,13 +467,18 @@ if (WK) {
   pruefe(vh('z1').text === '[[projekt:p1|Umzug]]\n\n## Aufgaben\n[] Laufen' && vh('z1').typ === 'ziel' && vh('p1').termin === '2026-11-30',
          'Ziele mit ihren Aufgaben; Art und Termin werden gemerkt');
   pruefe(p.vorhaben.aufgaben === 2 && !/Erledigt|Steuer/.test(vh('p1').text), 'erledigte und wiederkehrende Aufgaben stehen nicht im Vorhaben');
-  const vt = p.verteilen.seiten[0];
-  pruefe(vt && vt.id === 'wb-verteilen' && vt.titel === 'Verteilen' && vt.art === 'liste', 'eine Liste „Verteilen“');
-  pruefe(vt.text === '## Büro\n[] Reisekosten\n\n## Haus\n[] Dachrinne\n\n## Ohne Liste\n[] Lose Zeile\n[] Verloren',
+  const vt = p.verteilen.seiten.filter(x => x.id === 'wb-verteilen-privat')[0];
+  const vb = p.verteilen.seiten.filter(x => x.id === 'wb-verteilen-beruf')[0];
+  pruefe(vt && vt.titel === 'Verteilen · Privat' && vt.kontext === 'privat' && vt.art === 'liste'
+         && vb && vb.titel === 'Verteilen · Beruf' && vb.kontext === 'beruflich', '„Verteilen“ je für Beruf und Privat');
+  pruefe(vt.text === '## Haus\n[] Dachrinne\n\n## Ohne Liste\n[] Lose Zeile\n[] Verloren',
          'Verteilen: alle Aufgaben ohne Vorhaben, mit dem Listennamen als Überschrift — leere Listen ohne Überschrift');
-  const rt = p.routine.seiten[0];
-  pruefe(rt && rt.id === 'wb-routine' && rt.titel === 'Routine', 'eine Liste „Routine“');
-  pruefe(rt.text === 'Steuerunterlagen sortieren\nMo, Mi, Fr, So\n\nBlumen\nalle 2 Wochen: Mo, Do\n\nMiete\nmonatlich am 15.\n\nFilter\nalle 3 Monate am 1.',
+  pruefe(vb.text === '## Büro\n[] Reisekosten', 'die Zuordnung kommt von der einzelnen Aufgabe');
+  const rt = p.routine.seiten.filter(x => x.id === 'wb-routine-privat')[0];
+  const rb = p.routine.seiten.filter(x => x.id === 'wb-routine-beruf')[0];
+  pruefe(rt && rt.titel === 'Routine · Privat' && rb && rb.titel === 'Routine · Beruf', '„Routine“ je für Beruf und Privat');
+  pruefe(rt.text === 'Blumen\nalle 2 Wochen: Mo, Do\n\nMiete\nmonatlich am 15.\n\nFilter\nalle 3 Monate am 1.'
+         && rb.text === 'Steuerunterlagen sortieren\nMo, Mi, Fr, So',
          'Routine: Name und darunter die Frequenz — auch aus Vorhaben, ohne beendete');
   pruefe(WK.kpFrequenz({ typ: 'woechentlich', intervall: 1, wochentage: [7, 2] }) === 'Di, So', 'auch die alte Schreibweise der Wiederholung');
   pruefe(p.notizen.seiten.map(s => s.titel).join('|') === 'Ideen Kundentag|Kopf', 'freie Notizen — ohne Titel heißt sie wie ihre erste Zeile, leere fallen weg');
@@ -481,13 +492,14 @@ if (WK) {
   pruefe(/kpMigAusfuehren\(\)/.test(hv) && (hv.match(/kpMigWahlUm\(/g) || []).length === 6, 'die Vorschau zeigt alle Teile zum Abwählen');
   WK.kpMigWahlUm('notizen');
   const z = WK.kpMigAusfuehren();
-  pruefe(z.seiten === 3 + 1 + 1 + 1 && z.wochen === 1 && WK.kp.mig === null, 'übernommen wird, was gewählt ist — Notizen abgewählt');
-  pruefe(!WK.kpSeiteFinden('g1') && WK.kpSeiteFinden('p1').art === 'vorhaben' && WK.kpSeiteFinden('wb-routine'), 'die Seiten stehen im Kompass');
-  pruefe(WK.kpOffeneZahl(WK.kpSeiteFinden('wb-verteilen')) === 4, 'die übernommenen Aufgaben sind offene Aufgaben im Kompass');
+  pruefe(z.seiten === 3 + 2 + 2 + 1 && z.wochen === 1 && WK.kp.mig === null, 'übernommen wird, was gewählt ist — Notizen abgewählt');
+  pruefe(!WK.kpSeiteFinden('g1') && WK.kpSeiteFinden('p1').art === 'vorhaben' && WK.kpSeiteFinden('wb-routine-beruf'), 'die Seiten stehen im Kompass');
+  pruefe(WK.kpSeiteFinden('p1').kontext === 'beruflich' && WK.kpSeiteFinden('p2').kontext === '', 'Beruf/Privat kommt mit — ohne Angabe bleibt es offen');
+  pruefe(WK.kpOffeneZahl(WK.kpSeiteFinden('wb-verteilen-privat')) === 3, 'die übernommenen Aufgaben sind offene Aufgaben im Kompass');
   WK.kpMigAusText(JSON.stringify(wb), 'Test');
   const z2 = WK.kpMigAusfuehren();
   pruefe(z2.seiten === 2 && z2.wochen === 0, 'eine zweite Übernahme legt nur an, was noch fehlt (hier die Notizen)');
-  pruefe(WK.DB.seiten.length === 8, 'keine Doppelten');
+  pruefe(WK.DB.seiten.length === 10, 'keine Doppelten');
   pruefe(WK.kpMigAusText('{"x":1}', 'Test') === false && WK.kpMigAusText('kein json', 'Test') === false, 'fremde Dateien werden abgewiesen');
   pruefe(Array.isArray(wb.aufgaben) && wb.aufgaben.length === 13 && wb.projekte[0].flaeche === 'Bis Ende November.\n\n', 'die Workbench-Daten bleiben unverändert');
   WK.kp.art = 'einst';
@@ -581,6 +593,112 @@ console.log('\n12. Schmale Bildschirme');
   pruefe(/min-width\s*:\s*0/.test(stand), 'die Standpille darf in der Kopfzeile schrumpfen');
   const marke = (css.match(/\.marke\{[^}]*\}/) || [''])[0];
   pruefe(/min-width\s*:\s*0/.test(marke), 'die Marke darf in der Kopfzeile schrumpfen');
+}
+
+/* ============================================================
+   13. Beruf und Privat
+   Grund: 2.0 hatte die Zuordnung verloren. Listen, Vorhaben und
+   Notizen tragen sie wieder, die Seitenleiste filtert danach.
+   ============================================================ */
+console.log('\n13. Beruf und Privat');
+if (WK) {
+  frisch();
+  WK.kp.filter = 'alle';
+  const a = WK.kpSeiteAnlegen('liste', 'Offen', '');
+  WK.kpFilterSetzen('beruflich');
+  const b = WK.kpSeiteAnlegen('vorhaben', 'Angebot Nord', '');
+  WK.kpFilterSetzen('privat');
+  const c = WK.kpSeiteAnlegen('notiz', 'Garten', '');
+  pruefe(a.kontext === '' && b.kontext === 'beruflich' && c.kontext === 'privat', 'eine neue Seite bekommt den gerade gewählten Filter');
+  pruefe(WK.localStorage.getItem('kompass-filter') === 'privat', 'der Filter wird auf dem Gerät gemerkt');
+  WK.kp.filter = 'alle'; WK.kpFilterLaden();
+  pruefe(WK.kp.filter === 'privat', 'und beim Start wieder geladen');
+  WK.leisteZeichnen();
+  let le = WK.document.getElementById('leiste').innerHTML;
+  pruefe(/Garten/.test(le) && /Offen/.test(le) && !/Angebot Nord/.test(le), 'Privat zeigt private Seiten und solche ohne Zuordnung');
+  pruefe(/Keine Vorhaben unter diesem Filter/.test(le), 'ein leerer Bereich sagt, dass der Filter greift');
+  WK.kpFilterSetzen('alle');
+  le = WK.document.getElementById('leiste').innerHTML;
+  pruefe(/Garten/.test(le) && /Offen/.test(le) && /Angebot Nord/.test(le), 'Alle zeigt alles');
+  pruefe(/kpFilterSetzen\('beruflich'\)/.test(le) && /kpFilterSetzen\('privat'\)/.test(le), 'der Filter steht in der Seitenleiste');
+  WK.kpFilterSetzen('quatsch');
+  pruefe(WK.kp.filter === 'alle', 'ein unbekannter Filter wird abgewiesen');
+  WK.kp.art = 'seite'; WK.kp.id = a.id;
+  WK.seiteZeichnen(true);
+  pruefe(/kpKontext\('beruflich'\)/.test(seiteHtml()) && /kpKontext\('privat'\)/.test(seiteHtml()), 'jede Seite hat im Kopf Beruf/Privat');
+  WK.kpKontext('beruflich');
+  pruefe(a.kontext === 'beruflich', 'die Zuordnung lässt sich setzen');
+  WK.kpKontext('anders');
+  pruefe(a.kontext === 'beruflich', 'eine unbekannte Zuordnung wird abgewiesen');
+  WK.kp.id = c.id; WK.seiteZeichnen(true);
+  pruefe(/kpKontext\(/.test(seiteHtml()), 'auch Notizen haben Beruf/Privat');
+}
+
+/* ============================================================
+   14. Sprung an die Zeile, Schreibmarke beim Wechsel
+   Grund: ↗ öffnet die Ansicht — die Schreibmarke steht danach beim
+   Wechsel auf „Schreiben“ genau in dieser Zeile.
+   ============================================================ */
+console.log('\n14. Sprung und Schreibmarke');
+if (WK) {
+  frisch();
+  const s = WK.kpSeiteAnlegen('vorhaben', 'Umzug', 'Erste Zeile\n\n[] Firma anfragen\n[] Lager kündigen');
+  WK.kp.art = 'seite'; WK.kp.id = s.id;
+  WK.kpEinplanen(3, 'v');
+  const mo = WK.kpHeuteMontag();
+  const e = WK.kpWocheFinden(mo).eintraege[0];
+  WK.kpSprung(mo, e.id);
+  pruefe(WK.kp.modus === 'ansicht' && WK.kp.hervor === 'Lager kündigen', '↗ öffnet die Seite in der Ansicht, nicht im Schreiben-Modus');
+  const f = WK.document.getElementById('kpFeld');
+  f.value = s.text; f.selectionStart = 0; f.selectionEnd = 0;
+  WK.modusSetzen('schreiben');
+  pruefe(f.selectionStart === 'Erste Zeile\n\n[] Firma anfragen\n'.length && f.selectionEnd === s.text.length,
+         'beim Wechsel auf „Schreiben“ steht die Schreibmarke in der Zeile, die Zeile ist markiert');
+  pruefe(WK.kp.hervor === '', 'danach ist die Hervorhebung verbraucht');
+  WK.kp.modus = 'ansicht';
+  f.selectionStart = 0; f.selectionEnd = 0;
+  WK.modusSetzen('schreiben');
+  pruefe(f.selectionStart === 0, 'ohne Sprung bleibt die Schreibmarke, wo sie war');
+  WK.kp.modus = 'ansicht'; WK.kp.oaAuf = true;
+  WK.kpOaSprung(2);
+  pruefe(WK.kp.oaAuf === false && WK.kp.hervor === 'Firma anfragen' && /id="kpHervor"/.test(seiteHtml()), '↘ im Fenster schließt es und hebt die Zeile im Text hervor');
+  WK.kp.oaAuf = true; WK.kp.modus = 'schreiben';
+  f.value = s.text;
+  WK.kpOaSprung(3);
+  pruefe(WK.kp.oaAuf === false && f.selectionStart === 'Erste Zeile\n\n[] Firma anfragen\n'.length, 'im Schreiben-Modus setzt ↘ die Schreibmarke direkt');
+  WK.kp.oaAuf = true;
+  WK.kpOaSchleier({ target: 1, currentTarget: 2 });
+  pruefe(WK.kp.oaAuf === true, 'ein Klick ins Fenster schließt es nicht');
+  WK.kpOaSchleier({ target: 1, currentTarget: 1 });
+  pruefe(WK.kp.oaAuf === false, 'ein Klick daneben schließt es');
+  WK.kp.oaAuf = true;
+  WK.tasteGlobal({ key: 'Escape' });
+  pruefe(WK.kp.oaAuf === false, 'Escape schließt das Fenster');
+  WK.kp.oaAuf = true;
+  WK.oeffne('woche', '');
+  pruefe(WK.kp.oaAuf === false, 'beim Seitenwechsel ist das Fenster zu');
+}
+
+/* ============================================================
+   15. Übernahme nach 2.0: nachtragen statt doppelt anlegen
+   Grund: Wer mit 2.0 schon übernommen hat, bekommt Beruf/Privat
+   nachgetragen — und „Verteilen“ steht nicht doppelt da.
+   ============================================================ */
+console.log('\n15. Übernahme nach 2.0');
+if (WK) {
+  frisch();
+  WK.DB.seiten.push({ id: 'p1', art: 'vorhaben', titel: 'Umzug', text: 'eigener Text', rang: 1, zustand: 'laeuft', geaendert: 1 });
+  WK.DB.seiten.push({ id: 'wb-verteilen', art: 'liste', titel: 'Verteilen', text: '[] a', rang: 2, geaendert: 1 });
+  const wb = { projekte: [{ id: 'p1', name: 'Umzug', kontext: 'beruflich', flaeche: 'alt' }],
+               aufgaben: [{ id: 'a', titel: 'a', status: 'offen', kontext: 'privat' }, { id: 'r', titel: 'R', status: 'offen', wiederholung: { takt: 'woche', intervall: 1, tage: [1] } }] };
+  WK.kpMigAusText(JSON.stringify(wb), 'Test');
+  WK.seiteZeichnen(true);
+  pruefe(/ungeteilte Liste aus 2\.0 besteht noch/.test(seiteHtml()), 'die Vorschau sagt, dass „Verteilen“ aus 2.0 noch besteht');
+  const z = WK.kpMigAusfuehren();
+  pruefe(WK.kpSeiteFinden('p1').kontext === 'beruflich' && WK.kpSeiteFinden('p1').text === 'eigener Text' && z.kontext === 1,
+         'Beruf/Privat wird nachgetragen — der eigene Text bleibt');
+  pruefe(!WK.kpSeiteFinden('wb-verteilen-privat') && z.alt === 1, 'neben dem alten „Verteilen“ entsteht kein zweites');
+  pruefe(!!WK.kpSeiteFinden('wb-routine-privat'), 'ohne alte „Routine“ wird sie geteilt angelegt');
 }
 
 /* ============================================================
