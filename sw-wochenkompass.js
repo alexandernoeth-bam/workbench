@@ -12,7 +12,7 @@
 
 'use strict';
 
-var VORRAT = 'wochenkompass-vorrat-3';
+var VORRAT = 'wochenkompass-vorrat-4';
 var PRAEFIX = 'wochenkompass-';
 var GRUNDLAGE = [
   './wochenkompass.html',

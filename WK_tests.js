@@ -2,9 +2,10 @@
    WK_tests.js — Regressionstests für den Wochenkompass
    Aufruf:  node WK_tests.js [wochenkompass.html] [workbench.html]
 
-   Mit dem zweiten Pfad wird zusätzlich geprüft, dass der Unterbau
-   wörtlich der Workbench entspricht. Ohne ihn wird das als „warn“
-   übersprungen — der Wochenkompass arbeitet allein (kompass.json).
+   Mit dem zweiten Pfad wird zusätzlich geprüft, dass Unterbau und
+   Aktivitäten-Kern wörtlich der Workbench entsprechen. Ohne ihn wird
+   das als „warn“ übersprungen. Seit 3.0 arbeiten beide Apps auf
+   derselben workbench.json.
    ============================================================ */
 
 'use strict';
@@ -123,7 +124,7 @@ console.log('\n1. Aufbau der Datei');
   const titel = (QUELLE.match(/<title>Wochenkompass ([\d.]+)<\/title>/) || [])[1];
   const kopf = (QUELLE.match(/Wochenkompass <small>v([\d.]+)<\/small>/) || [])[1];
   pruefe(version && version === titel && version === kopf, 'Version steht gleich in Titel, Kopf und APP_VERSION (' + version + ')');
-  pruefe(version && Number(version.split('.')[0]) >= 2, 'Hauptversion 2 — eigene Datei, neues Datenmodell');
+  pruefe(version && Number(version.split('.')[0]) >= 3, 'Hauptversion 3 — dieselben Daten wie die Workbench');
   pruefe(!/@media/.test(QUELLE), 'keine @media-Regeln — Breite über body.breit');
   pruefe(/body\.breit \.leiste\{position:static/.test(QUELLE), 'am großen Bildschirm steht die Seitenleiste fest, am Handy ist sie eine Schublade');
   const fns = [...SKRIPT.matchAll(/\nfunction (\w+)\s*\(/g)].map(m => m[1]);
@@ -149,10 +150,19 @@ if (WK) { ok('der Wochenkompass lässt sich außerhalb des Browsers auswerten');
 function frisch() {
   WK.DB = WK.leereDatenbank();
   WK.kp.art = 'woche'; WK.kp.id = ''; WK.kp.frage = ''; WK.kp.modus = 'ansicht'; WK.kp.hervor = '';
-  WK.kp.zielWoche = 'diese'; WK.kp.mig = null; WK.kp.neuIn = '';
+  WK.kp.zielWoche = 'diese'; WK.kp.neuIn = '';
+  WK.DB.einstellungen.aktivitaetenUmgestellt = '2026-10-16 12:00:00';
   WK.zurueckHolen = null;
 }
 function seiteHtml() { return WK.document.getElementById('seite').innerHTML; }
+/* Seit 3.0 legt kpSeiteAnlegen (aus der Workbench) mit Beruf/Privat an,
+   nicht mit Text — der kommt danach. */
+function neueSeite(art, name, text) {
+  const s = WK.kpSeiteAnlegen(art, name, WK.kp.filter);
+  if (s && text) { s.text = text; }
+  return s;
+}
+function wochenKennung() { return WK.kpWocheKennung(WK.kpOffenerMontag()); }
 function feld(text, a, b) {
   const f = WK.document.getElementById('kpFeld');
   f.value = text; f.selectionStart = a; f.selectionEnd = (b === undefined) ? a : b;
@@ -172,42 +182,67 @@ if (WK) {
 }
 
 /* ============================================================
-   3. Unterbau: wörtlich aus der Workbench — aber eigene Datei
-   Grund: Kompass 1.0 schrieb in die workbench.json. 2.0 hat seine
-   eigene Datei und darf die der Workbench nie anfassen.
+   3. Unterbau: wörtlich aus der Workbench — dieselbe Datei
+   Grund: Seit 3.0 arbeiten Workbench und Wochenkompass auf der
+   workbench.json. Jede Abweichung im Unterbau oder im Kern (kp…)
+   würde Daten der anderen App verderben.
    ============================================================ */
-console.log('\n3. Unterbau und eigene Datei');
+console.log('\n3. Unterbau und gemeinsame Datei');
 {
-  const WOERTLICH = ['zusammenfuehren', 'alsText', 'uebernehmen', 'speichern', 'laden',
+  const WOERTLICH = ['zusammenfuehren', 'alsText', 'uebernehmen', 'speichern', 'laden', 'leereDatenbank',
     'grabsteinSetzen', 'grabsteinZeit', 'grabsteineAufraeumen', 'textZuBestand', 'abgleichen', 'abgleichPlanen',
     'driveSuchen', 'driveAnlegen', 'driveHochladen', 'driveHerunterladen', 'antwortPruefen',
     'tokenMerken', 'tokenGueltig', 'klientVorbereiten', 'anmelden', 'anmeldeVersuch', 'abmelden',
     'erneuerungPlanen', 'erneuerungPruefen', 'dateiWaehlen', 'dateiAnlegen', 'opfsSchreiben', 'opfsLesen',
     'montagVon', 'kalenderwoche', 'neueKennung', 'esc',
-    'feldErsetzen', 'wortUmDieMarke', 'flaecheSinnbild', 'tabelleHtml', 'tabellenZellen', 'listenNummern', 'langDatum'];
+    'feldErsetzen', 'wortUmDieMarke', 'flaecheSinnbild', 'tabellenZellen', 'listenNummern', 'langDatum'];
+  /* Der Kern steht als eigener Abschnitt im Unterbau; die Anschlüsse
+     (kpBzUm, kpTextSetzen …) gehören jeder App selbst. */
+  const kernStart = SKRIPT.indexOf('/* ---------- Aktivitäten-Kern der Workbench ---------- */');
+  const kernEnde = SKRIPT.indexOf('Wochenkompass 3 — eigener Teil');
+  const KERN = (kernStart >= 0 && kernEnde > kernStart)
+    ? [...SKRIPT.slice(kernStart, kernEnde).matchAll(/\nfunction (kp\w+)\s*\(/g)].map(m => m[1]) : [];
   if (!WB_SKRIPT) {
     warn('workbench.html nicht neben dem Wochenkompass — Vergleich übersprungen');
   } else {
     const abweichend = WOERTLICH.filter(n => funktionText(SKRIPT, n) === null || funktionText(SKRIPT, n) !== funktionText(WB_SKRIPT, n));
     pruefe(abweichend.length === 0, WOERTLICH.length + ' Funktionen stimmen wörtlich mit der Workbench überein'
            + (abweichend.length ? ' — abweichend: ' + abweichend.join(', ') : ''));
+    const kernAnders = KERN.filter(n => funktionText(SKRIPT, n) !== funktionText(WB_SKRIPT, n));
+    pruefe(KERN.length >= 60 && kernAnders.length === 0, KERN.length + ' Kernfunktionen (kp…) stimmen wörtlich mit der Workbench überein'
+           + (kernAnders.length ? ' — abweichend: ' + kernAnders.join(', ') : ''));
     const wertW = (s, n) => (s.match(new RegExp("var " + n + "\\s*=\\s*'([^']*)';")) || [])[1];
-    pruefe(wertW(SKRIPT, 'CLIENT_ID') === wertW(WB_SKRIPT, 'CLIENT_ID'), 'dieselbe Google-Anwendung — nur so ist die workbench.json für die Übernahme sichtbar');
+    pruefe(wertW(SKRIPT, 'CLIENT_ID') === wertW(WB_SKRIPT, 'CLIENT_ID'), 'dieselbe Google-Anwendung — nur so ist die workbench.json sichtbar');
+    pruefe(wertW(SKRIPT, 'DRIVE_DATEI') === wertW(WB_SKRIPT, 'DRIVE_DATEI'), 'dieselbe Datei in Drive wie die Workbench');
+    const sa = s => (s.match(/var SAMMLUNGEN = \[[\s\S]*?\];/) || [''])[0];
+    pruefe(sa(SKRIPT) !== '' && sa(SKRIPT) === sa(WB_SKRIPT), 'dieselben Sammlungen wie die Workbench — beim Abgleich geht nichts verloren');
+    ['KP_ARTEN', 'KP_ABSCHNITTE', 'KP_KASTEN', 'KP_VERWEIS', 'KP_ZUSTAENDE'].forEach(function (n) {
+      const v = s => (s.match(new RegExp('\\nvar ' + n + '\\b[\\s\\S]*?;\\n')) || [''])[0];
+      pruefe(v(SKRIPT) !== '' && v(SKRIPT) === v(WB_SKRIPT), n + ' gleicht der Workbench');
+    });
   }
   const wert = n => (SKRIPT.match(new RegExp("var " + n + "\\s*=\\s*'([^']*)';")) || [])[1];
-  pruefe(wert('DRIVE_DATEI') === 'kompass.json' && wert('DATEINAME') === 'kompass.json' && wert('OPFS_NAME') === 'kompass.json',
-         'eigene Datei kompass.json — in Drive, als Datei und im Gerätespeicher');
-  pruefe(wert('IDB_NAME') !== 'wochenkompass-speicher' && wert('LS_KEY') !== 'wochenkompass-daten',
-         'nicht der Dateigriff von Kompass 1.0 — der zeigte auf die workbench.json');
-  pruefe(!/workbench\.json/.test(wert('DRIVE_DATEI') + wert('DATEINAME') + wert('OPFS_NAME') + wert('LS_KEY')), 'kein Speicherweg führt in die workbench.json');
-  pruefe(/var SAMMLUNGEN = \['seiten', 'wochen'\];/.test(SKRIPT), 'eigene Sammlungen: seiten und wochen');
+  pruefe(wert('DRIVE_DATEI') === 'workbench.json' && wert('DATEINAME') === 'workbench.json', 'Datei ist die workbench.json');
+  pruefe(['wochenkompass-speicher', 'kompass-speicher', 'workbench-speicher'].indexOf(wert('IDB_NAME')) < 0
+         && ['wochenkompass-daten', 'kompass-daten', 'workbench-daten'].indexOf(wert('LS_KEY')) < 0
+         && ['wochenkompass.json', 'kompass.json', 'workbench.json'].indexOf(wert('OPFS_NAME')) < 0,
+         'eigener Gerätespeicher — kein alter Dateigriff auf kompass.json, kein Zugriff auf den Speicher der Workbench');
   pruefe(wert('SCOPES') === 'https://www.googleapis.com/auth/drive.file', 'nur das Recht drive.file');
   if (WK) {
     const db = WK.leereDatenbank();
-    pruefe(Array.isArray(db.seiten) && Array.isArray(db.wochen) && !db.aufgaben && !db.gedanken, 'ein leerer Bestand hat nur Seiten und Wochen');
-    const r = WK.zusammenfuehren({ seiten: [{ id: 'a', titel: 'alt', geaendert: 1 }], wochen: [], grabsteine: [] },
-                                 { seiten: [{ id: 'a', titel: 'neu', geaendert: 2 }, { id: 'b', geaendert: 1 }], wochen: [], grabsteine: [] });
-    pruefe(r.db.seiten.length === 2 && r.db.seiten.filter(s => s.id === 'a')[0].titel === 'neu', 'der Abgleich führt Seiten nach Stempel zusammen');
+    pruefe(Array.isArray(db.projekte) && Array.isArray(db.themen) && Array.isArray(db.gedanken) && Array.isArray(db.aufgaben)
+           && Array.isArray(db.wochen) && Array.isArray(db.tage) && !db.seiten, 'ein leerer Bestand hat die Sammlungen der Workbench');
+    /* Fehlerart: Die Kalenderzuordnung ist ein Verzeichnis. Würde sie
+       zur Liste, verlöre die Workbench ihre Zuordnungen. */
+    const b = WK.leereDatenbank();
+    b.kalenderzuordnung = { 'abc': 'urlaub' };
+    WK.bestandStempeln(b);
+    pruefe(!Array.isArray(b.kalenderzuordnung) && b.kalenderzuordnung.abc && b.kalenderzuordnung.abc.art === 'urlaub',
+           'die Kalenderzuordnung bleibt ein Verzeichnis');
+    const r = WK.zusammenfuehren({ projekte: [{ id: 'a', name: 'alt', geaendert: 1 }], aufgaben: [{ id: 'r', titel: 'Routine', geaendert: 5 }], grabsteine: [] },
+                                 { projekte: [{ id: 'a', name: 'neu', geaendert: 2 }], notizbuecher: [{ id: 'n', geaendert: 1 }], grabsteine: [] });
+    pruefe(r.db.projekte[0].name === 'neu' && r.db.aufgaben.length === 1 && r.db.notizbuecher.length === 1,
+           'der Abgleich führt alles zusammen — auch, was nur die Workbench zeigt');
   }
 }
 
@@ -217,12 +252,12 @@ console.log('\n3. Unterbau und eigene Datei');
 console.log('\n4. Seiten');
 if (WK) {
   frisch();
-  const v = WK.kpSeiteAnlegen('vorhaben', 'Umzug Büro', '');
-  const l = WK.kpSeiteAnlegen('liste', 'Büro', '');
-  const n = WK.kpSeiteAnlegen('notiz', 'Ideen', '');
-  pruefe(v && l && n && WK.DB.seiten.length === 3, 'alle drei Arten lassen sich anlegen');
+  const v = neueSeite('vorhaben', 'Umzug Büro', '');
+  const l = neueSeite('liste', 'Büro', '');
+  const n = neueSeite('notiz', 'Ideen', '');
+  pruefe(v && l && n && WK.kpSeitenAlle().length === 3, 'alle drei Arten lassen sich anlegen');
   pruefe(v.zustand === 'laeuft' && l.zustand === undefined && n.zustand === undefined, 'nur das Vorhaben hat einen Zustand');
-  pruefe(WK.kpSeiteAnlegen('termin', 'x', '') === null && WK.kpSeiteAnlegen('liste', '  ', '') === null, 'unbekannte Art und leerer Name werden abgewiesen');
+  pruefe(WK.kpSeiteAnlegen('termin', 'x', '') === null && neueSeite('liste', '  ', '') === null, 'unbekannte Art und leerer Name werden abgewiesen');
   pruefe(l.rang > v.rang && n.rang > l.rang, 'neue Seiten stehen hinten');
   v.text = 'Wir ziehen um.\nDas wird [] kein Kästchen.\n[] Firma anfragen\n  [ ] Angebote vergleichen\n[x] Adresse melden\n- [] Punkt mit Klammern\n[]   ';
   pruefe(WK.kpOffeneZahl(v) === 2, 'offene Aufgaben: nur Zeilen, die mit [] oder [ ] beginnen — Fließtext zählt nicht, [x] nicht, leeres Kästchen nicht');
@@ -253,7 +288,7 @@ if (WK) {
 console.log('\n5. Planen mit S und V');
 if (WK) {
   frisch();
-  const s = WK.kpSeiteAnlegen('liste', 'Büro', 'Einleitung\n[] Reisekosten einreichen\n[] Steuerberater anrufen\n[x] Erledigtes');
+  const s = neueSeite('liste', 'Büro', 'Einleitung\n[] Reisekosten einreichen\n[] Steuerberater anrufen\n[x] Erledigtes');
   WK.kp.art = 'seite'; WK.kp.id = s.id; WK.kp.modus = 'ansicht'; WK.kp.oaAuf = false;
   WK.seiteZeichnen(true);
   let h = seiteHtml();
@@ -277,7 +312,7 @@ if (WK) {
   pruefe(new RegExp('class="drin"[^>]*>KW ' + WK.kalenderwoche(mo) + ' · S ×<').test(h), 'im Fenster steht danach „KW nn · S ×“');
   pruefe((h.match(/kpEinplanen\(\d+,'s'\)/g) || []).length === 1, 'die eingeplante Aufgabe hat kein S und V mehr');
   pruefe(/kpZielWocheSetzen\('naechste'\)/.test(h) && /kpOaSprung\(1\)/.test(h), 'im Fenster: Wahl der Woche und ↘ zur Zeile');
-  WK.kpAusplanen(mo, w.eintraege[0].id);
+  WK.kpAusplanen(WK.kpWocheKennung(mo), w.eintraege[0].id);
   pruefe(w.eintraege.length === 0 && /\[\] Reisekosten/.test(s.text), 'ein Tipp auf die Marke nimmt sie aus der Woche — die Zeile in der Quelle bleibt');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpZielWocheSetzen('naechste');
@@ -301,7 +336,7 @@ if (WK) {
 console.log('\n6. Woche als Notiz');
 if (WK) {
   frisch();
-  const s = WK.kpSeiteAnlegen('vorhaben', 'Umzug', 'Notiz\n[] Firma anfragen\n[] Lager kündigen');
+  const s = neueSeite('vorhaben', 'Umzug', 'Notiz\n[] Firma anfragen\n[] Lager kündigen');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpEinplanen(1, 's');
   WK.kpEinplanen(2, 'v');
@@ -314,12 +349,12 @@ if (WK) {
   let h = seiteHtml();
   pruefe(/>Bringt mich substanziell weiter</.test(h) && />Verbindlichkeiten</.test(h) && !/>Substanz</.test(h), 'die Überschrift heißt „Bringt mich substanziell weiter“');
   pruefe(!/tkasten/.test(h) && !/<textarea/.test(h) && /modusSetzen\('schreiben'\)/.test(h), 'in der Ansicht keine Kästchen und kein Feld — aber „Schreiben“');
-  pruefe((h.match(/kpWocheSprung\(/g) || []).length === 2 && /title="Zu „Umzug“"/.test(h), 'hinter eingeplanten Aufgaben ein ↗ zur Quelle');
-  WK.kpWocheZeileUm(1);
+  pruefe((h.match(/kpBzSprung\(/g) || []).length === 2 && /title="Zu „Umzug“"/.test(h), 'hinter eingeplanten Aufgaben ein ↗ zur Quelle');
+  WK.kpBzUm(wochenKennung(), 1);
   pruefe(/\[x\] Firma anfragen/.test(s.text) && /\[x\] Firma anfragen/.test(w.text), 'ein Klick streicht durch — und hakt die Zeile in der Quelle ab');
   WK.seiteZeichnen(true);
   pruefe(/class="wz erl"/.test(seiteHtml()), 'die Zeile steht in der Woche durchgestrichen');
-  WK.kpWocheZeileUm(1);
+  WK.kpBzUm(wochenKennung(), 1);
   pruefe(/\[\] Firma anfragen/.test(s.text) && /\[\] Firma anfragen/.test(w.text), 'ein zweiter Klick nimmt beides zurück');
 
   WK.modusSetzen('schreiben');
@@ -329,27 +364,27 @@ if (WK) {
   WK.modusSetzen('ansicht');
   h = seiteHtml();
   pruefe(/Messe am Mittwoch/.test(h) && /Freitag: Reisekosten/.test(h), 'frei Geschriebenes steht in der Woche — auch zwischen den Aufgaben');
-  pruefe(/kpWocheZeileUm\(\d+\)[^>]*>Reifen wechseln/.test(h) && (h.match(/kpWocheSprung\(/g) || []).length === 2,
+  pruefe(/kpBzUm\('kw-[\d-]+',\d+\)[^>]*>Reifen wechseln/.test(h) && (h.match(/kpBzSprung\(/g) || []).length === 2,
          'eine selbst geschriebene Aufgabe lässt sich durchstreichen — ohne ↗');
   const zeilen = w.text.split('\n');
   const nrR = zeilen.indexOf('[] Reifen wechseln');
-  WK.kpWocheZeileUm(nrR);
+  WK.kpBzUm(wochenKennung(), nrR);
   pruefe(w.text.indexOf('[x] Reifen wechseln') >= 0, 'und wird durchgestrichen');
 
-  WK.kpWocheSprung(w.text.split('\n').indexOf('[] Firma anfragen'));
+  WK.kpBzSprung(wochenKennung(), w.text.split('\n').indexOf('[] Firma anfragen'));
   pruefe(WK.kp.art === 'seite' && WK.kp.id === s.id && WK.kp.hervor === 'Firma anfragen', '↗ öffnet die Quelle');
   pruefe((seiteHtml().match(/id="kpHervor"/g) || []).length === 1, 'die Zeile ist dort hervorgehoben');
 
   s.text = 'Notiz\n[] Firma anrufen\n[] Lager kündigen';
   WK.kp.art = 'woche'; WK.kp.id = '';
-  WK.kpWocheZeileUm(w.text.split('\n').indexOf('[] Firma anfragen'));
+  WK.kpBzUm(wochenKennung(), w.text.split('\n').indexOf('[] Firma anfragen'));
   pruefe(w.text.indexOf('[x] Firma anfragen') >= 0 && s.text.indexOf('[x]') < 0, 'umformuliert: Durchstreichen wirkt nur in der Woche, die Quelle bleibt');
-  WK.DB.seiten = [];
+  WK.DB.projekte = []; WK.DB.ziele = []; WK.DB.themen = []; WK.DB.gedanken = [];
   WK.seiteZeichnen(true);
-  pruefe(!/kpWocheSprung\(/.test(seiteHtml()) && /Lager kündigen/.test(seiteHtml()), 'ohne Quelle bleibt die Aufgabe stehen — ohne ↗');
+  pruefe(!/kpBzSprung\(/.test(seiteHtml()) && /Lager kündigen/.test(seiteHtml()), 'ohne Quelle bleibt die Aufgabe stehen — ohne ↗');
 
   frisch();
-  const q = WK.kpSeiteAnlegen('liste', 'L', '[] eins');
+  const q = neueSeite('liste', 'L', '[] eins');
   WK.kp.art = 'seite'; WK.kp.id = q.id;
   WK.kpEinplanen(0, 'v');
   const w2 = WK.kpWocheFinden(mo);
@@ -358,7 +393,7 @@ if (WK) {
   WK.kp.art = 'seite'; WK.kp.id = q.id;
   WK.kpEinplanen(0, 's');
   pruefe(w2.eintraege.length === 1 && /## Bringt mich substanziell weiter\n\[\] eins/.test(w2.text), 'und sie lässt sich neu einplanen — ohne verwaisten Eintrag');
-  WK.kpAusplanen(mo, w2.eintraege[0].id);
+  WK.kpAusplanen(WK.kpWocheKennung(mo), w2.eintraege[0].id);
   pruefe(w2.eintraege.length === 0 && w2.text.indexOf('eins') < 0 && q.text === '[] eins', '„KW · S ×“ nimmt die Zeile aus der Woche, die Quelle bleibt');
   w2.text = 'Eigenes\n## Ohne Abschnitte';
   WK.kp.art = 'seite'; WK.kp.id = q.id;
@@ -373,7 +408,12 @@ if (WK) {
   WK.kp.art = 'woche'; WK.kp.id = ''; WK.kp.modus = 'ansicht';
   WK.seiteZeichnen(true);
   pruefe(WK.DB.wochen.length === 0, 'eine Woche ansehen legt sie nicht an');
-  pruefe(/S oder V/.test(seiteHtml()) && /oeffne\('einst',''\)/.test(seiteHtml()), 'eine leere Woche sagt, wo geplant wird — und bietet die Übernahme an');
+  pruefe(/S oder V/.test(seiteHtml()) && !/oeffne\('einst',''\)/.test(seiteHtml()), 'eine leere Woche sagt, wo geplant wird — eine Übernahme gibt es nicht mehr');
+  pruefe(!/um-hinweis/.test(seiteHtml()), 'nach der Umstellung in der Workbench kein Hinweis');
+  delete WK.DB.einstellungen.aktivitaetenUmgestellt;
+  WK.seiteZeichnen(true);
+  pruefe(/um-hinweis/.test(seiteHtml()) && /Erst in der Workbench umstellen/.test(seiteHtml()), 'vorher sagt die Woche, dass erst die Workbench umstellt');
+  WK.DB.einstellungen.aktivitaetenUmgestellt = '2026-10-16 12:00:00';
   WK.kp.modus = 'schreiben';
   WK.kpTextSetzen('Hallo');
   pruefe(WK.kpWocheFinden(mo) && WK.kpWocheFinden(mo).text === 'Hallo', 'wer in der Woche schreibt, legt sie an');
@@ -385,7 +425,7 @@ if (WK) {
 console.log('\n7. Abhaken auf der Seite');
 if (WK) {
   frisch();
-  const s = WK.kpSeiteAnlegen('notiz', 'Telefonat', '[] Unterlagen schicken');
+  const s = neueSeite('notiz', 'Telefonat', '[] Unterlagen schicken');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpEinplanen(0, 'v');
   const mo = WK.kpHeuteMontag();
@@ -412,16 +452,16 @@ if (WK) {
          && /fl-kap">kap</.test(a) && /<b>auch<\/b>/.test(a) && /<s>so<\/s>/.test(a), 'Auszeichnungen der Workbench und aus Markdown');
   pruefe(/<a href="https:\/\/x\.de"/.test(WK.kpAuszeichnen('[Seite](https://x.de)')), 'Verweise ins Netz');
   pruefe(WK.kpAuszeichnen('<script>').indexOf('<script>') < 0, 'fremdes HTML bleibt maskiert');
-  const v = WK.kpSeiteAnlegen('vorhaben', 'Ziel', '');
+  const v = neueSeite('vorhaben', 'Ziel', '');
   pruefe(/oeffne\('seite','/.test(WK.kpAuszeichnen('[[projekt:' + v.id + '|Alt]]')) && /wb-tot/.test(WK.kpAuszeichnen('[[projekt:weg|Alt]]')),
          'Workbench-Verweise führen zur Seite, wenn es sie hier gibt');
-  const s = WK.kpSeiteAnlegen('notiz', 'N', '# Titel\n## Abschnitt\nText\n- Punkt\n1. eins\n2. zwei\n---\n| A | B |\n|---|---|\n| [] x | y |\n!skizze:abcdefgh');
+  const s = neueSeite('notiz', 'N', '# Titel\n## Abschnitt\nText\n- Punkt\n1. eins\n2. zwei\n---\n| A | B |\n|---|---|\n| [] x | y |\n!skizze:abcdefgh');
   const h = WK.kpAnsichtHtml(s);
   pruefe(/fl-h1/.test(h) && /fl-h2/.test(h) && /fl-punkt/.test(h) && /fl-nr">2\./.test(h) && /fl-trenner/.test(h), 'Überschriften, Punkte, Nummern, Trennlinie');
-  pruefe(/fl-tab/.test(h) && /zellenKastenUm\(9,0\)/.test(h), 'Tabellen mit Kästchen in Zellen');
-  pruefe(/nur in der Workbench/.test(h), 'eine Skizze verschwindet nicht kommentarlos');
+  pruefe(/fl-tab/.test(h) && /kpZelleUm\(9,0\)/.test(h), 'Tabellen mit Kästchen in Zellen');
+  pruefe(/Workbench zu sehen/.test(h), 'eine Skizze verschwindet nicht kommentarlos');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
-  WK.zellenKastenUm(9, 0);
+  WK.kpZelleUm(9, 0);
   pruefe(/\| \[x\] x \| y \|/.test(s.text), 'ein Kästchen in einer Zelle lässt sich abhaken');
 
   WK.kp.modus = 'schreiben';
@@ -456,109 +496,17 @@ if (WK) {
 }
 
 /* ============================================================
-   9. Übernahme aus der Workbench
-   Grund: Vorhaben, Verteilen und Routine müssen genau so entstehen,
-   wie es vereinbart ist — und eine zweite Übernahme legt nichts doppelt an.
-   ============================================================ */
-console.log('\n9. Übernahme aus der Workbench');
-if (WK) {
-  frisch();
-  const mo = WK.kpHeuteMontag();
-  const wb = {
-    projekte: [{ id: 'p1', name: 'Umzug Büro', status: 'laufend', kontext: 'beruflich', flaeche: 'Bis Ende November.\n\n', ende: '2026-11-30', ordnung: 2 },
-               { id: 'p2', name: 'Website', status: 'ruht', flaeche: '', ordnung: 1 }],
-    ziele: [{ id: 'z1', name: 'Fit', status: 'erreicht', flaeche: '[[projekt:p1|Umzug]]', zieltermin: '2026-12-31' }],
-    themen: [{ id: 't1', name: 'Büro' }, { id: 't2', name: 'Haus' }, { id: 't3', name: 'Leer' }],
-    aufgaben: [
-      { id: 'a1', titel: 'Firma anfragen', status: 'offen', projektId: 'p1' },
-      { id: 'a2', titel: 'Erledigt', status: 'erledigt', projektId: 'p1' },
-      { id: 'a3', titel: 'Laufen', status: 'offen', zielId: 'z1' },
-      { id: 'a4', titel: 'Reisekosten', status: 'offen', themaId: 't1', kontext: 'beruflich' },
-      { id: 'a5', titel: 'Dachrinne', status: 'offen', themaId: 't2' },
-      { id: 'a6', titel: 'Lose\nZeile', status: 'offen' },
-      { id: 'a7', titel: 'Verloren', status: 'offen', projektId: 'gibtsnicht' },
-      { id: 'a8', titel: 'Steuerunterlagen sortieren', status: 'offen', projektId: 'p1', kontext: 'beruflich',
-        wiederholung: { takt: 'woche', intervall: 1, tage: [1, 3, 5, 0], tag: 1 } },
-      { id: 'a9', titel: 'Blumen', status: 'offen', wiederholung: { takt: 'woche', intervall: 2, tage: [4, 1], tag: 1 } },
-      { id: 'a10', titel: 'Miete', status: 'offen', wiederholung: { takt: 'monat', intervall: 1, tage: [], tag: 15 } },
-      { id: 'a11', titel: 'Filter', status: 'offen', wiederholung: { takt: 'monat', intervall: 3, tage: [], tag: 1 } },
-      { id: 'a12', titel: 'Alt', status: 'erledigt', wiederholung: { takt: 'woche', intervall: 1, tage: [1], tag: 1 } },
-      { id: 'a13', titel: 'Weg', status: 'cancelled', themaId: 't1' }
-    ],
-    gedanken: [
-      { id: 'g1', titel: 'Ideen Kundentag', text: 'Termin 21.11.\n[] Raum anfragen' },
-      { id: 'g2', titel: '', text: '# Kopf\nmehr' },
-      { id: 'g3', titel: 'leer', text: '' },
-      { id: 'kw-' + mo, kompass: 'woche', woche: mo, text: '# Woche\n\n## Was diese Woche Substanz schafft\n- Angebot Nord\n- ~~Fertig~~\n- \n\n## Verbindlichkeiten\n1. Becker anrufen' },
-      { id: 'L1', kompass: 'liste', titel: 'Lesestapel', text: '- Buch' }
-    ]
-  };
-  const ok1 = WK.kpMigAusText(JSON.stringify(wb), 'Test');
-  pruefe(ok1 && WK.kp.mig && WK.kp.art === 'einst', 'eine Workbench-Datei ergibt eine Vorschau in den Einstellungen');
-  const p = WK.kp.mig.plan;
-  const vh = id => p.vorhaben.seiten.filter(s => s.id === id)[0];
-  pruefe(p.vorhaben.seiten.map(s => s.id).join(',') === 'p2,p1,z1', 'Vorhaben in der Reihenfolge der Workbench, Kennung bleibt');
-  pruefe(vh('p1').text === 'Bis Ende November.\n\n## Aufgaben\n[] Firma anfragen', 'Vorhaben: erst der Notiztext, dann die offenen Aufgaben als Zeilen');
-  pruefe(vh('p2').text === '' && vh('p2').zustand === 'ruht' && vh('z1').zustand === 'erledigt' && vh('p1').zustand === 'laeuft',
-         'der Zustand kommt mit: läuft · ruht · erledigt');
-  pruefe(vh('z1').text === '[[projekt:p1|Umzug]]\n\n## Aufgaben\n[] Laufen' && vh('z1').typ === 'ziel' && vh('p1').termin === '2026-11-30',
-         'Ziele mit ihren Aufgaben; Art und Termin werden gemerkt');
-  pruefe(p.vorhaben.aufgaben === 2 && !/Erledigt|Steuer/.test(vh('p1').text), 'erledigte und wiederkehrende Aufgaben stehen nicht im Vorhaben');
-  const vt = p.verteilen.seiten.filter(x => x.id === 'wb-verteilen-privat')[0];
-  const vb = p.verteilen.seiten.filter(x => x.id === 'wb-verteilen-beruf')[0];
-  pruefe(vt && vt.titel === 'Verteilen · Privat' && vt.kontext === 'privat' && vt.art === 'liste'
-         && vb && vb.titel === 'Verteilen · Beruf' && vb.kontext === 'beruflich', '„Verteilen“ je für Beruf und Privat');
-  pruefe(vt.text === '## Haus\n[] Dachrinne\n\n## Ohne Liste\n[] Lose Zeile\n[] Verloren',
-         'Verteilen: alle Aufgaben ohne Vorhaben, mit dem Listennamen als Überschrift — leere Listen ohne Überschrift');
-  pruefe(vb.text === '## Büro\n[] Reisekosten', 'die Zuordnung kommt von der einzelnen Aufgabe');
-  const rt = p.routine.seiten.filter(x => x.id === 'wb-routine-privat')[0];
-  const rb = p.routine.seiten.filter(x => x.id === 'wb-routine-beruf')[0];
-  pruefe(rt && rt.titel === 'Routine · Privat' && rb && rb.titel === 'Routine · Beruf', '„Routine“ je für Beruf und Privat');
-  pruefe(rt.text === 'Blumen\nalle 2 Wochen: Mo, Do\n\nMiete\nmonatlich am 15.\n\nFilter\nalle 3 Monate am 1.'
-         && rb.text === 'Steuerunterlagen sortieren\nMo, Mi, Fr, So',
-         'Routine: Name und darunter die Frequenz — auch aus Vorhaben, ohne beendete');
-  pruefe(WK.kpFrequenz({ typ: 'woechentlich', intervall: 1, wochentage: [7, 2] }) === 'Di, So', 'auch die alte Schreibweise der Wiederholung');
-  pruefe(p.notizen.seiten.map(s => s.titel).join('|') === 'Ideen Kundentag|Kopf', 'freie Notizen — ohne Titel heißt sie wie ihre erste Zeile, leere fallen weg');
-  pruefe(p.listen.seiten.length === 1 && p.listen.seiten[0].id === 'L1', 'Listen aus Kompass 1.0');
-  const ww = p.wochen.wochen[0];
-  pruefe(ww && ww.montag === mo && ww.eintraege.length === 3 && ww.eintraege[0].abschnitt === 's' && ww.eintraege[1].erledigt === true
-         && ww.eintraege[1].text === 'Fertig' && ww.eintraege[2].abschnitt === 'v' && ww.eintraege[2].text === 'Becker anrufen',
-         'Wochen aus Kompass 1.0: Substanz und Verbindlichkeiten, Durchgestrichenes erledigt, leere Punkte weg');
-  WK.seiteZeichnen(true);
-  const hv = seiteHtml();
-  pruefe(/kpMigAusfuehren\(\)/.test(hv) && (hv.match(/kpMigWahlUm\(/g) || []).length === 6, 'die Vorschau zeigt alle Teile zum Abwählen');
-  WK.kpMigWahlUm('notizen');
-  const z = WK.kpMigAusfuehren();
-  pruefe(z.seiten === 3 + 2 + 2 + 1 && z.wochen === 1 && WK.kp.mig === null, 'übernommen wird, was gewählt ist — Notizen abgewählt');
-  pruefe(!WK.kpSeiteFinden('g1') && WK.kpSeiteFinden('p1').art === 'vorhaben' && WK.kpSeiteFinden('wb-routine-beruf'), 'die Seiten stehen im Kompass');
-  pruefe(WK.kpSeiteFinden('p1').kontext === 'beruflich' && WK.kpSeiteFinden('p2').kontext === '', 'Beruf/Privat kommt mit — ohne Angabe bleibt es offen');
-  pruefe(WK.kpOffeneZahl(WK.kpSeiteFinden('wb-verteilen-privat')) === 3, 'die übernommenen Aufgaben sind offene Aufgaben im Kompass');
-  WK.kpMigAusText(JSON.stringify(wb), 'Test');
-  const z2 = WK.kpMigAusfuehren();
-  pruefe(z2.seiten === 2 && z2.wochen === 0, 'eine zweite Übernahme legt nur an, was noch fehlt (hier die Notizen)');
-  pruefe(WK.DB.seiten.length === 10, 'keine Doppelten');
-  pruefe(/\[x\] Fertig/.test(WK.kpWocheFinden(mo).text) && /## Verbindlichkeiten\n\[\] Becker anrufen/.test(WK.kpWocheFinden(mo).text),
-         'eine Woche aus Kompass 1.0 kommt als Text an');
-  pruefe(WK.kpMigAusText('{"x":1}', 'Test') === false && WK.kpMigAusText('kein json', 'Test') === false, 'fremde Dateien werden abgewiesen');
-  pruefe(Array.isArray(wb.aufgaben) && wb.aufgaben.length === 13 && wb.projekte[0].flaeche === 'Bis Ende November.\n\n', 'die Workbench-Daten bleiben unverändert');
-  WK.kp.art = 'einst';
-  WK.seiteZeichnen(true);
-  const he = seiteHtml();
-  pruefe(/kpMigDrive\(\)/.test(he) && /onchange="kpMigDatei\(this\)"/.test(he) && /kpMigGeraet\(\)/.test(he), 'drei Quellen: Drive, Datei, Kompass 1.0 auf dem Gerät');
-}
-
-/* ============================================================
    10. Löschen und Rückgängig
    ============================================================ */
 console.log('\n10. Löschen und Rückgängig');
 if (WK) {
   frisch();
-  const s = WK.kpSeiteAnlegen('liste', 'Weg damit', '[] a');
+  const s = neueSeite('liste', 'Weg damit', '[] a');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpEinplanen(0, 's');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpLoeschen();
-  pruefe(!WK.kpSeiteFinden(s.id) && WK.DB.grabsteine.some(g => g.s === 'seiten' && g.id === s.id), 'gelöscht mit Löschvermerk');
+  pruefe(!WK.kpSeiteFinden(s.id) && WK.DB.grabsteine.some(g => g.s === 'themen' && g.id === s.id), 'gelöscht mit Löschvermerk — in der Sammlung der Workbench');
   pruefe(WK.kpWocheFinden(WK.kpHeuteMontag()).eintraege.length === 1, 'was sie in die Woche gegeben hat, bleibt dort');
   WK.rueckgaengig();
   pruefe(WK.kpSeiteFinden(s.id) && !WK.DB.grabsteine.some(g => g.id === s.id), 'Rückgängig holt die Seite zurück');
@@ -643,12 +591,14 @@ console.log('\n13. Beruf und Privat');
 if (WK) {
   frisch();
   WK.kp.filter = 'alle';
-  const a = WK.kpSeiteAnlegen('liste', 'Offen', '');
+  const a = neueSeite('liste', 'Offen', '');
   WK.kpFilterSetzen('beruflich');
-  const b = WK.kpSeiteAnlegen('vorhaben', 'Angebot Nord', '');
+  const b = neueSeite('vorhaben', 'Angebot Nord', '');
   WK.kpFilterSetzen('privat');
-  const c = WK.kpSeiteAnlegen('notiz', 'Garten', '');
-  pruefe(a.kontext === '' && b.kontext === 'beruflich' && c.kontext === 'privat', 'eine neue Seite bekommt den gerade gewählten Filter');
+  const c = neueSeite('notiz', 'Garten', '');
+  pruefe(a.kontext === 'beruflich' && b.kontext === 'beruflich' && c.kontext === 'privat',
+         'eine neue Seite bekommt den gerade gewählten Filter — ohne Filter beruflich wie in der Workbench');
+  a.kontext = '';
   pruefe(WK.localStorage.getItem('kompass-filter') === 'privat', 'der Filter wird auf dem Gerät gemerkt');
   WK.kp.filter = 'alle'; WK.kpFilterLaden(); WK.kp.notizenAuf = true;
   pruefe(WK.kp.filter === 'privat', 'und beim Start wieder geladen');
@@ -681,12 +631,12 @@ if (WK) {
 console.log('\n14. Sprung und Schreibmarke');
 if (WK) {
   frisch();
-  const s = WK.kpSeiteAnlegen('vorhaben', 'Umzug', 'Erste Zeile\n\n[] Firma anfragen\n[] Lager kündigen');
+  const s = neueSeite('vorhaben', 'Umzug', 'Erste Zeile\n\n[] Firma anfragen\n[] Lager kündigen');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpEinplanen(3, 'v');
   const mo = WK.kpHeuteMontag();
   WK.kp.art = 'woche'; WK.kp.id = '';
-  WK.kpWocheSprung(WK.kpWocheFinden(mo).text.split('\n').indexOf('[] Lager kündigen'));
+  WK.kpBzSprung(wochenKennung(), WK.kpWocheFinden(mo).text.split('\n').indexOf('[] Lager kündigen'));
   pruefe(WK.kp.modus === 'ansicht' && WK.kp.hervor === 'Lager kündigen', '↗ öffnet die Seite in der Ansicht, nicht im Schreiben-Modus');
   const f = WK.document.getElementById('kpFeld');
   f.value = s.text; f.selectionStart = 0; f.selectionEnd = 0;
@@ -719,28 +669,6 @@ if (WK) {
 }
 
 /* ============================================================
-   15. Übernahme nach 2.0: nachtragen statt doppelt anlegen
-   Grund: Wer mit 2.0 schon übernommen hat, bekommt Beruf/Privat
-   nachgetragen — und „Verteilen“ steht nicht doppelt da.
-   ============================================================ */
-console.log('\n15. Übernahme nach 2.0');
-if (WK) {
-  frisch();
-  WK.DB.seiten.push({ id: 'p1', art: 'vorhaben', titel: 'Umzug', text: 'eigener Text', rang: 1, zustand: 'laeuft', geaendert: 1 });
-  WK.DB.seiten.push({ id: 'wb-verteilen', art: 'liste', titel: 'Verteilen', text: '[] a', rang: 2, geaendert: 1 });
-  const wb = { projekte: [{ id: 'p1', name: 'Umzug', kontext: 'beruflich', flaeche: 'alt' }],
-               aufgaben: [{ id: 'a', titel: 'a', status: 'offen', kontext: 'privat' }, { id: 'r', titel: 'R', status: 'offen', wiederholung: { takt: 'woche', intervall: 1, tage: [1] } }] };
-  WK.kpMigAusText(JSON.stringify(wb), 'Test');
-  WK.seiteZeichnen(true);
-  pruefe(/ungeteilte Liste aus 2\.0 besteht noch/.test(seiteHtml()), 'die Vorschau sagt, dass „Verteilen“ aus 2.0 noch besteht');
-  const z = WK.kpMigAusfuehren();
-  pruefe(WK.kpSeiteFinden('p1').kontext === 'beruflich' && WK.kpSeiteFinden('p1').text === 'eigener Text' && z.kontext === 1,
-         'Beruf/Privat wird nachgetragen — der eigene Text bleibt');
-  pruefe(!WK.kpSeiteFinden('wb-verteilen-privat') && z.alt === 1, 'neben dem alten „Verteilen“ entsteht kein zweites');
-  pruefe(!!WK.kpSeiteFinden('wb-routine-privat'), 'ohne alte „Routine“ wird sie geteilt angelegt');
-}
-
-/* ============================================================
    16. Wochen aus 2.0/2.1 werden zu Text
    ============================================================ */
 console.log('\n16. Alte Wochen umstellen');
@@ -765,10 +693,10 @@ console.log('\n17. Seitenleiste eingeklappt');
 if (WK) {
   frisch();
   WK.kp.filter = 'alle'; WK.kp.notizenAuf = false; WK.kp.ruhtAuf = false; WK.kp.fertigAuf = false;
-  const n = WK.kpSeiteAnlegen('notiz', 'Geheime Notiz', '[] a\n[] b');
-  const r = WK.kpSeiteAnlegen('vorhaben', 'Ruhendes', '');
+  const n = neueSeite('notiz', 'Geheime Notiz', '[] a\n[] b');
+  const r = neueSeite('vorhaben', 'Ruhendes', '');
   r.zustand = 'ruht';
-  const f = WK.kpSeiteAnlegen('vorhaben', 'Fertiges', '');
+  const f = neueSeite('vorhaben', 'Fertiges', '');
   f.zustand = 'erledigt';
   WK.kp.art = 'woche'; WK.kp.id = '';
   WK.leisteZeichnen();
@@ -845,10 +773,10 @@ console.log('\n20. Manuell sortieren');
 if (WK) {
   frisch();
   WK.kp.filter = 'alle'; WK.kp.sortieren = ''; WK.kp.ruhtAuf = false; WK.kp.notizenAuf = false;
-  const a = WK.kpSeiteAnlegen('liste', 'A', '');
-  const b = WK.kpSeiteAnlegen('vorhaben', 'V1', '');
-  const c = WK.kpSeiteAnlegen('liste', 'B', '');
-  const d = WK.kpSeiteAnlegen('liste', 'C', '');
+  const a = neueSeite('liste', 'A', '');
+  const b = neueSeite('vorhaben', 'V1', '');
+  const c = neueSeite('liste', 'B', '');
+  const d = neueSeite('liste', 'C', '');
   const namen = schl => WK.kpGruppe(schl).map(x => x.titel).join(',');
   pruefe(namen('liste') === 'A,B,C', 'Ausgang: A, B, C');
   pruefe(WK.kpVerschieben(d.id, a.id, 'vor') && namen('liste') === 'C,A,B', 'ziehen vor einen Eintrag');
@@ -868,12 +796,12 @@ if (WK) {
   pruefe(namen('liste') === 'C,A,B', 'unter einem Filter wird mit dem nächsten sichtbaren getauscht');
   pruefe(WK.kpGruppe('liste').filter(x => x.kontext === 'beruflich').length === 1, 'ausgeblendete Einträge bleiben erhalten');
   WK.kp.filter = 'alle';
-  const g1 = WK.kpSeiteAnlegen('notiz', 'N1', ''); g1.rang = 5;
-  const g2 = WK.kpSeiteAnlegen('notiz', 'N2', ''); g2.rang = 5;
+  const g1 = neueSeite('notiz', 'N1', ''); g1.rang = 5;
+  const g2 = neueSeite('notiz', 'N2', ''); g2.rang = 5;
   pruefe(WK.kpVerschieben(g2.id, g1.id, 'vor') && namen('notiz') === 'N2,N1', 'auch alte Daten mit gleichem Rang lassen sich sortieren');
   WK.kp.art = 'seite'; WK.kp.id = b.id;
-  const v2 = WK.kpSeiteAnlegen('vorhaben', 'V2', '');
-  const v3 = WK.kpSeiteAnlegen('vorhaben', 'V3', '');
+  const v2 = neueSeite('vorhaben', 'V2', '');
+  const v3 = neueSeite('vorhaben', 'V3', '');
   v3.zustand = 'ruht';
   WK.kp.id = v2.id; WK.kpZustand('ruht');
   pruefe(namen('vorhaben-ruht') === 'V3,V2', 'wer den Zustand wechselt, steht in der neuen Gruppe unten');
@@ -924,7 +852,7 @@ if (WK) {
   pruefe(WK.kpPasst('Anrufer', 'Anrufen') === 0 && WK.kpPasst('Anrufens', 'Anrufen') === 0 && WK.kpPasst('Bitte Anrufen', 'Anrufen') === 0,
          'mitten im Wort oder vorne geändert passt nicht');
   frisch();
-  const s = WK.kpSeiteAnlegen('liste', 'Büro', '[] Anrufen\n[] Offering beschreiben');
+  const s = neueSeite('liste', 'Büro', '[] Anrufen\n[] Offering beschreiben');
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   WK.kpEinplanen(1, 'v');
   const mo = WK.kpHeuteMontag();
@@ -932,11 +860,11 @@ if (WK) {
   w.text = w.text.replace('[] Offering beschreiben', '[] Offering beschreiben (Fr)');
   WK.kp.art = 'woche'; WK.kp.id = ''; WK.kp.modus = 'ansicht';
   WK.seiteZeichnen(true);
-  pruefe(/kpWocheSprung\(/.test(seiteHtml()), 'in der Woche um „(Fr)“ ergänzt: ↗ bleibt');
+  pruefe(/kpBzSprung\(/.test(seiteHtml()), 'in der Woche um „(Fr)“ ergänzt: ↗ bleibt');
   const nr = w.text.split('\n').indexOf('[] Offering beschreiben (Fr)');
-  WK.kpWocheZeileUm(nr);
+  WK.kpBzUm(wochenKennung(), nr);
   pruefe(/\[x\] Offering beschreiben \(Fr\)/.test(w.text) && /\[x\] Offering beschreiben$/.test(s.text), 'Durchstreichen hakt die Quelle weiter ab');
-  WK.kpWocheZeileUm(nr);
+  WK.kpBzUm(wochenKennung(), nr);
   WK.kp.art = 'seite'; WK.kp.id = s.id;
   pruefe(WK.kpEintragFinden(s.id, 'Offering beschreiben') !== null, 'an der Quelle bleibt die Marke „KW“');
   s.text = '[] Anrufen\n[] Offering beschreiben – Entwurf an Jana';
@@ -945,11 +873,11 @@ if (WK) {
   pruefe(/\[x\] Offering beschreiben \(Fr\)/.test(w.text), 'abhaken in der Quelle streicht die ergänzte Zeile in der Woche durch');
   WK.kpKastenUm(1);
   WK.kp.art = 'woche'; WK.kp.id = '';
-  WK.kpWocheSprung(nr);
+  WK.kpBzSprung(wochenKennung(), nr);
   pruefe(WK.kp.art === 'seite' && /id="kpHervor"[^>]*>|class="fl-zeile aufgabe hervor" id="kpHervor"/.test(seiteHtml())
          && (seiteHtml().match(/id="kpHervor"/g) || []).length === 1, '↗ hebt die ergänzte Zeile in der Quelle hervor');
   frisch();
-  const q = WK.kpSeiteAnlegen('liste', 'L', '[] Anrufen\n[] Anrufen Becker');
+  const q = neueSeite('liste', 'L', '[] Anrufen\n[] Anrufen Becker');
   WK.kp.art = 'seite'; WK.kp.id = q.id;
   WK.kpEinplanen(0, 's');
   WK.kp.art = 'seite'; WK.kp.id = q.id;
@@ -958,9 +886,70 @@ if (WK) {
   pruefe(w2.eintraege.length === 2, '„Anrufen Becker“ ist nicht schon durch „Anrufen“ eingeplant');
   const nrB = w2.text.split('\n').indexOf('[] Anrufen Becker');
   WK.kp.art = 'woche'; WK.kp.id = '';
-  WK.kpWocheZeileUm(nrB);
+  WK.kpBzUm(wochenKennung(), nrB);
   pruefe(/\[x\] Anrufen Becker/.test(q.text) && /\[\] Anrufen$/m.test(q.text), 'wörtlich gleiche Zeilen gehen vor — die richtige wird abgehakt');
   pruefe(WK.kpWocheEintrag(w2, 'Anrufen Becker').text === 'Anrufen Becker', 'zur Zeile gehört der genaueste Eintrag');
+}
+
+/* ============================================================
+   22. Gemeinsame Daten mit der Workbench (3.0)
+   Grund: Vorhaben, Listen, Notizen, Wochen und Tage sind Sätze der
+   Workbench. Was die eine App plant oder abhakt, muss die andere
+   genauso sehen — und keine darf Sätze der anderen verlieren.
+   ============================================================ */
+console.log('\n22. Gemeinsame Daten mit der Workbench');
+if (WK) {
+  frisch();
+  const heute = WK.isoDatum();
+  const mo = WK.kpHeuteMontag();
+  WK.DB.projekte.push({ id: 'p1', name: 'Umbau', kontext: 'beruflich', status: 'laufend', flaeche: 'Text\n[] Angebot\n[] Statik', ordnung: 10, geaendert: 1 });
+  WK.DB.themen.push({ id: 't1', name: 'Einkauf', kontext: 'privat', text: '[] Milch', ordnung: 20, geaendert: 1 });
+  WK.DB.gedanken.push({ id: 'g1', titel: 'Idee', text: 'frei', kontext: 'beruflich', geaendert: 1 });
+  WK.DB.gedanken.push({ id: 'g2', titel: 'Alte Kompass-Woche', kompass: 'woche', text: '', geaendert: 1 });
+  WK.DB.aufgaben.push({ id: 'r1', titel: 'Joggen', wiederholung: { takt: 'woche', intervall: 1, tage: [1] }, geaendert: 1 });
+  const titel = WK.kpSeitenAlle().map(x => x.art + ':' + x.titel).sort().join(',');
+  pruefe(titel === 'liste:Einkauf,notiz:Idee,vorhaben:Umbau', 'Projekte, Themen und Gedanken sind Vorhaben, Listen und Notizen — Kompass-1.0-Reste und Routinen nicht');
+  const v = WK.kpSeiteFinden('p1');
+  pruefe(v.text === 'Text\n[] Angebot\n[] Statik' && v.zustand === 'laeuft', 'der Text eines Vorhabens ist seine Fläche, „laufend“ heißt läuft');
+
+  /* In der Workbench für heute vorgenommen: hier als Marke „Heute ×“. */
+  WK.kpPlanenKern(v, 1, 'h', heute);
+  WK.kp.art = 'seite'; WK.kp.id = 'p1'; WK.kp.oaAuf = true; WK.kp.modus = 'ansicht';
+  WK.seiteZeichnen(true);
+  let h = seiteHtml();
+  pruefe(/class="drin h"[^>]*>Heute ×</.test(h), 'was die Workbench für heute vorgenommen hat, zeigt der Kompass als „Heute ×“');
+  pruefe(/kpEinplanen\(1,'s'\)/.test(h), 'eine Aufgabe für heute lässt sich trotzdem in die Woche planen');
+  WK.kpEinplanen(1, 's');
+  const w = WK.kpWocheFinden(mo);
+  pruefe(w && w.id === 'kw-' + mo && /\[\] Angebot/.test(w.text), 'die Woche ist derselbe Satz wie im Tag der Workbench');
+
+  /* Durchstreichen in der Woche hakt auch im Tag der Workbench ab. */
+  const nr = w.text.split('\n').indexOf('[] Angebot');
+  WK.kp.art = 'woche'; WK.kp.id = '';
+  WK.kpBzUm(w.id, nr);
+  pruefe(/\[x\] Angebot/.test(v.text) && /\[x\] Angebot/.test(WK.kpTagFinden(heute).text), 'abgehakt in der Woche: in der Seite und im Tag der Workbench ebenso');
+
+  /* Anlegen über die Seitenleiste: in der Sammlung der Workbench. */
+  WK.kp.filter = 'privat'; WK.kp.neuIn = 'vorhaben';
+  WK.document.getElementById('neuName').value = 'Garten';
+  WK.anlegen();
+  const neu = WK.DB.projekte.filter(p => p.name === 'Garten')[0];
+  pruefe(neu && neu.kontext === 'privat' && neu.status === 'laufend' && typeof neu.ordnung === 'number',
+         'ein neues Vorhaben ist ein Projekt der Workbench — mit Kontext, Status und Rang');
+  WK.kp.filter = 'alle';
+
+  /* Löschen: der Vermerk nennt die Sammlung der Workbench. */
+  WK.kp.art = 'seite'; WK.kp.id = 'p1';
+  WK.kpLoeschen();
+  pruefe(!WK.DB.projekte.some(p => p.id === 'p1') && WK.DB.grabsteine.some(g => g.s === 'projekte' && g.id === 'p1'), 'ein gelöschtes Vorhaben hinterlässt den Vermerk unter „projekte“');
+  WK.rueckgaengig();
+  pruefe(WK.DB.projekte.some(p => p.id === 'p1') && !WK.DB.grabsteine.some(g => g.id === 'p1'), 'Rückgängig holt das Projekt zurück');
+  pruefe(WK.DB.aufgaben.length === 1 && WK.DB.aufgaben[0].id === 'r1', 'Routinen der Workbench bleiben unberührt');
+
+  /* Alte Wochenziele werden erst nach der Umstellung Text. */
+  const st = funktionText(SKRIPT, 'start');
+  pruefe(st && /if \(kpUmgestellt\(\)\) \{ kpWochenUmstellen\(\); \}/.test(st), 'alte Wochen werden erst nach der Umstellung in der Workbench zu Text');
+  pruefe(!/kpMig|kompass\.json/.test(SKRIPT.replace(/\/\*[\s\S]*?\*\//g, '')), 'keine eigene Übernahme und keine kompass.json mehr');
 }
 
 /* ============================================================
