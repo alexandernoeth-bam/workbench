@@ -4154,8 +4154,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel,'
-                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel, terminListeHtml, routinenKarteHtml, tagesEintraege,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; },'
+                   + ' tagZeigenSetzen: function(w){ tagZeigen.vorgenommen = w; tagZeigen.termine = w; tagZeigen.routinen = w; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -9959,7 +9960,10 @@ console.log('\n112. Tagessicht in Karten');
   if (!mz) {
     warn('Funktionen nicht auswertbar');
   } else {
+    /* Seit v6.2.2 blendet der Tag Vergangenes aus — hier geht es um die Liste selbst. */
+    if (globalThis.__akApi) { globalThis.__akApi.tagZeigenSetzen(true); }
     const e2 = mz.pruefe();
+    if (globalThis.__akApi) { globalThis.__akApi.tagZeigenSetzen(false); }
     pruefe(e2.mitZeit === 'Fragebogen,Einladung',
            'in der Terminliste stehen die Aufgaben mit Uhrzeit');
     pruefe(e2.keineTermine === true,
@@ -10092,7 +10096,9 @@ console.log('\n117. Termine als Einzeiler');
   if (!t) {
     warn('Funktionen nicht auswertbar');
   } else {
+    if (globalThis.__akApi) { globalThis.__akApi.tagZeigenSetzen(true); }
     const e = t.pruefe();
+    if (globalThis.__akApi) { globalThis.__akApi.tagZeigenSetzen(false); }
     pruefe(e.zeilen === 3, 'jeder Termin eine Zeile in der Liste');
     pruefe(e.kalender === '', 'der Kalendername steht nirgends mehr');
     pruefe(e.keinOrt === true, 'Ort und Beschreibung stehen nicht in der Zeile');
@@ -10246,7 +10252,9 @@ console.log('\n120. Zweizeilige Einträge');
   if (!s) {
     warn('Funktionen nicht auswertbar');
   } else {
+    if (globalThis.__akApi) { globalThis.__akApi.tagZeigenSetzen(true); }
     const e = s.pruefe();
+    if (globalThis.__akApi) { globalThis.__akApi.tagZeigenSetzen(false); }
     pruefe(e.zeit === '07:00–07:30', 'die Terminliste beginnt mit dem ersten Termin, mit Von und Bis');
     pruefe(e.dauer === false,
            'ein halbstündiger Block zeigt jetzt auch seine Zeitspanne');
@@ -12959,6 +12967,51 @@ console.log('\n201. Ende und Zieltermin');
   const hu = skript.match(/function kpHuelle\([\s\S]*?\n\}/);
   pruefe(hu && /typ === 'ziel'\) \? \(satz\.zieltermin/.test(hu[0]) && /satz\.ende/.test(hu[0]),
          'beim Projekt landet er im Ende, beim Ziel im Zieltermin — wie in der Workbench bisher');
+}
+
+/* ============================================================
+   202. Erledigtes, nicht Relevantes und Vergangenes im Tag ausblenden (v6.2.2)
+   Grund: Der Tag soll zeigen, was noch zu tun ist. Erledigtes und
+   Vergangenes bleibt erreichbar über „zeigen“.
+   ============================================================ */
+console.log('\n202. Ausblenden im Tag');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  pruefe(/\.ruhig\.erl-aus \.wz\.erl,\.ruhig\.erl-aus \.wz\.nr\{display:none\}/.test(QUELLE),
+         'in „Vorgenommen“ werden erledigte und nicht relevante Zeilen verborgen — die Zeilennummern bleiben');
+  const wk = skript.match(/function wocheKarteHtml\([\s\S]*?\n\}/);
+  pruefe(wk && !/erl-aus/.test(wk[0]), 'die Woche bleibt unverändert');
+  const tl0 = skript.match(/function terminListeHtml\([\s\S]*?\n\}/);
+  pruefe(tl0 && /var istVorbei = heute && eintragVorbei\(v, is\)/.test(tl0[0]), 'vergangene Termine fallen nur am heutigen Tag weg');
+  if (typeof g.terminListeHtml !== 'function') {
+    warn('Ausblenden nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    try {
+      g.setzeDB(g.leereDatenbank());
+      g.tagZeigenSetzen(false);
+      const h = g.isoDatum();
+      const R = function (id, ti, z) { g.holeDB().aufgaben.push({ id: id, titel: ti, kontext: 'privat', status: 'offen', planung: 'backlog', uhrzeit: z || '', art: 'haupt',
+        wiederholung: { takt: 'woche', intervall: 1, tage: [0, 1, 2, 3, 4, 5, 6], tag: 1 }, erledigtTage: [], geaendert: 1 }); };
+      R('r1', 'Offen'); R('r2', 'Fertig'); R('r3', 'Mit Zeit fertig', '00:01');
+      g.holeDB().aufgaben[1].erledigtTage = [h]; g.holeDB().aufgaben[1].zuletztErledigt = h;
+      g.holeDB().aufgaben[2].erledigtTage = [h]; g.holeDB().aufgaben[2].zuletztErledigt = h;
+      const e = g.tagesEintraege(h);
+      let rk = g.routinenKarteHtml(h, e);
+      pruefe(/Offen/.test(rk) && !/>Fertig</.test(rk) && /1 erledigt · <u>zeigen/.test(rk), 'erledigte Routinen sind ausgeblendet — mit Hinweis „zeigen“');
+      let tl = g.terminListeHtml(h, e);
+      pruefe(!/Mit Zeit fertig/.test(tl) && /vorbei oder erledigt · <u>zeigen/.test(tl), 'eine erledigte Routine mit Uhrzeit verschwindet aus den Terminen');
+      g.tagZeigenSetzen(true);
+      rk = g.routinenKarteHtml(h, e);
+      tl = g.terminListeHtml(h, e);
+      pruefe(/Fertig/.test(rk) && /Mit Zeit fertig/.test(tl) && /verbergen/.test(rk), '„zeigen“ holt alles zurück, „verbergen“ blendet es wieder aus');
+      g.tagZeigenSetzen(false);
+    } catch (e) {
+      fail('Ausblenden: ' + e.message);
+    }
+    g.setzeDB(alt);
+  }
 }
 
 /* ============================================================

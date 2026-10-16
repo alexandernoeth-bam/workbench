@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.2.1</title>
+<title>Workbench 6.2.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2445,6 +2445,10 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
 body.breit .tagblatt{align-content:start}
 body.breit .tagblatt > .blick-band{grid-row:1}
 body.breit .tagblatt > .tspalte,body.breit.weit .tspalte-rechts > .tabschnitt{grid-row:2}
+.tag-aus{padding:6px 0 0}
+.tag-aus button{border:0;background:none;padding:2px 0;font:inherit;font-size:12px;color:var(--grau);cursor:pointer}
+.tag-aus u{color:var(--weinrot);text-decoration:none;border-bottom:1px dotted var(--weinrot)}
+.ruhig.erl-aus .wz.erl,.ruhig.erl-aus .wz.nr{display:none}
 .blick-band{grid-column:1 / -1;background:#FBF7F2;border:1px solid #E6DCCF;border-radius:12px;padding:12px 18px 10px;margin:0 0 12px}
 body.nacht .blick-band{background:var(--karte);border-color:var(--linie)}
 .blick-band.schreibt{background:var(--karte)}
@@ -2992,7 +2996,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.2.1';
+var APP_VERSION = '6.2.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -9255,11 +9259,17 @@ function terminListeHtml(is, e) {
   var heute = (is === isoDatum());
   var jetztMin = heute ? minutenAus(uhrzeitJetzt()) : -1;
   var zeilen = [];
+  /* Seit v6.2.2: Vergangenes (nur heute) und Erledigtes fällt weg — bis
+     man es mit „zeigen“ holt. */
+  var weg = 0;
+  var zeigen = tagZeigen.termine;
   (e.verlauf || []).forEach(function (v) {
     if (v.art === 'termin') {
       if (!v.t || v.t.ganztags || !v.t.von) { return; }
       var von = minutenAus(v.t.von);
       var bis = v.t.bis ? minutenAus(v.t.bis) : von;
+      var istVorbei = heute && eintragVorbei(v, is) && !(jetztMin >= von && jetztMin < (v.t.bis ? bis : von + 1));
+      if (istVorbei) { weg++; if (!zeigen) { return; } }
       zeilen.push({ von: von, art: 'termin', html: function () {
         var laeuft = heute && jetztMin >= von && jetztMin < (v.t.bis ? bis : von + 1);
         var vorbei = eintragVorbei(v, is);
@@ -9271,6 +9281,7 @@ function terminListeHtml(is, e) {
       } });
     } else if (v.a) {
       var zeit = v.zeit || v.a.uhrzeit || '';
+      if (istErledigtAn(v.a, is)) { weg++; if (!zeigen) { return; } }
       zeilen.push({ von: minutenAus(zeit), art: 'aufgabe', html: function () {
         var erledigt = istErledigtAn(v.a, is);
         return '<div class="tzeile tm-z' + (erledigt ? ' erledigt' : '') + '">'
@@ -9296,9 +9307,9 @@ function terminListeHtml(is, e) {
   var h = '';
   zeilen.forEach(function (z) { h += z.html(); });
   if (!zeilen.some(function (z) { return z.art !== 'frei'; })) {
-    h = '<div class="tleer">Keine Termine.</div>' + h;
+    h = '<div class="tleer">' + (weg ? 'Keine weiteren Termine.' : 'Keine Termine.') + '</div>' + h;
   }
-  return h;
+  return h + tagAusHinweisHtml('termine', weg, 'vorbei oder erledigt');
 }
 
 
@@ -21856,6 +21867,9 @@ var akGezogen = '';
    sonst die offene Seite. */
 var tagSchreibt = '';
 
+/* Was im Tag trotz Erledigung gezeigt wird — nur für die Sitzung (seit v6.2.2). */
+var tagZeigen = { vorgenommen: false, termine: false, routinen: false };
+
 /* ---------- Anschlüsse des Kerns ---------- */
 
 function kpVerweisHtml(art, id, titel) {
@@ -23369,6 +23383,21 @@ function blickBandHtml() {
        + '<div class="tabschnitt-titel"><span>Jeden Tag im Blick</span>' + tagUmschalterHtml('blick') + '</div>' + inhalt + '</div>';
 }
 
+/* ---------- Erledigtes und Vergangenes ausblenden (seit v6.2.2) ---------- */
+
+function tagZeigenUm(was) {
+  if (!Object.prototype.hasOwnProperty.call(tagZeigen, was)) { return; }
+  tagZeigen[was] = !tagZeigen[was];
+  tagZeichnen();
+}
+
+function tagAusHinweisHtml(was, n, wort) {
+  if (!n) { return ''; }
+  var an = tagZeigen[was];
+  return '<div class="tag-aus"><button type="button" onclick="tagZeigenUm(\'' + was + '\')" aria-expanded="' + an + '">'
+       + n + ' ' + wort + ' · <u>' + (an ? 'verbergen' : 'zeigen') + '</u></button></div>';
+}
+
 function tagUmschalterHtml(was) {
   var an = (tagSchreibt === was);
   return '<button class="tag-knopf" type="button" onclick="tagSchreibenUm(\'' + was + '\')" aria-pressed="' + an + '">'
@@ -23393,7 +23422,15 @@ function heuteKarteHtml(is) {
     inhalt = '<div class="tleer">Noch nichts vorgenommen. In einer Aktivität „Offene Aufgaben“ öffnen und H tippen — '
            + 'oder hier frei schreiben.</div>';
   } else {
-    inhalt = '<div class="ruhig ruhig-tag">' + kpAnsichtHtml(t, true) + '</div>';
+    /* Erledigtes ([x]) und nicht Relevantes ([-]) blendet die Karte aus;
+       die Zeilen bleiben im Text, damit Klicks ihre Nummer behalten. */
+    var ansicht = kpAnsichtHtml(t, true);
+    var weg = (ansicht.match(/class="wz (erl|nr)"/g) || []).length;
+    var offen = (ansicht.match(/class="wz"/g) || []).length;
+    var frei = String(text).split('\n').some(function (z) { return z.trim() && !kpAufgabe(z) && !/^\s*#/.test(z); });
+    inhalt = '<div class="ruhig ruhig-tag' + (tagZeigen.vorgenommen ? '' : ' erl-aus') + '">' + ansicht + '</div>'
+           + ((weg && !offen && !frei && !tagZeigen.vorgenommen) ? '<div class="tleer">Alles erledigt.</div>' : '')
+           + tagAusHinweisHtml('vorgenommen', weg, 'erledigt oder nicht relevant');
   }
   /* Seit v6.1.2 ohne „Heute“ und Datum — beides steht im Tageskopf. */
   return tagBlockHtml('Vorgenommen', inhalt, tagUmschalterHtml('tag'));
@@ -23427,7 +23464,9 @@ function routinenKarteHtml(is, e) {
   }
   h += listeMitSektionenHtml(offen, is, false);
   var i;
-  for (i = 0; i < fertig.length; i++) { h += zeileHtml(fertig[i], is, false); }
+  if (!offen.length && fertig.length && !tagZeigen.routinen) { h += '<div class="tleer">Alle Routinen erledigt.</div>'; }
+  if (tagZeigen.routinen) { for (i = 0; i < fertig.length; i++) { h += zeileHtml(fertig[i], is, false); } }
+  h += tagAusHinweisHtml('routinen', fertig.length, 'erledigt');
   return tagBlockHtml('Routinen', h, '<button class="tag-knopf" type="button" onclick="akOeffnen(\'routinen\')">alle ›</button>');
 }
 
