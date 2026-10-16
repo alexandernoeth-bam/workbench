@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.0.1</title>
+<title>Workbench 6.0.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2459,6 +2459,12 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
 .pkt.start{background:var(--karte);border:2px solid var(--petrol);box-sizing:border-box}
 .pkt.aus{background:none;border:1.5px dashed var(--linie);box-sizing:border-box}
 .uhr{font-size:10px;color:var(--grau);display:block;margin-top:1px}
+.rt-diesmal{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;flex:1 1 300px;min-width:0}
+.rt-plan + .rt-diesmal,.rt-raster + .rt-diesmal{margin-top:10px;padding:10px 12px;border:1px solid var(--weinrot);border-radius:10px;background:var(--karte)}
+.rt-dm-kopf{font-size:13.5px}
+.rt-dm-kopf b{font-weight:600}
+.rt-dm-felder{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%}
+.rt-plan td.gewaehlt{box-shadow:inset 0 0 0 2px var(--weinrot)}
 .rt-legende{font-size:12px;color:var(--grau);margin-top:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
@@ -2943,7 +2949,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.0.1';
+var APP_VERSION = '6.0.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -21658,7 +21664,8 @@ var ak = {
   notizenAuf: false,
   rtAnsicht: 'liste',   /* liste | planung */
   rtOffen: '',          /* aufgeklappte Routine */
-  rtAb: ''              /* erster Tag der Planung */
+  rtAb: '',             /* erster Tag der Planung */
+  rtDiesmal: null       /* „Nur diesmal“: { id, is, verlegen } — seit v6.0.2 */
 };
 
 var AK_FILTER_KEY = 'wb-aktivitaeten-filter';
@@ -22324,13 +22331,77 @@ function akRtNeu() {
 
 function akRtUm(id) {
   ak.rtOffen = (ak.rtOffen === id) ? '' : id;
+  ak.rtDiesmal = null;
   akSeiteZeichnen();
 }
 
 function akRtAnsicht(w) {
   if (w !== 'liste' && w !== 'planung') { return; }
   ak.rtAnsicht = w;
+  ak.rtDiesmal = null;
   akSeiteZeichnen();
+}
+
+/* ---------- Nur diesmal: auslassen oder verlegen (seit v6.0.2) ----------
+
+   Dieselben Funktionen wie im Blatt der Aufgabe im Tag
+   (ausfuehrungAuslassen, ausfuehrungVerlegen) — die Regel bleibt. */
+
+function akRtDiesmalHtml(a, is, mitAbbrechen) {
+  var d = ak.rtDiesmal;
+  var verlegen = !!(d && d.id === a.id && d.is === is && d.verlegen);
+  var id = esc(a.id);
+  var zeit = aufgabeZeitAn(a, is);
+  var h = '<div class="rt-diesmal"><span class="rt-dm-kopf"><b>Nur diesmal</b> · ' + esc(akDatumText(is))
+        + (akDatumText(is) !== kurzDatum(is) ? ' (' + esc(kurzDatum(is)) + ')' : '') + (zeit ? ' · ' + esc(zeit) : '')
+        + (mitAbbrechen ? ' · ' + esc(a.titel || 'ohne Namen') : '') + '</span>'
+        + '<span class="knoepfe"><button type="button" class="pille" onclick="akRtAuslassen(\'' + id + '\',\'' + is + '\')">Auslassen</button>'
+        + '<button type="button" class="pille' + (verlegen ? ' voll' : '') + '" onclick="akRtVerlegenZeigen(\'' + id + '\',\'' + is + '\')" '
+        + 'aria-expanded="' + verlegen + '">Verlegen …</button>'
+        + (mitAbbrechen ? '<button type="button" class="pille" onclick="akRtDiesmalWeg()">Abbrechen</button>' : '') + '</span>';
+  if (verlegen) {
+    h += '<span class="rt-dm-felder"><input id="rtDmTag" class="rt-ein" type="date" value="' + is + '" aria-label="Neuer Tag">'
+       + '<input id="rtDmZeit" class="rt-ein" type="time" value="' + esc(zeit) + '" aria-label="Neue Uhrzeit">'
+       + '<button type="button" class="pille voll" onclick="akRtVerlegen(\'' + id + '\',\'' + is + '\')">Verlegen</button>'
+       + '<span class="leise">Nur diese Ausführung — die Regel bleibt, wie sie ist.</span></span>';
+  }
+  return h + '</div>';
+}
+
+function akRtVerlegenZeigen(id, is) {
+  var d = ak.rtDiesmal;
+  var auf = !(d && d.id === id && d.is === is && d.verlegen);
+  ak.rtDiesmal = { id: id, is: is, verlegen: auf };
+  akSeiteZeichnen();
+  var f = auf ? document.getElementById('rtDmTag') : null;
+  if (f && f.focus) { f.focus(); }
+}
+
+function akRtDiesmalWeg() {
+  ak.rtDiesmal = null;
+  akSeiteZeichnen();
+}
+
+function akRtAuslassen(id, is) {
+  var a = aufgabeFinden(id);
+  if (!ausfuehrungAuslassen(a, is)) { melde('An diesem Tag ist die Routine nicht dran.', null); return; }
+  ak.rtDiesmal = null;
+  akZeichnen();
+  melde(a.titel + ' fällt am ' + kurzDatum(is) + ' aus — die Regel bleibt.', 'gut');
+}
+
+function akRtVerlegen(id, von) {
+  var a = aufgabeFinden(id);
+  var tagFeld = document.getElementById('rtDmTag');
+  var zeitFeld = document.getElementById('rtDmZeit');
+  if (!a || !tagFeld) { return; }
+  var zu = String(tagFeld.value || '');
+  var zeit = zeitFeld ? String(zeitFeld.value || '') : '';
+  if (!ausfuehrungVerlegen(a, von, zu, zeit)) { melde('Bitte einen Tag wählen.', 'warn'); return; }
+  ak.rtDiesmal = null;
+  akZeichnen();
+  melde(a.titel + ' diesmal am ' + kurzDatum(zu) + (aufgabeZeitAn(a, zu) ? ' um ' + aufgabeZeitAn(a, zu) : '')
+      + ' — die Regel bleibt.', 'gut');
 }
 
 /* Ein Feld der Routine setzen. */
@@ -22409,6 +22480,8 @@ function akRtBlattHtml(a) {
      + knopf(!!a.pausiert, 'akRtFeld(\'' + id + '\',\'pausiert\',true)', 'pausiert') + '</span></div>'
      + '<div class="rt-feld"><b>Notiz</b><textarea class="rt-ein breit rt-notiz" rows="2" '
      + 'onchange="akRtFeld(\'' + id + '\',\'beschreibung\',this.value)">' + esc(a.beschreibung || '') + '</textarea></div>';
+  var naechstes = a.pausiert ? '' : akNaechstesMal(a);
+  if (naechstes) { h += '<div class="rt-feld"><b>Nächstes Mal</b>' + akRtDiesmalHtml(a, naechstes, false) + '</div>'; }
   var zuletzt = (Array.isArray(a.erledigtTage) ? a.erledigtTage.slice() : (a.zuletztErledigt ? [a.zuletztErledigt] : [])).sort().reverse().slice(0, 3);
   h += '<div class="rt-feld"><b>Zuletzt</b><span class="leise">' + (zuletzt.length ? zuletzt.map(kurzDatum).join(' · ') : 'noch nie') + '</span>'
      + '<span class="oa-luecke"></span>' + pinKnopfHtml('aufgabe', a.id)
@@ -22430,8 +22503,9 @@ function akRtListeHtml(l) {
   return h + '</tbody></table></div>';
 }
 
-/* Planung: die nächsten 14 Tage. Ein Klick auf eine Zelle lässt die
-   Routine an diesem Tag ausfallen — oder holt sie zusätzlich dorthin. */
+/* Planung: die nächsten 14 Tage. Ein Klick auf einen Punkt bietet
+   „Nur diesmal“ an (auslassen oder verlegen); ein Klick auf ein leeres
+   Feld holt die Routine zusätzlich dorthin. */
 function akRtPlanHtml(l) {
   var ab = ak.rtAb || isoDatum();
   var heute = isoDatum();
@@ -22446,13 +22520,16 @@ function akRtPlanHtml(l) {
   });
   h += '</tr></thead><tbody>';
   var summe = tage.map(function () { return 0; });
+  var gewaehlt = ak.rtDiesmal ? aufgabeFinden(ak.rtDiesmal.id) : null;
+  var auswahl = (gewaehlt && aufgabeFaelligAn(gewaehlt, ak.rtDiesmal.is)) ? akRtDiesmalHtml(gewaehlt, ak.rtDiesmal.is, true) : '';
   l.forEach(function (a) {
     var erster = '';
     h += '<tr><td class="name"><button type="button" class="rt-name" onclick="akRtAusPlanung(\'' + esc(a.id) + '\')">' + esc(a.titel || 'ohne Namen') + '</button></td>';
     tage.forEach(function (is, k) {
       var dran = aufgabeFaelligAn(a, is);
       var regulaer = regulaerFaellig(a, is) && (!a.ab || is >= a.ab) && !a.pausiert;
-      var klasse = (is === heute ? 'heute' : (we(is) ? 'we' : ''));
+      var klasse = (is === heute ? 'heute' : (we(is) ? 'we' : ''))
+                 + ((ak.rtDiesmal && ak.rtDiesmal.id === a.id && ak.rtDiesmal.is === is) ? ' gewaehlt' : '');
       var punkt = '';
       if (dran) {
         summe[k]++;
@@ -22462,13 +22539,13 @@ function akRtPlanHtml(l) {
       } else if (regulaer) {
         punkt = '<span class="pkt aus" title="fällt aus"></span>';
       }
-      h += '<td class="' + klasse + '" onclick="akRtTagUm(\'' + esc(a.id) + '\',\'' + is + '\')" title="' + (dran ? 'Diesmal auslassen' : 'Zusätzlich an diesem Tag') + '">' + punkt + '</td>';
+      h += '<td class="' + klasse + '" onclick="akRtTagUm(\'' + esc(a.id) + '\',\'' + is + '\')" title="' + (dran ? 'Auslassen oder verlegen' : 'Zusätzlich an diesem Tag') + '">' + punkt + '</td>';
     });
     h += '</tr>';
   });
   h += '<tr class="summe"><td class="name">an diesem Tag</td>';
   summe.forEach(function (n, k) { h += '<td class="' + (tage[k] === heute ? 'heute' : (we(tage[k]) ? 'we' : '')) + '">' + n + '</td>'; });
-  h += '</tr></tbody></table></div>'
+  h += '</tr></tbody></table></div>' + auswahl
      + '<div class="rt-legende"><span><span class="pkt"></span> dran</span><span><span class="pkt zeit"></span> mit Uhrzeit</span>'
      + '<span><span class="pkt erl"></span> erledigt</span><span><span class="pkt start"></span> erster Termin</span>'
      + '<span><span class="pkt aus"></span> fällt diesmal aus</span></div>';
@@ -22479,6 +22556,13 @@ function akRtTagUm(id, is) {
   var a = aufgabeFinden(id);
   if (!a || !a.wiederholung) { return; }
   if (a.pausiert || (a.ab && is < a.ab)) { melde('Vor dem Start oder pausiert ist die Routine nicht dran.', null); return; }
+  if (aufgabeFaelligAn(a, is)) {
+    var d = ak.rtDiesmal;
+    ak.rtDiesmal = (d && d.id === id && d.is === is) ? null : { id: id, is: is, verlegen: false };
+    akSeiteZeichnen();
+    return;
+  }
+  ak.rtDiesmal = null;
   zusatzTagUm(id, is);
   akSeiteZeichnen();
 }
@@ -22490,6 +22574,7 @@ function akRtAusPlanung(id) {
 }
 
 function akRtBlaettern(richtung) {
+  ak.rtDiesmal = null;
   var ab = ak.rtAb || isoDatum();
   ak.rtAb = (richtung === 0) ? '' : tagePlus(ab, richtung * 14);
   akSeiteZeichnen();

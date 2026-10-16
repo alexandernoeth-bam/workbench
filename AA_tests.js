@@ -4154,8 +4154,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus,'
-                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; } };';
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -12585,6 +12585,68 @@ console.log('\n192. Aufzählungspunkt');
   const t = Number((z.match(/top:(\d+)px/) || [])[1]);
   pruefe(kern && /background:var\(--tinte\)/.test(z) && w > 0 && w < 8, 'das Quadrat ist gefüllt, dunkel und kleiner als vorher (8 px)');
   pruefe(kern && Math.abs((l + w / 2) - 8.5) <= 0.5 && Math.abs((t + w / 2) - 8.5) <= 0.5, 'es steht mittig in Höhe und Breite');
+}
+
+/* ============================================================
+   193. Routinen: nur diesmal auslassen oder verlegen (v6.0.2)
+   Grund: Im Blatt der Aufgabe im Tag gab es „Nur diesmal“ mit
+   Auslassen und Verlegen — in den Aktivitäten → Routinen fehlte es,
+   und ein Klick in der Planung ließ die Ausführung sofort ausfallen.
+   ============================================================ */
+console.log('\n193. Routinen: nur diesmal');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  ['akRtDiesmalHtml', 'akRtVerlegenZeigen', 'akRtDiesmalWeg', 'akRtAuslassen', 'akRtVerlegen'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+  const au = skript.match(/function akRtAuslassen\([\s\S]*?\n\}/);
+  const ve = skript.match(/function akRtVerlegen\([\s\S]*?\n\}/);
+  pruefe(au && /ausfuehrungAuslassen\(/.test(au[0]) && ve && /ausfuehrungVerlegen\(/.test(ve[0]),
+         'dieselben Funktionen wie im Blatt der Aufgabe — nichts doppelt gebaut');
+  if (typeof g.akRtTagUm !== 'function' || typeof g.holeAk !== 'function') {
+    warn('Routinen nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    try {
+      g.setzeDB(g.leereDatenbank());
+      const heute = g.isoDatum();
+      const morgen = g.tagePlus(heute, 1);
+      const r = { id: 'r1', titel: 'Zeitung', kontext: 'privat', status: 'offen', uhrzeit: '07:00',
+                  wiederholung: { takt: 'woche', intervall: 1, tage: [0, 1, 2, 3, 4, 5, 6], tag: 1 } };
+      g.holeDB().aufgaben.push(r);
+      const blatt = g.akRtBlattHtml(r);
+      pruefe(/Nur diesmal/.test(blatt) && /akRtAuslassen\('r1','/.test(blatt) && /akRtVerlegenZeigen\('r1','/.test(blatt),
+             'das Blatt der Routine bietet für das nächste Mal Auslassen und Verlegen an');
+      r.pausiert = true;
+      pruefe(!/Nur diesmal/.test(g.akRtBlattHtml(r)), 'eine pausierte Routine hat kein nächstes Mal');
+      r.pausiert = false;
+
+      /* Ein Klick auf einen Punkt in der Planung fragt — er lässt nicht sofort ausfallen. */
+      g.akRtTagUm('r1', morgen);
+      pruefe(g.aufgabeFaelligAn(r, morgen) && !(r.ausfallTage || []).length, 'ein Klick auf einen Punkt lässt die Ausführung nicht sofort ausfallen');
+      const ak = g.holeAk();
+      pruefe(ak.rtDiesmal && ak.rtDiesmal.id === 'r1' && ak.rtDiesmal.is === morgen, 'sondern wählt sie für „Nur diesmal“ aus');
+      const plan = g.akRtPlanHtml([r]);
+      pruefe(/class="rt-diesmal"/.test(plan) && /akRtDiesmalWeg\(\)/.test(plan) && /gewaehlt/.test(plan),
+             'unter der Planung stehen Auslassen, Verlegen und Abbrechen, der Punkt ist markiert');
+      g.akRtTagUm('r1', morgen);
+      pruefe(ak.rtDiesmal === null, 'ein zweiter Klick hebt die Auswahl wieder auf');
+      g.akRtTagUm('r1', morgen);
+      g.akRtAuslassen('r1', morgen);
+      pruefe(!g.aufgabeFaelligAn(r, morgen) && (r.ausfallTage || []).indexOf(morgen) >= 0 && ak.rtDiesmal === null,
+             'Auslassen: an diesem Tag fällt sie aus — die Regel bleibt');
+      pruefe(g.aufgabeFaelligAn(r, g.tagePlus(heute, 2)), 'am Tag danach ist sie wieder dran');
+      r.ausfallTage = [];
+      r.wiederholung.tage = [1];
+      const mo = g.montagVon(g.tagePlus(heute, 7));
+      g.akRtTagUm('r1', g.tagePlus(mo, 1));
+      pruefe((r.zusatzTage || []).indexOf(g.tagePlus(mo, 1)) >= 0, 'ein Klick auf ein leeres Feld holt die Routine weiter zusätzlich dorthin');
+    } catch (e) {
+      fail('Routinen nur diesmal: ' + e.message);
+    }
+    g.setzeDB(alt);
+  }
 }
 
 /* ============================================================
