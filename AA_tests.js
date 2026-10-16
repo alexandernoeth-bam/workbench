@@ -12943,6 +12943,25 @@ console.log('\n200. Jeden Tag im Blick');
 }
 
 /* ============================================================
+   201. Ende und Zieltermin in den Aktivitäten änderbar (v6.2.1)
+   Grund: Seit 6.0 stand das Ende eines Projekts nur noch als Text da;
+   setzen oder ändern ließ es sich nicht mehr.
+   ============================================================ */
+console.log('\n201. Ende und Zieltermin');
+{
+  const skript = hauptSkript();
+  const sh = skript.match(/function akSeiteHtml\([\s\S]*?\n\}/);
+  pruefe(sh && /<input type="date" class="rt-ein" value="' \+ esc\(s\.termin \|\| ''\) \+ '" onchange="akTermin\(this\.value\)"/.test(sh[0]),
+         'Projekte und Ziele haben ein Datumsfeld für Ende bzw. Zieltermin');
+  const at = skript.match(/function akTermin\([\s\S]*?\n\}/);
+  pruefe(at && /s\.termin = w;/.test(at[0]) && /spaeterSichern\(\)/.test(at[0]) && /s\.art !== 'vorhaben'/.test(at[0]),
+         'der Termin wird gesetzt, gestempelt und gesichert — nur bei Projekten und Zielen');
+  const hu = skript.match(/function kpHuelle\([\s\S]*?\n\}/);
+  pruefe(hu && /typ === 'ziel'\) \? \(satz\.zieltermin/.test(hu[0]) && /satz\.ende/.test(hu[0]),
+         'beim Projekt landet er im Ende, beim Ziel im Zieltermin — wie in der Workbench bisher');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

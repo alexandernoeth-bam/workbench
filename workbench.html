@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.2.0</title>
+<title>Workbench 6.2.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2397,6 +2397,8 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
 .wb-tot{color:var(--grau)}
 .oa{margin:0 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ak-falten{display:inline-flex;gap:6px;margin-left:auto}
+.ak-termin{display:inline-flex;align-items:center;gap:6px}
+.ak-termin .rt-ein{padding:3px 6px;font-size:12.5px}
 /* Vorschau beim Darüberfahren (seit v6.1.1): nur zum Lesen */
 .ak-vorschau .blatt{pointer-events:none;box-shadow:0 0 0 2px #FBF1F3}
 .ak-vorschau .ak-titel{margin:2px 0 8px;overflow-wrap:anywhere}
@@ -2990,7 +2992,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.2.0';
+var APP_VERSION = '6.2.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -22296,6 +22298,16 @@ function akKontext(wert) {
   akZeichnen();
 }
 
+function akTermin(wert) {
+  var s = akSeite();
+  var w = String(wert || '');
+  if (!s || s.art !== 'vorhaben' || (w && !/^\d{4}-\d{2}-\d{2}$/.test(w))) { return; }
+  s.termin = w;
+  s.geaendert = jetzt();
+  spaeterSichern();
+  akSeiteZeichnen();
+}
+
 function akZustand(wert) {
   var s = akSeite();
   if (!s || s.art !== 'vorhaben' || ['laeuft', 'ruht', 'erledigt'].indexOf(wert) < 0) { return; }
@@ -22447,7 +22459,10 @@ function akSeiteHtml(s) {
     h += '<span class="gruppe-knopf" role="group" aria-label="Zustand">' + KP_ZUSTAENDE.map(function (p) {
       return '<button type="button" class="' + (s.zustand === p[0] ? 'an' : '') + '" onclick="akZustand(\'' + p[0] + '\')">' + p[1] + '</button>';
     }).join('') + '</span>';
-    if (s.termin) { h += '<span class="leise">bis ' + esc(kurzDatum(s.termin)) + s.termin.slice(0, 4) + '</span>'; }
+    /* Seit v6.2.1 wieder änderbar: Ende eines Projekts, Zieltermin eines Ziels. */
+    h += '<label class="ak-termin"><span class="leise">' + (s.typ === 'ziel' ? 'Zieltermin' : 'Ende') + '</span>'
+       + '<input type="date" class="rt-ein" value="' + esc(s.termin || '') + '" onchange="akTermin(this.value)" '
+       + 'aria-label="' + (s.typ === 'ziel' ? 'Zieltermin' : 'Ende des Projekts') + '"></label>';
   }
   var pin = akPinArt(s);
   h += pinKnopfHtml(pin.art, pin.id) + '</div>';
