@@ -4154,7 +4154,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
@@ -10472,8 +10472,6 @@ console.log('\n127. Eigener Satz im Tag');
   pruefe(an && /leitsatzText\(\)\.trim\(\)\.length > 0/.test(an[0]),
          'und ohne Text bleibt er weg, auch wenn er angeschaltet ist');
   const lz = skript.match(/function leitsatzZeichnen\([\s\S]*?\n\}/);
-  pruefe(lz && /esc\(leitsatzText\(\)/.test(lz[0]),
-         'der Text wird maskiert — er kommt vom Benutzer');
   const ls = skript.match(/function leitsatzSetzen\([\s\S]*?\n\}/);
   pruefe(ls && /spaeterSichern/.test(ls[0]) && /einstellungen\.stempel/.test(ls[0]),
          'er liegt im Bestand und wird abgeglichen');
@@ -10484,11 +10482,7 @@ console.log('\n127. Eigener Satz im Tag');
     const e = l.pruefe();
     pruefe(e.zuerstAus === true, 'ohne Zutun steht nichts da');
     pruefe(e.textAllein === true, 'ein Text allein zeigt ihn noch nicht');
-    pruefe(e.angeschaltet === 'Zuerst das Schwere, dann das Viele.',
-           'angeschaltet steht er über dem Tagesplan');
     pruefe(e.leererText === true, 'ein leerer Text blendet ihn wieder aus');
-    pruefe(e.geaendert === 'Heute: eine Sache fertig machen.',
-           'eine Änderung ist sofort zu sehen');
     pruefe(e.ausText === true, 'ausgeschaltet bleibt der Text erhalten');
     pruefe(e.imFeld === 'Heute: eine Sache fertig machen.',
            'und steht in der Diagnose im Feld');
@@ -12899,6 +12893,50 @@ console.log('\n199. Überschriften im Tag');
       pruefe(!/Habe ich mich/.test(alteWoche.text), 'dabei entsteht kein zweiter Abschnitt');
     } catch (e) {
       fail('Abschnittsnamen: ' + e.message);
+    }
+    g.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   200. Jeden Tag im Blick (v6.2.0)
+   Grund: Ein Band über allen Karten des Tags für Sätze, an die man
+   jeden Tag denken will. Es ersetzt die Leitsatz-Zeile im Kopf; der
+   Text liegt weiter im Leitsatz der Einstellungen. Fehlerart: Das
+   Raster des Tags verteilte freie Höhe auf die Zeilen — unter dem Band
+   klaffte eine Lücke.
+   ============================================================ */
+console.log('\n200. Jeden Tag im Blick');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /h = blick \+ '<div class="tspalte tspalte-links">/.test(tz[0]) && (tz[0].match(/h = blick \+/g) || []).length === 2,
+         'das Band steht am Rechner und am Handy über allen Karten');
+  pruefe(/body\.breit \.tagblatt\{align-content:start\}/.test(QUELLE), 'das Raster schiebt keine Lücke unter das Band');
+  pruefe(/\.blick-band\{grid-column:1 \/ -1;/.test(QUELLE), 'das Band geht über alle Spalten');
+  const lz = skript.match(/function leitsatzZeichnen\([\s\S]*?\n\}/);
+  pruefe(lz && /el\.innerHTML = '';/.test(lz[0]), 'die alte Leitsatz-Zeile im Kopf bleibt leer — kein doppelter Text');
+  const ts = skript.match(/function tagSchreibenUm\([\s\S]*?\n\}/);
+  pruefe(ts && /was !== 'blick'/.test(ts[0]), '„schreiben“ öffnet das Band zum Schreiben');
+  if (typeof g.blickBandHtml !== 'function') {
+    warn('Band nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    try {
+      g.setzeDB(g.leereDatenbank());
+      let h = g.blickBandHtml();
+      pruefe(/blick-band leer/.test(h) && /Jeden Tag im Blick — schreiben/.test(h), 'ohne Text nur eine dünne Zeile');
+      const z = g.blickZiel();
+      const vorher = g.holeDB().einstellungen.stempel || 0;
+      z.text = 'Erst das Wichtige.\n- Um 17 Uhr ist Schluss.\n\n<b>Zuhören</b>';
+      pruefe(g.holeDB().einstellungen.leitsatz.indexOf('Erst das Wichtige.') === 0 && g.holeDB().einstellungen.stempel >= vorher,
+             'der Text liegt im Leitsatz der Einstellungen — mit Stempel für den Abgleich');
+      h = g.blickBandHtml();
+      pruefe((h.match(/<li>/g) || []).length === 3 && /<li>Um 17 Uhr ist Schluss\.<\/li>/.test(h), 'jede Zeile ein Gedanke — Leerzeilen und Aufzählungszeichen fallen weg');
+      pruefe(!/<b>Zuhören<\/b>/.test(h) && /&lt;b&gt;/.test(h), 'der Text wird maskiert — er kommt vom Benutzer');
+    } catch (e) {
+      fail('Jeden Tag im Blick: ' + e.message);
     }
     g.setzeDB(alt);
   }

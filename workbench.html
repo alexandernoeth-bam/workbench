@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.1.2</title>
+<title>Workbench 6.2.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2438,6 +2438,22 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
 /* Seit v6.1.2: Kartenüberschriften im Tag rot und größer, wie die Wochenabschnitte */
 #schirmTag .tabschnitt-titel{font-size:12.5px;color:var(--weinrot);letter-spacing:.07em}
 #schirmTag .woche-karte{position:relative}
+/* Jeden Tag im Blick (seit v6.2.0): ruhiges Band über allen Karten */
+/* Das Band steht in der ersten Rasterzeile, die Spalten darunter in der zweiten. */
+body.breit .tagblatt{align-content:start}
+body.breit .tagblatt > .blick-band{grid-row:1}
+body.breit .tagblatt > .tspalte,body.breit.weit .tspalte-rechts > .tabschnitt{grid-row:2}
+.blick-band{grid-column:1 / -1;background:#FBF7F2;border:1px solid #E6DCCF;border-radius:12px;padding:12px 18px 10px;margin:0 0 12px}
+body.nacht .blick-band{background:var(--karte);border-color:var(--linie)}
+.blick-band.schreibt{background:var(--karte)}
+.blick-band .tabschnitt-titel{margin:0 0 4px}
+.blick-liste{margin:2px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:1fr;gap:2px 26px}
+body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.blick-liste li{position:relative;padding:3px 0 3px 16px;font-family:Georgia,"Iowan Old Style","Times New Roman",serif;
+  font-size:calc(var(--fs)*0.98);line-height:1.45;overflow-wrap:anywhere}
+.blick-liste li::before{content:"";position:absolute;left:0;top:.66em;width:5px;height:5px;background:var(--weinrot)}
+.blick-band.leer{background:none;border:1px dashed var(--linie);padding:4px 12px}
+.blick-leer{border:0;background:none;color:var(--grau);font:inherit;font-size:12.5px;cursor:pointer;padding:2px 0}
 #schirmTag .woche-knopf{position:absolute;top:8px;right:14px;z-index:1}
 #schirmTag .woche-karte .ruhig .r-h:first-child{padding-right:96px}
 #schirmTag .woche-karte.schreibt{padding-top:42px}
@@ -2974,7 +2990,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.1.2';
+var APP_VERSION = '6.2.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8230,15 +8246,16 @@ function tagZeichnen() {
   var heuteKarte = heuteKarteHtml(is);
   var wocheKarte = wocheKarteHtml(is);
   var umstellung = akUmstellungOffen() ? akUmstellungHinweisHtml() : '';
+  var blick = blickBandHtml();
 
   /* Am Rechner zwei Spalten: links Heute und Woche, rechts Termine und
      Routinen. Am Handy eine Folge von oben nach unten. */
   var h;
   if (istBreit()) {
-    h = '<div class="tspalte tspalte-links">' + umstellung + heuteKarte + wocheKarte + '</div>'
+    h = blick + '<div class="tspalte tspalte-links">' + umstellung + heuteKarte + wocheKarte + '</div>'
       + '<div class="tspalte tspalte-rechts">' + terminKarte + routinenKarte + '</div>';
   } else {
-    h = '<div class="tspalte tspalte-links">' + umstellung + terminKarte + heuteKarte + routinenKarte + wocheKarte + '</div>'
+    h = blick + '<div class="tspalte tspalte-links">' + umstellung + terminKarte + heuteKarte + routinenKarte + wocheKarte + '</div>'
       + '<div class="tspalte tspalte-rechts"></div>';
   }
 
@@ -9811,11 +9828,12 @@ function zeichneLeitsatzWahl() {
 
 /* Er steht auf jedem Gerät über dem Tagesplan, auch am Handy. */
 function leitsatzZeichnen() {
+  /* Seit v6.2.0 steht der Leitsatz im Band „Jeden Tag im Blick“ — die
+     alte Zeile im Tageskopf bleibt leer. */
   var el = document.getElementById('tagLeitsatz');
-  if (!el) { return; }
-  if (!leitsatzAn()) { el.innerHTML = ''; el.className = 'tag-leitsatz'; return; }
-  el.innerHTML = esc(leitsatzText().trim());
-  el.className = 'tag-leitsatz auf';
+  if (el) { el.innerHTML = ''; el.className = 'tag-leitsatz'; }
+  var band = document.getElementById('tagBlick');
+  if (band && tagSchreibt !== 'blick') { band.outerHTML = blickBandHtml(); }
 }
 
 function zeichneFerien() {
@@ -21847,6 +21865,7 @@ function kpVerweisHtml(art, id, titel) {
 
 function kpTextZiel(anlegen) {
   if (schirmOffen === 'Tag') {
+    if (tagSchreibt === 'blick') { return blickZiel(); }
     if (tagSchreibt === 'woche') { return anlegen ? kpWocheAnlegen(montagVon(tagOffen || isoDatum())) : kpWocheFinden(montagVon(tagOffen || isoDatum())); }
     if (tagSchreibt === 'tag') { return anlegen ? kpTagAnlegen(tagOffen || isoDatum()) : kpTagFinden(tagOffen || isoDatum()); }
     return null;
@@ -23292,13 +23311,47 @@ function akUmstellungHtml() {
    ============================================================ */
 
 function tagSchreibenUm(was) {
-  if (was !== 'tag' && was !== 'woche') { return; }
+  if (was !== 'tag' && was !== 'woche' && was !== 'blick') { return; }
   tagSchreibt = (tagSchreibt === was) ? '' : was;
   tagZeichnen();
   if (tagSchreibt) {
     var f = kpFeldHolen();
     if (f && f.focus) { f.focus(); }
   }
+}
+
+/* ---------- Jeden Tag im Blick (seit v6.2.0) ----------
+
+   Ein freier Text über allen Karten des Tags, für jeden Tag derselbe:
+   Leitsätze und Dinge, an die man täglich denken will. Er liegt im
+   Leitsatz der Einstellungen — die Morgenroutine kennt ihn von dort. */
+
+function blickZiel() {
+  var h = {};
+  kpEigenschaft(h, 'text', function () { return leitsatzText(); }, function (w) {
+    DB.einstellungen.leitsatz = String(w);
+    DB.einstellungen.stempel = jetzt();
+  });
+  kpEigenschaft(h, 'geaendert', function () { return DB.einstellungen.stempel; }, function () { /* steht im Stempel */ });
+  return h;
+}
+
+function blickInhaltHtml() {
+  var zeilen = leitsatzText().split('\n').map(function (z) { return z.trim().replace(/^[-•*]\s+/, ''); })
+    .filter(function (z) { return z.length > 0; });
+  if (!zeilen.length) { return ''; }
+  return '<ul class="blick-liste">' + zeilen.map(function (z) { return '<li>' + kpAuszeichnen(z) + '</li>'; }).join('') + '</ul>';
+}
+
+function blickBandHtml() {
+  var schreibt = (tagSchreibt === 'blick');
+  var inhalt = schreibt ? tagFeldHtml(leitsatzText(), 'Jede Zeile ein Satz, an den du jeden Tag denken willst') : blickInhaltHtml();
+  if (!inhalt) {
+    return '<div class="blick-band leer" id="tagBlick"><button type="button" class="blick-leer" onclick="tagSchreibenUm(\'blick\')">'
+         + 'Jeden Tag im Blick — schreiben</button></div>';
+  }
+  return '<div class="blick-band' + (schreibt ? ' schreibt' : '') + '" id="tagBlick">'
+       + '<div class="tabschnitt-titel"><span>Jeden Tag im Blick</span>' + tagUmschalterHtml('blick') + '</div>' + inhalt + '</div>';
 }
 
 function tagUmschalterHtml(was) {
