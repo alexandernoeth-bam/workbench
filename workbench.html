@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.0.4</title>
+<title>Workbench 6.0.5</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2329,6 +2329,10 @@ body.breit .ak-zurueck{display:none}
 .ak-leiste .eintrag.an{background:var(--papier);box-shadow:inset 3px 0 0 var(--weinrot);font-weight:500}
 .ak-leiste .eintrag .zeichen{width:18px;text-align:center;color:var(--weinrot);flex:0 0 18px}
 .ak-leiste .eintrag .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Seit v6.0.5: beim Darüberfahren und ausgewählt steht der Name ganz da. */
+.ak-leiste .eintrag:hover .name,.ak-leiste .eintrag.an .name,.ak-leiste .eintrag:focus-visible .name{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.ak-leiste .eintrag{align-items:flex-start}
+.ak-leiste .eintrag .zeichen,.ak-leiste .eintrag .marke-klein{margin-top:2px}
 .ak-leiste .eintrag.ruht,.ak-leiste .eintrag.ruht .zeichen{color:var(--grau)}
 .ak-leiste .eintrag.routinen-eintrag{margin-top:4px}
 .ak-leiste .eintrag.zieh-vor{box-shadow:inset 0 2px 0 var(--weinrot)}
@@ -2349,10 +2353,11 @@ body.breit .sortier-knopf{display:none}
 .ak-rumpf .pille,.um-hinweis .pille,.tabschnitt .pille{font:inherit;font-size:calc(var(--fs)*0.76);padding:4px 12px;border:1px solid var(--linie);border-radius:14px;background:var(--karte);color:var(--tinte);cursor:pointer}
 .ak-rumpf .pille.voll,.um-hinweis .pille.voll{background:var(--tinte);color:#fff;border-color:var(--tinte)}
 .ak-rumpf .pille.weg{border-color:var(--weinrot);color:var(--weinrot)}
-.ak-kopf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.ak-kopf{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .ak-titel{margin:0;font-size:calc(var(--fs)*1.14);font-weight:600;flex:1 1 200px}
 .ak-kopf .titelfeld{flex:1 1 220px;min-width:0;font:inherit;font-size:calc(var(--fs)*1.14);font-weight:600;color:var(--tinte);
-  border:1px solid transparent;border-radius:6px;padding:2px 6px;background:transparent}
+  border:1px solid transparent;border-radius:6px;padding:2px 6px;background:transparent;
+  resize:none;overflow:hidden;line-height:1.3;white-space:pre-wrap;overflow-wrap:anywhere;field-sizing:content;display:block}
 .ak-kopf .titelfeld:hover{border-color:var(--linie)}
 .ak-kopf .titelfeld:focus{border-color:var(--weinrot);background:var(--karte)}
 .ak-rumpf .umschalter,.ak-rumpf .gruppe-knopf,.tabschnitt .gruppe-knopf{display:inline-flex;border:1px solid var(--linie);border-radius:14px;overflow:hidden}
@@ -2957,7 +2962,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.0.4';
+var APP_VERSION = '6.0.5';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -21917,7 +21922,7 @@ function akSichtbar(s) {
 
 function akEintragHtml(an, aufruf, zeichen, name, extra, klasse, ziehen) {
   return '<button type="button" class="eintrag' + (an ? ' an' : '') + (klasse ? ' ' + klasse : '') + '"' + (ziehen || '')
-       + ' onclick="' + aufruf + '"' + (an ? ' aria-current="page"' : '') + '>'
+       + ' onclick="' + aufruf + '"' + (an ? ' aria-current="page"' : '') + ' title="' + esc(name) + '">'
        + '<span class="zeichen">' + zeichen + '</span><span class="name">' + esc(name) + '</span>' + (extra || '') + '</button>';
 }
 
@@ -22102,7 +22107,7 @@ function akLoeschen() {
 
 function akTitelSetzen(wert) {
   var s = akSeite();
-  var t = String(wert || '').trim().slice(0, 200);
+  var t = String(wert || '').replace(/\s*\n\s*/g, ' ').trim().slice(0, 200);
   if (!s || !t) { akLeisteZeichnen(); return; }
   s.titel = t;
   s.geaendert = jetzt();
@@ -22111,7 +22116,19 @@ function akTitelSetzen(wert) {
 }
 
 function akTitelTaste(e) {
-  if (e.key === 'Enter' && e.target && e.target.blur) { e.target.blur(); }
+  /* Der Titel bleibt eine Zeile — Enter beendet die Eingabe. */
+  if (e.key === 'Enter') {
+    if (e.preventDefault) { e.preventDefault(); }
+    if (e.target && e.target.blur) { e.target.blur(); }
+  }
+}
+
+/* Der Titel bricht um und zeigt sich ganz (seit v6.0.5): Das Feld
+   wächst mit seinem Inhalt. */
+function akTitelHoehe(el) {
+  if (!el || !el.style) { return; }
+  el.style.height = 'auto';
+  if (el.scrollHeight) { el.style.height = el.scrollHeight + 'px'; }
 }
 
 function akKontext(wert) {
@@ -22258,8 +22275,8 @@ function akPinArt(s) {
 
 function akSeiteHtml(s) {
   var h = '<div class="ak-kopf"><button type="button" class="pille ak-zurueck" onclick="akZurueck()">‹ Aktivitäten</button>'
-        + '<input id="kpTitel" class="titelfeld" type="text" maxlength="200" value="' + esc(s.titel || '') + '" aria-label="Name" '
-        + 'onchange="akTitelSetzen(this.value)" onkeydown="akTitelTaste(event)">'
+        + '<textarea id="kpTitel" class="titelfeld" rows="1" maxlength="200" aria-label="Name" spellcheck="false" '
+        + 'onchange="akTitelSetzen(this.value)" onkeydown="akTitelTaste(event)" oninput="akTitelHoehe(this)">' + esc(s.titel || '') + '</textarea>'
         + '<span class="umschalter" role="group" aria-label="Ansicht oder Schreiben">'
         + '<button type="button" class="' + (ak.modus === 'ansicht' ? 'an' : '') + '" onclick="akModusSetzen(\'ansicht\')">Ansicht</button>'
         + '<button type="button" class="' + (ak.modus === 'schreiben' ? 'an' : '') + '" onclick="akModusSetzen(\'schreiben\')">Schreiben</button></span>'
@@ -22322,6 +22339,7 @@ function akSeiteZeichnen() {
   }
   if (aktiv && aktiv.id === 'kpFeld' && ak.modus === 'schreiben' && el.querySelector && el.querySelector('#kpFeld')) { return; }
   el.innerHTML = akSeiteHtml(s);
+  akTitelHoehe(document.getElementById('kpTitel'));
 }
 
 function akZeichnen() {

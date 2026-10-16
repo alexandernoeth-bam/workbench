@@ -12741,6 +12741,32 @@ console.log('\n195. Nicht relevant');
 }
 
 /* ============================================================
+   196. Lange Namen in den Aktivitäten ganz zeigen (v6.0.5)
+   Grund: Lange Namen von Vorhaben, Listen und Notizen wurden in der
+   Seitenleiste mit „…“ und im Detailbereich im einzeiligen Feld
+   abgeschnitten.
+   ============================================================ */
+console.log('\n196. Lange Namen');
+{
+  const skript = hauptSkript();
+  const eh = skript.match(/function akEintragHtml\([\s\S]*?\n\}/);
+  pruefe(eh && /title="' \+ esc\(name\) \+ '">'/.test(eh[0]), 'jeder Eintrag der Seitenleiste nennt seinen ganzen Namen beim Darüberfahren');
+  pruefe(/\.ak-leiste \.eintrag:hover \.name,\.ak-leiste \.eintrag\.an \.name[^{]*\{white-space:normal/.test(QUELLE),
+         'beim Darüberfahren und ausgewählt bricht der Name um statt abgeschnitten zu werden');
+  const sh = skript.match(/function akSeiteHtml\([\s\S]*?\n\}/);
+  pruefe(sh && /<textarea id="kpTitel" class="titelfeld" rows="1"/.test(sh[0]) && !/<input id="kpTitel"/.test(sh[0]),
+         'der Titel im Detailbereich ist mehrzeilig und zeigt sich ganz');
+  const tf = QUELLE.match(/\.ak-kopf \.titelfeld\{[^}]*\}/);
+  pruefe(tf && /white-space:pre-wrap/.test(tf[0]) && /overflow-wrap:anywhere/.test(tf[0]) && /resize:none/.test(tf[0]), 'das Feld bricht um und lässt sich nicht von Hand ziehen');
+  const tt = skript.match(/function akTitelTaste\([\s\S]*?\n\}/);
+  pruefe(tt && /preventDefault\(\)/.test(tt[0]), 'Enter beendet die Eingabe, statt eine neue Zeile zu machen');
+  const ts = skript.match(/function akTitelSetzen\([\s\S]*?\n\}/);
+  pruefe(ts && /replace\(\/\\s\*\\n\\s\*\/g, ' '\)/.test(ts[0]), 'ein eingefügter Zeilenumbruch wird zum Leerzeichen');
+  const sz = skript.match(/function akSeiteZeichnen\([\s\S]*?\n\}/);
+  pruefe(sz && /akTitelHoehe\(/.test(sz[0]), 'nach dem Zeichnen passt sich die Höhe dem Titel an');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');
