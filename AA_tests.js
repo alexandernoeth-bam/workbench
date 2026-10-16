@@ -11870,7 +11870,7 @@ console.log('\n163. Aufzählungspunkt und Umbruch');
   const kasten = QUELLE.match(/\.fl-zeile \.tkasten\{[^}]*\}/);
   pruefe(kasten && /align-self:flex-start/.test(kasten[0]) && !/align-self:center/.test(kasten[0]),
          'das Kästchen auch');
-  pruefe(/\.nb-inhalt \.fl-punkt\{margin-top:8px\}/.test(QUELLE) && /\.nb-inhalt \.fl-zeile \.tkasten\{margin-top:3\.5px\}/.test(QUELLE),
+  pruefe(/\.nb-inhalt \.fl-punkt\{margin-top:3\.5px\}/.test(QUELLE) && /\.nb-inhalt \.fl-zeile \.tkasten\{margin-top:3\.5px\}/.test(QUELLE),
          'auf Notizseiten mittig zur ersten Kästchenzeile (24 px)');
   const text = QUELLE.match(/\.fl-text\{[^}]*\}/);
   const absatz = QUELLE.match(/\.fl-absatz\{[^}]*\}/);
@@ -12562,6 +12562,29 @@ console.log('\n191. Aktivitäten (v6.0.0)');
     }
     g.setzeDB(alt);
   }
+}
+
+/* ============================================================
+   192. Aufzählungspunkt als kleines schwarzes Quadrat (v6.0.1)
+   Grund: Der Punkt war ein umrandetes Kästchen, kleiner als das der
+   Aufgaben und nicht mit ihm in einer Flucht. Jetzt ist er ein kleines
+   gefülltes Quadrat, mittig im Feld eines Aufgabenkästchens.
+   ============================================================ */
+console.log('\n192. Aufzählungspunkt');
+{
+  const punkt = QUELLE.match(/\.fl-punkt\{[^}]*\}/);
+  const kern = QUELLE.match(/\.fl-punkt::before\{[^}]*\}/);
+  const kasten = QUELLE.match(/\n\.tkasten\{[^}]*\}/);
+  const breite = s => Number(((s || '').match(/flex:0 0 (\d+)px/) || [])[1]);
+  pruefe(punkt && !/border:/.test(punkt[0]), 'der Punkt hat keinen Rahmen mehr');
+  pruefe(punkt && kasten && breite(punkt[0]) === breite(kasten[0]) && /height:17px/.test(punkt[0]),
+         'sein Feld ist so groß wie ein Aufgabenkästchen');
+  const z = kern ? kern[0] : '';
+  const w = Number((z.match(/width:(\d+)px/) || [])[1]);
+  const l = Number((z.match(/left:(\d+)px/) || [])[1]);
+  const t = Number((z.match(/top:(\d+)px/) || [])[1]);
+  pruefe(kern && /background:var\(--tinte\)/.test(z) && w > 0 && w < 8, 'das Quadrat ist gefüllt, dunkel und kleiner als vorher (8 px)');
+  pruefe(kern && Math.abs((l + w / 2) - 8.5) <= 0.5 && Math.abs((t + w / 2) - 8.5) <= 0.5, 'es steht mittig in Höhe und Breite');
 }
 
 /* ============================================================

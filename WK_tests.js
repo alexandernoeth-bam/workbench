@@ -953,6 +953,28 @@ if (WK) {
 }
 
 /* ============================================================
+   23. Aufzählungspunkt als kleines schwarzes Quadrat (3.0.1)
+   Grund: Der Punkt war ein umrandetes Kästchen und stand nicht in
+   einer Flucht mit den Aufgabenkästchen.
+   ============================================================ */
+console.log('\n23. Aufzählungspunkt');
+{
+  const punkt = QUELLE.match(/\.fl-punkt\{[^}]*\}/);
+  const kern = QUELLE.match(/\.fl-punkt::before\{[^}]*\}/);
+  const kasten = QUELLE.match(/\n\.tkasten\{[^}]*\}/);
+  const z = kern ? kern[0] : '';
+  const w = Number((z.match(/width:(\d+)px/) || [])[1]);
+  const l = Number((z.match(/left:(\d+)px/) || [])[1]);
+  const t = Number((z.match(/top:(\d+)px/) || [])[1]);
+  pruefe(punkt && !/border:/.test(punkt[0]) && /flex:0 0 17px/.test(punkt[0]) && /height:17px/.test(punkt[0])
+         && kasten && /flex:0 0 17px/.test(kasten[0]), 'der Punkt hat keinen Rahmen und ein Feld so groß wie ein Aufgabenkästchen');
+  pruefe(punkt && kasten && (punkt[0].match(/margin-top:[^;}]*/) || [''])[0] === (kasten[0].match(/margin-top:[^;}]*/) || ['x'])[0],
+         'er steht auf derselben Höhe wie das Kästchen');
+  pruefe(kern && /background:var\(--tinte\)/.test(z) && w > 0 && w < 7, 'das Quadrat ist gefüllt, dunkel und kleiner als vorher (7 px)');
+  pruefe(kern && Math.abs((l + w / 2) - 8.5) <= 0.5 && Math.abs((t + w / 2) - 8.5) <= 0.5, 'es steht mittig in Höhe und Breite');
+}
+
+/* ============================================================
    18. Neue Fassung suchen und laden — wie in der Workbench
    ============================================================ */
 console.log('\n18. Neue Fassung');
