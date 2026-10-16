@@ -4154,7 +4154,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
@@ -12764,6 +12764,59 @@ console.log('\n196. Lange Namen');
   pruefe(ts && /replace\(\/\\s\*\\n\\s\*\/g, ' '\)/.test(ts[0]), 'ein eingefügter Zeilenumbruch wird zum Leerzeichen');
   const sz = skript.match(/function akSeiteZeichnen\([\s\S]*?\n\}/);
   pruefe(sz && /akTitelHoehe\(/.test(sz[0]), 'nach dem Zeichnen passt sich die Höhe dem Titel an');
+}
+
+/* ============================================================
+   197. Projekte und Ziele getrennt, Schalter Aktiv / Alle (v6.1.0)
+   Grund: Über das + bei „Vorhaben“ entstand immer ein Projekt — ein
+   Ziel ließ sich nicht anlegen. Projekte und Ziele standen gemischt;
+   Ruhendes, Erledigtes und Einfälle ließen sich nicht ausblenden.
+   ============================================================ */
+console.log('\n197. Projekte und Ziele');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  const an = skript.match(/function akAnlegen\([\s\S]*?\n\}/);
+  pruefe(an && /ak\.neuIn === 'ziel'\) \? kpSeiteAnlegen\('vorhaben', name, ak\.filter, 'ziel'\)/.test(an[0]),
+         'das + bei „Ziele“ legt ein Ziel an');
+  pruefe(/vorhaben: \{ zeichen: '◎', name: 'Projekt', gruppe: 'Projekte'/.test(skript) && /ziel: +\{ zeichen: '◇', name: 'Ziel', +gruppe: 'Ziele'/.test(skript),
+         'die Bereiche heißen „Projekte“ und „Ziele“');
+  if (typeof g.akLeisteHtml !== 'function') {
+    warn('Projekte und Ziele nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    const ak = g.holeAk();
+    const altUmfang = ak.umfang;
+    const altFilter = ak.filter;
+    try {
+      g.setzeDB(g.leereDatenbank());
+      ak.filter = 'alle';
+      const p = g.kpSeiteAnlegen('vorhaben', 'Haus', 'privat');
+      const z = g.kpSeiteAnlegen('vorhaben', 'Gewicht', 'privat', 'ziel');
+      pruefe(g.holeDB().ziele.length === 1 && g.holeDB().projekte.length === 1 && z.typ === 'ziel' && z.zustand === 'laeuft',
+             'ein Ziel landet bei den Zielen der Workbench, ein Projekt bei den Projekten');
+      pruefe(g.kpGruppenSchluessel(p) !== g.kpGruppenSchluessel(z), 'Projekte und Ziele werden getrennt sortiert');
+      const r = g.kpSeiteAnlegen('vorhaben', 'Ruhend', 'privat'); r.zustand = 'ruht';
+      const zr = g.kpSeiteAnlegen('vorhaben', 'Ziel ruht', 'privat', 'ziel'); zr.zustand = 'ruht';
+      g.holeDB().einfaelle.push({ id: 'e1', titel: 'Idee', kontext: 'privat', stand: 'offen', geaendert: 1 });
+      ak.umfang = 'aktiv';
+      let h = g.akLeisteHtml();
+      const iP = h.indexOf('>Projekte<'), iZ = h.indexOf('>Ziele<'), iL = h.indexOf('>Listen<');
+      pruefe(iP >= 0 && iZ > iP && iL > iZ, 'Ziele stehen zwischen Projekten und Listen');
+      pruefe(/akUmfangSetzen\('aktiv'\)/.test(h) && /akUmfangSetzen\('alle'\)/.test(h), 'unter Alle/Beruf/Privat der Schalter Aktiv / Alle');
+      pruefe(!/Ruht ·/.test(h) && !/Einfälle ·/.test(h) && /◇/.test(h), '„Aktiv“ blendet Ruht, Erledigt und Einfälle aus');
+      ak.umfang = 'alle';
+      h = g.akLeisteHtml();
+      pruefe((h.match(/Ruht · 1/g) || []).length === 2 && /Einfälle · 1/.test(h), '„Alle“ zeigt sie — Ruht für Projekte und Ziele getrennt');
+      g.akUmfangSetzen('quatsch');
+      pruefe(ak.umfang === 'alle', 'ein unbekannter Wert wird abgewiesen');
+    } catch (e) {
+      fail('Projekte und Ziele: ' + e.message);
+    }
+    ak.umfang = altUmfang;
+    ak.filter = altFilter;
+    g.setzeDB(alt);
+  }
 }
 
 /* ============================================================

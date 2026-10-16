@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.0.5</title>
+<title>Workbench 6.1.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2962,7 +2962,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.0.5';
+var APP_VERSION = '6.1.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -20843,12 +20843,20 @@ function kpNaechsterRang() {
 }
 
 /* Legt eine Seite an — mit den Feldern, die die Workbench erwartet. */
-function kpSeiteAnlegen(art, name, kontext) {
+function kpSeiteAnlegen(art, name, kontext, typ) {
   var titel = String(name || '').trim().slice(0, 200);
   if (!titel || !KP_ARTEN[art]) { return null; }
   var k = (kontext === 'privat' || kontext === 'beruflich') ? kontext : 'beruflich';
   var rang = kpNaechsterRang();
   var satz;
+  if (art === 'vorhaben' && typ === 'ziel') {
+    satz = { id: neueKennung(), name: titel, kontext: k, beschreibung: '', zieltermin: '',
+             status: 'laufend', zielzustaende: [], einzahler: [], anlagen: [], flaeche: '',
+             ordnung: rang, geaendert: jetzt() };
+    if (!Array.isArray(DB.ziele)) { DB.ziele = []; }
+    DB.ziele.push(satz);
+    return kpHuelle(satz, 'vorhaben', 'ziel');
+  }
   if (art === 'vorhaben') {
     satz = { id: neueKennung(), name: titel, kontext: k, beschreibung: '', start: '', ende: '',
              status: 'laufend', meilensteine: [], zielzustaende: [], anlagen: [], flaeche: '',
@@ -20876,8 +20884,10 @@ function kpPasstFilter(s, filter) {
 
 /* ---------- Sortieren innerhalb einer Gruppe ---------- */
 
+/* Projekte und Ziele sind getrennte Gruppen (seit Workbench 6.1.0). */
 function kpGruppenSchluessel(s) {
-  return (s.art === 'vorhaben') ? 'vorhaben-' + (s.zustand || 'laeuft') : s.art;
+  if (s.art !== 'vorhaben') { return s.art; }
+  return (s.typ === 'ziel' ? 'ziel-' : 'vorhaben-') + (s.zustand || 'laeuft');
 }
 
 function kpGruppe(schluessel) {
@@ -21771,6 +21781,9 @@ var ak = {
   fertigAuf: false,
   einfallAuf: false,
   notizenAuf: false,
+  zielRuhtAuf: false,
+  zielFertigAuf: false,
+  umfang: 'aktiv',      /* aktiv | alle — Einfälle, Ruht, Erledigt zeigen (seit v6.1.0) */
   rtAnsicht: 'liste',   /* liste | planung */
   rtOffen: '',          /* aufgeklappte Routine */
   rtAb: '',             /* erster Tag der Planung */
@@ -21778,6 +21791,13 @@ var ak = {
 };
 
 var AK_FILTER_KEY = 'wb-aktivitaeten-filter';
+var AK_UMFANG_KEY = 'wb-aktivitaeten-umfang';
+
+/* Wie ein Vorhaben in der Leiste heißt und aussieht: Projekt oder Ziel. */
+var AK_TYPEN = {
+  vorhaben: { zeichen: '◎', name: 'Projekt', gruppe: 'Projekte', neu: 'Name des Projekts', typ: 'projekt' },
+  ziel:     { zeichen: '◇', name: 'Ziel',    gruppe: 'Ziele',    neu: 'Name des Ziels',    typ: 'ziel' }
+};
 var akGezogen = '';
 
 /* Was das Schreibfeld gerade beschreibt: im Tag die Woche oder den Tag,
@@ -21912,8 +21932,18 @@ function akFilterSetzen(f) {
 
 function akFilterLaden() {
   var f = null;
-  try { f = window.localStorage.getItem(AK_FILTER_KEY); } catch (e) { f = null; }
+  var u = null;
+  try { f = window.localStorage.getItem(AK_FILTER_KEY); u = window.localStorage.getItem(AK_UMFANG_KEY); } catch (e) { f = null; u = null; }
   if (f === 'alle' || f === 'beruflich' || f === 'privat') { ak.filter = f; }
+  if (u === 'aktiv' || u === 'alle') { ak.umfang = u; }
+}
+
+/* Aktiv: nur Laufendes. Alle: dazu Einfälle, Ruht und Erledigt. */
+function akUmfangSetzen(u) {
+  if (u !== 'aktiv' && u !== 'alle') { return; }
+  ak.umfang = u;
+  try { window.localStorage.setItem(AK_UMFANG_KEY, u); } catch (e) { /* nur für jetzt */ }
+  akLeisteZeichnen();
 }
 
 function akSichtbar(s) {
@@ -21931,7 +21961,8 @@ function akSeitenEintragHtml(s, klasse) {
   var ziehen = ' draggable="true" data-id="' + id + '" ondragstart="akZiehStart(event,\'' + id + '\')" '
              + 'ondragover="akZiehUeber(event,\'' + id + '\')" ondragleave="akZiehWeg(event)" '
              + 'ondrop="akZiehAb(event,\'' + id + '\')" ondragend="akZiehEnde()"';
-  var h = akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + id + '\')', KP_ARTEN[s.art].zeichen, s.titel || 'ohne Titel', '', klasse, ziehen);
+  var zeichen = (s.art === 'vorhaben' && s.typ === 'ziel') ? AK_TYPEN.ziel.zeichen : KP_ARTEN[s.art].zeichen;
+  var h = akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + id + '\')', zeichen, s.titel || 'ohne Titel', '', klasse, ziehen);
   if (ak.sortieren !== kpGruppenSchluessel(s)) { return h; }
   return '<div class="sort-zeile">' + h
        + '<button type="button" class="sort-pfeil" onclick="akSchieben(\'' + id + '\',-1)" aria-label="Nach oben">▲</button>'
@@ -21945,31 +21976,36 @@ function akSortierKnopfHtml(schluessel) {
 }
 
 function akNeuFeldHtml() {
-  var platz = (ak.neuIn === 'einfall') ? 'Einfall merken' : KP_ARTEN[ak.neuIn].neu;
+  var platz = (ak.neuIn === 'einfall') ? 'Einfall merken'
+            : (AK_TYPEN[ak.neuIn] ? AK_TYPEN[ak.neuIn].neu : KP_ARTEN[ak.neuIn].neu);
   return '<div class="neu-feld"><input id="akNeuName" type="text" maxlength="200" placeholder="' + esc(platz) + '" '
        + 'onkeydown="akNeuTaste(event)"><button type="button" class="pille" onclick="akAnlegen()">Anlegen</button></div>';
 }
 
 function akGruppeKopfHtml(art) {
-  var titel = KP_ARTEN[art].gruppe;
+  var info = AK_TYPEN[art] || KP_ARTEN[art];
+  var titel = info.gruppe;
   if (art === 'notiz') {
     var auf = akNotizenAuf();
     titel = '<button type="button" class="klapp-kopf" onclick="akKlappUm(\'notiz\')" aria-expanded="' + auf + '">'
           + (auf ? '⌄ ' : '› ') + titel + '</button>';
   }
-  var schluessel = (art === 'vorhaben') ? 'vorhaben-laeuft' : art;
+  var schluessel = (art === 'vorhaben') ? 'vorhaben-laeuft' : ((art === 'ziel') ? 'ziel-laeuft' : art);
   var sortierbar = (art !== 'notiz' || akNotizenAuf()) && kpGruppe(schluessel).filter(akSichtbar).length > 1;
   return '<div class="ak-gruppe"><span>' + titel + '</span>' + (sortierbar ? akSortierKnopfHtml(schluessel) : '')
-       + '<button type="button" class="plus" onclick="akNeuOeffnen(\'' + art + '\')" title="Neu: ' + KP_ARTEN[art].name + '" '
-       + 'aria-label="Neu: ' + KP_ARTEN[art].name + '" aria-expanded="' + (ak.neuIn === art) + '">+</button></div>'
+       + '<button type="button" class="plus" onclick="akNeuOeffnen(\'' + art + '\')" title="Neu: ' + info.name + '" '
+       + 'aria-label="Neu: ' + info.name + '" aria-expanded="' + (ak.neuIn === art) + '">+</button></div>'
        + (ak.neuIn === art ? akNeuFeldHtml() : '');
 }
 
 function akKlappGruppeHtml(was, titel, seiten, klasse) {
   if (!seiten.length) { return ''; }
-  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf' }[was];
-  var auf = ak[feld] || seiten.some(function (s) { return s.id === ak.id; });
-  var schluessel = (was === 'ruht') ? 'vorhaben-ruht' : 'vorhaben-erledigt';
+  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf' }[was];
+  var drin = seiten.some(function (s) { return s.id === ak.id; });
+  /* Unter „Aktiv“ ausgeblendet — außer die offene Seite liegt darin. */
+  if (ak.umfang === 'aktiv' && !drin) { return ''; }
+  var auf = ak[feld] || drin;
+  var schluessel = { ruht: 'vorhaben-ruht', fertig: 'vorhaben-erledigt', zruht: 'ziel-ruht', zfertig: 'ziel-erledigt' }[was];
   var h = '<div class="ak-gruppe leise"><button type="button" class="klapp-kopf" onclick="akKlappUm(\'' + was + '\')" aria-expanded="' + auf + '">'
         + (auf ? '⌄ ' : '› ') + titel + ' · ' + seiten.length + '</button>'
         + (auf && seiten.length > 1 ? akSortierKnopfHtml(schluessel) : '') + '</div>';
@@ -22005,7 +22041,8 @@ function akNotizenAuf() {
 }
 
 function akKlappUm(was) {
-  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', notiz: 'notizenAuf', einfall: 'einfallAuf' }[was];
+  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', notiz: 'notizenAuf', einfall: 'einfallAuf',
+               zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf' }[was];
   if (!feld) { return; }
   ak[feld] = !ak[feld];
   akLeisteZeichnen();
@@ -22015,6 +22052,10 @@ function akLeisteHtml() {
   var h = '<div class="filter" role="group" aria-label="Beruf oder Privat">'
         + [['alle', 'Alle'], ['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (p) {
           return '<button type="button" class="' + (ak.filter === p[0] ? 'an' : '') + '" onclick="akFilterSetzen(\'' + p[0] + '\')">' + p[1] + '</button>';
+        }).join('') + '</div>'
+        + '<div class="filter" role="group" aria-label="Nur Aktives oder alles">'
+        + [['aktiv', 'Aktiv'], ['alle', 'Alle']].map(function (p) {
+          return '<button type="button" class="' + (ak.umfang === p[0] ? 'an' : '') + '" onclick="akUmfangSetzen(\'' + p[0] + '\')">' + p[1] + '</button>';
         }).join('') + '</div>';
   var heute = akRoutinenHeute().length;
   h += akEintragHtml(ak.id === 'routinen', 'akOeffnen(\'routinen\')', '↻', 'Routinen',
@@ -22022,14 +22063,22 @@ function akLeisteHtml() {
   var leer = function (wort) {
     return '<div class="leer-hinweis">' + (ak.filter === 'alle' ? 'Noch keine ' + wort + '.' : 'Keine ' + wort + ' unter diesem Filter.') + '</div>';
   };
-  h += akGruppeKopfHtml('vorhaben');
-  var vh = kpSeiten('vorhaben').filter(akSichtbar);
-  var laeuft = vh.filter(function (s) { return s.zustand === 'laeuft'; });
-  if (!vh.length) { h += leer('Vorhaben'); }
-  laeuft.forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
-  h += akEinfaelleHtml();
-  h += akKlappGruppeHtml('ruht', 'Ruht', vh.filter(function (s) { return s.zustand === 'ruht'; }), 'ruht');
-  h += akKlappGruppeHtml('fertig', 'Erledigt', vh.filter(function (s) { return s.zustand === 'erledigt'; }), 'ruht');
+  var alleVh = kpSeiten('vorhaben').filter(akSichtbar);
+  var bereich = function (art, liste, ruht, fertig, wort) {
+    var t = AK_TYPEN[art].gruppe;
+    var x = akGruppeKopfHtml(art);
+    var laeuft = liste.filter(function (s) { return s.zustand === 'laeuft'; });
+    if (!laeuft.length) {
+      x += '<div class="leer-hinweis">' + (liste.length ? 'Keine laufenden ' + t + '.' : (ak.filter === 'alle' ? 'Noch keine ' + wort + '.' : 'Keine ' + wort + ' unter diesem Filter.')) + '</div>';
+    }
+    laeuft.forEach(function (s) { x += akSeitenEintragHtml(s, ''); });
+    if (art === 'vorhaben' && ak.umfang !== 'aktiv') { x += akEinfaelleHtml(); }
+    x += akKlappGruppeHtml(ruht, 'Ruht', liste.filter(function (s) { return s.zustand === 'ruht'; }), 'ruht');
+    x += akKlappGruppeHtml(fertig, 'Erledigt', liste.filter(function (s) { return s.zustand === 'erledigt'; }), 'ruht');
+    return x;
+  };
+  h += bereich('vorhaben', alleVh.filter(function (s) { return s.typ !== 'ziel'; }), 'ruht', 'fertig', 'Projekte');
+  h += bereich('ziel', alleVh.filter(function (s) { return s.typ === 'ziel'; }), 'zruht', 'zfertig', 'Ziele');
   h += akGruppeKopfHtml('liste');
   var listen = kpSeiten('liste').filter(akSichtbar);
   if (!listen.length) { h += leer('Listen'); }
@@ -22051,7 +22100,7 @@ function akLeisteZeichnen() {
 /* ---------- Anlegen, Löschen ---------- */
 
 function akNeuOeffnen(was) {
-  if (!KP_ARTEN[was] && was !== 'einfall') { return; }
+  if (!KP_ARTEN[was] && !AK_TYPEN[was] && was !== 'einfall') { return; }
   ak.neuIn = (ak.neuIn === was) ? '' : was;
   akLeisteZeichnen();
   var f = document.getElementById('akNeuName');
@@ -22069,7 +22118,8 @@ function akAnlegen() {
     akZeichnen();
     return;
   }
-  var s = kpSeiteAnlegen(ak.neuIn, name, ak.filter);
+  /* „ziel“ ist ein Vorhaben in der Sammlung der Ziele. */
+  var s = (ak.neuIn === 'ziel') ? kpSeiteAnlegen('vorhaben', name, ak.filter, 'ziel') : kpSeiteAnlegen(ak.neuIn, name, ak.filter);
   ak.neuIn = '';
   spaeterSichern();
   if (s) { akOeffnen(s.id); akModusSetzen('schreiben'); }
