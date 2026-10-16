@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.1.0</title>
+<title>Workbench 6.1.1</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2397,6 +2397,10 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
 .wb-tot{color:var(--grau)}
 .oa{margin:0 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ak-falten{display:inline-flex;gap:6px;margin-left:auto}
+/* Vorschau beim Darüberfahren (seit v6.1.1): nur zum Lesen */
+.ak-vorschau .blatt{pointer-events:none;box-shadow:0 0 0 2px #FBF1F3}
+.ak-vorschau .ak-titel{margin:2px 0 8px;overflow-wrap:anywhere}
+.ak-vorschau-hinweis{display:inline-block;font-size:11.5px;color:var(--weinrot);border:1px dashed var(--weinrot);border-radius:10px;padding:1px 10px;margin-bottom:8px}
 .oa-knopf{border:1.5px solid var(--weinrot);color:var(--weinrot);background:var(--karte);border-radius:16px;padding:5px 14px;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer}
 .oa-schleier{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.28);display:flex;align-items:flex-start;justify-content:center;padding:60px 12px 12px}
 .oa-fenster{background:var(--karte);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.3);width:620px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
@@ -2962,7 +2966,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.1.0';
+var APP_VERSION = '6.1.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -21784,6 +21788,7 @@ var ak = {
   zielRuhtAuf: false,
   zielFertigAuf: false,
   umfang: 'aktiv',      /* aktiv | alle — Einfälle, Ruht, Erledigt zeigen (seit v6.1.0) */
+  vorschau: '',         /* Seite, die beim Darüberfahren gezeigt wird (seit v6.1.1) */
   rtAnsicht: 'liste',   /* liste | planung */
   rtOffen: '',          /* aufgeklappte Routine */
   rtAb: '',             /* erster Tag der Planung */
@@ -21792,6 +21797,8 @@ var ak = {
 
 var AK_FILTER_KEY = 'wb-aktivitaeten-filter';
 var AK_UMFANG_KEY = 'wb-aktivitaeten-umfang';
+var akVorschauUhr = null;
+var akVorschauEndeUhr = null;
 
 /* Wie ein Vorhaben in der Leiste heißt und aussieht: Projekt oder Ziel. */
 var AK_TYPEN = {
@@ -21901,6 +21908,8 @@ function akOeffnen(id, hervor) {
   ak.frage = '';
   ak.oaAuf = false;
   ak.hervor = hervor || '';
+  ak.vorschau = '';
+  akVorschauUhrenWeg();
   /* Liegt die Zeile in einem eingeklappten Abschnitt, geht er auf. */
   var ziel = hervor ? akSeite() : null;
   var zz = ziel ? kpZeileSuchen(ziel, hervor) : null;
@@ -21916,6 +21925,58 @@ function akOeffnen(id, hervor) {
     var rolle = document.getElementById('schirmAktivitaeten');
     if (rolle) { rolle.scrollTop = 0; }
   }
+}
+
+/* ---------- Vorschau beim Darüberfahren (seit v6.1.1) ----------
+
+   Nur am Rechner und nicht beim Schreiben. Verweilt die Maus kurz auf
+   einem Eintrag, zeigt der Detailbereich die Seite zum Lesen; wer
+   wegfährt, sieht wieder die geöffnete, ein Klick öffnet sie richtig. */
+
+function akVorschauUhrenWeg() {
+  if (akVorschauUhr) { window.clearTimeout(akVorschauUhr); akVorschauUhr = null; }
+  if (akVorschauEndeUhr) { window.clearTimeout(akVorschauEndeUhr); akVorschauEndeUhr = null; }
+}
+
+function akVorschauStart(id) {
+  akVorschauUhrenWeg();
+  var kl = document.body ? document.body.classList : null;
+  var breit = !!(kl && typeof kl.contains === 'function' && kl.contains('breit'));
+  if (!breit || ak.modus === 'schreiben' || ak.oaAuf) { return; }
+  if (id === ak.id) {
+    if (ak.vorschau) { ak.vorschau = ''; akSeiteZeichnen(); }
+    return;
+  }
+  akVorschauUhr = window.setTimeout(function () {
+    akVorschauUhr = null;
+    if (!kpSeiteFinden(id)) { return; }
+    ak.vorschau = id;
+    akSeiteZeichnen();
+  }, 300);
+}
+
+function akVorschauEnde() {
+  if (akVorschauUhr) { window.clearTimeout(akVorschauUhr); akVorschauUhr = null; }
+  if (!ak.vorschau) { return; }
+  if (akVorschauEndeUhr) { window.clearTimeout(akVorschauEndeUhr); }
+  akVorschauEndeUhr = window.setTimeout(function () {
+    akVorschauEndeUhr = null;
+    if (!ak.vorschau) { return; }
+    ak.vorschau = '';
+    akSeiteZeichnen();
+  }, 200);
+}
+
+function akVorschauHtml(s) {
+  var art = (s.art === 'vorhaben') ? (s.typ === 'ziel' ? 'Ziel' : 'Projekt') : KP_ARTEN[s.art].name;
+  var zustand = (s.art === 'vorhaben') ? ' · ' + ({ laeuft: 'läuft', ruht: 'ruht', erledigt: 'erledigt' }[s.zustand] || '') : '';
+  return '<div class="ak-vorschau"><div class="ak-vorschau-hinweis">Vorschau · klicken zum Öffnen</div>'
+       + '<h1 class="ak-titel">' + esc(s.titel || 'ohne Titel') + '</h1>'
+       + '<div class="eigen"><span class="art-marke">' + art + '</span><span class="leise">'
+       + (s.kontext === 'privat' ? 'Privat' : 'Beruf') + zustand + '</span></div>'
+       + (String(s.text || '').trim() ? '<div class="blatt">' + kpAnsichtHtml(s, false, '') + '</div>'
+                                     : '<div class="blatt leer-blatt"><p>Noch leer.</p></div>')
+       + '</div>';
 }
 
 function akZurueck() {
@@ -21960,7 +22021,8 @@ function akSeitenEintragHtml(s, klasse) {
   var id = esc(s.id);
   var ziehen = ' draggable="true" data-id="' + id + '" ondragstart="akZiehStart(event,\'' + id + '\')" '
              + 'ondragover="akZiehUeber(event,\'' + id + '\')" ondragleave="akZiehWeg(event)" '
-             + 'ondrop="akZiehAb(event,\'' + id + '\')" ondragend="akZiehEnde()"';
+             + 'ondrop="akZiehAb(event,\'' + id + '\')" ondragend="akZiehEnde()" '
+             + 'onmouseenter="akVorschauStart(\'' + id + '\')" onmouseleave="akVorschauEnde()"';
   var zeichen = (s.art === 'vorhaben' && s.typ === 'ziel') ? AK_TYPEN.ziel.zeichen : KP_ARTEN[s.art].zeichen;
   var h = akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + id + '\')', zeichen, s.titel || 'ohne Titel', '', klasse, ziehen);
   if (ak.sortieren !== kpGruppenSchluessel(s)) { return h; }
@@ -22379,6 +22441,8 @@ function akSeiteZeichnen() {
   if (schirm && schirm.classList) {
     if (ak.id) { schirm.classList.add('mit-seite'); } else { schirm.classList.remove('mit-seite'); }
   }
+  var vs = ak.vorschau ? kpSeiteFinden(ak.vorschau) : null;
+  if (vs) { el.innerHTML = akVorschauHtml(vs); return; }
   if (ak.id === 'routinen') { el.innerHTML = akRoutinenHtml(); return; }
   if (ak.id === 'umstellung') { el.innerHTML = akUmstellungHtml(); return; }
   var s = akSeite();

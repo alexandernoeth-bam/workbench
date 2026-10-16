@@ -4154,7 +4154,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
@@ -12815,6 +12815,49 @@ console.log('\n197. Projekte und Ziele');
     }
     ak.umfang = altUmfang;
     ak.filter = altFilter;
+    g.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   198. Vorschau beim Darüberfahren in den Aktivitäten (v6.1.1)
+   Grund: Am Rechner soll man durch die Seitenleiste blättern können,
+   ohne jede Seite zu öffnen. Die Vorschau darf nichts verändern und
+   beim Schreiben nicht dazwischenfunken.
+   ============================================================ */
+console.log('\n198. Vorschau');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  const se = skript.match(/function akSeitenEintragHtml\([\s\S]*?\n\}/);
+  pruefe(se && /onmouseenter="akVorschauStart\(/.test(se[0]) && /onmouseleave="akVorschauEnde\(\)"/.test(se[0]),
+         'Projekte, Ziele, Listen und Notizen zeigen beim Darüberfahren eine Vorschau');
+  const st = skript.match(/function akVorschauStart\([\s\S]*?\n\}/);
+  pruefe(st && /ak\.modus === 'schreiben'/.test(st[0]) && /contains\('breit'\)/.test(st[0]) && /setTimeout\([\s\S]*?, 300\)/.test(st[0]),
+         'nur am Rechner, nicht beim Schreiben und erst nach kurzem Verweilen');
+  const ao = skript.match(/function akOeffnen\([\s\S]*?\n\}/);
+  pruefe(ao && /ak\.vorschau = '';/.test(ao[0]), 'ein Klick öffnet die Seite richtig und beendet die Vorschau');
+  pruefe(/\.ak-vorschau \.blatt\{pointer-events:none/.test(QUELLE), 'in der Vorschau lässt sich nichts abhaken oder ändern');
+  if (typeof g.akVorschauHtml !== 'function') {
+    warn('Vorschau nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    try {
+      g.setzeDB(g.leereDatenbank());
+      const l = g.kpSeiteAnlegen('liste', 'Einkauf', 'privat');
+      l.text = '[] Milch';
+      const h = g.akVorschauHtml(l);
+      pruefe(/Vorschau · klicken zum Öffnen/.test(h) && /Einkauf/.test(h) && /Milch/.test(h), 'die Vorschau zeigt Titel und Text mit Hinweis');
+      pruefe(!/kpTitel/.test(h) && !/akModusSetzen/.test(h) && !/akOaUm/.test(h), 'ohne Titelfeld, Schreiben und „Offene Aufgaben“');
+      const ak = g.holeAk();
+      const altModus = ak.modus;
+      ak.modus = 'schreiben';
+      g.akVorschauStart(l.id);
+      pruefe(ak.vorschau === '', 'beim Schreiben entsteht keine Vorschau');
+      ak.modus = altModus;
+    } catch (e) {
+      fail('Vorschau: ' + e.message);
+    }
     g.setzeDB(alt);
   }
 }
