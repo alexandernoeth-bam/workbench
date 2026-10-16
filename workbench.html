@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.1.1</title>
+<title>Workbench 6.1.2</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2435,6 +2435,14 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
 .datei-wahl{position:relative;overflow:hidden;display:inline-block}
 .datei-wahl input{position:absolute;inset:0;opacity:0;cursor:pointer}
 /* Knöpfe in den Karten des Tags */
+/* Seit v6.1.2: Kartenüberschriften im Tag rot und größer, wie die Wochenabschnitte */
+#schirmTag .tabschnitt-titel{font-size:12.5px;color:var(--weinrot);letter-spacing:.07em}
+#schirmTag .woche-karte{position:relative}
+#schirmTag .woche-knopf{position:absolute;top:8px;right:14px;z-index:1}
+#schirmTag .woche-karte .ruhig .r-h:first-child{padding-right:96px}
+#schirmTag .woche-karte.schreibt{padding-top:42px}
+.woche-knopf .tag-knopf{border:1px solid var(--linie);background:var(--karte);color:var(--grau);border-radius:12px;font:inherit;font-size:11.5px;font-weight:500;padding:2px 10px;cursor:pointer}
+.woche-knopf .tag-knopf[aria-pressed="true"]{border-color:var(--weinrot);color:var(--weinrot)}
 .tabschnitt-titel .tag-knopf{border:1px solid var(--linie);background:var(--karte);color:var(--grau);border-radius:12px;font:inherit;font-size:11.5px;letter-spacing:0;text-transform:none;font-weight:500;padding:2px 10px;cursor:pointer;flex:0 0 auto}
 .tabschnitt-titel .tag-knopf[aria-pressed="true"]{border-color:var(--weinrot);color:var(--weinrot)}
 .tabschnitt-titel .tag-knopf:hover{color:var(--tinte)}
@@ -2966,7 +2974,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.1.1';
+var APP_VERSION = '6.1.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8217,7 +8225,7 @@ function tagZeichnen() {
   }
   termin += terminListeHtml(is, e);
 
-  var terminKarte = tagBlockHtml('Termine heute', termin, '');
+  var terminKarte = tagBlockHtml('Termine', termin, '');
   var routinenKarte = routinenKarteHtml(is, e);
   var heuteKarte = heuteKarteHtml(is);
   var wocheKarte = wocheKarteHtml(is);
@@ -20709,6 +20717,8 @@ function wochenUmstellen() {
      schickt, werden Text — aber erst nach der Umstellung, die ihre
      Aufgaben kennt. */
   if (!akUmstellungOffen()) { kpWochenUmstellen(); }
+  /* Seit v6.1.2: neue Namen der Wochenabschnitte. */
+  if (kpAbschnitteUmbenennen()) { spaeterSichern(); }
   return zahl;
 }
 
@@ -20754,7 +20764,8 @@ function planungWeiter(id) {
    ============================================================ */
 
 var KP_KASTEN = /^(\s*)\[([ xX-]?)\]\s*(.*)$/;   /* [-] = nicht relevant (seit Workbench 6.0.4) */
-var KP_ABSCHNITTE = { s: 'Bringt mich substanziell weiter', v: 'Verbindlichkeiten' };
+/* Seit Workbench 6.1.2 neue Namen; die alten werden beim Start umbenannt und weiter erkannt. */
+var KP_ABSCHNITTE = { s: 'Bringt mich dauerhaft weiter', v: 'Habe ich mich verpflichtet zu' };
 var KP_ZUSTAENDE = [['laeuft', 'läuft'], ['ruht', 'ruht'], ['erledigt', 'erledigt']];
 var KP_ARTEN = {
   vorhaben: { zeichen: '◎', name: 'Vorhaben', gruppe: 'Vorhaben', neu: 'Name des Vorhabens' },
@@ -21008,6 +21019,20 @@ function kpWochenTitel(montag) {
   return 'KW ' + kalenderwoche(montag) + ' · ' + kpKurz(montag) + ' – ' + kpKurz(tagePlus(montag, 6));
 }
 
+/* Benennt die Abschnitte vorhandener Wochen einmal um — nur die alten
+   Überschriften, wie sie die App selbst geschrieben hat. */
+function kpAbschnitteUmbenennen() {
+  var n = 0;
+  (DB.wochen || []).forEach(function (w) {
+    if (!w || typeof w.text !== 'string') { return; }
+    var neu = w.text
+      .replace(/^(\s*#{1,3}\s+)Bringt mich substanziell weiter\s*$/gm, '$1' + KP_ABSCHNITTE.s)
+      .replace(/^(\s*#{1,3}\s+)Verbindlichkeiten\s*$/gm, '$1' + KP_ABSCHNITTE.v);
+    if (neu !== w.text) { w.text = neu; w.geaendert = jetzt(); n++; }
+  });
+  return n;
+}
+
 function kpWocheGeruest() {
   return '## ' + KP_ABSCHNITTE.s + '\n\n## ' + KP_ABSCHNITTE.v + '\n';
 }
@@ -21070,7 +21095,7 @@ function kpWochenUmstellen() {
 }
 
 function kpAbschnittZeile(zeilen, ab) {
-  var muster = (ab === 's') ? /substanz/i : /verbindlich/i;
+  var muster = (ab === 's') ? /substanz|dauerhaft/i : /verbindlich|verpflicht/i;
   var i;
   for (i = 0; i < zeilen.length; i++) {
     var m = zeilen[i].match(/^\s*#{1,3}\s+(.*)$/);
@@ -23302,8 +23327,8 @@ function heuteKarteHtml(is) {
   } else {
     inhalt = '<div class="ruhig ruhig-tag">' + kpAnsichtHtml(t, true) + '</div>';
   }
-  var titel = (is === isoDatum()) ? 'Heute vorgenommen' : ('Vorgenommen · ' + kurzDatum(is));
-  return tagBlockHtml(titel, inhalt, tagUmschalterHtml('tag'));
+  /* Seit v6.1.2 ohne „Heute“ und Datum — beides steht im Tageskopf. */
+  return tagBlockHtml('Vorgenommen', inhalt, tagUmschalterHtml('tag'));
 }
 
 /* Die Woche des offenen Tags: Bringt mich substanziell weiter ·
@@ -23315,7 +23340,10 @@ function wocheKarteHtml(is) {
   var inhalt = (tagSchreibt === 'woche')
     ? tagFeldHtml(text, 'Die Woche — frei beschreibbar')
     : '<div class="ruhig ruhig-tag">' + kpAnsichtHtml({ id: w ? w.id : '', text: text, eintraege: w ? w.eintraege : [] }, true) + '</div>';
-  return tagBlockHtml('Woche · ' + kpWochenTitel(montag), inhalt, tagUmschalterHtml('woche'));
+  /* Seit v6.1.2 ohne eigene Titelzeile — die KW steht im Tageskopf; der
+     Knopf sitzt in der Zeile des ersten Abschnitts. */
+  return '<div class="tabschnitt woche-karte' + (tagSchreibt === 'woche' ? ' schreibt' : '') + '" data-kurz="Woche">'
+       + '<span class="woche-knopf">' + tagUmschalterHtml('woche') + '</span>' + inhalt + '</div>';
 }
 
 /* Die Routinen des Tags: die wiederkehrenden Aufgaben, wie bisher mit
@@ -23327,7 +23355,7 @@ function routinenKarteHtml(is, e) {
   var h = '';
   if (!offen.length && !fertig.length) {
     var mitZeit = (DB.aufgaben || []).some(function (a) { return a.wiederholung && a.uhrzeit && aufgabeFaelligAn(a, is); });
-    h += '<div class="tleer">' + (mitZeit ? 'Die Routinen mit Uhrzeit stehen bei den Terminen.' : 'Heute keine Routinen.') + '</div>';
+    h += '<div class="tleer">' + (mitZeit ? 'Die Routinen mit Uhrzeit stehen bei den Terminen.' : 'Keine Routinen.') + '</div>';
   }
   h += listeMitSektionenHtml(offen, is, false);
   var i;

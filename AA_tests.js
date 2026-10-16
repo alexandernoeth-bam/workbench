@@ -1528,7 +1528,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '     if (!t) { return \'\'; }'
                  + '     return (t.match(/ttitel">([^<]*)/g) || [])'
                  + '       .map(function(x){ return x.slice(8); }).join(\',\'); };'
-                 + '   var r = { mitZeit: kachel(\'Termine heute\'),'
+                 + '   var r = { mitZeit: kachel(\'Termine\'),'
                  + '     ohneZeit: kachel(\'Verbindlichkeiten heute\'),'
                  + '     klein: kachel(\'Kleinigkeiten\') };'
                  + '   r.keineTermine = (r.mitZeit.indexOf(\'Weekly\') < 0);'
@@ -4154,7 +4154,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
@@ -12451,8 +12451,8 @@ console.log('\n191. Aktivitäten (v6.0.0)');
              'H legt die Aufgabe in „Heute vorgenommen“ — mit Quelle');
       pruefe(g.kpPlanenKern(v, 1, 'h', heute) === null, 'doppelt geplant wird nicht');
       const w = g.kpPlanenKern(v, 2, 's', heute);
-      pruefe(w && w.id === 'kw-' + montag && /## Bringt mich substanziell weiter\n\[\] Hecke/.test(w.text),
-             'S legt sie unter „Bringt mich substanziell weiter“');
+      pruefe(w && w.id === 'kw-' + montag && /## Bringt mich dauerhaft weiter\n\[\] Hecke/.test(w.text),
+             'S legt sie unter „Bringt mich dauerhaft weiter“');
       pruefe(g.kpPlanenKern(v, 0, 'v', heute) === null, 'Fließtext lässt sich nicht planen');
 
       /* Durchstreichen im Tag hakt in der Seite und in der Woche ab. */
@@ -12495,9 +12495,9 @@ console.log('\n191. Aktivitäten (v6.0.0)');
       pruefe(tagQuelle && !/Verbindlichkeiten heute/.test(tagQuelle[0]) && !/Kleinigkeiten/.test(tagQuelle[0]),
              'die alten Karten Verbindlichkeiten und Kleinigkeiten sind fort');
       const hk = g.heuteKarteHtml(heute);
-      pruefe(/Heute vorgenommen/.test(hk), 'die Karte heißt „Heute vorgenommen“');
+      pruefe(/<span>Vorgenommen</.test(hk) && !/Heute vorgenommen/.test(hk), 'die Karte heißt „Vorgenommen“ (seit v6.1.2)');
       const wk = g.wocheKarteHtml(heute);
-      pruefe(/Bringt mich substanziell weiter/.test(wk) && /Verbindlichkeiten/.test(wk), 'die Woche hat ihre beiden Abschnitte');
+      pruefe(/Bringt mich dauerhaft weiter/.test(wk) && /Habe ich mich verpflichtet zu/.test(wk), 'die Woche hat ihre beiden Abschnitte');
 
       /* Pinnwand: ohne Zählung offener Aufgaben. */
       g.holeDB().pinnwand = [];
@@ -12553,7 +12553,7 @@ console.log('\n191. Aktivitäten (v6.0.0)');
       const tg = g.kpTagFinden(heute);
       pruefe(tg && tg.eintraege.length === 1 && tg.eintraege[0].quelle === 'p1', 'was für heute geplant war, steht in „Heute vorgenommen“');
       const wo = g.kpWocheFinden(montag);
-      pruefe(wo && typeof wo.text === 'string' && !wo.ziele && /Umbau voran/.test(wo.text) && /## Verbindlichkeiten\n\[\] Rechnung prüfen/.test(wo.text),
+      pruefe(wo && typeof wo.text === 'string' && !wo.ziele && /Umbau voran/.test(wo.text) && /## Habe ich mich verpflichtet zu\n\[\] Rechnung prüfen/.test(wo.text),
              'Wochenziele und Verbindliches werden Text der Woche');
       pruefe(g.holeDB().pinnwand.length === 1 && g.holeDB().pinnwand[0].art === 'liste', 'der Zettel des Vorgangs hängt jetzt an der Liste');
       pruefe(!g.akUmstellungOffen() && !!g.holeDB().einstellungen.aktivitaetenUmgestellt, 'danach steht nichts mehr aus');
@@ -12857,6 +12857,48 @@ console.log('\n198. Vorschau');
       ak.modus = altModus;
     } catch (e) {
       fail('Vorschau: ' + e.message);
+    }
+    g.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   199. Überschriften im Tag und neue Abschnittsnamen (v6.1.2)
+   Grund: Die Kartenüberschriften im Tag waren klein und grau, „Heute“
+   und die KW standen doppelt. Die Wochenabschnitte heißen jetzt
+   „Bringt mich dauerhaft weiter“ und „Habe ich mich verpflichtet zu“;
+   alte Wochen werden umbenannt und beim Planen weiter erkannt.
+   ============================================================ */
+console.log('\n199. Überschriften im Tag');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  pruefe(/#schirmTag \.tabschnitt-titel\{[^}]*color:var\(--weinrot\)/.test(QUELLE), 'die Kartenüberschriften im Tag sind rot');
+  const tz = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(tz && /tagBlockHtml\('Termine', /.test(tz[0]) && !/Termine heute/.test(tz[0]), '„Termine“ ohne „heute“');
+  const wk = skript.match(/function wocheKarteHtml\([\s\S]*?\n\}/);
+  pruefe(wk && !/kpWochenTitel\(/.test(wk[0]) && /woche-knopf/.test(wk[0]), 'die Woche hat keine eigene Titelzeile mehr — der Knopf sitzt beim ersten Abschnitt');
+  const wz = skript.match(/function wochenUmstellen\([\s\S]*?\n\}/);
+  pruefe(wz && /kpAbschnitteUmbenennen\(\)/.test(wz[0]), 'vorhandene Wochen werden beim Start umbenannt');
+  if (typeof g.kpAbschnitteUmbenennen !== 'function') {
+    warn('Abschnittsnamen nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    try {
+      g.setzeDB(g.leereDatenbank());
+      const w = { id: 'kw-2026-10-12', montag: '2026-10-12', text: '## Bringt mich substanziell weiter\n[] a\n\n## Verbindlichkeiten\n[] b\n\n## Meine Verbindlichkeiten privat', eintraege: [], geaendert: 1 };
+      g.holeDB().wochen.push(w);
+      pruefe(g.kpAbschnitteUmbenennen() === 1 && /^## Bringt mich dauerhaft weiter\n\[\] a\n\n## Habe ich mich verpflichtet zu\n\[\] b/.test(w.text) && w.geaendert > 1,
+             'alte Abschnittsnamen werden umbenannt — mit neuem Stempel');
+      pruefe(/## Meine Verbindlichkeiten privat/.test(w.text), 'eigene Überschriften bleiben, wie sie sind');
+      pruefe(g.kpAbschnitteUmbenennen() === 0, 'ein zweites Mal ändert nichts');
+      const alteWoche = { text: '## Bringt mich substanziell weiter\n\n## Verbindlichkeiten\n' };
+      g.kpInAbschnitt(alteWoche, 'v', '[] neu');
+      pruefe(alteWoche.text === '## Bringt mich substanziell weiter\n\n## Verbindlichkeiten\n[] neu\n' || /## Verbindlichkeiten\n\[\] neu/.test(alteWoche.text),
+             'eine Woche mit alten Namen (etwa vom Kompass) wird beim Planen weiter erkannt');
+      pruefe(!/Habe ich mich/.test(alteWoche.text), 'dabei entsteht kein zweiter Abschnitt');
+    } catch (e) {
+      fail('Abschnittsnamen: ' + e.message);
     }
     g.setzeDB(alt);
   }
