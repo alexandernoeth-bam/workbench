@@ -4154,7 +4154,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
@@ -12691,6 +12691,52 @@ console.log('\n194. Einklappen in den Aktivitäten');
     g.kpAbschnittSetzen('kw-x', '## Verbindlichkeiten', true);
     const wh = g.kpAnsichtHtml(woche, true, '');
     pruefe(!/fl-falt/.test(wh) && />b</.test(wh), 'Woche und Tag werden nicht gefaltet');
+  }
+}
+
+/* ============================================================
+   195. Aufgabe „nicht relevant“: [-] (v6.0.4)
+   Grund: Neben offen [] und erledigt [x] braucht es einen Stand für
+   Aufgaben, die sich erledigt haben, ohne getan zu sein. Sie dürfen
+   nicht mehr als offen zählen — und nicht als erledigt erscheinen.
+   ============================================================ */
+console.log('\n195. Nicht relevant');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  pruefe(/var KP_KASTEN = \/\^\(\\s\*\)\\\[\(\[ xX-\]\?\)\\\]/.test(skript), 'eine Zeile mit [-] ist eine Aufgabe');
+  const kz = skript.match(/function kpZeichen\([\s\S]*?\n\}/);
+  pruefe(kz && /was === 'nichtrelevant'/.test(kz[0]) && /\[\] ' : '\[-\] '/.test(kz[0]), 'der Knopf setzt [-] — ein zweiter Tipp wieder []');
+  const lw = skript.match(/function kpListeWeiter\([\s\S]*?\n\}/);
+  pruefe(lw && /\[ xX-\]/.test(lw[0]), 'Enter nach einer [-]-Zeile beginnt eine neue offene Aufgabe');
+  if (typeof g.kpAufgabe !== 'function') {
+    warn('Nicht relevant nicht auswertbar');
+  } else {
+    const a = g.kpAufgabe('[-] Altrechner zurückgeben');
+    pruefe(a && a.nichtRelevant === true && a.erledigt === true && a.text === 'Altrechner zurückgeben',
+           '[-] gilt als nicht offen und ist als „nicht relevant“ erkennbar');
+    pruefe(g.kpAufgabe('[x] a').nichtRelevant === false && g.kpAufgabe('[] a').erledigt === false, '[x] und [] bleiben, was sie waren');
+    pruefe(/kpZeichen\('nichtrelevant'\)/.test(g.kpLeisteHtml()), 'die Werkzeugleiste hat den Knopf');
+    const alt = g.holeDB();
+    try {
+      g.setzeDB(g.leereDatenbank());
+      const heute = g.isoDatum();
+      const l = g.kpSeiteAnlegen('liste', 'Altrechner', 'beruflich');
+      l.text = '[] säubern\n[] zurückgeben\n[] Lernreise';
+      const w = g.kpPlanenKern(l, 1, 'v', heute);
+      l.text = '[] säubern\n[-] zurückgeben\n[] Lernreise';
+      pruefe(g.kpPlanenKern(l, 1, 'h', heute) === null, 'nicht Relevantes lässt sich nicht planen');
+      const h = g.kpAnsichtHtml(l, false, '');
+      pruefe(/tkasten nr/.test(h) && /fl-text nr/.test(h) && /nicht relevant/.test(h) && !/tkasten an/.test(h),
+             'die Ansicht zeigt es grau mit Strich — nicht als erledigt');
+      const wh = g.kpAnsichtHtml(w, true, '');
+      pruefe(/class="wz nr"/.test(wh) && /nicht relevant/.test(wh), 'in der Woche steht es durchgestrichen mit „nicht relevant“');
+      g.kpSeiteKastenUmKern(l, 1);
+      pruefe(/\n\[\] zurückgeben/.test(l.text), 'ein Tipp auf das Kästchen öffnet die Aufgabe wieder');
+    } catch (e) {
+      fail('Nicht relevant: ' + e.message);
+    }
+    g.setzeDB(alt);
   }
 }
 

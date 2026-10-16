@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.0.3</title>
+<title>Workbench 6.0.4</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2380,6 +2380,13 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
   border:1px solid var(--linie);border-radius:6px;padding:12px;background:var(--karte);color:var(--tinte);resize:vertical;box-sizing:border-box}
 .feld.tag-feld{min-height:22vh}
 .fl-zeile.aufgabe:hover{background:var(--papier)}
+/* Nicht relevant: [-] (seit v6.0.4) */
+.tkasten.nr{background:var(--papier);border-color:var(--grau-hell,#9B958B)}
+.tkasten.nr::after{content:"";position:absolute;left:3px;right:3px;top:6.2px;height:1.6px;background:var(--grau)}
+.fl-text.nr{flex:0 1 auto;color:var(--grau-hell,#9B958B);text-decoration:line-through}
+.nr-marke{flex:0 0 auto;font-size:11px;color:var(--grau);border:1px solid var(--linie);border-radius:8px;padding:0 6px;margin-left:6px;white-space:nowrap;align-self:center;text-decoration:none}
+.ruhig .wz.nr .wt{color:var(--grau-hell,#9B958B);text-decoration:line-through}
+.ruhig .wz .nr-marke{align-self:center}
 .fl-zeile.hervor{background:#FFF4C2;box-shadow:0 0 0 4px #FFF4C2;border-radius:4px}
 .fl-absatz.leise{color:var(--grau);font-style:italic}
 .wb-tot{color:var(--grau)}
@@ -2950,7 +2957,7 @@ body:not(.breit) .ak-rumpf .blatt{padding:14px 14px 22px}
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.0.3';
+var APP_VERSION = '6.0.4';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -15229,6 +15236,7 @@ function flaecheSinnbild(art) {
     h3:      '<text x="2" y="17" font-size="15" font-weight="600">H3</text>',
     kasten:  '<rect x="4" y="4" width="16" height="16" rx="2"></rect>'
            + '<path d="M8 12l3 3 5-6"></path>',
+    nichtrelevant: '<rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M8 12h8"></path>',
     nummer:  '<text x="2" y="16" font-size="12" font-weight="700">1.</text><path d="M12 8h9M12 16h9"></path>',
     ersetzen: '<circle cx="9" cy="9" r="5"></circle><path d="M13 13l3 3"></path><path d="M14 20h7M18 17l3 3-3 3"></path>',
     punkt:   '<rect x="3" y="5" width="5" height="5" rx="1"></rect>'
@@ -20736,7 +20744,7 @@ function planungWeiter(id) {
    Seite kommt. Hinten anhängen („(Fr)“) hält die Verbindung.
    ============================================================ */
 
-var KP_KASTEN = /^(\s*)\[([ xX]?)\]\s*(.*)$/;
+var KP_KASTEN = /^(\s*)\[([ xX-]?)\]\s*(.*)$/;   /* [-] = nicht relevant (seit Workbench 6.0.4) */
 var KP_ABSCHNITTE = { s: 'Bringt mich substanziell weiter', v: 'Verbindlichkeiten' };
 var KP_ZUSTAENDE = [['laeuft', 'läuft'], ['ruht', 'ruht'], ['erledigt', 'erledigt']];
 var KP_ARTEN = {
@@ -20902,7 +20910,8 @@ function kpSchluessel(text) {
 function kpAufgabe(zeile) {
   var m = String(zeile).match(KP_KASTEN);
   if (!m) { return null; }
-  return { erledigt: (m[2] === 'x' || m[2] === 'X'), text: kpSchluessel(m[3]) };
+  /* „Nicht relevant“ ([-]) gilt als nicht offen — wie erledigt, nur anders gezeigt. */
+  return { erledigt: (m[2] === 'x' || m[2] === 'X' || m[2] === '-'), nichtRelevant: (m[2] === '-'), text: kpSchluessel(m[3]) };
 }
 
 function kpOffeneZahl(seite) {
@@ -20954,12 +20963,12 @@ function kpZeileSuchen(seite, text, vorzug) {
   return beste;
 }
 
-function kpKastenSetzen(seite, nr, erledigt) {
+function kpKastenSetzen(seite, nr, erledigt, nichtRelevant) {
   var zeilen = String(seite.text || '').split('\n');
   if (nr < 0 || nr >= zeilen.length) { return false; }
-  var vorne = zeilen[nr].match(/^(\s*)\[([ xX]?)\]/);
+  var vorne = zeilen[nr].match(/^(\s*)\[([ xX-]?)\]/);
   if (!vorne) { return false; }
-  zeilen[nr] = vorne[1] + (erledigt ? '[x]' : '[]') + zeilen[nr].slice(vorne[0].length);
+  zeilen[nr] = vorne[1] + (nichtRelevant ? '[-]' : (erledigt ? '[x]' : '[]')) + zeilen[nr].slice(vorne[0].length);
   seite.text = zeilen.join('\n');
   seite.geaendert = jetzt();
   return true;
@@ -21343,11 +21352,17 @@ function kpBehaelterZeileHtml(b, rest, nr, stil) {
   if (!a) { return ''; }
   var kasten = rest.match(KP_KASTEN);
   var e = (b && a.text) ? kpWocheEintrag(b, a.text) : null;
-  var name = e ? (kpSeiteFinden(e.quelle).titel || 'ohne Titel') : '';
+  var quelle = e ? kpSeiteFinden(e.quelle) : null;
+  var name = quelle ? (quelle.titel || 'ohne Titel') : '';
+  /* Nicht relevant: in der Quelle als [-] markiert — oder hier selbst. */
+  var qz = quelle ? kpZeileSuchen(quelle, e.text) : null;
+  var qa = qz ? kpAufgabe(String(quelle.text || '').split('\n')[qz.nr]) : null;
+  var nichtRelevant = a.nichtRelevant || !!(qa && qa.nichtRelevant);
   var bid = esc(b.id);
-  return '<div class="wz' + (a.erledigt ? ' erl' : '') + '"' + stil + '>'
+  return '<div class="wz' + (nichtRelevant ? ' nr' : (a.erledigt ? ' erl' : '')) + '"' + stil + '>'
        + '<button type="button" class="wt" onclick="kpBzUm(\'' + bid + '\',' + nr + ')" aria-pressed="' + a.erledigt + '">'
        + kpAuszeichnen(kasten[3]) + '</button>'
+       + (nichtRelevant ? '<span class="nr-marke">nicht relevant</span>' : '')
        + (e ? '<button type="button" class="hin" onclick="kpBzSprung(\'' + bid + '\',' + nr + ')" title="Zu „' + esc(name) + '“" '
               + 'aria-label="Zu „' + esc(name) + '“">↗</button>' : '')
        + '</div>';
@@ -21387,6 +21402,11 @@ function kpZeileHtml(seite, zeile, nr, nummer, behaelter, hervor, falte) {
     var kasten = rest.match(KP_KASTEN);
     var z = hervor ? kpZeileSuchen(seite, hervor) : null;
     var istHervor = !!(z && z.nr === nr);
+    if (a.nichtRelevant) {
+      return '<div class="fl-zeile aufgabe' + (istHervor ? ' hervor' : '') + '"' + (istHervor ? ' id="kpHervor"' : '') + stil + '>'
+           + '<button class="tkasten nr" type="button" onclick="kpKastenUm(' + nr + ')" aria-label="Wieder öffnen" title="Nicht relevant — tippen öffnet wieder"></button>'
+           + '<span class="fl-text nr">' + kpAuszeichnen(kasten[3]) + '</span><span class="nr-marke">nicht relevant</span></div>';
+    }
     return '<div class="fl-zeile aufgabe' + (istHervor ? ' hervor' : '') + '"' + (istHervor ? ' id="kpHervor"' : '') + stil + '>'
          + '<button class="tkasten' + (a.erledigt ? ' an' : '') + '" type="button" onclick="kpKastenUm(' + nr + ')" aria-label="Abhaken"></button>'
          + '<span class="fl-text' + (a.erledigt ? ' fertig' : '') + '">' + kpAuszeichnen(kasten[3]) + '</span></div>';
@@ -21506,7 +21526,7 @@ function kpListeWeiter(feld) {
   var ende = text.indexOf('\n', a);
   if (ende < 0) { ende = text.length; }
   var zeile = text.slice(anfang, ende);
-  var kasten = zeile.match(/^(\s*)(\[[ xX]?\])(\s*)(.*)$/);
+  var kasten = zeile.match(/^(\s*)(\[[ xX-]?\])(\s*)(.*)$/);
   var punkt = kasten ? null : zeile.match(/^(\s*)([-•*])(\s+)(.*)$/);
   var nummer = (kasten || punkt) ? null : zeile.match(/^(\s*)(\d{1,3}[.)])(\s+)(.*)$/);
   var m = kasten || punkt || nummer;
@@ -21592,7 +21612,7 @@ function kpZeichen(was) {
   if (ende < 0) { ende = text.length; }
   var zeile = text.slice(anfang, ende);
   var einzug = (zeile.match(/^\s*/) || [''])[0];
-  var ohne = zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX]?\]\s*|[-•*]\s+|\d{1,3}[.)]\s+)/, '');
+  var ohne = zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX-]?\]\s*|[-•*]\s+|\d{1,3}[.)]\s+)/, '');
   var neu;
   if (was === 'einzug')        { neu = '  ' + zeile; }
   else if (was === 'ausrueck') { neu = zeile.replace(/^ {1,2}/, ''); }
@@ -21602,6 +21622,10 @@ function kpZeichen(was) {
   else if (was === 'h2')       { neu = einzug + '## ' + ohne; }
   else if (was === 'h3')       { neu = einzug + '### ' + ohne; }
   else if (was === 'kasten')   { neu = einzug + '[] ' + ohne; }
+  else if (was === 'nichtrelevant') {
+    /* Ein zweiter Tipp macht die Aufgabe wieder offen. */
+    neu = einzug + (/^\[-\]/.test(zeile.slice(einzug.length)) ? '[] ' : '[-] ') + ohne;
+  }
   else if (was === 'punkt')    { neu = einzug + '- ' + ohne; }
   else { return; }
   feldErsetzen(feld, anfang, ende, neu);
@@ -21623,7 +21647,7 @@ function kpNummerieren() {
     if (!zeile.trim().length) { return zeile; }
     var einzug = (zeile.match(/^\s*/) || [''])[0];
     n++;
-    return einzug + n + '. ' + zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX]?\]\s*|[-•*]\s+|\d{1,3}[.)]\s+)/, '');
+    return einzug + n + '. ' + zeile.slice(einzug.length).replace(/^(#{1,3}\s*|\[[ xX-]?\]\s*|[-•*]\s+|\d{1,3}[.)]\s+)/, '');
   }).join('\n');
   feldErsetzen(feld, anfang, ende, block);
   kpTextSetzen(feld.value);
@@ -21652,6 +21676,7 @@ function kpLeisteHtml() {
     + kpKnopf('kpZeichen(\'h2\')', 'h2', 'Zwischenüberschrift')
     + kpKnopf('kpZeichen(\'h3\')', 'h3', 'Kleine Überschrift')
     + kpKnopf('kpZeichen(\'kasten\')', 'kasten', 'Kästchen — macht die Zeile zur Aufgabe')
+    + kpKnopf('kpZeichen(\'nichtrelevant\')', 'nichtrelevant', 'Nicht relevant — [-], noch einmal tippen öffnet wieder')
     + kpKnopf('kpZeichen(\'punkt\')', 'punkt', 'Aufzählung')
     + kpKnopf('kpNummerieren()', 'nummer', 'Nummerierte Liste') + t
     + kpKnopf('kpUmschliessen(\'*\')', 'fett', 'Fett')
