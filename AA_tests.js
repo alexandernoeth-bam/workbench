@@ -4154,7 +4154,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
@@ -12646,6 +12646,51 @@ console.log('\n193. Routinen: nur diesmal');
       fail('Routinen nur diesmal: ' + e.message);
     }
     g.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   194. Einklappen unter Überschriften in den Aktivitäten (v6.0.3)
+   Grund: Auf der Fläche ließen sich Abschnitte unter Überschriften
+   einklappen — in Vorhaben, Listen und Notizen der Aktivitäten fehlte
+   das. Ein Sprung zu einer Aufgabe muss sie auch in einem
+   eingeklappten Abschnitt zeigen.
+   ============================================================ */
+console.log('\n194. Einklappen in den Aktivitäten');
+{
+  const skript = hauptSkript();
+  const g = globalThis.__akApi || {};
+  ['kpAbschnittUm', 'akAlleZu', 'kpAbschnittZu', 'kpAbschnittSetzen', 'kpAlleAbschnitte', 'kpAbschnitteOeffnenBis', 'kpHatUeberschriften'].forEach(function (f) {
+    pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript), 'Funktion ' + f + ' ist definiert');
+  });
+  const ao = skript.match(/function akOeffnen\([\s\S]*?\n\}/);
+  pruefe(ao && /kpAbschnitteOeffnenBis\(/.test(ao[0]) && ao[0].indexOf('kpAbschnitteOeffnenBis(') < ao[0].indexOf('akZeichnen()'),
+         'ein Sprung öffnet den Abschnitt, bevor gezeichnet wird');
+  const sh = skript.match(/function akSeiteHtml\([\s\S]*?\n\}/);
+  pruefe(sh && /akAlleZu\(true\)/.test(sh[0]) && /akAlleZu\(false\)/.test(sh[0]) && /kpHatUeberschriften\(s\)/.test(sh[0]),
+         'im Seitenkopf „alles zu“ und „alles auf“ — nur bei Überschriften');
+  if (typeof g.kpAnsichtHtml !== 'function') {
+    warn('Einklappen nicht auswertbar');
+  } else {
+    const seite = { id: 'p9', text: 'Einleitung\n# Planung\nText\n[] Statik prüfen\n## Details\n[] Angebot einholen\n# Ausführung\n[] Bagger bestellen' };
+    let h = g.kpAnsichtHtml(seite, false, '');
+    pruefe((h.match(/class="fl-falt"/g) || []).length === 3 && /kpAbschnittUm\(1\)/.test(h), 'jede Überschrift hat einen Pfeil');
+    g.kpAbschnittSetzen('p9', '# Planung', true);
+    h = g.kpAnsichtHtml(seite, false, '');
+    pruefe(!/Statik prüfen/.test(h) && !/Details/.test(h) && /Bagger bestellen/.test(h) && /4 Zeilen/.test(h),
+           'zugeklappt verschwindet alles bis zur nächsten gleich hohen Überschrift — mit Zahl der Zeilen');
+    pruefe(g.kpAbschnittZu('p9', '  # planung '), 'gemerkt wird je Überschrift, nicht je Zeilennummer');
+    g.kpAbschnitteOeffnenBis(seite, 5);
+    pruefe(!g.kpAbschnittZu('p9', '# Planung'), 'ein Sprung zu einer Zeile darunter öffnet den Abschnitt');
+    g.kpAlleAbschnitte(seite, true);
+    h = g.kpAnsichtHtml(seite, false, '');
+    pruefe(!/Statik/.test(h) && !/Bagger/.test(h) && /Einleitung/.test(h), '„alles zu“ klappt jeden Abschnitt ein — Text davor bleibt');
+    g.kpAlleAbschnitte(seite, false);
+    pruefe(/Statik/.test(g.kpAnsichtHtml(seite, false, '')), '„alles auf“ öffnet wieder');
+    const woche = { id: 'kw-x', text: '## Bringt mich substanziell weiter\n[] a\n\n## Verbindlichkeiten\n[] b', eintraege: [] };
+    g.kpAbschnittSetzen('kw-x', '## Verbindlichkeiten', true);
+    const wh = g.kpAnsichtHtml(woche, true, '');
+    pruefe(!/fl-falt/.test(wh) && />b</.test(wh), 'Woche und Tag werden nicht gefaltet');
   }
 }
 
