@@ -697,6 +697,23 @@ async function schreibTest() {
   CL.katSetzen('alle');
 }
 
+/* ============================================================
+   16. Lesbare Ziffern
+   Grund: In der Pixelschrift sah 5 wie S, 2 wie Z und 7 wie ⌐ aus —
+   die Uhrzeit „12:58“ las sich wie „12:S8“ (0.2.0). Seit 0.2.1 kommen
+   0–9 und „:“ aus VT323, eingebettet, damit es auch ohne Netz gilt.
+   ============================================================ */
+function zifferTest() {
+  console.log('\n16. Lesbare Ziffern');
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  const ff = css.match(/@font-face\{font-family:"CLIE Ziffern";src:url\(data:font\/woff2;base64,([A-Za-z0-9+\/=]+)\)[^}]*unicode-range:U\+0030-0039,U\+003A/);
+  pruefe(!!ff, 'die Ziffernschrift ist eingebettet und gilt nur für 0–9 und „:“');
+  pruefe(ff && ff[1].length > 500 && ff[1].length < 20000, 'eingebettet als kleine Datei (' + (ff ? ff[1].length : 0) + ' Zeichen)');
+  pruefe(ff && Buffer.from(ff[1], 'base64').slice(0, 4).toString('latin1') === 'wOF2', 'es ist eine gültige WOFF2-Schrift');
+  pruefe(/body\{[^}]*font-family:"CLIE Ziffern","Pixelify Sans"/.test(css), 'sie steht vor der Pixelschrift — für alle Texte der App');
+  pruefe(!/__ZIFFERN__|__ZGROESSE__/.test(QUELLE), 'keine Platzhalter des Bauskripts übrig');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -709,6 +726,7 @@ async function schreibTest() {
   einkaufTest();
   try { kalenderTest(); } catch (e) { fail('Kalender warf: ' + e.message); }
   try { await schreibTest(); } catch (e) { fail('Termine schreiben warf: ' + e.message); }
+  zifferTest();
 
   /* ============================================================
      ERGEBNIS
