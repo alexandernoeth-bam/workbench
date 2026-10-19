@@ -278,8 +278,10 @@ function uebersichtTest() {
   pruefe((h.match(/class="app[ "]/g) || []).length === 9, 'neun Apps im Raster');
   pruefe(/onclick="oeffne\('abgleich'\)"/.test(h) && /class="app spaeter" onclick="oeffne\('kalender'\)"/.test(h),
     'Abgleich ist fertig, die anderen Apps sind als „kommt noch“ gekennzeichnet');
-  pruefe(/▪ Erst das Wichtige/.test(h) && /Schluss &lt;b&gt;/.test(h) && (h.match(/<div>▪/g) || []).length === 2,
-    'die Zeilen aus „Jeden Tag im Blick“ stehen oben — ohne Auszeichnung, ohne Leerzeilen, maskiert');
+  /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
+  pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
+    '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
+  pruefe(CL.DB.einstellungen.leitsatz.indexOf('Erst das') >= 0, 'die Leitsätze selbst bleiben unangetastet in der Datei');
   pruefe(/KW \d+/.test(h), 'an der Woche steht die Kalenderwoche');
   pruefe(/>Projekte<span class="unterz">2</.test(h) && /Memo<span class="unterz">1</.test(h), 'Projekte und Memo zählen nur Laufendes, ohne Kompass-Notizen');
 
@@ -372,22 +374,22 @@ function swTest() {
 
 /* ============================================================
    10. Schriftgrößen
-   Grund: In 0.1.0 war die Schrift am Pixel zu klein (Wunsch: +10 %).
-   Keine Schrift unter 12,5 px, Grundschrift mindestens 17,5 px,
-   Inhalt der Apps mindestens 15,5 px.
+   Grund: In 0.1.0 und 0.1.1 war die Schrift am Pixel zu klein
+   (Wunsch: zweimal +10 %). Keine Schrift unter 14 px, Grundschrift
+   mindestens 19 px, Zeilen mindestens 17 px, App-Namen 18 px.
    ============================================================ */
 function schriftTest() {
   console.log('\n10. Schriftgrößen');
   const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
   const groessen = [...css.matchAll(/font-size:([\d.]+)px/g)].map(m => Number(m[1]));
-  pruefe(groessen.length > 20 && Math.min.apply(null, groessen) >= 12.5,
-    'keine Schrift kleiner als 12,5 px (kleinste: ' + Math.min.apply(null, groessen) + ' px)');
+  pruefe(groessen.length > 20 && Math.min.apply(null, groessen) >= 14,
+    'keine Schrift kleiner als 14 px (kleinste: ' + Math.min.apply(null, groessen) + ' px)');
   const grund = Number((css.match(/body\{[^}]*font-size:([\d.]+)px/) || [])[1]);
-  pruefe(grund >= 17.5, 'Grundschrift mindestens 17,5 px (' + grund + ' px)');
+  pruefe(grund >= 19, 'Grundschrift mindestens 19 px (' + grund + ' px)');
   const regel = (sel) => Number((css.match(new RegExp('(?:^|\\n)' + sel.replace(/\./g, '\\.') + '\\{[^}]*font-size:([\\d.]+)px')) || [])[1]);
-  pruefe(regel('.reihe') >= 15.5 && regel('.app') >= 15.5 && regel('.reiter') >= 18.5,
+  pruefe(regel('.reihe') >= 17 && regel('.app') >= 18 && regel('.reiter') >= 20,
     'Zeilen, App-Namen und Reiter groß genug (' + [regel('.reihe'), regel('.app'), regel('.reiter')].join(' / ') + ' px)');
-  pruefe(/class="aufklapp" style="top:42px/.test(SKRIPT), 'die Kategorieliste sitzt unter dem höheren Kopf');
+  pruefe(/class="aufklapp" style="top:46px/.test(SKRIPT), 'die Kategorieliste sitzt unter dem höheren Kopf');
 }
 
 (async function () {
