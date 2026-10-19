@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.8.1</title>
+<title>CLIE 0.8.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -131,6 +131,9 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .wochenleiste .wt.heute{text-decoration:underline}
 .wochenleiste .wt.an{background:var(--px);color:var(--lcd);border-radius:3px}
 .ganztags{display:block;width:100%;text-align:left;border:2px solid var(--px);padding:2px 6px;margin:3px 0;font-size:19px}
+/* Aus der Workbench (seit 0.8.2): Feiertag kräftig, Ferien leise */
+.ganztags.gz-feiertag{background:var(--px);color:var(--lcd)}
+.ganztags.gz-ferien{border-style:dashed;color:var(--px-mitte)}
 .std{display:flex;gap:8px;border-bottom:2px dotted var(--px-zart);min-height:36px;align-items:center}
 .std .z{width:60px;flex:0 0 60px;color:var(--px-mitte);font-size:19px}
 .std .t{flex:1;min-width:0;display:flex;gap:8px;align-items:center;min-height:34px}
@@ -371,7 +374,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.8.1';
+var APP_VERSION = '0.8.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1560,6 +1563,137 @@ function termineFuerTag(is) {
   }
   zeit.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
   return { zeit: zeit, ganztags: ganztags };
+}
+
+/* ---------- Jahrestermine, Feiertage, Ferien (aus der Workbench) ---------- */
+
+var feiertagJahr = 0;
+
+var feiertagListe = {};
+
+var FUELLWOERTER = ['der','die','das','den','dem','des','ein','eine','einen','einem',
+  'eines','einer','und','oder','aber','für','fuer','mit','ohne','von','vom','zum',
+  'zur','zu','bei','beim','im','in','am','an','auf','aus','nach','über','ueber',
+  'unter','vor','ist','sind','war','wird','werden','habe','haben','hat','muss',
+  'müssen','muessen','soll','sollen','kann','können','koennen','noch','mal','bitte',
+  'dann','wenn','als','wie','was','wer','wo','nicht','kein','keine','es','ich','wir',
+  'sie','er','man','sich','mein','meine','unser','unsere','neu','neue','neuen'];
+
+var JT_BERUFLICH = ['dienstreise', 'abwesend', 'termin'];
+
+function ostern(j) {
+  var a = j % 19, b = Math.floor(j / 100), c = j % 100;
+  var d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  var i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  var m = Math.floor((a + 11 * h + 22 * l) / 451);
+  var monat = Math.floor((h + l - 7 * m + 114) / 31);
+  var tag = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(j, monat - 1, tag);
+}
+
+function feiertageVon(jahr) {
+  var o = ostern(jahr);
+  function verschoben(n) {
+    var d = new Date(o.getFullYear(), o.getMonth(), o.getDate() + n);
+    return isoDatum(d);
+  }
+  var liste = {};
+  liste[jahr + '-01-01'] = 'Neujahr';
+  liste[jahr + '-01-06'] = 'Heilige Drei Könige';
+  liste[verschoben(-2)] = 'Karfreitag';
+  liste[verschoben(1)]  = 'Ostermontag';
+  liste[jahr + '-05-01'] = 'Tag der Arbeit';
+  liste[verschoben(39)] = 'Christi Himmelfahrt';
+  liste[verschoben(50)] = 'Pfingstmontag';
+  liste[verschoben(60)] = 'Fronleichnam';
+  liste[jahr + '-08-15'] = 'Mariä Himmelfahrt';
+  liste[jahr + '-10-03'] = 'Tag der Deutschen Einheit';
+  liste[jahr + '-11-01'] = 'Allerheiligen';
+  liste[jahr + '-12-25'] = '1. Weihnachtstag';
+  liste[jahr + '-12-26'] = '2. Weihnachtstag';
+  return liste;
+}
+
+function feiertagAn(is) {
+  /* Eingelesene Feiertage haben Vorrang vor der Berechnung. */
+  var e = ferienEintragAn(is, 'feiertag');
+  if (e) { return e.titel; }
+  var jahr = Number(String(is).slice(0, 4));
+  if (jahr !== feiertagJahr) {
+    feiertagJahr = jahr;
+    feiertagListe = feiertageVon(jahr);
+  }
+  return feiertagListe[is] || '';
+}
+
+function ferienEintragAn(is, art) {
+  var liste = DB.ferien || [];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (art && liste[i].art !== art) { continue; }
+    if (is >= liste[i].von && is <= (liste[i].bis || liste[i].von)) { return liste[i]; }
+  }
+  return null;
+}
+
+function ferienAn(is) {
+  var e = ferienEintragAn(is, 'ferien');
+  return e ? e.titel : '';
+}
+
+function wortStamm(w) {
+  var s = String(w).toLowerCase()
+            .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u')
+            .replace(/ß/g, 'ss')
+            .replace(/[^a-z0-9]/g, '');
+  if (s.length <= 4) { return s; }
+  s = s.replace(/(ungen|ung|chen|lein|enden|ende|end|ern|est|eten|ete|ten|te|nen|en|er|es|em|el|st|e|s|n)$/, '');
+  if (s.length < 3) { return String(w).toLowerCase().slice(0, 4); }
+  /* Die Endungsregel trifft nicht jeden Fall: „Angebot" behält sein t,
+     „Angebote" verliert te — dann fänden sie sich nicht. Das Kappen auf
+     sechs Zeichen fängt das ab. */
+  return s.slice(0, 6);
+}
+
+function woerterVon(text) {
+  var roh = String(text || '').toLowerCase().split(/[^a-zA-Z0-9äöüßÄÖÜ]+/);
+  var aus = [];
+  var i;
+  for (i = 0; i < roh.length; i++) {
+    var w = roh[i];
+    if (w.length < 3) { continue; }
+    if (FUELLWOERTER.indexOf(w) >= 0) { continue; }
+    var st = wortStamm(w);
+    if (st.length < 3) { continue; }
+    if (aus.indexOf(st) < 0) { aus.push(st); }
+  }
+  return aus;
+}
+
+function aehnlichkeit(a, b) {
+  var wa = woerterVon(a);
+  var wb = woerterVon(b);
+  if (!wa.length || !wb.length) { return 0; }
+  var treffer = 0;
+  var i;
+  for (i = 0; i < wa.length; i++) {
+    if (wb.indexOf(wa[i]) >= 0) { treffer++; }
+  }
+  return treffer / Math.min(wa.length, wb.length);
+}
+
+function jtDoppelWahl() {
+  return (DB.einstellungen.doppelBehalten === 'kalender') ? 'kalender' : 'eigene';
+}
+
+function jtDoppelt(a, b) {
+  return aehnlichkeit(a.titel || '', b.titel || '') >= 0.7;
+}
+
+function jtKontext(e) {
+  if (e.kontext === 'beruflich' || e.kontext === 'privat') { return e.kontext; }
+  return (JT_BERUFLICH.indexOf(e.art) >= 0) ? 'beruflich' : 'privat';
 }
 
 /* ---------- Routinen: fällig, erledigt, Uhrzeit (aus der Workbench) ---------- */
@@ -3004,9 +3138,63 @@ function clKalReiter() {
 
 /* ---- Was an einem Tag steht ---- */
 
+/* Ganztägiges eines Tages: Feiertag, Google-Termine, eigene Jahrestermine
+   der Workbench, Ferien (seit 0.8.2). Doppelte fallen weg — welche Fassung
+   bleibt, sagt die Einstellung der Workbench (doppelBehalten). */
 function clTermineAm(is) {
   var t = termineFuerTag(is);
-  return { zeit: t.zeit.filter(clPasstTermin), ganztags: t.ganztags.filter(clPasstTermin) };
+  var google = t.ganztags.filter(clPasstTermin);
+  var jahr = clJahrAm(is);
+  var art = function (a) { return jahr.filter(function (x) { return x.jahr === a; }); };
+  var feiertag = art('feiertag');
+  var eigene = art('jahrestermin');
+  google = google.filter(function (g) { return !feiertag.some(function (f) { return jtDoppelt(g, f); }); });
+  if (jtDoppelWahl() === 'kalender') {
+    eigene = eigene.filter(function (e) { return !google.some(function (g) { return jtDoppelt(e, g); }); });
+  } else {
+    google = google.filter(function (g) { return !eigene.some(function (e) { return jtDoppelt(g, e); }); });
+  }
+  return { zeit: t.zeit.filter(clPasstTermin), ganztags: feiertag.concat(google, eigene, art('ferien')) };
+}
+
+/* Was die Workbench im Jahreskalender selbst kennt: Feiertage (berechnet
+   oder eingelesen), eigene Jahrestermine (auch jährlich und mehrtägig)
+   und Ferien. Die Kennung beginnt mit fei-, jt- oder fer-. */
+function clJahrAm(is) {
+  var aus = [];
+  var fei = feiertagAn(is);
+  if (fei) { aus.push({ id: 'fei-' + is, titel: fei, ganztags: true, jahr: 'feiertag', zeichen: '★' }); }
+  (DB.jahrestermine || []).forEach(function (e) {
+    if (!e || !e.von) { return; }
+    var von = e.von;
+    var bis = e.bis || e.von;
+    if (e.jaehrlich) {
+      von = is.slice(0, 4) + von.slice(4);
+      bis = is.slice(0, 4) + (e.bis || e.von).slice(4);
+    }
+    if (is < von || is > bis) { return; }
+    var k = jtKontext(e);
+    if (cl.filter !== 'alle' && k !== cl.filter) { return; }
+    aus.push({ id: 'jt-' + e.id, titel: String(e.titel || ''), ganztags: true, jahr: 'jahrestermin', zeichen: '◆',
+               kontext: k, von: von, bis: bis });
+  });
+  var fer = ferienAn(is);
+  if (fer) { aus.push({ id: 'fer-' + is, titel: fer, ganztags: true, jahr: 'ferien', zeichen: '·' }); }
+  return aus;
+}
+
+/* Antippen: Google-Termine öffnen ihr Fenster, Workbench-Einträge
+   zeigen nur, was sie sind — ändern geht in der Workbench. */
+function clGanzAufruf(is, x) {
+  return x.jahr ? 'clJahrZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')' : 'terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')';
+}
+
+function clJahrZeigen(is, id) {
+  var x = clJahrAm(is).filter(function (y) { return y.id === id; })[0];
+  if (!x) { return; }
+  var was = { feiertag: 'Feiertag', jahrestermin: 'Jahrestermin aus der Workbench', ferien: 'Ferien' }[x.jahr];
+  var zeit = (x.von && x.bis && x.von !== x.bis) ? '\n' + clKurzDatum(x.von) + ' – ' + clKurzDatum(x.bis) : '';
+  melde(x.zeichen + ' ' + x.titel + zeit + '\n' + was, null);
 }
 
 /* Routinen eines Tages: fällig oder an diesem Tag erledigt. */
@@ -3054,7 +3242,7 @@ function kalTagHtml(is) {
   var h = clWochenleisteHtml(is);
 
   t.ganztags.forEach(function (x) {
-    h += '<button type="button" class="ganztags" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')">◆ ' + esc(x.titel) + '</button>';
+    h += '<button type="button" class="ganztags' + (x.jahr ? ' gz-' + x.jahr : '') + '" onclick="' + clGanzAufruf(is, x) + '">' + (x.zeichen || '◆') + ' ' + esc(x.titel) + '</button>';
   });
   t.zeit.forEach(function (x) {
     posten.push({ zeit: x.zeit, bis: x.bis || x.zeit, termin: true, vorbei: clVorbei(is, x.bis || x.zeit), html: '<button type="button" class="tx" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')">'
@@ -3198,7 +3386,7 @@ function kalWocheHtml(is) {
   for (i = 0; i < 7; i++) {
     var d = tagePlus(montag, i);
     var t = clTermineAm(d);
-    var e = t.ganztags.map(function (x) { return '<div>◆ ' + esc(x.titel) + '</div>'; })
+    var e = t.ganztags.map(function (x) { return '<div>' + (x.zeichen || '◆') + ' ' + esc(x.titel) + '</div>'; })
       .concat(t.zeit.map(function (x) { return '<div>' + esc(clZeitText(x.zeit)) + ' ' + esc(x.titel) + '</div>'; }));
     h += '<button type="button" class="wtag' + (d === isoDatum() ? ' heute' : '') + '" onclick="clKalGehe(\'' + d + '\',\'tag\')">'
        + '<b>' + clWt(d) + ' ' + Number(d.slice(8, 10)) + '</b><span class="e">' + (e.join('') || '<div class="leise">—</div>') + '</span></button>';
@@ -3329,7 +3517,7 @@ function kalBloeckeHtml(is) {
     h += '<div class="wb-ganz-z">◆</div>';
     tage.forEach(function (d) {
       h += '<div class="wb-ganz-sp">' + clTermineAm(d).ganztags.map(function (x) {
-        return '<button type="button" class="wb-ganz" onclick="terminZeigen(\'' + d + '\',\'' + esc(x.id) + '\')">' + esc(x.titel) + '</button>';
+        return '<button type="button" class="wb-ganz" onclick="' + clGanzAufruf(d, x) + '">' + esc(x.titel) + '</button>';
       }).join('') + '</div>';
     });
   }

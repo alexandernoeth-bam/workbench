@@ -127,7 +127,9 @@ console.log('\n1. Aufbau der Datei');
   pruefe(doppelt.length === 0, 'keine doppelt definierten Funktionen' + (doppelt.length ? ' — gefunden: ' + doppelt.join(', ') : ''));
 
   /* Aufrufe nicht definierter Funktionen: im Code und in den Bedienelementen */
-  const definiert = new Set(fns);
+  /* Seit 0.8.2 auch innere Funktionen (feiertageVon der Workbench hat „verschoben“) */
+  const innere = [...SKRIPT.matchAll(/\n[ \t]+function (\w+)\s*\(/g)].map(m => m[1]);
+  const definiert = new Set(fns.concat(innere));
   const vars = new Set([...SKRIPT.matchAll(/\bvar\s+(\w+)/g)].map(m => m[1]));
   const ohne = SKRIPT.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const bekannt = new Set(('if for while switch return function typeof catch String Number Boolean Array Object JSON Math Date RegExp '
@@ -1748,6 +1750,69 @@ function kennzahlTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   31. Jahrestermine, Feiertage und Ferien der Workbench (0.8.2)
+   Grund: CLIE zeigte nur Google-Termine; im Jahreskalender der
+   Workbench stehen dazu eigene Jahrestermine, Feiertage und Ferien.
+   Erkennt: fehlende Quellen, falsche Jahreswiederholung, Doppelte,
+   falsche Zuordnung Beruf/Privat, Antippen öffnet ein falsches Fenster.
+   ============================================================ */
+function jahrTest() {
+  console.log('\n31. Jahrestermine, Feiertage und Ferien der Workbench (0.8.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  ['ostern', 'feiertageVon', 'feiertagAn', 'ferienEintragAn', 'ferienAn', 'woerterVon', 'aehnlichkeit', 'jtDoppelt', 'jtKontext'].forEach(n => {
+    pruefe(typeof S[n] === 'function', n + ' ist da (aus der Workbench)');
+  });
+  if (WB_QUELLE) {
+    const wb = WB_QUELLE;
+    const gleich = ['feiertageVon', 'feiertagAn', 'ferienAn', 'aehnlichkeit', 'jtKontext'].every(n => funktionText(SKRIPT, n) === funktionText(wb, n));
+    pruefe(gleich, 'wörtlich wie in der Workbench');
+  }
+  pruefe(S.feiertagAn('2026-11-01') === 'Allerheiligen' && S.feiertagAn('2026-06-04') === 'Fronleichnam' && S.feiertagAn('2026-08-15') === 'Mariä Himmelfahrt',
+    'Feiertage in Bayern berechnet (Allerheiligen, Fronleichnam 2026, Mariä Himmelfahrt)');
+  S.DB.jahrestermine = [
+    { id: 'j1', titel: 'Geburtstag Oma', von: '2020-11-03', jaehrlich: true, art: 'geburtstag', geaendert: 1 },
+    { id: 'j2', titel: 'Urlaub Borkum', von: '2026-11-02', bis: '2026-11-06', art: 'urlaub', geaendert: 1 },
+    { id: 'j3', titel: 'Dienstreise Fürth', von: '2026-11-04', art: 'dienstreise', geaendert: 1 }];
+  S.DB.ferien = [{ id: 'f1', titel: 'Herbstferien', von: '2026-11-02', bis: '2026-11-06', art: 'ferien', geaendert: 1 }];
+  const titel = (is) => S.clTermineAm(is).ganztags.map(x => (x.zeichen || '◆') + x.titel).join(' | ');
+  pruefe(titel('2026-11-03') === '◆Geburtstag Oma | ◆Urlaub Borkum | ·Herbstferien', 'jährlicher Geburtstag, mehrtägiger Urlaub, Ferien — ' + titel('2026-11-03'));
+  pruefe(/Geburtstag Oma/.test(titel('2031-11-03')) && !/Geburtstag Oma/.test(titel('2026-11-04')), 'jährlich: jedes Jahr am selben Tag, sonst nicht');
+  pruefe(titel('2026-11-01') === '★Allerheiligen', 'Feiertag mit ★');
+  S.cl.filter = 'beruflich';
+  pruefe(titel('2026-11-04') === '◆Dienstreise Fürth | ·Herbstferien', 'Filter Beruf: nur die Dienstreise (Urlaub ist privat), Ferien bleiben');
+  S.cl.filter = 'alle';
+  S.termineNachTag['2026-11-03'] = [{ id: 'g1', titel: 'Geburtstag Oma', ganztags: true, zeit: '', bis: '', kontext: 'privat' }];
+  S.termineNachTag['2026-11-01'] = [{ id: 'g2', titel: 'Allerheiligen', ganztags: true, zeit: '', bis: '', kontext: 'privat' }];
+  pruefe((titel('2026-11-03').match(/Geburtstag Oma/g) || []).length === 1 && S.clTermineAm('2026-11-03').ganztags.some(x => x.id === 'jt-j1'),
+    'doppelt in Google und Workbench: nur einmal — die eigene Fassung bleibt (Voreinstellung)');
+  S.DB.einstellungen.doppelBehalten = 'kalender';
+  pruefe(S.clTermineAm('2026-11-03').ganztags.some(x => x.id === 'g1') && !S.clTermineAm('2026-11-03').ganztags.some(x => x.id === 'jt-j1'),
+    'mit „doppelBehalten: kalender“ bleibt die Google-Fassung');
+  delete S.DB.einstellungen.doppelBehalten;
+  pruefe(titel('2026-11-01') === '★Allerheiligen', 'ein Feiertag aus einem Google-Feiertagskalender erscheint nicht doppelt');
+
+  /* Anzeige */
+  S.oeffne('kalender'); S.clKalGehe('2026-11-03', 'tag');
+  let h = inhalt();
+  pruefe(/class="ganztags gz-jahrestermin" onclick="clJahrZeigen\('2026-11-03','jt-j1'\)">◆ Geburtstag Oma/.test(h), 'Tag: Jahrestermin antippbar, ohne Terminfenster');
+  pruefe(/class="ganztags gz-ferien"[^>]*>· Herbstferien/.test(h), 'Tag: Ferien als leise Zeile');
+  S.clJahrZeigen('2026-11-03', 'jt-j2');
+  pruefe(/Urlaub Borkum\n02\.11\. – 06\.11\.\nJahrestermin aus der Workbench/.test(S.document.getElementById('toastText').textContent), 'Antippen zeigt Titel, Zeitraum und Herkunft');
+  S.clKalGehe('2026-11-01', 'tag');
+  pruefe(/class="ganztags gz-feiertag"[^>]*>★ Allerheiligen/.test(inhalt()), 'Tag: Feiertag mit ★');
+  S.clKalGehe('2026-10-28', 'woche');
+  const w1 = inhalt();
+  S.clKalGehe('2026-11-02', 'woche');
+  pruefe(/<div>★ Allerheiligen<\/div>/.test(w1) && /<div>· Herbstferien<\/div>/.test(inhalt()), 'Woche: Feiertag und Ferien mit Zeichen');
+  S.clKalGehe('2026-11-03', 'bloecke');
+  pruefe(/class="wb-ganz" onclick="clJahrZeigen\('2026-11-03','jt-j1'\)">Geburtstag Oma/.test(inhalt()), 'Wochenblöcke: Jahrestermine in der Ganztags-Zeile');
+  S.clKalGehe(S.isoDatum(), 'tag');
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1775,6 +1840,7 @@ function kennzahlTest() {
   try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
   try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
   try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
+  try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
