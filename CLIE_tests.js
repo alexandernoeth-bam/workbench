@@ -370,12 +370,33 @@ function swTest() {
   }
 }
 
+/* ============================================================
+   10. Schriftgrößen
+   Grund: In 0.1.0 war die Schrift am Pixel zu klein (Wunsch: +10 %).
+   Keine Schrift unter 12,5 px, Grundschrift mindestens 17,5 px,
+   Inhalt der Apps mindestens 15,5 px.
+   ============================================================ */
+function schriftTest() {
+  console.log('\n10. Schriftgrößen');
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  const groessen = [...css.matchAll(/font-size:([\d.]+)px/g)].map(m => Number(m[1]));
+  pruefe(groessen.length > 20 && Math.min.apply(null, groessen) >= 12.5,
+    'keine Schrift kleiner als 12,5 px (kleinste: ' + Math.min.apply(null, groessen) + ' px)');
+  const grund = Number((css.match(/body\{[^}]*font-size:([\d.]+)px/) || [])[1]);
+  pruefe(grund >= 17.5, 'Grundschrift mindestens 17,5 px (' + grund + ' px)');
+  const regel = (sel) => Number((css.match(new RegExp('(?:^|\\n)' + sel.replace(/\./g, '\\.') + '\\{[^}]*font-size:([\\d.]+)px')) || [])[1]);
+  pruefe(regel('.reihe') >= 15.5 && regel('.app') >= 15.5 && regel('.reiter') >= 18.5,
+    'Zeilen, App-Namen und Reiter groß genug (' + [regel('.reihe'), regel('.app'), regel('.reiter')].join(' / ') + ' px)');
+  pruefe(/class="aufklapp" style="top:42px/.test(SKRIPT), 'die Kategorieliste sitzt unter dem höheren Kopf');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
   try { bedienTest(); } catch (e) { fail('Bedienen warf: ' + e.message); }
   try { verbindungTest(); } catch (e) { fail('Verbindung warf: ' + e.message); }
   swTest();
+  schriftTest();
 
   /* ============================================================
      ERGEBNIS
