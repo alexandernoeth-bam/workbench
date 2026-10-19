@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.7.1</title>
+<title>CLIE 0.7.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -47,12 +47,10 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 
 .inhalt{flex:1;min-height:0;overflow:auto;padding:6px 10px 14px;position:relative}
 
-/* Silkscreen: die festen Tasten unten */
-.silk{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);background:var(--lcd-hell);border-top:2px solid var(--px-mitte);
-  padding:6px 4px calc(8px + env(safe-area-inset-bottom));text-align:center;font-size:16px;color:var(--px-mitte)}
-.silk button{color:var(--px-mitte);font-size:16px;padding:2px 0}
-.silk button b{display:block;font-size:28px;line-height:1.05;color:var(--px)}
-.silk button:disabled b{color:var(--px-zart)}
+/* Seit 0.7.2 keine Tasten unten mehr: Zurück übernimmt die Android-Taste ◀,
+   das Menü öffnet der Reiter oben links (wie am Palm die Titelleiste). */
+.geraet{padding-bottom:env(safe-area-inset-bottom)}
+.reiter::after{content:" ▾";font-size:.75em}
 
 /* Übersicht */
 .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 4px;padding:16px 0 6px}
@@ -344,12 +342,6 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
   </button>
   <main class="inhalt" id="inhalt"></main>
   <div class="fuss" id="fuss"></div>
-  <nav class="silk" aria-label="Tasten">
-    <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Übersicht</button>
-    <button type="button" onclick="menueUm()"><b>≡</b>Menü</button>
-    <button type="button" disabled title="Kommt mit CLIE 0.3"><b>⌕</b>Suchen</button>
-    <button type="button" onclick="oeffne('abgleich')"><b>⇅</b>Abgleich</button>
-  </nav>
   <div class="schleier" id="schleier" onclick="aufklappZu()"></div>
   <div id="aufklapp"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" onclick="toastZu()">OK</button></div>
@@ -367,7 +359,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.7.1';
+var APP_VERSION = '0.7.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6980,12 +6972,44 @@ function swAnmelden() {
 }
 
 function tasteGlobal(e) {
-  if (e && e.key === 'Escape' && cl.aufklapp) { aufklappZu(); return; }
+  if (e && e.key === 'Escape') { clZurueck(); return; }
   /* Am Rechner mit Tastatur: Ziffern, Rechenzeichen, Enter, Rücktaste */
   if (e && cl.app === 'rechner' && !cl.aufklapp && !e.ctrlKey && !e.metaKey && !e.altKey) {
     var t = RT_TASTEN[e.key];
     if (t) { e.preventDefault(); rtTaste(t); }
   }
+}
+
+/* ---------- Android-Taste Zurück (seit 0.7.2) ----------
+   Ein Merkposten im Verlauf fängt die Taste ab: Sie schließt zuerst ein
+   offenes Fenster, geht dann eine Ebene hoch und zuletzt zur Übersicht.
+   Auf der Übersicht verlässt sie die App wie gewohnt. */
+
+var ZURUECK_MARKE = { clie: 'zurueck' };
+
+function zurueckScharf() {
+  try { window.history.pushState(ZURUECK_MARKE, ''); } catch (e) { /* ohne Verlauf bleibt nur die Übersicht */ }
+}
+
+/* Ein Schritt zurück. Ergebnis: true, wenn CLIE etwas getan hat. */
+function clZurueck() {
+  if (cl.aufklapp) { aufklappZu(); return true; }
+  if (cl.app === 'sammlungen' && cl.sa.id) {
+    if (cl.sa.ansicht !== 'tabelle') { saAnsicht('tabelle'); } else { saZurListe(); }
+    return true;
+  }
+  if (cl.app === 'memo' && cl.memo.schreiben) { memoSchreibenUm(); return true; }
+  if (cl.app === 'memo' && cl.memo.id) { memoZurListe(); return true; }
+  if (cl.app === 'checklisten' && cl.cls.schreiben) { clsSchreibenUm(); return true; }
+  if (cl.app === 'checklisten' && cl.cls.id) { clsZurListe(); return true; }
+  if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
+  return false;
+}
+
+function zurueckGedrueckt() {
+  if (clZurueck()) { zurueckScharf(); return; }
+  /* Nichts mehr zu tun: die App wirklich verlassen */
+  try { window.history.back(); } catch (e) { /* egal */ }
 }
 
 /* Die Übersicht hängt an der Uhr: nächster Termin, „vor 2 Min.“. */
@@ -7002,6 +7026,8 @@ function start() {
   rtLaden();
   saFilterLaden();
   document.addEventListener('keydown', tasteGlobal);
+  window.addEventListener('popstate', zurueckGedrueckt);
+  zurueckScharf();
   zeichne();
   clTokenHolen();
   if (tokenAusSitzung()) {

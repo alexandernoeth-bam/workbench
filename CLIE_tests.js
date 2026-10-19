@@ -328,8 +328,8 @@ function bedienTest() {
   CL.menueUm();
   CL.oeffne('uebersicht');
   pruefe(CL.cl.aufklapp === '', 'Öffnen einer App schließt offene Listen');
-  pruefe(/onclick="oeffne\('uebersicht'\)"/.test(QUELLE) && /onclick="menueUm\(\)"/.test(QUELLE) && /onclick="oeffne\('abgleich'\)"/.test(QUELLE),
-    'die festen Tasten: Übersicht, Menü, Abgleich');
+  pruefe(/onclick="menueUm\(\)"/.test(QUELLE) && CL.CL_APPS.some(x => x.id === 'abgleich'),
+    'seit 0.7.2: Menü über den Reiter, Abgleich als App, Übersicht über die Taste Zurück');
 }
 
 /* ============================================================
@@ -1561,6 +1561,47 @@ async function neustartTest() {
   CL.oeffne('uebersicht');
 }
 
+/* ============================================================
+   28. Ohne Tastenleiste — Android-Taste Zurück (0.7.2)
+   Grund: Die Leiste unten (Übersicht, Menü, Suchen, Abgleich) kostete
+   Platz; Suchen war nur ein Platzhalter. Zurück übernimmt die Taste ◀
+   von Android, das Menü der Reiter. Erkennt: zurückgekehrte Leiste,
+   Zurück, das Ebenen überspringt oder die App zu früh verlässt.
+   ============================================================ */
+function zurueckTest() {
+  console.log('\n28. Ohne Tastenleiste — Android-Taste Zurück (0.7.2)');
+  if (!CL) { return; }
+  frisch();
+  pruefe(!/class="silk"/.test(QUELLE) && !/⌕<\/b>Suchen/.test(QUELLE) && !/\.silk\{/.test(QUELLE), 'keine Tastenleiste unten, kein Platzhalter „Suchen“');
+  pruefe(/id="reiter" onclick="menueUm\(\)"/.test(QUELLE) && /\.reiter::after\{content:" ▾"/.test(QUELLE), 'der Reiter öffnet das Menü und trägt ein ▾');
+  pruefe(/addEventListener\('popstate', zurueckGedrueckt\)/.test(SKRIPT), 'die Android-Taste Zurück wird abgefangen');
+  let gepusht = 0, zurueck = 0;
+  CL.window.history = { pushState() { gepusht++; }, back() { zurueck++; } };
+  const s = CL.saAusVorlage(CL.SA_VORLAGEN.frei, 'Test', false, [{ name: 'a' }]);
+  CL.oeffne('sammlungen'); CL.saOeffnen(s.id); CL.saAnsicht('felder'); CL.saFeldOeffnen('name');
+  const schritte = [];
+  const merke = () => schritte.push((CL.cl.aufklapp ? 'fenster' : '') + '|' + CL.cl.app + '|' + (CL.cl.sa.id ? CL.cl.sa.ansicht : 'liste'));
+  merke();
+  for (let i = 0; i < 4; i++) { CL.zurueckGedrueckt(); merke(); }
+  pruefe(schritte.join(' > ') === 'fenster|sammlungen|felder > |sammlungen|felder > |sammlungen|tabelle > |sammlungen|liste > |uebersicht|liste',
+    'Zurück: Fenster → Felder → Tabelle → Liste → Übersicht — ' + schritte.join(' > '));
+  pruefe(gepusht === 4 && zurueck === 0, 'nach jedem Schritt wird die Taste wieder abgefangen');
+  CL.zurueckGedrueckt();
+  pruefe(zurueck === 1 && CL.cl.app === 'uebersicht', 'auf der Übersicht verlässt Zurück die App');
+  CL.DB.gedanken.push({ id: 'm1', titel: 'Notiz', text: 'x', geaendert: 1 });
+  CL.oeffne('memo'); CL.memoOeffnen('m1'); CL.memoSchreibenUm();
+  CL.zurueckGedrueckt();
+  pruefe(CL.cl.app === 'memo' && CL.cl.memo.id === 'm1' && !CL.cl.memo.schreiben, 'Memo: Zurück beendet zuerst das Schreiben');
+  CL.zurueckGedrueckt();
+  pruefe(CL.cl.app === 'memo' && !CL.cl.memo.id, 'Memo: dann zur Liste');
+  CL.oeffne('kalender'); CL.cl.aufklapp = 'menue';
+  CL.tasteGlobal({ key: 'Escape' });
+  pruefe(CL.cl.app === 'kalender' && !CL.cl.aufklapp, 'Escape schließt wie Zurück zuerst das Menü');
+  CL.tasteGlobal({ key: 'Escape' });
+  pruefe(CL.cl.app === 'uebersicht', 'Escape geht dann zur Übersicht');
+  CL.window.history = undefined;
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1585,6 +1626,7 @@ async function neustartTest() {
   try { datebookTest(); } catch (e) { fail('Tag wie im Datebook warf: ' + e.message); }
   try { sammlungenTest(); } catch (e) { fail('Sammlungen warf: ' + e.message); }
   try { await neustartTest(); } catch (e) { fail('Neustart/Statistik warf: ' + e.message); }
+  try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
