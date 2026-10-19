@@ -1562,17 +1562,18 @@ async function neustartTest() {
 }
 
 /* ============================================================
-   28. Ohne Tastenleiste — Android-Taste Zurück (0.7.2)
+   28. Android-Taste Zurück (0.7.2, Leiste seit 0.8 wieder da)
    Grund: Die Leiste unten (Übersicht, Menü, Suchen, Abgleich) kostete
    Platz; Suchen war nur ein Platzhalter. Zurück übernimmt die Taste ◀
    von Android, das Menü der Reiter. Erkennt: zurückgekehrte Leiste,
    Zurück, das Ebenen überspringt oder die App zu früh verlässt.
    ============================================================ */
 function zurueckTest() {
-  console.log('\n28. Ohne Tastenleiste — Android-Taste Zurück (0.7.2)');
+  console.log('\n28. Android-Taste Zurück (0.7.2, Leiste seit 0.8 wieder da)');
   if (!CL) { return; }
   frisch();
-  pruefe(!/class="silk"/.test(QUELLE) && !/⌕<\/b>Suchen/.test(QUELLE) && !/\.silk\{/.test(QUELLE), 'keine Tastenleiste unten, kein Platzhalter „Suchen“');
+  pruefe(/<nav class="silk"/.test(QUELLE) && /onclick="oeffne\('uebersicht'\)"><b>⌂<\/b>Übersicht/.test(QUELLE) && /onclick="oeffne\('abgleich'\)"><b>⇅<\/b>Abgleich/.test(QUELLE),
+    'seit 0.8 ist die Tastenleiste unten wieder da (Übersicht, Menü, Suchen, Abgleich)');
   pruefe(/id="reiter" onclick="menueUm\(\)"/.test(QUELLE) && /\.reiter::after\{content:" ▾"/.test(QUELLE), 'der Reiter öffnet das Menü und trägt ein ▾');
   pruefe(/addEventListener\('popstate', zurueckGedrueckt\)/.test(SKRIPT), 'die Android-Taste Zurück wird abgefangen');
   let gepusht = 0, zurueck = 0;
@@ -1602,6 +1603,93 @@ function zurueckTest() {
   CL.window.history = undefined;
 }
 
+/* ============================================================
+   29. Feste Werte, Formeln und Standardwerte (0.8)
+   Grund: Sammlungen brauchen Werte, die als Variable dienen (etwa ein
+   Zielgewicht), Felder, die damit rechnen, und Vorbelegungen bei Neu.
+   Erkennt: falsche Rechenregeln (Punkt vor Strich, Klammern, Minus),
+   Formeln, die Code ausführen könnten, leere statt fehlerhafter Werte,
+   Formelwerte in den Daten, falsche Vorbelegung.
+   ============================================================ */
+function formelTest() {
+  console.log('\n29. Feste Werte, Formeln und Standardwerte (0.8)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const r = (t, w) => S.saFormelAuswerten(t, w || (() => null));
+  pruefe(r('2 + 3 * 4') === 14 && r('(2 + 3) * 4') === 20 && r('10 - 4 - 3') === 3 && r('-3 + 5') === 2 && r('2 × 3 ÷ 4') === 1.5 && r('1,5 + 1') === 2.5,
+    'Rechenregeln: Punkt vor Strich, Klammern, Minus, × ÷, Komma');
+  pruefe(r('5 / 0') === null && r('[x] + 1') === null, 'Division durch 0 und fehlende Werte ergeben leer');
+  let wirft = 0;
+  ['2 +', '(2', 'alert(1)', '2 ** 3', '[a', 'window.x'].forEach(t => { try { r(t); } catch (e) { wirft++; } });
+  pruefe(wirft === 6, 'falsche Schreibweise und fremde Zeichen werden abgewiesen (kein Code)');
+  pruefe(!/\beval\(|new Function/.test(SKRIPT.slice(SKRIPT.indexOf('---- Formeln (seit 0.8)'), SKRIPT.indexOf('---- Filter, Sortierung, Summen'))), 'das Rechenwerk benutzt weder eval noch Function');
+
+  /* Gewichtstagebuch */
+  const g = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Gewicht', false, []);
+  g.felder = [{ id: 'dat', name: 'Datum', typ: 'datum', spalte: true, standard: 'heute' },
+              { id: 'kg', name: 'kg', typ: 'zahl', spalte: true, summe: 'schnitt', standard: 'zuletzt' },
+              { id: 'dz', name: 'Δ Ziel', typ: 'formel', formel: '[kg] - [Zielgewicht]', dez: 1, vorzeichen: true, spalte: true, summe: 'schnitt' },
+              { id: 'ort', name: 'Ort', typ: 'text', standard: 'fest', standardWert: 'Bad' }];
+  g.werte = [{ id: 'w1', name: 'Zielgewicht', wert: 82, einheit: 'kg' }];
+  const neu = (dat, kg, t) => S.DB.datensaetze.push({ id: 'd' + dat, sammlung: g.id, werte: { dat: dat, kg: kg }, angelegt: t, geaendert: t });
+  neu('2026-10-12', 86, 1); neu('2026-10-19', 84.6, 3); neu('2026-10-17', 85.3, 2);
+  const d = S.saSaetze(g).filter(x => x.id === 'd2026-10-19')[0];
+  pruefe(Math.abs(S.saRoh(g, d, g.felder[2]) - 2.6) < 1e-9 && S.saWertText(g.felder[2], S.saRoh(g, d, g.felder[2])) === '+2,6', 'Formel mit festem Wert: 84,6 − 82 = +2,6');
+  S.cl.app = 'sammlungen'; S.cl.sa.id = g.id; S.cl.sa.ansicht = 'tabelle'; S.zeichne();
+  let h = inhalt();
+  pruefe(/<td class="r">84,6<\/td><td class="r">\+2,6<\/td>/.test(h), 'die Formel steht als Spalte in der Tabelle');
+  pruefe(/<tr class="sa-sum"><td>Σ 3<\/td><td class="r">85,3<\/td><td class="r">\+3,3<\/td>/.test(h), 'Ø unter Zahl und Formel');
+  pruefe(/Feste Werte[\s\S]*Zielgewicht<\/span><span>82 kg/.test(h), 'die festen Werte stehen unter der Tabelle');
+  g.werte[0].wert = 84;
+  pruefe(Math.abs(S.saRoh(g, d, g.felder[2]) - 0.6) < 1e-9, 'ein neuer fester Wert rechnet sofort neu');
+  pruefe(!('dz' in d.werte), 'Formelwerte werden nicht gespeichert');
+
+  /* Standardwerte */
+  const st = S.saStandardWerte(g);
+  pruefe(st.dat === S.isoDatum() && st.kg === 84.6 && st.ort === 'Bad' && !('dz' in st), 'Neu: Datum heute, kg wie zuletzt angelegt, Ort fest, Formel nicht');
+  S.saEintrag('');
+  pruefe(/Neu · Gewicht/.test(S.saFensterHtml()) && !/saF_dz/.test(S.saFensterHtml()), 'das Formular für Neu hat kein Eingabefeld für die Formel');
+
+  /* Feld-Editor */
+  S.saFensterAuf({ modus: 'feld', id: '' });
+  const feld = (id, w) => { S.document.getElementById(id).value = w; };
+  ['saFeldWerte', 'saFeldSumme', 'saFeldStd', 'saFeldStdWert'].forEach(x => feld(x, ''));
+  S.document.getElementById('saFeldSpalte').checked = false; S.document.getElementById('saFeldGruppe').checked = false; S.document.getElementById('saFeldVz').checked = false;
+  feld('saFeldName', 'BMI'); feld('saFeldTyp', 'formel'); feld('saFeldFormel', '[kg] / [Größe] ^ 2'); feld('saFeldDez', '1');
+  const vorher = g.felder.length;
+  S.saFeldSpeichern();
+  pruefe(g.felder.length === vorher && S.cl.aufklapp === 'sa', 'eine falsche Formel wird nicht gespeichert');
+  feld('saFeldFormel', '[kg] / ([Größe] * [Größe])');
+  S.saFeldSpeichern();
+  pruefe(g.felder.length === vorher, 'eine Formel mit unbekanntem Namen wird nicht gespeichert');
+  S.saFensterAuf({ modus: 'wert', id: '' });
+  feld('saWertName', 'Größe'); feld('saWertZahl', '1,82'); feld('saWertEinheit', 'm');
+  S.saWertSpeichern();
+  pruefe(g.werte.length === 2 && g.werte[1].wert === 1.82, 'fester Wert über das Fenster angelegt');
+  S.saFensterAuf({ modus: 'feld', id: '' });
+  ['saFeldWerte', 'saFeldSumme', 'saFeldStd', 'saFeldStdWert'].forEach(x => feld(x, ''));
+  feld('saFeldName', 'BMI'); feld('saFeldTyp', 'formel'); feld('saFeldFormel', '[kg] / ([Größe] * [Größe])'); feld('saFeldDez', '1');
+  S.saFeldSpeichern();
+  const bmi = g.felder[g.felder.length - 1];
+  pruefe(bmi.typ === 'formel' && bmi.dez === 1 && S.saWertText(bmi, S.saRoh(g, d, bmi)) === '25,5', 'Formel-Feld mit zwei festen Werten: BMI 25,5');
+  S.saFensterAuf({ modus: 'wert', id: '' });
+  feld('saWertName', 'kg'); feld('saWertZahl', '1'); feld('saWertEinheit', '');
+  S.saWertSpeichern();
+  pruefe(g.werte.length === 2, 'ein fester Wert darf nicht heißen wie ein Feld');
+  S.cl.aufklapp = '';
+
+  /* Kopie und Vorlage nehmen feste Werte mit */
+  const k = S.saAusVorlage(g, 'Kopie', true, []);
+  pruefe(k.werte.length === 2 && k.werte !== g.werte && k.felder.some(f => f.typ === 'formel'), 'Kopie/Vorlage übernimmt feste Werte und Formeln');
+  S.cl.sa.ansicht = 'werte'; S.zeichne();
+  pruefe(S.document.getElementById('reiter').textContent === 'Feste Werte' && /saWertOeffnen/.test(inhalt()) && /\+ Wert/.test(S.document.getElementById('fuss').innerHTML), 'Ansicht „Feste Werte“ mit „+ Wert“');
+  S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
+  pruefe(/menueWahl\('saWerte'\)">Feste Werte…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü: Feste Werte…');
+  S.cl.aufklapp = ''; S.cl.sa.id = ''; S.cl.sa.ansicht = 'tabelle';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1627,6 +1715,7 @@ function zurueckTest() {
   try { sammlungenTest(); } catch (e) { fail('Sammlungen warf: ' + e.message); }
   try { await neustartTest(); } catch (e) { fail('Neustart/Statistik warf: ' + e.message); }
   try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
+  try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.7.2</title>
+<title>CLIE 0.8.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -47,9 +47,13 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 
 .inhalt{flex:1;min-height:0;overflow:auto;padding:6px 10px 14px;position:relative}
 
-/* Seit 0.7.2 keine Tasten unten mehr: Zurück übernimmt die Android-Taste ◀,
-   das Menü öffnet der Reiter oben links (wie am Palm die Titelleiste). */
-.geraet{padding-bottom:env(safe-area-inset-bottom)}
+/* Silkscreen: die festen Tasten unten (seit 0.8 wieder da — die Android-
+   Taste ◀ geht zusätzlich zurück, der Reiter öffnet ebenfalls das Menü) */
+.silk{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);background:var(--lcd-hell);border-top:2px solid var(--px-mitte);
+  padding:6px 4px calc(8px + env(safe-area-inset-bottom));text-align:center;font-size:16px;color:var(--px-mitte)}
+.silk button{color:var(--px-mitte);font-size:16px;padding:2px 0}
+.silk button b{display:block;font-size:28px;line-height:1.05;color:var(--px)}
+.silk button:disabled b{color:var(--px-zart)}
 .reiter::after{content:" ▾";font-size:.75em}
 
 /* Übersicht */
@@ -301,6 +305,8 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-vzeile{display:flex;gap:6px;align-items:center}
 .sa-vzeile .wahl{flex:1}
 .fenster .wahl.sa-gewaehlt{font-weight:600}
+/* In der Pixelschrift sehen [ ] fast wie ( ) aus — Formeln deshalb in klarer Schrift (seit 0.8) */
+.fenster .sa-formel{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px}
 .fenster select.eingabe,.fenster textarea.eingabe{font:inherit;font-size:17.5px}
 .fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
@@ -342,6 +348,12 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
   </button>
   <main class="inhalt" id="inhalt"></main>
   <div class="fuss" id="fuss"></div>
+  <nav class="silk" aria-label="Tasten">
+    <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Übersicht</button>
+    <button type="button" onclick="menueUm()"><b>≡</b>Menü</button>
+    <button type="button" disabled title="Kommt später"><b>⌕</b>Suchen</button>
+    <button type="button" onclick="oeffne('abgleich')"><b>⇅</b>Abgleich</button>
+  </nav>
   <div class="schleier" id="schleier" onclick="aufklappZu()"></div>
   <div id="aufklapp"></div>
   <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" onclick="toastZu()">OK</button></div>
@@ -359,7 +371,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.7.2';
+var APP_VERSION = '0.8.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2831,6 +2843,7 @@ function aufklappZeichnen() {
       + ((cl.app === 'sammlungen' && cl.sa.id) ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'saFelder\')">Felder…</button>'
           + '<button type="button" onclick="menueWahl(\'saFilter\')">Filter…</button>'
+          + '<button type="button" onclick="menueWahl(\'saWerte\')">Feste Werte…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
       + '<div class="trenn"></div>'
@@ -2917,6 +2930,7 @@ function menueWahl(was) {
   if (was === 'statistik') { oeffne('statistik'); return; }
   if (was === 'saFelder') { saAnsicht('felder'); return; }
   if (was === 'saFilter') { saAnsicht('filter'); return; }
+  if (was === 'saWerte') { saAnsicht('werte'); return; }
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   aufklappZeichnen();
@@ -5031,7 +5045,7 @@ function clsLoeschen() {
 cl.sa = { id: '', ansicht: 'tabelle', fenster: null, wahl: {} };
 
 var SA_FILTER_KEY = 'clie-sa-filter';
-var SA_TYPEN = [['text', 'Text'], ['betrag', 'Betrag'], ['zahl', 'Zahl'], ['auswahl', 'Auswahl'],
+var SA_TYPEN = [['text', 'Text'], ['betrag', 'Betrag'], ['zahl', 'Zahl'], ['formel', 'Formel'], ['auswahl', 'Auswahl'],
                 ['datum', 'Datum'], ['bewertung', 'Bewertung'], ['janein', 'Ja/Nein']];
 var SA_SUMMEN = [['', 'nichts'], ['summe', 'Summe'], ['schnitt', 'Ø'], ['min', 'Min'], ['max', 'Max'], ['anzahl', 'Anzahl']];
 var SA_BEDINGUNGEN = [['gleich', 'ist'], ['ungleich', 'ist nicht'], ['enthaelt', 'enthält'], ['leer', 'ist leer'],
@@ -5189,15 +5203,135 @@ function saSterne(n) {
   return t;
 }
 
+/* Eine Zahl ohne überflüssige Nullen: 82 · 82,5 · 84,63 */
+function saZahlKurz(n) {
+  var t = saZahlText(n, 2);
+  return (t.indexOf(',') >= 0) ? t.replace(/0+$/, '').replace(/,$/, '') : t;
+}
+
 /* Anzeige eines Werts in Liste und Formular */
 function saWertText(f, w) {
   if (w === null || w === undefined || w === '') { return ''; }
+  if (f.typ === 'formel') {
+    var n = Number(w);
+    if (!isFinite(n)) { return ''; }
+    var t = saZahlText(n, (f.dez >= 0 && f.dez <= 3) ? f.dez : 2);
+    return (f.vorzeichen && n > 0) ? '+' + t : t;
+  }
   if (f.typ === 'betrag') { return saBetragText(Number(w)); }
-  if (f.typ === 'zahl') { return saZahlText(Number(w), (Number(w) % 1) ? 2 : 0); }
+  if (f.typ === 'zahl') { return saZahlKurz(Number(w)); }
   if (f.typ === 'datum') { return saDatumText(w); }
   if (f.typ === 'bewertung') { return w ? saSterne(Number(w)) : ''; }
   if (f.typ === 'janein') { return w ? 'ja' : 'nein'; }
   return String(w);
+}
+
+/* ---- Formeln (seit 0.8) ----
+   Ein kleines eigenes Rechenwerk — kein eval: Zahlen, + − × ÷, Klammern
+   und [Namen] von Feldern oder festen Werten der Sammlung. */
+
+function saFormelTeile(text) {
+  var teile = [];
+  var s = String(text || '');
+  var ops = { '+': '+', '-': '-', '−': '-', '*': '*', '×': '*', '·': '*', '/': '/', '÷': '/', ':': '/', '(': '(', ')': ')' };
+  var i = 0;
+  while (i < s.length) {
+    var c = s.charAt(i);
+    if (c === ' ' || c === '\t') { i++; continue; }
+    if (c === '[') {
+      var j = s.indexOf(']', i);
+      if (j < 0) { throw new Error('„]“ fehlt'); }
+      teile.push({ art: 'name', w: s.slice(i + 1, j).trim() });
+      i = j + 1;
+      continue;
+    }
+    var m = s.slice(i).match(/^[0-9]+([.,][0-9]+)?/);
+    if (m) {
+      teile.push({ art: 'zahl', w: Number(m[0].replace(',', '.')) });
+      i += m[0].length;
+      continue;
+    }
+    if (!ops[c]) { throw new Error('Zeichen „' + c + '“ ist nicht erlaubt'); }
+    teile.push({ art: ops[c] });
+    i++;
+  }
+  if (!teile.length) { throw new Error('Die Formel ist leer'); }
+  return teile;
+}
+
+/* Rechnet eine Formel; wert(name) liefert Zahl oder null. Fehlt ein Wert,
+   ist das Ergebnis null (leer). Falsche Schreibweise wirft einen Fehler. */
+function saFormelAuswerten(text, wert) {
+  var t = saFormelTeile(text);
+  var p = 0;
+  var rechne = function (a, o, b) {
+    if (a === null || b === null) { return null; }
+    if (o === '+') { return a + b; }
+    if (o === '-') { return a - b; }
+    if (o === '*') { return a * b; }
+    return (b === 0) ? null : a / b;
+  };
+  var faktor;
+  var term = function () {
+    var a = faktor();
+    while (p < t.length && (t[p].art === '*' || t[p].art === '/')) { var o = t[p++].art; a = rechne(a, o, faktor()); }
+    return a;
+  };
+  var ausdruck = function () {
+    var a = term();
+    while (p < t.length && (t[p].art === '+' || t[p].art === '-')) { var o = t[p++].art; a = rechne(a, o, term()); }
+    return a;
+  };
+  faktor = function () {
+    var x = t[p];
+    if (!x) { throw new Error('Die Formel endet zu früh'); }
+    p++;
+    if (x.art === '-') { var v = faktor(); return v === null ? null : -v; }
+    if (x.art === '+') { return faktor(); }
+    if (x.art === 'zahl') { return x.w; }
+    if (x.art === 'name') { return wert(x.w); }
+    if (x.art === '(') {
+      var r = ausdruck();
+      if (!t[p] || t[p].art !== ')') { throw new Error('„)“ fehlt'); }
+      p++;
+      return r;
+    }
+    throw new Error('„' + x.art + '“ steht an falscher Stelle');
+  };
+  var e = ausdruck();
+  if (p < t.length) { throw new Error('„' + (t[p].art === 'name' ? '[' + t[p].w + ']' : t[p].art) + '“ steht an falscher Stelle'); }
+  return (e === null || !isFinite(e)) ? null : e;
+}
+
+/* Wert eines Namens: zuerst ein Feld des Eintrags, dann ein fester Wert */
+function saNamensWert(s, d, name, ohne, tiefe) {
+  var n = String(name || '').toLowerCase();
+  var i;
+  for (i = 0; i < (s.felder || []).length; i++) {
+    var g = s.felder[i];
+    if (g === ohne || String(g.name).toLowerCase() !== n) { continue; }
+    if (g.typ === 'formel') { return (tiefe < 5) ? saFormelWert(s, d, g, tiefe + 1) : null; }
+    var w = (d.werte || {})[g.id];
+    return (w === null || w === undefined || w === '' || typeof w === 'boolean') ? null : saZahlLesen(w);
+  }
+  for (i = 0; i < (s.werte || []).length; i++) {
+    if (String(s.werte[i].name).toLowerCase() === n) { return saZahlLesen(s.werte[i].wert); }
+  }
+  return null;
+}
+
+function saFormelWert(s, d, f, tiefe) {
+  try {
+    return saFormelAuswerten(f.formel, function (name) { return saNamensWert(s, d, name, f, tiefe || 0); });
+  } catch (e) {
+    return null;
+  }
+}
+
+/* Der Wert eines Felds — bei Formeln gerechnet */
+function saRoh(s, d, f) {
+  if (f.typ === 'formel') { return saFormelWert(s, d, f, 0); }
+  return (d.werte || {})[f.id];
 }
 
 /* ---- Filter, Sortierung, Summen ---- */
@@ -5215,7 +5349,7 @@ function saFilterWahl(s) {
 function saPasst(s, d, flt) {
   var f = saFeld(s, flt.feld);
   if (!f) { return true; }
-  var w = (d.werte || {})[flt.feld];
+  var w = saRoh(s, d, f);
   var leer = (w === null || w === undefined || w === '');
   var heute = isoDatum();
   switch (flt.op) {
@@ -5241,10 +5375,10 @@ function saGefiltert(s) {
   var f = so.feld ? saFeld(s, so.feld) : null;
   if (!f) { f = (s.felder || [])[0] || null; }
   if (f) {
-    var zahl = (f.typ === 'betrag' || f.typ === 'zahl' || f.typ === 'bewertung');
+    var zahl = saRechts(f);
     l.sort(function (a, b) {
-      var x = (a.werte || {})[f.id];
-      var y = (b.werte || {})[f.id];
+      var x = saRoh(s, a, f);
+      var y = saRoh(s, b, f);
       var lx = (x === null || x === undefined || x === '');
       var ly = (y === null || y === undefined || y === '');
       if (lx !== ly) { return lx ? 1 : -1; }   /* Leeres immer ans Ende */
@@ -5270,6 +5404,7 @@ function saAuswerten(art, werte) {
 function saAuswertungText(f, art, n) {
   if (n === null || n === undefined) { return ''; }
   if (art === 'anzahl') { return String(n); }
+  if (f.typ === 'formel') { return saWertText(f, n); }
   if (art === 'schnitt' || f.typ === 'bewertung') { return saZahlText(n, 1); }
   return f.typ === 'betrag' ? saBetragText(n) : saZahlText(n, (n % 1) ? 2 : 0);
 }
@@ -5383,7 +5518,7 @@ function saSpalten(s) {
 
 function saZelle(s, f, d) {
   if (f.id === '_mon') { var m = saAboMonat(s, d); return m === null ? '' : saZahlText(m, 2); }
-  var t = saWertText(f, (d.werte || {})[f.id]);
+  var t = saWertText(f, saRoh(s, d, f));
   if (s.art === 'abos' && f.id === (s.rollen || {}).betrag && t) {
     var b = saZahlLesen((d.werte || {})[f.id]);
     t = saZahlText(b, 2) + ' ' + (SA_TAKT_KURZ[saWert(s, d, 'takt')] || 'M');
@@ -5391,14 +5526,14 @@ function saZelle(s, f, d) {
   return t;
 }
 
-function saRechts(f) { return f.typ === 'betrag' || f.typ === 'zahl' || f.typ === 'bewertung'; }
+function saRechts(f) { return f.typ === 'betrag' || f.typ === 'zahl' || f.typ === 'bewertung' || f.typ === 'formel'; }
 
 function saSummenZeile(s, sp, l, klasse, titel) {
   var werte = sp.map(function (f, i) {
     if (i === 0) { return '<td>' + esc(titel) + '</td>'; }
     var art = f.summe || '';
     if (f.id === '_mon') { art = ''; }
-    var n = art ? saAuswerten(art, l.map(function (d) { return (d.werte || {})[f.id]; })) : null;
+    var n = art ? saAuswerten(art, l.map(function (d) { return saRoh(s, d, f); })) : null;
     return '<td class="' + (saRechts(f) ? 'r' : '') + '">' + esc(saAuswertungText(f, art, n)) + '</td>';
   });
   return '<tr class="' + klasse + '">' + werte.join('') + '</tr>';
@@ -5513,8 +5648,14 @@ function saBuecherHtml(s, l) {
 function saSammlungHtml(s) {
   if (cl.sa.ansicht === 'felder') { return saFelderHtml(s); }
   if (cl.sa.ansicht === 'filter') { return saFilterListeHtml(s); }
+  if (cl.sa.ansicht === 'werte') { return saWerteHtml(s); }
   var l = saGefiltert(s);
   var h = saTabelleHtml(s);
+  if ((s.werte || []).length) {
+    h += '<div class="sa-box"><div class="leise">Feste Werte</div>' + s.werte.map(function (x) {
+      return reihe(x.name, saZahlKurz(Number(x.wert)) + (x.einheit ? ' ' + x.einheit : ''));
+    }).join('') + '</div>';
+  }
   if (s.art === 'budget') { h += saBudgetHtml(s, l); }
   else if (s.art === 'abos') { h += saAbosHtml(s, l); }
   else if (s.art === 'buecher') { h += saBuecherHtml(s, l); }
@@ -5529,11 +5670,25 @@ function saFelderHtml(s) {
     if (s.gruppe === f.id) { rollen.push('Gruppe'); }
     if ((s.filter || []).some(function (x) { return x.feld === f.id; })) { rollen.push('Filter'); }
     if (f.summe) { rollen.push((SA_SUMMEN.filter(function (x) { return x[0] === f.summe; })[0] || ['', ''])[1]); }
+    if (f.standard === 'heute') { rollen.push('Neu: heute'); }
+    if (f.standard === 'zuletzt') { rollen.push('Neu: wie zuletzt'); }
+    if (f.standard === 'fest') { rollen.push('Neu: ' + String(f.standardWert || '')); }
     h += '<div class="sa-feldzeile"><button type="button" class="tx" onclick="saFeldOeffnen(\'' + esc(f.id) + '\')">' + esc(f.name)
-       + '<small>' + esc(saTypName(f.typ)) + (rollen.length ? ' · ' + esc(rollen.join(', ')) : '') + '</small></button>'
+       + '<small>' + esc(saTypName(f.typ)) + (f.typ === 'formel' ? ' ' + esc(f.formel || '') : '') + (rollen.length ? ' · ' + esc(rollen.join(', ')) : '') + '</small></button>'
        + '<button type="button" class="knopf" onclick="saFeldSchieben(' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + ' aria-label="nach oben">▲</button>'
        + '<button type="button" class="knopf" onclick="saFeldSchieben(' + i + ',1)"' + (i === s.felder.length - 1 ? ' disabled' : '') + ' aria-label="nach unten">▼</button></div>';
   });
+  return h;
+}
+
+/* Feste Werte einer Sammlung (seit 0.8) — in Formeln mit [Name] */
+function saWerteHtml(s) {
+  var h = '<p class="leise">Werte, die für die ganze Sammlung gelten. In Formeln mit [Name].</p>';
+  (s.werte || []).forEach(function (x) {
+    h += '<button type="button" class="sa-zeile" onclick="saWertOeffnen(\'' + esc(x.id) + '\')"><span class="tx">' + esc(x.name) + '</span>'
+       + '<span class="sa-kz">' + esc(saZahlKurz(Number(x.wert)) + (x.einheit ? ' ' + x.einheit : '')) + '</span></button>';
+  });
+  if (!(s.werte || []).length) { h += '<p class="leise">Noch kein fester Wert — „+ Wert“ tippen.</p>'; }
   return h;
 }
 
@@ -5572,6 +5727,10 @@ function sammlungenFussHtml() {
     return '<button type="button" class="knopf voll" onclick="saAnsicht(\'tabelle\')">Fertig</button>'
       + '<button type="button" class="knopf" onclick="saFilterOeffnen(\'\')">+ Filter</button>';
   }
+  if (cl.sa.ansicht === 'werte') {
+    return '<button type="button" class="knopf voll" onclick="saAnsicht(\'tabelle\')">Fertig</button>'
+      + '<button type="button" class="knopf" onclick="saWertOeffnen(\'\')">+ Wert</button>';
+  }
   return '<button type="button" class="knopf" onclick="saZurListe()">Fertig</button>'
     + '<button type="button" class="knopf" onclick="saEintrag(\'\')">Neu</button>'
     + (s.gruppe && saFeld(s, s.gruppe) ? '<button type="button" class="knopf' + (s.gruppenAn ? ' voll' : '') + '" onclick="saGruppenUm()">Gruppen</button>' : '')
@@ -5583,6 +5742,7 @@ function saReiter() {
   if (!s) { return 'Sammlungen'; }
   if (cl.sa.ansicht === 'felder') { return 'Felder'; }
   if (cl.sa.ansicht === 'filter') { return 'Filter'; }
+  if (cl.sa.ansicht === 'werte') { return 'Feste Werte'; }
   return s.name;
 }
 
@@ -5636,7 +5796,7 @@ function saZurListe() {
 }
 
 function saAnsicht(a) {
-  if (['tabelle', 'felder', 'filter'].indexOf(a) < 0) { return; }
+  if (['tabelle', 'felder', 'filter', 'werte'].indexOf(a) < 0) { return; }
   cl.sa.ansicht = a;
   cl.aufklapp = '';
   zeichne();
@@ -5728,6 +5888,7 @@ function saEintrag(id) {
 function saFeldOeffnen(id) { saFensterAuf({ modus: 'feld', id: id }); }
 function saFeldNeu() { saFensterAuf({ modus: 'feld', id: '' }); }
 function saFilterOeffnen(id) { saFensterAuf({ modus: 'filter', id: id }); }
+function saWertOeffnen(id) { saFensterAuf({ modus: 'wert', id: id }); }
 function saKopierenOeffnen() { saFensterAuf({ modus: 'kopie', als: 'vorlage', mit: 'geruest' }); }
 function saDetailsOeffnen() { saFensterAuf({ modus: 'details' }); }
 
@@ -5821,9 +5982,15 @@ function saFensterHtml() {
 
   if (f.modus === 'eintrag') {
     var d = f.id ? saSatzFinden(f.id) : null;
-    var werte = d ? (d.werte || {}) : {};
+    /* Neu: mit den Standardwerten der Felder vorbelegt (seit 0.8) */
+    var werte = d ? (d.werte || {}) : saStandardWerte(s);
     var e = kopf(d ? s.name : 'Neu · ' + s.name);
     (s.felder || []).forEach(function (fe) {
+      if (fe.typ === 'formel') {
+        /* Formeln tippt man nicht ein — sie werden gerechnet */
+        if (d) { e += reihe('→ ' + fe.name, saWertText(fe, saRoh(s, d, fe)) || '—'); }
+        return;
+      }
       e += '<label for="saF_' + esc(fe.id) + '">' + esc(fe.name) + ':</label>' + saEingabeHtml(fe, werte[fe.id]);
     });
     if (s.art === 'abos' && d) {
@@ -5858,9 +6025,37 @@ function saFensterHtml() {
       + '<label class="haken"><input id="saFeldGruppe" type="checkbox"' + (fe2 && s.gruppe === fe2.id ? ' checked' : '') + '> danach gruppieren</label>'
       + '<label for="saFeldSumme">Darunter (bei Zahlen):</label><select id="saFeldSumme" class="eingabe">' + SA_SUMMEN.map(function (t) {
           return '<option value="' + t[0] + '"' + (t[0] === (x.summe || '') ? ' selected' : '') + '>' + t[1] + '</option>';
-        }).join('') + '</select>';
+        }).join('') + '</select>'
+      /* Formel (seit 0.8) */
+      + '<label for="saFeldFormel">Formel (nur bei Typ Formel):</label>'
+      + '<input id="saFeldFormel" class="eingabe sa-formel" type="text" autocomplete="off" spellcheck="false" value="' + esc(x.formel || '') + '">'
+      + '<p class="leise sa-formel">Erlaubt: + − × ÷ ( ) und Zahlen. Namen: ' + esc(saFormelNamen(s, fe2).join(' ')) + '</p>'
+      + '<label for="saFeldDez">Nachkommastellen:</label><select id="saFeldDez" class="eingabe">' + [0, 1, 2, 3].map(function (n) {
+          return '<option value="' + n + '"' + (n === ((x.dez >= 0 && x.dez <= 3) ? x.dez : 2) ? ' selected' : '') + '>' + n + '</option>';
+        }).join('') + '</select>'
+      + '<label class="haken"><input id="saFeldVz" type="checkbox"' + (x.vorzeichen ? ' checked' : '') + '> mit Vorzeichen (+2,6)</label>'
+      /* Standardwert bei Neu (seit 0.8) */
+      + '<label for="saFeldStd">Bei Neu:</label><select id="saFeldStd" class="eingabe">'
+      + [['', 'leer'], ['heute', 'heute (nur Datum)'], ['fest', 'fester Wert'], ['zuletzt', 'wie zuletzt']].map(function (t) {
+          return '<option value="' + t[0] + '"' + (t[0] === (x.standard || '') ? ' selected' : '') + '>' + t[1] + '</option>';
+        }).join('') + '</select>'
+      + '<label for="saFeldStdWert">Fester Wert bei Neu:</label>'
+      + '<input id="saFeldStdWert" class="eingabe" type="text" autocomplete="off" value="' + esc(x.standardWert || '') + '">';
     return g + saKnoepfe('<button type="button" class="knopf voll" onclick="saFeldSpeichern()">OK</button>' + abbrechen
       + (fe2 ? '<button type="button" class="knopf" onclick="saFensterSchritt(\'feld-loeschen\')">Feld löschen…</button>' : ''));
+  }
+
+  if (f.modus === 'wert') {
+    var fw = null;
+    (s.werte || []).forEach(function (y) { if (y.id === f.id) { fw = y; } });
+    var wv = fw || { name: '', wert: '', einheit: '' };
+    return kopf(fw ? 'Fester Wert' : 'Neuer fester Wert')
+      + '<label for="saWertName">Name:</label><input id="saWertName" class="eingabe" type="text" autocomplete="off" value="' + esc(wv.name) + '">'
+      + '<label for="saWertZahl">Wert:</label><input id="saWertZahl" class="eingabe" type="text" inputmode="decimal" autocomplete="off" value="'
+      + esc(wv.wert === '' ? '' : String(wv.wert).replace('.', ',')) + '">'
+      + '<label for="saWertEinheit">Einheit (z. B. kg, €):</label><input id="saWertEinheit" class="eingabe" type="text" autocomplete="off" value="' + esc(wv.einheit || '') + '">'
+      + saKnoepfe('<button type="button" class="knopf voll" onclick="saWertSpeichern()">OK</button>' + abbrechen
+        + (fw ? '<button type="button" class="knopf" onclick="saWertLoeschen()">Löschen</button>' : ''));
   }
 
   if (f.modus === 'feld-loeschen') {
@@ -5933,13 +6128,13 @@ function saAusVorlage(v, name, alsVorlage, saetze) {
   var s = { id: neueKennung(), name: String(name || v.name).slice(0, 120), art: v.art || 'frei', vorlage: !!alsVorlage,
             kontext: (cl.filter === 'beruflich' || cl.filter === 'privat') ? cl.filter : (v.kontext || 'privat'),
             felder: saKopie(v.felder || []), rollen: saKopie(v.rollen || {}), filter: saKopie(v.filter || []),
-            gruppe: v.gruppe || '', gruppenAn: !!v.gruppenAn, sort: saKopie(v.sort || {}),
+            gruppe: v.gruppe || '', gruppenAn: !!v.gruppenAn, sort: saKopie(v.sort || {}), werte: saKopie(v.werte || []),
             ordnung: saNaechsterRang(), geaendert: jetzt() };
   if (alsVorlage) { s.saetze = saKopie(saetze || []); }
   DB.sammlungen.push(s);
   if (!alsVorlage) {
     (saetze || []).forEach(function (w) {
-      DB.datensaetze.push({ id: neueKennung(), sammlung: s.id, werte: saKopie(w), geaendert: jetzt() });
+      DB.datensaetze.push({ id: neueKennung(), sammlung: s.id, werte: saKopie(w), angelegt: jetzt(), geaendert: jetzt() });
     });
   }
   return s;
@@ -5964,6 +6159,7 @@ function saAnlegen() {
 function saWerteLesen(s) {
   var w = {};
   (s.felder || []).forEach(function (f) {
+    if (f.typ === 'formel') { return; }
     var t = saFeldWert('saF_' + f.id);
     if (f.typ === 'betrag' || f.typ === 'zahl') {
       var n = saZahlLesen(t);
@@ -5993,7 +6189,7 @@ function saEintragSpeichern() {
     d.geaendert = jetzt();
   } else {
     if (!Array.isArray(DB.datensaetze)) { DB.datensaetze = []; }
-    DB.datensaetze.push({ id: neueKennung(), sammlung: s.id, werte: werte, geaendert: jetzt() });
+    DB.datensaetze.push({ id: neueKennung(), sammlung: s.id, werte: werte, angelegt: jetzt(), geaendert: jetzt() });
   }
   spaeterSichern();
   aufklappZu();
@@ -6004,7 +6200,7 @@ function saEintragKopieren() {
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
   var d = (f && f.id) ? saSatzFinden(f.id) : null;
   if (!s || !d) { return; }
-  var neu = { id: neueKennung(), sammlung: s.id, werte: saWerteLesen(s), geaendert: jetzt() };
+  var neu = { id: neueKennung(), sammlung: s.id, werte: saWerteLesen(s), angelegt: jetzt(), geaendert: jetzt() };
   DB.datensaetze.push(neu);
   spaeterSichern();
   melde('Kopie angelegt.', 'gut');
@@ -6029,26 +6225,95 @@ function saFeldSpeichern() {
   if (!f || !s) { aufklappZu(); return; }
   var name = String(saFeldWert('saFeldName') || '').trim();
   if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  if (/[\[\]]/.test(name)) { melde('Der Name darf keine eckigen Klammern enthalten.', 'warn'); return; }
   var fe = f.id ? saFeld(s, f.id) : null;
+  var typ = saFeldWert('saFeldTyp');
+  typ = SA_TYPEN.some(function (t) { return t[0] === typ; }) ? typ : 'text';
+  var formel = String(saFeldWert('saFeldFormel') || '').trim();
+  if (typ === 'formel') {
+    var fehler = saFormelPruefen(s, formel, fe);
+    if (fehler) { melde('Die Formel stimmt nicht: ' + fehler, 'warn'); return; }
+  }
   if (!fe) {
     fe = { id: 'f' + neueKennung() };
     s.felder.push(fe);
   }
   fe.name = name.slice(0, 60);
-  var typ = saFeldWert('saFeldTyp');
-  fe.typ = SA_TYPEN.some(function (t) { return t[0] === typ; }) ? typ : 'text';
+  fe.typ = typ;
   fe.werte = String(saFeldWert('saFeldWerte') || '').split('\n').map(function (x) { return x.trim(); }).filter(function (x) { return x; });
   if (fe.typ !== 'auswahl') { delete fe.werte; }
   var sp = document.getElementById('saFeldSpalte');
   var gr = document.getElementById('saFeldGruppe');
   fe.spalte = !!(sp && sp.checked);
   var summe = saFeldWert('saFeldSumme');
-  fe.summe = (['betrag', 'zahl', 'bewertung'].indexOf(fe.typ) >= 0 || summe === 'anzahl') ? summe : '';
+  fe.summe = (saRechts(fe) || summe === 'anzahl') ? summe : '';
   if (gr && gr.checked) { s.gruppe = fe.id; }
   else if (s.gruppe === fe.id) { s.gruppe = ''; s.gruppenAn = false; }
+  /* Formel und Standardwert (seit 0.8) */
+  if (fe.typ === 'formel') {
+    var vz = document.getElementById('saFeldVz');
+    var dez = Number(saFeldWert('saFeldDez'));
+    fe.formel = formel.slice(0, 200);
+    fe.dez = (dez >= 0 && dez <= 3) ? dez : 2;
+    fe.vorzeichen = !!(vz && vz.checked);
+    delete fe.standard;
+    delete fe.standardWert;
+  } else {
+    delete fe.formel;
+    delete fe.dez;
+    delete fe.vorzeichen;
+    var std = saFeldWert('saFeldStd');
+    if (std === 'heute' && fe.typ !== 'datum') { std = ''; }
+    if (['heute', 'fest', 'zuletzt'].indexOf(std) < 0) { std = ''; }
+    fe.standard = std;
+    fe.standardWert = (std === 'fest') ? String(saFeldWert('saFeldStdWert') || '').trim().slice(0, 200) : '';
+    if (!std) { delete fe.standard; delete fe.standardWert; }
+  }
   saGeaendert(s);
   spaeterSichern();
   aufklappZu();
+}
+
+/* Die Namen, die eine Formel verwenden darf — ohne das Feld selbst */
+function saFormelNamen(s, ohne) {
+  var n = (s.felder || []).filter(function (f) { return f !== ohne; }).map(function (f) { return '[' + f.name + ']'; });
+  return n.concat((s.werte || []).map(function (w) { return '[' + w.name + ']'; }));
+}
+
+/* Prüft die Schreibweise und ob es alle Namen gibt. Ergebnis: Fehlertext oder '' */
+function saFormelPruefen(s, formel, ohne) {
+  var namen = saFormelNamen(s, ohne).map(function (x) { return x.toLowerCase(); });
+  try {
+    saFormelAuswerten(formel, function (name) {
+      if (namen.indexOf('[' + String(name).toLowerCase() + ']') < 0) { throw new Error('[' + name + '] gibt es nicht'); }
+      return 1;
+    });
+  } catch (e) {
+    return e.message;
+  }
+  return '';
+}
+
+/* Die Vorbelegung bei Neu: heute, ein fester Wert oder wie im jüngsten Eintrag */
+function saStandardWerte(s) {
+  var w = {};
+  var letzter = null;
+  saSaetze(s).forEach(function (d) {
+    if (!letzter || (d.angelegt || d.geaendert || 0) > (letzter.angelegt || letzter.geaendert || 0)) { letzter = d; }
+  });
+  (s.felder || []).forEach(function (f) {
+    if (f.standard === 'heute' && f.typ === 'datum') { w[f.id] = isoDatum(); }
+    else if (f.standard === 'fest' && String(f.standardWert || '') !== '') {
+      var t = String(f.standardWert);
+      if (f.typ === 'betrag' || f.typ === 'zahl') { var n = saZahlLesen(t); if (n !== null) { w[f.id] = n; } }
+      else if (f.typ === 'bewertung') { w[f.id] = Number(t) || 0; }
+      else if (f.typ === 'janein') { w[f.id] = /^(ja|1|x)$/i.test(t); }
+      else { w[f.id] = t; }
+    } else if (f.standard === 'zuletzt' && letzter && (letzter.werte || {})[f.id] !== undefined) {
+      w[f.id] = letzter.werte[f.id];
+    }
+  });
+  return w;
 }
 
 function saFeldLoeschen() {
@@ -6084,6 +6349,38 @@ function saFilterSpeichern() {
   fi.feld = feld;
   fi.op = op;
   fi.wert = String(saFeldWert('saFiWert') || '').trim();
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
+}
+
+function saWertSpeichern() {
+  var f = cl.sa.fenster;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || !s) { aufklappZu(); return; }
+  var name = String(saFeldWert('saWertName') || '').trim();
+  var zahl = saZahlLesen(saFeldWert('saWertZahl'));
+  if (!name || /[\[\]]/.test(name)) { melde('Bitte einen Namen ohne eckige Klammern eingeben.', 'warn'); return; }
+  if (zahl === null) { melde('Bitte eine Zahl eingeben, z. B. 82,5.', 'warn'); return; }
+  var doppelt = (s.felder || []).concat(s.werte || []).some(function (y) { return y.id !== f.id && String(y.name).toLowerCase() === name.toLowerCase(); });
+  if (doppelt) { melde('Den Namen „' + name + '“ gibt es in dieser Sammlung schon.', 'warn'); return; }
+  if (!Array.isArray(s.werte)) { s.werte = []; }
+  var w = null;
+  s.werte.forEach(function (y) { if (y.id === f.id) { w = y; } });
+  if (!w) { w = { id: 'w' + neueKennung() }; s.werte.push(w); }
+  w.name = name.slice(0, 40);
+  w.wert = zahl;
+  w.einheit = String(saFeldWert('saWertEinheit') || '').trim().slice(0, 12);
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
+}
+
+function saWertLoeschen() {
+  var f = cl.sa.fenster;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || !s) { aufklappZu(); return; }
+  s.werte = (s.werte || []).filter(function (y) { return y.id !== f.id; });
   saGeaendert(s);
   spaeterSichern();
   aufklappZu();
