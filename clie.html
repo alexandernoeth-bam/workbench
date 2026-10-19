@@ -1,0 +1,2647 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CLIE 0.1.0</title>
+<meta name="theme-color" content="#1C2116">
+<link rel="manifest" href="./clie.webmanifest">
+<link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./clie-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Optik A: grünes LCD, Pixelschrift, Knöpfe mit runden Ecken — wie der Palm */
+:root{--lcd:#B9C4A6;--lcd-hell:#C9D3B7;--px:#1C2116;--px-mitte:#56604A;--px-zart:#8E9A7C;--gehaeuse:#1E1E1E}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--gehaeuse);color:var(--px);overflow:hidden;
+  font-family:"Pixelify Sans",ui-monospace,Menlo,Consolas,monospace;font-size:16px;line-height:1.25;-webkit-font-smoothing:none}
+button{font:inherit;color:inherit;cursor:pointer;background:transparent;border:0;padding:0;-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:default;color:var(--px-zart)}
+button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
+
+.geraet{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;background:var(--lcd);position:relative;overflow:hidden;
+  padding-top:env(safe-area-inset-top)}
+.kopf{display:flex;align-items:center;gap:8px;padding:8px 8px 6px;border-bottom:2px solid var(--px);flex:0 0 auto}
+.reiter{background:var(--px);color:var(--lcd);font-weight:600;padding:3px 9px 2px;border-radius:5px 5px 0 0;font-size:17px;max-width:62%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.luecke{flex:1}
+.uhr{font-size:15px}
+.kat{font-size:15px;padding:2px 2px 2px 6px;white-space:nowrap}
+.kat.an{background:var(--px);color:var(--lcd);border-radius:3px}
+
+.anmeldebanner{display:none;align-items:center;gap:8px;padding:7px 8px;border-bottom:2px solid var(--px);background:var(--px);color:var(--lcd);font-size:14px}
+.anmeldebanner.sichtbar{display:flex}
+#anmeldeText{flex:1;min-width:0}
+.anmeldebanner button{border:2px solid var(--lcd);border-radius:12px;padding:1px 9px;font-size:14px;white-space:nowrap}
+.neustreifen{display:none;align-items:center;gap:8px;padding:6px 8px;border-bottom:2px dotted var(--px);font-size:14px;width:100%;text-align:left}
+.neustreifen.sichtbar{display:flex}
+#neuText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.neu-wort{border:2px solid var(--px);border-radius:12px;padding:0 8px}
+
+.inhalt{flex:1;min-height:0;overflow:auto;padding:6px 10px 14px;position:relative}
+
+/* Silkscreen: die festen Tasten unten */
+.silk{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);background:var(--lcd-hell);border-top:2px solid var(--px-mitte);
+  padding:6px 4px calc(8px + env(safe-area-inset-bottom));text-align:center;font-size:12px;color:var(--px-mitte)}
+.silk button{color:var(--px-mitte);font-size:12px;padding:2px 0}
+.silk button b{display:block;font-size:21px;line-height:1.05;color:var(--px)}
+.silk button:disabled b{color:var(--px-zart)}
+
+/* Übersicht */
+.blick{margin:4px 2px 0;padding:6px 8px;border:2px dotted var(--px-mitte);border-radius:8px;font-size:14px}
+.blick div{padding:1px 0}
+.apps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 6px;padding:14px 2px 6px}
+.app{text-align:center;font-size:15px;display:flex;flex-direction:column;align-items:center}
+.sym{width:60px;height:60px;margin:0 auto 5px;border:2px solid var(--px);border-radius:12px;display:flex;align-items:center;justify-content:center;
+  position:relative;font-size:27px;background:var(--lcd-hell)}
+.app:active .sym{background:var(--px);color:var(--lcd)}
+.app.spaeter .sym{border-style:dashed;color:var(--px-mitte)}
+.zahl{position:absolute;top:-8px;right:-10px;background:var(--px);color:var(--lcd);border-radius:10px;font-size:12px;padding:0 6px;line-height:18px}
+.fassung{text-align:center;font-size:12px;color:var(--px-mitte);margin:10px 0 0}
+.unterz{display:block;font-size:11.5px;color:var(--px-mitte);margin-top:1px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Aufklapplisten: Kategorie und Menü */
+.aufklapp{position:absolute;z-index:20;background:var(--lcd);border:2px solid var(--px);box-shadow:3px 3px 0 var(--px);min-width:150px}
+.aufklapp button{display:block;width:100%;text-align:left;padding:5px 12px;font-size:16px}
+.aufklapp button.an,.aufklapp button:active{background:var(--px);color:var(--lcd)}
+.aufklapp .trenn{border-top:2px dotted var(--px-zart);margin:2px 0}
+.menue-zeile{display:flex;gap:0;border-bottom:2px solid var(--px);background:var(--px);color:var(--lcd)}
+.menue-zeile span{padding:3px 12px;font-weight:600}
+.schleier{position:absolute;inset:0;z-index:15;display:none}
+.schleier.auf{display:block}
+
+/* Platzhalter späterer Apps */
+.spaeter-text{margin:18px 6px;font-size:15px;line-height:1.45}
+.spaeter-text .gross{font-size:44px;text-align:center;margin:10px 0 14px}
+
+/* Abgleich (HotSync) */
+.hs{text-align:center;padding:14px 0 6px}
+.hs-knopf{width:112px;height:112px;border:2px solid var(--px);border-radius:50%;font-size:50px;background:var(--lcd-hell);box-shadow:3px 3px 0 var(--px)}
+.hs-knopf:active{background:var(--px);color:var(--lcd);box-shadow:none;transform:translate(3px,3px)}
+.hs-knopf.laeuft{animation:hs-dreh 1.2s steps(8) infinite}
+@keyframes hs-dreh{to{transform:rotate(360deg)}}
+.hs-wort{margin-top:8px;font-size:17px;font-weight:600}
+.hs-stand{font-size:14px;color:var(--px-mitte);margin-top:2px}
+.abschnitt{font-weight:600;margin:12px 0 2px;font-size:14px;border-bottom:2px solid var(--px)}
+.reihe{display:flex;gap:8px;border-bottom:2px dotted var(--px-zart);padding:4px 0;font-size:14.5px}
+.reihe span:first-child{flex:0 0 42%;color:var(--px-mitte)}
+.reihe span:last-child{flex:1;min-width:0;overflow-wrap:anywhere;text-align:right}
+.reihe .warn{font-weight:600}
+.knoepfe{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
+.knopf{border:2px solid var(--px);border-radius:12px;padding:2px 10px;font-size:14.5px}
+.knopf.voll{background:var(--px);color:var(--lcd)}
+.knopf:disabled{border-color:var(--px-zart)}
+.leise{font-size:13px;color:var(--px-mitte);margin:6px 0 0;line-height:1.4}
+
+/* Hinweis wie ein Palm-Alarm */
+.toast{position:absolute;left:10px;right:10px;bottom:calc(70px + env(safe-area-inset-bottom));z-index:40;display:none;gap:10px;align-items:center;
+  background:var(--lcd);border:2px solid var(--px);box-shadow:3px 3px 0 var(--px);padding:8px 10px;font-size:14.5px;white-space:pre-line}
+.toast.auf{display:flex}
+.toast.warn{background:var(--px);color:var(--lcd);box-shadow:3px 3px 0 var(--px-mitte)}
+#toastText{flex:1}
+.toast button{border:2px solid currentColor;border-radius:12px;padding:0 8px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="geraet">
+  <header class="kopf">
+    <button type="button" class="reiter" id="reiter" onclick="menueUm()" title="Menü">Übersicht</button>
+    <span class="luecke"></span>
+    <span class="uhr" id="uhr"></span>
+    <button type="button" class="kat" id="katKnopf" onclick="katUm()" title="Beruf oder Privat">▼ Alle</button>
+  </header>
+  <div class="anmeldebanner" id="anmeldeStreifen">
+    <span id="anmeldeText">Keine Verbindung zu Google.</span>
+    <button type="button" onclick="anmelden(false)">Verbinden</button>
+  </div>
+  <button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
+    <span id="neuText"></span>
+    <span class="neu-wort">Laden</span>
+  </button>
+  <main class="inhalt" id="inhalt"></main>
+  <nav class="silk" aria-label="Tasten">
+    <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Übersicht</button>
+    <button type="button" onclick="menueUm()"><b>≡</b>Menü</button>
+    <button type="button" disabled title="Kommt mit CLIE 0.3"><b>⌕</b>Suchen</button>
+    <button type="button" onclick="oeffne('abgleich')"><b>⇅</b>Abgleich</button>
+  </nav>
+  <div class="schleier" id="schleier" onclick="aufklappZu()"></div>
+  <div id="aufklapp"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" onclick="toastZu()">OK</button></div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   Grunddaten
+
+   CLIE arbeitet auf der workbench.json — mit den Sammlungen der
+   Workbench. Gerätespeicher, Dateigriff und Anmeldemerker heißen
+   eigen: Liegen die Apps unter derselben Adresse, kommen sie sich
+   lokal nicht in die Quere; zusammen kommen sie über Google Drive.
+   ============================================================ */
+
+var APP_VERSION = '0.1.0';
+var DATEINAME   = 'workbench.json';
+var IDB_NAME    = 'clie-speicher';
+var IDB_STORE   = 'handles';
+var IDB_KEY     = 'datendatei';
+var LS_KEY      = 'clie-daten';
+var OPFS_NAME   = 'clie-workbench.json';
+/* Dieselbe Google-Anwendung wie die Workbench: Nur so ist deren
+   workbench.json mit dem Recht drive.file sichtbar. Dazu das Lesen
+   des Kalenders. */
+var CLIENT_ID   = '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
+var REDIRECT_URI = 'https://alexandernoeth-bam.github.io/workbench/workbench.html';
+var SCOPES = 'https://www.googleapis.com/auth/drive.file '
+           + 'https://www.googleapis.com/auth/calendar.readonly';
+var GIS_URL   = 'https://accounts.google.com/gsi/client';
+var TOKEN_KEY = 'clie-zugriff';
+var ANMELDE_MERKER = 'clie-war-angemeldet';
+var ABGLEICH_VERZUG  = 4000;
+var ABGLEICH_MINDEST = 20000;
+var ABGLEICH_TAKT    = 30000;
+var DRIVE_DATEI = 'workbench.json';
+var VORLAUF_MS = 5 * 60 * 1000;
+var GRABSTEIN_TAGE = 180;
+
+/* Wörtlich aus der Workbench — sonst gingen beim Abgleich Sammlungen verloren. */
+var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe',
+                  'jahrestermine','ferien','einfaelle','gedanken','pinnwand',
+                  'kalenderzuordnung','notizbuecher','notizseiten','wochen','tage'];
+
+/* Aus der Workbench: nummerierte Zeilen */
+var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
+
+var speicherWeg = 'keiner';
+var dateiHandle = null;
+var dateiName = '';
+var rechteStand = 'unbekannt';
+var letzterSchreibvorgang = null;
+var tokenClient = null;
+var zugriffToken = null;
+var tokenAblauf = 0;
+var erneuerungsUhr = null;
+var erneuerungVersuche = 0;
+var ERNEUERUNG_MAX = 6;
+var ERNEUERUNG_ABSTAND = 60000;
+var ANMELDE_ZEITGRENZE_MS = 60 * 1000;
+var anmeldungLaeuft = false;
+var letzteErneuerung = null;
+var gisBereit = false;
+var driveDateiId = '';
+var driveStand = '';
+var letzteUebertragung = null;
+var letzterAbgleich = null;
+var letzterBericht = null;
+var abgleichUhr = null;
+var abgleichLaeuft = false;
+var abgleichZuletztMs = 0;
+var verbindungOk = null;
+var verbindungUhr = null;
+var VERBINDUNG_TAKT = 60000;
+var abgleichFehler = '';
+var lokalOffen = false;
+var taktUhr = null;
+
+/* Termine gehören Google: nur im Arbeitsspeicher, nie in der Datei. */
+var kalenderListe = [];
+var termineNachTag = {};
+var kalenderStand = '';
+var kalenderFehler = '';
+var kalenderLaeuft = false;
+var kalenderUhr = null;
+
+/* ============================================================
+   Unterbau aus der Workbench 6.2.2 — wörtlich übernommen:
+   Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke,
+   Kalender lesen, leere Datenbank und der Aktivitäten-Kern (kp…).
+   ============================================================ */
+
+function zwei(n) { return (n < 10 ? '0' : '') + n; }
+
+function isoDatum(d) {
+  var x = d || new Date();
+  return x.getFullYear() + '-' + zwei(x.getMonth() + 1) + '-' + zwei(x.getDate());
+}
+
+function isoZeit(d) {
+  var x = d || new Date();
+  return isoDatum(x) + ' ' + zwei(x.getHours()) + ':' + zwei(x.getMinutes()) + ':' + zwei(x.getSeconds());
+}
+
+function esc(text) {
+  return String(text === null || text === undefined ? '' : text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function ausIso(is) {
+  var p = String(is).split('-');
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+
+function tagePlus(is, n) {
+  var d = ausIso(is);
+  d.setDate(d.getDate() + n);
+  return isoDatum(d);
+}
+
+function montagVon(is) {
+  var d = ausIso(is);
+  var wt = (d.getDay() === 0) ? 7 : d.getDay();
+  return tagePlus(is, 1 - wt);
+}
+
+function kalenderwoche(is) {
+  var d = ausIso(is);
+  var ziel = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  ziel.setDate(ziel.getDate() + 3 - ((ziel.getDay() + 6) % 7));
+  var ersterDonnerstag = new Date(ziel.getFullYear(), 0, 4);
+  ersterDonnerstag.setDate(ersterDonnerstag.getDate() + 3 - ((ersterDonnerstag.getDay() + 6) % 7));
+  return 1 + Math.round((ziel - ersterDonnerstag) / (7 * 86400000));
+}
+
+function fsApiDa()   { return (typeof window.showOpenFilePicker === 'function'); }
+
+function opfsDa()    { return !!(navigator.storage && navigator.storage.getDirectory); }
+
+function idbDa()     { return !!window.indexedDB; }
+
+function localDa() {
+  try {
+    window.localStorage.setItem('__probe__', '1');
+    window.localStorage.removeItem('__probe__');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function idbOeffnen() {
+  return new Promise(function (fertig, fehler) {
+    if (!idbDa()) { fehler(new Error('IndexedDB nicht verfügbar')); return; }
+    var anfrage = window.indexedDB.open(IDB_NAME, 1);
+    anfrage.onupgradeneeded = function () {
+      var db = anfrage.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) { db.createObjectStore(IDB_STORE); }
+    };
+    anfrage.onsuccess = function () { fertig(anfrage.result); };
+    anfrage.onerror   = function () { fehler(anfrage.error); };
+  });
+}
+
+function idbSchreiben(schluessel, wert) {
+  return idbOeffnen().then(function (db) {
+    return new Promise(function (fertig, fehler) {
+      var t = db.transaction(IDB_STORE, 'readwrite');
+      t.objectStore(IDB_STORE).put(wert, schluessel);
+      t.oncomplete = function () { db.close(); fertig(true); };
+      t.onerror    = function () { db.close(); fehler(t.error); };
+    });
+  });
+}
+
+function idbLesen(schluessel) {
+  return idbOeffnen().then(function (db) {
+    return new Promise(function (fertig, fehler) {
+      var t = db.transaction(IDB_STORE, 'readonly');
+      var a = t.objectStore(IDB_STORE).get(schluessel);
+      a.onsuccess = function () { db.close(); fertig(a.result || null); };
+      a.onerror   = function () { db.close(); fehler(a.error); };
+    });
+  });
+}
+
+function rechtePruefen(handle) {
+  if (!handle || typeof handle.queryPermission !== 'function') {
+    return Promise.resolve('unbekannt');
+  }
+  return handle.queryPermission({ mode: 'readwrite' })
+    .then(function (stand) { return stand; })
+    .catch(function () { return 'unbekannt'; });
+}
+
+function rechteAnfragen(handle) {
+  if (!handle || typeof handle.requestPermission !== 'function') {
+    return Promise.resolve('unbekannt');
+  }
+  return handle.requestPermission({ mode: 'readwrite' })
+    .then(function (stand) { return stand; })
+    .catch(function () { return 'denied'; });
+}
+
+function dateiSchreiben(handle, text) {
+  return handle.createWritable().then(function (strom) {
+    return strom.write(text).then(function () { return strom.close(); });
+  });
+}
+
+function dateiLesen(handle) {
+  return handle.getFile().then(function (f) { return f.text(); });
+}
+
+function opfsHandle(anlegen) {
+  return navigator.storage.getDirectory().then(function (ordner) {
+    return ordner.getFileHandle(OPFS_NAME, { create: !!anlegen });
+  });
+}
+
+function opfsSchreiben(text) {
+  return opfsHandle(true).then(function (h) { return dateiSchreiben(h, text); });
+}
+
+function opfsLesen() {
+  return opfsHandle(false).then(function (h) { return dateiLesen(h); });
+}
+
+function localSchreiben(text) {
+  window.localStorage.setItem(LS_KEY, text);
+  return Promise.resolve(true);
+}
+
+function localLesen() {
+  return Promise.resolve(window.localStorage.getItem(LS_KEY));
+}
+
+function jetzt() { return Date.now(); }
+
+function neueKennung() {
+  return 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function grabsteinSetzen(sammlung, id) {
+  if (!Array.isArray(DB.grabsteine)) { DB.grabsteine = []; }
+  var i;
+  for (i = 0; i < DB.grabsteine.length; i++) {
+    if (DB.grabsteine[i].s === sammlung && DB.grabsteine[i].id === id) {
+      DB.grabsteine[i].z = jetzt();
+      return DB.grabsteine[i];
+    }
+  }
+  var g = { s: sammlung, id: id, z: jetzt() };
+  DB.grabsteine.push(g);
+  return g;
+}
+
+function grabsteinZeit(steine, sammlung, id) {
+  var i;
+  for (i = 0; i < steine.length; i++) {
+    if (steine[i].s === sammlung && steine[i].id === id) { return steine[i].z || 0; }
+  }
+  return 0;
+}
+
+function grabsteineAufraeumen(steine) {
+  var grenze = jetzt() - (GRABSTEIN_TAGE * 24 * 60 * 60 * 1000);
+  var frisch = [];
+  var i;
+  for (i = 0; i < steine.length; i++) {
+    if ((steine[i].z || 0) >= grenze) { frisch.push(steine[i]); }
+  }
+  return frisch;
+}
+
+function zusammenfuehren(lokal, fremd) {
+  var bericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+  var ergebnis = leereDatenbank();
+
+  var steine = grabsteineAufraeumen(
+    (Array.isArray(lokal.grabsteine) ? lokal.grabsteine : [])
+      .concat(Array.isArray(fremd.grabsteine) ? fremd.grabsteine : [])
+  );
+  /* Doppelte Vermerke auf den jüngsten zusammenziehen */
+  var karteS = {};
+  var i, s, k;
+  for (i = 0; i < steine.length; i++) {
+    var sl = steine[i].s + '|' + steine[i].id;
+    if (!karteS[sl] || (steine[i].z || 0) > karteS[sl].z) {
+      karteS[sl] = { s: steine[i].s, id: steine[i].id, z: steine[i].z || 0 };
+    }
+  }
+  var steineFrisch = [];
+  for (k in karteS) {
+    if (Object.prototype.hasOwnProperty.call(karteS, k)) { steineFrisch.push(karteS[k]); }
+  }
+  ergebnis.grabsteine = steineFrisch;
+
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    s = SAMMLUNGEN[i];
+
+    if (s === 'kalenderzuordnung') {
+      var a = lokal[s] || {};
+      var b = fremd[s] || {};
+      var alle = {};
+      for (k in a) { if (Object.prototype.hasOwnProperty.call(a, k)) { alle[k] = true; } }
+      for (k in b) { if (Object.prototype.hasOwnProperty.call(b, k)) { alle[k] = true; } }
+      for (k in alle) {
+        if (!Object.prototype.hasOwnProperty.call(alle, k)) { continue; }
+        var wa = a[k] || null;
+        var wb = b[k] || null;
+        var tot = grabsteinZeit(steineFrisch, s, k);
+        var neuster = Math.max(wa ? (wa.geaendert || 0) : 0, wb ? (wb.geaendert || 0) : 0);
+        if (tot && tot >= neuster) { bericht.entfernt++; continue; }
+        if (wa && wb) {
+          if ((wb.geaendert || 0) > (wa.geaendert || 0)) {
+            ergebnis[s][k] = wb; bericht.ersetzt++;
+            if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'fremd' }); }
+          } else {
+            ergebnis[s][k] = wa; bericht.behalten++;
+            if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'lokal' }); }
+          }
+        } else if (wb) {
+          ergebnis[s][k] = wb; bericht.neu++;
+        } else {
+          ergebnis[s][k] = wa; bericht.behalten++;
+        }
+      }
+      continue;
+    }
+
+    var listeA = Array.isArray(lokal[s]) ? lokal[s] : [];
+    var listeB = Array.isArray(fremd[s]) ? fremd[s] : [];
+    var karte = {};
+    var j;
+    for (j = 0; j < listeA.length; j++) { karte[listeA[j].id] = { a: listeA[j], b: null }; }
+    for (j = 0; j < listeB.length; j++) {
+      if (karte[listeB[j].id]) { karte[listeB[j].id].b = listeB[j]; }
+      else { karte[listeB[j].id] = { a: null, b: listeB[j] }; }
+    }
+
+    var kennung;
+    for (kennung in karte) {
+      if (!Object.prototype.hasOwnProperty.call(karte, kennung)) { continue; }
+      var paar = karte[kennung];
+      var za = paar.a ? (paar.a.geaendert || 0) : 0;
+      var zb = paar.b ? (paar.b.geaendert || 0) : 0;
+      var totZeit = grabsteinZeit(steineFrisch, s, kennung);
+
+      if (totZeit && totZeit >= Math.max(za, zb)) { bericht.entfernt++; continue; }
+
+      if (paar.a && paar.b) {
+        if (zb > za) {
+          ergebnis[s].push(paar.b); bericht.ersetzt++;
+          if (za > 0 && zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'fremd' }); }
+        } else if (za > zb) {
+          ergebnis[s].push(paar.a); bericht.behalten++;
+          if (zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'lokal' }); }
+        } else {
+          ergebnis[s].push(paar.a); bericht.behalten++;
+        }
+      } else if (paar.b) {
+        ergebnis[s].push(paar.b); bericht.neu++;
+      } else {
+        ergebnis[s].push(paar.a); bericht.behalten++;
+      }
+    }
+  }
+
+  /* Einstellungen wurden bisher als Ganzes ersetzt: Wer den jüngeren
+     Stempel hatte, bestimmte alles. Damit verschwand eine Einstellung,
+     die das andere Gerät gar nicht kannte — etwa eine neu freigegebene
+     Art fürs Jahresraster. Jetzt wird je Schlüssel zusammengeführt:
+     Der jüngere Stand gewinnt, aber er löscht nichts, was er nicht
+     kennt. */
+  var ea = (lokal.einstellungen && lokal.einstellungen.stempel) || 0;
+  var eb = (fremd.einstellungen && fremd.einstellungen.stempel) || 0;
+  var aelter = (eb > ea) ? (lokal.einstellungen || {}) : (fremd.einstellungen || {});
+  var juenger = (eb > ea) ? (fremd.einstellungen || {}) : (lokal.einstellungen || {});
+
+  /* Diese Einstellungen sind Verzeichnisse: Dort wird je Eintrag
+     verschmolzen, sonst verlöre man die Wahl des anderen Geräts. */
+  var VERZEICHNISSE = ['artenImJahr', 'flaecheOben', 'skizzenVorschau'];
+
+  var e;
+  for (e in aelter) {
+    if (Object.prototype.hasOwnProperty.call(aelter, e)) {
+      ergebnis.einstellungen[e] = aelter[e];
+    }
+  }
+  for (e in juenger) {
+    if (!Object.prototype.hasOwnProperty.call(juenger, e)) { continue; }
+    if (VERZEICHNISSE.indexOf(e) >= 0) {
+      var zus = {};
+      var q, k2;
+      for (q = 0; q < 2; q++) {
+        var vz = (q === 0) ? (aelter[e] || {}) : (juenger[e] || {});
+        for (k2 in vz) {
+          if (Object.prototype.hasOwnProperty.call(vz, k2)) { zus[k2] = vz[k2]; }
+        }
+      }
+      ergebnis.einstellungen[e] = zus;
+      continue;
+    }
+    ergebnis.einstellungen[e] = juenger[e];
+  }
+  ergebnis.einstellungen.clientId = CLIENT_ID;
+  ergebnis.einstellungen.redirectUri = REDIRECT_URI;
+  ergebnis.version = APP_VERSION;
+
+  return { db: ergebnis, bericht: bericht };
+}
+
+function alsText() {
+  DB.version = APP_VERSION;
+  if (!DB.einstellungen) { DB.einstellungen = leereDatenbank().einstellungen; }
+  DB.einstellungen.gespeichert = isoZeit();
+  if (!DB.einstellungen.stempel) { DB.einstellungen.stempel = jetzt(); }
+  if (!Array.isArray(DB.grabsteine)) { DB.grabsteine = []; }
+  return JSON.stringify(DB, null, 2);
+}
+
+function uebernehmen(text) {
+  if (!text) { return false; }
+  var gelesen;
+  try {
+    gelesen = JSON.parse(text);
+  } catch (e) {
+    melde('Die Datei enthält kein gültiges JSON: ' + e.message, 'warn');
+    return false;
+  }
+  if (!gelesen || typeof gelesen !== 'object') { return false; }
+
+  var frisch = leereDatenbank();
+  var i;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    var name = SAMMLUNGEN[i];
+    if (name === 'kalenderzuordnung') {
+      if (gelesen[name] && typeof gelesen[name] === 'object') { frisch[name] = gelesen[name]; }
+    } else if (Array.isArray(gelesen[name])) {
+      frisch[name] = gelesen[name];
+    }
+  }
+  if (gelesen.einstellungen && typeof gelesen.einstellungen === 'object') {
+    var e;
+    for (e in gelesen.einstellungen) {
+      if (Object.prototype.hasOwnProperty.call(gelesen.einstellungen, e)) {
+        frisch.einstellungen[e] = gelesen.einstellungen[e];
+      }
+    }
+  }
+  if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
+  frisch.einstellungen.clientId    = CLIENT_ID;
+  frisch.einstellungen.redirectUri = REDIRECT_URI;
+  bestandStempeln(frisch);
+  DB = frisch;
+  return true;
+}
+
+function speichern() {
+  var text = alsText();
+
+  if (speicherWeg === 'datei' && dateiHandle) {
+    return dateiSchreiben(dateiHandle, text).then(function () {
+      letzterSchreibvorgang = isoZeit();
+      return 'datei';
+    }).catch(function (f) {
+      melde('Schreiben in die Datei fehlgeschlagen, weiche auf den Notweg aus.\n' + f.message, 'warn');
+      return notwegSchreiben(text);
+    });
+  }
+  return notwegSchreiben(text);
+}
+
+function notwegSchreiben(text) {
+  if (opfsDa()) {
+    return opfsSchreiben(text).then(function () {
+      speicherWeg = 'opfs';
+      letzterSchreibvorgang = isoZeit();
+      return 'opfs';
+    }).catch(function () {
+      return localNotweg(text);
+    });
+  }
+  return localNotweg(text);
+}
+
+function localNotweg(text) {
+  if (!localDa()) {
+    speicherWeg = 'keiner';
+    return Promise.reject(new Error('Kein Speicherweg verfügbar'));
+  }
+  return localSchreiben(text).then(function () {
+    speicherWeg = 'local';
+    letzterSchreibvorgang = isoZeit();
+    return 'local';
+  });
+}
+
+function laden() {
+  if (dateiHandle) {
+    return rechtePruefen(dateiHandle).then(function (stand) {
+      rechteStand = stand;
+      if (stand !== 'granted') { return null; }
+      return dateiLesen(dateiHandle).then(function (text) {
+        if (uebernehmen(text)) { speicherWeg = 'datei'; return 'datei'; }
+        return null;
+      });
+    }).then(function (ergebnis) {
+      if (ergebnis) { return ergebnis; }
+      return notwegLesen();
+    }).catch(function () {
+      return notwegLesen();
+    });
+  }
+  return notwegLesen();
+}
+
+function notwegLesen() {
+  if (opfsDa()) {
+    return opfsLesen().then(function (text) {
+      if (uebernehmen(text)) { speicherWeg = 'opfs'; return 'opfs'; }
+      return localNotwegLesen();
+    }).catch(function () {
+      return localNotwegLesen();
+    });
+  }
+  return localNotwegLesen();
+}
+
+function localNotwegLesen() {
+  if (!localDa()) { speicherWeg = 'keiner'; return Promise.resolve(null); }
+  return localLesen().then(function (text) {
+    if (uebernehmen(text)) { speicherWeg = 'local'; return 'local'; }
+    speicherWeg = localDa() ? 'local' : 'keiner';
+    return null;
+  });
+}
+
+function gisLaden() {
+  if (gisBereit) { return Promise.resolve(true); }
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+    gisBereit = true;
+    return Promise.resolve(true);
+  }
+  return new Promise(function (fertig, fehler) {
+    var vorhanden = document.getElementById('gisSkript');
+    if (vorhanden) {
+      vorhanden.addEventListener('load', function () { gisBereit = true; fertig(true); });
+      return;
+    }
+    var s = document.createElement('script');
+    s.id = 'gisSkript';
+    s.src = GIS_URL;
+    s.async = true;
+    s.onload = function () { gisBereit = true; fertig(true); };
+    s.onerror = function () { fehler(new Error('Die Anmeldebibliothek ließ sich nicht laden.')); };
+    document.head.appendChild(s);
+  });
+}
+
+function tokenMerken(token, gueltigSek) {
+  zugriffToken = token;
+  tokenAblauf = Date.now() + (gueltigSek * 1000);
+  try {
+    window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ t: token, a: tokenAblauf }));
+  } catch (e) {
+    /* ohne sessionStorage lebt der Schlüssel nur bis zum Neuladen */
+  }
+  erneuerungPlanen();
+}
+
+function tokenAusSitzung() {
+  try {
+    var roh = window.sessionStorage.getItem(TOKEN_KEY);
+    if (!roh) { return false; }
+    var w = JSON.parse(roh);
+    if (!w || !w.t || !w.a || w.a <= Date.now()) { return false; }
+    zugriffToken = w.t;
+    tokenAblauf = w.a;
+    erneuerungPlanen();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function tokenVergessen() {
+  zugriffToken = null;
+  tokenAblauf = 0;
+  if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
+  try { window.sessionStorage.removeItem(TOKEN_KEY); } catch (e) { /* egal */ }
+}
+
+function tokenGueltig() {
+  return !!zugriffToken && tokenAblauf > Date.now();
+}
+
+function restMinuten() {
+  if (!tokenGueltig()) { return 0; }
+  return Math.max(0, Math.round((tokenAblauf - Date.now()) / 60000));
+}
+
+function erneuerungPlanen() {
+  if (erneuerungsUhr) { window.clearTimeout(erneuerungsUhr); erneuerungsUhr = null; }
+  if (!tokenAblauf) { return; }
+  erneuerungVersuche = 0;
+  var wartezeit = tokenAblauf - Date.now() - VORLAUF_MS;
+  if (wartezeit < 1000) { wartezeit = 1000; }
+  erneuerungsUhr = window.setTimeout(erneuerungLaufen, wartezeit);
+}
+
+function erneuerungLaufen() {
+  erneuerungsUhr = null;
+  erneuerungVersuche++;
+  anmelden(true).then(function (gut) {
+    if (gut) { return; }
+    if (erneuerungVersuche >= ERNEUERUNG_MAX) { return; }
+    erneuerungsUhr = window.setTimeout(erneuerungLaufen, ERNEUERUNG_ABSTAND);
+  });
+}
+
+function erneuerungPruefen() {
+  if (!tokenGueltig()) { return; }
+  if (erneuerungsUhr) { return; }
+  if (restMinuten() > 10) { return; }
+  erneuerungVersuche = 0;
+  erneuerungLaufen();
+}
+
+function klientVorbereiten() {
+  if (tokenClient) { return Promise.resolve(tokenClient); }
+  return gisLaden().then(function () {
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: function () { /* wird je Anfrage überschrieben */ },
+      /* Scheitert das Anmeldefenster selbst — blockiert, geschlossen —,
+         meldet Google das nur hier, nicht über callback. */
+      error_callback: function () { /* wird je Anfrage überschrieben */ }
+    });
+    return tokenClient;
+  });
+}
+
+function anmelden(still) {
+  return anmeldeVersuch(still, still ? '' : '').then(function (gut) {
+    if (gut || still) { return gut; }
+    return anmeldeVersuch(false, 'consent');
+  });
+}
+
+function anmeldeVersuch(still, aufforderung) {
+  return klientVorbereiten().then(function (klient) {
+    return new Promise(function (fertig) {
+      anmeldeAnfragen(klient, still, aufforderung, fertig);
+    });
+  }).catch(function (f) {
+    anmeldungLaeuft = false;
+    melde('Anmeldung nicht möglich.\n' + (f ? f.message : ''), 'warn');
+    zeichne();
+    return false;
+  });
+}
+
+function abmelden() {
+  var alt = zugriffToken;
+  try { window.localStorage.removeItem(ANMELDE_MERKER); } catch (e) { /* egal */ }
+  tokenVergessen();
+  driveDateiId = '';
+  driveStand = '';
+  if (alt && window.google && window.google.accounts && window.google.accounts.oauth2) {
+    try { window.google.accounts.oauth2.revoke(alt, function () { return null; }); }
+    catch (e) { /* Widerruf ist Beiwerk */ }
+  }
+  melde('Abgemeldet. Die lokalen Daten bleiben erhalten.', null);
+  anmeldeStreifenPruefen();
+  zeichne();
+}
+
+function warAngemeldet() {
+  try { return window.localStorage.getItem(ANMELDE_MERKER) === '1'; }
+  catch (e) { return false; }
+}
+
+function driveKopf(zusatz) {
+  var k = { 'Authorization': 'Bearer ' + zugriffToken };
+  if (zusatz) {
+    var n;
+    for (n in zusatz) {
+      if (Object.prototype.hasOwnProperty.call(zusatz, n)) { k[n] = zusatz[n]; }
+    }
+  }
+  return k;
+}
+
+function dienstAusAdresse(url) {
+  var text = String(url || '');
+  if (text.indexOf('/calendar/') >= 0) { return 'Der Kalender'; }
+  if (text.indexOf('/drive/') >= 0 || text.indexOf('/upload/drive/') >= 0) { return 'Drive'; }
+  return 'Google';
+}
+
+function antwortPruefen(a) {
+  if (a.ok) { return a; }
+  var dienst = dienstAusAdresse(a.url);
+  if (a.status === 401) {
+    tokenVergessen();
+    throw new Error('Der Zugriff ist abgelaufen. Bitte neu anmelden.');
+  }
+  return a.text().then(function (t) {
+    /* Eine nicht freigeschaltete Schnittstelle sieht aus wie ein
+       Rechtefehler, ist aber eine Einstellung im Google-Projekt. */
+    if (a.status === 403 && /has not been used|is disabled|SERVICE_DISABLED/i.test(t)) {
+      throw new Error(dienst + ' ist im Google-Projekt noch nicht freigeschaltet.\n'
+        + 'Cloud Console öffnen, Projekt wählen, unter „APIs & Dienste – Bibliothek" '
+        + 'die passende Schnittstelle aktivieren und ein bis zwei Minuten warten.');
+    }
+    if (a.status === 403) {
+      throw new Error(dienst + ' verweigert den Zugriff (403).\n' + t.slice(0, 200));
+    }
+    throw new Error(dienst + ' antwortete mit ' + a.status + ': ' + t.slice(0, 200));
+  });
+}
+
+function driveSuchen() {
+  var url = 'https://www.googleapis.com/drive/v3/files'
+          + '?q=' + encodeURIComponent("name='" + DRIVE_DATEI + "' and trashed=false")
+          + '&fields=' + encodeURIComponent('files(id,name,modifiedTime)')
+          + '&pageSize=10';
+  return window.fetch(url, { headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      var liste = (d && d.files) ? d.files : [];
+      if (!liste.length) { return null; }
+      driveDateiId = liste[0].id;
+      driveStand = liste[0].modifiedTime || '';
+      return liste[0];
+    });
+}
+
+function driveAnlegen() {
+  return window.fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: driveKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name: DRIVE_DATEI, mimeType: 'application/json' })
+  }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      driveDateiId = d.id;
+      return d.id;
+    });
+}
+
+function driveHochladen() {
+  var text = alsText();
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : driveAnlegen(); });
+  return los.then(function (id) {
+    return window.fetch('https://www.googleapis.com/upload/drive/v3/files/' + id
+                        + '?uploadType=media&fields=id,modifiedTime', {
+      method: 'PATCH',
+      headers: driveKopf({ 'Content-Type': 'application/json' }),
+      body: text
+    });
+  }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      driveStand = d.modifiedTime || '';
+      letzteUebertragung = isoZeit();
+      return true;
+    });
+}
+
+function driveHerunterladen() {
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : null; });
+  return los.then(function (id) {
+    if (!id) { return null; }
+    return window.fetch('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', {
+      headers: driveKopf()
+    }).then(antwortPruefen)
+      .then(function (a) { return a.text(); });
+  });
+}
+
+function textZuBestand(text) {
+  var gelesen;
+  try {
+    gelesen = JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+  if (!gelesen || typeof gelesen !== 'object') { return null; }
+  var frisch = leereDatenbank();
+  var i, name;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    name = SAMMLUNGEN[i];
+    if (name === 'kalenderzuordnung') {
+      if (gelesen[name] && typeof gelesen[name] === 'object') { frisch[name] = gelesen[name]; }
+    } else if (Array.isArray(gelesen[name])) {
+      frisch[name] = gelesen[name];
+    }
+  }
+  if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
+  if (gelesen.einstellungen && typeof gelesen.einstellungen === 'object') {
+    var e;
+    for (e in gelesen.einstellungen) {
+      if (Object.prototype.hasOwnProperty.call(gelesen.einstellungen, e)) {
+        frisch.einstellungen[e] = gelesen.einstellungen[e];
+      }
+    }
+  }
+  bestandStempeln(frisch);
+  return frisch;
+}
+
+function berichtText(b) {
+  if (!b) { return 'kein Abgleich gelaufen'; }
+  var t = b.neu + ' neu · ' + b.ersetzt + ' ersetzt · ' + b.behalten + ' behalten · '
+        + b.entfernt + ' entfernt';
+  if (b.konflikte.length) { t += ' · ' + b.konflikte.length + ' Konflikt(e)'; }
+  return t;
+}
+
+function abgleichen() {
+  if (!tokenGueltig()) { return Promise.reject(new Error('Nicht angemeldet.')); }
+  bestandStempeln(DB);
+  return driveHerunterladen().then(function (text) {
+    var fremd = text ? textZuBestand(text) : null;
+    if (!fremd) {
+      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+      return driveHochladen();
+    }
+    var ergebnis = zusammenfuehren(DB, fremd);
+    DB = ergebnis.db;
+    letzterBericht = ergebnis.bericht;
+    return speichern().then(function () { return driveHochladen(); });
+  }).then(function () {
+    letzterAbgleich = isoZeit();
+    return letzterBericht;
+  });
+}
+
+function abgleichPlanen(sofort) {
+  if (!tokenGueltig()) { return; }
+  if (abgleichUhr) { window.clearTimeout(abgleichUhr); }
+  abgleichUhr = window.setTimeout(abgleichStill, sofort ? 300 : ABGLEICH_VERZUG);
+}
+
+function taktPruefen() {
+  if (document.hidden) { return; }
+  anmeldeStreifenPruefen();
+  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  if (lokalOffen) { abgleichStill(); return; }
+  var vorher = driveStand;
+  driveSuchen().then(function (treffer) {
+    if (treffer && treffer.modifiedTime && treffer.modifiedTime !== vorher) {
+      abgleichStill();
+    }
+  }).catch(function () {
+    return null;
+  });
+}
+
+function taktStarten() {
+  if (taktUhr) { window.clearInterval(taktUhr); }
+  taktUhr = window.setInterval(taktPruefen, ABGLEICH_TAKT);
+}
+
+function verbindungTaktStarten() {
+  if (verbindungUhr) { window.clearInterval(verbindungUhr); }
+  verbindungUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    verbindungPruefen();
+  }, VERBINDUNG_TAKT);
+}
+
+function wegText(weg) {
+  if (weg === 'datei') { return 'Datei auf dem Gerät'; }
+  if (weg === 'opfs')  { return 'geräteeigener Speicher'; }
+  if (weg === 'local') { return 'lokaler Browserspeicher'; }
+  return 'keiner';
+}
+
+function dateiWaehlen() {
+  if (!fsApiDa()) {
+    melde('Dieser Browser kennt die Datei-Schnittstelle nicht. '
+        + 'Es wird ' + (opfsDa() ? 'der geräteeigene Speicher' : 'der lokale Speicher') + ' benutzt.', 'warn');
+    return;
+  }
+  window.showOpenFilePicker({
+    multiple: false,
+    types: [{ description: 'Workbench-Daten', accept: { 'application/json': ['.json'] } }]
+  }).then(function (liste) {
+    dateiHandle = liste[0];
+    dateiName = dateiHandle.name;
+    return rechteAnfragen(dateiHandle);
+  }).then(function (stand) {
+    rechteStand = stand;
+    if (stand !== 'granted') {
+      melde('Zugriff auf die Datei wurde nicht erteilt.', 'warn');
+      zeichne();
+      return null;
+    }
+    return idbSchreiben(IDB_KEY, dateiHandle).then(function () { return laden(); });
+  }).then(function (weg) {
+    if (weg) {
+      melde('Datei geöffnet und gelesen: ' + dateiName + '\nSpeicherweg: ' + wegText(weg), 'gut');
+    }
+    zeichne();
+  }).catch(function (f) {
+    if (f && f.name === 'AbortError') { melde('Auswahl abgebrochen.'); return; }
+    melde('Datei konnte nicht geöffnet werden.\n' + (f ? f.message : ''), 'warn');
+  });
+}
+
+function dateiAnbieten(name, text) {
+  try {
+    var brocken = new window.Blob([text], { type: 'application/json' });
+    var adresse = window.URL.createObjectURL(brocken);
+    var a = document.createElement('a');
+    a.href = adresse;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(function () { window.URL.revokeObjectURL(adresse); }, 4000);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function klickErneuern(e) {
+  if (anmeldungLaeuft || tokenGueltig() || !warAngemeldet()) { return; }
+  var ziel = e ? e.target : null;
+  if (ziel && ziel.closest && ziel.closest('[onclick^="anmelden"]')) { return; }
+  var schluessel = String(tokenAblauf || 'start');
+  if (klickErneuerungFuer === schluessel) { return; }
+  klickErneuerungFuer = schluessel;
+  anmeldeVersuch(true, '').then(function (gut) {
+    if (gut) { melde('Verbindung zu Google wiederhergestellt.', 'gut'); }
+  });
+}
+
+function leereDatenbank() {
+  return {
+    version:           APP_VERSION,
+    aufgaben:          [],
+    ziele:             [],
+    themen:            [],
+    projekte:          [],
+    ablaeufe:          [],
+    durchlaeufe:       [],
+    jahrestermine:     [],
+    ferien:            [],
+    einfaelle:         [],
+    gedanken:          [],
+    pinnwand:          [],
+    kalenderzuordnung: {},
+    notizbuecher:      [],
+    notizseiten:       [],
+    wochen:            [],
+    tage:              [],
+    grabsteine:        [],
+    einstellungen: {
+      clientId:      CLIENT_ID,
+      redirectUri:   REDIRECT_URI,
+      kalender:      [],
+      ferienZeigen:  true,
+      darstellung:   'automatisch',
+      gespeichert:   null,
+      stempel:       0
+    }
+  };
+}
+
+/* ---------- Google-Kalender lesen (aus der Workbench) ---------- */
+
+var ART_MUSTER = /#([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{1,23})/;
+
+var KAL_SEITEN_MAX = 40;
+
+function kalenderListeHolen() {
+  if (!tokenGueltig()) { return Promise.resolve([]); }
+  var adresse = 'https://www.googleapis.com/calendar/v3/users/me/calendarList'
+              + '?fields=' + encodeURIComponent('items(id,summary,backgroundColor,selected)')
+              + '&maxResults=50';
+  return window.fetch(adresse, { headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      var roh = (d && d.items) ? d.items : [];
+      kalenderListe = [];
+      var i;
+      for (i = 0; i < roh.length; i++) {
+        kalenderListe.push({
+          id: roh[i].id,
+          name: roh[i].summary || roh[i].id,
+          farbe: roh[i].backgroundColor || ''
+        });
+      }
+      return kalenderListe;
+    });
+}
+
+function kalenderGewaehlt(id) {
+  var gewaehlt = (DB.einstellungen && DB.einstellungen.kalender) || [];
+  var i;
+  for (i = 0; i < gewaehlt.length; i++) {
+    if (gewaehlt[i].id === id) { return gewaehlt[i].aktiv !== false; }
+  }
+  return true;   /* noch nie entschieden: lesen */
+}
+
+function kalenderKontext(id) {
+  var gewaehlt = (DB.einstellungen && DB.einstellungen.kalender) || [];
+  var i;
+  for (i = 0; i < gewaehlt.length; i++) {
+    if (gewaehlt[i].id === id) { return gewaehlt[i].kontext || 'privat'; }
+  }
+  return 'privat';
+}
+
+function zeitAusEintrag(wert) {
+  /* Google liefert dateTime mit Zeitzone. Die lokale Uhrzeit ist das,
+     was auf dem Blatt stehen soll. */
+  if (typeof wert !== 'string' || wert.length === 0) { return ''; }
+  var d = new Date(wert);
+  if (isNaN(d.getTime())) { return ''; }
+  return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
+}
+
+function tagAusEintrag(wert) {
+  if (typeof wert !== 'string' || wert.length === 0) { return ''; }
+  var d = new Date(wert);
+  if (isNaN(d.getTime())) { return ''; }
+  return isoDatum(d);
+}
+
+function titelOhneArt(titel) {
+  if (typeof titel !== 'string') { return ''; }
+  return titel.replace(ART_MUSTER, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+function praktischGanztags(tag, von, endTag, bis) {
+  if (!von || von > '00:30') { return false; }
+  if (endTag === tag) { return !!bis && bis >= '23:30'; }
+  /* Ende um Mitternacht des Folgetags */
+  return endTag === tagePlus(tag, 1) && !!bis && bis <= '00:30';
+}
+
+function terminKontextUeber(t) {
+  if (!t) { return ''; }
+  var z = DB.kalenderzuordnung || {};
+  if (t.id && z[t.id] && z[t.id].kontext) { return z[t.id].kontext; }
+  if (t.serieId && z['serie:' + t.serieId] && z['serie:' + t.serieId].kontext) {
+    return z['serie:' + t.serieId].kontext;
+  }
+  return '';
+}
+
+function merkeTermin(tag, satz, ziel) {
+  var wohin = ziel || termineNachTag;
+  if (!wohin[tag]) { wohin[tag] = []; }
+  var vorhanden = wohin[tag];
+  var i;
+  for (i = 0; i < vorhanden.length; i++) {
+    if (vorhanden[i].id === satz.id) { return; }
+  }
+  /* Der Kalender gibt den Kontext vor, eine eigene Zuordnung kann ihn
+     überstimmen. Der vom Kalender bleibt gemerkt. */
+  satz.kalKontext = satz.kontext;
+  satz.kontext = terminKontextUeber(satz) || satz.kontext;
+  vorhanden.push(satz);
+}
+
+function eintraegeEinsortieren(eintraege, quelle, kontext, ziel) {
+  var welcher = kontext || 'privat';
+  var wohin = ziel || termineNachTag;
+  var i;
+  for (i = 0; i < eintraege.length; i++) {
+    var e = eintraege[i];
+    if (e.status === 'cancelled') { continue; }
+    /* Das Kürzel gehört nicht in die Anzeige — der rohe Titel bleibt
+       daneben erhalten, denn aus ihm wird die Art gelesen. */
+    var rohTitel = e.summary || '(ohne Titel)';
+    var titel = titelOhneArt(rohTitel) || rohTitel;
+
+    if (e.start && e.start.date) {
+      /* Ganztägig: das Ende ist bei Google der Folgetag. */
+      var von = e.start.date;
+      var bis = e.end && e.end.date ? tagePlus(e.end.date, -1) : von;
+      var lauf = von;
+      var schutz = 0;
+      while (lauf <= bis && schutz < 400) {
+        merkeTermin(lauf, { id: e.id, titel: titel, rohTitel: rohTitel,
+                            zeit: '', bis: '',
+                            ort: e.location || '', ganztags: true, quelle: quelle,
+                            kontext: welcher, beschreibung: e.description || '',
+                            serieId: e.recurringEventId || '' }, wohin);
+        lauf = tagePlus(lauf, 1);
+        schutz++;
+      }
+      continue;
+    }
+
+    if (!e.start || !e.start.dateTime) { continue; }
+    var tag = tagAusEintrag(e.start.dateTime);
+    if (!tag) { continue; }
+
+    /* Wer von 00:00 bis 23:55 einträgt, meint den ganzen Tag — auch ohne
+       das Häkchen „ganztägig". Solche Termine werden von hier an wie
+       ganztägige behandelt, überall. Die Uhrzeiten bleiben erhalten. */
+    var zVon = zeitAusEintrag(e.start.dateTime);
+    var zBis = (e.end && e.end.dateTime) ? zeitAusEintrag(e.end.dateTime) : '';
+    var endTag = (e.end && e.end.dateTime) ? tagAusEintrag(e.end.dateTime) : tag;
+    if (praktischGanztags(tag, zVon, endTag, zBis)) {
+      merkeTermin(tag, { id: e.id, titel: titel, rohTitel: rohTitel,
+                         zeit: '', bis: '', ausZeit: zVon + '–' + zBis,
+                         ort: e.location || '', ganztags: true, quelle: quelle,
+                         kontext: welcher, beschreibung: e.description || '',
+                         serieId: e.recurringEventId || '' }, wohin);
+      continue;
+    }
+    merkeTermin(tag, {
+      id: e.id, titel: titel, rohTitel: rohTitel,
+      zeit: zeitAusEintrag(e.start.dateTime),
+      bis: e.end && e.end.dateTime ? zeitAusEintrag(e.end.dateTime) : '',
+      ort: e.location || '', ganztags: false, quelle: quelle,
+      beschreibung: e.description || '',
+      serieId: e.recurringEventId || '',
+      kontext: welcher
+    }, wohin);
+  }
+}
+
+function einenKalenderHolen(kal, von, bis, ziel) {
+  var wohin = ziel || termineNachTag;
+  var basis = 'https://www.googleapis.com/calendar/v3/calendars/'
+            + encodeURIComponent(kal.id) + '/events'
+            + '?singleEvents=true&orderBy=startTime&maxResults=2500'
+            + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
+            + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
+            + '&fields=' + encodeURIComponent(
+                'nextPageToken,items(id,summary,description,location,status,start,'
+                + 'end,recurringEventId)');
+  var seiten = 0;
+
+  function seite(marke) {
+    var adresse = basis + (marke ? ('&pageToken=' + encodeURIComponent(marke)) : '');
+    return window.fetch(adresse, { headers: driveKopf() })
+      .then(antwortPruefen)
+      .then(function (a) { return a.json(); })
+      .then(function (d) {
+        eintraegeEinsortieren((d && d.items) ? d.items : [], kal.name,
+                              kalenderKontext(kal.id), wohin);
+        seiten++;
+        if (d && d.nextPageToken && seiten < KAL_SEITEN_MAX) {
+          return seite(d.nextPageToken);
+        }
+        return true;
+      });
+  }
+
+  return seite('').catch(function (f) {
+    /* Ein einzelner Kalender darf nicht die anderen verhindern. */
+    kalenderFehler = kal.name + ': ' + (f ? f.message : 'Fehler');
+    return true;
+  });
+}
+
+function termineZahl() {
+  var n = 0;
+  var k;
+  for (k in termineNachTag) {
+    if (Object.prototype.hasOwnProperty.call(termineNachTag, k)) {
+      n += termineNachTag[k].length;
+    }
+  }
+  return n;
+}
+
+function termineFuerTag(is) {
+  var liste = termineNachTag[is] || [];
+  var zeit = [], ganztags = [];
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].ganztags) { ganztags.push(liste[i]); }
+    else { zeit.push(liste[i]); }
+  }
+  zeit.sort(function (x, y) { return (x.zeit < y.zeit) ? -1 : ((x.zeit > y.zeit) ? 1 : 0); });
+  return { zeit: zeit, ganztags: ganztags };
+}
+
+/* ---------- Aktivitäten-Kern der Workbench ---------- */
+
+var KP_KASTEN = /^(\s*)\[([ xX-]?)\]\s*(.*)$/;   /* [-] = nicht relevant (seit Workbench 6.0.4) */
+/* Seit Workbench 6.1.2 neue Namen; die alten werden beim Start umbenannt und weiter erkannt. */
+var KP_ABSCHNITTE = { s: 'Bringt mich dauerhaft weiter', v: 'Habe ich mich verpflichtet zu' };
+var KP_ZUSTAENDE = [['laeuft', 'läuft'], ['ruht', 'ruht'], ['erledigt', 'erledigt']];
+var KP_ARTEN = {
+  vorhaben: { zeichen: '◎', name: 'Vorhaben', gruppe: 'Vorhaben', neu: 'Name des Vorhabens' },
+  liste:    { zeichen: '≡', name: 'Liste',    gruppe: 'Listen',   neu: 'Name der Liste' },
+  notiz:    { zeichen: '✎', name: 'Notiz',    gruppe: 'Notizen',  neu: 'Titel der Notiz' }
+};
+
+var KP_ABSCHNITTE = { s: 'Bringt mich dauerhaft weiter', v: 'Habe ich mich verpflichtet zu' };
+
+var KP_ZUSTAENDE = [['laeuft', 'läuft'], ['ruht', 'ruht'], ['erledigt', 'erledigt']];
+
+var KP_ARTEN = {
+  vorhaben: { zeichen: '◎', name: 'Vorhaben', gruppe: 'Vorhaben', neu: 'Name des Vorhabens' },
+  liste:    { zeichen: '≡', name: 'Liste',    gruppe: 'Listen',   neu: 'Name der Liste' },
+  notiz:    { zeichen: '✎', name: 'Notiz',    gruppe: 'Notizen',  neu: 'Titel der Notiz' }
+};
+
+var KP_VERWEIS = /\[\[(projekt|ziel|flaeche|aufgabe|notiz):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]/g;
+
+var KP_ZU = {};
+
+function grabsteinWeg(sammlung, id) {
+  DB.grabsteine = (DB.grabsteine || []).filter(function (g) { return !(g.s === sammlung && g.id === id); });
+}
+
+function kpEigenschaft(h, name, lesen, schreiben) {
+  Object.defineProperty(h, name, { get: lesen, set: schreiben, enumerable: true, configurable: true });
+}
+
+function kpHuelle(satz, art, typ) {
+  if (!satz) { return null; }
+  var alt = satz.__huelle;
+  if (alt && alt.__satz === satz && alt.art === art) { return alt; }
+  var h = {};
+  Object.defineProperty(h, '__satz', { value: satz });
+  Object.defineProperty(h, 'art', { value: art, enumerable: true });
+  Object.defineProperty(h, 'typ', { value: typ || '', enumerable: true });
+  kpEigenschaft(h, 'id', function () { return satz.id; }, function (w) { satz.id = w; });
+  var namensFeld = (art === 'notiz') ? 'titel' : 'name';
+  kpEigenschaft(h, 'titel', function () { return satz[namensFeld] || ''; }, function (w) { satz[namensFeld] = w; });
+  var textFeld = (art === 'vorhaben') ? 'flaeche' : 'text';
+  kpEigenschaft(h, 'text', function () { return String(satz[textFeld] || ''); }, function (w) { satz[textFeld] = String(w); });
+  kpEigenschaft(h, 'kontext', function () { return satz.kontext || ''; }, function (w) { satz.kontext = w; });
+  kpEigenschaft(h, 'rang', function () { return satz.ordnung; }, function (w) { satz.ordnung = w; });
+  kpEigenschaft(h, 'geaendert', function () { return satz.geaendert; }, function (w) { satz.geaendert = w; });
+  if (art === 'vorhaben') {
+    kpEigenschaft(h, 'zustand', function () {
+      if (satz.status === 'ruht') { return 'ruht'; }
+      if (satz.status === 'abgeschlossen') { return 'erledigt'; }
+      return 'laeuft';
+    }, function (w) {
+      satz.status = (w === 'ruht') ? 'ruht' : ((w === 'erledigt') ? 'abgeschlossen' : 'laufend');
+    });
+    kpEigenschaft(h, 'termin', function () { return (typ === 'ziel') ? (satz.zieltermin || '') : (satz.ende || ''); },
+                  function (w) { if (typ === 'ziel') { satz.zieltermin = w; } else { satz.ende = w; } });
+  }
+  Object.defineProperty(satz, '__huelle', { value: h, enumerable: false, configurable: true, writable: true });
+  return h;
+}
+
+function kpSammlungVon(s) {
+  if (!s) { return ''; }
+  if (s.art === 'vorhaben') { return (s.typ === 'ziel') ? 'ziele' : 'projekte'; }
+  return (s.art === 'liste') ? 'themen' : 'gedanken';
+}
+
+function kpSeitenAlle() {
+  var aus = [];
+  (DB.projekte || []).forEach(function (p) { aus.push(kpHuelle(p, 'vorhaben', 'projekt')); });
+  (DB.ziele || []).forEach(function (z) { aus.push(kpHuelle(z, 'vorhaben', 'ziel')); });
+  (DB.themen || []).forEach(function (t) { aus.push(kpHuelle(t, 'liste', '')); });
+  (DB.gedanken || []).forEach(function (g) { if (g && !g.kompass) { aus.push(kpHuelle(g, 'notiz', '')); } });
+  return aus;
+}
+
+function kpNachRang(liste) {
+  return liste.map(function (s, i) { return { s: s, i: i }; }).sort(function (a, b) {
+    var ra = (typeof a.s.rang === 'number') ? a.s.rang : 1e12;
+    var rb = (typeof b.s.rang === 'number') ? b.s.rang : 1e12;
+    return (ra !== rb) ? ra - rb : a.i - b.i;
+  }).map(function (x) { return x.s; });
+}
+
+function kpSeiten(art) {
+  return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === art; }));
+}
+
+function kpSeiteFinden(id) {
+  if (!id) { return null; }
+  var l = kpSeitenAlle();
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].id === id) { return l[i]; } }
+  return null;
+}
+
+function kpNaechsterRang() {
+  return kpSeitenAlle().reduce(function (m, s) { return Math.max(m, (typeof s.rang === 'number') ? s.rang : 0); }, 0) + 10;
+}
+
+function kpSeiteAnlegen(art, name, kontext, typ) {
+  var titel = String(name || '').trim().slice(0, 200);
+  if (!titel || !KP_ARTEN[art]) { return null; }
+  var k = (kontext === 'privat' || kontext === 'beruflich') ? kontext : 'beruflich';
+  var rang = kpNaechsterRang();
+  var satz;
+  if (art === 'vorhaben' && typ === 'ziel') {
+    satz = { id: neueKennung(), name: titel, kontext: k, beschreibung: '', zieltermin: '',
+             status: 'laufend', zielzustaende: [], einzahler: [], anlagen: [], flaeche: '',
+             ordnung: rang, geaendert: jetzt() };
+    if (!Array.isArray(DB.ziele)) { DB.ziele = []; }
+    DB.ziele.push(satz);
+    return kpHuelle(satz, 'vorhaben', 'ziel');
+  }
+  if (art === 'vorhaben') {
+    satz = { id: neueKennung(), name: titel, kontext: k, beschreibung: '', start: '', ende: '',
+             status: 'laufend', meilensteine: [], zielzustaende: [], anlagen: [], flaeche: '',
+             ordnung: rang, geaendert: jetzt() };
+    if (!Array.isArray(DB.projekte)) { DB.projekte = []; }
+    DB.projekte.push(satz);
+    return kpHuelle(satz, 'vorhaben', 'projekt');
+  }
+  if (art === 'liste') {
+    satz = { id: neueKennung(), name: titel, kontext: k, text: '', ordnung: rang, geaendert: jetzt() };
+    if (!Array.isArray(DB.themen)) { DB.themen = []; }
+    DB.themen.push(satz);
+    return kpHuelle(satz, 'liste', '');
+  }
+  satz = { id: neueKennung(), titel: titel, text: '', kontext: k, ordnung: rang, geaendert: jetzt() };
+  if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+  DB.gedanken.push(satz);
+  return kpHuelle(satz, 'notiz', '');
+}
+
+function kpPasstFilter(s, filter) {
+  return !filter || filter === 'alle' || !s.kontext || s.kontext === filter;
+}
+
+function kpGruppenSchluessel(s) {
+  if (s.art !== 'vorhaben') { return s.art; }
+  return (s.typ === 'ziel' ? 'ziel-' : 'vorhaben-') + (s.zustand || 'laeuft');
+}
+
+function kpGruppe(schluessel) {
+  return kpNachRang(kpSeitenAlle().filter(function (s) { return kpGruppenSchluessel(s) === schluessel; }));
+}
+
+function kpVerschiebenKern(id, zielId, wo) {
+  var s = kpSeiteFinden(id);
+  var z = kpSeiteFinden(zielId);
+  if (!s || !z || s.id === z.id || kpGruppenSchluessel(s) !== kpGruppenSchluessel(z)) { return false; }
+  var gruppe = kpGruppe(kpGruppenSchluessel(s));
+  var raenge = gruppe.map(function (x) { return x.rang; });
+  var eindeutig = raenge.every(function (r, i) { return typeof r === 'number' && (i === 0 || r > raenge[i - 1]); });
+  if (!eindeutig) {
+    var basis = kpNaechsterRang();
+    raenge = gruppe.map(function (x, i) { return basis + i * 10; });
+  }
+  var neu = gruppe.filter(function (x) { return x.id !== s.id; });
+  var stelle = neu.map(function (x) { return x.id; }).indexOf(z.id) + (wo === 'nach' ? 1 : 0);
+  neu.splice(stelle, 0, s);
+  neu.forEach(function (x, i) {
+    if (x.rang !== raenge[i]) { x.rang = raenge[i]; x.geaendert = jetzt(); }
+  });
+  return true;
+}
+
+function kpSchluessel(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function kpAufgabe(zeile) {
+  var m = String(zeile).match(KP_KASTEN);
+  if (!m) { return null; }
+  /* „Nicht relevant“ ([-]) gilt als nicht offen — wie erledigt, nur anders gezeigt. */
+  return { erledigt: (m[2] === 'x' || m[2] === 'X' || m[2] === '-'), nichtRelevant: (m[2] === '-'), text: kpSchluessel(m[3]) };
+}
+
+function kpOffeneZahl(seite) {
+  var zeilen = String((seite && seite.text) || '').split('\n');
+  var n = 0;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var a = kpAufgabe(zeilen[i]);
+    if (a && !a.erledigt && a.text) { n++; }
+  }
+  return n;
+}
+
+function kpPasst(zeilenText, gemerkt) {
+  var z = String(zeilenText || '');
+  var g = String(gemerkt || '');
+  if (!g) { return 0; }
+  if (z === g) { return 2; }
+  if (z.length > g.length && z.indexOf(g) === 0 && /[\s(\[,.;:!?\-–—✔→]/.test(z.charAt(g.length))) { return 1; }
+  return 0;
+}
+
+function kpHatWoertlich(seite, text) {
+  if (!seite) { return false; }
+  return String(seite.text || '').split('\n').some(function (z) {
+    var a = kpAufgabe(z);
+    return !!(a && a.text === text);
+  });
+}
+
+function kpZeileSuchen(seite, text, vorzug) {
+  if (!seite) { return null; }
+  var zeilen = String(seite.text || '').split('\n');
+  var beste = null;
+  var besteWert = 0;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var a = kpAufgabe(zeilen[i]);
+    var p = a ? kpPasst(a.text, text) : 0;
+    if (!p) { continue; }
+    var wert = p * 2 + ((typeof vorzug !== 'boolean' || a.erledigt === vorzug) ? 1 : 0);
+    if (wert > besteWert) { beste = { nr: i, erledigt: a.erledigt }; besteWert = wert; }
+  }
+  return beste;
+}
+
+function kpKastenSetzen(seite, nr, erledigt, nichtRelevant) {
+  var zeilen = String(seite.text || '').split('\n');
+  if (nr < 0 || nr >= zeilen.length) { return false; }
+  var vorne = zeilen[nr].match(/^(\s*)\[([ xX-]?)\]/);
+  if (!vorne) { return false; }
+  zeilen[nr] = vorne[1] + (nichtRelevant ? '[-]' : (erledigt ? '[x]' : '[]')) + zeilen[nr].slice(vorne[0].length);
+  seite.text = zeilen.join('\n');
+  seite.geaendert = jetzt();
+  return true;
+}
+
+function kpHeuteMontag() { return montagVon(isoDatum()); }
+
+function kpWocheKennung(montag) { return 'kw-' + montag; }
+
+function kpKurz(is) {
+  var d = ausIso(is);
+  return d.getDate() + '.' + (d.getMonth() + 1) + '.';
+}
+
+function kpWochenTitel(montag) {
+  return 'KW ' + kalenderwoche(montag) + ' · ' + kpKurz(montag) + ' – ' + kpKurz(tagePlus(montag, 6));
+}
+
+function kpAbschnitteUmbenennen() {
+  var n = 0;
+  (DB.wochen || []).forEach(function (w) {
+    if (!w || typeof w.text !== 'string') { return; }
+    var neu = w.text
+      .replace(/^(\s*#{1,3}\s+)Bringt mich substanziell weiter\s*$/gm, '$1' + KP_ABSCHNITTE.s)
+      .replace(/^(\s*#{1,3}\s+)Verbindlichkeiten\s*$/gm, '$1' + KP_ABSCHNITTE.v);
+    if (neu !== w.text) { w.text = neu; w.geaendert = jetzt(); n++; }
+  });
+  return n;
+}
+
+function kpWocheGeruest() {
+  return '## ' + KP_ABSCHNITTE.s + '\n\n## ' + KP_ABSCHNITTE.v + '\n';
+}
+
+function kpWochen() {
+  return (DB.wochen || []).filter(function (w) { return w && w.montag; })
+    .sort(function (a, b) { return (a.montag < b.montag) ? 1 : ((a.montag > b.montag) ? -1 : 0); });
+}
+
+function kpWocheFinden(montag) {
+  var l = DB.wochen || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].montag === montag) { return l[i]; } }
+  return null;
+}
+
+function kpWocheAnlegen(montag) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(montag || ''))) { return null; }
+  var w = kpWocheFinden(montag);
+  if (w) {
+    if (typeof w.text !== 'string') { w.text = kpWocheTextAus(w); w.geaendert = jetzt(); }
+    if (!Array.isArray(w.eintraege)) { w.eintraege = []; }
+    return w;
+  }
+  if (!Array.isArray(DB.wochen)) { DB.wochen = []; }
+  w = { id: kpWocheKennung(montag), montag: montag, text: kpWocheGeruest(), eintraege: [], geaendert: jetzt() };
+  DB.wochen.push(w);
+  grabsteinWeg('wochen', w.id);
+  return w;
+}
+
+function kpWocheTextAus(w) {
+  var l = Array.isArray(w && w.eintraege) ? w.eintraege : [];
+  var zeile = function (text, erledigt) { return (erledigt ? '[x] ' : '[] ') + text; };
+  var s = l.filter(function (e) { return e.abschnitt === 's'; }).map(function (e) { return zeile(e.text, e.erledigt); });
+  var v = l.filter(function (e) { return e.abschnitt === 'v'; }).map(function (e) { return zeile(e.text, e.erledigt); });
+  (Array.isArray(w && w.ziele) ? w.ziele : []).forEach(function (z) {
+    var t = kpSchluessel(z && z.text);
+    if (t) { s.push(zeile(t, !!z.erreicht)); }
+  });
+  return '## ' + KP_ABSCHNITTE.s + '\n' + (s.length ? s.join('\n') + '\n' : '')
+       + '\n## ' + KP_ABSCHNITTE.v + '\n' + (v.length ? v.join('\n') + '\n' : '');
+}
+
+function kpWochenUmstellen() {
+  var n = 0;
+  (DB.wochen || []).forEach(function (w) {
+    if (typeof w.text === 'string') { return; }
+    w.text = kpWocheTextAus(w);
+    if (!Array.isArray(w.eintraege)) { w.eintraege = []; }
+    delete w.ziele;
+    delete w.verbindlich;
+    w.geaendert = jetzt();
+    n++;
+  });
+  if (n) { spaeterSichern(); }
+  return n;
+}
+
+function kpAbschnittZeile(zeilen, ab) {
+  var muster = (ab === 's') ? /substanz|dauerhaft/i : /verbindlich|verpflicht/i;
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    var m = zeilen[i].match(/^\s*#{1,3}\s+(.*)$/);
+    if (m && muster.test(m[1])) { return i; }
+  }
+  return -1;
+}
+
+function kpInAbschnitt(w, ab, zeile) {
+  var zeilen = String(w.text || '').split('\n');
+  if (ab !== 's' && ab !== 'v') {
+    while (zeilen.length && !zeilen[zeilen.length - 1].trim()) { zeilen.pop(); }
+    zeilen.push(zeile);
+  } else {
+    var h = kpAbschnittZeile(zeilen, ab);
+    if (h < 0) {
+      while (zeilen.length && !zeilen[zeilen.length - 1].trim()) { zeilen.pop(); }
+      zeilen.push('', '## ' + KP_ABSCHNITTE[ab], zeile);
+    } else {
+      var ende = h + 1;
+      while (ende < zeilen.length && !/^\s*#{1,3}\s/.test(zeilen[ende])) { ende++; }
+      var stelle = ende;
+      while (stelle - 1 > h && !zeilen[stelle - 1].trim()) { stelle--; }
+      zeilen.splice(stelle, 0, zeile);
+    }
+  }
+  w.text = zeilen.join('\n');
+  w.geaendert = jetzt();
+}
+
+function kpTagKennung(datum) { return 'tag-' + datum; }
+
+function kpTagFinden(datum) {
+  var l = DB.tage || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].datum === datum) { return l[i]; } }
+  return null;
+}
+
+function kpTagAnlegen(datum) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(datum || ''))) { return null; }
+  var t = kpTagFinden(datum);
+  if (t) { if (!Array.isArray(t.eintraege)) { t.eintraege = []; } return t; }
+  if (!Array.isArray(DB.tage)) { DB.tage = []; }
+  t = { id: kpTagKennung(datum), datum: datum, text: '', eintraege: [], geaendert: jetzt() };
+  DB.tage.push(t);
+  grabsteinWeg('tage', t.id);
+  return t;
+}
+
+function kpBehaelterAb() {
+  var heute = isoDatum();
+  var montag = kpHeuteMontag();
+  return (DB.wochen || []).filter(function (w) { return w && w.montag && w.montag >= montag; })
+    .concat((DB.tage || []).filter(function (t) { return t && t.datum && t.datum >= heute; }));
+}
+
+function kpBehaelterFinden(id) {
+  var l = (DB.wochen || []).concat(DB.tage || []);
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i] && l[i].id === id) { return l[i]; } }
+  return null;
+}
+
+function kpEintraegeFinden(seiteId, text) {
+  var seite = kpSeiteFinden(seiteId);
+  var aus = [];
+  kpBehaelterAb().forEach(function (b) {
+    var beste = null;
+    var besteWert = 0;
+    (b.eintraege || []).forEach(function (e) {
+      if (e.quelle !== seiteId) { return; }
+      var p = kpPasst(text, e.text);
+      if (p === 1 && kpHatWoertlich(seite, e.text)) { p = 0; }
+      if (p > besteWert && kpZeileSuchen(b, e.text)) { beste = e; besteWert = p; }
+    });
+    if (beste) { aus.push({ woche: b, eintrag: beste }); }
+  });
+  return aus;
+}
+
+function kpEintragFinden(seiteId, text) {
+  return kpEintraegeFinden(seiteId, text)[0] || null;
+}
+
+function kpEintragHolen(behaelterId, id) {
+  var b = kpBehaelterFinden(behaelterId);
+  if (!b) { return null; }
+  var l = b.eintraege || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i].id === id) { return { woche: b, eintrag: l[i] }; } }
+  return null;
+}
+
+function kpWocheEintrag(w, text) {
+  var l = (w && w.eintraege) || [];
+  var beste = null;
+  var besteWert = 0;
+  var i;
+  for (i = 0; i < l.length; i++) {
+    if (!l[i].quelle || !kpSeiteFinden(l[i].quelle)) { continue; }
+    var p = kpPasst(text, l[i].text);
+    if (p === 1 && kpHatWoertlich(w, l[i].text)) { p = 0; }
+    var wert = p ? p * 1000 + String(l[i].text).length : 0;
+    if (wert > besteWert) { beste = l[i]; besteWert = wert; }
+  }
+  return beste;
+}
+
+function kpPlanenKern(seite, nr, abschnitt, datum) {
+  if (!seite || ['s', 'v', 'h'].indexOf(abschnitt) < 0) { return null; }
+  var zeilen = String(seite.text || '').split('\n');
+  var a = (nr >= 0 && nr < zeilen.length) ? kpAufgabe(zeilen[nr]) : null;
+  if (!a || !a.text || a.erledigt) { return null; }
+  var b = (abschnitt === 'h') ? kpTagAnlegen(datum) : kpWocheAnlegen(montagVon(datum));
+  if (!b) { return null; }
+  var schon = kpEintraegeFinden(seite.id, a.text).some(function (f) { return f.woche === b; });
+  if (schon) { return null; }
+  if (!Array.isArray(b.eintraege)) { b.eintraege = []; }
+  b.eintraege = b.eintraege.filter(function (e) { return !(e.quelle === seite.id && e.text === a.text); });
+  kpInAbschnitt(b, abschnitt, '[] ' + a.text);
+  b.eintraege.push({ id: neueKennung(), abschnitt: abschnitt, text: a.text, quelle: seite.id, erledigt: false });
+  b.geaendert = jetzt();
+  return b;
+}
+
+function kpAusplanenKern(behaelterId, id) {
+  var f = kpEintragHolen(behaelterId, id);
+  if (!f) { return false; }
+  var b = f.woche;
+  var z = kpZeileSuchen(b, f.eintrag.text);
+  if (z) {
+    var zeilen = String(b.text || '').split('\n');
+    zeilen.splice(z.nr, 1);
+    b.text = zeilen.join('\n');
+  }
+  b.eintraege = b.eintraege.filter(function (e) { return e.id !== id; });
+  b.geaendert = jetzt();
+  return true;
+}
+
+function kpBehaelterAngleichen(seiteId, text, erledigt, ausser) {
+  kpEintraegeFinden(seiteId, text).forEach(function (f) {
+    if (f.woche === ausser) { return; }
+    var z = kpZeileSuchen(f.woche, f.eintrag.text, !erledigt);
+    if (z && z.erledigt !== erledigt) { kpKastenSetzen(f.woche, z.nr, erledigt); }
+    f.eintrag.erledigt = erledigt;
+    f.woche.geaendert = jetzt();
+  });
+}
+
+function kpBehaelterZeileUmKern(b, nr) {
+  if (!b) { return false; }
+  var zeilen = String(b.text || '').split('\n');
+  var a = (nr >= 0 && nr < zeilen.length) ? kpAufgabe(zeilen[nr]) : null;
+  if (!a) { return false; }
+  var neu = !a.erledigt;
+  kpKastenSetzen(b, nr, neu);
+  var e = a.text ? kpWocheEintrag(b, a.text) : null;
+  if (e) {
+    var quelle = kpSeiteFinden(e.quelle);
+    var z = kpZeileSuchen(quelle, e.text, a.erledigt);
+    if (z && z.erledigt !== neu) { kpKastenSetzen(quelle, z.nr, neu); }
+    e.erledigt = neu;
+    kpBehaelterAngleichen(quelle.id, e.text, neu, b);
+  }
+  return true;
+}
+
+function kpSeiteKastenUmKern(s, nr) {
+  if (!s) { return false; }
+  var zeilen = String(s.text || '').split('\n');
+  var a = (nr >= 0 && nr < zeilen.length) ? kpAufgabe(zeilen[nr]) : null;
+  if (!a) { return false; }
+  kpKastenSetzen(s, nr, !a.erledigt);
+  if (a.text) { kpBehaelterAngleichen(s.id, a.text, !a.erledigt, null); }
+  return true;
+}
+
+function kpUeberschriftStufe(zeile) {
+  var m = String(zeile).replace(/^\s+/, '').match(/^(#{1,3})\s*(.*)$/);
+  return m ? m[1].length : 0;
+}
+
+function kpAbschnittSchluessel(seiteId, zeile) {
+  return String(seiteId) + '|' + String(zeile).trim().toLowerCase();
+}
+
+function kpAbschnittZu(seiteId, zeile) {
+  return KP_ZU[kpAbschnittSchluessel(seiteId, zeile)] === true;
+}
+
+function kpAbschnittSetzen(seiteId, zeile, zu) {
+  var k = kpAbschnittSchluessel(seiteId, zeile);
+  if (zu) { KP_ZU[k] = true; } else { delete KP_ZU[k]; }
+}
+
+function kpHatUeberschriften(seite) {
+  return String((seite && seite.text) || '').split('\n').some(function (z) { return kpUeberschriftStufe(z) > 0; });
+}
+
+function kpAlleAbschnitte(seite, zu) {
+  if (!seite) { return; }
+  String(seite.text || '').split('\n').forEach(function (z) {
+    if (kpUeberschriftStufe(z)) { kpAbschnittSetzen(seite.id, z, zu); }
+  });
+}
+
+function kpAbschnitteOeffnenBis(seite, nr) {
+  if (!seite) { return; }
+  var zeilen = String(seite.text || '').split('\n');
+  var stufe = 9;
+  var i;
+  for (i = Math.min(nr, zeilen.length) - 1; i >= 0 && stufe > 1; i--) {
+    var s = kpUeberschriftStufe(zeilen[i]);
+    if (s && s < stufe) { kpAbschnittSetzen(seite.id, zeilen[i], false); stufe = s; }
+  }
+}
+
+function kpFeldHolen() {
+  var f = (typeof document.querySelector === 'function') ? document.querySelector('.schirm.aktiv #kpFeld') : null;
+  return f || document.getElementById('kpFeld');
+}
+
+function kpMarkeAnZeile(feld, nr, rolle) {
+  var zeilen = String(feld.value || '').split('\n');
+  if (nr < 0 || nr >= zeilen.length) { return; }
+  var a = 0;
+  var i;
+  for (i = 0; i < nr; i++) { a += zeilen[i].length + 1; }
+  if (typeof feld.setSelectionRange === 'function') { feld.setSelectionRange(a, a + zeilen[nr].length); }
+  if (!rolle || typeof feld.getBoundingClientRect !== 'function' || typeof window.getComputedStyle !== 'function') { return; }
+  var zeilenHoehe = parseFloat(window.getComputedStyle(feld).lineHeight) || 24;
+  var oben = parseFloat(window.getComputedStyle(feld).paddingTop) || 0;
+  var r = feld.getBoundingClientRect();
+  rolle.scrollTop += r.top + oben + nr * zeilenHoehe - (window.innerHeight || 800) / 2;
+}
+
+function kpFrequenz(w) {
+  if (!w) { return ''; }
+  var kz = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  var n = Math.max(1, Number(w.intervall) || 1);
+  var namen = [];
+  var i;
+  if (w.takt === 'woche' || w.typ === 'woechentlich') {
+    var tage = Array.isArray(w.tage) ? w.tage : [];
+    if (!w.takt) {
+      tage = (Array.isArray(w.wochentage) ? w.wochentage : []).map(function (t) { return Number(t) === 7 ? 0 : Number(t); });
+    }
+    for (i = 1; i <= 7; i++) {
+      var nr = (i === 7) ? 0 : i;
+      if (tage.indexOf(nr) >= 0) { namen.push(kz[nr]); }
+    }
+    var liste = (namen.length === 7) ? 'täglich' : (namen.join(', ') || 'wöchentlich');
+    return (n === 1) ? liste : ('alle ' + n + ' Wochen: ' + liste);
+  }
+  if (w.takt === 'monat' || w.typ === 'monatlich') {
+    var tag = Number(w.tag) || 1;
+    return (n === 1) ? ('monatlich am ' + tag + '.') : ('alle ' + n + ' Monate am ' + tag + '.');
+  }
+  return '';
+}
+
+/* Aus der Workbench — termineHolen heißt hier clTermineHolen. */
+function anmeldeAnfragen(klient, still, aufforderung, fertig) {
+  var erledigt = false;
+  var uhr = null;
+  anmeldungLaeuft = true;
+  var abschliessen = function (gut) {
+    if (erledigt) { return; }
+    erledigt = true;
+    anmeldungLaeuft = false;
+    if (uhr) { window.clearTimeout(uhr); }
+    fertig(gut);
+  };
+  var gescheitert = function (grund) {
+    if (erledigt) { return; }
+    letzteErneuerung = { zeit: isoZeit(),
+                         ergebnis: still ? 'still fehlgeschlagen' : 'abgebrochen',
+                         grund: grund };
+    if (still) {
+      melde('Die stille Erneuerung ist fehlgeschlagen (' + grund + ').\n'
+          + 'Der nächste Klick in der App verbindet neu.', 'warn');
+    } else {
+      melde('Anmeldung nicht abgeschlossen (' + grund + ').', 'warn');
+    }
+    zeichne();
+    abschliessen(false);
+  };
+  klient.callback = function (antwort) {
+    if (antwort && antwort.access_token) {
+      tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+      try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
+      verbindungOk = true;
+      letzteErneuerung = { zeit: isoZeit(), ergebnis: still ? 'still erneuert' : 'angemeldet',
+                           grund: '' };
+      abgleichPlanen(true);
+      clTermineHolen(false);
+      verbindungPruefen();
+      if (!still) { melde('Angemeldet. Gültig für ' + restMinuten() + ' Minuten.', 'gut'); }
+      zeichne();
+      abschliessen(true);
+      return;
+    }
+    gescheitert((antwort && antwort.error) ? antwort.error : 'unbekannt');
+  };
+  klient.error_callback = function (fehler) {
+    gescheitert((fehler && fehler.type) ? fehler.type : 'fenster_fehler');
+  };
+  /* Von Hand darf es länger dauern — wer ein Konto wählt, braucht Zeit. */
+  uhr = window.setTimeout(function () { gescheitert('keine_antwort'); },
+                          still ? ANMELDE_ZEITGRENZE_MS : 5 * ANMELDE_ZEITGRENZE_MS);
+  /* Auch von Hand zuerst ohne Rückfrage: Wer schon zugestimmt hat,
+     soll die Zustimmung nicht jedes Mal wieder erteilen müssen. */
+  klient.requestAccessToken({ prompt: aufforderung });
+}
+
+/* ============================================================
+   CLIE — eigener Teil
+
+   Ein Organizer im Stil des Palm für das Handy. CLIE arbeitet auf
+   derselben workbench.json wie die Workbench; Unterbau, Kalender und
+   Aktivitäten-Kern kommen beim Bauen wörtlich von dort.
+
+   Hier steht nur, was CLIE selbst zeigt: die Übersicht mit den Apps,
+   die Abgleich-App, die Kategorie oben rechts, das Menü und die
+   festen Tasten unten. Die übrigen Apps folgen Stufe für Stufe.
+   ============================================================ */
+
+var speicherUhr = null;
+var klickErneuerungFuer = '';   /* für welchen Ablauf schon einmal per Klick erneuert wurde */
+var stillVersuchtMs = 0;        /* wann zuletzt still angemeldet wurde */
+var STILL_ABSTAND = 60000;
+var KAL_TAKT = 2 * 60 * 1000;
+var KAL_VOR = 7;                /* Tage rückwärts */
+var KAL_NACH = 60;              /* Tage vorwärts */
+
+/* Was gerade offen ist */
+var cl = {
+  app: 'uebersicht',     /* uebersicht | abgleich | eine der späteren Apps */
+  filter: 'alle',        /* alle | beruflich | privat */
+  aufklapp: ''           /* '' | kat | menue */
+};
+
+var CL_FILTER_KEY = 'clie-filter';
+var CL_KATEGORIEN = [['alle', 'Alle'], ['beruflich', 'Beruf'], ['privat', 'Privat']];
+
+/* Die Apps der Übersicht, in der Reihenfolge des Rasters.
+   „stufe“ = mit welcher Fassung die App kommt; leer = schon da. */
+var CL_APPS = [
+  { id: 'kalender', name: 'Kalender', sym: '▦', stufe: '0.2', was: 'Termine aus dem Google-Kalender, dazu „Vorgenommen“ und die Routinen des Tages. Tag, Woche und Monat.' },
+  { id: 'woche',    name: 'Woche',    sym: '◫', stufe: '0.4', was: 'Die Woche mit „Bringt mich dauerhaft weiter“ und „Habe ich mich verpflichtet zu“ — wie im Tag der Workbench.' },
+  { id: 'aufgaben', name: 'Aufgaben', sym: '☑', stufe: '0.3', was: 'Alle offenen Zeilen aus Projekten, Zielen und Listen in einer Liste. Abhaken wirkt in der Seite.' },
+  { id: 'projekte', name: 'Projekte', sym: '◎', stufe: '0.3', was: 'Deine laufenden Projekte: lesen, abhaken, schreiben, planen für heute oder die Woche.' },
+  { id: 'ziele',    name: 'Ziele',    sym: '◇', stufe: '0.3', was: 'Deine Ziele mit Zieltermin: lesen, abhaken, schreiben.' },
+  { id: 'listen',   name: 'Listen',   sym: '≡', stufe: '0.3', was: 'Deine Listen: lesen, abhaken, schreiben.' },
+  { id: 'memo',     name: 'Memo',     sym: '✎', stufe: '0.3', was: 'Deine Notizen: lesen und schreiben.' },
+  { id: 'routinen', name: 'Routinen', sym: '↻', stufe: '0.4', was: 'Die Routinen von heute abhaken, auslassen oder verlegen („nur diesmal“).' },
+  { id: 'abgleich', name: 'Abgleich', sym: '⇅', stufe: '',    was: '' }
+];
+
+/* ---------- Bestand ---------- */
+
+/* Nur Kennung und Stempel nachtragen — alles andere gehört der Workbench.
+   (Wie im Wochenkompass; die Unterbau-Funktion uebernehmen ruft das.) */
+function bestandStempeln(db) {
+  var i, s, k;
+  var nachgetragen = 0;
+  for (i = 0; i < SAMMLUNGEN.length; i++) {
+    s = SAMMLUNGEN[i];
+    /* Die Kalenderzuordnung ist ein Verzeichnis, keine Liste. */
+    if (s === 'kalenderzuordnung') {
+      if (!db[s] || typeof db[s] !== 'object' || Array.isArray(db[s])) { db[s] = {}; }
+      for (k in db[s]) {
+        if (!Object.prototype.hasOwnProperty.call(db[s], k)) { continue; }
+        if (typeof db[s][k] === 'string') { db[s][k] = { art: db[s][k], geaendert: 0 }; nachgetragen++; }
+        else if (db[s][k] && !db[s][k].geaendert) { db[s][k].geaendert = 0; nachgetragen++; }
+      }
+      continue;
+    }
+    if (!Array.isArray(db[s])) { db[s] = []; }
+    var liste = db[s];
+    var j;
+    for (j = 0; j < liste.length; j++) {
+      if (!liste[j].id) { liste[j].id = neueKennung(); nachgetragen++; }
+      if (typeof liste[j].geaendert !== 'number') { liste[j].geaendert = 0; nachgetragen++; }
+    }
+  }
+  if (!Array.isArray(db.grabsteine)) { db.grabsteine = []; }
+  if (!db.einstellungen || typeof db.einstellungen !== 'object') { db.einstellungen = {}; }
+  return nachgetragen;
+}
+
+/* ---------- Kategorie: Alle, Beruf, Privat ---------- */
+
+function clFilterLaden() {
+  var f = null;
+  try { f = window.localStorage.getItem(CL_FILTER_KEY); } catch (e) { f = null; }
+  if (f === 'alle' || f === 'beruflich' || f === 'privat') { cl.filter = f; }
+}
+
+function katSetzen(f) {
+  if (f !== 'alle' && f !== 'beruflich' && f !== 'privat') { return; }
+  cl.filter = f;
+  try { window.localStorage.setItem(CL_FILTER_KEY, f); } catch (e) { /* ohne Speicher eben nur für jetzt */ }
+  cl.aufklapp = '';
+  zeichne();
+}
+
+function katName(f) {
+  var i;
+  for (i = 0; i < CL_KATEGORIEN.length; i++) { if (CL_KATEGORIEN[i][0] === f) { return CL_KATEGORIEN[i][1]; } }
+  return 'Alle';
+}
+
+function clPasstTermin(t) {
+  return cl.filter === 'alle' || !t.kontext || t.kontext === cl.filter;
+}
+
+/* ---------- Kalender ---------- */
+
+/* Wie termineHolen der Workbench, nur schlanker: ein Fenster um heute,
+   kein Jahresarchiv, kein Ladebalken. Erst am Ende eingesetzt, damit
+   die Übersicht während des Abrufs gefüllt bleibt. */
+function clTermineHolen(laut) {
+  if (!tokenGueltig()) {
+    if (laut) { melde('Nicht mit Google verbunden — bitte erst verbinden.', 'warn'); }
+    return Promise.resolve(false);
+  }
+  if (kalenderLaeuft) { return Promise.resolve(false); }
+  kalenderLaeuft = true;
+  kalenderFehler = '';
+  var heute = isoDatum();
+  var von = tagePlus(heute, -KAL_VOR);
+  var bis = tagePlus(heute, KAL_NACH);
+  var vorbereitung = kalenderListe.length ? Promise.resolve(kalenderListe) : kalenderListeHolen();
+  return vorbereitung.then(function () {
+    var neu = {};
+    var reihe = Promise.resolve(true);
+    kalenderListe.forEach(function (kal) {
+      if (!kalenderGewaehlt(kal.id)) { return; }
+      reihe = reihe.then(function () { return einenKalenderHolen(kal, von, bis, neu); });
+    });
+    return reihe.then(function () { return neu; });
+  }).then(function (neu) {
+    termineNachTag = neu || {};
+    kalenderStand = isoZeit();
+    if (laut) {
+      if (kalenderFehler) { melde('Termine teilweise geholt.\n' + kalenderFehler, 'warn'); }
+      else { melde('Termine geholt: ' + termineZahl() + '.', 'gut'); }
+    }
+    return true;
+  }).catch(function (f) {
+    kalenderFehler = f ? f.message : 'unbekannter Fehler';
+    if (laut) { melde('Termine konnten nicht geholt werden.\n' + kalenderFehler, 'warn'); }
+    return false;
+  }).then(function (wert) {
+    kalenderLaeuft = false;
+    zeichne();
+    return wert;
+  });
+}
+
+function clKalenderTaktStarten() {
+  if (kalenderUhr) { window.clearInterval(kalenderUhr); }
+  kalenderUhr = window.setInterval(function () {
+    if (document.hidden || !tokenGueltig()) { return; }
+    clTermineHolen(false);
+  }, KAL_TAKT);
+}
+
+function clUhrzeit() {
+  var d = new Date();
+  return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
+}
+
+/* Termine von heute mit Uhrzeit, die noch nicht vorbei sind. */
+function clTermineRest() {
+  var t = termineFuerTag(isoDatum()).zeit;
+  var nun = clUhrzeit();
+  return t.filter(function (x) { return clPasstTermin(x) && (x.bis || x.zeit) > nun; });
+}
+
+/* ---------- Zahlen für die Übersicht ---------- */
+
+function clSeitenAktiv(art, typ) {
+  return kpSeitenAlle().filter(function (s) {
+    if (s.art !== art || !kpPasstFilter(s, cl.filter)) { return false; }
+    if (typ && s.typ !== typ) { return false; }
+    return s.art !== 'vorhaben' || s.zustand === 'laeuft';
+  });
+}
+
+function clOffeneAufgaben() {
+  var seiten = clSeitenAktiv('vorhaben', '').concat(clSeitenAktiv('liste', ''));
+  return seiten.reduce(function (n, s) { return n + kpOffeneZahl(s); }, 0);
+}
+
+/* „vor 2 Min.“ aus einem Zeitstempel der Form JJJJ-MM-TT HH:MM:SS */
+function clVor(stempel) {
+  if (!stempel) { return ''; }
+  var d = new Date(String(stempel).replace(' ', 'T'));
+  if (isNaN(d.getTime())) { return ''; }
+  var min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 1) { return 'gerade eben'; }
+  if (min < 60) { return 'vor ' + min + ' Min.'; }
+  if (min < 24 * 60) { return 'vor ' + Math.floor(min / 60) + ' Std.'; }
+  return String(stempel).slice(8, 10) + '.' + String(stempel).slice(5, 7) + '.';
+}
+
+function clAppHinweis(id) {
+  if (id === 'kalender') {
+    var rest = clTermineRest();
+    if (!tokenGueltig() && !rest.length) { return { zahl: 0, unter: '' }; }
+    return { zahl: rest.length, unter: rest.length ? rest[0].zeit + ' ' + rest[0].titel : 'frei' };
+  }
+  if (id === 'woche') { return { zahl: 0, unter: 'KW ' + kalenderwoche(isoDatum()) }; }
+  if (id === 'aufgaben') { var n = clOffeneAufgaben(); return { zahl: n, unter: n ? 'offen' : '' }; }
+  if (id === 'projekte') { return { zahl: 0, unter: clZahlText(clSeitenAktiv('vorhaben', 'projekt').length) }; }
+  if (id === 'ziele') { return { zahl: 0, unter: clZahlText(clSeitenAktiv('vorhaben', 'ziel').length) }; }
+  if (id === 'listen') { return { zahl: 0, unter: clZahlText(clSeitenAktiv('liste', '').length) }; }
+  if (id === 'memo') { return { zahl: 0, unter: clZahlText(clSeitenAktiv('notiz', '').length) }; }
+  if (id === 'abgleich') {
+    if (!tokenGueltig()) { return { zahl: 0, unter: warAngemeldet() ? 'abgelaufen' : 'nur lokal' }; }
+    if (abgleichFehler) { return { zahl: 0, unter: 'Fehler' }; }
+    return { zahl: 0, unter: abgleichLaeuft ? 'läuft …' : (clVor(letzterAbgleich) || 'angemeldet') };
+  }
+  return { zahl: 0, unter: '' };
+}
+
+function clZahlText(n) { return n ? String(n) : ''; }
+
+/* ---------- Zeichnen ---------- */
+
+function clApp(id) {
+  var i;
+  for (i = 0; i < CL_APPS.length; i++) { if (CL_APPS[i].id === id) { return CL_APPS[i]; } }
+  return null;
+}
+
+function blickHtml() {
+  var zeilen = String((DB.einstellungen && DB.einstellungen.leitsatz) || '').split('\n')
+    .map(function (z) { return z.trim().replace(/^[-•*▪]\s+/, '').replace(/[*_~+^]/g, ''); })
+    .filter(function (z) { return z.length > 0; });
+  if (!zeilen.length) { return ''; }
+  return '<div class="blick">' + zeilen.map(function (z) { return '<div>▪ ' + esc(z) + '</div>'; }).join('') + '</div>';
+}
+
+function uebersichtHtml() {
+  var h = blickHtml() + '<div class="apps">';
+  CL_APPS.forEach(function (a) {
+    var hin = clAppHinweis(a.id);
+    h += '<button type="button" class="app' + (a.stufe ? ' spaeter' : '') + '" onclick="oeffne(\'' + a.id + '\')">'
+       + '<span class="sym">' + a.sym + (hin.zahl ? '<span class="zahl">' + hin.zahl + '</span>' : '') + '</span>'
+       + esc(a.name) + '<span class="unterz">' + esc(hin.unter || ' ') + '</span></button>';
+  });
+  return h + '</div><div class="fassung">CLIE v' + esc(APP_VERSION) + '</div>';
+}
+
+function spaeterHtml(a) {
+  return '<div class="spaeter-text"><div class="gross">' + a.sym + '</div>'
+    + '<p><b>' + esc(a.name) + '</b> kommt mit CLIE ' + esc(a.stufe) + '.</p>'
+    + '<p>' + esc(a.was) + '</p>'
+    + '<div class="knoepfe"><button type="button" class="knopf" onclick="oeffne(\'uebersicht\')">Zurück</button></div></div>';
+}
+
+function reihe(name, wert, warn) {
+  return '<div class="reihe"><span>' + esc(name) + '</span><span' + (warn ? ' class="warn"' : '') + '>' + esc(wert) + '</span></div>';
+}
+
+/* Die Abgleich-App: ein großer Knopf wie HotSync, darunter der Stand. */
+function abgleichHtml() {
+  var an = tokenGueltig();
+  var h = '<div class="hs"><button type="button" class="hs-knopf' + (abgleichLaeuft ? ' laeuft' : '') + '" onclick="clAbgleichTipp()"'
+        + ' aria-label="Abgleichen">⇅</button>'
+        + '<div class="hs-wort">' + (an ? 'Abgleichen' : 'Mit Google verbinden') + '</div>'
+        + '<div class="hs-stand">' + esc(standText().text) + '</div></div>';
+  h += '<div class="abschnitt">Google Drive</div>'
+     + reihe('Anmeldung', an ? 'noch ' + restMinuten() + ' Min.' : (warAngemeldet() ? 'abgelaufen' : 'nicht angemeldet'), !an)
+     + reihe('Datei', DRIVE_DATEI)
+     + reihe('Letzter Abgleich', letzterAbgleich ? letzterAbgleich.slice(0, 16) : '—')
+     + reihe('Ergebnis', berichtText(letzterBericht))
+     + (abgleichFehler ? reihe('Letzter Fehler', abgleichFehler, true) : '');
+  h += '<div class="abschnitt">Google-Kalender</div>'
+     + reihe('Termine', kalenderLaeuft ? 'werden geholt …' : String(termineZahl()))
+     + reihe('Geholt', kalenderStand ? kalenderStand.slice(11, 16) : '—')
+     + (kalenderFehler ? reihe('Fehler', kalenderFehler, true) : '');
+  h += '<div class="abschnitt">Gerät</div>'
+     + reihe('Gespeichert über', wegText(speicherWeg))
+     + (dateiName ? reihe('Datei', dateiName) : '')
+     + reihe('Zuletzt gespeichert', letzterSchreibvorgang || '—');
+  h += '<div class="abschnitt">Fassung</div>'
+     + reihe('Läuft', 'CLIE ' + APP_VERSION)
+     + (neueVersion ? reihe('Neu', neueVersion + ' liegt bereit') : '');
+  h += '<div class="knoepfe">'
+     + (an ? '<button type="button" class="knopf" onclick="clTermineHolen(true)">Termine holen</button>'
+           + '<button type="button" class="knopf" onclick="abmelden()">Abmelden</button>'
+           : '<button type="button" class="knopf voll" onclick="anmelden(false)">Anmelden</button>')
+     + '<button type="button" class="knopf" onclick="versionPruefen(true)">Neue Fassung?</button>'
+     + (neueVersion ? '<button type="button" class="knopf voll" onclick="neuLaden()">Jetzt laden</button>' : '')
+     + '</div><div class="knoepfe">'
+     + (fsApiDa() ? '<button type="button" class="knopf" onclick="dateiWaehlen()">Datei öffnen …</button>' : '')
+     + '<button type="button" class="knopf" onclick="sicherungLaden()">Sicherung</button></div>'
+     + '<p class="leise">CLIE arbeitet auf ' + esc(DATEINAME) + ' — derselben Datei wie die Workbench. Abgeglichen wird von selbst, '
+     + 'bei jeder Änderung, beim Zurückkehren und alle 30 Sekunden. Die Termine kommen alle 2 Minuten neu.</p>';
+  return h;
+}
+
+function inhaltZeichnen() {
+  var el = document.getElementById('inhalt');
+  if (!el) { return; }
+  var a = clApp(cl.app);
+  if (cl.app === 'abgleich') { el.innerHTML = abgleichHtml(); }
+  else if (a && a.stufe) { el.innerHTML = spaeterHtml(a); }
+  else { el.innerHTML = uebersichtHtml(); }
+}
+
+function kopfZeichnen() {
+  var a = clApp(cl.app);
+  var reiter = document.getElementById('reiter');
+  if (reiter) { reiter.textContent = a ? a.name : 'Übersicht'; }
+  var kat = document.getElementById('katKnopf');
+  if (kat) {
+    kat.textContent = '▼ ' + katName(cl.filter);
+    kat.className = 'kat' + (cl.aufklapp === 'kat' ? ' an' : '');
+  }
+  uhrZeichnen();
+}
+
+function uhrZeichnen() {
+  var el = document.getElementById('uhr');
+  if (el) { el.textContent = clUhrzeit(); }
+}
+
+/* Kategorie- und Menüliste: wie die Aufklapplisten des Palm. */
+function aufklappZeichnen() {
+  var el = document.getElementById('aufklapp');
+  var schleier = document.getElementById('schleier');
+  if (!el) { return; }
+  if (schleier) { schleier.className = 'schleier' + (cl.aufklapp ? ' auf' : ''); }
+  if (cl.aufklapp === 'kat') {
+    el.innerHTML = '<div class="aufklapp" style="top:38px;right:6px">'
+      + CL_KATEGORIEN.map(function (k) {
+          return '<button type="button"' + (k[0] === cl.filter ? ' class="an"' : '') + ' onclick="katSetzen(\'' + k[0] + '\')">' + k[1] + '</button>';
+        }).join('') + '</div>';
+  } else if (cl.aufklapp === 'menue') {
+    el.innerHTML = '<div class="aufklapp" style="top:0;left:0;right:0;box-shadow:0 3px 0 var(--px)">'
+      + '<div class="menue-zeile"><span>CLIE</span></div>'
+      + '<button type="button" onclick="menueWahl(\'abgleich\')">Abgleichen</button>'
+      + '<button type="button" onclick="menueWahl(\'termine\')">Termine holen</button>'
+      + '<div class="trenn"></div>'
+      + '<button type="button" onclick="menueWahl(\'version\')">Auf neue Fassung prüfen</button>'
+      + '<button type="button" onclick="menueWahl(\'info\')">Info</button></div>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function zeichne() {
+  kopfZeichnen();
+  inhaltZeichnen();
+  aufklappZeichnen();
+  standZeichnen();
+  document.title = 'CLIE ' + APP_VERSION;
+}
+
+/* ---------- Bedienen ---------- */
+
+function oeffne(id) {
+  cl.app = clApp(id) ? id : 'uebersicht';
+  cl.aufklapp = '';
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
+}
+
+function katUm() {
+  cl.aufklapp = (cl.aufklapp === 'kat') ? '' : 'kat';
+  kopfZeichnen();
+  aufklappZeichnen();
+}
+
+function menueUm() {
+  cl.aufklapp = (cl.aufklapp === 'menue') ? '' : 'menue';
+  kopfZeichnen();
+  aufklappZeichnen();
+}
+
+function aufklappZu() {
+  cl.aufklapp = '';
+  kopfZeichnen();
+  aufklappZeichnen();
+}
+
+function menueWahl(was) {
+  cl.aufklapp = '';
+  if (was === 'abgleich') { oeffne('abgleich'); clAbgleichTipp(); return; }
+  if (was === 'termine') { aufklappZeichnen(); clTermineHolen(true); return; }
+  if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
+  aufklappZeichnen();
+  melde('CLIE ' + APP_VERSION + '\nauf ' + DATEINAME + ' · Unterbau aus der Workbench', null);
+}
+
+function clAbgleichTipp() {
+  if (!tokenGueltig()) { anmelden(false); return; }
+  if (abgleichLaeuft) { return; }
+  abgleichLaeuft = true;
+  zeichne();
+  abgleichen().then(function (b) {
+    abgleichZuletztMs = Date.now();
+    abgleichFehler = '';
+    lokalOffen = false;
+    verbindungOk = true;
+    melde('Abgleich fertig.\n' + berichtText(b), 'gut');
+  }).catch(function (f) {
+    abgleichFehler = f ? f.message : 'unbekannter Fehler';
+    melde('Abgleich fehlgeschlagen.\n' + abgleichFehler, 'warn');
+  }).then(function () {
+    abgleichLaeuft = false;
+    zeichne();
+    clTermineHolen(false);
+  });
+}
+
+function sicherungLaden() {
+  var name = 'workbench-sicherung-' + isoDatum() + '.json';
+  if (dateiAnbieten(name, alsText())) { melde('Sicherung bereitgestellt: ' + name, 'gut'); }
+  else { melde('Die Sicherung ließ sich nicht bereitstellen.', 'warn'); }
+}
+
+/* ---------- Stand und Rückmeldungen ---------- */
+
+var toastZeit = 0;
+
+function melde(text, art) {
+  var t = document.getElementById('toast');
+  var tt = document.getElementById('toastText');
+  if (!t || !tt) { return; }
+  tt.textContent = String(text || '');
+  t.className = 'toast auf' + (art === 'warn' ? ' warn' : '');
+  if (toastZeit) { window.clearTimeout(toastZeit); }
+  toastZeit = window.setTimeout(toastZu, (art === 'warn') ? 7000 : 3500);
+}
+
+function toastZu() {
+  var el = document.getElementById('toast');
+  if (el) { el.className = 'toast'; }
+  if (toastZeit) { window.clearTimeout(toastZeit); }
+  toastZeit = 0;
+}
+
+function standText() {
+  if (!tokenGueltig()) {
+    return warAngemeldet() ? { text: 'Anmeldung abgelaufen', warn: true } : { text: 'nur auf diesem Gerät', warn: false };
+  }
+  if (abgleichFehler) { return { text: 'Abgleich fehlgeschlagen', warn: true }; }
+  if (verbindungOk === false) { return { text: 'keine Verbindung — lokal gespeichert', warn: true }; }
+  if (abgleichLaeuft) { return { text: 'gleicht ab …', warn: false }; }
+  if (letzterAbgleich) { return { text: 'abgeglichen ' + letzterAbgleich.slice(11, 16), warn: false }; }
+  return { text: 'angemeldet', warn: false };
+}
+
+function standZeichnen() {
+  anmeldebannerZeichnen();
+}
+
+/* Wie in der Workbench: Ein Streifen oben meldet sich nur, wenn keine
+   Verbindung zu Google besteht — mit „Verbinden“. */
+function anmeldebannerZeichnen() {
+  var streifen = document.getElementById('anmeldeStreifen');
+  var text = document.getElementById('anmeldeText');
+  if (!streifen || !text) { return; }
+  if (tokenGueltig() && verbindungOk !== false) {
+    streifen.classList.remove('sichtbar');
+    return;
+  }
+  if (!tokenGueltig()) {
+    text.textContent = warAngemeldet() ? 'Anmeldung bei Google abgelaufen.' : 'Nicht bei Google angemeldet — nur lokal.';
+  } else {
+    text.textContent = 'Keine Verbindung zu Google — nur lokal.';
+  }
+  streifen.classList.add('sichtbar');
+}
+
+/* Die Workbench-Funktionen rufen diesen Namen. */
+function anmeldeStreifenPruefen() { standZeichnen(); }
+
+/* Wer schon einmal angemeldet war, wird still neu angemeldet: beim Start
+   und sobald die App merkt, dass sie nicht verbunden ist. Höchstens
+   einmal je Minute, damit kein Fenster flackert. */
+function stillAnmelden(grund) {
+  if (anmeldungLaeuft || tokenGueltig() || !warAngemeldet()) { return Promise.resolve(false); }
+  if (Date.now() - stillVersuchtMs < STILL_ABSTAND) { return Promise.resolve(false); }
+  stillVersuchtMs = Date.now();
+  return anmelden(true).then(function (gut) {
+    if (gut) {
+      verbindungOk = true;
+      if (grund !== 'start') { melde('Verbindung zu Google wiederhergestellt.', 'gut'); }
+      abgleichPlanen(true);
+    } else {
+      verbindungOk = false;
+      melde('Die Anmeldung ließ sich nicht im Hintergrund erneuern.\nBitte oben auf „Verbinden“ tippen.', 'warn');
+    }
+    zeichne();
+    return gut;
+  });
+}
+
+/* ---------- Speichern und Abgleich ---------- */
+
+function spaeterSichern() {
+  if (speicherUhr) { window.clearTimeout(speicherUhr); }
+  lokalOffen = true;
+  speicherUhr = window.setTimeout(function () {
+    speicherUhr = null;
+    speichern().then(function () {
+      standZeichnen();
+      abgleichPlanen(false);
+    }).catch(function () { return null; });
+  }, 1500);
+}
+
+function abgleichStill() {
+  abgleichUhr = null;
+  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  abgleichLaeuft = true;
+  zeichne();
+  abgleichen().then(function (b) {
+    abgleichZuletztMs = Date.now();
+    abgleichFehler = '';
+    lokalOffen = false;
+    verbindungOk = true;
+    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); }
+    abgleichLaeuft = false;
+    zeichne();
+  }).catch(function (f) {
+    abgleichFehler = f ? f.message : 'unbekannter Fehler';
+    abgleichLaeuft = false;
+    zeichne();
+  });
+}
+
+function verbindungPruefen() {
+  if (!tokenGueltig()) { verbindungOk = false; standZeichnen(); stillAnmelden('verbindung'); return; }
+  window.fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: driveKopf() })
+    .then(function (a) {
+      if (a.ok) { verbindungOk = true; }
+      else if (a.status === 401 || a.status === 403) { tokenVergessen(); verbindungOk = false; stillAnmelden('verbindung'); }
+      standZeichnen();
+    }).catch(function () {
+      verbindungOk = false;
+      standZeichnen();
+    });
+}
+
+function rueckkehrPruefen() {
+  erneuerungPruefen();
+  if (document.hidden) { return; }
+  versionPruefen(false);
+  zeichne();
+  if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
+  clTermineHolen(false);
+  if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
+  abgleichPlanen(true);
+}
+
+/* ---------- Neue Fassung suchen und laden — wie in der Workbench ---------- */
+
+var VERSION_TAKT = 15 * 60 * 1000;
+var neueVersion = '';
+var versionUhr = null;
+
+function versionPruefen(laut) {
+  if (typeof window.fetch !== 'function') { return Promise.resolve(null); }
+  var adresse = './clie.html?stand=' + Date.now();
+  return window.fetch(adresse, { cache: 'no-store' }).then(function (a) {
+    if (!a.ok) { throw new Error('Abruf mit Status ' + a.status); }
+    return a.text();
+  }).then(function (text) {
+    var treffer = text.match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+    if (!treffer) { throw new Error('Im Abruf steht keine Versionsnummer.'); }
+    var dort = treffer[1];
+    if (dort !== APP_VERSION) {
+      neueVersion = dort;
+      neuStreifenZeigen(dort);
+      if (laut) { melde('Neue Fassung ' + dort + ' gefunden.', 'gut'); }
+    } else {
+      neueVersion = '';
+      neuStreifenVerbergen();
+      if (laut) { melde('CLIE ' + APP_VERSION + ' ist die neueste Fassung.', 'gut'); }
+    }
+    if (cl.app === 'abgleich') { inhaltZeichnen(); }
+    return dort;
+  }).catch(function (f) {
+    if (laut) { melde('Versionsprüfung nicht möglich.\n' + (f ? f.message : ''), 'warn'); }
+    return null;
+  });
+}
+
+function neuStreifenZeigen(dort) {
+  var streifen = document.getElementById('neuStreifen');
+  var text = document.getElementById('neuText');
+  if (!streifen || !text) { return; }
+  text.textContent = 'Neue Fassung ' + dort + ' (läuft: ' + APP_VERSION + ')';
+  streifen.classList.add('sichtbar');
+}
+
+function neuStreifenVerbergen() {
+  var streifen = document.getElementById('neuStreifen');
+  if (streifen) { streifen.classList.remove('sichtbar'); }
+}
+
+/* Vor dem Neuladen wird alles Wartende gesichert. */
+function neuLaden() {
+  neuStreifenVerbergen();
+  melde('Neue Fassung wird geladen …', null);
+  speichern().catch(function () { return null; }).then(function () {
+    if (!navigator.serviceWorker || typeof navigator.serviceWorker.getRegistration !== 'function') { return null; }
+    return navigator.serviceWorker.getRegistration('./clie').then(function (anmeldung) {
+      if (!anmeldung) { return null; }
+      if (anmeldung.waiting) { anmeldung.waiting.postMessage('sofort-uebernehmen'); }
+      return anmeldung.update().catch(function () { return null; });
+    }).catch(function () { return null; });
+  }).then(function () {
+    window.setTimeout(function () { window.location.reload(); }, 600);
+  });
+}
+
+function versionTaktStarten() {
+  if (versionUhr) { window.clearInterval(versionUhr); }
+  versionUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    versionPruefen(false);
+  }, VERSION_TAKT);
+}
+
+/* ---------- Start ---------- */
+
+function swAnmelden() {
+  if (!navigator.serviceWorker || typeof navigator.serviceWorker.register !== 'function') { return; }
+  if (!/^https?:/.test(String(window.location && window.location.protocol))) { return; }
+  /* Eigener Bereich: Die Service Worker der anderen Apps bleiben unberührt. */
+  navigator.serviceWorker.register('./sw-clie.js', { scope: './clie' }).catch(function () { return null; });
+}
+
+function tasteGlobal(e) {
+  if (e && e.key === 'Escape' && cl.aufklapp) { aufklappZu(); }
+}
+
+/* Die Übersicht hängt an der Uhr: nächster Termin, „vor 2 Min.“. */
+function minutenTakt() {
+  if (document.hidden) { return; }
+  uhrZeichnen();
+  if (cl.app === 'uebersicht' && !cl.aufklapp) { inhaltZeichnen(); }
+}
+
+function start() {
+  clFilterLaden();
+  document.addEventListener('keydown', tasteGlobal);
+  zeichne();
+  if (tokenAusSitzung()) {
+    melde('Anmeldung übernommen, noch ' + restMinuten() + ' Minuten gültig.', null);
+  } else {
+    stillAnmelden('start');
+  }
+  var los = idbDa()
+    ? idbLesen(IDB_KEY).then(function (h) { if (h) { dateiHandle = h; dateiName = h.name || ''; } }).catch(function () { return null; })
+    : Promise.resolve(null);
+  los.then(function () { return laden(); }).then(function () {
+    zeichne();
+    if (tokenGueltig()) { abgleichPlanen(true); verbindungPruefen(); clTermineHolen(false); }
+    taktStarten();
+    verbindungTaktStarten();
+    clKalenderTaktStarten();
+  }).catch(function (f) {
+    melde('Laden fehlgeschlagen: ' + (f ? f.message : ''), 'warn');
+    zeichne();
+  });
+  document.addEventListener('visibilitychange', rueckkehrPruefen);
+  document.addEventListener('click', klickErneuern, true);
+  window.addEventListener('focus', standZeichnen);
+  window.addEventListener('focus', erneuerungPruefen);
+  window.setInterval(minutenTakt, 30000);
+  swAnmelden();
+  versionPruefen(false);
+  versionTaktStarten();
+}
+
+window.addEventListener('DOMContentLoaded', start);
+
+var DB = leereDatenbank();
+
+</script>
+</body>
+</html>
