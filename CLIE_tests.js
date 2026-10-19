@@ -282,9 +282,10 @@ function uebersichtTest() {
   CL.zeichne();
   const h = inhalt();
   pruefe(CL.clOffeneAufgaben() === 4, 'offene Aufgaben: nur [] aus laufenden Projekten und Listen, nicht [x], [-], Ruhendes oder Notizen');
-  pruefe(!/class="zahl"/.test(h) && typeof CL.clAppZahl === 'undefined', 'seit 0.7.1 keine Zahlen an den Symbolen');
+  pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
+    'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 9, 'neun Apps im Raster (seit 0.7 mit Sammlungen)');
+  pruefe((h.match(/class="app"/g) || []).length === 10, 'zehn Apps im Raster (seit 0.9 mit Heute)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -411,12 +412,12 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","abgleich"]',
-    'genau neun Apps: Kalender, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","abgleich"]',
+    'genau zehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 9, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/9)');
+  pruefe(syms === 10, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/10)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -1813,6 +1814,68 @@ function jahrTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   32. Heute (0.9)
+   Grund: eine Ansicht nur für das, was heute noch offen ist, mit einer
+   Zahl an der App und unten in der Leiste (statt „Menü“).
+   Erkennt: falsch Gezähltes (Ganztägiges, begonnene oder vorbeie
+   Termine), fehlende Abschnitte, Zahl, die nach dem Abhaken nicht sinkt.
+   ============================================================ */
+function heuteTest() {
+  console.log('\n32. Heute (0.9)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const altUhr = S.clUhrzeit;
+  S.clUhrzeit = () => '14:35';
+  const heute = S.isoDatum();
+  const wt = S.ausIso(heute).getDay();
+  S.termineNachTag[heute] = [
+    { id: 'a', zeit: '09:00', bis: '11:00', titel: 'Vorbei', kontext: 'privat' },
+    { id: 'b', zeit: '14:00', bis: '15:30', titel: 'Läuft gerade', kontext: 'privat' },
+    { id: 'c', zeit: '15:00', bis: '16:00', titel: 'Zahnarzt', kontext: 'privat' },
+    { id: 'd', zeit: '19:30', bis: '21:00', titel: 'Elternabend', kontext: 'beruflich' },
+    { id: 'g', zeit: '', bis: '', titel: 'Geburtstag Oma', ganztags: true, kontext: 'privat' }];
+  S.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '[] Rechnung prüfen\n[] Offering\n[] Rückruf Becker\n[x] Fertig', status: 'laufend', kontext: 'privat', geaendert: 1 });
+  S.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Rechnung prüfen\n[] Offering\n[] Rückruf Becker\n[x] Fertig', geaendert: 1, eintraege: [
+    { id: 'e1', abschnitt: 'h', text: 'Rechnung prüfen', quelle: 'p1', erledigt: false },
+    { id: 'e2', abschnitt: 'h', text: 'Offering', quelle: 'p1', erledigt: false },
+    { id: 'e3', abschnitt: 'h', text: 'Rückruf Becker', quelle: 'p1', erledigt: false, zeit: '17:00' },
+    { id: 'e4', abschnitt: 'h', text: 'Fertig', quelle: 'p1', erledigt: true }] });
+  S.DB.aufgaben.push({ id: 'r1', titel: 'Oskar laufen lassen', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, kontext: 'privat', geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'r2', titel: 'Pausiert', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, pausiert: true, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[x] a\n[] b', checkliste: 'lauf', kontext: 'privat', geaendert: 1 });
+  const d = S.clHeuteDaten();
+  pruefe(d.zahl === 6, 'gezählt: 2 kommende Termine, 1 Aufgabe mit Uhrzeit, 2 vorgenommene, 1 Routine = 6 (ist ' + d.zahl + ')');
+  pruefe(d.posten.map(p => p.titel).join(' | ') === 'Zahnarzt | Rückruf Becker | Elternabend', 'Als Nächstes: nach Zeit, ohne Begonnenes und Vorbei');
+  pruefe(!d.posten.some(p => /Vorbei|Läuft/.test(p.titel)), 'begonnene und beendete Termine fehlen');
+  S.oeffne('heute');
+  let h = inhalt();
+  pruefe(S.document.getElementById('reiter').textContent === 'Heute ' + S.clWt(heute) + ' ' + S.clKurzDatum(heute), 'Reiter: Heute mit Datum');
+  pruefe(/class="heute-kopf">Als Nächstes: Zahnarzt <b>in 25 Min\.<\/b>/.test(h), 'oben: als Nächstes mit Countdown');
+  pruefe(/◆ Geburtstag Oma/.test(h), 'Ganztägiges steht oben, ungezählt');
+  pruefe(/>Vorgenommen</.test(h) && /Rechnung prüfen/.test(h) && />Routinen</.test(h) && /Oskar laufen lassen/.test(h) && !/Pausiert/.test(h), 'Vorgenommen und Routinen, ohne Pausiertes');
+  pruefe(/>Hinweise</.test(h) && /☑ Packliste · 1\/2/.test(h), 'Hinweise: laufende Checkliste');
+  pruefe(/1 erledigt · zeigen/.test(h) && !/>Fertig</.test(h), 'Erledigtes ist eingeklappt');
+  pruefe(S.document.getElementById('heuteZahl').textContent === '6', 'die Zahl steht unten in der Leiste');
+  pruefe(S.clCountdown('19:30', '14:35') === 'um 19:30' && S.clCountdown('14:35', '14:35') === 'jetzt', 'ab einer Stunde die Uhrzeit, sonst Minuten');
+  S.clTagZeileUm(heute, 0);
+  pruefe(S.clHeuteZahl() === 5 && S.document.getElementById('heuteZahl').textContent === '5' && /2 erledigt · zeigen/.test(inhalt()), 'Abhaken senkt die Zahl sofort');
+  S.clHeuteErlUm();
+  pruefe(/>Erledigt</.test(inhalt()) && /class="hz erl"/.test(inhalt()), 'Erledigtes lässt sich zeigen');
+  S.clHeuteErlUm();
+  S.katSetzen('beruflich');
+  pruefe(S.clHeuteDaten().posten.map(p => p.titel).join(' | ') === 'Elternabend', 'der Filter ▼ gilt auch hier');
+  S.katSetzen('alle');
+  S.oeffne('uebersicht');
+  pruefe(/oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">5</.test(inhalt()), 'auf der Übersicht dieselbe Zahl an „Heute“');
+  pruefe(/onclick="oeffne\('heute'\)"><b>◉<\/b>Heute<span id="heuteZahl"/.test(QUELLE) && !/<nav class="silk"[^]*?menueUm\(\)[^]*?<\/nav>/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE),
+    'Leiste unten: Heute statt Menü, Suchen bleibt');
+  pruefe(/onclick="aufNeuAm\(isoDatum\(\),\\?'\\?'\)">Neu/.test(SKRIPT) || /aufNeuAm\(isoDatum\(\)/.test(SKRIPT), 'unten: Neu für heute');
+  S.clUhrzeit = altUhr;
+  S.zeichne();
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1841,6 +1904,7 @@ function jahrTest() {
   try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
   try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
+  try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
