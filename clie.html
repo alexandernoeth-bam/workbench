@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.9.1</title>
+<title>CLIE 0.10.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -59,6 +59,16 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .zahl{position:absolute;top:-4px;right:-8px;background:var(--px);color:var(--lcd);border-radius:10px;font-size:16px;padding:0 7px;line-height:22px}
 .silk .zahl{top:0;right:12%}
 .zahl.leer{display:none}
+/* Suchen (seit 0.10) */
+.su-feld{display:flex;gap:6px;align-items:center;border:2px solid var(--px);background:var(--lcd-hell);padding:2px 8px;margin:4px 0 8px;font-size:21px}
+.su-feld input{flex:1;min-width:0;font:inherit;font-size:19px;color:var(--px);background:transparent;border:0;padding:6px 2px;outline:none}
+.su-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.su-chip{border:2px solid var(--px);border-radius:12px;padding:0 9px;font-size:18px}
+.su-gruppe{display:flex;justify-content:space-between;font-weight:600;font-size:18.5px;border-bottom:2px solid var(--px);margin:10px 0 2px}
+.su-treffer{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:19.5px;overflow-wrap:anywhere}
+.su-treffer small{display:block;font-size:16px;color:var(--px-mitte)}
+.su-treffer mark,.su-treffer small mark{background:var(--px);color:var(--lcd);padding:0 2px}
+.su-mehr{font-size:16.5px;color:var(--px-mitte);text-decoration:underline;padding:4px 0}
 .heute-kopf{background:var(--px);color:var(--lcd);padding:6px 9px;margin:4px 0 8px;font-size:19.5px}
 .heute-kopf b{font-weight:400;white-space:nowrap}
 .hz{display:flex;gap:9px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:4px 0;min-height:38px}
@@ -366,7 +376,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
   <nav class="silk" aria-label="Tasten">
     <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Übersicht</button>
     <button type="button" onclick="oeffne('heute')"><b>◉</b>Heute<span id="heuteZahl" class="zahl leer"></span></button>
-    <button type="button" disabled title="Kommt später"><b>⌕</b>Suchen</button>
+    <button type="button" onclick="oeffne('suchen')"><b>⌕</b>Suchen</button>
     <button type="button" onclick="oeffne('abgleich')"><b>⇅</b>Abgleich</button>
   </nav>
   <div class="schleier" id="schleier" onclick="aufklappZu()"></div>
@@ -386,7 +396,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.9.1';
+var APP_VERSION = '0.10.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2858,6 +2868,323 @@ function clHeuteErlUm() {
   inhaltZeichnen();
 }
 
+/* ---------- Suchen (seit 0.10) ----------
+   Wie „Find“ am Palm: ein Feld, alles durchsuchen, nach App gruppiert.
+   Groß/klein, ä/ae und ß/ss sind egal. Der Filter ▼ gilt hier nicht —
+   gesucht wird immer in allem. Termine nur im geholten Zeitraum. */
+
+var SU_ZULETZT_KEY = 'clie-suche-zuletzt';
+var SU_GRUPPEN = [['termine', 'Termine'], ['jahr', 'Jahrestermine'], ['aufgaben', 'Aufgaben'], ['memo', 'Memo'],
+                  ['checklisten', 'Checklisten'], ['sammlungen', 'Sammlungen'], ['routinen', 'Routinen']];
+var SU_JE_GRUPPE = 3;
+
+cl.su = { text: '', erl: false, auf: {}, zuletzt: [] };
+
+function suLaden() {
+  try { cl.su.zuletzt = JSON.parse(window.localStorage.getItem(SU_ZULETZT_KEY) || '[]') || []; } catch (e) { cl.su.zuletzt = []; }
+  if (!Array.isArray(cl.su.zuletzt)) { cl.su.zuletzt = []; }
+}
+
+function suMerken(t) {
+  var w = String(t || '').trim();
+  if (w.length < 2) { return; }
+  cl.su.zuletzt = [w].concat(cl.su.zuletzt.filter(function (x) { return x.toLowerCase() !== w.toLowerCase(); })).slice(0, 6);
+  try { window.localStorage.setItem(SU_ZULETZT_KEY, JSON.stringify(cl.su.zuletzt)); } catch (e) { /* nur für jetzt */ }
+}
+
+/* Ein Zeichen vereinheitlicht: klein, ä→ae, ö→oe, ü→ue, ß→ss */
+function suZeichen(c) {
+  var k = String(c).toLowerCase();
+  return { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }[k] || k;
+}
+
+function suNorm(t) {
+  var s = String(t || '');
+  var aus = '';
+  var i;
+  for (i = 0; i < s.length; i++) { aus += suZeichen(s.charAt(i)); }
+  return aus;
+}
+
+/* Wo steht der Suchbegriff im Original? { a, e, wort } oder null.
+   wort = true, wenn der Treffer an einem Wortanfang steht. */
+function suFinde(orig, q) {
+  var s = String(orig || '');
+  var norm = '';
+  var start = [];
+  var i;
+  for (i = 0; i < s.length; i++) {
+    var z = suZeichen(s.charAt(i));
+    var k;
+    for (k = 0; k < z.length; k++) { start.push(i); }
+    norm += z;
+  }
+  var p = norm.indexOf(suNorm(q));
+  if (p < 0 || !q) { return null; }
+  var a = start[p];
+  var ende = p + suNorm(q).length - 1;
+  var e = start[ende] + 1;
+  return { a: a, e: e, wort: (a === 0 || /[^0-9A-Za-zÄÖÜäöüß]/.test(s.charAt(a - 1))) };
+}
+
+/* Text mit hervorgehobenem Treffer; lang = Ausschnitt um den Treffer */
+function suMarkiert(orig, q, lang) {
+  var s = String(orig || '').replace(/\s+/g, ' ');
+  var f = suFinde(s, q);
+  if (!f) { return esc(lang ? s.slice(0, 60) : s); }
+  var von = 0, bis = s.length;
+  if (lang) {
+    von = Math.max(0, f.a - 24);
+    bis = Math.min(s.length, f.e + 36);
+  }
+  return (von > 0 ? '… ' : '') + esc(s.slice(von, f.a)) + '<mark>' + esc(s.slice(f.a, f.e)) + '</mark>' + esc(s.slice(f.e, bis)) + (bis < s.length ? ' …' : '');
+}
+
+/* Alle Treffer: { gruppe, titel (HTML), unter (HTML), aufruf, rang: [Zahlen/Text] } */
+function suTreffer(q) {
+  var aus = [];
+  if (suNorm(q).length < 2) { return aus; }
+  var heute = isoDatum();
+  var wort = function (t) { var f = suFinde(t, q); return f ? (f.wort ? 0 : 1) : 2; };
+
+  /* Termine: jeder nur einmal — mehrtägige stehen an mehreren Tagen und
+     zählen am ersten kommenden Tag, sonst am letzten */
+  var termine = {};
+  Object.keys(termineNachTag).sort().forEach(function (tag) {
+    (termineNachTag[tag] || []).forEach(function (t) {
+      if (!suFinde([t.titel, t.ort || '', t.beschreibung || ''].join(' '), q)) { return; }
+      if (!termine[t.id]) { termine[t.id] = { t: t, tage: [] }; }
+      termine[t.id].tage.push(tag);
+    });
+  });
+  Object.keys(termine).forEach(function (id) {
+    var t = termine[id].t;
+    var tage = termine[id].tage;
+    var tag = tage.filter(function (x) { return x >= heute; })[0] || tage[tage.length - 1];
+    var text = [t.titel, t.ort || '', t.beschreibung || ''].join(' ');
+    var vorbei = (tag < heute) || (tag === heute && !t.ganztags && (t.bis || t.zeit) <= clUhrzeit());
+    aus.push({ gruppe: 'termine',
+      titel: suMarkiert(t.titel, q, false),
+      unter: esc(clWt(tag) + ' ' + clKurzDatum(tag) + ' · ' + (t.ganztags ? 'ganztägig' : clZeitText(t.zeit)) + (vorbei ? ' · vorbei' : ''))
+             + (suFinde(t.titel, q) ? '' : ' · ' + suMarkiert(text, q, true)),
+      aufruf: 'suTermin(\'' + esc(tag) + '\',\'' + esc(t.id) + '\')',
+      rang: [vorbei ? 1 : 0, (vorbei ? -1 : 1) * Number(tag.replace(/-/g, '')), (vorbei ? '' : (t.ganztags ? '' : t.zeit)), wort(t.titel)] });
+  });
+
+  /* Jahrestermine: nach dem nächsten Vorkommen */
+  (DB.jahrestermine || []).forEach(function (e) {
+    if (!e || !e.von || !suFinde(e.titel, q)) { return; }
+    var naechst = e.von;
+    if (e.jaehrlich) {
+      naechst = heute.slice(0, 4) + e.von.slice(4);
+      if ((heute.slice(0, 4) + (e.bis || e.von).slice(4)) < heute) { naechst = (Number(heute.slice(0, 4)) + 1) + e.von.slice(4); }
+    }
+    aus.push({ gruppe: 'jahr', titel: suMarkiert(e.titel, q, false),
+      unter: esc(clKurzDatum(naechst) + naechst.slice(0, 4) + (e.jaehrlich ? ' · jährlich' : '')),
+      aufruf: 'suTag(\'' + esc(naechst) + '\')', rang: [naechst < heute ? 1 : 0, Number(naechst.replace(/-/g, '')), wort(e.titel)] });
+  });
+
+  /* Aufgaben aus Projekten, Zielen und Listen */
+  kpSeitenAlle().forEach(function (sei) {
+    if (sei.art !== 'vorhaben' && sei.art !== 'liste') { return; }
+    String(sei.text || '').split('\n').forEach(function (z, nr) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || !suFinde(a.text, q)) { return; }
+      if (a.erledigt && !cl.su.erl) { return; }
+      var g = a.erledigt ? null : aufGeplant(sei, a.text);
+      aus.push({ gruppe: 'aufgaben', titel: (a.erledigt ? '✓ ' : '') + suMarkiert(a.text, q, false),
+        unter: esc(clSeitenZeichen(sei) + ' ' + sei.titel + (g ? ' · ' + clPlanText(g.datum, g.zeit) : '')),
+        aufruf: 'suAufgabe(\'' + esc(sei.id) + '\',' + nr + ')',
+        rang: [a.erledigt ? 1 : 0, g ? 0 : 1, g ? g.datum + (g.zeit || '') : '', wort(a.text), suNorm(a.text)] });
+    });
+  });
+
+  /* Memos: Titel vor Text, dann zuletzt geändert */
+  kpSeitenAlle().forEach(function (sei) {
+    if (sei.art === 'liste' || (sei.art === 'notiz' && sei.__satz && sei.__satz.checkliste)) { return; }
+    var imTitel = !!suFinde(sei.titel, q);
+    if (!imTitel && !suFinde(sei.text, q)) { return; }
+    aus.push({ gruppe: 'memo', titel: clSeitenZeichen(sei) + ' ' + suMarkiert(sei.titel, q, false),
+      unter: imTitel ? esc(String(sei.text || '').replace(/\s+/g, ' ').slice(0, 50)) : suMarkiert(sei.text, q, true),
+      aufruf: 'suMemo(\'' + esc(sei.id) + '\')', rang: [imTitel ? 0 : 1, -(Number(sei.geaendert) || 0)] });
+  });
+
+  /* Checklisten: laufend, Vorlagen, erledigt */
+  (DB.gedanken || []).forEach(function (g) {
+    if (!g || !g.checkliste) { return; }
+    if (g.checkliste === 'fertig' && !cl.su.erl) { return; }
+    var imTitel = !!suFinde(g.titel, q);
+    if (!imTitel && !suFinde(g.text, q)) { return; }
+    var art = { lauf: 'laufend', vorlage: 'Vorlage', fertig: 'erledigt' }[g.checkliste] || '';
+    aus.push({ gruppe: 'checklisten', titel: suMarkiert(g.titel, q, false),
+      unter: esc(art) + (imTitel ? '' : ' · ' + suMarkiert(g.text, q, true)),
+      aufruf: 'suCheckliste(\'' + esc(g.id) + '\')', rang: [{ lauf: 0, vorlage: 1, fertig: 2 }[g.checkliste], wort(g.titel)] });
+  });
+
+  /* Sammlungen: erst die Sammlung selbst, dann ihre Einträge */
+  (DB.sammlungen || []).forEach(function (sa) {
+    if (!sa || sa.vorlage) { return; }
+    if (suFinde(sa.name, q)) {
+      aus.push({ gruppe: 'sammlungen', titel: esc(SA_ZEICHEN[sa.art] || '≡') + ' ' + suMarkiert(sa.name, q, false),
+        unter: esc('Sammlung · ' + saSaetze(sa).length + (saSaetze(sa).length === 1 ? ' Eintrag' : ' Einträge')), aufruf: 'suSammlung(\'' + esc(sa.id) + '\',\'\')', rang: [0, 0] });
+    }
+    saSaetze(sa).forEach(function (d) {
+      var treffer = null;
+      (sa.felder || []).forEach(function (f) {
+        if (treffer || f.typ === 'formel') { return; }
+        var w = (d.werte || {})[f.id];
+        if (w === null || w === undefined || w === '' || typeof w === 'boolean') { return; }
+        if (suFinde(saWertText(f, w), q)) { treffer = f; }
+      });
+      if (!treffer) { return; }
+      var sp = saSpalten(sa).filter(function (f) { return f.id !== '_mon'; }).slice(0, 2);
+      var titel = sp.map(function (f) { return saZelle(sa, f, d); }).filter(function (t) { return t; }).join(' · ');
+      aus.push({ gruppe: 'sammlungen', titel: suMarkiert(titel || saWertText(treffer, d.werte[treffer.id]), q, false),
+        unter: esc(sa.name + ' · ' + treffer.name) + (suFinde(titel, q) ? '' : ': ' + suMarkiert(saWertText(treffer, d.werte[treffer.id]), q, true)),
+        aufruf: 'suSammlung(\'' + esc(sa.id) + '\',\'' + esc(d.id) + '\')', rang: [1, -(Number(d.angelegt || d.geaendert) || 0)] });
+    });
+  });
+
+  /* Routinen: alphabetisch */
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.wiederholung || !suFinde(a.titel, q)) { return; }
+    aus.push({ gruppe: 'routinen', titel: suMarkiert(a.titel, q, false), unter: esc(a.pausiert ? 'Routine · pausiert' : 'Routine'),
+      aufruf: 'suRoutine(\'' + esc(a.id) + '\')', rang: [a.pausiert ? 1 : 0, wort(a.titel), suNorm(a.titel)] });
+  });
+
+  var vgl = function (x, y) {
+    var i;
+    for (i = 0; i < Math.max(x.rang.length, y.rang.length); i++) {
+      var a = x.rang[i], b = y.rang[i];
+      if (a === b) { continue; }
+      if (typeof a === 'number' && typeof b === 'number') { return a - b; }
+      return String(a).localeCompare(String(b), 'de');
+    }
+    return 0;
+  };
+  return aus.sort(vgl);
+}
+
+function suErgebnisHtml() {
+  var q = cl.su.text;
+  if (suNorm(q).length < 2) {
+    var h = '';
+    if (cl.su.zuletzt.length) {
+      h += '<div class="leise">Zuletzt gesucht</div><div class="su-chips">' + cl.su.zuletzt.map(function (w, i) {
+        return '<button type="button" class="su-chip" onclick="suZuletzt(' + i + ')">' + esc(w) + '</button>';
+      }).join('') + '</div>';
+    }
+    return h + '<p class="leise">Durchsucht Termine, Jahrestermine, Aufgaben, Memos, Checklisten, Sammlungen und Routinen — ab 2 Buchstaben. Groß/klein und ä/ae sind egal.</p>';
+  }
+  var alle = suTreffer(q);
+  if (!alle.length) { return '<p class="leise">Nichts gefunden' + (cl.su.erl ? '' : ' — vielleicht bei „auch Erledigtes“') + '.</p>'; }
+  var h2 = '';
+  SU_GRUPPEN.forEach(function (g) {
+    var l = alle.filter(function (x) { return x.gruppe === g[0]; });
+    if (!l.length) { return; }
+    var zeigen = cl.su.auf[g[0]] ? l : l.slice(0, SU_JE_GRUPPE);
+    h2 += '<div class="su-gruppe"><span>' + g[1] + '</span><span>' + l.length + '</span></div>'
+       + zeigen.map(function (x) {
+           return '<button type="button" class="su-treffer" onclick="suMerken(cl.su.text);' + x.aufruf + '">' + x.titel + '<small>' + x.unter + '</small></button>';
+         }).join('');
+    if (l.length > zeigen.length) {
+      h2 += '<button type="button" class="su-mehr" onclick="suGruppeAuf(\'' + g[0] + '\')">+' + (l.length - zeigen.length) + ' weitere</button>';
+    }
+  });
+  return h2;
+}
+
+function suchenHtml() {
+  return '<div class="su-feld">⌕<input id="suchFeld" type="search" autocomplete="off" spellcheck="false" enterkeyhint="search"'
+    + ' placeholder="Suchen …" value="' + esc(cl.su.text) + '" oninput="suGetippt()" onkeydown="suTaste(event)"></div>'
+    + '<div id="suchErgebnis">' + suErgebnisHtml() + '</div>';
+}
+
+function suchenFussHtml() {
+  return '<button type="button" class="knopf' + (cl.su.erl ? ' voll' : '') + '" onclick="suErlUm()">' + (cl.su.erl ? '☒' : '☐') + ' auch Erledigtes</button>';
+}
+
+/* Beim Tippen nur die Ergebnisse neu zeichnen — das Feld behält den Fokus */
+function suErgebnisZeichnen() {
+  var el = document.getElementById('suchErgebnis');
+  if (el) { el.innerHTML = suErgebnisHtml(); }
+}
+
+function suGetippt() {
+  var f = document.getElementById('suchFeld');
+  cl.su.text = f ? String(f.value || '') : '';
+  cl.su.auf = {};
+  suErgebnisZeichnen();
+}
+
+function suTaste(e) {
+  if (e && e.key === 'Enter') { suMerken(cl.su.text); if (e.target && e.target.blur) { e.target.blur(); } }
+}
+
+function suZuletzt(i) {
+  var w = cl.su.zuletzt[i];
+  if (!w) { return; }
+  cl.su.text = w;
+  var f = document.getElementById('suchFeld');
+  if (f) { f.value = w; }
+  suErgebnisZeichnen();
+}
+
+function suErlUm() {
+  cl.su.erl = !cl.su.erl;
+  suErgebnisZeichnen();
+  fussZeichnen();
+}
+
+function suGruppeAuf(g) {
+  cl.su.auf[g] = true;
+  suErgebnisZeichnen();
+}
+
+function suFokus() {
+  var f = document.getElementById('suchFeld');
+  if (f && f.focus) { f.focus(); }
+}
+
+/* ---- Treffer öffnen ---- */
+
+function suTermin(tag, id) {
+  oeffne('kalender');
+  clKalGehe(tag, 'tag');
+  terminZeigen(tag, id);
+}
+
+function suTag(tag) {
+  oeffne('kalender');
+  clKalGehe(tag, 'tag');
+}
+
+function suAufgabe(seiteId, nr) {
+  oeffne('aufgaben');
+  aufDetails(seiteId, nr);
+}
+
+function suMemo(id) {
+  oeffne('memo');
+  memoOeffnen(id);
+}
+
+function suCheckliste(id) {
+  oeffne('checklisten');
+  clsOeffnen(id);
+}
+
+function suSammlung(sid, did) {
+  oeffne('sammlungen');
+  saOeffnen(sid);
+  if (did) { saEintrag(did); }
+}
+
+function suRoutine(id) {
+  oeffne('routinen');
+  rtDetails(id);
+}
+
 /* ---------- Statistik (seit 0.7.1) ----------
    Statt Zahlen an den Symbolen: je App ihre Datensätze, nach dem
    Filter ▼ (Alle, Beruf, Privat). Antippen eines Blocks öffnet die App. */
@@ -3008,6 +3335,11 @@ function inhaltZeichnen() {
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'statistik') { el.innerHTML = statistikHtml(); }
   else if (cl.app === 'heute') { el.innerHTML = heuteHtml(); }
+  else if (cl.app === 'suchen') {
+    /* Beim Neuzeichnen (Abgleich, Uhr) bleibt das Feld stehen — nur die Treffer kommen neu */
+    if (el.innerHTML.indexOf('suchFeld') >= 0) { suErgebnisZeichnen(); return; }
+    el.innerHTML = suchenHtml();
+  }
   else if (cl.app === 'checklisten') {
     if (cl.cls.schreiben && el.innerHTML.indexOf('memoFeld') >= 0) { return; }
     el.innerHTML = checklistenHtml();
@@ -3026,6 +3358,7 @@ function kopfZeichnen() {
       : (cl.app === 'sammlungen') ? saReiter()
       : (cl.app === 'statistik') ? 'Statistik'
       : (cl.app === 'heute') ? 'Heute ' + clWt(isoDatum()) + ' ' + clKurzDatum(isoDatum())
+      : (cl.app === 'suchen') ? 'Suchen'
       : memoSeite ? clSeitenZeichen(memoSeite) + ' ' + memoSeite.titel
       : (a ? a.name : 'Übersicht');
   }
@@ -3124,7 +3457,8 @@ function fussZeichnen() {
         : (cl.app === 'checklisten') ? checklistenFussHtml()
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
-        : (cl.app === 'heute') ? heuteFussHtml() : '';
+        : (cl.app === 'heute') ? heuteFussHtml()
+        : (cl.app === 'suchen') ? suchenFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -3150,11 +3484,12 @@ function oeffne(id) {
   if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; }
   if (id === 'sammlungen' && cl.app !== 'sammlungen') { cl.sa.id = ''; cl.sa.ansicht = 'tabelle'; }
-  cl.app = (clApp(id) || id === 'statistik') ? id : 'uebersicht';
+  cl.app = (clApp(id) || id === 'statistik' || id === 'suchen') ? id : 'uebersicht';
   cl.aufklapp = '';
   var el = document.getElementById('inhalt');
   if (el) { el.scrollTop = 0; }
   zeichne();
+  if (cl.app === 'suchen') { suFokus(); }
 }
 
 function katUm() {
@@ -7831,6 +8166,7 @@ function start() {
   aufListeLaden();
   rtLaden();
   saFilterLaden();
+  suLaden();
   document.addEventListener('keydown', tasteGlobal);
   window.addEventListener('popstate', zurueckGedrueckt);
   zurueckScharf();

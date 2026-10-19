@@ -1924,6 +1924,93 @@ function trainingTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   34. Suchen (0.10)
+   Grund: „Suchen“ war ein Platzhalter. Jetzt durchsucht es alle Apps,
+   gruppiert und sortiert die Treffer und öffnet sie.
+   Erkennt: Treffer, die fehlen (Umlaute, Groß/klein, Filter ▼),
+   doppelte mehrtägige Termine, falsche Reihenfolge, Erledigtes ohne
+   Schalter, Treffer, die das Falsche öffnen.
+   ============================================================ */
+function suchenTest() {
+  console.log('\n34. Suchen (0.10)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const plus = n => S.tagePlus(heute, n);
+  pruefe(S.suNorm('Größe Übung') === 'groesse uebung', 'vereinheitlicht: klein, ä/ö/ü, ß');
+  const f = S.suFinde('Die Größe', 'groesse');
+  pruefe(f && f.a === 4 && f.e === 9 && f.wort, 'Treffer im Original: „Größe“ für „groesse“, am Wortanfang');
+  pruefe(S.suMarkiert('Fahrrad putzen', 'RAD', false) === 'Fahr<mark>rad</mark> putzen', 'Hervorhebung im Original, Groß/klein egal');
+  pruefe(S.suTreffer('c').length === 0, 'erst ab 2 Zeichen');
+
+  S.termineNachTag[plus(-5)] = [{ id: 't1', zeit: '10:00', bis: '11:00', titel: 'Bauamt wegen Carport', kontext: 'privat' }];
+  S.termineNachTag[plus(3)] = [{ id: 't2', zeit: '16:00', bis: '17:00', titel: 'Angebot Carport', kontext: 'beruflich' }];
+  S.termineNachTag[plus(1)] = [{ id: 't3', zeit: '', bis: '', titel: 'Urlaub', beschreibung: 'Carport-Bau beaufsichtigen', ganztags: true, kontext: 'privat' }];
+  S.termineNachTag[plus(2)] = [{ id: 't3', zeit: '', bis: '', titel: 'Urlaub', beschreibung: 'Carport-Bau beaufsichtigen', ganztags: true, kontext: 'privat' }];
+  S.DB.themen.push({ id: 'l1', name: 'Haus', text: '[] Statik für Carport anfragen\n[x] Carport vermessen\n[] Rasen', kontext: 'privat', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p1', name: 'Baulücke', flaeche: 'Fundament für den Carport mit Punktfundamenten', status: 'laufend', kontext: 'privat', geaendert: 5 });
+  S.DB.gedanken.push({ id: 'c1', titel: 'Carport-Abnahme', text: '[] Dach', checkliste: 'vorlage', kontext: 'privat', geaendert: 1 });
+  const sa = S.saAusVorlage(S.SA_VORLAGEN.budget, 'Carport', false, [{ posten: 'Bausatz', gewerk: 'Material', plan: 3500 }, { posten: 'Lasur', notiz: 'für Carport-Holz', plan: 300 }]);
+  S.DB.aufgaben.push({ id: 'r1', titel: 'Carport fegen', wiederholung: { takt: 'woche', tage: [1], intervall: 1 }, geaendert: 1 });
+  S.cl.filter = 'beruflich';
+  const t = S.suTreffer('carport');
+  const g = n => t.filter(x => x.gruppe === n);
+  pruefe(g('termine').length === 3, 'Termine: drei — der mehrtägige nur einmal');
+  pruefe(g('termine').map(x => x.unter.indexOf('vorbei') >= 0 ? 'v' : 'k').join('') === 'kkv', 'Termine: kommende zuerst, Vergangenes zuletzt');
+  pruefe(/Urlaub/.test(g('termine')[0].titel) && /Angebot/.test(g('termine')[1].titel), 'Termine: der nächste oben (morgen vor in drei Tagen)');
+  pruefe(/<mark>Carport<\/mark>-Bau/.test(g('termine')[0].unter), 'Treffer in der Beschreibung: Ausschnitt darunter');
+  pruefe(g('aufgaben').length === 1 && /Statik/.test(g('aufgaben')[0].titel), 'Aufgaben: Erledigtes ohne Schalter nicht');
+  pruefe(g('memo').length === 1 && /Baulücke/.test(g('memo')[0].titel) && /<mark>Carport<\/mark>/.test(g('memo')[0].unter), 'Memo: Treffer im Text mit Ausschnitt');
+  pruefe(g('checklisten').length === 1 && g('routinen').length === 1, 'Checklisten und Routinen');
+  pruefe(g('sammlungen').length === 2 && /Sammlung · 2 Einträge/.test(g('sammlungen')[0].unter) && /Lasur/.test(g('sammlungen')[1].titel),
+    'Sammlungen: erst die Sammlung, dann der Eintrag (Treffer in der Notiz)');
+  pruefe(t.length === 9, 'der Filter ▼ (Beruf) gilt bei der Suche nicht — alles wird gefunden');
+  S.cl.filter = 'alle';
+  S.cl.su.erl = true;
+  pruefe(S.suTreffer('carport').filter(x => x.gruppe === 'aufgaben').length === 2, '„auch Erledigtes“ zeigt die erledigte Aufgabe');
+  S.cl.su.erl = false;
+  pruefe(S.suTreffer('rad').length === 0 && S.suTreffer('ARPO').length === 9, 'mitten im Wort und in Großbuchstaben');
+
+  /* Bedienen */
+  S.oeffne('suchen');
+  pruefe(S.document.getElementById('reiter').textContent === 'Suchen' && /id="suchFeld"/.test(inhalt()), 'Suchen: Reiter und Feld');
+  S.document.getElementById('suchFeld').value = 'carport';
+  S.suGetippt();
+  let h = S.document.getElementById('suchErgebnis').innerHTML;
+  pruefe(/class="su-gruppe"><span>Termine<\/span><span>3<\/span>/.test(h) && /\+0 weitere/.test(h) === false, 'Gruppe mit Anzahl');
+  const gruppen = (h.match(/class="su-gruppe"><span>([^<]+)/g) || []).map(x => x.replace(/.*<span>/, ''));
+  pruefe(gruppen.join(',') === 'Termine,Aufgaben,Memo,Checklisten,Sammlungen,Routinen', 'Gruppen in fester Reihenfolge — ' + gruppen.join(','));
+  for (let i = 0; i < 3; i++) { S.DB.themen[0].text += '\n[] Carport Punkt ' + i; }
+  S.suGetippt();
+  h = S.document.getElementById('suchErgebnis').innerHTML;
+  pruefe((h.match(/class="su-treffer"/g) || []).length === 3 + 3 + 1 + 1 + 2 + 1 && /\+1 weitere/.test(h), 'je Gruppe höchstens 3, dazu „+1 weitere“');
+  S.suGruppeAuf('aufgaben');
+  pruefe(!/\+1 weitere/.test(S.document.getElementById('suchErgebnis').innerHTML), '„weitere“ klappt die Gruppe auf');
+  S.suMerken('carport'); S.suMerken('Becker'); S.suMerken('CARPORT');
+  pruefe(S.cl.su.zuletzt.join(',') === 'CARPORT,Becker', 'zuletzt gesucht: ohne Doppelte, Neuestes vorn');
+  S.document.getElementById('suchFeld').value = '';
+  S.suGetippt();
+  pruefe(/su-chip" onclick="suZuletzt\(0\)">CARPORT/.test(S.document.getElementById('suchErgebnis').innerHTML), 'leeres Feld: die letzten Suchbegriffe');
+
+  /* Öffnen */
+  S.suSammlung(sa.id, S.saSaetze(sa)[1].id);
+  pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === sa.id && S.cl.aufklapp === 'sa' && S.cl.sa.fenster.id === S.saSaetze(sa)[1].id, 'Sammlungs-Treffer öffnet den Eintrag');
+  S.aufklappZu();
+  S.suMemo('p1');
+  pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'p1', 'Memo-Treffer öffnet die Seite');
+  S.suAufgabe('l1', 0);
+  pruefe(S.cl.app === 'aufgaben' && S.cl.aufklapp === 'aufgabe', 'Aufgaben-Treffer öffnet die Aufgabe');
+  S.aufklappZu();
+  S.suRoutine('r1');
+  pruefe(S.cl.app === 'routinen' && S.cl.aufklapp === 'routine', 'Routinen-Treffer öffnet die Routine');
+  S.aufklappZu();
+  pruefe(/onclick="oeffne\('suchen'\)"><b>⌕<\/b>Suchen/.test(QUELLE) && !/disabled title="Kommt später"/.test(QUELLE), 'Suchen unten ist kein Platzhalter mehr');
+  S.cl.su = { text: '', erl: false, auf: {}, zuletzt: [] };
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1954,6 +2041,7 @@ function trainingTest() {
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
   try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
   try { trainingTest(); } catch (e) { fail('Training warf: ' + e.message); }
+  try { suchenTest(); } catch (e) { fail('Suchen warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
