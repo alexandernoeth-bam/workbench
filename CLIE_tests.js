@@ -2199,6 +2199,19 @@ function prioTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   38. Memo-Liste zweizeilig (0.12.1)
+   Grund: lange Seitentitel wurden nach einer Zeile abgeschnitten.
+   Erkennt: Rückfall auf einzeilig, unbegrenzte Höhe.
+   ============================================================ */
+function memoZweiTest() {
+  console.log('\n38. Memo-Liste zweizeilig (0.12.1)');
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  const regel = (css.match(/\.memo-zeile \.tx\{[^}]*\}/) || [''])[0];
+  pruefe(/white-space:normal/.test(regel) && /-webkit-line-clamp:2/.test(regel) && /max-height:2\.5em/.test(regel) && !/nowrap/.test(regel),
+    'Titel in der Memo-Liste: bis zu zwei Zeilen, dann abgeschnitten');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2233,6 +2246,7 @@ function prioTest() {
   try { trendTest(); } catch (e) { fail('Trend/Link warf: ' + e.message); }
   try { vierTest(); } catch (e) { fail('Vier Spalten warf: ' + e.message); }
   try { prioTest(); } catch (e) { fail('Prioritäten warf: ' + e.message); }
+  memoZweiTest();
 
   /* ============================================================
      ERGEBNIS
