@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.11.0</title>
+<title>CLIE 0.11.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -308,13 +308,18 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-zeile .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .sa-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
 .sa-sym{width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:#3B4433;color:var(--lcd-hell);display:flex;align-items:center;justify-content:center;font-size:18px}
-.sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap}
+.sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap;text-align:right;line-height:1.15}
+/* Kennzahl 2 klein darunter (seit 0.11.1) */
+.sa-kz small{display:block;font-size:16px}
 .sa-hinweis{display:block;width:100%;text-align:left;border:2px dashed var(--px);padding:3px 7px;margin:8px 0;font-size:18px}
 .sa-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:19px}
 .sa-tab th{font-size:16px;font-weight:600;text-align:left;border-bottom:2px solid var(--px);padding:2px 3px}
 .sa-tab td{border-bottom:2px dotted var(--px-zart);padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sa-tab th:first-child,.sa-tab td:first-child{width:46%}
 .sa-tab.sa-dat th:first-child,.sa-tab.sa-dat td:first-child{width:22%}
+.sa-tab.sa-vier{font-size:17.5px}
+.sa-tab.sa-vier th:first-child,.sa-tab.sa-vier td:first-child{width:34%}
+.sa-tab.sa-vier.sa-dat th:first-child,.sa-tab.sa-vier.sa-dat td:first-child{width:20%}
 .sa-tab .r{text-align:right}
 .sa-tab tr.sa-z{cursor:pointer}
 .sa-tab tr.sa-gr td{font-weight:600;border-bottom:2px solid var(--px-mitte);padding-top:8px}
@@ -400,7 +405,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.11.0';
+var APP_VERSION = '0.11.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6226,8 +6231,10 @@ function saBudget(s, l) {
 }
 
 /* Die Kennzahl rechts in der Liste: wie gewählt (seit 0.8.1), sonst nach der Vorlage */
-function saKennzahl(s) {
-  var kz = s.kennzahl || {};
+/* Eine Kennzahl nach Wahl; null = keine Wahl getroffen */
+function saKennzahlNach(s, kz) {
+  kz = kz || {};
+  if (!kz.art) { return null; }
   var l = saSaetze(s);
   if (kz.art === 'anzahl') { return String(l.length); }
   if (kz.art === 'wert') {
@@ -6248,7 +6255,18 @@ function saKennzahl(s) {
     var n = saAuswerten(kz.art, l.map(function (d) { return saRoh(s, d, f); }));
     return (n === null) ? '—' : saAuswertungText(f, kz.art, n);
   }
-  return saKennzahlStandard(s);
+  return null;
+}
+
+/* Kennzahl 1: wie gewählt, sonst nach der Vorlage */
+function saKennzahl(s) {
+  var t = saKennzahlNach(s, s.kennzahl);
+  return (t === null) ? saKennzahlStandard(s) : t;
+}
+
+/* Kennzahl 2 (seit 0.11.1): nur, wenn gewählt */
+function saKennzahl2(s) {
+  return saKennzahlNach(s, s.kennzahl2) || '';
 }
 
 function saKennzahlStandard(s) {
@@ -6297,7 +6315,8 @@ function saListeHtml() {
     h += '<div class="gruppe">' + esc(g) + '</div>';
     l.forEach(function (s) {
       h += '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + (SA_ZEICHEN[s.art] || '≡') + '</span>'
-         + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s)) + '</span></button>';
+         + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
+         + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>';
     });
   });
   if (!alle.length) { h += '<p class="leise">Noch keine Sammlung — „Neu…“ tippen und eine Vorlage wählen.</p>'; }
@@ -6307,12 +6326,15 @@ function saListeHtml() {
   return h;
 }
 
-/* Die Spalten der Tabelle: höchstens drei Felder, bei Abos dazu „/Mon“ */
+/* Die Spalten der Tabelle: höchstens vier Felder (seit 0.11.1, vorher drei),
+   bei Abos dazu „/Mon“ als letzte Spalte */
+var SA_SPALTEN_MAX = 4;
+
 function saSpalten(s) {
-  var sp = (s.felder || []).filter(function (f) { return f.spalte; }).slice(0, 3);
+  var sp = (s.felder || []).filter(function (f) { return f.spalte; }).slice(0, SA_SPALTEN_MAX);
   if (!sp.length && s.felder && s.felder.length) { sp = [s.felder[0]]; }
   if (s.art === 'abos' && saFeld(s, (s.rollen || {}).betrag)) {
-    sp = sp.slice(0, 2).concat([{ id: '_mon', name: '/Mon', typ: 'betrag', summe: '', virtuell: true }]);
+    sp = sp.slice(0, SA_SPALTEN_MAX - 1).concat([{ id: '_mon', name: '/Mon', typ: 'betrag', summe: '', virtuell: true }]);
   }
   return sp;
 }
@@ -6347,7 +6369,7 @@ function saSummenZeile(s, sp, l, klasse, titel) {
 function saTabelleHtml(s) {
   var sp = saSpalten(s);
   var l = saGefiltert(s);
-  var h = '<table class="sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + '"><tr>' + sp.map(function (f) {
+  var h = '<table class="sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '') + '"><tr>' + sp.map(function (f) {
     return '<th class="' + (saRechts(f) ? 'r' : '') + '">' + esc(f.name) + '</th>';
   }).join('') + '</tr>';
   var zeile = function (d) {
@@ -6772,14 +6794,16 @@ function saDetailsOeffnen() {
   if (!s) { return; }
   var kz = s.kennzahl || {};
   saFensterAuf({ modus: 'details', name: s.name, kontext: s.kontext || 'privat', gruppe: s.gruppeName || '',
-                 kzArt: kz.art || '', kzFeld: kz.feld || ((s.felder || [])[0] || {}).id || '', kzWert: kz.wert || ((s.werte || [])[0] || {}).id || '' });
+                 kzArt: kz.art || '', kzFeld: kz.feld || ((s.felder || [])[0] || {}).id || '', kzWert: kz.wert || ((s.werte || [])[0] || {}).id || '',
+                 kz2Art: (s.kennzahl2 || {}).art || '', kz2Feld: (s.kennzahl2 || {}).feld || ((s.felder || [])[0] || {}).id || '',
+                 kz2Wert: (s.kennzahl2 || {}).wert || ((s.werte || [])[0] || {}).id || '' });
 }
 
 /* Getipptes und Gewähltes ins Fenster-Objekt, bevor neu gezeichnet wird */
 function saDetailsLesen(f) {
   var el = document.getElementById('saName');
   if (el && typeof el.value === 'string') { f.name = el.value; }
-  ['saGruppe:gruppe', 'saKzArt:kzArt', 'saKzFeld:kzFeld', 'saKzWert:kzWert'].forEach(function (x) {
+  ['saGruppe:gruppe', 'saKzArt:kzArt', 'saKzFeld:kzFeld', 'saKzWert:kzWert', 'saKz2Art:kz2Art', 'saKz2Feld:kz2Feld', 'saKz2Wert:kz2Wert'].forEach(function (x) {
     var t = x.split(':');
     var e = document.getElementById(t[0]);
     if (e && typeof e.value === 'string') { f[t[1]] = e.value; }
@@ -6920,7 +6944,7 @@ function saFensterHtml() {
         }).join('') + '</select>'
       + '<label for="saFeldWerte">Werte (nur bei Auswahl, je Zeile einer):</label>'
       + '<textarea id="saFeldWerte" class="eingabe" rows="3">' + esc((x.werte || []).join('\n')) + '</textarea>'
-      + '<label class="haken"><input id="saFeldSpalte" type="checkbox"' + (x.spalte ? ' checked' : '') + (!x.spalte && spalten >= 3 ? ' disabled' : '') + '> als Spalte in der Liste' + (!x.spalte && spalten >= 3 ? ' (schon 3)' : '') + '</label>'
+      + '<label class="haken"><input id="saFeldSpalte" type="checkbox"' + (x.spalte ? ' checked' : '') + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' disabled' : '') + '> als Spalte in der Liste' + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' (schon ' + SA_SPALTEN_MAX + ')' : '') + '</label>'
       + '<label class="haken"><input id="saFeldGruppe" type="checkbox"' + (fe2 && s.gruppe === fe2.id ? ' checked' : '') + '> danach gruppieren</label>'
       + '<label for="saFeldSumme">Darunter (bei Zahlen):</label><select id="saFeldSumme" class="eingabe">' + SA_SUMMEN.map(function (t) {
           return '<option value="' + t[0] + '"' + (t[0] === (x.summe || '') ? ' selected' : '') + '>' + t[1] + '</option>';
@@ -7018,6 +7042,10 @@ function saFensterHtml() {
       + '<label for="saKzArt">Kennzahl rechts in der Liste:</label>' + feldWahl('saKzArt', f.kzArt, kzArten)
       + '<label for="saKzFeld">… von Feld:</label>' + feldWahl('saKzFeld', f.kzFeld, (s.felder || []).map(function (x) { return [x.id, x.name]; }))
       + ((s.werte || []).length ? '<label for="saKzWert">… fester Wert:</label>' + feldWahl('saKzWert', f.kzWert, s.werte.map(function (x) { return [x.id, x.name]; })) : '')
+      /* Kennzahl 2 (seit 0.11.1): klein unter der ersten */
+      + '<label for="saKz2Art">Kennzahl 2 (darunter, klein):</label>' + feldWahl('saKz2Art', f.kz2Art, [['', 'keine']].concat(kzArten.slice(1)))
+      + '<label for="saKz2Feld">… von Feld:</label>' + feldWahl('saKz2Feld', f.kz2Feld, (s.felder || []).map(function (x) { return [x.id, x.name]; }))
+      + ((s.werte || []).length ? '<label for="saKz2Wert">… fester Wert:</label>' + feldWahl('saKz2Wert', f.kz2Wert, s.werte.map(function (x) { return [x.id, x.name]; })) : '')
       + '<p class="leise">Jetzt: ' + esc(saKennzahl(s)) + ' · ' + saSaetze(s).length + ' Einträge · ' + (s.felder || []).length + ' Felder</p>'
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saDetailsSpeichern()">OK</button>' + abbrechen
         + '<button type="button" class="knopf" onclick="saFensterSchritt(\'sammlung-loeschen\')">Löschen…</button>');
@@ -7372,17 +7400,21 @@ function saDetailsSpeichern() {
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { s.kontext = f.kontext; }
   var gruppe = String(f.gruppe || '').trim().slice(0, 40);
   if (gruppe && gruppe !== saGruppeStandard(s)) { s.gruppeName = gruppe; } else { delete s.gruppeName; }
-  var arten = ['anzahl', 'letzter', 'summe', 'schnitt', 'min', 'max', 'wert'];
-  if (arten.indexOf(f.kzArt) >= 0) {
-    s.kennzahl = { art: f.kzArt };
-    if (f.kzArt === 'wert') { s.kennzahl.wert = f.kzWert; }
-    else if (f.kzArt !== 'anzahl') { s.kennzahl.feld = f.kzFeld; }
-  } else {
-    delete s.kennzahl;
-  }
+  var kz1 = saKennzahlWahl(f.kzArt, f.kzFeld, f.kzWert);
+  var kz2 = saKennzahlWahl(f.kz2Art, f.kz2Feld, f.kz2Wert);
+  if (kz1) { s.kennzahl = kz1; } else { delete s.kennzahl; }
+  if (kz2) { s.kennzahl2 = kz2; } else { delete s.kennzahl2; }
   saGeaendert(s);
   spaeterSichern();
   aufklappZu();
+}
+
+/* Aus der Wahl im Fenster eine gespeicherte Kennzahl; null = keine */
+function saKennzahlWahl(art, feld, wert) {
+  if (['anzahl', 'letzter', 'summe', 'schnitt', 'min', 'max', 'wert'].indexOf(art) < 0) { return null; }
+  var kz = { art: art };
+  if (art === 'wert') { kz.wert = wert; } else if (art !== 'anzahl') { kz.feld = feld; }
+  return kz;
 }
 
 function saSammlungLoeschen() {

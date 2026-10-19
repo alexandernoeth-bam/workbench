@@ -2079,6 +2079,61 @@ function trendTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   36. Zwei Kennzahlen und vier Spalten (0.11.1)
+   Grund: In der Liste der Sammlungen sollen zwei Werte stehen, in der
+   Tabelle bis zu vier Spalten.
+   Erkennt: Kennzahl 2 ohne Wahl sichtbar, Wahl geht im Fenster verloren,
+   mehr als vier oder nur drei Spalten, „/Mon“ der Abos verdrängt.
+   ============================================================ */
+function vierTest() {
+  console.log('\n36. Zwei Kennzahlen und vier Spalten (0.11.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const g = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Gewicht', false, []);
+  g.felder = [{ id: 'dat', name: 'Datum', typ: 'datum', spalte: true }, { id: 'kg', name: 'kg', typ: 'zahl', spalte: true },
+              { id: 'tr', name: 'Trend', typ: 'formel', formel: '[kg] - vorher[kg]', dez: 1, trend: true, spalte: true },
+              { id: 'dz', name: 'Δ Ziel', typ: 'formel', formel: '[kg] - 82', dez: 1, vorzeichen: true, spalte: true },
+              { id: 'n', name: 'Notiz', typ: 'text', spalte: true }];
+  [['2026-10-18', 85.3, 1], ['2026-10-19', 84.6, 2]].forEach(x => S.DB.datensaetze.push({ id: 'd' + x[2], sammlung: g.id, werte: { dat: x[0], kg: x[1] }, angelegt: x[2], geaendert: x[2] }));
+  pruefe(S.saSpalten(g).map(f => f.name).join(',') === 'Datum,kg,Trend,Δ Ziel', 'höchstens vier Spalten — die fünfte bleibt weg');
+  S.cl.app = 'sammlungen'; S.cl.sa.id = g.id; S.cl.sa.ansicht = 'tabelle'; S.zeichne();
+  pruefe(/<table class="sa-tab sa-dat sa-vier">/.test(inhalt()) && /<td class="r">▼ −0,7<\/td><td class="r">\+2,6<\/td>/.test(inhalt()), 'Tabelle mit vier Spalten, schmaler gesetzt');
+  const ab = S.saAusVorlage(S.SA_VORLAGEN.abos, 'Abos', false, []);
+  ab.felder.forEach(f => { if (f.id === 'takt' || f.id === 'naechste') { f.spalte = true; } });
+  pruefe(S.saSpalten(ab).map(f => f.id).join(',') === 'name,betrag,takt,_mon', 'Abos: drei Felder und „/Mon“ als letzte Spalte');
+  S.saFensterAuf({ modus: 'feld', id: 'n' });
+  pruefe(/id="saFeldSpalte" type="checkbox" checked>/.test(S.saFensterHtml()), 'eine fünfte markierte Spalte bleibt im Editor sichtbar markiert');
+  S.saFensterAuf({ modus: 'feld', id: '' });
+  pruefe(/disabled> als Spalte in der Liste \(schon 4\)/.test(S.saFensterHtml()), 'Editor: mehr als vier gehen nicht („schon 4“)');
+  g.felder[4].spalte = false;
+  S.saFensterAuf({ modus: 'feld', id: '' });
+  pruefe(/disabled> als Spalte in der Liste \(schon 4\)/.test(S.saFensterHtml()), 'bei vier markierten ist Schluss');
+  S.cl.aufklapp = '';
+
+  /* Zwei Kennzahlen */
+  pruefe(S.saKennzahl2(g) === '', 'ohne Wahl keine Kennzahl 2');
+  S.saDetailsOeffnen();
+  const feld = (id, w) => { S.document.getElementById(id).value = w; };
+  feld('saName', 'Gewicht'); feld('saGruppe', ''); feld('saKzArt', 'letzter'); feld('saKzFeld', 'kg'); feld('saKzWert', '');
+  feld('saKz2Art', 'letzter'); feld('saKz2Feld', 'tr'); feld('saKz2Wert', '');
+  S.saKontext('beruflich');
+  pruefe(S.cl.sa.fenster.kz2Art === 'letzter' && S.cl.sa.fenster.kz2Feld === 'tr' && /<option value="tr" selected>/.test(S.saFensterHtml()), 'Kennzahl 2 bleibt beim Umschalten im Fenster erhalten');
+  pruefe(/<select id="saKz2Art" class="eingabe"><option value="">keine<\/option>/.test(S.saFensterHtml()), 'Kennzahl 2 kann „keine“ sein');
+  S.saDetailsSpeichern();
+  pruefe(g.kennzahl.feld === 'kg' && g.kennzahl2.art === 'letzter' && g.kennzahl2.feld === 'tr', 'beide Kennzahlen gespeichert');
+  S.cl.sa.id = ''; S.zeichne();
+  pruefe(/Gewicht<\/span><span class="sa-kz">84,6<small>▼ −0,7<\/small><\/span>/.test(inhalt()), 'Liste: Kennzahl 1 groß, Kennzahl 2 klein darunter');
+  pruefe(!/Abos<\/span><span class="sa-kz">[^<]*<small>/.test(inhalt()), 'ohne Kennzahl 2 nur ein Wert');
+  S.cl.sa.id = g.id; S.saDetailsOeffnen();
+  feld('saName', 'Gewicht'); feld('saGruppe', ''); feld('saKzArt', 'letzter'); feld('saKzFeld', 'kg'); feld('saKz2Art', ''); feld('saKz2Feld', 'tr');
+  S.saDetailsSpeichern();
+  pruefe(!('kennzahl2' in g), '„keine“ entfernt Kennzahl 2 wieder');
+  S.cl.sa.id = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2111,6 +2166,7 @@ function trendTest() {
   try { trainingTest(); } catch (e) { fail('Training warf: ' + e.message); }
   try { suchenTest(); } catch (e) { fail('Suchen warf: ' + e.message); }
   try { trendTest(); } catch (e) { fail('Trend/Link warf: ' + e.message); }
+  try { vierTest(); } catch (e) { fail('Vier Spalten warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
