@@ -119,7 +119,7 @@ console.log('\n1. Aufbau der Datei');
   const version = (SKRIPT.match(/var APP_VERSION = '([\d.]+)';/) || [])[1];
   const titel = (QUELLE.match(/<title>CLIE ([\d.]+)<\/title>/) || [])[1];
   pruefe(version && version === titel, 'Version steht gleich im Titel und in APP_VERSION (' + version + ')');
-  pruefe(/class="fassung">CLIE v' \+ esc\(APP_VERSION\)/.test(SKRIPT), 'die Übersicht zeigt die Version im Hauptfenster');
+  pruefe(/class="fassung" onclick="oeffne\(\\'statistik\\'\)">CLIE v' \+ esc\(APP_VERSION\)/.test(SKRIPT), 'die Übersicht zeigt die Version im Hauptfenster (seit 0.7.1 mit Weg zur Statistik)');
   pruefe(/document\.title = 'CLIE ' \+ APP_VERSION/.test(SKRIPT), 'der Fenstertitel trägt die Version');
   pruefe(!/@media/.test(QUELLE), 'keine @media-Regeln');
   const fns = [...SKRIPT.matchAll(/\nfunction (\w+)\s*\(/g)].map(m => m[1]);
@@ -280,9 +280,8 @@ function uebersichtTest() {
   CL.zeichne();
   const h = inhalt();
   pruefe(CL.clOffeneAufgaben() === 4, 'offene Aufgaben: nur [] aus laufenden Projekten und Listen, nicht [x], [-], Ruhendes oder Notizen');
-  pruefe(/class="zahl">4</.test(h), 'die Zahl steht am Symbol der Aufgaben');
-  pruefe(CL.clAppZahl('kalender') === 1 && /oeffne\('kalender'\)"><span class="sym"><svg[^]*?<span class="zahl">1</.test(h),
-    'am Kalender steht die Zahl der heute noch kommenden Termine — Vergangenes zählt nicht');
+  pruefe(!/class="zahl"/.test(h) && typeof CL.clAppZahl === 'undefined', 'seit 0.7.1 keine Zahlen an den Symbolen');
+  pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
   pruefe((h.match(/class="app"/g) || []).length === 9, 'neun Apps im Raster (seit 0.7 mit Sammlungen)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
@@ -318,7 +317,7 @@ function bedienTest() {
   CL.zugriffToken = 'test'; CL.tokenAblauf = Date.now() + 3600000;
   CL.zeichne();
   const b = inhalt();
-  pruefe(/>Abgleichen</.test(b) && /clTermineHolen\(true\)/.test(b) && /abmelden\(\)/.test(b), 'angemeldet: Abgleichen, Termine holen, Abmelden');
+  pruefe(/>Abgleichen</.test(b) && /clTermineHolen\(true\)/.test(b) && /clAbmelden\(\)/.test(b), 'angemeldet: Abgleichen, Termine holen, Abmelden');
   CL.zugriffToken = null;
   CL.menueUm();
   pruefe(CL.cl.aufklapp === 'menue' && /Auf neue Fassung prüfen/.test(CL.document.getElementById('aufklapp').innerHTML), 'der Reiter öffnet das Menü');
@@ -1119,7 +1118,7 @@ function checklistenTest() {
   CL.oeffne('aufgaben');
   pruefe(!/Badesachen|Reifen|Belege/.test(inhalt()), 'nicht in den Aufgaben');
   CL.oeffne('uebersicht');
-  pruefe(CL.clAppZahl('checklisten') === 0, 'die Zahl an der App zählt laufende Checklisten');
+  pruefe(CL.clsAlle('lauf').length === 0, 'keine laufende Checkliste');
 
   /* Löschen mit Löschvermerk */
   CL.oeffne('checklisten');
@@ -1427,7 +1426,7 @@ function sammlungenTest() {
   pruefe(/<td class="r">312,00 J<\/td><td class="r">26,00<\/td>/.test(h) && /pro Jahr<\/span><span>730,68 €/.test(h), 'Abo-Liste: Betrag mit Takt, Spalte /Mon, Jahressumme');
   pruefe(/▼ Aktiv/.test(S.document.getElementById('katKnopf').textContent), 'oben rechts steht der Filter der Sammlung');
   S.zeichne();
-  pruefe(/<span class="zahl">1<\/span>/.test((S.cl.app = 'uebersicht', S.zeichne(), inhalt())), 'das Symbol zeigt die Zahl der Kündigungshinweise');
+  pruefe(S.saHinweise().length === 1, 'genau ein Kündigungshinweis');
 
   /* Bücher und Filter */
   const k = S.saAusVorlage(S.SA_VORLAGEN.buecher, 'Bücher', false, [
@@ -1491,6 +1490,77 @@ function sammlungenTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   27. Anmeldung über Neustarts und Statistik (0.7.1)
+   Grund: Mit zwei Google-Konten auf dem Handy kam bei jedem Start die
+   Kontoauswahl. Die Zahlen an den Symbolen sollten einer Statistik
+   weichen. Erkennt: Anfragen ohne Kontohinweis, verlorene oder zu alte
+   Schlüssel nach einem Neustart, Abmelden ohne Aufräumen, Zahlen an
+   den Symbolen, fehlende Blöcke der Statistik.
+   ============================================================ */
+async function neustartTest() {
+  console.log('\n27. Anmeldung über Neustarts und Statistik (0.7.1)');
+  if (!CL) { return; }
+  frisch();
+  const ls = CL.window.localStorage;
+  const a = funktionText(SKRIPT, 'anmeldeAnfragen') || '';
+  pruefe(/tokenMerken\([^\n]*\n\s*clTokenSichern\(\);\n\s*clKontoMerken\(\);/.test(a), 'nach jeder Anmeldung: Schlüssel sichern und Konto merken');
+  pruefe(/klient\.requestAccessToken\(clAnfrage\(aufforderung\)\)/.test(a), 'jede Anfrage an Google geht über clAnfrage (mit Kontohinweis)');
+  ls.removeItem('clie-konto');
+  let q = CL.clAnfrage('');
+  pruefe(q.prompt === '' && !('hint' in q), 'ohne gemerktes Konto: kein Hinweis');
+  ls.setItem('clie-konto', 'ich@example.org');
+  q = CL.clAnfrage('consent');
+  pruefe(q.prompt === 'consent' && q.hint === 'ich@example.org' && q.login_hint === 'ich@example.org', 'mit gemerktem Konto: Hinweis an Google');
+
+  ls.removeItem(CL.TOKEN_KEY);
+  ls.setItem('clie-zugriff-lang', JSON.stringify({ t: 'alt', a: Date.now() + 30 * 60000 }));
+  pruefe(CL.clTokenHolen() === true && CL.tokenAusSitzung() === true && CL.zugriffToken === 'alt', 'Neustart: ein noch gültiger Schlüssel wird übernommen');
+  ls.removeItem(CL.TOKEN_KEY);
+  ls.setItem('clie-zugriff-lang', JSON.stringify({ t: 'fast', a: Date.now() + 60000 }));
+  pruefe(CL.clTokenHolen() === false && ls.getItem('clie-zugriff-lang') === null, 'ein Schlüssel mit weniger als 2 Minuten wird verworfen');
+  CL.zugriffToken = 'neu'; CL.tokenAblauf = Date.now() + 3600000;
+  CL.clTokenSichern();
+  pruefe(JSON.parse(ls.getItem('clie-zugriff-lang')).t === 'neu', 'ein neuer Schlüssel wird gesichert');
+
+  ls.removeItem('clie-konto');
+  CL.fetch = function (adresse) {
+    return Promise.resolve({ ok: /drive\/v3\/about\?fields=user\(emailAddress\)/.test(adresse), json() { return Promise.resolve({ user: { emailAddress: 'konto@example.org' } }); } });
+  };
+  const m = await CL.clKontoMerken();
+  pruefe(m === 'konto@example.org' && ls.getItem('clie-konto') === 'konto@example.org', 'das Konto kommt aus Drive (about) und wird gemerkt');
+  CL.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
+  pruefe((await CL.clKontoMerken()) === '' && ls.getItem('clie-konto') === 'konto@example.org', 'ohne Netz bleibt das gemerkte Konto');
+  CL.cl.app = 'abgleich'; CL.zeichne();
+  pruefe(/Konto<\/span><span>konto@example\.org/.test(inhalt()), 'die Abgleich-App zeigt das Konto');
+  CL.clAbmelden();
+  pruefe(ls.getItem('clie-konto') === null && ls.getItem('clie-zugriff-lang') === null && !CL.tokenGueltig(), 'Abmelden vergisst Schlüssel und Konto');
+
+  /* Statistik */
+  frisch();
+  const heute = CL.isoDatum();
+  CL.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '[] A\n[] B\n[x] C', status: 'laufend', kontext: 'beruflich', geaendert: 1 });
+  CL.DB.gedanken.push({ id: 'c1', titel: 'Packen', text: '[] x', checkliste: 'vorlage', kontext: 'privat', geaendert: 1 });
+  CL.termineNachTag[heute] = [{ id: 't', zeit: '10:00', bis: '11:00', titel: 'T', kontext: 'privat' }];
+  CL.oeffne('uebersicht');
+  let h = inhalt();
+  pruefe(!/class="zahl"/.test(h) && /onclick="oeffne\('statistik'\)">CLIE v[\d.]+ · <u>Statistik<\/u>/.test(h), 'Übersicht ohne Zahlen, die Versionszeile führt zur Statistik');
+  CL.cl.aufklapp = 'menue'; CL.aufklappZeichnen();
+  pruefe(/menueWahl\('statistik'\)">Statistik/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: Statistik');
+  CL.cl.aufklapp = '';
+  CL.oeffne('statistik');
+  h = inhalt();
+  pruefe(CL.document.getElementById('reiter').textContent === 'Statistik', 'der Reiter heißt Statistik');
+  ['kalender', 'aufgaben', 'memo', 'checklisten', 'sammlungen', 'routinen', 'abgleich'].forEach(id => {
+    pruefe(new RegExp('class="st-kopf" onclick="oeffne\\(\'' + id + '\'\\)">').test(h), 'Block ' + id + ' öffnet die App');
+  });
+  pruefe(/offen · davon eingeplant<\/span><span>2 · 0</.test(h), 'Aufgaben: offen zählt nur [] — nicht [x]');
+  pruefe(/Vorlagen · laufend · erledigt<\/span><span>1 · 0 · 0</.test(h), 'Checklisten gezählt');
+  pruefe(/Termine heute · diese Woche<\/span><span>1 · 1</.test(h), 'Termine heute und in der Woche');
+  pruefe(/workbench\.json<\/span><span>\d+ KB</.test(h), 'Größe der Datei');
+  CL.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1514,6 +1584,7 @@ function sammlungenTest() {
   try { feinschliffTest(); } catch (e) { fail('Feinschliff 0.6.1 warf: ' + e.message); }
   try { datebookTest(); } catch (e) { fail('Tag wie im Datebook warf: ' + e.message); }
   try { sammlungenTest(); } catch (e) { fail('Sammlungen warf: ' + e.message); }
+  try { await neustartTest(); } catch (e) { fail('Neustart/Statistik warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

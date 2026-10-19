@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.7.0</title>
+<title>CLIE 0.7.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -60,8 +60,13 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sym{width:76px;height:76px;margin:0 auto 4px;position:relative;display:block}
 .sym svg{width:76px;height:76px;display:block}
 .app:active .sym svg{filter:invert(1)}
-.zahl{position:absolute;top:-4px;right:-8px;background:var(--px);color:var(--lcd);border-radius:10px;font-size:16px;padding:0 7px;line-height:22px}
-.fassung{text-align:center;font-size:16px;color:var(--px-mitte);margin:10px 0 0}
+.fassung{display:block;width:100%;text-align:center;font-size:16px;color:var(--px-mitte);margin:10px 0 0;padding:6px 0}
+.fassung u{color:var(--px)}
+/* Statistik (seit 0.7.1) */
+.st-kopf{display:flex;gap:7px;align-items:center;width:100%;text-align:left;font-weight:600;font-size:18.5px;border-bottom:2px solid var(--px);margin:10px 0 2px;padding:2px 0}
+.st-kopf svg{width:26px;height:26px;flex:0 0 26px}
+.st .reihe span:first-child{flex:1 1 auto}
+.st .reihe span:last-child{flex:0 0 auto;white-space:nowrap}
 
 /* Aufklapplisten: Kategorie und Menü */
 .aufklapp{position:absolute;z-index:20;background:var(--lcd);border:2px solid var(--px);box-shadow:3px 3px 0 var(--px);min-width:150px}
@@ -362,7 +367,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.7.0';
+var APP_VERSION = '0.7.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2290,7 +2295,8 @@ function kpFrequenz(w) {
   return '';
 }
 
-/* Aus der Workbench — termineHolen heißt hier clTermineHolen. */
+/* Aus der Workbench — termineHolen heißt hier clTermineHolen; dazu
+   merkt CLIE Schlüssel und Konto (seit 0.7.1). */
 function anmeldeAnfragen(klient, still, aufforderung, fertig) {
   var erledigt = false;
   var uhr = null;
@@ -2319,6 +2325,8 @@ function anmeldeAnfragen(klient, still, aufforderung, fertig) {
   klient.callback = function (antwort) {
     if (antwort && antwort.access_token) {
       tokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+      clTokenSichern();
+      clKontoMerken();
       try { window.localStorage.setItem(ANMELDE_MERKER, '1'); } catch (e) { /* egal */ }
       verbindungOk = true;
       letzteErneuerung = { zeit: isoZeit(), ergebnis: still ? 'still erneuert' : 'angemeldet',
@@ -2341,7 +2349,7 @@ function anmeldeAnfragen(klient, still, aufforderung, fertig) {
                           still ? ANMELDE_ZEITGRENZE_MS : 5 * ANMELDE_ZEITGRENZE_MS);
   /* Auch von Hand zuerst ohne Rückfrage: Wer schon zugestimmt hat,
      soll die Zustimmung nicht jedes Mal wieder erteilen müssen. */
-  klient.requestAccessToken({ prompt: aufforderung });
+  klient.requestAccessToken(clAnfrage(aufforderung));
 }
 
 /* ============================================================
@@ -2588,14 +2596,68 @@ function clOffeneAufgaben() {
   return seiten.reduce(function (n, s) { return n + kpOffeneZahl(s); }, 0);
 }
 
-/* Die kleine Zahl am Symbol: Termine heute, offene Aufgaben. */
-function clAppZahl(id) {
-  if (id === 'kalender') { return clTermineRest().length; }
-  if (id === 'aufgaben') { return clOffeneAufgaben(); }
-  if (id === 'routinen') { return clRoutinenAm(isoDatum()).filter(function (a) { return !istErledigtAn(a, isoDatum()); }).length; }
-  if (id === 'checklisten') { return clsAlle('lauf').length; }
-  if (id === 'sammlungen') { return saHinweise().length; }
-  return 0;
+/* ---------- Statistik (seit 0.7.1) ----------
+   Statt Zahlen an den Symbolen: je App ihre Datensätze, nach dem
+   Filter ▼ (Alle, Beruf, Privat). Antippen eines Blocks öffnet die App. */
+
+function clStatAufgaben() {
+  var st = { offen: 0, geplant: 0 };
+  aufSeiten().forEach(function (s) {
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt) { return; }
+      st.offen++;
+      if (aufGeplant(s, a.text)) { st.geplant++; }
+    });
+  });
+  return st;
+}
+
+function clStatTermine(von, tage) {
+  var n = 0;
+  var i;
+  for (i = 0; i < tage; i++) {
+    var t = clTermineAm(tagePlus(von, i));
+    n += t.zeit.length + t.ganztags.length;
+  }
+  return n;
+}
+
+function clStatBlock(id, name, zeilen) {
+  return '<button type="button" class="st-kopf" onclick="oeffne(\'' + id + '\')">' + clSymbol(id) + esc(name) + '</button>'
+    + '<div class="st">' + zeilen.map(function (z) { return reihe(z[0], z[1]); }).join('') + '</div>';
+}
+
+function statistikHtml() {
+  var heute = isoDatum();
+  var au = clStatAufgaben();
+  var vorhaben = clSeitenAktiv('vorhaben', '');
+  var rt = rtAlle();
+  var rtPause = rt.filter(function (a) { return a.pausiert; }).length;
+  var rtOffen = clRoutinenAm(heute).filter(function (a) { return !a.pausiert && !istErledigtAn(a, heute); }).length;
+  var sammlungen = saAlle(false);
+  var eintraege = sammlungen.reduce(function (n, s) { return n + saSaetze(s).length; }, 0);
+  var kb = Math.max(1, Math.round(alsText().length / 1024));
+  var h = clStatBlock('kalender', 'Kalender', [
+      ['Termine heute · diese Woche', clStatTermine(heute, 1) + ' · ' + clStatTermine(montagVon(heute), 7)],
+      ['Termine geholt', String(termineZahl())]])
+    + clStatBlock('aufgaben', 'Aufgaben', [
+      ['offen · davon eingeplant', au.offen + ' · ' + au.geplant],
+      ['Listen · Projekte · Ziele', clSeitenAktiv('liste', '').length + ' · '
+        + vorhaben.filter(function (s) { return s.typ !== 'ziel'; }).length + ' · '
+        + vorhaben.filter(function (s) { return s.typ === 'ziel'; }).length]])
+    + clStatBlock('memo', 'Memo', [['Seiten', String(memoSeiten().length)]])
+    + clStatBlock('checklisten', 'Checklisten', [
+      ['Vorlagen · laufend · erledigt', clsAlle('vorlage').length + ' · ' + clsAlle('lauf').length + ' · ' + clsAlle('fertig').length]])
+    + clStatBlock('sammlungen', 'Sammlungen', [
+      ['Sammlungen · Einträge', sammlungen.length + ' · ' + eintraege],
+      ['eigene Vorlagen · Hinweise', saAlle(true).length + ' · ' + saHinweise().length]])
+    + clStatBlock('routinen', 'Routinen', [
+      ['aktiv · pausiert · heute offen', (rt.length - rtPause) + ' · ' + rtPause + ' · ' + rtOffen]])
+    + clStatBlock('abgleich', 'Datei', [
+      [DATEINAME, kb + ' KB'],
+      ['Letzter Abgleich', letzterAbgleich ? String(letzterAbgleich).slice(11, 16) : '—']]);
+  return h;
 }
 
 /* ---------- Zeichnen ---------- */
@@ -2609,12 +2671,12 @@ function clApp(id) {
 function uebersichtHtml() {
   var h = '<div class="apps">';
   CL_APPS.forEach(function (a) {
-    var zahl = clAppZahl(a.id);
     h += '<button type="button" class="app" onclick="oeffne(\'' + a.id + '\')">'
-       + '<span class="sym">' + clSymbol(a.id) + (zahl ? '<span class="zahl">' + zahl + '</span>' : '') + '</span>'
+       + '<span class="sym">' + clSymbol(a.id) + '</span>'
        + esc(a.name) + '</button>';
   });
-  return h + '</div><div class="fassung">CLIE v' + esc(APP_VERSION) + '</div>';
+  /* Seit 0.7.1 keine Zahlen an den Symbolen — die Statistik zeigt alles */
+  return h + '</div><button type="button" class="fassung" onclick="oeffne(\'statistik\')">CLIE v' + esc(APP_VERSION) + ' · <u>Statistik</u></button>';
 }
 
 function spaeterHtml(a) {
@@ -2636,6 +2698,7 @@ function abgleichHtml() {
         + '<div class="hs-wort">' + (an ? 'Abgleichen' : 'Mit Google verbinden') + '</div>'
         + '<div class="hs-stand">' + esc(standText().text) + '</div></div>';
   h += '<div class="abschnitt">Google Drive</div>'
+     + (clKonto() ? reihe('Konto', clKonto()) : '')
      + reihe('Anmeldung', an ? 'noch ' + restMinuten() + ' Min.' : (warAngemeldet() ? 'abgelaufen' : 'nicht angemeldet'), !an)
      + reihe('Datei', DRIVE_DATEI)
      + reihe('Letzter Abgleich', letzterAbgleich ? letzterAbgleich.slice(0, 16) : '—')
@@ -2654,7 +2717,7 @@ function abgleichHtml() {
      + (neueVersion ? reihe('Neu', neueVersion + ' liegt bereit') : '');
   h += '<div class="knoepfe">'
      + (an ? '<button type="button" class="knopf" onclick="clTermineHolen(true)">Termine holen</button>'
-           + '<button type="button" class="knopf" onclick="abmelden()">Abmelden</button>'
+           + '<button type="button" class="knopf" onclick="clAbmelden()">Abmelden</button>'
            : '<button type="button" class="knopf voll" onclick="anmelden(false)">Anmelden</button>')
      + '<button type="button" class="knopf" onclick="versionPruefen(true)">Neue Fassung?</button>'
      + (neueVersion ? '<button type="button" class="knopf voll" onclick="neuLaden()">Jetzt laden</button>' : '')
@@ -2681,6 +2744,7 @@ function inhaltZeichnen() {
   }
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
+  else if (cl.app === 'statistik') { el.innerHTML = statistikHtml(); }
   else if (cl.app === 'checklisten') {
     if (cl.cls.schreiben && el.innerHTML.indexOf('memoFeld') >= 0) { return; }
     el.innerHTML = checklistenHtml();
@@ -2697,6 +2761,7 @@ function kopfZeichnen() {
     reiter.textContent = (cl.app === 'kalender') ? clKalReiter()
       : (cl.app === 'checklisten') ? clsReiter()
       : (cl.app === 'sammlungen') ? saReiter()
+      : (cl.app === 'statistik') ? 'Statistik'
       : memoSeite ? clSeitenZeichen(memoSeite) + ' ' + memoSeite.titel
       : (a ? a.name : 'Übersicht');
   }
@@ -2777,6 +2842,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
       + '<div class="trenn"></div>'
+      + '<button type="button" onclick="menueWahl(\'statistik\')">Statistik</button>'
       + '<button type="button" onclick="menueWahl(\'version\')">Auf neue Fassung prüfen</button>'
       + '<button type="button" onclick="menueWahl(\'info\')">Info</button></div>';
   } else {
@@ -2817,7 +2883,7 @@ function oeffne(id) {
   if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; }
   if (id === 'sammlungen' && cl.app !== 'sammlungen') { cl.sa.id = ''; cl.sa.ansicht = 'tabelle'; }
-  cl.app = clApp(id) ? id : 'uebersicht';
+  cl.app = (clApp(id) || id === 'statistik') ? id : 'uebersicht';
   cl.aufklapp = '';
   var el = document.getElementById('inhalt');
   if (el) { el.scrollTop = 0; }
@@ -2856,6 +2922,7 @@ function menueWahl(was) {
   if (was === 'termine') { aufklappZeichnen(); clTermineHolen(true); return; }
   if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
   if (was === 'einkauf') { cl.aufklapp = 'einkauf'; aufklappZeichnen(); return; }
+  if (was === 'statistik') { oeffne('statistik'); return; }
   if (was === 'saFelder') { saAnsicht('felder'); return; }
   if (was === 'saFilter') { saAnsicht('filter'); return; }
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
@@ -6706,6 +6773,75 @@ function stillAnmelden(grund) {
   });
 }
 
+/* ---------- Anmeldung über Neustarts (seit 0.7.1) ----------
+
+   Mit zwei Google-Konten auf dem Handy zeigte Google bei jeder stillen
+   Erneuerung die Kontoauswahl — also bei jedem Start der App. Jetzt
+   merkt sich CLIE das Konto der workbench.json und gibt es als Hinweis
+   mit. Der Schlüssel überlebt außerdem einen Neustart der App, aber nur
+   bis zu seinem Ablauf (höchstens eine Stunde). */
+
+var KONTO_KEY = 'clie-konto';
+var TOKEN_LANG_KEY = 'clie-zugriff-lang';
+
+function clKonto() {
+  try { return String(window.localStorage.getItem(KONTO_KEY) || ''); } catch (e) { return ''; }
+}
+
+/* Was mit der Anfrage an Google geht: die Aufforderung und das Konto */
+function clAnfrage(aufforderung) {
+  var a = { prompt: aufforderung };
+  var k = clKonto();
+  if (k) { a.hint = k; a.login_hint = k; }
+  return a;
+}
+
+function clTokenSichern() {
+  try {
+    window.localStorage.setItem(TOKEN_LANG_KEY, JSON.stringify({ t: zugriffToken, a: tokenAblauf }));
+  } catch (e) { /* ohne Speicher gilt der Schlüssel eben nur in der Sitzung */ }
+}
+
+/* Beim Start: einen gesicherten Schlüssel in die Sitzung holen — nur,
+   wenn er noch mindestens zwei Minuten gilt. */
+function clTokenHolen() {
+  try {
+    if (window.sessionStorage.getItem(TOKEN_KEY)) { return false; }
+    var w = JSON.parse(window.localStorage.getItem(TOKEN_LANG_KEY) || 'null');
+    if (w && w.t && w.a && w.a - Date.now() > 120000) {
+      window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ t: w.t, a: w.a }));
+      return true;
+    }
+    window.localStorage.removeItem(TOKEN_LANG_KEY);
+  } catch (e) { /* ohne Speicher wird eben neu angemeldet */ }
+  return false;
+}
+
+/* Welches Konto angemeldet ist, verrät Drive (reicht mit drive.file). */
+function clKontoMerken() {
+  if (!zugriffToken || typeof fetch !== 'function') { return Promise.resolve(''); }
+  return fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: driveKopf() })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      var m = (j && j.user && j.user.emailAddress) ? String(j.user.emailAddress) : '';
+      if (m) {
+        try { window.localStorage.setItem(KONTO_KEY, m); } catch (e) { /* dann eben ohne Hinweis */ }
+      }
+      return m;
+    })
+    .catch(function () { return ''; });
+}
+
+/* Abmelden vergisst auch Schlüssel und Konto — danach lässt sich ein
+   anderes Konto wählen. */
+function clAbmelden() {
+  try {
+    window.localStorage.removeItem(TOKEN_LANG_KEY);
+    window.localStorage.removeItem(KONTO_KEY);
+  } catch (e) { /* egal */ }
+  abmelden();
+}
+
 /* ---------- Speichern und Abgleich ---------- */
 
 function spaeterSichern() {
@@ -6867,6 +7003,7 @@ function start() {
   saFilterLaden();
   document.addEventListener('keydown', tasteGlobal);
   zeichne();
+  clTokenHolen();
   if (tokenAusSitzung()) {
     melde('Anmeldung übernommen, noch ' + restMinuten() + ' Minuten gültig.', null);
   } else {
