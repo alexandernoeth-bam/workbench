@@ -900,8 +900,8 @@ function aufgabenTest() {
   const tag = CL.kpTagFinden(heute);
   const e = tag && tag.eintraege.filter(x => x.text === 'Winterreifen')[0];
   pruefe(e && e.quelle === 't1' && e.zeit === '15:00' && /\[\] Winterreifen/.test(tag.text), 'für heute um 15:00 eingeplant — im selben Tag wie die Workbench');
-  pruefe(/<span class="plan-marke">15:00<\/span>/.test(inhalt()) && inhalt().indexOf('Winterreifen') < inhalt().indexOf('Angebot einholen'),
-    'Eingeplantes steht oben, mit Uhrzeit');
+  pruefe(/Winterreifen<\/button><span class="plan-marke">15:00<\/span>/.test(inhalt()) && inhalt().indexOf('≡ Garten') < inhalt().indexOf('Winterreifen'),
+    'Eingeplantes steht bei seiner Liste, mit Uhrzeit als Marke');
   CL.oeffne('kalender');
   pruefe(/class="z">15:00<\/span><span class="t"><button type="button" class="k" onclick="clTagZeileUm[^>]*><\/button><span class="tx">Winterreifen/.test(inhalt()),
     'und steht im Kalender an seiner Stunde');
@@ -1267,6 +1267,41 @@ function auszeichnungTest() {
   CL.oeffne('uebersicht');
 }
 
+/* ============================================================
+   24. Feinschliff 0.6.1
+   Grund: „Geplant“ als eigene Gruppe in „Alle Aufgaben“ war doppelt
+   (die Marke steht ohnehin an der Aufgabe); die Uhrzeit im Kopf der
+   App-Seiten war überflüssig; in den Wochenblöcken fehlte Ganztägiges
+   (nur ein leerer Rahmen ohne Titel).
+   ============================================================ */
+function feinschliffTest() {
+  console.log('\n24. Feinschliff 0.6.1');
+  if (!CL) { return; }
+  aufgabenDaten();
+  const heute = CL.isoDatum();
+  CL.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Laub', geaendert: 1, eintraege: [{ id: 'e1', abschnitt: 'h', text: 'Laub', quelle: 't1', erledigt: false }] });
+  CL.oeffne('aufgaben');
+  const h = inhalt();
+  pruefe(!/>Geplant</.test(h) && /≡ Garten<\/div><div class="aufg[^"]*">[\s\S]*?Laub<\/button><span class="plan-marke">heute<\/span>/.test(h),
+    'keine Gruppe „Geplant“ — die Aufgabe steht bei ihrer Liste mit der Marke „heute“');
+  pruefe(CL.document.getElementById('uhr').textContent === '', 'auf App-Seiten keine Uhrzeit im Kopf');
+  CL.oeffne('uebersicht');
+  pruefe(/^\d{2}:\d{2}$/.test(CL.document.getElementById('uhr').textContent), 'auf der Übersicht bleibt die Uhr');
+
+  CL.termineNachTag[heute] = [{ id: 'g1', titel: 'Geburtstag Oma', ganztags: true, zeit: '', bis: '', kontext: 'privat' },
+                              { id: 't1', zeit: '09:00', bis: '10:00', titel: 'Termin', kontext: 'privat' }];
+  CL.oeffne('kalender');
+  CL.clKalAnsicht('bloecke');
+  let b = inhalt();
+  pruefe(/class="wb-ganz" onclick="terminZeigen\('[^']+','g1'\)">Geburtstag Oma<\/button>/.test(b), 'Ganztägiges steht in den Blöcken — mit Titel, antippbar');
+  pruefe((b.match(/class="wb-ganz-sp"/g) || []).length === CL.cl.kal.tage, 'eine Zeile für Ganztägiges, eine Zelle je Tag');
+  CL.termineNachTag[heute] = [{ id: 't1', zeit: '09:00', bis: '10:00', titel: 'Termin', kontext: 'privat' }];
+  CL.zeichne();
+  pruefe(!/wb-ganz-sp/.test(inhalt()), 'ohne Ganztägiges keine leere Zeile');
+  CL.clKalGehe(heute, 'tag');
+  CL.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1287,6 +1322,7 @@ function auszeichnungTest() {
   try { routinenTest(); } catch (e) { fail('Routinen warf: ' + e.message); }
   try { auszeichnungTest(); } catch (e) { fail('Auszeichnungen warf: ' + e.message); }
   zustandsklassenTest();
+  try { feinschliffTest(); } catch (e) { fail('Feinschliff 0.6.1 warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

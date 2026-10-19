@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.6.0</title>
+<title>CLIE 0.6.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -182,7 +182,11 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .wb-blk.s3{background:#7A8668;color:var(--px)}
 .wb-blk.vorbei{opacity:.55}
 .wb.breit .wb-blk{font-size:17.5px;white-space:normal}
-.wb-ganz{position:absolute;left:3px;right:3px;top:0;height:7px;border:2px solid var(--px);pointer-events:none}
+.wb-ganz-z{text-align:center;font-size:16px;color:var(--px-mitte);border-bottom:2px solid var(--px);padding-top:2px}
+.wb-ganz-sp{border-left:2px dotted var(--px-zart);border-bottom:2px solid var(--px);padding:2px 2px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.wb-ganz{display:block;width:100%;border:2px solid var(--px);border-radius:2px;font-size:15.5px;line-height:1.1;padding:1px 2px;text-align:left;
+  white-space:nowrap;overflow:hidden;text-overflow:clip}
+.wb.breit .wb-ganz{font-size:17.5px;white-space:normal}
 .wb-jetzt{position:absolute;left:0;right:0;border-top:3px solid var(--px);pointer-events:none;z-index:1}
 
 /* Aufgaben (seit 0.3) */
@@ -329,7 +333,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.6.0';
+var APP_VERSION = '0.6.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2663,9 +2667,10 @@ function kopfZeichnen() {
   uhrZeichnen();
 }
 
+/* Die Uhr steht nur auf der Übersicht (seit 0.6.1) */
 function uhrZeichnen() {
   var el = document.getElementById('uhr');
-  if (el) { el.textContent = clUhrzeit(); }
+  if (el) { el.textContent = (cl.app === 'uebersicht') ? clUhrzeit() : ''; }
 }
 
 /* Kategorie- und Menüliste: wie die Aufklapplisten des Palm. */
@@ -3156,6 +3161,15 @@ function kalBloeckeHtml(is) {
     h += '<button type="button" class="kz' + (d === isoDatum() ? ' heute' : '') + '" onclick="clKalGehe(\'' + d + '\',\'tag\')">'
        + clWt(d) + '<br>' + Number(d.slice(8, 10)) + '</button>';
   });
+  /* Ganztägiges: eine eigene Zeile unter den Wochentagen (seit 0.6.1) */
+  if (tage.some(function (d) { return clTermineAm(d).ganztags.length; })) {
+    h += '<div class="wb-ganz-z">◆</div>';
+    tage.forEach(function (d) {
+      h += '<div class="wb-ganz-sp">' + clTermineAm(d).ganztags.map(function (x) {
+        return '<button type="button" class="wb-ganz" onclick="terminZeigen(\'' + d + '\',\'' + esc(x.id) + '\')">' + esc(x.titel) + '</button>';
+      }).join('') + '</div>';
+    });
+  }
   h += '<div class="wb-uhr" style="height:' + BLOCK_HOEHE + 'px">';
   var st;
   for (st = von / 60; st <= bis / 60; st += 2) { h += '<span style="top:' + Math.round((st * 60 - von) * proMin) + 'px">' + st + '</span>'; }
@@ -3164,7 +3178,6 @@ function kalBloeckeHtml(is) {
     var t = clTermineAm(d);
     h += '<div class="wb-sp' + (d === isoDatum() ? ' heute' : '') + '" style="height:' + BLOCK_HOEHE + 'px">'
        + '<button type="button" class="wb-tag" onclick="clKalGehe(\'' + d + '\',\'tag\')" aria-label="' + clWt(d) + ' öffnen"></button>';
-    if (t.ganztags.length) { h += '<span class="wb-ganz" title="ganztägig"></span>'; }
     h += jetztLinie;
     clUeberlappung(t.zeit).forEach(function (x) {
       var oben = Math.round((x.a - von) * proMin);
@@ -3677,12 +3690,12 @@ function aufNachPlan(l) {
   }).map(function (p) { return p.x; });
 }
 
-function aufZeileHtml(x, mitQuelle) {
+function aufZeileHtml(x) {
   var marke = x.datum ? '<span class="plan-marke">' + esc(clPlanText(x.datum, x.zeit)) + '</span>' : '';
   return '<div class="aufg' + (x.a.erledigt ? ' erl' : '') + (cl.auf.wahl === x.key ? ' gewaehlt' : '') + '">'
     + clKastenHtml(x.a.erledigt, 'aufHaken(\'' + esc(x.seite.id) + '\',' + x.nr + ')')
     + '<button type="button" class="tx umbruch" onclick="aufTippen(\'' + esc(x.seite.id) + '\',' + x.nr + ')">' + esc(clSchlicht(x.a.text))
-    + (mitQuelle ? '<small>' + esc(clSeitenZeichen(x.seite) + ' ' + x.seite.titel) + '</small>' : '') + '</button>'
+    + '</button>'
     + marke + '</div>';
 }
 
@@ -3694,18 +3707,18 @@ function aufgabenHtml() {
   }
   /* Eine Liste gewählt oder Kategorien aus: eine Liste, Eingeplantes oben */
   if (liste || !cl.auf.kategorien) {
-    return aufNachPlan(l).map(function (x) { return aufZeileHtml(x, false); }).join('');
+    return aufNachPlan(l).map(function (x) { return aufZeileHtml(x); }).join('');
   }
-  /* Kategorien: „Geplant“ oben (mit Herkunft), dann je Liste ihre Aufgaben */
-  var geplant = aufNachPlan(l.filter(function (x) { return x.datum; }));
-  var h = geplant.length ? '<div class="gruppe">Geplant</div>' + geplant.map(function (x) { return aufZeileHtml(x, true); }).join('') : '';
+  /* Kategorien: je Liste ihre Aufgaben — Eingeplantes bleibt bei seiner
+     Liste und trägt seine Marke (seit 0.6.1 ohne eigene Gruppe „Geplant“) */
+  var h = '';
   var seitenId = '';
-  l.filter(function (x) { return !x.datum; }).forEach(function (x) {
+  l.forEach(function (x) {
     if (x.seite.id !== seitenId) {
       seitenId = x.seite.id;
       h += '<div class="gruppe">' + esc(clSeitenZeichen(x.seite) + ' ' + x.seite.titel) + '</div>';
     }
-    h += aufZeileHtml(x, false);
+    h += aufZeileHtml(x);
   });
   return h;
 }
