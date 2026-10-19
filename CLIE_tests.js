@@ -280,7 +280,7 @@ function uebersichtTest() {
   pruefe(/class="zahl">4</.test(h), 'die Zahl steht am Symbol der Aufgaben');
   pruefe(CL.clAppZahl('kalender') === 1 && /oeffne\('kalender'\)"><span class="sym"><svg[^]*?<span class="zahl">1</.test(h),
     'am Kalender steht die Zahl der heute noch kommenden Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 7, 'sieben Apps im Raster');
+  pruefe((h.match(/class="app"/g) || []).length === 8, 'acht Apps im Raster');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -303,8 +303,8 @@ function bedienTest() {
   console.log('\n7. Apps, Menü und Tasten');
   if (!CL) { return; }
   frisch();
-  CL.oeffne('aufgaben');
-  pruefe(CL.document.getElementById('reiter').textContent === 'Aufgaben' && /kommt mit CLIE 0\.3/.test(inhalt()),
+  CL.oeffne('routinen');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Routinen' && /kommt mit CLIE 0\.5/.test(inhalt()),
     'eine spätere App zeigt, mit welcher Fassung sie kommt');
   CL.oeffne('gibtsnicht');
   pruefe(CL.cl.app === 'uebersicht' && CL.document.getElementById('reiter').textContent === 'Übersicht', 'Unbekanntes führt zur Übersicht');
@@ -395,8 +395,8 @@ function schriftTest() {
 /* ============================================================
    11. Übersicht wie am Palm
    Grund: Gewünscht ist die Reduktion des Palm (0.1.3): Kalender,
-   Aufgaben, Memo, Routinen, dazu Einkauf und Rechner (0.1.4) und
-   Abgleich; Symbole als dunkle Scheibe
+   Aufgaben, Memo, Routinen, dazu Einkauf und Rechner (0.1.4),
+   Checklisten (0.4) und Abgleich; Symbole als dunkle Scheibe
    mit hellem Bildzeichen; keine Unterzeile unter den Apps.
    Projekte, Ziele und Listen sind keine eigenen Apps — sie liegen im
    Memo und sind Kategorien der Aufgaben.
@@ -407,15 +407,15 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","routinen","einkauf","rechner","abgleich"]',
-    'genau sieben Apps: Kalender, Aufgaben, Memo, Routinen, Einkauf, Rechner, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","checklisten","routinen","einkauf","rechner","abgleich"]',
+    'genau acht Apps: Kalender, Aufgaben, Memo, Checklisten, Routinen, Einkauf, Rechner, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 7, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/7)');
+  pruefe(syms === 8, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/8)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
-  CL.oeffne('memo');
+  CL.oeffne('routinen');
   pruefe(/class="gross"><svg/.test(inhalt()), 'auch die Seite einer späteren App zeigt das Symbol');
   CL.oeffne('uebersicht');
 }
@@ -714,6 +714,333 @@ function zifferTest() {
   pruefe(!/__ZIFFERN__|__ZGROESSE__/.test(QUELLE), 'keine Platzhalter des Bauskripts übrig');
 }
 
+/* ============================================================
+   17. Zeitklammern und Wochenblöcke
+   Grund (0.2.2): Stunden, die mitten in einem Termin liegen, sollen im
+   Tag nicht als leere Zeile erscheinen (9–11 Uhr: kein 10:00). Lange
+   Termine bekommen links eine Klammer, Überschneidungen eine zweite.
+   Die Woche als Blöcke zeigt keine Titel und kennt Mo–Fr und Mo–So.
+   ============================================================ */
+function bloeckeTest() {
+  console.log('\n17. Zeitklammern und Wochenblöcke');
+  if (!CL) { return; }
+  frisch();
+  const heute = CL.isoDatum();
+  CL.termineNachTag[heute] = [
+    { id: 'a', zeit: '09:00', bis: '11:00', titel: 'Workshop', kontext: 'beruflich', kalId: 'k' },
+    { id: 'b', zeit: '10:30', bis: '12:00', titel: 'Parallel', kontext: 'beruflich', kalId: 'k' },
+    { id: 'c', zeit: '13:00', bis: '13:30', titel: 'Kurz', kontext: 'beruflich', kalId: 'k' },
+    { id: 'd', zeit: '15:00', bis: '18:00', titel: 'Lang', kontext: 'beruflich', kalId: 'k' }];
+  CL.oeffne('kalender');
+  CL.clKalAnsicht('tag');
+  const h = inhalt();
+  const stunden = (h.match(/class="z">(\d+:\d+)</g) || []).map(x => x.replace(/class="z">|</g, ''));
+  pruefe(stunden.indexOf('10:00') < 0 && stunden.indexOf('16:00') < 0 && stunden.indexOf('17:00') < 0,
+    'leere Stunden mitten in einem Termin entfallen (10:00, 16:00, 17:00) — ' + stunden.join(' '));
+  pruefe(stunden.indexOf('11:00') < 0 && stunden.indexOf('12:00') >= 0 && stunden.indexOf('14:00') >= 0 && stunden.indexOf('18:00') >= 0,
+    'Stunden am Ende eines Termins und freie Stunden dazwischen bleiben');
+  const reihen = h.split('<div class="std').slice(1);
+  const zeile = (zeit) => reihen.filter(r => r.indexOf('class="z">' + zeit + '<') >= 0)[0] || '';
+  pruefe(/class="kl"><i class="oben"><\/i>/.test(zeile('9:00')) && /<i class="unten"><\/i>/.test(zeile('10:30')), 'Workshop 9–11: Klammer von 9:00 bis 10:30');
+  pruefe(/<i class="(oben|einzel)"><\/i>/.test(zeile('10:30').replace(/<i class="unten"><\/i>/, '')) || /<i class="unten"><\/i><i class="oben"><\/i>/.test(zeile('10:30')),
+    'der parallele Termin bekommt eine zweite Klammer daneben');
+  pruefe(/class="kl"><i class=""><\/i><i class=""><\/i>/.test(zeile('13:00')), 'kurze Termine (unter 1 Std.) ohne Klammer');
+  pruefe(/<i class="einzel"><\/i>/.test(zeile('15:00')), 'ein langer Termin ohne weitere Zeilen bekommt eine einzelne Klammer');
+
+  CL.clKalAnsicht('bloecke');
+  let b = inhalt();
+  pruefe(/^KW \d+$/.test(CL.document.getElementById('reiter').textContent), 'Blöcke: KW im Reiter');
+  pruefe((b.match(/class="wb-blk/g) || []).length === 4, 'jeder Termin ist ein Block');
+  pruefe(!/Workshop|Parallel|Lang</.test(b.replace(/aria-label="[^"]*"/g, '')), 'ohne Titel in den Blöcken (nur für Vorlesehilfen)');
+  pruefe(/terminZeigen\('[^']+','a'\)/.test(b), 'ein Tipp auf einen Block öffnet den Termin');
+  CL.clWocheTageSetzen(5);
+  b = inhalt();
+  pruefe(CL.cl.kal.tage === 5 && (b.match(/class="kz[^"]*" onclick/g) || []).length === 5 && CL.__ablage['clie-woche-tage'] === '5', 'Mo–Fr: fünf Spalten, gemerkt');
+  CL.clWocheTageSetzen(7);
+  pruefe((inhalt().match(/class="kz[^"]*" onclick/g) || []).length === 7, 'Mo–So: sieben Spalten');
+  const vor = CL.clKalDatum();
+  CL.clBlaettern(1);
+  pruefe(CL.clKalDatum() === CL.tagePlus(vor, 7), 'Blättern springt eine Woche');
+  pruefe(/clKalAnsicht\('bloecke'\)/.test(CL.document.getElementById('fuss').innerHTML), 'unten der Knopf ▥');
+  CL.clKalGehe(heute, 'tag');
+  CL.oeffne('uebersicht');
+}
+
+/* ============================================================
+   18. Aufgaben
+   Grund: Aufgaben sind Zeilen in Seiten. Abhaken, Anlegen, Ändern,
+   Verschieben, Einplanen und Löschen müssen Seite, Tag und Woche
+   gemeinsam ändern — sonst zeigen CLIE und Workbench Verschiedenes.
+   Neu ohne Liste darf nicht gehen; Ziele stehen nicht in der Auswahl.
+   ============================================================ */
+function aufgabenDaten() {
+  frisch();
+  CL.cl.auf.liste = ''; CL.cl.auf.frisch = {}; CL.cl.auf.erlZeigen = false; CL.cl.auf.fenster = null; CL.cl.auf.wahl = '';
+  CL.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '## Statik\n[] Angebot einholen\n[x] Pläne\nText dazu', status: 'laufend', kontext: 'beruflich', ordnung: 10, geaendert: 1 });
+  CL.DB.projekte.push({ id: 'p2', name: 'Umbau', flaeche: '[] Fenster messen', status: 'laufend', kontext: 'privat', ordnung: 20, geaendert: 1 });
+  CL.DB.projekte.push({ id: 'p3', name: 'Ruht', flaeche: '[] versteckt', status: 'ruht', kontext: 'privat', ordnung: 30, geaendert: 1 });
+  CL.DB.projekte.push({ id: 'p4', name: 'Leer', flaeche: '[x] alles erledigt', status: 'laufend', kontext: 'privat', ordnung: 35, geaendert: 1 });
+  CL.DB.ziele.push({ id: 'z1', name: 'Halbmarathon', flaeche: '[] 10 km laufen', status: 'laufend', kontext: 'privat', ordnung: 40, geaendert: 1 });
+  CL.DB.themen.push({ id: 't1', name: 'Garten', text: '[] Laub\n[-] Teich', kontext: 'privat', ordnung: 50, geaendert: 1 });
+  CL.DB.gedanken.push({ id: 'g1', titel: 'Notiz', text: '[] in einer Notiz', ordnung: 60, geaendert: 1 });
+  CL.__ablage['clie-zuletzt'] = '[]';
+}
+
+function aufgabenTest() {
+  console.log('\n18. Aufgaben');
+  if (!CL) { return; }
+  aufgabenDaten();
+  const heute = CL.isoDatum();
+  CL.oeffne('aufgaben');
+  let h = inhalt();
+  pruefe(/Angebot einholen/.test(h) && /Fenster messen/.test(h) && /Laub/.test(h) && /10 km laufen/.test(h),
+    'alle offenen Aufgaben aus laufenden Projekten, Zielen und Listen');
+  pruefe(!/versteckt/.test(h) && !/Pläne/.test(h) && !/Teich/.test(h) && !/in einer Notiz/.test(h),
+    'nicht: Ruhendes, Erledigtes, nicht Relevantes, Notizen');
+  pruefe(/class="q">Büro</.test(h), 'rechts steht, woher die Aufgabe kommt');
+  CL.aufFilter('beruflich');
+  pruefe(/Angebot einholen/.test(inhalt()) && !/Fenster messen/.test(inhalt()), 'der Filter Beruf zeigt nur berufliche Seiten');
+  CL.aufFilter('alle');
+
+  /* Auswahl oben rechts */
+  CL.katUm();
+  let a = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /Alle Aufgaben/.test(a) && /Weitere/.test(a),
+    'die Aufklappliste: Filter, Alle Aufgaben, Weitere…');
+  CL.listenwahlOeffnen('filter');
+  a = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Umbau/.test(a) && /Garten/.test(a) && !/Halbmarathon/.test(a) && !/Ruht/.test(a) && !/>◎ Leer/.test(a),
+    '„Weitere…“: Projekte und Listen mit offenen Aufgaben — keine Ziele, nichts Ruhendes, nichts ohne Offenes');
+  CL.listeGewaehlt('p2');
+  pruefe(CL.cl.auf.liste === 'p2' && /Fenster messen/.test(inhalt()) && !/Angebot einholen/.test(inhalt()), 'eine Liste gewählt: nur ihre Aufgaben');
+  pruefe(/▼ Umbau/.test(CL.document.getElementById('katKnopf').textContent), 'oben rechts steht die Liste');
+  pruefe(JSON.parse(CL.__ablage['clie-zuletzt'])[0] === 'p2' && CL.__ablage['clie-aufgaben-liste'] === 'p2', 'zuletzt benutzt und die Wahl werden gemerkt');
+  CL.katUm();
+  pruefe(/Zuletzt benutzt/.test(CL.document.getElementById('aufklapp').innerHTML) && /aufListeSetzen\('p2'\)/.test(CL.document.getElementById('aufklapp').innerHTML),
+    'die zuletzt benutzte Liste steht oben in der Auswahl');
+  CL.aufListeSetzen('');
+
+  /* Abhaken */
+  CL.aufHaken('p2', 0);
+  pruefe(/^\[x\] Fenster messen/.test(CL.DB.projekte[1].flaeche) && /class="aufg erl/.test(inhalt()), 'abhaken: in der Seite erledigt, bleibt kurz durchgestrichen stehen');
+  CL.oeffne('uebersicht'); CL.oeffne('aufgaben');
+  pruefe(!/Fenster messen/.test(inhalt()), 'nach dem Verlassen ist es weg');
+  CL.aufErlUm();
+  pruefe(/Fenster messen/.test(inhalt()) && /Pläne/.test(inhalt()), '„Erledigte“ zeigt es wieder');
+  CL.aufErlUm();
+
+  /* Neu: Liste ist Pflicht */
+  CL.aufNeu();
+  let f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Neue Aufgabe/.test(f) && /id="aufOk" class="knopf voll" disabled/.test(f) && /bitte wählen/.test(f), 'Neu ohne Liste: OK ist gesperrt');
+  CL.document.getElementById('aufText').value = 'Winterreifen';
+  CL.aufSpeichern();
+  pruefe(!/Winterreifen/.test(JSON.stringify(CL.DB)) && /Liste/.test(CL.document.getElementById('toastText').textContent), 'auch per Aufruf: ohne Liste wird nichts gespeichert');
+  CL.listenwahlOeffnen('aufgabe');
+  a = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Leer \(keine offenen\)/.test(a) && !/Halbmarathon/.test(a), 'bei Neu stehen alle laufenden Listen zur Wahl, auch ohne offene Aufgaben');
+  CL.listeGewaehlt('t1');
+  f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(CL.cl.aufklapp === 'aufgabe' && /≡ Garten/.test(f) && /value="Winterreifen"/.test(f), 'zurück im Fenster: Liste gewählt, Getipptes noch da');
+  CL.aufPlanSetzen('um');
+  CL.document.getElementById('aufZeit').value = '15:00';
+  CL.aufSpeichern();
+  const garten = CL.DB.themen[0];
+  pruefe(/\n\[\] Winterreifen$/.test(garten.text), 'die neue Aufgabe steht am Ende der Liste');
+  const tag = CL.kpTagFinden(heute);
+  const e = tag && tag.eintraege.filter(x => x.text === 'Winterreifen')[0];
+  pruefe(e && e.quelle === 't1' && e.zeit === '15:00' && /\[\] Winterreifen/.test(tag.text), 'für heute um 15:00 eingeplant — im selben Tag wie die Workbench');
+  pruefe(/<span class="heute">15:00<\/span>/.test(inhalt()) && inhalt().indexOf('Winterreifen') < inhalt().indexOf('Angebot einholen'),
+    'Eingeplantes steht oben, mit Uhrzeit');
+  CL.oeffne('kalender');
+  pruefe(/class="z">15:00<\/span><span class="t"><button type="button" class="k" onclick="clTagZeileUm[^>]*><\/button><span class="tx">Winterreifen/.test(inhalt()),
+    'und steht im Kalender an seiner Stunde');
+  CL.oeffne('aufgaben');
+
+  /* Details: Text ändern, verschieben, ausplanen */
+  const nr = garten.text.split('\n').indexOf('[] Winterreifen');
+  CL.aufDetails('t1', nr);
+  f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/>Aufgabe</.test(f) && /heute um/.test(f) && /value="15:00"/.test(f) && /Im Memo zeigen/.test(f) && /Löschen/.test(f), 'Details zeigen Planung, Memo und Löschen');
+  CL.document.getElementById('aufText').value = 'Winterreifen wechseln';
+  CL.cl.auf.fenster.seite = 'p2';
+  CL.cl.auf.fenster.plan = 'heute';
+  CL.document.getElementById('aufZeit').value = '';
+  CL.aufSpeichern();
+  const umbau = CL.DB.projekte[1];
+  const e2 = CL.kpTagFinden(heute).eintraege.filter(x => /Winterreifen/.test(x.text))[0];
+  pruefe(!/Winterreifen/.test(garten.text) && /\n\[\] Winterreifen wechseln$/.test(umbau.flaeche), 'neuer Text und in die andere Liste verschoben');
+  pruefe(e2 && e2.text === 'Winterreifen wechseln' && e2.quelle === 'p2' && !e2.zeit && /\[\] Winterreifen wechseln/.test(CL.kpTagFinden(heute).text),
+    'die Planung zieht mit — jetzt „heute“ ohne Uhrzeit');
+  const nr2 = umbau.flaeche.split('\n').indexOf('[] Winterreifen wechseln');
+  CL.aufDetails('p2', nr2);
+  CL.aufPlanSetzen('nicht');
+  CL.aufSpeichern();
+  pruefe(!/Winterreifen/.test(CL.kpTagFinden(heute).text) && !CL.kpTagFinden(heute).eintraege.some(x => /Winterreifen/.test(x.text)), '„nicht“ nimmt sie aus dem Tag');
+  CL.aufDetails('p2', nr2);
+  CL.aufLoeschenFragen();
+  pruefe(/wirklich|löschen\?/.test(CL.document.getElementById('aufklapp').innerHTML) && /Winterreifen/.test(umbau.flaeche), 'Löschen fragt erst nach');
+  CL.aufLoeschen();
+  pruefe(!/Winterreifen/.test(umbau.flaeche), 'dann ist die Zeile aus der Seite weg');
+
+  /* Auswahl per Tippen, zweiter Tipp öffnet Details */
+  CL.aufTippen('p1', 1);
+  pruefe(CL.cl.auf.wahl === 'p1|1' && /class="aufg gewaehlt"/.test(inhalt()) && CL.cl.aufklapp === '', 'erster Tipp wählt aus');
+  CL.aufTippen('p1', 1);
+  pruefe(CL.cl.aufklapp === 'aufgabe' && /value="Angebot einholen"/.test(CL.document.getElementById('aufklapp').innerHTML), 'zweiter Tipp öffnet die Details');
+  CL.aufklappZu();
+  CL.oeffne('uebersicht');
+}
+
+/* ============================================================
+   19. Memo
+   Grund: Im Memo liegen die Seiten selbst. Lesen, Abhaken und Schreiben
+   ändern denselben Text wie die Workbench; beim Schreiben darf ein
+   Abgleich im Hintergrund das Getippte nicht überschreiben.
+   ============================================================ */
+function memoTest() {
+  console.log('\n19. Memo');
+  if (!CL) { return; }
+  aufgabenDaten();
+  CL.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[] Zahnbürste', checkliste: 'vorlage', ordnung: 70, geaendert: 1 });
+  CL.oeffne('memo');
+  let h = inhalt();
+  pruefe(/>Projekte</.test(h) && />Ziele</.test(h) && />Listen</.test(h) && />Notizen</.test(h), 'gruppiert: Projekte, Ziele, Listen, Notizen');
+  pruefe(/Büro/.test(h) && /Halbmarathon/.test(h) && !/Ruht/.test(h) && !/Packliste/.test(h), 'laufende Seiten — nichts Ruhendes, keine Checklisten');
+  CL.memoOeffnen('p1');
+  h = inhalt();
+  pruefe(/◎ Büro/.test(CL.document.getElementById('reiter').textContent), 'der Reiter zeigt die Seite');
+  pruefe(/class="memo-h2">Statik</.test(h) && /class="aufg erl"/.test(h) && /class="memo-text">Text dazu</.test(h), 'Überschriften, erledigte Aufgaben und Text');
+  CL.memoHaken('p1', 1);
+  pruefe(/\[x\] Angebot einholen/.test(CL.DB.projekte[0].flaeche), 'abhaken im Memo');
+  CL.memoSchreibenUm();
+  pruefe(/id="memoFeld"/.test(inhalt()) && /Fertig/.test(CL.document.getElementById('fuss').innerHTML), '„Schreiben“ öffnet das Textfeld');
+  const feld = CL.document.getElementById('memoFeld');
+  feld.value = '## Statik\n[x] Angebot einholen\nneu'; feld.selectionStart = feld.value.length;
+  CL.memoTextGetippt();
+  pruefe(CL.DB.projekte[0].flaeche === '## Statik\n[x] Angebot einholen\nneu', 'das Getippte landet in der Seite');
+  CL.memoZeichen('kasten');
+  pruefe(/\n\[\] neu$/.test(CL.DB.projekte[0].flaeche), '[ ] macht die Zeile zur Aufgabe');
+  const vorher = inhalt();
+  CL.zeichne();
+  pruefe(inhalt() === vorher, 'ein Neuzeichnen (etwa nach dem Abgleich) lässt das Textfeld in Ruhe');
+  CL.memoSchreibenUm();
+  pruefe(/class="aufg"/.test(inhalt()) && /neu/.test(inhalt()), '„Fertig“ zeigt die Seite wieder');
+
+  CL.memoDetails();
+  let f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Details/.test(f) && /memoWahl\('zustand','ruht'\)/.test(f) && /Ende:/.test(f), 'Details eines Projekts: Name, Kategorie, Zustand, Ende');
+  CL.document.getElementById('memoTitel').value = 'Büro neu';
+  CL.document.getElementById('memoTermin').value = '2027-03-31';
+  CL.memoWahl('zustand', 'ruht');
+  CL.memoSpeichern();
+  const p1 = CL.DB.projekte[0];
+  pruefe(p1.name === 'Büro neu' && p1.ende === '2027-03-31' && p1.status === 'ruht', 'Name, Ende und Zustand werden gespeichert');
+  pruefe(CL.cl.memo.id === '' && !/Büro neu/.test(inhalt()), 'eine ruhende Seite verschwindet aus der Liste');
+
+  CL.memoNeu();
+  CL.memoWahl('art', 'liste');
+  CL.document.getElementById('memoTitel').value = '';
+  CL.memoSpeichern();
+  const zahl = CL.DB.themen.length;
+  pruefe(/Namen/.test(CL.document.getElementById('toastText').textContent), 'ohne Namen kein neues Memo');
+  CL.document.getElementById('memoTitel').value = 'Geschenkideen';
+  CL.memoWahl('kontext', 'privat');
+  CL.memoSpeichern();
+  const neu = CL.DB.themen[CL.DB.themen.length - 1];
+  pruefe(CL.DB.themen.length === zahl + 1 && neu.name === 'Geschenkideen' && neu.kontext === 'privat', 'Neu legt eine Liste an — in der Workbench unter „themen“');
+  pruefe(CL.cl.memo.id === neu.id && CL.cl.memo.schreiben, 'und öffnet sie gleich zum Schreiben');
+  CL.memoSchreibenUm();
+
+  CL.memoZeile('t1', 0);
+  pruefe(CL.cl.app === 'memo' && CL.cl.memo.id === 't1' && /class="aufg hervor"/.test(inhalt()), '„Im Memo zeigen“ öffnet die Seite an der Zeile');
+  CL.oeffne('uebersicht');
+  CL.oeffne('memo');
+  pruefe(CL.cl.memo.id === '' && /memoOeffnen/.test(inhalt()), 'von der Übersicht aus beginnt Memo mit der Liste');
+  CL.oeffne('uebersicht');
+}
+
+/* ============================================================
+   20. Checklisten
+   Grund: Vorlagen dürfen beim Starten nie verändert werden; laufende
+   Checklisten starten leer. Gespeichert wird als gekennzeichnete
+   Notiz — sie darf weder im Memo noch in den Aufgaben auftauchen, und
+   Löschen braucht einen Löschvermerk, sonst käme sie per Abgleich zurück.
+   ============================================================ */
+function checklistenTest() {
+  console.log('\n20. Checklisten');
+  if (!CL) { return; }
+  frisch();
+  CL.cl.cls.id = ''; CL.cl.cls.schreiben = false; CL.cl.cls.fenster = null;
+  CL.DB.gedanken.push({ id: 'v1', titel: 'Packliste Urlaub', text: '## Kleidung\n[x] Regenjacke\n[] Badesachen\n## Technik\n[-] Kabel', kontext: 'privat', checkliste: 'vorlage', benutzt: 2, ordnung: 1, geaendert: 1 });
+  CL.DB.gedanken.push({ id: 'v2', titel: 'Monatsabschluss', text: '[] Belege', kontext: 'beruflich', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
+  CL.DB.projekte.push({ id: 'p1', name: 'Umbau', flaeche: '## Statik\n[x] Pläne\nText\n[] Angebot', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  CL.oeffne('checklisten');
+  let h = inhalt();
+  pruefe(/>Laufend</.test(h) && />Vorlagen</.test(h) && /Packliste Urlaub/.test(h) && /3 Punkte · 2× benutzt/.test(h), 'Übersicht: Laufend und Vorlagen mit Punkten und Nutzung');
+  CL.katSetzen('beruflich');
+  pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'Beruf / Privat filtert');
+  CL.katSetzen('alle');
+
+  const vorText = CL.DB.gedanken[0].text;
+  CL.clsStarten('v1');
+  const lauf = CL.DB.gedanken.filter(g => g.checkliste === 'lauf')[0];
+  pruefe(lauf && lauf.vorlage === 'v1' && lauf.gestartet === CL.isoDatum() && lauf.kontext === 'privat', 'Starten legt eine laufende Checkliste an — mit Datum');
+  pruefe(lauf && lauf.text === '## Kleidung\n[] Regenjacke\n[] Badesachen\n## Technik\n[] Kabel', 'sie beginnt mit leeren Kästchen');
+  pruefe(CL.DB.gedanken[0].text === vorText && CL.DB.gedanken[0].benutzt === 3, 'die Vorlage bleibt unverändert, zählt nur mit');
+  pruefe(CL.cl.cls.id === lauf.id && /0\/3/.test(inhalt()), 'und ist gleich offen, Stand 0/3');
+  CL.clsHaken(lauf.id, 1);
+  pruefe(/\[x\] Regenjacke/.test(lauf.text) && /1\/3/.test(inhalt()), 'abhaken zählt den Fortschritt');
+  CL.clsHaken('v1', 2);
+  pruefe(CL.DB.gedanken[0].text === vorText, 'in einer Vorlage lässt sich nichts abhaken');
+  CL.clsHaken(lauf.id, 2); CL.clsHaken(lauf.id, 4);
+  pruefe(/Alles erledigt/.test(inhalt()) && /clsAbschliessen/.test(inhalt()), 'alles erledigt: „Abschließen“ wird angeboten');
+  CL.clsAbschliessen();
+  pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv, zurück zur Übersicht');
+  pruefe(/Erledigt · 1/.test(inhalt()), 'die Übersicht zählt Erledigte (eingeklappt)');
+
+  /* Neu: aus einem Memo, als Kopie, leer */
+  CL.clsNeu();
+  pruefe(/Aus einem Memo/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet: leer, Kopie, aus Memo, einmalig');
+  CL.clsFensterSchritt('memo');
+  pruefe(/clsAnlegen\('memo','p1'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Memos mit Punkten stehen zur Wahl');
+  CL.clsAnlegen('memo', 'p1');
+  const ausMemo = CL.DB.gedanken[CL.DB.gedanken.length - 1];
+  pruefe(ausMemo.checkliste === 'vorlage' && ausMemo.titel === 'Umbau' && ausMemo.text === '## Statik\n[] Pläne\n[] Angebot', 'aus dem Memo: nur Punkte und Überschriften, leer');
+  pruefe(/\[x\] Pläne/.test(CL.DB.projekte[0].flaeche) && /Text/.test(CL.DB.projekte[0].flaeche), 'das Memo bleibt, wie es ist');
+  CL.clsAnlegen('kopie', 'v2');
+  pruefe(CL.DB.gedanken[CL.DB.gedanken.length - 1].titel === 'Kopie von Monatsabschluss', 'Kopie einer Vorlage');
+  CL.clsAnlegen('leer', '');
+  const leer = CL.DB.gedanken[CL.DB.gedanken.length - 1];
+  pruefe(CL.cl.cls.schreiben && CL.cl.aufklapp === 'checkliste' && /clsTitel/.test(CL.document.getElementById('aufklapp').innerHTML), 'leere Vorlage: gleich Name vergeben und schreiben');
+  CL.document.getElementById('clsTitel').value = 'Auto Winter';
+  CL.clsSpeichern();
+  pruefe(leer.titel === 'Auto Winter', 'der Name wird gespeichert');
+  const feld = CL.document.getElementById('memoFeld');
+  feld.value = '[] Reifen\nScheibenfrost'; feld.selectionStart = feld.value.length;
+  CL.clsTextGetippt();
+  CL.memoZeichen('kasten');
+  pruefe(leer.text === '[] Reifen\n[] Scheibenfrost', 'Schreiben mit [ ] wie im Memo');
+
+  /* Wo Checklisten nicht erscheinen */
+  CL.oeffne('memo');
+  pruefe(!/Packliste|Auto Winter|Monatsabschluss/.test(inhalt()), 'nicht im Memo');
+  CL.oeffne('aufgaben');
+  pruefe(!/Badesachen|Reifen|Belege/.test(inhalt()), 'nicht in den Aufgaben');
+  CL.oeffne('uebersicht');
+  pruefe(CL.clAppZahl('checklisten') === 0, 'die Zahl an der App zählt laufende Checklisten');
+
+  /* Löschen mit Löschvermerk */
+  CL.oeffne('checklisten');
+  CL.clsOeffnen('v2');
+  CL.clsDetails();
+  CL.clsFensterSchritt('loeschen');
+  pruefe(/wirklich löschen/.test(CL.document.getElementById('aufklapp').innerHTML) && CL.clsFinden('v2'), 'Löschen fragt nach');
+  CL.clsLoeschen();
+  pruefe(!CL.clsFinden('v2') && CL.DB.grabsteine.some(g => g.s === 'gedanken' && g.id === 'v2'), 'gelöscht — mit Löschvermerk für den Abgleich');
+  CL.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -727,6 +1054,10 @@ function zifferTest() {
   try { kalenderTest(); } catch (e) { fail('Kalender warf: ' + e.message); }
   try { await schreibTest(); } catch (e) { fail('Termine schreiben warf: ' + e.message); }
   zifferTest();
+  try { bloeckeTest(); } catch (e) { fail('Zeitklammern/Blöcke warf: ' + e.message); }
+  try { aufgabenTest(); } catch (e) { fail('Aufgaben warf: ' + e.message); }
+  try { memoTest(); } catch (e) { fail('Memo warf: ' + e.message); }
+  try { checklistenTest(); } catch (e) { fail('Checklisten warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
