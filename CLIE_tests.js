@@ -274,16 +274,13 @@ function uebersichtTest() {
   const h = inhalt();
   pruefe(CL.clOffeneAufgaben() === 4, 'offene Aufgaben: nur [] aus laufenden Projekten und Listen, nicht [x], [-], Ruhendes oder Notizen');
   pruefe(/class="zahl">4</.test(h), 'die Zahl steht am Symbol der Aufgaben');
-  pruefe(/23:58 Becker/.test(h) && !/Vorbei/.test(h), 'am Kalender steht der nächste Termin, Vergangenes nicht');
-  pruefe((h.match(/class="app[ "]/g) || []).length === 9, 'neun Apps im Raster');
-  pruefe(/onclick="oeffne\('abgleich'\)"/.test(h) && /class="app spaeter" onclick="oeffne\('kalender'\)"/.test(h),
-    'Abgleich ist fertig, die anderen Apps sind als „kommt noch“ gekennzeichnet');
+  pruefe(CL.clAppZahl('kalender') === 1 && /oeffne\('kalender'\)"><span class="sym"><svg[^]*?<span class="zahl">1</.test(h),
+    'am Kalender steht die Zahl der heute noch kommenden Termine — Vergangenes zählt nicht');
+  pruefe((h.match(/class="app"/g) || []).length === 5, 'fünf Apps im Raster');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
   pruefe(CL.DB.einstellungen.leitsatz.indexOf('Erst das') >= 0, 'die Leitsätze selbst bleiben unangetastet in der Datei');
-  pruefe(/KW \d+/.test(h), 'an der Woche steht die Kalenderwoche');
-  pruefe(/>Projekte<span class="unterz">2</.test(h) && /Memo<span class="unterz">1</.test(h), 'Projekte und Memo zählen nur Laufendes, ohne Kompass-Notizen');
 
   CL.katSetzen('privat');
   const p = inhalt();
@@ -349,7 +346,6 @@ function verbindungTest() {
   pruefe(/\.\/clie\.html\?stand=/.test(SKRIPT) && /versionTaktStarten\(\)/.test(SKRIPT), 'nach neuer Fassung wird gefragt — beim Start und alle 15 Minuten');
   CL.neuStreifenZeigen('9.9.9');
   pruefe(/9\.9\.9/.test(CL.document.getElementById('neuText').textContent), 'eine neue Fassung wird oben angezeigt');
-  pruefe(CL.clVor(CL.isoZeit()) === 'gerade eben' && CL.clVor('') === '', '„vor … Min.“ für den letzten Abgleich');
 }
 
 /* ============================================================
@@ -374,22 +370,49 @@ function swTest() {
 
 /* ============================================================
    10. Schriftgrößen
-   Grund: In 0.1.0 und 0.1.1 war die Schrift am Pixel zu klein
-   (Wunsch: zweimal +10 %). Keine Schrift unter 14 px, Grundschrift
-   mindestens 19 px, Zeilen mindestens 17 px, App-Namen 18 px.
+   Grund: In 0.1.0 bis 0.1.2 war die Schrift am Pixel zu klein
+   (Wunsch: dreimal +10 %). Keine Schrift unter 15,5 px, Grundschrift
+   mindestens 21 px, Zeilen mindestens 19 px, App-Namen 20 px.
    ============================================================ */
 function schriftTest() {
   console.log('\n10. Schriftgrößen');
   const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
   const groessen = [...css.matchAll(/font-size:([\d.]+)px/g)].map(m => Number(m[1]));
-  pruefe(groessen.length > 20 && Math.min.apply(null, groessen) >= 14,
-    'keine Schrift kleiner als 14 px (kleinste: ' + Math.min.apply(null, groessen) + ' px)');
+  pruefe(groessen.length > 20 && Math.min.apply(null, groessen) >= 15.5,
+    'keine Schrift kleiner als 15,5 px (kleinste: ' + Math.min.apply(null, groessen) + ' px)');
   const grund = Number((css.match(/body\{[^}]*font-size:([\d.]+)px/) || [])[1]);
-  pruefe(grund >= 19, 'Grundschrift mindestens 19 px (' + grund + ' px)');
+  pruefe(grund >= 21, 'Grundschrift mindestens 21 px (' + grund + ' px)');
   const regel = (sel) => Number((css.match(new RegExp('(?:^|\\n)' + sel.replace(/\./g, '\\.') + '\\{[^}]*font-size:([\\d.]+)px')) || [])[1]);
-  pruefe(regel('.reihe') >= 17 && regel('.app') >= 18 && regel('.reiter') >= 20,
+  pruefe(regel('.reihe') >= 19 && regel('.app') >= 20 && regel('.reiter') >= 22.5,
     'Zeilen, App-Namen und Reiter groß genug (' + [regel('.reihe'), regel('.app'), regel('.reiter')].join(' / ') + ' px)');
-  pruefe(/class="aufklapp" style="top:46px/.test(SKRIPT), 'die Kategorieliste sitzt unter dem höheren Kopf');
+  pruefe(/class="aufklapp" style="top:49px/.test(SKRIPT), 'die Kategorieliste sitzt unter dem höheren Kopf');
+}
+
+/* ============================================================
+   11. Übersicht wie am Palm
+   Grund: Gewünscht ist die Reduktion des Palm (0.1.3): nur Kalender,
+   Aufgaben, Memo, Routinen und Abgleich; Symbole als dunkle Scheibe
+   mit hellem Bildzeichen; keine Unterzeile unter den Apps.
+   Projekte, Ziele und Listen sind keine eigenen Apps — sie liegen im
+   Memo und sind Kategorien der Aufgaben.
+   ============================================================ */
+function palmTest() {
+  console.log('\n11. Übersicht wie am Palm');
+  if (!CL) { return; }
+  frisch();
+  CL.zeichne();
+  const h = inhalt();
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","routinen","abgleich"]',
+    'genau fünf Apps: Kalender, Aufgaben, Memo, Routinen, Abgleich');
+  pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
+  pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
+  const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
+  pruefe(syms === 5, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/5)');
+  pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
+  pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
+  CL.oeffne('memo');
+  pruefe(/class="gross"><svg/.test(inhalt()), 'auch die Seite einer späteren App zeigt das Symbol');
+  CL.oeffne('uebersicht');
 }
 
 (async function () {
@@ -399,6 +422,7 @@ function schriftTest() {
   try { verbindungTest(); } catch (e) { fail('Verbindung warf: ' + e.message); }
   swTest();
   schriftTest();
+  palmTest();
 
   /* ============================================================
      ERGEBNIS
