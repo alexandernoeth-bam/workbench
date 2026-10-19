@@ -283,7 +283,7 @@ function uebersichtTest() {
   pruefe(/class="zahl">4</.test(h), 'die Zahl steht am Symbol der Aufgaben');
   pruefe(CL.clAppZahl('kalender') === 1 && /oeffne\('kalender'\)"><span class="sym"><svg[^]*?<span class="zahl">1</.test(h),
     'am Kalender steht die Zahl der heute noch kommenden Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 8, 'acht Apps im Raster');
+  pruefe((h.match(/class="app"/g) || []).length === 9, 'neun Apps im Raster (seit 0.7 mit Sammlungen)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -410,12 +410,12 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","checklisten","routinen","einkauf","rechner","abgleich"]',
-    'genau acht Apps: Kalender, Aufgaben, Memo, Checklisten, Routinen, Einkauf, Rechner, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","abgleich"]',
+    'genau neun Apps: Kalender, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 8, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/8)');
+  pruefe(syms === 9, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/9)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -1365,6 +1365,132 @@ function datebookTest() {
   CL.oeffne('uebersicht');
 }
 
+/* ============================================================
+   26. Sammlungen (0.7)
+   Grund: neue App mit eigenen Feldern, Summen und Auswertungen. Die
+   Daten liegen in zwei neuen Bereichen der workbench.json — fehlen
+   sie in SAMMLUNGEN, verwirft der Abgleich sie still.
+   Erkennt: falsch gelesene oder gezeigte Beträge, falsche Summen und
+   Umrechnungen, Kopien mit falschem Inhalt, fehlende Löschvermerke,
+   ES2015-Aufrufe (padStart, repeat) im ES5-Code, fehlende Bereiche.
+   ============================================================ */
+function sammlungenTest() {
+  console.log('\n26. Sammlungen (0.7)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*'sammlungen','datensaetze'\]/.test(QUELLE) && Array.isArray(S.DB.sammlungen) && Array.isArray(S.DB.datensaetze),
+    'die Bereiche sammlungen und datensaetze kommen aus der Workbench (6.2.3) — sonst gingen sie beim Abgleich verloren');
+  const code = (QUELLE.match(/\/\* ---------- Sammlungen \(seit 0\.7\)[\s\S]*?\/\* ---------- Routinen \(seit 0\.5\)/) || [''])[0];
+  pruefe(code.length > 1000 && !/padStart|\.repeat\(|=>/.test(code), 'Sammlungen: nur ES5 — kein padStart, repeat oder Pfeilfunktionen');
+
+  pruefe(S.saZahlLesen('1.234,56') === 1234.56 && S.saZahlLesen('14,90') === 14.9 && S.saZahlLesen('14.90') === 14.9
+    && S.saZahlLesen('19 €') === 19 && S.saZahlLesen('') === null && S.saZahlLesen('abc') === null, 'Beträge lesen: 1.234,56 · 14,90 · 14.90 · 19 € · leer');
+  pruefe(S.saZahlText(1234.5, 2) === '1.234,50' && S.saZahlText(-1870, 0) === '−1.870' && S.saBetragText(8500) === '8.500' && S.saBetragText(14.9) === '14,90',
+    'Beträge zeigen: 1.234,50 · −1.870 · 8.500 · 14,90');
+  pruefe(S.saMonatePlus('2026-01-31', 1) === '2026-02-28' && S.saMonatePlus('2026-11-15', 2) === '2027-01-15' && S.saMonatePlus('2026-03-10', -3) === '2025-12-10',
+    'Monate rechnen: Monatsende, Jahreswechsel, rückwärts');
+
+  /* Budget */
+  const b = S.saAusVorlage(S.SA_VORLAGEN.budget, 'Carport', false, [
+    { posten: 'Fundament', gewerk: 'Arbeit', plan: 1600, ist: 1890 },
+    { posten: 'Bausatz', gewerk: 'Material', plan: 3500, ist: 3580 },
+    { posten: 'Dach', gewerk: 'Material', plan: 1900 }]);
+  const bu = S.saBudget(b, S.saSaetze(b));
+  pruefe(bu.plan === 7000 && bu.ist === 5470 && bu.rest === 1530 && bu.proz === 78, 'Budget: Plan, Ist, Rest und Prozent');
+  S.cl.app = 'sammlungen'; S.cl.sa.id = b.id; S.cl.sa.ansicht = 'tabelle';
+  S.zeichne();
+  let h = inhalt();
+  pruefe(/<tr class="sa-gr"><td>Material<\/td><td class="r">5\.400<\/td><td class="r">3\.580<\/td><\/tr>/.test(h), 'Gruppe mit Zwischensumme (Material 5.400 / 3.580)');
+  pruefe(/<tr class="sa-sum"><td>Σ 3<\/td><td class="r">7\.000<\/td><td class="r">5\.470<\/td><\/tr>/.test(h), 'Summenzeile unter den Betragsspalten');
+  pruefe(/Arbeit \+290 € über Plan/.test(h) && /78 % verbraucht/.test(h), 'Überschreitung je Gruppe und Verbrauch in Prozent');
+  pruefe(S.document.getElementById('reiter').textContent === 'Carport', 'der Reiter zeigt den Namen der Sammlung');
+
+  /* Abos */
+  const heute = S.isoDatum();
+  const a = S.saAusVorlage(S.SA_VORLAGEN.abos, 'Abos', false, [
+    { name: 'Kfz', betrag: 312, takt: 'jährlich', status: 'aktiv' },
+    { name: 'Handy', betrag: 19.99, takt: 'monatlich', status: 'aktiv', naechste: S.saMonatePlus(heute, -3) },
+    { name: 'Zeitung', betrag: 14.9, takt: 'monatlich', status: 'aktiv', laufzeit: S.saMonatePlus(S.tagePlus(heute, 10), 2), frist: 2 },
+    { name: 'Alt', betrag: 50, takt: 'monatlich', status: 'gekündigt' }]);
+  const da = S.saSaetze(a);
+  pruefe(Math.abs(S.saAboMonat(a, da[0]) - 26) < 1e-9, 'Abo: 312 € jährlich = 26 € im Monat');
+  pruefe(S.saKennzahl(a) === '60,89 €/Mon', 'Kennzahl pro Monat ohne gekündigte Abos (26 + 19,99 + 14,90)');
+  const n = S.saAboNaechste(a, da[1]);
+  pruefe(n >= heute && n < S.saMonatePlus(heute, 1) && n.slice(8) === heute.slice(8).replace(/^(29|30|31)$/, n.slice(8)), 'nächste Abbuchung rollt mit dem Takt in die Zukunft');
+  pruefe(S.saAboKuendbar(a, da[2]) === S.tagePlus(heute, 10), 'kündbar bis = Laufzeitende minus Frist');
+  const hw = S.saHinweise();
+  pruefe(hw.length === 1 && hw[0].name === 'Zeitung', 'Hinweis nur für das Abo, das in 30 Tagen kündbar endet');
+  S.cl.sa.wahl = {};
+  pruefe(S.saFilterWahl(a) === 'aktiv' && S.saGefiltert(a).length === 3, 'Abos zeigen zuerst nur die aktiven');
+  S.cl.sa.id = a.id; S.zeichne(); h = inhalt();
+  pruefe(/<td class="r">312,00 J<\/td><td class="r">26,00<\/td>/.test(h) && /pro Jahr<\/span><span>730,68 €/.test(h), 'Abo-Liste: Betrag mit Takt, Spalte /Mon, Jahressumme');
+  pruefe(/▼ Aktiv/.test(S.document.getElementById('katKnopf').textContent), 'oben rechts steht der Filter der Sammlung');
+  S.zeichne();
+  pruefe(/<span class="zahl">1<\/span>/.test((S.cl.app = 'uebersicht', S.zeichne(), inhalt())), 'das Symbol zeigt die Zahl der Kündigungshinweise');
+
+  /* Bücher und Filter */
+  const k = S.saAusVorlage(S.SA_VORLAGEN.buecher, 'Bücher', false, [
+    { titel: 'Deep Work', autor: 'Newport', status: 'Gelesen', gelesen: heute, bewertung: 5 },
+    { titel: 'Slow', autor: 'Newport', status: 'Gelesen', gelesen: heute, bewertung: 4 },
+    { titel: 'Alt', autor: 'Clear', status: 'Gelesen', gelesen: '2019-05-01', bewertung: 3 },
+    { titel: 'Wunsch', autor: 'Seneca', status: 'Wunschliste', preis: 24.9 }]);
+  S.cl.app = 'sammlungen'; S.cl.sa.id = k.id; S.zeichne(); h = inhalt();
+  pruefe(new RegExp('gelesen ' + heute.slice(0, 4) + '</span><span>2<').test(h) && /Ø Bewertung<\/span><span>4,0</.test(h) && /Wunschliste<\/span><span>1 · 24,90 €/.test(h),
+    'Bücher: gelesen im Jahr, Ø Bewertung, Wunschliste mit Preis');
+  pruefe(/Meistgelesen[\s\S]*Newport[\s\S]*>2</.test(h), 'meistgelesener Autor');
+  S.saFilterSetzen('jahr');
+  pruefe(S.saGefiltert(k).length === 2 && /▼ Gelesen \d{4}/.test(S.document.getElementById('katKnopf').textContent), 'Filter „Gelesen dieses Jahr“');
+  const f0 = { feld: 'titel', op: 'enthaelt', wert: 'EEP' };
+  pruefe(S.saPasst(k, S.saSaetze(k)[0], f0) && !S.saPasst(k, S.saSaetze(k)[3], f0), 'Filter „enthält“ ohne Groß/Klein');
+
+  /* Eintrag über das Formular */
+  S.saEintrag('');
+  const feld = (id, w) => { S.document.getElementById(id).value = w; };
+  ['titel', 'autor', 'status', 'gelesen', 'bewertung', 'preis', 'verliehen', 'notiz'].forEach(x => feld('saF_' + x, ''));
+  feld('saF_titel', '  Neu  '); feld('saF_preis', '1.234,5'); feld('saF_bewertung', '0');
+  S.saEintragSpeichern();
+  const neu = S.saSaetze(k).filter(d => d.werte.titel === 'Neu')[0];
+  pruefe(neu && neu.werte.preis === 1234.5 && !('bewertung' in neu.werte) && S.cl.aufklapp === '', 'Formular: Text gekürzt, Betrag gelesen, leere Felder bleiben weg');
+
+  /* Kopieren als Vorlage mit Gerüst, dann daraus anlegen */
+  S.cl.sa.id = b.id;
+  S.saKopierenOeffnen();
+  feld('saName', 'Bauprojekt');
+  S.saKopieren();
+  const v = S.DB.sammlungen.filter(x => x.vorlage)[0];
+  pruefe(v && v.name === 'Bauprojekt' && v.saetze.length === 3 && !('plan' in v.saetze[0]) && v.saetze[0].posten === 'Fundament'
+    && !S.DB.datensaetze.some(d => d.sammlung === v.id), 'als Vorlage: Gerüst ohne Beträge, keine eigenen Datensätze');
+  pruefe(S.saAlle(false).every(x => !x.vorlage), 'Vorlagen stehen nicht in der Liste der Sammlungen');
+  S.saNeu(); S.saNeuWahl(v.id); feld('saName', 'Terrasse'); S.saAnlegen();
+  const t = S.DB.sammlungen.filter(x => x.name === 'Terrasse')[0];
+  pruefe(t && !t.vorlage && t.art === 'budget' && S.saSaetze(t).length === 3 && t.rollen.plan === 'plan', 'aus eigener Vorlage: Budget mit Gerüst und Auswertung');
+
+  /* Felder */
+  S.cl.sa.id = t.id;
+  S.saFeldNeu();
+  feld('saFeldName', 'Menge'); feld('saFeldTyp', 'zahl'); feld('saFeldWerte', ''); feld('saFeldSumme', 'summe');
+  S.document.getElementById('saFeldSpalte').checked = false; S.document.getElementById('saFeldGruppe').checked = false;
+  S.saFeldSpeichern();
+  const fm = t.felder[t.felder.length - 1];
+  pruefe(fm.name === 'Menge' && fm.typ === 'zahl' && fm.summe === 'summe' && /^f/.test(fm.id), 'neues Feld mit Typ und Summe');
+  S.saFeldSchieben(t.felder.length - 1, -1);
+  pruefe(t.felder[t.felder.length - 2] === fm, 'Feld nach oben schieben');
+
+  /* Löschen mit Vermerk */
+  const d1 = S.saSaetze(t)[0];
+  S.saFensterAuf({ modus: 'eintrag', id: d1.id }); S.saEintragLoeschen();
+  pruefe(!S.saSatzFinden(d1.id) && S.DB.grabsteine.some(g => g.s === 'datensaetze' && g.id === d1.id), 'Eintrag löschen setzt einen Löschvermerk');
+  S.saSammlungLoeschen();
+  pruefe(!S.saFinden(t.id) && !S.DB.datensaetze.some(d => d.sammlung === t.id) && S.DB.grabsteine.some(g => g.s === 'sammlungen' && g.id === t.id),
+    'Sammlung löschen nimmt ihre Einträge mit — mit Löschvermerken');
+  S.cl.app = 'sammlungen'; S.cl.sa.id = b.id; S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
+  const menue = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/menueWahl\('saFelder'\)">Felder…/.test(menue) && /menueWahl\('saKopieren'\)">Kopieren \/ als Vorlage…/.test(menue), 'im Menü einer Sammlung: Felder… und Kopieren / als Vorlage…');
+  S.cl.sa.id = ''; S.cl.aufklapp = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1387,6 +1513,7 @@ function datebookTest() {
   zustandsklassenTest();
   try { feinschliffTest(); } catch (e) { fail('Feinschliff 0.6.1 warf: ' + e.message); }
   try { datebookTest(); } catch (e) { fail('Tag wie im Datebook warf: ' + e.message); }
+  try { sammlungenTest(); } catch (e) { fail('Sammlungen warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

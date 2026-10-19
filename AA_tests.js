@@ -248,7 +248,9 @@ console.log('\n6. Datenmodell');
   const erwartet = ['aufgaben', 'ziele', 'themen', 'projekte', 'ablaeufe',
                     'durchlaeufe', 'jahrestermine', 'ferien', 'einfaelle',
                     'gedanken', 'pinnwand', 'kalenderzuordnung',
-                    'notizbuecher', 'notizseiten', 'wochen', 'tage'];
+                    'notizbuecher', 'notizseiten', 'wochen', 'tage',
+                    /* seit v6.2.3: die App „Sammlungen“ im CLIE */
+                    'sammlungen', 'datensaetze'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -13011,6 +13013,42 @@ console.log('\n202. Ausblenden im Tag');
       fail('Ausblenden: ' + e.message);
     }
     g.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   203. Bereiche des CLIE bleiben erhalten (v6.2.3)
+   Grund: Die App „Sammlungen“ im CLIE speichert in der workbench.json.
+   Die Workbench verwarf bisher alles, was nicht in SAMMLUNGEN steht —
+   beim Laden und beim Abgleich. Erkennt: Bereiche, die beim Laden oder
+   Zusammenführen verloren gehen.
+   ============================================================ */
+console.log('\n203. CLIE-Bereiche bleiben erhalten');
+{
+  const a = globalThis.__api || {};
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen und datensaetze');
+  if (typeof a.zusammenfuehren !== 'function') {
+    warn('Abgleich nicht auswertbar');
+  } else {
+    const leer = a.leereDatenbank();
+    pruefe(Array.isArray(leer.sammlungen) && Array.isArray(leer.datensaetze), 'die leere Datenbank hat beide Bereiche');
+    const lokal = a.leereDatenbank();
+    const fremd = a.leereDatenbank();
+    lokal.sammlungen = [{ id: 's1', name: 'Carport', geaendert: 5 }];
+    fremd.sammlungen = [{ id: 's1', name: 'Carport neu', geaendert: 9 }, { id: 's2', name: 'Abos', geaendert: 3 }];
+    lokal.datensaetze = [{ id: 'd1', sammlung: 's1', werte: { f1: 'Fundament' }, geaendert: 4 }];
+    const m = a.zusammenfuehren(lokal, fremd);
+    const db = m.db || m.ergebnis || m;
+    pruefe(db.sammlungen && db.sammlungen.length === 2 && db.sammlungen.filter(x => x.id === 's1')[0].name === 'Carport neu',
+      'Abgleich: Sammlungen werden je Eintrag zusammengeführt, der jüngere gewinnt');
+    pruefe(db.datensaetze && db.datensaetze.length === 1, 'Abgleich: Datensätze bleiben erhalten');
+  }
+  if (typeof a.textZuBestand === 'function') {
+    const t = JSON.stringify({ sammlungen: [{ id: 's9', name: 'Bücher', geaendert: 1 }], datensaetze: [{ id: 'd9', sammlung: 's9', geaendert: 1 }] });
+    const b = a.textZuBestand(t);
+    pruefe(b && b.sammlungen && b.sammlungen.length === 1 && b.datensaetze.length === 1, 'Laden: beide Bereiche überleben das Einlesen');
+  } else {
+    warn('Laden nicht auswertbar');
   }
 }
 
