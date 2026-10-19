@@ -1876,6 +1876,54 @@ function heuteTest() {
   S.zeichne();
 }
 
+/* ============================================================
+   33. Vorlage Training (0.9.1)
+   Grund: Trainingsplan für Multisport mit Plan, Ist und Ergebnis
+   (geschafft / teilweise / ausgefallen) und eigener Wochenauswertung.
+   Erkennt: falsche Wochensummen, Einheiten außerhalb der Woche, falsche
+   Quote, falsch gerechnete Formeln, fehlender Filter „Diese Woche“.
+   ============================================================ */
+function trainingTest() {
+  console.log('\n33. Vorlage Training (0.9.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const mo = S.montagVon(S.isoDatum());
+  const t = S.saAusVorlage(S.SA_VORLAGEN.training, 'Training', false, [
+    { dat: mo, sport: 'Lauf', einheit: 'GA1', pmin: 60, imin: 50, pkm: 10, ikm: 9, ergebnis: 'geschafft' },
+    { dat: S.tagePlus(mo, 1), sport: 'Schwimmen', einheit: '6×200', pmin: 50, imin: 40, pkm: 2.2, ikm: 1.8, ergebnis: 'teilweise' },
+    { dat: S.tagePlus(mo, 2), sport: 'Rad', einheit: 'Rolle', pmin: 60, ergebnis: 'ausgefallen' },
+    { dat: S.tagePlus(mo, 5), sport: 'Lauf', einheit: 'lang', pmin: 100, pkm: 18 },
+    { dat: S.tagePlus(mo, -3), sport: 'Lauf', einheit: 'Vorwoche', pmin: 45, imin: 45, ergebnis: 'geschafft' }]);
+  pruefe(t.art === 'training' && t.werte.length === 1 && t.werte[0].name === 'Wochenziel' && t.rollen.wochenziel === 'wziel', 'Vorlage mit festem Wert „Wochenziel“');
+  pruefe(t.felder.filter(f => f.spalte).map(f => f.name).join(',') === 'Datum,Einheit,Ergebnis', 'Spalten: Datum, Einheit, Ergebnis');
+  const w = S.saTrainingWoche(t);
+  pruefe(w.plan === 270 && w.ist === 90 && w.reihe.join(',') === 'Schwimmen,Rad,Lauf', 'Woche: Plan 4:30 h, Ist 1:30 h, Sportarten in fester Reihenfolge — ohne die Vorwoche');
+  pruefe(w.sport.Lauf.plan === 160 && w.sport.Lauf.km === 9, 'je Sportart summiert');
+  pruefe(w.erg.geschafft === 1 && w.erg.teilweise === 1 && w.erg.ausgefallen === 1 && w.erg.offen === 1, 'Ergebnisse der Woche gezählt');
+  pruefe(S.saStunden(90) === '1:30' && S.saStunden(5) === '0:05', 'Minuten als Stunden');
+  const sch = S.saSaetze(t).filter(d => d.werte.sport === 'Schwimmen')[0];
+  pruefe(S.saWertText(S.saFeld(t, 'erf'), S.saRoh(t, sch, S.saFeld(t, 'erf'))) === '82' && S.saWertText(S.saFeld(t, 'pace'), S.saRoh(t, sch, S.saFeld(t, 'pace'))) === '22,22',
+    'Formeln: Erfüllung 82 %, Pace 22,22 min/km');
+  S.cl.app = 'sammlungen'; S.cl.sa.id = t.id; S.cl.sa.ansicht = 'tabelle'; S.cl.sa.wahl = {};
+  S.zeichne();
+  let h = inhalt();
+  pruefe(/Schwimmen · 6×200<\/td><td class="">◐<\/td>/.test(h), 'Tabelle: Sportart vor der Einheit, Ergebnis als Zeichen' + (/Schwimmen · 6×200/.test(h) ? '' : ' — ' + (h.match(/<tr class="sa-z"[^]*?<\/tr>/) || [''])[0]));
+  pruefe(/<table class="sa-tab sa-dat">/.test(h) && new RegExp('<td class="">' + S.clKurzDatum(mo) + '</td>').test(h), 'Datum kurz (ohne Jahr) und schmale Datumsspalte');
+  pruefe(/Diese Woche · KW \d+/.test(h) && /Lauf<\/span><span>0:50 \/ 2:40 h · 9 km/.test(h), 'Auswertung: Lauf Ist / Plan und km');
+  pruefe(/1:30 von 8:00 h Wochenziel · 19 %/.test(h), 'Balken gegen das Wochenziel');
+  pruefe(/✓ 1 · ◐ 1 · ✗ 1 · offen 1<\/span><span>Quote 50 %/.test(h), 'Verteilung und Quote (2 von 4 bewerteten in der Liste)');
+  S.saFilterSetzen('woche');
+  pruefe(S.saGefiltert(t).length === 4, 'Filter „Diese Woche“');
+  S.saFilterSetzen('offen');
+  pruefe(S.saGefiltert(t).length === 1, 'Filter „Offen“: noch ohne Ergebnis');
+  pruefe(S.saKennzahl(t) === '1:30 h/Wo', 'Kennzahl in der Liste: Ist-Stunden der Woche');
+  pruefe(S.saStandardWerte(t).dat === S.isoDatum(), 'Neu: Datum heute');
+  pruefe(/saNeuWahl\('training'\)/.test((S.saNeu(), S.saFensterHtml())), '„Training“ steht bei Neu… unter den Vorlagen');
+  S.cl.aufklapp = ''; S.cl.sa.fenster = null; S.cl.sa.id = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1905,6 +1953,7 @@ function heuteTest() {
   try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
   try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
+  try { trainingTest(); } catch (e) { fail('Training warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

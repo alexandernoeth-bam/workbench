@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.9.0</title>
+<title>CLIE 0.9.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -304,6 +304,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-tab th{font-size:16px;font-weight:600;text-align:left;border-bottom:2px solid var(--px);padding:2px 3px}
 .sa-tab td{border-bottom:2px dotted var(--px-zart);padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sa-tab th:first-child,.sa-tab td:first-child{width:46%}
+.sa-tab.sa-dat th:first-child,.sa-tab.sa-dat td:first-child{width:22%}
 .sa-tab .r{text-align:right}
 .sa-tab tr.sa-z{cursor:pointer}
 .sa-tab tr.sa-gr td{font-weight:600;border-bottom:2px solid var(--px-mitte);padding-top:8px}
@@ -385,7 +386,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.9.0';
+var APP_VERSION = '0.9.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -5365,12 +5366,14 @@ var SA_TYPEN = [['text', 'Text'], ['betrag', 'Betrag'], ['zahl', 'Zahl'], ['form
 var SA_SUMMEN = [['', 'nichts'], ['summe', 'Summe'], ['schnitt', 'Ø'], ['min', 'Min'], ['max', 'Max'], ['anzahl', 'Anzahl']];
 var SA_BEDINGUNGEN = [['gleich', 'ist'], ['ungleich', 'ist nicht'], ['enthaelt', 'enthält'], ['leer', 'ist leer'],
                       ['nichtleer', 'ist nicht leer'], ['ja', 'ist ja'], ['nein', 'ist nein'],
-                      ['diesesJahr', 'in diesem Jahr'], ['bald', 'in den nächsten 30 Tagen']];
+                      ['diesesJahr', 'in diesem Jahr'], ['dieseWoche', 'in dieser Woche'], ['bald', 'in den nächsten 30 Tagen']];
 var SA_TAKTE = ['monatlich', 'quartalsweise', 'halbjährlich', 'jährlich'];
 var SA_TAKT_MONATE = { 'monatlich': 1, 'quartalsweise': 3, 'halbjährlich': 6, 'jährlich': 12 };
 var SA_TAKT_KURZ = { 'monatlich': 'M', 'quartalsweise': 'Q', 'halbjährlich': 'H', 'jährlich': 'J' };
-var SA_ARTEN = [['budget', 'Budgets'], ['abos', 'Verwaltung'], ['buecher', 'Sammlung'], ['frei', 'Eigene']];
-var SA_ZEICHEN = { budget: '€', abos: '↻', buecher: '▤', frei: '≡' };
+var SA_ARTEN = [['budget', 'Budgets'], ['abos', 'Verwaltung'], ['buecher', 'Sammlung'], ['training', 'Training'], ['frei', 'Eigene']];
+var SA_ZEICHEN = { budget: '€', abos: '↻', buecher: '▤', training: '»', frei: '≡' };
+/* Training (seit 0.9.1): das Ergebnis einer Einheit als Zeichen */
+var SA_ERGEBNIS = { 'geschafft': '✓', 'teilweise': '◐', 'ausgefallen': '✗' };
 
 /* Die festen Vorlagen. Feldkennungen sind innerhalb einer Sammlung eindeutig. */
 var SA_VORLAGEN = {
@@ -5413,6 +5416,33 @@ var SA_VORLAGEN = {
              { id: 'lese', name: 'Lese gerade', feld: 'status', op: 'gleich', wert: 'Lese gerade' },
              { id: 'wunsch', name: 'Wunschliste', feld: 'status', op: 'gleich', wert: 'Wunschliste' },
              { id: 'verliehen', name: 'Ausgeliehen', feld: 'verliehen', op: 'nichtleer', wert: '' }] },
+  /* Multisport mit Plan, Ist und Ergebnis (seit 0.9.1) */
+  training: { name: 'Training', art: 'training',
+    felder: [{ id: 'dat', name: 'Datum', typ: 'datum', spalte: true, standard: 'heute' },
+             { id: 'sport', name: 'Sport', typ: 'auswahl', werte: ['Schwimmen', 'Rad', 'Lauf', 'Kraft', 'Koppel', 'Sonstiges'] },
+             { id: 'einheit', name: 'Einheit', typ: 'text', spalte: true },
+             { id: 'pmin', name: 'Plan Min', typ: 'zahl', summe: 'summe' },
+             { id: 'pkm', name: 'Plan km', typ: 'zahl', summe: 'summe' },
+             { id: 'imin', name: 'Ist Min', typ: 'zahl', summe: 'summe' },
+             { id: 'ikm', name: 'Ist km', typ: 'zahl', summe: 'summe' },
+             { id: 'ergebnis', name: 'Ergebnis', typ: 'auswahl', werte: ['geschafft', 'teilweise', 'ausgefallen'], spalte: true },
+             { id: 'gefuehl', name: 'Gefühl', typ: 'bewertung', summe: 'schnitt' },
+             { id: 'puls', name: 'Puls Ø', typ: 'zahl', summe: 'schnitt' },
+             { id: 'erf', name: 'Erfüllung %', typ: 'formel', formel: '[Ist km] / [Plan km] * 100', dez: 0 },
+             { id: 'pace', name: 'Pace min/km', typ: 'formel', formel: '[Ist Min] / [Ist km]', dez: 2 },
+             { id: 'notiz', name: 'Notiz', typ: 'text' }],
+    rollen: { datum: 'dat', sport: 'sport', einheit: 'einheit', pmin: 'pmin', pkm: 'pkm', imin: 'imin', ikm: 'ikm',
+              ergebnis: 'ergebnis', wochenziel: 'wziel' },
+    werte: [{ id: 'wziel', name: 'Wochenziel', wert: 8, einheit: 'h' }],
+    gruppe: 'sport', gruppenAn: false,
+    filter: [{ id: 'woche', name: 'Diese Woche', feld: 'dat', op: 'dieseWoche', wert: '' },
+             { id: 'offen', name: 'Offen', feld: 'ergebnis', op: 'leer', wert: '' },
+             { id: 'geschafft', name: 'Geschafft', feld: 'ergebnis', op: 'gleich', wert: 'geschafft' },
+             { id: 'teilweise', name: 'Teilweise', feld: 'ergebnis', op: 'gleich', wert: 'teilweise' },
+             { id: 'ausgefallen', name: 'Ausgefallen', feld: 'ergebnis', op: 'gleich', wert: 'ausgefallen' },
+             { id: 'schwimmen', name: 'Schwimmen', feld: 'sport', op: 'gleich', wert: 'Schwimmen' },
+             { id: 'rad', name: 'Rad', feld: 'sport', op: 'gleich', wert: 'Rad' },
+             { id: 'lauf', name: 'Lauf', feld: 'sport', op: 'gleich', wert: 'Lauf' }] },
   frei: { name: 'Leer', art: 'frei',
     felder: [{ id: 'name', name: 'Name', typ: 'text', spalte: true }, { id: 'notiz', name: 'Notiz', typ: 'text' }],
     rollen: {}, gruppe: '', gruppenAn: false, filter: [] }
@@ -5677,6 +5707,7 @@ function saPasst(s, d, flt) {
     case 'nein': return !w;
     case 'diesesJahr': return !leer && String(w).slice(0, 4) === heute.slice(0, 4);
     case 'bald': return !leer && String(w) >= heute && String(w) <= tagePlus(heute, 30);
+    case 'dieseWoche': return !leer && String(w) >= montagVon(heute) && String(w) <= tagePlus(montagVon(heute), 6);
   }
   return true;
 }
@@ -5815,6 +5846,7 @@ function saKennzahl(s) {
 
 function saKennzahlStandard(s) {
   var l = saSaetze(s);
+  if (s.art === 'training') { return saStunden(saTrainingWoche(s).ist) + ' h/Wo'; }
   if (s.art === 'budget') { return saBudget(s, l).proz + ' %'; }
   if (s.art === 'abos') {
     var m = 0;
@@ -5885,6 +5917,10 @@ function saZelle(s, f, d) {
     var b = saZahlLesen((d.werte || {})[f.id]);
     t = saZahlText(b, 2) + ' ' + (SA_TAKT_KURZ[saWert(s, d, 'takt')] || 'M');
   }
+  /* Datum in der Liste kurz: im laufenden Jahr ohne Jahreszahl (seit 0.9.1) */
+  if (f.typ === 'datum' && t && String(saRoh(s, d, f)).slice(0, 4) === isoDatum().slice(0, 4)) { t = t.slice(0, 6); }
+  if (s.art === 'training' && f.id === (s.rollen || {}).ergebnis) { t = SA_ERGEBNIS[t] || t; }
+  if (s.art === 'training' && f.id === (s.rollen || {}).einheit && saWert(s, d, 'sport')) { t = saWert(s, d, 'sport') + (t ? ' · ' + t : ''); }
   return t;
 }
 
@@ -5904,7 +5940,7 @@ function saSummenZeile(s, sp, l, klasse, titel) {
 function saTabelleHtml(s) {
   var sp = saSpalten(s);
   var l = saGefiltert(s);
-  var h = '<table class="sa-tab"><tr>' + sp.map(function (f) {
+  var h = '<table class="sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + '"><tr>' + sp.map(function (f) {
     return '<th class="' + (saRechts(f) ? 'r' : '') + '">' + esc(f.name) + '</th>';
   }).join('') + '</tr>';
   var zeile = function (d) {
@@ -6007,6 +6043,73 @@ function saBuecherHtml(s, l) {
   return h;
 }
 
+/* ---- Training (seit 0.9.1) ---- */
+
+/* Minuten als Stunden: 330 → 5:30 */
+function saStunden(min) {
+  var m = Math.round(Number(min) || 0);
+  return Math.floor(m / 60) + ':' + ((m % 60) < 10 ? '0' : '') + (m % 60);
+}
+
+/* Die laufende Woche (Mo–So): je Sportart Plan- und Ist-Minuten, Ist-km,
+   dazu die Ergebnisse. Unabhängig vom gewählten Filter. */
+function saTrainingWoche(s) {
+  var von = montagVon(isoDatum());
+  var bis = tagePlus(von, 6);
+  var w = { sport: {}, reihe: [], plan: 0, ist: 0, erg: { geschafft: 0, teilweise: 0, ausgefallen: 0, offen: 0 } };
+  saSaetze(s).forEach(function (d) {
+    var dat = String(saWert(s, d, 'datum') || '');
+    if (dat < von || dat > bis) { return; }
+    var sp = String(saWert(s, d, 'sport') || 'ohne Sport');
+    if (!w.sport[sp]) { w.sport[sp] = { plan: 0, ist: 0, km: 0 }; w.reihe.push(sp); }
+    var pm = saZahlLesen(saWert(s, d, 'pmin')) || 0;
+    var im = saZahlLesen(saWert(s, d, 'imin')) || 0;
+    w.sport[sp].plan += pm;
+    w.sport[sp].ist += im;
+    w.sport[sp].km += saZahlLesen(saWert(s, d, 'ikm')) || 0;
+    w.plan += pm;
+    w.ist += im;
+    var e = String(saWert(s, d, 'ergebnis') || '');
+    if (w.erg[e] !== undefined && e !== 'offen') { w.erg[e]++; } else { w.erg.offen++; }
+  });
+  var f = saFeld(s, (s.rollen || {}).sport);
+  var ordnung = (f && f.werte) || [];
+  w.reihe.sort(function (a, b) {
+    var ia = ordnung.indexOf(a), ib = ordnung.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'de');
+  });
+  return w;
+}
+
+function saTrainingHtml(s, l) {
+  var w = saTrainingWoche(s);
+  var h = '<div class="sa-box"><div class="leise">Diese Woche · KW ' + kalenderwoche(isoDatum()) + ' · Ist / Plan</div>';
+  if (!w.reihe.length) { h += '<p class="leise">Diese Woche ist noch nichts geplant.</p>'; }
+  w.reihe.forEach(function (sp) {
+    var x = w.sport[sp];
+    h += reihe(sp, saStunden(x.ist) + ' / ' + saStunden(x.plan) + ' h' + (x.km ? ' · ' + saZahlKurz(x.km) + ' km' : ''));
+  });
+  /* Balken: gegen das Wochenziel (fester Wert), sonst gegen den Plan */
+  var ziel = null;
+  (s.werte || []).forEach(function (x) { if (x.id === (s.rollen || {}).wochenziel) { ziel = saZahlLesen(x.wert); } });
+  var soll = (ziel !== null && ziel > 0) ? ziel * 60 : w.plan;
+  var proz = soll ? Math.round(w.ist * 100 / soll) : 0;
+  h += '<div class="sa-balken"><i style="width:' + Math.min(100, proz) + '%"></i></div>'
+     + '<div class="leise">' + saStunden(w.ist) + ' von ' + saStunden(soll) + ' h ' + ((ziel !== null && ziel > 0) ? 'Wochenziel' : 'geplant') + ' · ' + proz + ' %</div>';
+  h += reihe('✓ ' + w.erg.geschafft + ' · ◐ ' + w.erg.teilweise + ' · ✗ ' + w.erg.ausgefallen + ' · offen ' + w.erg.offen, saTrainingQuote(s, l));
+  return h + '</div>';
+}
+
+/* Quote: geschafft von allen bewerteten Einheiten — für den gewählten Filter */
+function saTrainingQuote(s, l) {
+  var g = 0, n = 0;
+  l.forEach(function (d) {
+    var e = saWert(s, d, 'ergebnis');
+    if (e === 'geschafft' || e === 'teilweise' || e === 'ausgefallen') { n++; if (e === 'geschafft') { g++; } }
+  });
+  return n ? 'Quote ' + Math.round(g * 100 / n) + ' %' : '';
+}
+
 function saSammlungHtml(s) {
   if (cl.sa.ansicht === 'felder') { return saFelderHtml(s); }
   if (cl.sa.ansicht === 'filter') { return saFilterListeHtml(s); }
@@ -6021,6 +6124,7 @@ function saSammlungHtml(s) {
   if (s.art === 'budget') { h += saBudgetHtml(s, l); }
   else if (s.art === 'abos') { h += saAbosHtml(s, l); }
   else if (s.art === 'buecher') { h += saBuecherHtml(s, l); }
+  else if (s.art === 'training') { h += saTrainingHtml(s, l); }
   return h;
 }
 
@@ -6327,7 +6431,7 @@ function saFensterHtml() {
 
   if (f.modus === 'neu') {
     var h = kopf('Neue Sammlung') + '<div class="gruppe">Vorlagen</div>';
-    ['budget', 'abos', 'buecher', 'frei'].forEach(function (k) {
+    ['budget', 'abos', 'buecher', 'training', 'frei'].forEach(function (k) {
       h += '<button type="button" class="wahl' + (f.quelle === k ? ' sa-gewaehlt' : '') + '" onclick="saNeuWahl(\'' + k + '\')">' + (f.quelle === k ? '● ' : '○ ') + esc(SA_VORLAGEN[k].name) + '</button>';
     });
     var eigene = saAlle(true);
