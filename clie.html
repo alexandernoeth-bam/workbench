@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.6.1</title>
+<title>CLIE 0.6.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -129,7 +129,9 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .std .t{flex:1;min-width:0;display:flex;gap:8px;align-items:center;min-height:34px}
 .std .tx{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .std.vorbei .tx,.std.vorbei .z{color:var(--px-zart)}
-.std.jetzt{border-bottom:2px solid var(--px)}
+/* Titel laufender und kommender Einträge brechen um (höchstens 3 Zeilen), Vergangenes bleibt einzeilig (seit 0.6.2) */
+.std:not(.vorbei) .tx{white-space:normal;overflow-wrap:anywhere;line-height:1.2;max-height:3.6em;padding:3px 0}
+.std.ende .t{min-height:28px}
 .k{width:20px;height:20px;border:2px solid var(--px);flex:0 0 20px;display:inline-block;background:transparent}
 .k.an{background:var(--px)}
 .aufg{display:flex;gap:9px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:4px 0;min-height:36px}
@@ -333,7 +335,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.6.1';
+var APP_VERSION = '0.6.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2920,34 +2922,39 @@ function kalTagHtml(is) {
     h += '<button type="button" class="ganztags" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')">◆ ' + esc(x.titel) + '</button>';
   });
   t.zeit.forEach(function (x) {
-    posten.push({ zeit: x.zeit, bis: x.bis || x.zeit, termin: true, html: '<button type="button" class="tx" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')">'
+    posten.push({ zeit: x.zeit, bis: x.bis || x.zeit, termin: true, vorbei: clVorbei(is, x.bis || x.zeit), html: '<button type="button" class="tx" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')">'
       + esc(x.titel) + '</button>' });
   });
   zeilen.forEach(function (z) {
     if (!z.a || !z.zeit) { return; }
     if (z.a.erledigt && !cl.kal.erlZeigen) { return; }
-    posten.push({ zeit: z.zeit, bis: z.zeit, erl: z.a.erledigt,
+    posten.push({ zeit: z.zeit, bis: z.zeit, erl: z.a.erledigt, vorbei: clVorbei(is, z.zeit),
       html: clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')') + '<span class="tx">' + esc(z.a.text) + '</span>' });
   });
   routinen.forEach(function (a) {
     var zt = aufgabeZeitAn(a, is);
     var erl = istErledigtAn(a, is);
     if (!zt || (erl && !cl.kal.erlZeigen)) { return; }
-    posten.push({ zeit: zt, bis: zt, erl: erl,
+    posten.push({ zeit: zt, bis: zt, erl: erl, vorbei: clVorbei(is, zt),
       html: clKastenHtml(erl, 'clRoutineUm(\'' + esc(a.id) + '\',\'' + is + '\')') + '<span class="tx">' + esc(a.titel) + '</span>' });
   });
   posten.sort(function (x, y) { return clMinuten(x.zeit) - clMinuten(y.zeit); });
 
   /* Seit 0.6 nur noch Belegtes: Termine, Aufgaben und Routinen mit
      Uhrzeit. Leere Stunden entfallen — Neues geht über den Knopf „Neu“. */
-  var reihen = posten.map(function (p) { return { beginn: clMinuten(p.zeit), st: Math.floor(clMinuten(p.zeit) / 60), p: p }; });
-  var klammern = clKlammern(posten, reihen);
-  var jetztStd = (is === isoDatum()) ? new Date().getHours() : -1;
+  /* Seit 0.6.2 wie im Datebook: ein Termin hat eine Zeile für den Beginn
+     und eine für das Ende, die Klammer verbindet beide. Vergangene Termine
+     stehen einzeilig ohne Klammer. Kein Strich mehr für „jetzt“. */
+  var reihen = clTagReihen(posten);
+  var klammern = clKlammern(reihen);
   if (!reihen.length && !t.ganztags.length) { h += '<p class="leise">Keine Termine.</p>'; }
   reihen.forEach(function (r, nr) {
-    var klasse = (r.st === jetztStd) ? ' jetzt' : '';
     var kl = '<span class="kl">' + klammern[nr].map(function (x) { return '<i class="' + x + '"></i>'; }).join('') + '</span>';
-    h += '<div class="std' + klasse + (clVorbei(is, r.p.bis) || r.p.erl ? ' vorbei' : '') + '">' + kl + '<span class="z">' + esc(clZeitText(r.p.zeit)) + '</span>'
+    if (r.ende) {
+      h += '<div class="std ende">' + kl + '<span class="z">' + esc(clZeitText(r.zeit)) + '</span><span class="t"></span></div>';
+      return;
+    }
+    h += '<div class="std' + (r.p.vorbei || r.p.erl ? ' vorbei' : '') + '">' + kl + '<span class="z">' + esc(clZeitText(r.zeit)) + '</span>'
        + '<span class="t">' + r.p.html + '</span></div>';
   });
 
@@ -2959,7 +2966,7 @@ function kalTagHtml(is) {
     if (z.a) {
       if (z.a.erledigt && !cl.kal.erlZeigen) { erlWeg++; return; }
       v += '<div class="aufg' + (z.a.erledigt ? ' erl' : '') + '">' + clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')')
-         + '<span class="tx">' + esc(z.a.text) + '</span>' + (z.quelle ? '<span class="q">' + esc(z.quelle) + '</span>' : '') + '</div>';
+         + '<span class="tx">' + esc(z.a.text) + '</span></div>';
     } else if (/^\s*#/.test(z.roh)) {
       v += '<div class="unterabschnitt">' + esc(z.roh.replace(/^\s*#+\s*/, '')) + '</div>';
     } else {
@@ -2985,24 +2992,45 @@ function kalTagHtml(is) {
   return h;
 }
 
-/* Zeitklammern wie im Datebook: Ein Termin ab einer Stunde Dauer bekommt
-   links eine Klammer über alle Zeilen, die in seine Zeit fallen.
+/* Klammer bekommt ein Termin, der noch nicht vorbei ist und eine Dauer hat
+   (seit 0.6.2 auch kurze). Aufgaben und Routinen haben keine Dauer. */
+function clMitKlammer(p) {
+  return !!p && !!p.termin && !p.vorbei && clMinuten(p.bis) > clMinuten(p.zeit);
+}
+
+/* Die Zeilen des Tages: je Posten eine Zeile für den Beginn, dazu je
+   Termin mit Klammer eine Endzeile — außer dort beginnt ohnehin etwas
+   oder ein anderer Termin endet zur selben Zeit (dann eine gemeinsame). */
+function clTagReihen(posten) {
+  var reihen = posten.map(function (p) { return { beginn: clMinuten(p.zeit), zeit: p.zeit, p: p, ende: false }; });
+  var anfaenge = reihen.map(function (r) { return r.beginn; });
+  posten.forEach(function (p) {
+    if (!clMitKlammer(p)) { return; }
+    var e = clMinuten(p.bis);
+    if (anfaenge.indexOf(e) >= 0) { return; }
+    if (reihen.some(function (r) { return r.ende && r.beginn === e; })) { return; }
+    reihen.push({ beginn: e, zeit: p.bis, p: null, ende: true });
+  });
+  reihen.sort(function (x, y) { return x.beginn - y.beginn; });
+  return reihen;
+}
+
+/* Zeitklammern wie im Datebook: von der Zeile des Beginns bis zur Zeile
+   des Endes (Endzeile oder der nächste Posten, der genau dann beginnt).
    Überschneiden sich zwei, steht die zweite daneben (höchstens zwei).
    Ergebnis: je Zeile zwei Felder, '' | 'oben' | 'mitte' | 'unten' | 'einzel'. */
-function clKlammern(posten, reihen) {
+function clKlammern(reihen) {
   var feld = reihen.map(function () { return ['', '']; });
   var belegt = [[], []];   /* je Spalte: Zeilennummern */
-  posten.forEach(function (p) {
-    if (!p.termin) { return; }
-    var a = clMinuten(p.zeit);
-    var e = clMinuten(p.bis);
-    if (e <= a) { e = 24 * 60; }
-    if (e - a < 60) { return; }
-    var nr = [];
+  reihen.forEach(function (start, s) {
+    if (start.ende || !clMitKlammer(start.p)) { return; }
+    var e = clMinuten(start.p.bis);
+    var nr = [s];
+    var fertig = false;
     reihen.forEach(function (r, i) {
-      if (r.p === p || (r.beginn > a && r.beginn < e)) { nr.push(i); }
+      if (i <= s || fertig) { return; }
+      if (r.beginn < e) { nr.push(i); } else if (r.beginn === e) { nr.push(i); fertig = true; }
     });
-    if (!nr.length) { return; }
     var sp = belegt[0].some(function (i) { return nr.indexOf(i) >= 0; }) ? 1 : 0;
     if (sp === 1 && belegt[1].some(function (i) { return nr.indexOf(i) >= 0; })) { return; }
     nr.forEach(function (i, k) {

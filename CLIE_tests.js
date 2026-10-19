@@ -545,13 +545,13 @@ function kalenderTest() {
   let h = inhalt();
   pruefe(CL.document.getElementById('reiter').textContent === CL.clWt(heute) + ' ' + CL.clKurzDatum(heute), 'der Reiter zeigt den Tag');
   pruefe(/◆ Geburtstag Oma/.test(h) && /Rückruf Becker/.test(h), 'Termine und Ganztägiges stehen im Tag');
-  pruefe((h.match(/class="z">/g) || []).length === 4 && /class="z">5:15</.test(h) && /class="z">7:30</.test(h) && !/class="z">9:00</.test(h),
+  pruefe((h.match(/class="z">/g) || []).length - (h.match(/class="std ende"/g) || []).length === 4 && /class="z">5:15</.test(h) && /class="z">7:30</.test(h) && !/class="z">9:00</.test(h),
     'seit 0.6 nur Belegtes: Termine, Aufgaben und Routinen mit Uhrzeit — keine leeren Stunden');
   pruefe(/class="z">11:00<\/span><span class="t"><button type="button" class="k" onclick="clTagZeileUm/.test(h),
     'eine mit Uhrzeit eingeplante Aufgabe steht an ihrer Stunde, mit Kästchen');
   const vorg = h.slice(h.indexOf('>Vorgenommen<'));
-  pruefe(/Rechnung prüfen/.test(vorg) && !/Offering beschreiben/.test(vorg) && /Nur ein Gedanke/.test(vorg) && /class="q">Büro</.test(vorg),
-    'Vorgenommen zeigt Aufgaben ohne Uhrzeit mit ihrer Seite, dazu freien Text');
+  pruefe(/Rechnung prüfen/.test(vorg) && !/Offering beschreiben/.test(vorg) && /Nur ein Gedanke/.test(vorg) && !/class="q"/.test(vorg),
+    'Vorgenommen zeigt Aufgaben ohne Uhrzeit (seit 0.6.2 ohne ihre Liste), dazu freien Text');
   const rout = h.slice(h.indexOf('>Routinen<'));
   pruefe(/Oskar laufen lassen/.test(rout) && !/Tabletten/.test(rout) && !/Morgen erst/.test(h) && !/Pausiert/.test(h),
     'Routinen: fällige ohne Uhrzeit unten, mit Uhrzeit im Raster, nicht fällige und pausierte gar nicht');
@@ -756,20 +756,24 @@ function bloeckeTest() {
     { id: 'b', zeit: '10:30', bis: '12:00', titel: 'Parallel', kontext: 'beruflich', kalId: 'k' },
     { id: 'c', zeit: '13:00', bis: '13:30', titel: 'Kurz', kontext: 'beruflich', kalId: 'k' },
     { id: 'd', zeit: '15:00', bis: '18:00', titel: 'Lang', kontext: 'beruflich', kalId: 'k' }];
+  const morgen = CL.tagePlus(heute, 1);
+  CL.termineNachTag[morgen] = CL.termineNachTag[heute];
   CL.oeffne('kalender');
-  CL.clKalAnsicht('tag');
+  CL.clKalGehe(morgen, 'tag');
   const h = inhalt();
   const stunden = (h.match(/class="z">(\d+:\d+)</g) || []).map(x => x.replace(/class="z">|</g, ''));
   pruefe(stunden.indexOf('10:00') < 0 && stunden.indexOf('16:00') < 0 && stunden.indexOf('17:00') < 0,
     'leere Stunden mitten in einem Termin entfallen (10:00, 16:00, 17:00) — ' + stunden.join(' '));
-  pruefe(stunden.join(' ') === '9:00 10:30 13:00 15:00', 'seit 0.6 auch keine freien Stunden zwischen Terminen — nur die Termine selbst');
+  pruefe(stunden.join(' ') === '9:00 10:30 11:00 12:00 13:00 13:30 15:00 18:00', 'keine freien Stunden — nur Beginn und (seit 0.6.2) Ende der Termine — ' + stunden.join(' '));
   const reihen = h.split('<div class="std').slice(1);
   const zeile = (zeit) => reihen.filter(r => r.indexOf('class="z">' + zeit + '<') >= 0)[0] || '';
-  pruefe(/class="kl"><i class="oben"><\/i>/.test(zeile('9:00')) && /<i class="unten"><\/i>/.test(zeile('10:30')), 'Workshop 9–11: Klammer von 9:00 bis 10:30');
-  pruefe(/<i class="(oben|einzel)"><\/i>/.test(zeile('10:30').replace(/<i class="unten"><\/i>/, '')) || /<i class="unten"><\/i><i class="oben"><\/i>/.test(zeile('10:30')),
-    'der parallele Termin bekommt eine zweite Klammer daneben');
-  pruefe(/class="kl"><i class=""><\/i><i class=""><\/i>/.test(zeile('13:00')), 'kurze Termine (unter 1 Std.) ohne Klammer');
-  pruefe(/<i class="einzel"><\/i>/.test(zeile('15:00')), 'ein langer Termin ohne weitere Zeilen bekommt eine einzelne Klammer');
+  pruefe(/class="kl"><i class="oben"><\/i>/.test(zeile('9:00')) && /class="kl"><i class="unten"><\/i>/.test(zeile('11:00')), 'Workshop 9–11: Klammer von 9:00 bis zur Endzeile 11:00');
+  pruefe(/class="kl"><i class="mitte"><\/i><i class="oben"><\/i>/.test(zeile('10:30')) && /<i class="mitte"><\/i>/.test(zeile('11:00')) && /class="kl"><i class=""><\/i><i class="unten"><\/i>/.test(zeile('12:00')),
+    'der parallele Termin bekommt eine zweite Klammer daneben, bis 12:00');
+  pruefe(/class="kl"><i class="oben"><\/i>/.test(zeile('13:00')) && /class="kl"><i class="unten"><\/i>/.test(zeile('13:30')), 'seit 0.6.2 auch kurze Termine mit Endzeile und Klammer (wie am Palm)');
+  pruefe(/class="kl"><i class="oben"><\/i>/.test(zeile('15:00')) && /class="kl"><i class="unten"><\/i>/.test(zeile('18:00')), 'ein langer Termin ohne weitere Zeilen: Klammer bis zur Endzeile');
+  CL.clKalGehe(heute, 'tag');
+  delete CL.termineNachTag[morgen];
 
   CL.clKalAnsicht('bloecke');
   let b = inhalt();
@@ -1302,6 +1306,65 @@ function feinschliffTest() {
   CL.oeffne('uebersicht');
 }
 
+/* ============================================================
+   25. Tag wie im Datebook (0.6.2)
+   Grund: Die Klammer endete an der nächsten Zeile statt an der echten
+   Endzeit; der Strich „jetzt“ und die Liste bei „Vorgenommen“ störten.
+   Vergangene Termine sollen einzeilig und ohne Klammer stehen.
+   Erkennt: fehlende/doppelte Endzeilen, Klammern an Vergangenem oder an
+   Aufgaben, zurückgekehrten „jetzt“-Strich oder Listennamen.
+   ============================================================ */
+function datebookTest() {
+  console.log('\n25. Tag wie im Datebook (0.6.2)');
+  if (!CL) { return; }
+  frisch();
+  const heute = CL.isoDatum();
+  const morgen = CL.tagePlus(heute, 1);
+  const gestern = CL.tagePlus(heute, -1);
+  const liste = [
+    { id: 'a', zeit: '07:30', bis: '16:00', titel: 'Reisekosten', kontext: 'beruflich', kalId: 'k' },
+    { id: 'b', zeit: '08:00', bis: '09:00', titel: 'Ma5080', kontext: 'beruflich', kalId: 'k' },
+    { id: 'c', zeit: '13:00', bis: '15:00', titel: 'Block', kontext: 'beruflich', kalId: 'k' },
+    { id: 'd', zeit: '15:00', bis: '15:30', titel: 'Zahnarzt', kontext: 'beruflich', kalId: 'k' },
+    { id: 'e', zeit: '17:00', bis: '19:00', titel: 'Meeting', kontext: 'beruflich', kalId: 'k' },
+    { id: 'f', zeit: '18:00', bis: '19:00', titel: 'Parallel', kontext: 'beruflich', kalId: 'k' }];
+  CL.termineNachTag[morgen] = liste;
+  CL.termineNachTag[gestern] = liste;
+  CL.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '[] Offering\n[] Rechnung', status: 'laufend', kontext: 'beruflich', geaendert: 1 });
+  CL.DB.tage.push({ id: 'tag-' + morgen, datum: morgen, text: '[] Offering\n[] Rechnung', geaendert: 1,
+    eintraege: [{ id: 'e1', abschnitt: 'h', text: 'Offering', quelle: 'p1', erledigt: false, zeit: '11:00' },
+                { id: 'e2', abschnitt: 'h', text: 'Rechnung', quelle: 'p1', erledigt: false }] });
+  CL.oeffne('kalender');
+  CL.clKalGehe(morgen, 'tag');
+  const h = inhalt();
+  const reihen = h.split('<div class="std').slice(1);
+  const z = reihen.map(r => (r.match(/class="z">([^<]*)</) || [])[1]);
+  pruefe(z.join(' ') === '7:30 8:00 9:00 11:00 13:00 15:00 15:30 16:00 17:00 18:00 19:00',
+    'Endzeilen 9:00, 15:30, 16:00, 19:00 — keine bei 15:00 (dort beginnt der Zahnarzt), 19:00 nur einmal — ' + z.join(' '));
+  const zeile = (zeit) => reihen[z.indexOf(zeit)] || '';
+  pruefe(/^ ende"/.test(zeile('9:00')) && /^ ende"/.test(zeile('19:00')) && !/^ ende"/.test(zeile('15:00')), 'Endzeilen tragen die Klasse „ende“');
+  pruefe(/class="kl"><i class="oben"><\/i><i class=""><\/i>/.test(zeile('7:30')) && /class="kl"><i class="unten"><\/i>/.test(zeile('16:00')),
+    'äußere Klammer 7:30 bis 16:00');
+  pruefe(/class="kl"><i class="mitte"><\/i><i class="oben"><\/i>/.test(zeile('8:00')) && /<i class="mitte"><\/i><i class="unten"><\/i>/.test(zeile('9:00')),
+    'innere Klammer 8:00 bis 9:00 daneben');
+  pruefe(/class="kl"><i class="mitte"><\/i><i class="unten"><\/i>/.test(zeile('15:00')),
+    '13–15 endet in der Zeile des Zahnarzts');
+  pruefe(/class="kl"><i class="mitte"><\/i><i class=""><\/i><\/span><span class="z">11:00/.test(zeile('11:00')) && /clTagZeileUm/.test(zeile('11:00')),
+    'eingeplante Aufgabe: eine Zeile, keine eigene Klammer');
+  pruefe(!/ jetzt/.test(h) && !/class="std jetzt/.test(h), 'kein Strich „jetzt“ mehr');
+  const vorg = h.slice(h.indexOf('>Vorgenommen<'));
+  pruefe(/Rechnung/.test(vorg) && !/class="q"/.test(vorg), 'Vorgenommen ohne Listen-/Projektnamen');
+
+  CL.clKalGehe(gestern, 'tag');
+  const g = inhalt();
+  pruefe(!/class="std ende"/.test(g) && !/<i class="(oben|mitte|unten|einzel)">/.test(g),
+    'vergangene Termine: keine Endzeile, keine Klammer');
+  pruefe((g.match(/class="std vorbei"/g) || []).length === 6, 'vergangene Termine einzeilig, je eine Zeile');
+  pruefe(!/\.std\.jetzt/.test(QUELLE), 'die Regel .std.jetzt ist entfernt');
+  CL.clKalGehe(heute, 'tag');
+  CL.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1323,6 +1386,7 @@ function feinschliffTest() {
   try { auszeichnungTest(); } catch (e) { fail('Auszeichnungen warf: ' + e.message); }
   zustandsklassenTest();
   try { feinschliffTest(); } catch (e) { fail('Feinschliff 0.6.1 warf: ' + e.message); }
+  try { datebookTest(); } catch (e) { fail('Tag wie im Datebook warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
