@@ -132,7 +132,7 @@ console.log('\n1. Aufbau der Datei');
   const ohne = SKRIPT.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const bekannt = new Set(('if for while switch return function typeof catch String Number Boolean Array Object JSON Math Date RegExp '
     + 'Error Promise parseInt parseFloat isNaN encodeURIComponent decodeURIComponent setTimeout clearTimeout setInterval '
-    + 'clearInterval fetch Blob URL new fehler fertig').split(' '));
+    + 'clearInterval fetch Blob URL new fehler fertig isFinite').split(' '));
   const code = ohne.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
   const fremdCode = [...new Set([...code.matchAll(/(^|[^.\w$])([A-Za-z_]\w*)\s*\(/g)].map(m => m[2]))]
     .filter(n => !definiert.has(n) && !vars.has(n) && !bekannt.has(n));
@@ -240,13 +240,15 @@ async function terminTest() {
     }
     return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve(d); } });
   };
-  const vorher = CL.alsText();
+  /* alsText stempelt die Uhrzeit hinein — die darf sich unterscheiden. */
+  const ohneZeit = () => CL.alsText().replace(/"gespeichert": "[^"]*"/, '');
+  const vorher = ohneZeit();
   const erg = await CL.clTermineHolen(false);
   pruefe(erg === true && CL.kalenderStand, 'die Termine werden geholt');
   pruefe(!abrufe.some(a => /calendars\/x\//.test(a)), 'abgewählte Kalender werden nicht gelesen');
   const t = (CL.termineNachTag[heute] || []);
   pruefe(t.length === 1 && t[0].titel === 'Rückruf Becker' && t[0].kontext === 'beruflich', 'abgesagte fallen weg, der Kontext kommt vom Kalender');
-  pruefe(CL.alsText() === vorher, 'die Termine landen nicht in der workbench.json');
+  pruefe(ohneZeit() === vorher, 'die Termine landen nicht in der workbench.json');
   CL.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
   CL.zugriffToken = null;
   const ohne = await CL.clTermineHolen(false);
@@ -276,7 +278,7 @@ function uebersichtTest() {
   pruefe(/class="zahl">4</.test(h), 'die Zahl steht am Symbol der Aufgaben');
   pruefe(CL.clAppZahl('kalender') === 1 && /oeffne\('kalender'\)"><span class="sym"><svg[^]*?<span class="zahl">1</.test(h),
     'am Kalender steht die Zahl der heute noch kommenden Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 5, 'fünf Apps im Raster');
+  pruefe((h.match(/class="app"/g) || []).length === 7, 'sieben Apps im Raster');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -390,8 +392,9 @@ function schriftTest() {
 
 /* ============================================================
    11. Übersicht wie am Palm
-   Grund: Gewünscht ist die Reduktion des Palm (0.1.3): nur Kalender,
-   Aufgaben, Memo, Routinen und Abgleich; Symbole als dunkle Scheibe
+   Grund: Gewünscht ist die Reduktion des Palm (0.1.3): Kalender,
+   Aufgaben, Memo, Routinen, dazu Einkauf und Rechner (0.1.4) und
+   Abgleich; Symbole als dunkle Scheibe
    mit hellem Bildzeichen; keine Unterzeile unter den Apps.
    Projekte, Ziele und Listen sind keine eigenen Apps — sie liegen im
    Memo und sind Kategorien der Aufgaben.
@@ -402,17 +405,111 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","routinen","abgleich"]',
-    'genau fünf Apps: Kalender, Aufgaben, Memo, Routinen, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","aufgaben","memo","routinen","einkauf","rechner","abgleich"]',
+    'genau sieben Apps: Kalender, Aufgaben, Memo, Routinen, Einkauf, Rechner, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 5, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/5)');
+  pruefe(syms === 7, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/7)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   CL.oeffne('memo');
   pruefe(/class="gross"><svg/.test(inhalt()), 'auch die Seite einer späteren App zeigt das Symbol');
   CL.oeffne('uebersicht');
+}
+
+/* ============================================================
+   12. Rechner
+   Grund: Ein Rechner, der falsch rechnet, ist schlimmer als keiner.
+   Geprüft werden Grundrechenarten, Punkt vor Kette (wie am Palm:
+   der Reihe nach), Prozent, Speicher, Division durch null,
+   Rundungsreste und die deutsche Schreibweise.
+   ============================================================ */
+function rechnerTest() {
+  console.log('\n12. Rechner');
+  if (!CL) { return; }
+  frisch();
+  const tippe = (folge) => { CL.rtTaste('C'); folge.split(' ').forEach(t => CL.rtTaste(t)); return CL.rt.anzeige; };
+  pruefe(tippe('2 4 9 , 9 0 * 3 =') === '749,7', '249,90 × 3 = 749,7 — mit Komma');
+  pruefe(tippe('0 , 1 + 0 , 2 =') === '0,3', '0,1 + 0,2 = 0,3 — ohne Rundungsrest');
+  pruefe(tippe('7 / 0 =') === 'Fehler' && CL.rt.fehler, 'durch null ergibt „Fehler“');
+  CL.rtTaste('5');
+  pruefe(CL.rt.anzeige === 'Fehler', 'nach einem Fehler hilft nur C');
+  pruefe(tippe('2 + 3 * 4 =') === '20', 'der Reihe nach gerechnet wie am Palm: 2 + 3 × 4 = 20');
+  pruefe(tippe('2 0 0 + 1 0 % =') === '220', '200 + 10 % = 220');
+  pruefe(tippe('2 0 0 * 1 0 % =') === '20', '200 × 10 % = 20');
+  pruefe(tippe('5 ± - 3 =') === '-8', 'Vorzeichen: −5 − 3 = −8');
+  pruefe(tippe('1 2 3 zurueck') === '12', 'die Rücktaste löscht die letzte Ziffer');
+  CL.rtTaste('C'); CL.rtTaste('MC');
+  tippe('1 0 M+'); tippe('5 M+'); tippe('3 M-');
+  pruefe(CL.rt.speicher === 12 && /"speicher":12/.test(CL.__ablage['clie-rechner'] || ''), 'Speicher M+ / M− rechnet und bleibt auf dem Gerät');
+  tippe('MR');
+  pruefe(CL.rt.anzeige === '12', 'MR holt den Speicher');
+  pruefe(CL.rt.verlauf.indexOf('-5 − 3 = -8') >= 0, 'Rechnungen landen im Verlauf („-5 − 3 = -8“)');
+  pruefe(CL.rt.verlauf.length <= 20, 'der Verlauf hat höchstens 20 Einträge');
+  const vorher = CL.alsText().replace(/"gespeichert": "[^"]*"/, '');
+  tippe('9 + 1 =');
+  pruefe(CL.alsText().replace(/"gespeichert": "[^"]*"/, '') === vorher, 'der Rechner schreibt nichts in die workbench.json');
+  CL.oeffne('rechner');
+  const h = inhalt();
+  pruefe(/rtTaste\('='\)/.test(h) && /rtTaste\('M\+'\)/.test(h) && (h.match(/class="taste[ "]/g) || []).length === 24, 'der Rechner zeigt 24 Tasten');
+  CL.rtVerlaufUm();
+  pruefe(/rt-verlauf/.test(inhalt()) && /9 \+ 1 = 10/.test(inhalt()), '„Verlauf…“ zeigt die letzten Rechnungen');
+  CL.rtVerlaufUm();
+  let gedrueckt = false;
+  CL.tasteGlobal({ key: '7', preventDefault() { gedrueckt = true; } });
+  pruefe(gedrueckt && /7$/.test(CL.rt.anzeige), 'am PC tippt die Tastatur mit');
+  CL.oeffne('uebersicht');
+}
+
+/* ============================================================
+   13. Einkauf: geteilte Keep-Notiz
+   Grund: Keep hat für normale Google-Konten keine Schnittstelle.
+   CLIE öffnet nur die gewählte Notiz — und darf dabei keine
+   fremden Adressen öffnen.
+   ============================================================ */
+function einkaufTest() {
+  console.log('\n13. Einkauf');
+  if (!CL) { return; }
+  frisch();
+  const geoeffnet = [];
+  CL.open = function (u) { geoeffnet.push(u); return {}; };
+  CL.oeffne('einkauf');
+  pruefe(CL.cl.aufklapp === 'einkauf' && /einkaufFeld/.test(CL.document.getElementById('aufklapp').innerHTML) && !geoeffnet.length,
+    'ohne Verknüpfung fragt Einkauf nach dem Link');
+  pruefe(CL.cl.app === 'uebersicht', 'Einkauf ist keine eigene Seite');
+  CL.document.getElementById('einkaufFeld').value = 'https://boese.example/keep.google.com';
+  CL.einkaufSpeichern();
+  pruefe(!CL.DB.einstellungen.clieEinkauf && CL.cl.aufklapp === 'einkauf', 'fremde Adressen werden abgelehnt');
+  CL.document.getElementById('einkaufFeld').value = 'javascript:alert(1)';
+  CL.einkaufSpeichern();
+  pruefe(!CL.DB.einstellungen.clieEinkauf, 'auch javascript:-Adressen');
+  const vorStempel = CL.DB.einstellungen.stempel || 0;
+  CL.document.getElementById('einkaufFeld').value = '  https://keep.google.com/#NOTE/abc123  ';
+  CL.einkaufSpeichern();
+  pruefe(CL.DB.einstellungen.clieEinkauf === 'https://keep.google.com/#NOTE/abc123' && CL.cl.aufklapp === '',
+    'ein Keep-Link wird gespeichert (ohne Leerzeichen)');
+  pruefe(CL.DB.einstellungen.stempel >= vorStempel && CL.DB.einstellungen.stempel > 0, 'der Stempel der Einstellungen wird gesetzt — so kommt der Link auf die anderen Geräte');
+  CL.oeffne('einkauf');
+  pruefe(geoeffnet[0] === 'https://keep.google.com/#NOTE/abc123' && CL.cl.aufklapp === '', 'danach öffnet Einkauf direkt die Notiz');
+  /* Fehler aus 0.1.4-Entwurf: mit „noopener“ liefert window.open immer null — CLIE ersetzte sich dann selbst durch Keep. */
+  pruefe(!/window\.open\([^)]*noopener/.test(SKRIPT) && !/location\.href = link/.test(SKRIPT),
+    'Einkauf öffnet ein neues Fenster und ersetzt nie CLIE selbst');
+  CL.open = function (u) { geoeffnet.push(u); return null; };
+  CL.oeffne('einkauf');
+  pruefe(CL.location.href === 'file:///test' && /Pop-ups/.test(CL.document.getElementById('toastText').textContent),
+    'blockiert der Browser das Fenster, bleibt CLIE offen und sagt es');
+  CL.open = function (u) { geoeffnet.push(u); return {}; };
+  geoeffnet.length = 1;
+  CL.DB.einstellungen.clieEinkauf = 'https://anders.example/';
+  CL.oeffne('einkauf');
+  pruefe(geoeffnet.length === 1 && CL.cl.aufklapp === 'einkauf', 'ein untergeschobener fremder Link (etwa per Abgleich) wird nicht geöffnet');
+  CL.aufklappZu();
+  CL.menueUm();
+  pruefe(/menueWahl\('einkauf'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: „Einkauf verknüpfen…“');
+  CL.aufklappZu();
+  CL.DB.einstellungen.clieEinkauf = 'https://keep.google.com/x" onmouseover="alert(1)';
+  pruefe(!/onmouseover="alert/.test(CL.einkaufDialogHtml()), 'der Link wird im Fenster maskiert');
 }
 
 (async function () {
@@ -423,6 +520,8 @@ function palmTest() {
   swTest();
   schriftTest();
   palmTest();
+  rechnerTest();
+  einkaufTest();
 
   /* ============================================================
      ERGEBNIS
