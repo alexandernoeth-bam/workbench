@@ -994,7 +994,8 @@ function memoTest() {
   let h = inhalt();
   pruefe(/>Projekte</.test(h) && />Ziele</.test(h) && !/>Listen</.test(h) && />Notizen</.test(h) && !/Garten/.test(h),
     'gruppiert: Projekte, Ziele, Notizen — seit 0.6 ohne Listen');
-  pruefe(/Büro/.test(h) && /Halbmarathon/.test(h) && !/Ruht/.test(h) && !/Packliste/.test(h), 'laufende Seiten — nichts Ruhendes, keine Checklisten');
+  pruefe(/Büro/.test(h) && /Halbmarathon/.test(h) && !/Packliste/.test(h) && h.indexOf('>Ruhend<') >= 0 && h.indexOf('Ruht') > h.indexOf('>Ruhend<'),
+    'laufende Seiten oben, Ruhendes (seit 0.12.2) in eigener Gruppe, keine Checklisten');
   CL.memoOeffnen('p1');
   h = inhalt();
   pruefe(/◎ Büro/.test(CL.document.getElementById('reiter').textContent), 'der Reiter zeigt die Seite');
@@ -1024,7 +1025,7 @@ function memoTest() {
   CL.memoSpeichern();
   const p1 = CL.DB.projekte[0];
   pruefe(p1.name === 'Büro neu' && p1.ende === '2027-03-31' && p1.status === 'ruht', 'Name, Ende und Zustand werden gespeichert');
-  pruefe(CL.cl.memo.id === '' && !/Büro neu/.test(inhalt()), 'eine ruhende Seite verschwindet aus der Liste');
+  pruefe(CL.cl.memo.id === '' && inhalt().indexOf('Büro neu') > inhalt().indexOf('>Ruhend<'), 'eine ruhende Seite wandert in die Gruppe „Ruhend“ (seit 0.12.2)');
 
   CL.memoNeu();
   pruefe(!/memoWahl\('art','liste'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet keine Liste mehr an');
@@ -2212,6 +2213,33 @@ function memoZweiTest() {
     'Titel in der Memo-Liste: bis zu zwei Zeilen, dann abgeschnitten');
 }
 
+/* ============================================================
+   39. Ruhende Projekte im Memo (0.12.2)
+   Grund: Die Memo-Liste blendete alles aus, was nicht läuft — ruhende
+   Projekte und Ziele waren nicht zu sehen.
+   Erkennt: wieder ausgeblendete ruhende Seiten, Abgeschlossenes, das
+   offen statt eingeklappt steht.
+   ============================================================ */
+function memoRuhtTest() {
+  console.log('\n39. Ruhende Projekte im Memo (0.12.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.projekte.push({ id: 'p1', name: 'Läuft', flaeche: '', status: 'laufend', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p2', name: 'Carport', flaeche: '', status: 'ruht', geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '', status: 'ruht', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p3', name: 'Altes Projekt', flaeche: '', status: 'abgeschlossen', geaendert: 1 });
+  S.oeffne('memo');
+  let h = inhalt();
+  const ruhend = h.slice(h.indexOf('>Ruhend<'), h.indexOf('Abgeschlossen'));
+  pruefe(/Carport/.test(ruhend) && /Marathon/.test(ruhend) && !/Läuft/.test(ruhend), 'ruhende Projekte und Ziele in eigener Gruppe „Ruhend“');
+  pruefe(/› Abgeschlossen · 1/.test(h) && !/Altes Projekt/.test(h), 'Abgeschlossenes eingeklappt');
+  S.memoFertigUm();
+  pruefe(/▾ Abgeschlossen · 1/.test(inhalt()) && /Altes Projekt/.test(inhalt()), 'aufgeklappt sichtbar');
+  S.memoFertigUm();
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2247,6 +2275,7 @@ function memoZweiTest() {
   try { vierTest(); } catch (e) { fail('Vier Spalten warf: ' + e.message); }
   try { prioTest(); } catch (e) { fail('Prioritäten warf: ' + e.message); }
   memoZweiTest();
+  try { memoRuhtTest(); } catch (e) { fail('Ruhende im Memo warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
