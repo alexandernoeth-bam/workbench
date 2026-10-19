@@ -13053,6 +13053,48 @@ console.log('\n203. CLIE-Bereiche bleiben erhalten');
 }
 
 /* ============================================================
+   204. Priorität einer Aufgabe (v6.3.0)
+   Grund: Aufgaben bekommen P1–P3 als Kürzel vor dem Text — gemeinsam
+   mit CLIE. Erkennt: Kürzel, das beim Ändern die Einplanung verliert,
+   falsch erkannte Kürzel, fehlendes Zeichen in Seite und Liste.
+   ============================================================ */
+console.log('\n204. Priorität einer Aufgabe');
+{
+  const skript = hauptSkript();
+  const fn = n => { const m = skript.match(new RegExp('function ' + n + '\\([\\s\\S]*?\\n\\}')); return m ? m[0] : ''; };
+  pruefe(/var KP_PRIO = \/\^\[P\]\(\[1-3\]\)/.test(skript), 'Kürzel P1–P3 am Zeilenanfang');
+  const sb = { KP_KASTEN: /^(\s*)\[([ xX-]?)\]\s*(.*)$/, kpSchluessel: t => String(t || '').replace(/\s+/g, ' ').trim(), jetzt: () => 99 };
+  let api = null;
+  try {
+    api = new Function('KP_KASTEN', 'kpSchluessel', 'jetzt', 'kpAuszeichnen', 'kpEintraegeFinden', 'kpZeileSuchen',
+      'var KP_PRIO = /^[P]([1-3])\\s+(\\S[\\s\\S]*)$/;\n' + fn('kpAufgabe') + '\n' + fn('kpPrio') + '\n' + fn('kpPrioText') + '\n' + fn('kpPrioHtml') + '\n' + fn('kpPrioSetzenKern')
+      + '\nreturn { kpPrio: kpPrio, kpPrioText: kpPrioText, kpPrioHtml: kpPrioHtml, kpPrioSetzenKern: kpPrioSetzenKern };');
+  } catch (e) { fail('Priorität nicht auswertbar: ' + e.message); }
+  if (api) {
+    const woche = { text: '[] P1 Angebot (Fr)\n[] Sonst', geaendert: 1 };
+    const eintrag = { text: 'P1 Angebot' };
+    const f = api(sb.KP_KASTEN, sb.kpSchluessel, sb.jetzt, t => String(t),
+      () => [{ woche: woche, eintrag: eintrag }], (w, t) => ({ nr: String(w.text).split('\n').findIndex(z => z.indexOf(t) >= 0) }));
+    pruefe(f.kpPrio('P2 Rasen').p === 2 && f.kpPrio('P2 Rasen').text === 'Rasen' && f.kpPrio('P4 x').p === 0 && f.kpPrio('P1').p === 0 && f.kpPrio('PDF lesen').p === 0,
+      'erkannt: P1–P3 mit Text — nicht P4, nicht „P1“ allein, nicht „PDF“');
+    pruefe(f.kpPrioText('P1 Angebot', 3) === 'P3 Angebot' && f.kpPrioText('P1 Angebot', 0) === 'Angebot' && f.kpPrioText('Angebot', 2) === 'P2 Angebot', 'setzen, ändern, entfernen');
+    pruefe(f.kpPrioHtml('P1 Angebot') === '<span class="prio p1">1</span>Angebot', 'Zeichen statt Kürzel');
+    const seite = { id: 's1', text: '[] P1 Angebot\n[x] Fertig', geaendert: 1 };
+    pruefe(f.kpPrioSetzenKern(seite, 0, 2) && seite.text === '[] P2 Angebot\n[x] Fertig' && woche.text === '[] P2 Angebot (Fr)\n[] Sonst' && eintrag.text === 'P2 Angebot',
+      'Ändern nimmt die Einplanung mit — „(Fr)“ bleibt stehen');
+    pruefe(f.kpPrioSetzenKern(seite, 1, 1) && /\[x\] P1 Fertig/.test(seite.text), 'auch bei Erledigtem');
+    pruefe(!f.kpPrioSetzenKern(seite, 0, 2), 'gleiche Priorität: nichts zu tun');
+  }
+  pruefe(/onclick="kpPrioUm\(' \+ nr \+ '\)"/.test(fn('kpZeileHtml')) && /kpPrioHtml\(kasten\[3\]\)/.test(fn('kpBehaelterZeileHtml')), 'Seite und Woche/Tag zeigen das Zeichen');
+  pruefe(/function kpPrioUm\(nr\)/.test(skript) && /\(kpPrio\(a\.text\)\.p \+ 1\) % 4/.test(fn('kpPrioUm')), 'antippen schaltet 1 → 2 → 3 → keine');
+  const kern = fs.readFileSync(path.join(__dirname, 'kern.js'), 'utf8');
+  pruefe(['kpPrio', 'kpPrioText', 'kpPrioHtml', 'kpPrioSetzenKern'].every(n => {
+    const a = skript.match(new RegExp('\\nfunction ' + n + '\\([\\s\\S]*?\\n\\}\\n')); const b = kern.match(new RegExp('\\nfunction ' + n + '\\([\\s\\S]*?\\n\\}\\n'));
+    return a && b && a[0] === b[0];
+  }), 'kern.js trägt dieselben Funktionen — CLIE übernimmt sie von dort');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\n============================================================');

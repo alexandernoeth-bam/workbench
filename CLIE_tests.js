@@ -2134,6 +2134,71 @@ function vierTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   37. Prioritäten P1–P3 (0.12, gemeinsam mit Workbench 6.3.0)
+   Grund: Aufgaben bekommen eine Priorität als Kürzel „P1 “ vor dem Text.
+   Erkennt: Kürzel sichtbar statt Zeichen, Einplanung verloren beim
+   Ändern, falsche Sortierung, Kürzel doppelt beim Speichern, Funktionen
+   nicht aus der Workbench.
+   ============================================================ */
+function prioTest() {
+  console.log('\n37. Prioritäten P1–P3 (0.12)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  if (WB_QUELLE) {
+    pruefe(['kpPrio', 'kpPrioText', 'kpPrioSetzenKern'].every(n => funktionText(SKRIPT, n) === funktionText(WB_QUELLE, n)), 'Kern-Funktionen wörtlich wie in der Workbench');
+  }
+  const heute = S.isoDatum();
+  S.DB.themen.push({ id: 'l1', name: 'Haus', text: '[] Keller aufräumen\n[] P2 Rasen vertikutieren\n[] P1 Statik anfragen\n[] P3 Ablage', kontext: 'privat', geaendert: 1 });
+  S.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Keller aufräumen\n[] P2 Rasen vertikutieren', geaendert: 1, eintraege: [
+    { id: 'e1', abschnitt: 'h', text: 'Keller aufräumen', quelle: 'l1', erledigt: false },
+    { id: 'e2', abschnitt: 'h', text: 'P2 Rasen vertikutieren', quelle: 'l1', erledigt: false }] });
+  S.cl.auf.prioSort = true;
+  S.oeffne('aufgaben');
+  let h = inhalt();
+  const reihe = (h.match(/class="tx umbruch"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
+  pruefe(reihe.join(' | ') === 'Statik anfragen | Rasen vertikutieren | Ablage | Keller aufräumen', 'nach Priorität sortiert, ohne Kürzel im Text — ' + reihe.join(' | '));
+  pruefe(/class="prio p1" onclick="aufPrioUm\('l1',2\)"[^>]*>1</.test(h) && /class="prio p0" onclick="aufPrioUm\('l1',0\)"[^>]*><\/button>/.test(h), 'Zeichen 1 … und ein leerer Platz zum Setzen');
+  S.aufPrioSortUm();
+  const reihe2 = (inhalt().match(/class="tx umbruch"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
+  pruefe(reihe2[0] === 'Keller aufräumen' && !S.cl.auf.prioSort, '„↕ Liste“: Reihenfolge wie in der Liste');
+  S.aufPrioSortUm();
+
+  /* Antippen schaltet weiter — die Einplanung im Tag zieht mit */
+  S.aufPrioUm('l1', 0);
+  pruefe(/\[\] P1 Keller aufräumen/.test(S.DB.themen[0].text) && /\[\] P1 Keller aufräumen/.test(S.DB.tage[0].text) && S.DB.tage[0].eintraege[0].text === 'P1 Keller aufräumen',
+    'Antippen: – → 1, auch im eingeplanten Tag');
+  S.aufPrioUm('l1', 1); S.aufPrioUm('l1', 1);
+  pruefe(/\[\] Rasen vertikutieren/.test(S.DB.themen[0].text) && S.DB.tage[0].eintraege[1].text === 'Rasen vertikutieren', '2 → 3 → – entfernt das Kürzel wieder');
+
+  /* Fenster */
+  S.aufDetails('l1', 2);
+  pruefe(S.cl.auf.fenster.text === 'Statik anfragen' && S.cl.auf.fenster.prio === 1 && /onclick="aufPrioWahl\(1\)">1/.test(S.aufFensterHtml()) && /class="an" onclick="aufPrioWahl\(1\)"/.test(S.aufFensterHtml()),
+    'Details: Text ohne Kürzel, Priorität als Wahl');
+  S.document.getElementById('aufText').value = 'Statik anfragen';
+  S.aufPrioWahl(3);
+  S.document.getElementById('aufText').value = 'Statik anfragen';
+  S.aufSpeichern();
+  pruefe(/\[\] P3 Statik anfragen/.test(S.DB.themen[0].text) && !/P1 Statik/.test(S.DB.themen[0].text), 'Speichern setzt die gewählte Priorität — ohne doppeltes Kürzel');
+  S.aufNeu();
+  S.cl.auf.fenster.seite = 'l1';
+  S.document.getElementById('aufText').value = 'P2 Hecke schneiden';
+  S.aufSpeichern();
+  pruefe(/\[\] P2 Hecke schneiden$/.test(S.DB.themen[0].text), 'getipptes „P2 …“ wird als Priorität übernommen');
+
+  /* Anzeige anderswo */
+  S.oeffne('heute');
+  h = inhalt();
+  pruefe(/<span class="prio p1">1<\/span>Keller aufräumen/.test(h) && !/P1 Keller/.test(h), 'Heute: Zeichen statt Kürzel');
+  const vg = h.slice(h.indexOf('>Vorgenommen<'));
+  pruefe(vg.indexOf('Keller') < vg.indexOf('Rasen'), 'Heute: Vorgenommenes nach Priorität');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  pruefe(/<span class="prio p1">1<\/span>Keller aufräumen/.test(inhalt()), 'Kalender-Tag: Zeichen statt Kürzel');
+  pruefe(S.suTreffer('keller').some(x => /<span class="prio p1">1<\/span><mark>Keller<\/mark>/.test(x.titel)), 'Suche: Zeichen und Treffer im Text ohne Kürzel');
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2167,6 +2232,7 @@ function vierTest() {
   try { suchenTest(); } catch (e) { fail('Suchen warf: ' + e.message); }
   try { trendTest(); } catch (e) { fail('Trend/Link warf: ' + e.message); }
   try { vierTest(); } catch (e) { fail('Vier Spalten warf: ' + e.message); }
+  try { prioTest(); } catch (e) { fail('Prioritäten warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
