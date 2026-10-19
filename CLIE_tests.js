@@ -2011,6 +2011,74 @@ function suchenTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   35. Trend und Feldtyp Link (0.11)
+   Grund: Werte sollen sich mit dem vorigen Eintrag vergleichen lassen
+   (vorher[Feld]), und Sammlungen brauchen Links.
+   Erkennt: falscher Vorgänger (Reihenfolge nach Datum, nicht nach
+   Eingabe), Trend ohne Vorgänger, Links mit javascript: oder ohne
+   Schema, Link-Adresse im onclick, Zeile öffnet statt Link.
+   ============================================================ */
+function trendTest() {
+  console.log('\n35. Trend und Feldtyp Link (0.11)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(S.saFormelAuswerten('[a] - vorher[a]', (n, v) => v ? 3 : 5) === 2 && S.saFormelAuswerten('vorher [a]', (n, v) => v ? 7 : 0) === 7,
+    'vorher[…] und vorher […] werden erkannt');
+  const g = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Gewicht', false, []);
+  g.felder = [{ id: 'dat', name: 'Datum', typ: 'datum', spalte: true }, { id: 'kg', name: 'kg', typ: 'zahl', spalte: true },
+              { id: 'tr', name: 'Trend', typ: 'formel', formel: '[kg] - vorher[kg]', dez: 1, trend: true, spalte: true }];
+  /* Absichtlich nicht in Datumsfolge angelegt */
+  const neu = (id, dat, kg, t) => S.DB.datensaetze.push({ id: id, sammlung: g.id, werte: { dat: dat, kg: kg }, angelegt: t, geaendert: t });
+  neu('a', '2026-10-17', 85.1, 1); neu('b', '2026-10-19', 84.6, 2); neu('c', '2026-10-12', 86.0, 3); neu('d', '2026-10-18', 85.3, 4); neu('e', '2026-10-16', 85.1, 5);
+  const satz = id => S.saSatzFinden(id);
+  pruefe(S.saVorher(g, satz('b')).id === 'd' && S.saVorher(g, satz('a')).id === 'e' && S.saVorher(g, satz('c')) === null, 'Vorgänger nach Datum, nicht nach Eingabe; der älteste hat keinen');
+  const tr = g.felder[2];
+  const txt = id => S.saWertText(tr, S.saRoh(g, satz(id), tr));
+  pruefe(txt('b') === '▼ −0,7' && txt('d') === '▲ +0,2' && txt('a') === '► 0,0' && txt('c') === '', 'als Trend: ▼ −0,7 · ▲ +0,2 · ► 0,0 · ohne Vorgänger leer — ' + [txt('b'), txt('d'), txt('a'), txt('c')].join(' | '));
+  satz('c').werte.dat = '2026-10-20'; satz('c').geaendert = 9;
+  pruefe(S.saVorher(g, satz('c')).id === 'b' && txt('e') === '', 'nach einer Datumsänderung stimmt die Reihenfolge wieder (kein alter Zwischenspeicher)');
+  satz('c').werte.dat = '2026-10-12'; satz('c').geaendert = 10;
+  g.kennzahl = { art: 'letzter', feld: 'tr' };
+  pruefe(S.saKennzahl(g) === '▼ −0,7', 'Kennzahl „letzter Wert“: der jüngste Eintrag nach Datum (19.10.), nicht der zuletzt angelegte');
+  pruefe(S.saFormelPruefen(g, '[kg] - vorher[kg]', tr) === '' && S.saFormelPruefen(g, 'vorher[Trend]', tr) === '' && /gibt es nicht/.test(S.saFormelPruefen(g, 'vorher[Gewicht]', tr)),
+    'Prüfen: vorher[…] kennt alle Felder, auch das eigene; Unbekanntes wird abgewiesen');
+  const pz = { id: 'pz', name: 'Prozent', typ: 'formel', formel: '([kg] - vorher[kg]) / vorher[kg] * 100', dez: 1, vorzeichen: true };
+  g.felder.push(pz);
+  pruefe(S.saWertText(pz, S.saRoh(g, satz('d'), pz)) === '+0,2', 'Veränderung in Prozent mit vorher[…]');
+
+  /* Link */
+  pruefe(S.saLinkGueltig('https://www.thalia.de/buch?id=1') && S.saLinkGueltig('http://x.de') && !S.saLinkGueltig('javascript:alert(1)') && !S.saLinkGueltig('www.thalia.de') && !S.saLinkGueltig('https://a.de/"onmouseover=x'),
+    'Links: nur http/https, keine Anführungszeichen');
+  pruefe(S.saLinkKurz('https://www.thalia.de/buch?id=1') === 'thalia.de', 'in der Liste nur der Rechnername');
+  const b = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Bücher', false, [{ name: 'Deep Work', url: 'https://www.thalia.de/deep' }, { name: 'Ohne' }]);
+  b.felder.push({ id: 'url', name: 'Link', typ: 'link', spalte: true });
+  S.cl.app = 'sammlungen'; S.cl.sa.id = b.id; S.cl.sa.ansicht = 'tabelle'; S.zeichne();
+  const h = inhalt();
+  pruefe(/<button type="button" class="sa-link" onclick="event\.stopPropagation\(\);saLinkOeffnen\('[^']+','url'\)">↗ thalia\.de<\/button>/.test(h) && !/thalia\.de\/deep/.test(h),
+    'Liste: ↗ thalia.de, öffnet über Kennungen (die Adresse steht nicht im onclick), ohne die Zeile zu öffnen');
+  let geoeffnet = [];
+  const altOpen = S.window.open;
+  S.window.open = (u, z) => { geoeffnet.push(u + '|' + z); return {}; };
+  S.saLinkOeffnen(S.saSaetze(b)[0].id, 'url');
+  pruefe(geoeffnet.join() === 'https://www.thalia.de/deep|_blank', 'Antippen öffnet die Adresse in einem neuen Tab');
+  S.saEintrag(S.saSaetze(b)[0].id);
+  pruefe(/type="url"[^>]*value="https:\/\/www\.thalia\.de\/deep"/.test(S.saFensterHtml()) && /saFormLinkOeffnen\('url'\)">↗ Öffnen/.test(S.saFensterHtml()), 'Formular: Adressfeld mit „↗ Öffnen“');
+  S.document.getElementById('saF_name').value = 'Deep Work';
+  S.document.getElementById('saF_notiz').value = '';
+  S.document.getElementById('saF_url').value = 'javascript:alert(1)';
+  S.saEintragSpeichern();
+  pruefe(S.saSaetze(b)[0].werte.url === 'https://www.thalia.de/deep' && S.cl.aufklapp === 'sa', 'eine ungültige Adresse wird nicht gespeichert');
+  S.saFormLinkOeffnen('url');
+  pruefe(geoeffnet.length === 1, 'auch „Öffnen“ öffnet keine ungültige Adresse');
+  S.window.open = altOpen;
+  S.cl.aufklapp = ''; S.cl.sa.fenster = null;
+  pruefe(S.suTreffer('thalia').some(x => x.gruppe === 'sammlungen'), 'die Suche findet Links über die volle Adresse');
+  S.cl.sa.id = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2042,6 +2110,7 @@ function suchenTest() {
   try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
   try { trainingTest(); } catch (e) { fail('Training warf: ' + e.message); }
   try { suchenTest(); } catch (e) { fail('Suchen warf: ' + e.message); }
+  try { trendTest(); } catch (e) { fail('Trend/Link warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
