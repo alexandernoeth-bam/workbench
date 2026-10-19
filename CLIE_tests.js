@@ -1690,6 +1690,64 @@ function formelTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   30. Kennzahl und Gruppe in der Liste (0.8.1)
+   Grund: Kennzahl und Überschrift hingen fest an der Vorlage — beim
+   Gewichtstagebuch stand rechts nur die Zahl der Einträge.
+   Erkennt: falsche Kennzahl, verlorene Wahl beim Umschalten im Fenster,
+   eigene Gruppen, die nicht oder doppelt erscheinen.
+   ============================================================ */
+function kennzahlTest() {
+  console.log('\n30. Kennzahl und Gruppe in der Liste (0.8.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const g = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Gewicht', false, []);
+  g.felder = [{ id: 'dat', name: 'Datum', typ: 'datum' }, { id: 'kg', name: 'kg', typ: 'zahl' },
+              { id: 'dz', name: 'Δ Ziel', typ: 'formel', formel: '[kg] - [Ziel]', dez: 1, vorzeichen: true }];
+  g.werte = [{ id: 'w1', name: 'Ziel', wert: 82, einheit: 'kg' }];
+  [[86, 1], [84.6, 3], [85.3, 2]].forEach(x => S.DB.datensaetze.push({ id: 'd' + x[1], sammlung: g.id, werte: { kg: x[0] }, angelegt: x[1], geaendert: 9 }));
+  pruefe(S.saKennzahl(g) === '3', 'ohne Wahl: wie die Vorlage (Anzahl)');
+  g.kennzahl = { art: 'letzter', feld: 'kg' };
+  pruefe(S.saKennzahl(g) === '84,6', 'letzter Wert: aus dem zuletzt angelegten Eintrag');
+  g.kennzahl = { art: 'letzter', feld: 'dz' };
+  pruefe(S.saKennzahl(g) === '+2,6', 'letzter Wert eines Formelfelds');
+  g.kennzahl = { art: 'min', feld: 'kg' };
+  pruefe(S.saKennzahl(g) === '84,6', 'Min eines Felds');
+  g.kennzahl = { art: 'schnitt', feld: 'dz' };
+  pruefe(S.saKennzahl(g) === '+3,3', 'Ø eines Formelfelds');
+  g.kennzahl = { art: 'wert', wert: 'w1' };
+  pruefe(S.saKennzahl(g) === '82 kg', 'ein fester Wert mit Einheit');
+  g.kennzahl = { art: 'letzter', feld: 'weg' };
+  pruefe(S.saKennzahl(g) === '3', 'ein gelöschtes Feld fällt auf die Vorlage zurück');
+
+  /* Über das Fenster */
+  S.cl.app = 'sammlungen'; S.cl.sa.id = g.id; S.cl.sa.ansicht = 'tabelle';
+  S.saDetailsOeffnen();
+  const feld = (id, w) => { S.document.getElementById(id).value = w; };
+  feld('saName', 'Gewicht'); feld('saGruppe', 'Gesundheit'); feld('saKzArt', 'letzter'); feld('saKzFeld', 'kg'); feld('saKzWert', 'w1');
+  S.saKontext('privat');
+  pruefe(S.cl.sa.fenster.gruppe === 'Gesundheit' && S.cl.sa.fenster.kzArt === 'letzter', 'Umschalten Beruf/Privat behält die übrige Wahl');
+  pruefe(/value="Gesundheit"/.test(S.saFensterHtml()) && /<option value="letzter" selected>/.test(S.saFensterHtml()), 'das Fenster zeigt die Wahl nach dem Neuzeichnen');
+  S.saDetailsSpeichern();
+  pruefe(g.gruppeName === 'Gesundheit' && g.kennzahl.art === 'letzter' && g.kennzahl.feld === 'kg' && !('wert' in g.kennzahl), 'gespeichert: Gruppe und Kennzahl');
+  const b = S.saAusVorlage(S.SA_VORLAGEN.budget, 'Carport', false, []);
+  const a = S.saAusVorlage(S.SA_VORLAGEN.abos, 'Abos', false, []);
+  a.gruppeName = 'Gesundheit';
+  S.cl.sa.id = ''; S.zeichne();
+  const h = inhalt();
+  pruefe((h.match(/class="gruppe">Gesundheit</g) || []).length === 1 && h.indexOf('>Budgets<') < h.indexOf('>Gesundheit<'), 'eigene Gruppe einmal, nach den Gruppen der Vorlagen');
+  const gr = h.slice(h.indexOf('>Gesundheit<'));
+  pruefe(/>Abos</.test(gr) && /Gewicht<\/span><span class="sa-kz">84,6</.test(gr), 'beide Sammlungen in ihrer Gruppe, mit eigener Kennzahl');
+  pruefe(!/>Verwaltung</.test(h), 'die leere Vorlagen-Gruppe verschwindet');
+  S.cl.sa.id = b.id; S.saDetailsOeffnen();
+  feld('saName', 'Carport'); feld('saGruppe', 'Budgets'); feld('saKzArt', '');
+  S.saDetailsSpeichern();
+  pruefe(!('gruppeName' in b) && !('kennzahl' in b), 'Gruppe wie die Vorlage und „wie die Vorlage“ speichern nichts Eigenes');
+  S.cl.sa.id = ''; S.cl.aufklapp = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1716,6 +1774,7 @@ function formelTest() {
   try { await neustartTest(); } catch (e) { fail('Neustart/Statistik warf: ' + e.message); }
   try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
   try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
+  try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
