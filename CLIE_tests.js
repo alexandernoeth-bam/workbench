@@ -304,8 +304,8 @@ function bedienTest() {
   if (!CL) { return; }
   frisch();
   CL.oeffne('routinen');
-  pruefe(CL.document.getElementById('reiter').textContent === 'Routinen' && /kommt mit CLIE 0\.5/.test(inhalt()),
-    'eine spätere App zeigt, mit welcher Fassung sie kommt');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Routinen' && !/kommt mit CLIE/.test(inhalt()),
+    'seit 0.5 sind alle Apps fertig — keine zeigt mehr „kommt mit …“');
   CL.oeffne('gibtsnicht');
   pruefe(CL.cl.app === 'uebersicht' && CL.document.getElementById('reiter').textContent === 'Übersicht', 'Unbekanntes führt zur Übersicht');
   CL.oeffne('abgleich');
@@ -415,8 +415,7 @@ function palmTest() {
   pruefe(syms === 8, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/8)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
-  CL.oeffne('routinen');
-  pruefe(/class="gross"><svg/.test(inhalt()), 'auch die Seite einer späteren App zeigt das Symbol');
+  pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
   CL.oeffne('uebersicht');
 }
 
@@ -1041,6 +1040,86 @@ function checklistenTest() {
   CL.oeffne('uebersicht');
 }
 
+/* ============================================================
+   21. Routinen
+   Grund: Routinen liegen in DB.aufgaben und werden von der Workbench
+   ausgewertet. Was CLIE anlegt oder ändert, muss dieselbe Gestalt haben
+   (wiederholung: takt, intervall, tage, tag) — sonst sind Routinen in
+   der Workbench falsch fällig. „Nur diesmal“ darf die Regel nie ändern.
+   ============================================================ */
+function routinenTest() {
+  console.log('\n21. Routinen');
+  if (!CL) { return; }
+  frisch();
+  CL.cl.rt.wahl = ''; CL.cl.rt.fenster = null; CL.cl.rt.pausiertAuf = false;
+  const heute = CL.isoDatum();
+  const wt = CL.ausIso(heute).getDay();
+  CL.DB.aufgaben.push({ id: 'r1', titel: 'Oskar laufen lassen', wiederholung: { takt: 'woche', intervall: 1, tage: [0,1,2,3,4,5,6], tag: 1 }, kontext: 'privat', geaendert: 1 });
+  CL.DB.aufgaben.push({ id: 'r2', titel: 'Monatsabschluss', wiederholung: { takt: 'monat', intervall: 3, tage: [], tag: 15 }, uhrzeit: '09:00', kontext: 'beruflich', geaendert: 1 });
+  CL.DB.aufgaben.push({ id: 'r3', titel: 'Alt', wiederholung: { takt: 'woche', intervall: 1, tage: [wt], tag: 1 }, pausiert: true, kontext: 'privat', geaendert: 1 });
+  CL.DB.aufgaben.push({ id: 'a1', titel: 'Keine Routine', status: 'offen', geaendert: 1 });
+  CL.oeffne('routinen');
+  let h = inhalt();
+  pruefe(/>Heute</.test(h) && /clRoutineUm\('r1'/.test(h) && !/clRoutineUm\('r3'/.test(h), 'Heute: fällige zum Abhaken, pausierte nicht');
+  pruefe(/täglich/.test(h) && /alle 3 Monate am 15\. · 9:00/.test(h), 'der Rhythmus in Worten — wie in der Workbench');
+  pruefe(/Pausiert · 1/.test(h) && !/rtTippen\('r3'\)/.test(h) && !/Keine Routine/.test(h), 'Pausierte eingeklappt, gewöhnliche Aufgaben gar nicht');
+
+  CL.rtNeu();
+  let f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Neue Routine/.test(f) && /rtWahl\('takt','monat'\)/.test(f) && /rtIntervall/.test(f), 'Neu: Name, Rhythmus, Tage, alle n Wochen');
+  CL.document.getElementById('rtName').value = 'Joggen';
+  CL.rtWahl('tag', String(wt));
+  CL.rtSpeichern();
+  pruefe(/Wochentag/.test(CL.document.getElementById('toastText').textContent) && CL.DB.aufgaben.length === 4, 'ohne Wochentag wird nichts gespeichert');
+  CL.rtWahl('tag', '2'); CL.rtWahl('tag', '4'); CL.rtWahl('tag', '6');
+  CL.document.getElementById('rtIntervall').value = '1';
+  CL.document.getElementById('rtZeit').value = '18:00';
+  CL.document.getElementById('rtAb').value = heute;
+  CL.rtSpeichern();
+  const neu = CL.DB.aufgaben[CL.DB.aufgaben.length - 1];
+  pruefe(neu.titel === 'Joggen' && JSON.stringify(neu.wiederholung) === JSON.stringify({ takt: 'woche', intervall: 1, tage: [2, 4, 6], tag: neu.wiederholung.tag })
+    && neu.uhrzeit === '18:00' && neu.ab === heute && neu.art === 'haupt' && neu.planung === 'backlog' && neu.status === 'offen',
+    'die neue Routine hat die Gestalt der Workbench');
+  pruefe(CL.aufgabeFaelligAn(neu, CL.tagePlus(CL.montagVon(heute), 1)) || CL.montagVon(heute) > heute, 'und ist an ihren Tagen fällig');
+
+  CL.rtTippen('r2'); CL.rtTippen('r2');
+  f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/value="Monatsabschluss"/.test(f) && /id="rtTag"[^>]*value="15"/.test(f) && /id="rtIntervall"[^>]*value="3"/.test(f), 'Details zeigen den Monatsrhythmus');
+  CL.document.getElementById('rtTag').value = '31';
+  CL.rtWahl('pausiert', '');
+  CL.rtSpeichern();
+  const r2 = CL.DB.aufgaben[1];
+  pruefe(r2.wiederholung.tag === 31 && r2.wiederholung.takt === 'monat' && r2.pausiert === true, 'ändern: Tag 31 und pausiert');
+  pruefe(CL.faelligAn({ takt: 'monat', intervall: 1, tag: 31 }, '2026-11-30'), 'der 31. gilt im November am 30. — wie in der Workbench');
+  CL.rtDetails('r2'); CL.rtWahl('pausiert', ''); CL.rtSpeichern();
+  pruefe(!('pausiert' in r2), 'Pause wieder aus');
+
+  /* Nur diesmal */
+  CL.cl.rt.wahl = 'r1';
+  CL.rtDiesmal();
+  f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Nur diesmal/.test(f) && /die Regel bleibt/.test(f) && new RegExp(CL.clKurzDatum(heute).replace(/\./g, '\\.')).test(f), 'Nur diesmal betrifft heute');
+  const regel = JSON.stringify(CL.DB.aufgaben[0].wiederholung);
+  CL.rtAuslassen(heute);
+  pruefe(!CL.aufgabeFaelligAn(CL.DB.aufgaben[0], heute) && JSON.stringify(CL.DB.aufgaben[0].wiederholung) === regel, 'Auslassen: heute nicht fällig, die Regel unverändert');
+  CL.rtDiesmal();
+  pruefe(new RegExp(CL.clKurzDatum(CL.tagePlus(heute, 1)).replace(/\./g, '\\.')).test(CL.document.getElementById('aufklapp').innerHTML), 'danach gilt „nur diesmal“ für die nächste Ausführung');
+  const morgen = CL.tagePlus(heute, 1), weiter = CL.tagePlus(heute, 2);
+  CL.document.getElementById('rtZu').value = weiter;
+  CL.document.getElementById('rtZuZeit').value = '07:15';
+  CL.rtVerlegen(morgen);
+  pruefe(CL.DB.aufgaben[0].zeitAusnahmen[weiter] === '07:15' && CL.aufgabeZeitAn(CL.DB.aufgaben[0], weiter) === '07:15', 'Verlegen mit eigener Uhrzeit');
+
+  /* Löschen */
+  CL.rtDetails('r1');
+  CL.rtLoeschenFragen();
+  pruefe(/wirklich löschen/.test(CL.document.getElementById('aufklapp').innerHTML), 'Löschen fragt nach');
+  CL.rtLoeschen();
+  pruefe(!CL.rtFinden('r1') && CL.DB.grabsteine.some(g => g.s === 'aufgaben' && g.id === 'r1'), 'gelöscht — mit Löschvermerk');
+  pruefe(CL.rtFinden('r2') && CL.DB.aufgaben.some(a => a.id === 'a1'), 'andere bleiben unberührt');
+  CL.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -1058,6 +1137,7 @@ function checklistenTest() {
   try { aufgabenTest(); } catch (e) { fail('Aufgaben warf: ' + e.message); }
   try { memoTest(); } catch (e) { fail('Memo warf: ' + e.message); }
   try { checklistenTest(); } catch (e) { fail('Checklisten warf: ' + e.message); }
+  try { routinenTest(); } catch (e) { fail('Routinen warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

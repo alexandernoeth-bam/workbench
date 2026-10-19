@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.4.0</title>
+<title>CLIE 0.5.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -234,6 +234,18 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .gruppe.klapp{display:block;width:100%;text-align:left;color:var(--px-mitte)}
 .fuss{flex-wrap:wrap}
 
+/* Routinen (seit 0.5) */
+.rt-zeile{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;min-height:44px}
+.rt-zeile .tx{flex:1;min-width:0}
+.rt-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
+.rt-zeile.pause .tx{color:var(--px-mitte)}
+.rt-zeile.gewaehlt{background:var(--px);color:var(--lcd)}
+.rt-zeile.gewaehlt small{color:var(--lcd-hell)}
+.aufg .zeit{color:var(--px-mitte);font-size:19px}
+.marke{font-size:15.5px;border:2px solid var(--px-mitte);border-radius:6px;padding:0 4px;color:var(--px-mitte);white-space:nowrap}
+.wahlreihe.tage button{min-width:40px;padding:1px 0;text-align:center}
+.zahlfeld{width:64px;text-align:center}
+
 /* Fenster wie die Dialoge des Palm */
 .fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
@@ -298,7 +310,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.4.0';
+var APP_VERSION = '0.5.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1565,6 +1577,52 @@ function aufgabeZeitAn(a, is) {
   return z || a.uhrzeit || '';
 }
 
+function regulaerFaellig(a, is) {
+  return !!(a && a.wiederholung && faelligAn(a.wiederholung, is));
+}
+
+function ausfuehrungAuslassen(a, is) {
+  if (!a || !a.wiederholung || !is || !aufgabeFaelligAn(a, is)) { return false; }
+  if (!Array.isArray(a.zusatzTage)) { a.zusatzTage = []; }
+  if (!Array.isArray(a.ausfallTage)) { a.ausfallTage = []; }
+  if (regulaerFaellig(a, is)) {
+    if (a.ausfallTage.indexOf(is) < 0) { a.ausfallTage.push(is); a.ausfallTage.sort(); }
+  } else {
+    a.zusatzTage = a.zusatzTage.filter(function (t) { return t !== is; });
+  }
+  if (a.zeitAusnahmen) { delete a.zeitAusnahmen[is]; }
+  a.geaendert = jetzt();
+  spaeterSichern();
+  return true;
+}
+
+function ausfuehrungVerlegen(a, von, zu, zeit) {
+  if (!a || !a.wiederholung || !/^\d{4}-\d{2}-\d{2}$/.test(String(zu || ''))) { return false; }
+  if (zeit && !/^([01]\d|2[0-3]):[0-5]\d$/.test(zeit)) { return false; }
+  if (!Array.isArray(a.zusatzTage)) { a.zusatzTage = []; }
+  if (!Array.isArray(a.ausfallTage)) { a.ausfallTage = []; }
+  if (!a.zeitAusnahmen || typeof a.zeitAusnahmen !== 'object') { a.zeitAusnahmen = {}; }
+  if (von && von !== zu) {
+    if (regulaerFaellig(a, von)) {
+      if (a.ausfallTage.indexOf(von) < 0) { a.ausfallTage.push(von); }
+    } else {
+      a.zusatzTage = a.zusatzTage.filter(function (t) { return t !== von; });
+    }
+    delete a.zeitAusnahmen[von];
+    if (regulaerFaellig(a, zu)) {
+      a.ausfallTage = a.ausfallTage.filter(function (t) { return t !== zu; });
+    } else if (a.zusatzTage.indexOf(zu) < 0) {
+      a.zusatzTage.push(zu);
+    }
+  }
+  if (zeit && zeit !== a.uhrzeit) { a.zeitAusnahmen[zu] = zeit; } else { delete a.zeitAusnahmen[zu]; }
+  a.zusatzTage.sort();
+  a.ausfallTage.sort();
+  a.geaendert = jetzt();
+  spaeterSichern();
+  return true;
+}
+
 /* ---------- Aktivitäten-Kern der Workbench ---------- */
 
 var KP_KASTEN = /^(\s*)\[([ xX-]?)\]\s*(.*)$/;   /* [-] = nicht relevant (seit Workbench 6.0.4) */
@@ -2246,7 +2304,7 @@ var CL_APPS = [
   { id: 'aufgaben', name: 'Aufgaben', stufe: '',    was: 'Alle offenen Aufgaben in einer Liste. Oben rechts wählst du Alle, Beruf, Privat oder eine einzelne Liste. Abhaken wirkt in der Seite.' },
   { id: 'memo',     name: 'Memo',     stufe: '',    was: 'Alle Seiten: Projekte, Ziele, Listen und Notizen — lesen, schreiben, Details.' },
   { id: 'checklisten', name: 'Checklisten', stufe: '', was: '' },
-  { id: 'routinen', name: 'Routinen', stufe: '0.5', was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.' },
+  { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.' },
   { id: 'einkauf',  name: 'Einkauf',  stufe: '',    was: '' },
   { id: 'rechner',  name: 'Rechner',  stufe: '',    was: '' },
   { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '' }
@@ -2448,6 +2506,7 @@ function clOffeneAufgaben() {
 function clAppZahl(id) {
   if (id === 'kalender') { return clTermineRest().length; }
   if (id === 'aufgaben') { return clOffeneAufgaben(); }
+  if (id === 'routinen') { return clRoutinenAm(isoDatum()).filter(function (a) { return !istErledigtAn(a, isoDatum()); }).length; }
   if (id === 'checklisten') { return clsAlle('lauf').length; }
   return 0;
 }
@@ -2533,6 +2592,7 @@ function inhaltZeichnen() {
     if (cl.memo.schreiben && el.innerHTML.indexOf('memoFeld') >= 0) { return; }
     el.innerHTML = memoHtml();
   }
+  else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'checklisten') {
     if (cl.cls.schreiben && el.innerHTML.indexOf('memoFeld') >= 0) { return; }
     el.innerHTML = checklistenHtml();
@@ -2590,6 +2650,9 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'memo') {
     if (el.innerHTML.indexOf('memoTitel') >= 0) { return; }
     el.innerHTML = memoFensterHtml();
+  } else if (cl.aufklapp === 'routine') {
+    if (el.innerHTML.indexOf('rtName') >= 0 || el.innerHTML.indexOf('rtZu') >= 0) { return; }
+    el.innerHTML = rtFensterHtml();
   } else if (cl.aufklapp === 'checkliste') {
     if (el.innerHTML.indexOf('clsTitel') >= 0) { return; }
     el.innerHTML = clsFensterHtml();
@@ -2620,7 +2683,8 @@ function fussZeichnen() {
   var h = (cl.app === 'kalender') ? kalFussHtml()
         : (cl.app === 'aufgaben') ? aufFussHtml()
         : (cl.app === 'memo') ? memoFussHtml()
-        : (cl.app === 'checklisten') ? checklistenFussHtml() : '';
+        : (cl.app === 'checklisten') ? checklistenFussHtml()
+        : (cl.app === 'routinen') ? routinenFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -2671,6 +2735,7 @@ function aufklappZu() {
   cl.auf.fenster = null;
   cl.memo.fenster = null;
   cl.cls.fenster = null;
+  cl.rt.fenster = null;
   zeichne();
 }
 
@@ -4506,6 +4571,279 @@ function clsLoeschen() {
   melde('„' + g.titel + '“ gelöscht.', null);
   aufklappZuStill();
   clsZurListe();
+}
+
+/* ---------- Routinen (seit 0.5) ----------
+
+   Routinen pflegen wie in der Workbench — dieselben Sätze in
+   DB.aufgaben mit „wiederholung“: wöchentlich an Tagen oder monatlich
+   an einem Tag, alle n Wochen/Monate, mit Uhrzeit, Start und Pause.
+   Fällig, erledigt, auslassen und verlegen kommen wörtlich aus der
+   Workbench. Das 14-Tage-Raster bleibt dort. */
+
+cl.rt = { wahl: '', pausiertAuf: false, fenster: null };
+var RT_WT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+function rtAlle() {
+  return (DB.aufgaben || []).filter(function (a) {
+    return a && a.wiederholung && (cl.filter === 'alle' || !a.kontext || a.kontext === cl.filter);
+  }).sort(function (x, y) { return String(x.titel || '').localeCompare(String(y.titel || ''), 'de'); });
+}
+
+function rtFinden(id) {
+  var l = DB.aufgaben || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i] && l[i].id === id && l[i].wiederholung) { return l[i]; } }
+  return null;
+}
+
+/* Die nächste offene Ausführung — heute, wenn fällig, sonst die nächste */
+function rtDiesmalTag(a) {
+  var d = isoDatum();
+  var i;
+  for (i = 0; i < 400; i++) {
+    if (aufgabeFaelligAn(a, d) && !istErledigtAn(a, d)) { return d; }
+    d = tagePlus(d, 1);
+  }
+  return '';
+}
+
+function routinenHtml() {
+  var heute = isoDatum();
+  var alle = rtAlle();
+  var faellig = clRoutinenAm(heute).sort(function (x, y) {
+    var zx = aufgabeZeitAn(x, heute) || '99:99';
+    var zy = aufgabeZeitAn(y, heute) || '99:99';
+    return zx < zy ? -1 : (zx > zy ? 1 : 0);
+  });
+  var h = '<div class="gruppe">Heute</div>';
+  h += faellig.length ? faellig.map(function (a) {
+    var erl = istErledigtAn(a, heute);
+    var zt = aufgabeZeitAn(a, heute);
+    return '<div class="aufg' + (erl ? ' erl' : '') + '">' + clKastenHtml(erl, 'clRoutineUm(\'' + esc(a.id) + '\',\'' + heute + '\')')
+      + '<span class="tx">' + esc(a.titel) + '</span>' + (zt ? '<span class="zeit">' + esc(clZeitText(zt)) + '</span>' : '') + '</div>';
+  }).join('') : '<p class="leise">Heute keine Routine.</p>';
+  var zeile = function (a) {
+    var rhythmus = kpFrequenz(a.wiederholung) + (a.uhrzeit ? ' · ' + clZeitText(a.uhrzeit) : '');
+    var ab = (a.ab && a.ab > heute) ? ' · ab ' + clKurzDatum(a.ab) : '';
+    return '<button type="button" class="rt-zeile' + (cl.rt.wahl === a.id ? ' gewaehlt' : '') + (a.pausiert ? ' pause' : '')
+      + '" onclick="rtTippen(\'' + esc(a.id) + '\')"><span class="tx">' + esc(a.titel || 'Routine') + '<small>' + esc(rhythmus + ab) + '</small></span>'
+      + (cl.filter === 'alle' && a.kontext === 'beruflich' ? '<span class="marke">Beruf</span>' : '') + '</button>';
+  };
+  var laufend = alle.filter(function (a) { return !a.pausiert; });
+  var pausiert = alle.filter(function (a) { return a.pausiert; });
+  h += '<div class="gruppe">Alle Routinen</div>' + (laufend.length ? laufend.map(zeile).join('') : '<p class="leise">Noch keine Routine — „Neu“ tippen.</p>');
+  if (pausiert.length) {
+    h += '<button type="button" class="gruppe klapp" onclick="rtPausiertUm()">' + (cl.rt.pausiertAuf ? '▾' : '›') + ' Pausiert · ' + pausiert.length + '</button>';
+    if (cl.rt.pausiertAuf) { h += pausiert.map(zeile).join(''); }
+  }
+  return h;
+}
+
+function routinenFussHtml() {
+  return '<button type="button" class="knopf" onclick="rtNeu()">Neu</button>'
+    + '<button type="button" class="knopf" onclick="rtDetailsGewaehlt()">Details…</button>'
+    + '<button type="button" class="knopf" onclick="rtDiesmal()">Nur diesmal…</button>';
+}
+
+function rtPausiertUm() {
+  cl.rt.pausiertAuf = !cl.rt.pausiertAuf;
+  inhaltZeichnen();
+}
+
+function rtTippen(id) {
+  if (cl.rt.wahl === id) { rtDetails(id); return; }
+  cl.rt.wahl = id;
+  inhaltZeichnen();
+}
+
+function rtDetailsGewaehlt() {
+  if (!rtFinden(cl.rt.wahl)) { melde('Erst eine Routine antippen, dann „Details…“.', null); return; }
+  rtDetails(cl.rt.wahl);
+}
+
+/* ---- Fenster: Neu, Details, Löschen ---- */
+
+function rtNeu() {
+  var heute = isoDatum();
+  cl.rt.fenster = { modus: 'neu', id: '', titel: '', takt: 'woche', intervall: 1, tage: [ausIso(heute).getDay()],
+                    tag: Number(heute.slice(8, 10)), uhrzeit: '', ab: heute, pausiert: false,
+                    kontext: (cl.filter === 'beruflich') ? 'beruflich' : 'privat' };
+  cl.aufklapp = 'routine';
+  aufklappNeu();
+}
+
+function rtDetails(id) {
+  var a = rtFinden(id);
+  if (!a) { return; }
+  var w = a.wiederholung || {};
+  cl.rt.wahl = id;
+  cl.rt.fenster = { modus: 'details', id: a.id, titel: a.titel || '', takt: (w.takt === 'monat') ? 'monat' : 'woche',
+                    intervall: Math.max(1, Number(w.intervall) || 1), tage: Array.isArray(w.tage) ? w.tage.slice() : [],
+                    tag: Number(w.tag) || 1, uhrzeit: a.uhrzeit || '', ab: a.ab || '', pausiert: !!a.pausiert,
+                    kontext: a.kontext === 'beruflich' ? 'beruflich' : 'privat' };
+  cl.aufklapp = 'routine';
+  aufklappNeu();
+}
+
+function rtFensterLesen() {
+  var f = cl.rt.fenster;
+  if (!f) { return null; }
+  var wert = function (id) { var e = document.getElementById(id); return (e && typeof e.value === 'string') ? e.value : null; };
+  var t = wert('rtName'); if (t !== null) { f.titel = t; }
+  var n = wert('rtIntervall'); if (n !== null) { f.intervall = n; }
+  var d = wert('rtTag'); if (d !== null) { f.tag = d; }
+  var z = wert('rtZeit'); if (z !== null) { f.uhrzeit = z; }
+  var ab = wert('rtAb'); if (ab !== null) { f.ab = ab; }
+  return f;
+}
+
+function rtWahl(feld, wert) {
+  var f = rtFensterLesen();
+  if (!f) { return; }
+  if (feld === 'takt' && (wert === 'woche' || wert === 'monat')) { f.takt = wert; }
+  else if (feld === 'kontext' && (wert === 'beruflich' || wert === 'privat')) { f.kontext = wert; }
+  else if (feld === 'pausiert') { f.pausiert = !f.pausiert; }
+  else if (feld === 'tag') {
+    var t = Number(wert);
+    if (t >= 0 && t <= 6) {
+      var i = f.tage.indexOf(t);
+      if (i >= 0) { f.tage.splice(i, 1); } else { f.tage.push(t); f.tage.sort(); }
+    }
+  } else { return; }
+  aufklappNeu();
+}
+
+function rtFensterHtml() {
+  var f = cl.rt.fenster;
+  if (!f) { return ''; }
+  var a = f.id ? rtFinden(f.id) : null;
+  if (f.modus === 'loeschen' && a) {
+    return '<div class="fenster"><div class="titel">Routine löschen</div><div class="rumpf">'
+      + '<p>„' + esc(a.titel) + '“ wirklich löschen? Auch ihre erledigten Tage verschwinden.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="rtLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="rtDetails(\'' + esc(a.id) + '\')">Abbrechen</button></div></div></div>';
+  }
+  if (f.modus === 'diesmal' && a) {
+    var tag = rtDiesmalTag(a);
+    if (!tag) {
+      return '<div class="fenster"><div class="titel">Nur diesmal · ' + esc(a.titel) + '</div><div class="rumpf">'
+        + '<p class="leise">Keine offene Ausführung gefunden.</p>'
+        + '<div class="knoepfe"><button type="button" class="knopf" onclick="aufklappZu()">OK</button></div></div></div>';
+    }
+    return '<div class="fenster"><div class="titel">Nur diesmal · ' + esc(a.titel) + '</div><div class="rumpf">'
+      + '<p class="leise">Betrifft nur die Ausführung am ' + esc(clWt(tag) + ' ' + clKurzDatum(tag))
+      + (aufgabeZeitAn(a, tag) ? ' um ' + esc(clZeitText(aufgabeZeitAn(a, tag))) : '') + ' — die Regel bleibt.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="rtAuslassen(\'' + tag + '\')">Auslassen</button></div>'
+      + '<label>Oder verlegen auf:</label><div class="zeitpaar">'
+      + '<input id="rtZu" class="eingabe" type="date" value="' + esc(tagePlus(tag, 1)) + '" aria-label="Tag">'
+      + '<input id="rtZuZeit" class="eingabe" type="time" value="' + esc(aufgabeZeitAn(a, tag)) + '" aria-label="Uhrzeit"></div>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="rtVerlegen(\'' + tag + '\')">Verlegen</button>'
+      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+  }
+  var reihe = function (feld, werte, an) {
+    return '<div class="wahlreihe">' + werte.map(function (w) {
+      return '<button type="button"' + (w[0] === an ? ' class="an"' : '') + ' onclick="rtWahl(\'' + feld + '\',\'' + w[0] + '\')">' + w[1] + '</button>';
+    }).join('') + '</div>';
+  };
+  var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neue Routine' : 'Routine') + '</div><div class="rumpf">'
+    + '<label for="rtName">Name:</label><input id="rtName" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
+    + '<label>Rhythmus:</label>' + reihe('takt', [['woche', 'wöchentlich'], ['monat', 'monatlich']], f.takt);
+  if (f.takt === 'woche') {
+    h += '<div class="wahlreihe tage">' + [1, 2, 3, 4, 5, 6, 0].map(function (t) {
+      return '<button type="button"' + (f.tage.indexOf(t) >= 0 ? ' class="an"' : '') + ' onclick="rtWahl(\'tag\',\'' + t + '\')">' + RT_WT[t] + '</button>';
+    }).join('') + '</div>'
+      + '<div class="zeitpaar"><span>alle</span><input id="rtIntervall" class="eingabe zahlfeld" type="number" min="1" max="52" inputmode="numeric" value="' + esc(String(f.intervall)) + '"><span>Woche(n)</span></div>';
+  } else {
+    h += '<div class="zeitpaar"><span>am</span><input id="rtTag" class="eingabe zahlfeld" type="number" min="1" max="31" inputmode="numeric" value="' + esc(String(f.tag)) + '"><span>. · alle</span>'
+       + '<input id="rtIntervall" class="eingabe zahlfeld" type="number" min="1" max="24" inputmode="numeric" value="' + esc(String(f.intervall)) + '"><span>Monat(e)</span></div>';
+  }
+  h += '<label for="rtZeit">Uhrzeit (frei lassen = ohne):</label><input id="rtZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.uhrzeit) + '">'
+     + '<label for="rtAb">Ab:</label><input id="rtAb" class="eingabe" type="date" value="' + esc(f.ab) + '">'
+     + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+     + '<div class="wahlreihe"><button type="button"' + (f.pausiert ? ' class="an"' : '') + ' onclick="rtWahl(\'pausiert\',\'\')">' + (f.pausiert ? '■' : '▢') + ' pausiert</button></div>'
+     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="rtSpeichern()">OK</button>'
+     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+     + (a ? '<button type="button" class="knopf" onclick="rtLoeschenFragen()">Löschen…</button>' : '') + '</div></div></div>';
+  return h;
+}
+
+function rtSpeichern() {
+  var f = rtFensterLesen();
+  if (!f) { return; }
+  var titel = String(f.titel || '').trim();
+  var intervall = Math.round(Number(f.intervall));
+  var tag = Math.round(Number(f.tag));
+  if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  if (f.takt === 'woche' && !f.tage.length) { melde('Bitte mindestens einen Wochentag wählen.', 'warn'); return; }
+  if (!(intervall >= 1 && intervall <= (f.takt === 'woche' ? 52 : 24))) { melde('„alle …“ bitte als Zahl ab 1.', 'warn'); return; }
+  if (f.takt === 'monat' && !(tag >= 1 && tag <= 31)) { melde('Der Tag im Monat muss zwischen 1 und 31 liegen.', 'warn'); return; }
+  if (f.uhrzeit && !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.uhrzeit)) { melde('Die Uhrzeit ist ungültig.', 'warn'); return; }
+  if (f.ab && !/^\d{4}-\d{2}-\d{2}$/.test(f.ab)) { melde('Das Startdatum ist ungültig.', 'warn'); return; }
+  var a = f.id ? rtFinden(f.id) : null;
+  if (!a) {
+    /* Dieselbe Gestalt wie eine neue Routine in der Workbench */
+    a = { id: neueKennung(), titel: '', beschreibung: '', kontext: f.kontext, themaId: null, projektId: null, frist: '',
+          planung: 'backlog', uhrzeit: '', art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
+          zuletztErledigt: null, ablaufSchritt: null, ab: '', geaendert: jetzt() };
+    if (!Array.isArray(DB.aufgaben)) { DB.aufgaben = []; }
+    DB.aufgaben.push(a);
+  }
+  a.titel = titel.slice(0, 200);
+  a.wiederholung = { takt: f.takt, intervall: intervall, tage: (f.takt === 'woche') ? f.tage.slice() : [],
+                     tag: (f.takt === 'monat') ? tag : ((a.wiederholung && a.wiederholung.tag) || Number(isoDatum().slice(8, 10))) };
+  a.uhrzeit = f.uhrzeit || '';
+  a.ab = f.ab || '';
+  a.kontext = f.kontext;
+  if (f.pausiert) { a.pausiert = true; } else { delete a.pausiert; }
+  a.geaendert = jetzt();
+  cl.rt.wahl = a.id;
+  spaeterSichern();
+  aufklappZu();
+}
+
+function rtLoeschenFragen() {
+  rtFensterLesen();
+  if (cl.rt.fenster) { cl.rt.fenster.modus = 'loeschen'; aufklappNeu(); }
+}
+
+function rtLoeschen() {
+  var a = cl.rt.fenster ? rtFinden(cl.rt.fenster.id) : null;
+  if (!a) { aufklappZu(); return; }
+  DB.aufgaben.splice(DB.aufgaben.indexOf(a), 1);
+  grabsteinSetzen('aufgaben', a.id);
+  cl.rt.wahl = '';
+  spaeterSichern();
+  aufklappZu();
+  melde('Routine gelöscht.', null);
+}
+
+/* ---- Nur diesmal ---- */
+
+function rtDiesmal() {
+  var a = rtFinden(cl.rt.wahl);
+  if (!a) { melde('Erst eine Routine antippen, dann „Nur diesmal…“.', null); return; }
+  cl.rt.fenster = { modus: 'diesmal', id: a.id };
+  cl.aufklapp = 'routine';
+  aufklappNeu();
+}
+
+function rtAuslassen(tag) {
+  var a = cl.rt.fenster ? rtFinden(cl.rt.fenster.id) : null;
+  if (!a || !ausfuehrungAuslassen(a, tag)) { melde('Das ließ sich nicht auslassen.', 'warn'); return; }
+  aufklappZu();
+  melde('Am ' + clKurzDatum(tag) + ' ausgelassen.', 'gut');
+}
+
+function rtVerlegen(von) {
+  var a = cl.rt.fenster ? rtFinden(cl.rt.fenster.id) : null;
+  var zu = (document.getElementById('rtZu') || {}).value || '';
+  var zeit = (document.getElementById('rtZuZeit') || {}).value || '';
+  if (!a) { aufklappZu(); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(zu))) { melde('Bitte einen Tag wählen.', 'warn'); return; }
+  if (!ausfuehrungVerlegen(a, von, zu, zeit)) { melde('Das ließ sich nicht verlegen.', 'warn'); return; }
+  aufklappZu();
+  melde('Verlegt auf ' + clWt(zu) + ' ' + clKurzDatum(zu) + (zeit ? ' ' + clZeitText(zeit) : '') + '.', 'gut');
 }
 
 /* ---------- Einkauf: die geteilte Google-Keep-Notiz ----------
