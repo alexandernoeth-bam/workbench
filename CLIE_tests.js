@@ -172,7 +172,8 @@ if (!WB_SKRIPT) {
     'erneuerungPlanen', 'erneuerungPruefen', 'taktPruefen', 'klickErneuern', 'dateiWaehlen', 'opfsSchreiben', 'opfsLesen',
     'montagVon', 'kalenderwoche', 'neueKennung', 'esc',
     'kalenderListeHolen', 'kalenderGewaehlt', 'kalenderKontext', 'einenKalenderHolen', 'eintraegeEinsortieren',
-    'merkeTermin', 'praktischGanztags', 'titelOhneArt', 'terminKontextUeber', 'termineFuerTag'];
+    'merkeTermin', 'praktischGanztags', 'titelOhneArt', 'terminKontextUeber', 'termineFuerTag',
+    'aufgabeFaelligAn', 'faelligAn', 'istErledigtAn', 'wiederholungSetzen', 'aufgabeZeitAn', 'wochenIndex', 'monatsIndex', 'monatsende'];
   const abweichend = WOERTLICH.filter(n => {
     const a = funktionText(SKRIPT, n), b = funktionText(WB_SKRIPT, n);
     return !a || !b || a !== b;
@@ -211,6 +212,7 @@ console.log('\n3. Eigene Speicherschlüssel');
 console.log('\n4. Google: Drive und Kalender');
 if (CL) {
   pruefe(/calendar\.readonly/.test(CL.SCOPES) && /drive\.file/.test(CL.SCOPES), 'die Anmeldung fragt Drive und das Lesen des Kalenders an');
+  pruefe(/calendar\.events/.test(CL.SCOPES), 'seit 0.2 auch das Schreiben von Terminen (calendar.events)');
   const a = funktionText(SKRIPT, 'anmeldeAnfragen') || '';
   pruefe(/clTermineHolen\(false\)/.test(a) && !/\btermineHolen\(/.test(a), 'nach der Anmeldung holt CLIE die Termine selbst');
   pruefe(!/^function termineHolen\(/m.test(SKRIPT), 'termineHolen der Workbench (mit Tag und Jahresarchiv) ist nicht dabei');
@@ -301,8 +303,8 @@ function bedienTest() {
   console.log('\n7. Apps, Menü und Tasten');
   if (!CL) { return; }
   frisch();
-  CL.oeffne('kalender');
-  pruefe(CL.document.getElementById('reiter').textContent === 'Kalender' && /kommt mit CLIE 0\.2/.test(inhalt()),
+  CL.oeffne('aufgaben');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Aufgaben' && /kommt mit CLIE 0\.3/.test(inhalt()),
     'eine spätere App zeigt, mit welcher Fassung sie kommt');
   CL.oeffne('gibtsnicht');
   pruefe(CL.cl.app === 'uebersicht' && CL.document.getElementById('reiter').textContent === 'Übersicht', 'Unbekanntes führt zur Übersicht');
@@ -512,6 +514,189 @@ function einkaufTest() {
   pruefe(!/onmouseover="alert/.test(CL.einkaufDialogHtml()), 'der Link wird im Fenster maskiert');
 }
 
+/* ============================================================
+   14. Kalender: Tag, Woche, Monat
+   Grund: Der Kalender zeigt Daten aus zwei Quellen — Google und die
+   workbench.json. Abhaken muss in der Seite ankommen, Routinen müssen
+   an denselben Tagen stehen wie in der Workbench, und Beruf/Privat
+   muss beides filtern.
+   ============================================================ */
+function kalenderTest() {
+  console.log('\n14. Kalender: Tag, Woche, Monat');
+  if (!CL) { return; }
+  frisch();
+  const heute = CL.isoDatum();
+  const wt = CL.ausIso(heute).getDay();
+  CL.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '[] Offering beschreiben\n[] Rechnung prüfen', status: 'laufend', kontext: 'beruflich', geaendert: 1 });
+  CL.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Offering beschreiben\n[] Rechnung prüfen\nNur ein Gedanke', geaendert: 1,
+    eintraege: [{ id: 'e1', abschnitt: 'h', text: 'Offering beschreiben', quelle: 'p1', erledigt: false, zeit: '11:00' },
+                { id: 'e2', abschnitt: 'h', text: 'Rechnung prüfen', quelle: 'p1', erledigt: false }] });
+  CL.DB.aufgaben.push({ id: 'r1', titel: 'Oskar laufen lassen', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, kontext: 'privat', geaendert: 1 });
+  CL.DB.aufgaben.push({ id: 'r2', titel: 'Tabletten', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, uhrzeit: '07:30', kontext: 'privat', geaendert: 1 });
+  CL.DB.aufgaben.push({ id: 'r3', titel: 'Morgen erst', wiederholung: { takt: 'woche', tage: [(wt + 1) % 7], intervall: 1 }, geaendert: 1 });
+  CL.DB.aufgaben.push({ id: 'r4', titel: 'Pausiert', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, pausiert: true, geaendert: 1 });
+  CL.termineNachTag[heute] = [
+    { id: 't1', zeit: '16:30', bis: '17:00', titel: 'Rückruf Becker', kontext: 'beruflich', kalId: 'buero' },
+    { id: 't2', zeit: '', bis: '', titel: 'Geburtstag Oma', ganztags: true, kontext: 'privat', kalId: 'privat' },
+    { id: 't3', zeit: '05:15', bis: '05:45', titel: 'Frühflug', kontext: 'privat', kalId: 'privat' }];
+  CL.oeffne('kalender');
+  let h = inhalt();
+  pruefe(CL.document.getElementById('reiter').textContent === CL.clWt(heute) + ' ' + CL.clKurzDatum(heute), 'der Reiter zeigt den Tag');
+  pruefe(/◆ Geburtstag Oma/.test(h) && /Rückruf Becker/.test(h), 'Termine und Ganztägiges stehen im Tag');
+  pruefe((h.match(/class="z">\d+:00</g) || []).length >= 10 && /class="z">5:15</.test(h) && /class="z">7:30</.test(h),
+    'Stunden 8–18 immer, frühere Termine und Routinen mit Uhrzeit kommen dazu');
+  pruefe(/class="z">11:00<\/span><span class="t"><button type="button" class="k" onclick="clTagZeileUm/.test(h),
+    'eine mit Uhrzeit eingeplante Aufgabe steht an ihrer Stunde, mit Kästchen');
+  const vorg = h.slice(h.indexOf('>Vorgenommen<'));
+  pruefe(/Rechnung prüfen/.test(vorg) && !/Offering beschreiben/.test(vorg) && /Nur ein Gedanke/.test(vorg) && /class="q">Büro</.test(vorg),
+    'Vorgenommen zeigt Aufgaben ohne Uhrzeit mit ihrer Seite, dazu freien Text');
+  const rout = h.slice(h.indexOf('>Routinen<'));
+  pruefe(/Oskar laufen lassen/.test(rout) && !/Tabletten/.test(rout) && !/Morgen erst/.test(h) && !/Pausiert/.test(h),
+    'Routinen: fällige ohne Uhrzeit unten, mit Uhrzeit im Raster, nicht fällige und pausierte gar nicht');
+
+  CL.clTagZeileUm(heute, 1);
+  pruefe(/\[x\] Rechnung prüfen/.test(CL.DB.tage[0].text) && /\[x\] Rechnung prüfen/.test(CL.DB.projekte[0].flaeche),
+    'Abhaken im Tag hakt auch in der Seite ab');
+  pruefe(!/Rechnung prüfen/.test(inhalt().slice(inhalt().indexOf('>Vorgenommen<'))) && /1 erledigt · zeigen/.test(inhalt()),
+    'Erledigtes verschwindet aus dem Tag — „1 erledigt · zeigen“');
+  CL.clErlUm();
+  pruefe(/class="aufg erl"/.test(inhalt()), '„zeigen“ holt es durchgestrichen zurück');
+  CL.clErlUm();
+  CL.clRoutineUm('r1', heute);
+  const r1 = CL.DB.aufgaben[0];
+  pruefe(CL.istErledigtAn(r1, heute) && r1.geaendert > 1, 'eine Routine wird für heute abgehakt — wie in der Workbench');
+  CL.clRoutineUm('r1', heute);
+  pruefe(!CL.istErledigtAn(r1, heute), 'und wieder zurück');
+
+  CL.katSetzen('beruflich');
+  h = inhalt();
+  pruefe(/Rückruf Becker/.test(h) && !/Geburtstag Oma/.test(h) && !/Oskar laufen lassen/.test(h), 'Beruf zeigt nur berufliche Termine und Routinen');
+  CL.katSetzen('privat');
+  h = inhalt();
+  pruefe(!/Rückruf Becker/.test(h) && !/Offering beschreiben/.test(h), 'Privat blendet berufliche Termine und Aufgaben aus beruflichen Seiten aus');
+  CL.katSetzen('alle');
+
+  CL.clBlaettern(1);
+  pruefe(CL.clKalDatum() === CL.tagePlus(heute, 1) && /Morgen erst/.test(inhalt()), 'blättern: der nächste Tag mit seinen Routinen');
+  CL.clBlaettern(-1);
+  pruefe(CL.cl.kal.datum === '', 'zurück auf heute');
+
+  const montag = CL.montagVon(heute);
+  CL.DB.wochen.push({ id: 'kw-' + montag, montag: montag, geaendert: 1, eintraege: [],
+    text: '## Bringt mich dauerhaft weiter\n[] CTS mit Testdaten\n[x] Workshop halten\n\n## Habe ich mich verpflichtet zu\n[] Angebot Statik' });
+  CL.clKalAnsicht('woche');
+  h = inhalt();
+  pruefe(/^KW \d+$/.test(CL.document.getElementById('reiter').textContent) && (h.match(/class="wtag/g) || []).length === 7, 'die Woche: KW im Reiter, sieben Tage');
+  pruefe(/>Bringt mich dauerhaft weiter</.test(h) && /class="aufg erl"/.test(h) && /clWocheZeileUm/.test(h), 'darunter die Abschnitte der Woche, abhakbar');
+  CL.clWocheZeileUm(montag, 5);
+  pruefe(/\[x\] Angebot Statik/.test(CL.DB.wochen[0].text), 'Abhaken in der Woche landet in der Woche');
+  CL.clKalAnsicht('monat');
+  h = inhalt();
+  pruefe((h.match(/class="mt/g) || []).length >= 28 && /class="mt[^"]* heute/.test(h), 'der Monat: alle Tage, heute hervorgehoben');
+  pruefe(/◆/.test(h), 'Ganztägiges als Raute');
+  CL.clKalGehe(heute, 'tag');
+  pruefe(CL.cl.kal.ansicht === 'tag', 'ein Tipp auf einen Tag öffnet ihn');
+  const fuss = CL.document.getElementById('fuss').innerHTML;
+  pruefe(/terminNeu/.test(fuss) && /clGeheZuOeffnen/.test(fuss) && /clKalAnsicht\('monat'\)/.test(fuss), 'unten: Neu, Gehe zu, T / W / M');
+  CL.clKalGehe('kaputt', 'woche');
+  pruefe(CL.cl.kal.ansicht === 'tag', 'ein ungültiges Datum wird ignoriert');
+  CL.oeffne('rechner');
+  pruefe(CL.document.getElementById('fuss').innerHTML === '', 'andere Apps haben keine Kalender-Knöpfe');
+  CL.oeffne('uebersicht');
+}
+
+/* ============================================================
+   15. Termine schreiben: direkt im Google-Kalender
+   Grund: Ein falsch geschickter Termin landet in deinem echten
+   Kalender. Geprüft wird, was an Google geht — Adresse, Methode,
+   Zeitangaben — und dass ohne Verbindung nichts verloren geht.
+   ============================================================ */
+async function schreibTest() {
+  console.log('\n15. Termine schreiben');
+  if (!CL) { return; }
+  frisch();
+  const heute = CL.isoDatum();
+  const anfragen = [];
+  CL.fetch = function (adresse, o) {
+    anfragen.push({ adresse, o: o || {} });
+    if (/minAccessRole=writer/.test(adresse)) {
+      return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve({ items: [{ id: 'privat@x', summary: 'Privat', primary: true }, { id: 'buero@x', summary: 'Büro' }] }); } });
+    }
+    return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve({ items: [] }); } });
+  };
+  CL.terminNeu(heute, '15:00');
+  pruefe(!anfragen.length && /Verbindung/.test(CL.document.getElementById('toastText').textContent), 'ohne Anmeldung: kein Fenster, ein Hinweis');
+  CL.zugriffToken = 'test'; CL.tokenAblauf = Date.now() + 3600000;
+  CL.DB.einstellungen.kalender = [{ id: 'buero@x', kontext: 'beruflich' }];
+  CL.katSetzen('beruflich');
+  CL.terminNeu(heute, '15:00');
+  await warte(); await warte();
+  let f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(CL.cl.aufklapp === 'termin' && /Neuer Termin/.test(f) && /value="15:00"/.test(f) && /value="16:00"/.test(f), '„Neu“ schlägt die getippte Stunde vor, eine Stunde lang');
+  pruefe(/<option value="buero@x" selected>/.test(f), 'vorgewählt ist ein Kalender, der zu Beruf passt');
+  const feld = (id, w) => { CL.document.getElementById(id).value = w; };
+  feld('terminTitel', ''); feld('terminDatum', heute); feld('terminVon', '15:00'); feld('terminBis', '16:00'); feld('terminKal', 'buero@x');
+  feld('terminOrt', ''); feld('terminNotiz', '');
+  CL.document.getElementById('terminGanz').checked = false;
+  const n = anfragen.length;
+  CL.terminSpeichern();
+  pruefe(anfragen.length === n && /Titel/.test(CL.document.getElementById('toastText').textContent), 'ohne Titel wird nichts geschickt');
+  feld('terminTitel', 'Zahnarzt'); feld('terminBis', '14:00');
+  CL.terminSpeichern();
+  pruefe(anfragen.length === n && /Ende/.test(CL.document.getElementById('toastText').textContent), 'Ende vor Beginn wird abgefangen');
+  feld('terminBis', '16:00'); feld('terminOrt', 'Fürth');
+  await CL.terminSpeichern();
+  const post = anfragen.filter(a => a.o.method === 'POST')[0];
+  const k = post ? JSON.parse(post.o.body) : {};
+  pruefe(post && /calendars\/buero%40x\/events$/.test(post.adresse), 'POST an den gewählten Kalender');
+  pruefe(k.summary === 'Zahnarzt' && k.start.dateTime === heute + 'T15:00:00' && k.end.dateTime === heute + 'T16:00:00' && k.start.timeZone && k.location === 'Fürth',
+    'Titel, Beginn, Ende, Zeitzone und Ort gehen mit');
+  pruefe(post && post.o.headers['Content-Type'] === 'application/json' && /^Bearer /.test(post.o.headers.Authorization), 'mit Anmeldung und als JSON');
+  pruefe(CL.cl.aufklapp === '' && CL.__ablage['clie-kalender-zuletzt'] === 'buero@x', 'danach schließt das Fenster, der Kalender wird gemerkt');
+
+  CL.terminNeu(heute, '09:00');
+  await warte(); await warte();
+  feld('terminTitel', 'Urlaub'); feld('terminDatum', heute); feld('terminKal', 'privat@x'); feld('terminOrt', ''); feld('terminNotiz', '');
+  CL.document.getElementById('terminGanz').checked = true;
+  await CL.terminSpeichern();
+  const ganz = JSON.parse(anfragen.filter(a => a.o.method === 'POST').pop().o.body);
+  pruefe(ganz.start.date === heute && ganz.end.date === CL.tagePlus(heute, 1), 'ganztägig: Ende ist bei Google der Folgetag');
+
+  CL.termineNachTag[heute] = [{ id: 'ev 1', zeit: '16:30', bis: '17:00', titel: 'Becker', rohTitel: 'Becker #Telefon', kontext: 'beruflich', kalId: 'buero@x', serieId: 's1' }];
+  CL.terminZeigen(heute, 'ev 1');
+  f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Ändern/.test(f) && /Löschen…/.test(f) && /Serientermin/.test(f), 'Details zeigen Ändern, Löschen und den Hinweis zur Serie');
+  CL.terminAendern();
+  f = CL.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Termin ändern/.test(f) && /value="Becker #Telefon"/.test(f), 'Ändern übernimmt den Titel samt Kürzel — es geht nichts verloren');
+  feld('terminTitel', 'Becker #Telefon'); feld('terminDatum', heute); feld('terminVon', '17:00'); feld('terminBis', '17:30');
+  CL.document.getElementById('terminGanz').checked = false;
+  await CL.terminSpeichern();
+  const patch = anfragen.filter(a => a.o.method === 'PATCH')[0];
+  pruefe(patch && /calendars\/buero%40x\/events\/ev%201$/.test(patch.adresse) && JSON.parse(patch.o.body).start.dateTime === heute + 'T17:00:00',
+    'Ändern schickt PATCH an genau diesen Termin');
+  const becker = () => { CL.termineNachTag[heute] = [{ id: 'ev 1', zeit: '17:00', bis: '17:30', titel: 'Becker', kontext: 'beruflich', kalId: 'buero@x' }]; };
+  becker();
+  CL.terminZeigen(heute, 'ev 1');
+  CL.terminLoeschenFragen();
+  pruefe(/wirklich/.test(CL.document.getElementById('aufklapp').innerHTML) && !anfragen.some(a => a.o.method === 'DELETE'), 'Löschen fragt erst nach');
+  await CL.terminLoeschen();
+  pruefe(anfragen.some(a => a.o.method === 'DELETE' && /events\/ev%201$/.test(a.adresse)), 'dann DELETE an genau diesen Termin');
+
+  /* Ohne Schreibrecht (Anmeldung noch aus 0.1): neu verbinden */
+  let angemeldet = 0;
+  const altAnmelden = CL.anmelden;
+  CL.anmelden = function () { angemeldet++; return Promise.resolve(false); };
+  CL.fetch = function (adresse) { return Promise.resolve({ ok: false, status: 403, url: adresse, text() { return Promise.resolve('insufficientPermissions'); } }); };
+  becker();
+  CL.terminZeigen(heute, 'ev 1');
+  await CL.terminLoeschen();
+  pruefe(angemeldet === 1 && /neu verbinden/.test(CL.document.getElementById('toastText').textContent), 'fehlt das Schreibrecht, fragt CLIE einmal neu bei Google an');
+  CL.anmelden = altAnmelden;
+  CL.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
+  CL.katSetzen('alle');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -522,6 +707,8 @@ function einkaufTest() {
   palmTest();
   rechnerTest();
   einkaufTest();
+  try { kalenderTest(); } catch (e) { fail('Kalender warf: ' + e.message); }
+  try { await schreibTest(); } catch (e) { fail('Termine schreiben warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
