@@ -285,7 +285,7 @@ function uebersichtTest() {
   pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
     'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 10, 'zehn Apps im Raster (seit 0.9 mit Heute)');
+  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 11, 'elf Apps im Raster (seit 0.18 mit Stones)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -412,12 +412,12 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","abgleich"]',
-    'genau zehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","stones","abgleich"]',
+    'genau elf Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Stones, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 10, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/10)');
+  pruefe(syms === CL.CL_APPS.length, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/' + CL.CL_APPS.length + ')');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -2653,6 +2653,89 @@ function ansichtTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   47. Stones (0.18)
+   Grund: Neues Spiel im LCD-Stil — Steine müssen sich korrekt bewegen,
+   drehen, landen, Reihen räumen, zählen; beim App-Wechsel pausieren;
+   die Bestenliste bleibt auf dem Gerät.
+   Erkennt: Steine durch Wände/Boden, falsche Drehung, Reihen nicht
+   geräumt, Punkte/Level falsch, kein Spielende, Bestenliste falsch
+   sortiert/zu lang, keine Pause beim Verlassen, Tasten/Feld fehlen.
+   ============================================================ */
+function stonesTest() {
+  console.log('\n47. Stones (0.18)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-stones-beste']; delete S.__ablage['clie-stones-spiele'];
+  const zellen = (st) => JSON.stringify(S.stoZellen(st).map(z => z.join(',')).sort());
+  pruefe(zellen({ typ: 'O', rot: 0, x: 0, y: 0 }) === zellen({ typ: 'O', rot: 1, x: 0, y: 0 }), 'O bleibt beim Drehen gleich');
+  pruefe(JSON.stringify(S.stoZellen({ typ: 'I', rot: 1, x: 0, y: 0 }).map(z => z[0])) === '[2,2,2,2]', 'I gedreht steht senkrecht');
+  pruefe(Object.keys(S.STO_FORMEN).length === 7 && S.STO_FORMEN[Object.keys(S.STO_FORMEN)[0]].z.length === 4, 'sieben Formen aus je vier Steinen');
+
+  S.oeffne('stones');
+  pruefe(S.cl.sto.zustand === 'start' && /Spielen/.test(inhalt()) && /Bestenliste/.test(inhalt()), 'Start: Fenster mit „Spielen“ und „Bestenliste“');
+  S.stoNeuesSpiel();
+  pruefe(S.cl.sto.zustand === 'laeuft' && S.cl.sto.stein && S.cl.sto.naechster && S.cl.sto.punkte === 0, 'neues Spiel: Stein, nächster Stein, 0 Punkte');
+  const h = inhalt();
+  pruefe((h.match(/<i/g) || []).length === 180 + 8 && /class="g"/.test(h) && /class="s"/.test(h), 'Feld 10 × 18 mit Stein und Umriss, Vorschau 4 × 2');
+  pruefe(/stoTaste\('links'\)[\s\S]*stoTaste\('drehen'\)[\s\S]*stoTaste\('rechts'\)[\s\S]*stoTaste\('fallen'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten vier Tasten ◀ ⟳ ▶ ▼');
+  pruefe(S.document.getElementById('katKnopf').textContent === 'Level 1', 'oben rechts: Level');
+
+  /* Wände und Boden */
+  S.cl.sto.stein = { typ: 'O', rot: 0, x: 4, y: 0 };
+  let n = 0; while (S.stoVersuch(-1, 0, 0)) { n++; }
+  pruefe(n === 4 && S.cl.sto.stein.x === 0, 'links bis an die Wand, nicht hindurch');
+  S.cl.sto.stein = { typ: 'I', rot: 1, x: -2, y: 2 };
+  pruefe(S.stoVersuch(0, 0, 1) && S.stoZellen(S.cl.sto.stein).every(z => z[0] >= 0), 'Drehen an der Wand weicht aus');
+  S.cl.sto.stein = { typ: 'O', rot: 0, x: 4, y: 0 };
+  S.stoTaste('fallen');
+  pruefe(S.cl.sto.feld[17][4] === 1 && S.cl.sto.feld[16][5] === 1 && S.cl.sto.punkte === 32, 'fallen lassen: landet am Boden, 2 Punkte je Zeile');
+
+  /* Reihe räumen */
+  S.cl.sto.feld = S.stoLeeresFeld();
+  S.cl.sto.feld[17] = [1, 1, 1, 0, 0, 0, 0, 1, 1, 1];
+  S.cl.sto.feld[16] = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  S.cl.sto.punkte = 0; S.cl.sto.reihen = 9; S.cl.sto.level = 1;
+  S.cl.sto.stein = { typ: 'I', rot: 0, x: 3, y: 15 };
+  S.stoTaste('fallen');
+  pruefe(S.cl.sto.reihen === 10 && S.cl.sto.level === 2 && S.cl.sto.punkte === 40 + 2 && JSON.stringify(S.cl.sto.feld[17]) === '[1,0,0,0,0,0,0,0,0,0]',
+    'volle Reihe geräumt, darüber rutscht nach; 10 Reihen → Level 2');
+  pruefe(S.stoTakt() < 800, 'höheres Level: schneller');
+  /* Uhr: ein Schritt tiefer */
+  S.cl.sto.stein = { typ: 'T', rot: 0, x: 4, y: 0 };
+  S.stoSchritt();
+  pruefe(S.cl.sto.stein.y === 1, 'ein Takt: eine Zeile tiefer');
+
+  /* Pause beim Verlassen */
+  S.oeffne('uebersicht');
+  pruefe(S.cl.sto.zustand === 'pause', 'App gewechselt: Pause');
+  S.oeffne('stones');
+  pruefe(/Weiter/.test(inhalt()) && /class="sto-spiel ruht"/.test(inhalt()), 'zurück: „Weiter“, Feld gedämpft');
+  S.stoTaste('links');
+  pruefe(S.cl.sto.stein.x === 4, 'in der Pause bewegt sich nichts');
+  S.stoWeiter();
+  pruefe(S.cl.sto.zustand === 'laeuft', 'Weiter');
+
+  /* Spielende und Bestenliste */
+  S.__ablage['clie-stones-beste'] = JSON.stringify([{ p: 900, r: 9, d: '2026-10-01' }, { p: 500, r: 5, d: '2026-10-02' }, { p: 400, r: 4, d: '2026-10-03' }, { p: 300, r: 3, d: '2026-10-04' }, { p: 100, r: 1, d: '2026-10-05' }]);
+  S.cl.sto.punkte = 650;
+  S.cl.sto.feld = S.stoLeeresFeld();
+  for (let r = 0; r < 18; r++) { S.cl.sto.feld[r][4] = 1; S.cl.sto.feld[r][5] = 1; }
+  S.cl.sto.naechster = 'O';
+  S.stoNeuerStein();
+  const beste = S.stoBeste();
+  pruefe(S.cl.sto.zustand === 'vorbei' && /Spiel vorbei/.test(inhalt()), 'kein Platz mehr: Spiel vorbei');
+  pruefe(beste.length === 5 && beste[1].p === 650 && beste[4].p === 300 && S.cl.sto.neu === 1, 'Bestenliste: sortiert, höchstens 5, neuer Platz 2');
+  pruefe(/<div class="neu"><span>2\. heute<\/span>/.test(inhalt()), 'der neue Eintrag ist hervorgehoben');
+  pruefe(S.stoSpiele() === 1 && !/stones/.test(JSON.stringify(S.DB)), 'gezählt nur auf dem Gerät — nichts in der workbench.json');
+  pruefe(S.stoZahl(12480) === '12 480', 'Tausender mit schmalem Abstand');
+  pruefe(S.STO_TASTEN.ArrowLeft === 'links' && S.STO_TASTEN[' '] === 'fallen', 'Pfeiltasten und Leertaste');
+  S.oeffne('statistik');
+  pruefe(/Stones/.test(inhalt()) && /900 · 1/.test(inhalt()), 'Statistik: Bester und Spiele');
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2696,6 +2779,7 @@ function ansichtTest() {
   try { clsPlanTest(); } catch (e) { fail('Checklisten einplanen warf: ' + e.message); }
   try { clsStichtagTest(); } catch (e) { fail('Stichtag warf: ' + e.message); }
   try { ansichtTest(); } catch (e) { fail('Aufgabensicht warf: ' + e.message); }
+  try { stonesTest(); } catch (e) { fail('Stones warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
