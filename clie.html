@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.22.0</title>
+<title>CLIE 0.23.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -472,6 +472,36 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .toast.warn{background:var(--px);color:var(--lcd);box-shadow:3px 3px 0 var(--px-mitte)}
 #toastText{flex:1}
 .toast button{border:2px solid currentColor;border-radius:12px;padding:0 8px;font-size:18.5px}
+/* Lernkartei (seit 0.23) */
+.lk-kasten{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px}
+.lk-k1{display:flex;justify-content:space-between;gap:8px;font-size:20px}
+.lk-k1 b{font-weight:400;background:var(--px);color:var(--lcd);padding:0 6px;white-space:nowrap}
+.lk-kasten small,.lk-karte-zeile small{display:block;font-size:16px;color:var(--px-mitte)}
+.lk-titel{font-size:21px;font-weight:600;border-bottom:2px solid var(--px);margin:2px 0 8px}
+.lk-faecher{display:flex;gap:8px;align-items:flex-end;margin:6px 0 10px}
+.lk-faecher div{flex:1;display:flex;flex-direction:column;align-items:center;font-size:17px}
+.lk-faecher small{font-size:15.5px;color:var(--px-mitte)}
+.lk-saeule{display:flex;align-items:flex-end;width:100%;height:70px;border:2px solid var(--px)}
+.lk-saeule i{display:block;width:100%;background:var(--px)}
+.lk-info{font-size:18px;margin:4px 0}
+.lk-karte-zeile{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 2px;font-size:19px}
+.lk-karte-zeile b{font-weight:400;color:var(--px-mitte);white-space:nowrap}
+.lk-kopfzeile{display:flex;justify-content:space-between;font-size:17px;color:var(--px-mitte);margin-bottom:6px}
+.lk-seite{display:block;width:100%;text-align:left;border:2px solid var(--px);background:var(--lcd-hell);padding:10px 12px;margin:0 0 10px;font-size:20px;line-height:1.4}
+.lk-seite.vorn{box-shadow:3px 3px 0 var(--px)}
+.lk-seite.hinten{background:var(--lcd)}
+.lk-seite small{display:block;font-size:15.5px;color:var(--px-mitte);margin-bottom:6px}
+.lk-zeile{margin:0 0 2px}
+.lk-leer{height:8px}
+.lk-punkt{display:flex;gap:8px;margin:2px 0}
+.lk-punkt span:first-child{flex:0 0 auto;min-width:18px}
+.lk-punkt.zu span:last-child{color:var(--px-zart)}
+.lk-mitte{text-align:center;justify-content:center}
+.lk-bewerten{display:flex;gap:6px;margin-top:8px}
+.lk-bewerten .knopf{flex:1;padding:6px 4px}
+.lk-feld{display:block;width:100%;min-height:150px;font:17.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--px);background:var(--lcd-hell);border:2px solid var(--px);padding:6px;box-sizing:border-box}
+.lk-feld.klein{min-height:64px}
+.lk-datei{display:none}
 </style>
 </head>
 <body>
@@ -515,7 +545,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.22.0';
+var APP_VERSION = '0.23.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2728,6 +2758,7 @@ var CL_APPS = [
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '' },
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '' },
   { id: 'schach',   name: 'Schach',   stufe: '',    was: '' },
+  { id: 'lernkartei', name: 'Lernkartei', stufe: '', was: '' },
   { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '' }
 ];
 
@@ -2771,6 +2802,9 @@ var CL_BILD = {
   /* Vier Steine wie ein gelandeter Stein (seit 0.18) */
   stones: '<rect x="15" y="34" width="10" height="10" ' + CL_FUELL + '/><rect x="27" y="34" width="10" height="10" ' + CL_FUELL + '/>'
         + '<rect x="39" y="34" width="10" height="10" ' + CL_FUELL + '/><rect x="27" y="22" width="10" height="10" ' + CL_FUELL + '/>',
+  /* Zwei Karteikarten, die vordere mit Zeilen (seit 0.23) */
+  lernkartei: '<rect x="22" y="14" width="26" height="18" rx="2" ' + CL_STRICH + '/><rect x="14" y="26" width="28" height="22" rx="2" ' + CL_FUELL + '/>'
+        + '<rect x="18" y="32" width="20" height="3" fill="#1C2116"/><rect x="18" y="39" width="14" height="3" fill="#1C2116"/>',
   abgleich: '<path d="M22 38c0-9 5-17 16-17" ' + CL_STRICH + '/><path d="M34 15l6 6-6 6" ' + CL_STRICH + '/><path d="M42 26c0 9-5 17-16 17" ' + CL_STRICH + '/><path d="M30 49l-6-6 6-6" ' + CL_STRICH + '/>'
 };
 
@@ -3024,11 +3058,11 @@ function heuteHtml() {
   if (d.posten.length) { h += '<div class="abschnitt">Als Nächstes</div>' + d.posten.map(function (p) { return clHeuteZeile(d, p); }).join(''); }
   if (d.vorgenommen.length) { h += '<div class="abschnitt">Vorgenommen</div>' + d.vorgenommen.map(function (p) { return clHeuteZeile(d, p); }).join(''); }
   if (d.routinen.length) { h += '<div class="abschnitt">Routinen</div>' + d.routinen.map(function (p) { return clHeuteZeile(d, p); }).join(''); }
-  /* Hinweise: laufende Checklisten und Abo-Fristen — nicht gezählt */
+  /* Hinweise: laufende Checklisten, fällige Lernkarten und Abo-Fristen — nicht gezählt */
   var hinweise = clsAlle('lauf').map(function (g) {
     var st = clsStand(g);
     return '<button type="button" class="hz" onclick="oeffne(\'checklisten\');clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">☑ ' + esc(g.titel) + ' · ' + st.fertig + '/' + st.alle + '</span></button>';
-  }).concat(saHinweise().map(function (x) {
+  }).concat(lkAlleHeute() ? ['<button type="button" class="hz" onclick="oeffne(\'lernkartei\')"><span class="tx">▤ Lernkartei · ' + lkAlleHeute() + ' Karten fällig</span></button>'] : []).concat(saHinweise().map(function (x) {
     return '<button type="button" class="hz" onclick="oeffne(\'sammlungen\');saOeffnen(\'' + esc(x.s.id) + '\')"><span class="tx">⚠ ' + esc(x.name) + ' kündbar bis ' + esc(saDatumText(x.bis).slice(0, 6)) + '</span></button>';
   }));
   if (hinweise.length) { h += '<div class="abschnitt">Hinweise</div>' + hinweise.join(''); }
@@ -3429,6 +3463,7 @@ function statistikHtml() {
       ['aktiv · pausiert · heute offen', (rt.length - rtPause) + ' · ' + rtPause + ' · ' + rtOffen]])
     + clStatBlock('drive', 'Drive', [['Favoriten', String(drvFavoriten().length)]])
     + clStatBlock('schach', 'Schach', [['gegen CLIE: gewonnen · verloren · remis', schBilanzLesen().g + ' · ' + schBilanzLesen().v + ' · ' + schBilanzLesen().r]])
+    + clStatBlock('lernkartei', 'Lernkartei', [['Kästen · Karten · heute fällig', lkStatZeile()]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
     + clStatBlock('abgleich', 'Datei', [
@@ -3514,6 +3549,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'rechner') { el.innerHTML = rechnerHtml(); }
   else if (cl.app === 'stones') { el.innerHTML = stonesHtml(); }
   else if (cl.app === 'schach') { el.innerHTML = schachHtml(); }
+  else if (cl.app === 'lernkartei') { el.innerHTML = lernkarteiHtml(); }
   else if (cl.app === 'drive') {
     /* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
     if (cl.drv.tab === 'suche' && el.innerHTML.indexOf('drvFeld') >= 0) { drvZeichnen(); return; }
@@ -3564,6 +3600,7 @@ function kopfZeichnen() {
     kat.textContent = (cl.app === 'stones') ? 'Level ' + cl.sto.level
       : (cl.app === 'drive') ? ''
       : (cl.app === 'schach') ? schKopfText()
+      : (cl.app === 'lernkartei') ? lkKopfText()
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
     kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter') ? ' an' : '');
   }
@@ -3642,6 +3679,9 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'schNeu\')">Neue Partie…</button>'
           + '<button type="button" onclick="menueWahl(\'schSpeichern\')">Partie speichern…</button>'
           + '<button type="button" onclick="menueWahl(\'schDrehen\')">Brett drehen</button>' : '')
+      + (cl.app === 'lernkartei' ? '<div class="trenn"></div>'
+          + '<button type="button" onclick="menueWahl(\'lkNeu\')">Neu…</button>'
+          + '<button type="button" onclick="menueWahl(\'lkPaket\')">Kartenpaket laden…</button>' : '')
       + (cl.app === 'stones' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'stoNeu\')">Neues Spiel</button>'
           + '<button type="button" onclick="menueWahl(\'stoListe\')">Bestenliste</button>' : '')
@@ -3667,7 +3707,8 @@ function fussZeichnen() {
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
         : (cl.app === 'drive') ? driveFussHtml()
-        : (cl.app === 'schach') ? schachFussHtml() : '';
+        : (cl.app === 'schach') ? schachFussHtml()
+        : (cl.app === 'lernkartei') ? lernkarteiFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -3695,6 +3736,7 @@ function oeffne(id) {
   if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; }
   if (id === 'sammlungen' && cl.app !== 'sammlungen') { cl.sa.id = ''; cl.sa.ansicht = 'tabelle'; }
+  if (id === 'lernkartei' && cl.app !== 'lernkartei') { cl.lk.fenster = ''; cl.lk.paket = null; }
   cl.app = (clApp(id) || id === 'statistik' || id === 'suchen') ? id : 'uebersicht';
   cl.aufklapp = '';
   var el = document.getElementById('inhalt');
@@ -3706,7 +3748,7 @@ function oeffne(id) {
 }
 
 function katUm() {
-  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach') { return; }
+  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'lernkartei') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
     : (cl.app === 'sammlungen' && saKatText() !== null) ? 'safilter' : 'kat';
@@ -3746,6 +3788,8 @@ function menueWahl(was) {
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   if (was === 'stoNeu') { stoNeuesSpiel(); return; }
+  if (was === 'lkNeu') { aufklappZeichnen(); lkNeuOeffnen(); return; }
+  if (was === 'lkPaket') { aufklappZeichnen(); cl.lk.id = ''; lkPaketWaehlen(); return; }
   if (was === 'schNeu') { aufklappZeichnen(); schNeuOeffnen(); return; }
   if (was === 'schSpeichern') { aufklappZeichnen(); schSpeichernOeffnen(); return; }
   if (was === 'schDrehen') { aufklappZeichnen(); schDrehen(); return; }
@@ -10617,6 +10661,649 @@ function schKopfText() {
   return s.gegner === 'zwei' ? '2 Spieler' : schKopfStufe();
 }
 
+/* ---------- Lernkartei (seit 0.23) ----------
+
+   Karteikarten nach dem Fächer-Prinzip (Leitner): Fach 1 täglich, dann
+   2, 4, 8 und 16 Tage. Gewusst → ein Fach weiter, Teilweise → bleibt,
+   Nicht gewusst → zurück in Fach 1 (und heute noch einmal).
+   Rückseiten mit Absätzen, Aufzählungen und **fett**; Listen lassen sich
+   Punkt für Punkt aufdecken. Kästen entstehen von Hand, aus eingefügtem
+   Text, aus einem Memo oder aus einem Kartenpaket (JSON-Datei). Alles
+   bleibt nur auf diesem Gerät. */
+
+var LK_KEY = 'clie-lernkartei';
+var LK_INTERVALL = [0, 1, 2, 4, 8, 16];
+var LK_RICHTUNGEN = [['vor', 'Vorder → Rück'], ['rueck', 'Rück → Vorder'], ['gemischt', 'Gemischt']];
+
+cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '' };
+
+function lkDaten() {
+  var d = null;
+  try { d = JSON.parse(window.localStorage.getItem(LK_KEY) || 'null'); } catch (e) { d = null; }
+  d = (d && typeof d === 'object') ? d : {};
+  if (!Array.isArray(d.kaesten)) { d.kaesten = []; }
+  if (!d.neu || typeof d.neu !== 'object') { d.neu = { datum: '', z: {} }; }
+  if (d.neu.datum !== isoDatum()) { d.neu = { datum: isoDatum(), z: {} }; }
+  return d;
+}
+
+function lkSichern(d) {
+  try { window.localStorage.setItem(LK_KEY, JSON.stringify(d)); return true; }
+  catch (e) { melde('Speichern ging nicht — der Speicher ist voll.', 'warn'); return false; }
+}
+
+function lkKasten(d, id) {
+  return d.kaesten.filter(function (k) { return k.id === id; })[0] || null;
+}
+
+/* Wie viele neue Karten heute noch dazukommen dürfen */
+function lkNeuFrei(d, k) {
+  var schon = Number(d.neu.z[k.id]) || 0;
+  var neu = k.karten.filter(function (c) { return !c.fach; }).length;
+  return Math.max(0, Math.min(neu, (Number(k.neuProTag) || 20) - schon));
+}
+
+function lkFaellig(k) {
+  var heute = isoDatum();
+  return k.karten.filter(function (c) { return c.fach >= 1 && (!c.faellig || c.faellig <= heute); });
+}
+
+function lkHeuteZahl(d, k) {
+  return lkFaellig(k).length + lkNeuFrei(d, k);
+}
+
+function lkAlleHeute() {
+  var d = lkDaten();
+  return d.kaesten.reduce(function (n, k) { return n + lkHeuteZahl(d, k); }, 0);
+}
+
+/* ---- Text der Karten: Absätze, Aufzählungen, fett ---- */
+
+function lkListenZeile(z) {
+  return /^\s*([•\-*]|\d{1,2}[.)])\s+/.test(z);
+}
+
+/* k = wie viele Listenpunkte schon aufgedeckt sind (-1 = alle) */
+function lkTextHtml(t, k) {
+  var n = 0;
+  return String(t || '').split('\n').map(function (z) {
+    var fett = function (x) { return esc(x).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>'); };
+    if (lkListenZeile(z)) {
+      var m = z.match(/^\s*([•\-*]|\d{1,2}[.)])\s+(.*)$/);
+      var zeichen = /\d/.test(m[1]) ? m[1].replace(')', '.') : '•';
+      var zu = k >= 0 && n >= k;
+      n++;
+      return '<div class="lk-punkt' + (zu ? ' zu' : '') + '"><span>' + esc(zeichen) + '</span><span>' + (zu ? '…………' : fett(m[2])) + '</span></div>';
+    }
+    return z.trim() ? '<div class="lk-zeile">' + fett(z) + '</div>' : '<div class="lk-leer"></div>';
+  }).join('');
+}
+
+function lkPunkte(t) {
+  return String(t || '').split('\n').filter(lkListenZeile).length;
+}
+
+/* ---- Lernen ---- */
+
+function lkMischen(l) {
+  var i;
+  for (i = l.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = l[i]; l[i] = l[j]; l[j] = t; }
+  return l;
+}
+
+/* Sitzung: fällige Karten (gemischt) und die neuen für heute — aus einem Kasten oder allen */
+function lkLernen(kastenId) {
+  var d = lkDaten();
+  var schlange = [];
+  d.kaesten.forEach(function (k) {
+    if (kastenId && k.id !== kastenId) { return; }
+    var faellig = lkMischen(lkFaellig(k).slice());
+    var neu = k.karten.filter(function (c) { return !c.fach; }).slice(0, lkNeuFrei(d, k));
+    faellig.concat(neu).forEach(function (c) {
+      var r = k.richtung === 'rueck' || (k.richtung === 'gemischt' && Math.random() < 0.5);
+      schlange.push({ k: k.id, c: c.id, r: r });
+    });
+  });
+  if (!schlange.length) { melde('Heute ist nichts fällig. Gut gemacht!', 'gut'); return; }
+  cl.lk.sitzung = { schlange: schlange, i: 0, um: false, auf: 0, stat: { g: 0, t: 0, n: 0 }, wieder: {} };
+  cl.lk.ansicht = 'lernen';
+  cl.lk.fenster = '';
+  lkZeichnen();
+}
+
+function lkAktuell() {
+  var s = cl.lk.sitzung;
+  if (!s || s.i >= s.schlange.length) { return null; }
+  var e = s.schlange[s.i];
+  var d = lkDaten();
+  var k = lkKasten(d, e.k);
+  var c = k ? k.karten.filter(function (x) { return x.id === e.c; })[0] : null;
+  return c ? { d: d, k: k, c: c, e: e } : null;
+}
+
+/* Frage und Antwort je nach Richtung */
+function lkSeiten(c, rueck) {
+  if (!rueck) { return { frage: c.v, antwort: c.r }; }
+  return { frage: c.w || String(c.r || '').split('\n')[0], antwort: c.v + (c.w ? '\n' + c.r : '') };
+}
+
+function lkUmdrehen() {
+  var s = cl.lk.sitzung;
+  if (!s) { return; }
+  s.um = true;
+  s.auf = 0;
+  lkZeichnen();
+}
+
+function lkNaechsterPunkt() {
+  var s = cl.lk.sitzung;
+  var a = lkAktuell();
+  if (!s || !a) { return; }
+  s.auf = Math.min(lkPunkte(lkSeiten(a.c, a.e.r).antwort), s.auf + 1);
+  lkZeichnen();
+}
+
+function lkAllesZeigen() {
+  var s = cl.lk.sitzung;
+  if (!s) { return; }
+  s.auf = -1;
+  lkZeichnen();
+}
+
+/* Bewertung: g = gewusst, t = teilweise, n = nicht gewusst */
+function lkBewerten(was) {
+  var s = cl.lk.sitzung;
+  var a = lkAktuell();
+  if (!s || !a || ['g', 't', 'n'].indexOf(was) < 0) { return; }
+  var c = a.c;
+  var heute = isoDatum();
+  if (!c.fach) { a.d.neu.z[a.k.id] = (Number(a.d.neu.z[a.k.id]) || 0) + 1; c.fach = 1; }
+  if (was === 'g') { c.fach = Math.min(5, c.fach + 1); c.faellig = tagePlus(heute, LK_INTERVALL[c.fach]); }
+  else if (was === 't') { c.faellig = tagePlus(heute, 1); }
+  else {
+    c.fach = 1;
+    c.faellig = heute;
+    /* heute noch einmal — aber nur einmal */
+    if (!s.wieder[c.id]) { s.wieder[c.id] = 1; s.schlange.push({ k: a.e.k, c: c.id, r: a.e.r }); }
+  }
+  c.gesehen = (Number(c.gesehen) || 0) + 1;
+  s.stat[was]++;
+  lkSichern(a.d);
+  s.i++;
+  s.um = false;
+  s.auf = 0;
+  lkZeichnen();
+}
+
+/* ---- Kästen und Karten ---- */
+
+function lkKastenNeu(name) {
+  var d = lkDaten();
+  var k = { id: neueKennung(), name: String(name || 'Neuer Kasten').slice(0, 80), karten: [], neuProTag: 20, richtung: 'vor', angelegt: isoDatum() };
+  d.kaesten.push(k);
+  lkSichern(d);
+  return k.id;
+}
+
+function lkKartenAusText(t) {
+  return String(t || '').replace(/\r/g, '').split(/\n\s*\n/).map(function (b) {
+    var z = b.split('\n').filter(function (x, i) { return i > 0 || x.trim(); });
+    var v = (z.shift() || '').trim();
+    return v ? { id: neueKennung(), v: v.slice(0, 500), r: z.join('\n').trim().slice(0, 4000), fach: 0, faellig: '' } : null;
+  }).filter(function (c) { return !!c; });
+}
+
+/* Memo: jede Überschrift (#) wird eine Karte, der Text darunter die Rückseite */
+function lkKartenAusMemo(text) {
+  var karten = [];
+  var akt = null;
+  String(text || '').split('\n').forEach(function (z) {
+    var m = z.match(/^\s*#{1,3}\s+(.*)$/);
+    if (m) { akt = { id: neueKennung(), v: m[1].trim().slice(0, 500), r: '', fach: 0, faellig: '' }; karten.push(akt); return; }
+    if (akt) { akt.r += (akt.r ? '\n' : '') + z.replace(/^\s*\[[ xX-]?\]\s*/, '- '); }
+  });
+  karten.forEach(function (c) { c.r = c.r.trim(); });
+  return karten.filter(function (c) { return c.v && c.r; });
+}
+
+function lkFensterAuf(f) {
+  cl.lk.fenster = f;
+  lkZeichnen();
+}
+
+function lkFensterZu() {
+  cl.lk.fenster = '';
+  cl.lk.karte = '';
+  cl.lk.paket = null;
+  lkZeichnen();
+}
+
+function lkKastenOeffnen(id) {
+  cl.lk.id = id;
+  cl.lk.ansicht = 'kasten';
+  cl.lk.fenster = '';
+  lkZeichnen();
+}
+
+function lkNeuerKastenOk() {
+  var f = document.getElementById('lkName');
+  var name = String((f && f.value) || '').trim();
+  if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  cl.lk.fenster = '';
+  lkKastenOeffnen(lkKastenNeu(name));
+}
+
+/* Text einfügen: in den gewählten Kasten (oder einen neuen) */
+function lkEinfuegenOk() {
+  var t = document.getElementById('lkText');
+  var n = document.getElementById('lkName');
+  var karten = lkKartenAusText(t && t.value);
+  if (!karten.length) { melde('Keine Karte erkannt — erste Zeile Vorderseite, Leerzeile trennt Karten.', 'warn'); return; }
+  var d = lkDaten();
+  var k = cl.lk.id ? lkKasten(d, cl.lk.id) : null;
+  if (!k) {
+    var name = String((n && n.value) || '').trim() || 'Meine Karten';
+    lkKastenNeu(name);
+    d = lkDaten();
+    k = d.kaesten[d.kaesten.length - 1];
+  }
+  k.karten = k.karten.concat(karten);
+  lkSichern(d);
+  melde(karten.length + ' Karten in „' + k.name + '“ übernommen.', 'gut');
+  cl.lk.fenster = '';
+  lkKastenOeffnen(k.id);
+}
+
+function lkMemoUebernehmen(seiteId) {
+  var s = kpSeiteFinden(seiteId);
+  var karten = s ? lkKartenAusMemo(s.text) : [];
+  if (!karten.length) { melde('In diesem Memo gibt es keine Überschrift mit Text darunter.', 'warn'); return; }
+  var d = lkDaten();
+  var k = cl.lk.id ? lkKasten(d, cl.lk.id) : null;
+  if (!k) { lkKastenNeu(s.titel); d = lkDaten(); k = d.kaesten[d.kaesten.length - 1]; }
+  k.karten = k.karten.concat(karten);
+  lkSichern(d);
+  melde(karten.length + ' Karten aus „' + s.titel + '“ übernommen.', 'gut');
+  cl.lk.fenster = '';
+  lkKastenOeffnen(k.id);
+}
+
+/* Karte bearbeiten / neu */
+function lkKarteOeffnen(id) {
+  cl.lk.karte = id || '';
+  lkFensterAuf('karte');
+}
+
+function lkKarteSpeichern() {
+  var v = String((document.getElementById('lkV') || {}).value || '').trim();
+  var r = String((document.getElementById('lkR') || {}).value || '').trim();
+  if (!v) { melde('Die Vorderseite ist leer.', 'warn'); return; }
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k) { lkFensterZu(); return; }
+  var c = cl.lk.karte ? k.karten.filter(function (x) { return x.id === cl.lk.karte; })[0] : null;
+  if (!c) { c = { id: neueKennung(), fach: 0, faellig: '' }; k.karten.push(c); }
+  c.v = v.slice(0, 500);
+  c.r = r.slice(0, 4000);
+  lkSichern(d);
+  lkFensterZu();
+}
+
+function lkKarteLoeschen() {
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k) { lkFensterZu(); return; }
+  k.karten = k.karten.filter(function (x) { return x.id !== cl.lk.karte; });
+  lkSichern(d);
+  lkFensterZu();
+}
+
+/* Während des Lernens: die aktuelle Karte bearbeiten */
+function lkAktuelleBearbeiten() {
+  var a = lkAktuell();
+  if (!a) { return; }
+  cl.lk.id = a.k.id;
+  lkKarteOeffnen(a.c.id);
+}
+
+/* Details eines Kastens */
+function lkDetailsSpeichern() {
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k) { lkFensterZu(); return; }
+  var n = String((document.getElementById('lkName') || {}).value || '').trim();
+  var t = Math.round(Number((document.getElementById('lkNeuTag') || {}).value));
+  if (n) { k.name = n.slice(0, 80); }
+  if (t >= 0 && t <= 200) { k.neuProTag = t; }
+  lkSichern(d);
+  lkFensterZu();
+}
+
+function lkRichtung(r) {
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k || !LK_RICHTUNGEN.some(function (x) { return x[0] === r; })) { return; }
+  k.richtung = r;
+  lkSichern(d);
+  lkZeichnen();
+}
+
+function lkZuruecksetzen() {
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k) { return; }
+  k.karten.forEach(function (c) { c.fach = 0; c.faellig = ''; });
+  lkSichern(d);
+  melde('Alle Karten sind wieder neu.', null);
+  lkFensterZu();
+}
+
+function lkKastenLoeschen() {
+  var d = lkDaten();
+  d.kaesten = d.kaesten.filter(function (k) { return k.id !== cl.lk.id; });
+  lkSichern(d);
+  cl.lk.id = '';
+  cl.lk.ansicht = 'liste';
+  lkFensterZu();
+}
+
+/* ---- Kartenpakete (JSON-Dateien) ---- */
+
+function lkPaketWaehlen() {
+  var f = document.getElementById('lkDatei');
+  if (f && f.click) { f.value = ''; f.click(); }
+}
+
+function lkPaketGewaehlt(feld) {
+  var datei = feld && feld.files && feld.files[0];
+  if (!datei || typeof window.FileReader !== 'function') { return; }
+  var leser = new window.FileReader();
+  leser.onload = function () { lkPaketPruefen(String(leser.result || ''), datei.name); };
+  leser.readAsText(datei);
+}
+
+/* Prüft und zeigt ein Paket vor dem Übernehmen */
+function lkPaketPruefen(text, dateiname) {
+  var p = null;
+  try { p = JSON.parse(text); } catch (e) { p = null; }
+  if (!p || p.format !== 'clie-lernkartei' || !p.paket || !p.paket.id || !Array.isArray(p.karten)) {
+    melde('Das ist kein Kartenpaket für CLIE.', 'warn');
+    return false;
+  }
+  var karten = p.karten.filter(function (c) { return c && c.id && c.v; });
+  cl.lk.paket = { id: String(p.paket.id), name: String(p.paket.name || dateiname || 'Paket'), version: Number(p.paket.version) || 1,
+                  beschreibung: String(p.paket.beschreibung || ''), richtung: p.paket.richtung, datei: dateiname || '',
+                  karten: karten.map(function (c) { return { id: String(c.id), v: String(c.v).slice(0, 500), r: String(c.r || '').slice(0, 4000), w: c.w ? String(c.w).slice(0, 200) : '' }; }) };
+  cl.lk.fenster = 'paket';
+  lkZeichnen();
+  return true;
+}
+
+/* Übernehmen: neuer Kasten oder Aktualisierung — der Lernstand bleibt */
+function lkPaketUebernehmen() {
+  var p = cl.lk.paket;
+  if (!p) { return; }
+  var d = lkDaten();
+  var k = d.kaesten.filter(function (x) { return x.paket && x.paket.id === p.id; })[0];
+  var neu = 0;
+  var geaendert = 0;
+  if (!k) {
+    k = { id: neueKennung(), name: p.name, karten: [], neuProTag: 20, richtung: ['vor', 'rueck', 'gemischt'].indexOf(p.richtung) >= 0 ? p.richtung : 'vor', angelegt: isoDatum() };
+    d.kaesten.push(k);
+  }
+  k.paket = { id: p.id, version: p.version };
+  var vorhanden = {};
+  k.karten.forEach(function (c) { if (c.q) { vorhanden[c.q] = c; } });
+  p.karten.forEach(function (x) {
+    var c = vorhanden[x.id];
+    if (c) {
+      if (c.v !== x.v || c.r !== x.r || (c.w || '') !== x.w) { c.v = x.v; c.r = x.r; c.w = x.w; geaendert++; }
+      return;
+    }
+    k.karten.push({ id: neueKennung(), q: x.id, v: x.v, r: x.r, w: x.w, fach: 0, faellig: '' });
+    neu++;
+  });
+  if (!lkSichern(d)) { return; }
+  melde('„' + k.name + '“: ' + neu + ' neue' + (geaendert ? ', ' + geaendert + ' aktualisierte' : '') + ' Karten.', 'gut');
+  cl.lk.paket = null;
+  cl.lk.fenster = '';
+  lkKastenOeffnen(k.id);
+}
+
+/* ---- Zeichnen ---- */
+
+function lkFaecher(k) {
+  var f = [0, 0, 0, 0, 0, 0];
+  k.karten.forEach(function (c) { f[Math.max(0, Math.min(5, Number(c.fach) || 0))]++; });
+  return f;
+}
+
+function lkFaecherHtml(k) {
+  var f = lkFaecher(k);
+  var max = Math.max(1, f[1], f[2], f[3], f[4], f[5]);
+  var h = '<div class="lk-faecher">';
+  var i;
+  for (i = 1; i <= 5; i++) {
+    h += '<div><span class="lk-saeule"><i style="height:' + Math.round(f[i] * 100 / max) + '%"></i></span><b>' + f[i] + '</b><small>Fach ' + i + '</small></div>';
+  }
+  return h + '</div>';
+}
+
+function lkListeHtml() {
+  var d = lkDaten();
+  if (!d.kaesten.length) {
+    return '<p>Noch keine Lernkartei.</p><p class="leise">Mit „Neu…“ legst du einen Kasten an, fügst Karten als Text ein, übernimmst ein Memo oder lädst ein Kartenpaket.</p>';
+  }
+  return d.kaesten.map(function (k) {
+    var heute = lkHeuteZahl(d, k);
+    var neu = k.karten.filter(function (c) { return !c.fach; }).length;
+    return '<button type="button" class="lk-kasten" onclick="lkKastenOeffnen(\'' + esc(k.id) + '\')"><span class="lk-k1"><span>' + esc(k.name) + '</span><b>'
+      + (heute ? heute + ' fällig' : '—') + '</b></span><small>' + (k.paket ? 'Paket · ' : '') + k.karten.length + ' Karten'
+      + (neu ? ' · ' + neu + ' neu' : '') + ' · ' + lkFaecher(k)[5] + ' in Fach 5</small></button>';
+  }).join('');
+}
+
+function lkKastenHtml() {
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k) { cl.lk.ansicht = 'liste'; return lkListeHtml(); }
+  var faellig = lkFaellig(k).length;
+  var neu = lkNeuFrei(d, k);
+  return '<div class="lk-titel">' + esc(k.name) + '</div>'
+    + lkFaecherHtml(k)
+    + '<div class="lk-info">' + faellig + ' fällig · ' + neu + ' neue für heute · ' + k.karten.filter(function (c) { return !c.fach; }).length + ' noch nicht gelernt</div>'
+    + '<div class="lk-info leise">Abfrage: ' + esc((LK_RICHTUNGEN.filter(function (x) { return x[0] === (k.richtung || 'vor'); })[0] || ['', ''])[1])
+    + ' · bis zu ' + (Number(k.neuProTag) || 20) + ' neue pro Tag' + (k.paket ? ' · Paket v' + k.paket.version : '') + '</div>';
+}
+
+function lkKartenHtml() {
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (!k) { return ''; }
+  var q = suNorm(cl.lk.suche || '');
+  var l = k.karten.filter(function (c) { return !q || suNorm(c.v + ' ' + c.r + ' ' + (c.w || '')).indexOf(q) >= 0; });
+  return '<div class="su-feld"><span>⌕</span><input id="lkSuche" type="search" autocomplete="off" placeholder="In den Karten suchen …" value="' + esc(cl.lk.suche) + '" oninput="lkSucheGetippt()"></div>'
+    + '<div id="lkKartenListe">' + lkKartenListeHtml(l) + '</div>';
+}
+
+function lkKartenListeHtml(l) {
+  return l.slice(0, 300).map(function (c) {
+    return '<button type="button" class="lk-karte-zeile" onclick="lkKarteOeffnen(\'' + esc(c.id) + '\')"><span>' + esc(c.v)
+      + '<small>' + esc(String(c.w || c.r || '').split('\n')[0].replace(/\*\*/g, '').slice(0, 70)) + '</small></span><b>' + (c.fach ? 'F' + c.fach : 'neu') + '</b></button>';
+  }).join('') + (l.length > 300 ? '<p class="leise">… und ' + (l.length - 300) + ' weitere — die Suche grenzt ein.</p>' : '') + (l.length ? '' : '<p class="leise">Keine Karte gefunden.</p>');
+}
+
+function lkSucheGetippt() {
+  var f = document.getElementById('lkSuche');
+  cl.lk.suche = f ? String(f.value || '') : '';
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  var ziel = document.getElementById('lkKartenListe');
+  if (!k || !ziel) { return; }
+  var q = suNorm(cl.lk.suche);
+  ziel.innerHTML = lkKartenListeHtml(k.karten.filter(function (c) { return !q || suNorm(c.v + ' ' + c.r + ' ' + (c.w || '')).indexOf(q) >= 0; }));
+}
+
+function lkLernenHtml() {
+  var s = cl.lk.sitzung;
+  var a = lkAktuell();
+  if (!s || !a) {
+    var st = s ? s.stat : { g: 0, t: 0, n: 0 };
+    return '<div class="lk-titel">Geschafft!</div><p>' + (st.g + st.t + st.n) + ' Karten gelernt: ' + st.g + ' gewusst, ' + st.t + ' teilweise, ' + st.n + ' nicht gewusst.</p>'
+      + '<p class="leise">Nicht Gewusstes kommt morgen wieder, Gewusstes rückt ein Fach weiter.</p>';
+  }
+  var seite = lkSeiten(a.c, a.e.r);
+  var punkte = lkPunkte(seite.antwort);
+  var h = '<div class="lk-kopfzeile"><span>' + esc(a.k.name) + '</span><span>' + (s.i + 1) + ' / ' + s.schlange.length + '</span></div>'
+    + '<button type="button" class="lk-seite vorn" onclick="lkUmdrehen()"><small>' + (a.e.r ? 'Rückseite → Vorderseite' : 'Vorderseite') + ' · ' + (a.c.fach ? 'Fach ' + a.c.fach : 'neu') + '</small>'
+    + lkTextHtml(seite.frage, -1) + '</button>';
+  if (!s.um) { return h + '<p class="leise lk-mitte">Erst selbst überlegen — dann umdrehen.</p>'; }
+  var k = (punkte && s.auf >= 0) ? s.auf : -1;
+  h += '<div class="lk-seite hinten"><small>Antwort' + (k >= 0 ? ' · ' + k + ' von ' + punkte + ' aufgedeckt' : '') + '</small>' + lkTextHtml(seite.antwort, k) + '</div>';
+  if (k >= 0 && k < punkte) {
+    h += '<div class="knoepfe lk-mitte"><button type="button" class="knopf voll" onclick="lkNaechsterPunkt()">Nächster Punkt</button>'
+       + '<button type="button" class="knopf" onclick="lkAllesZeigen()">Alles zeigen</button></div>';
+  }
+  return h + '<div class="lk-bewerten"><button type="button" class="knopf" onclick="lkBewerten(\'n\')">✗ Nicht</button>'
+    + '<button type="button" class="knopf" onclick="lkBewerten(\'t\')">~ Teilweise</button>'
+    + '<button type="button" class="knopf voll" onclick="lkBewerten(\'g\')">✓ Gewusst</button></div>';
+}
+
+function lkFensterHtml() {
+  var f = cl.lk.fenster;
+  if (!f) { return ''; }
+  var kopf = function (t) { return '<div class="fenster lk-fenster"><div class="titel">' + t + '</div><div class="rumpf">'; };
+  var zu = '</div></div>';
+  var d = lkDaten();
+  var k = lkKasten(d, cl.lk.id);
+  if (f === 'neu') {
+    return kopf('Neu') + '<button type="button" class="wahl" onclick="lkFensterAuf(\'kasten\')">Neuer Kasten …</button>'
+      + '<button type="button" class="wahl" onclick="lkFensterAuf(\'einfuegen\')">Karten als Text einfügen …</button>'
+      + '<button type="button" class="wahl" onclick="lkFensterAuf(\'memo\')">Aus einem Memo übernehmen …</button>'
+      + '<button type="button" class="wahl" onclick="lkPaketWaehlen()">Kartenpaket laden …</button>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'kasten') {
+    return kopf('Neuer Kasten') + '<label for="lkName">Name:</label><input id="lkName" class="eingabe" type="text" autocomplete="off" value="">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkNeuerKastenOk()">Anlegen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'einfuegen') {
+    return kopf('Karten einfügen') + (k ? '<p class="leise">In den Kasten „' + esc(k.name) + '“.</p>'
+        : '<label for="lkName">Neuer Kasten:</label><input id="lkName" class="eingabe" type="text" autocomplete="off" value="Meine Karten">')
+      + '<label for="lkText">Leerzeile trennt Karten · 1. Zeile = Vorderseite · Rest = Rückseite (Listen mit • - 1. erlaubt)</label>'
+      + '<textarea id="lkText" class="eingabe lk-feld" spellcheck="true"></textarea>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkEinfuegenOk()">Übernehmen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'memo') {
+    var seiten = kpNachRang(kpSeitenAlle()).filter(function (s) { return /^\s*#{1,3}\s/m.test(String(s.text || '')); });
+    return kopf('Aus einem Memo') + (seiten.length ? seiten.map(function (s) {
+        return '<button type="button" class="wahl" onclick="lkMemoUebernehmen(\'' + esc(s.id) + '\')">' + clSeitenZeichen(s) + ' ' + esc(s.titel) + '</button>';
+      }).join('') : '<p class="leise">Kein Memo mit Überschriften gefunden.</p>')
+      + '<p class="leise">Jede Überschrift wird eine Karte, der Text darunter ihre Rückseite.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'paket' && cl.lk.paket) {
+    var p = cl.lk.paket;
+    var da = d.kaesten.filter(function (x) { return x.paket && x.paket.id === p.id; })[0];
+    return kopf('Kartenpaket') + '<p><b>' + esc(p.name) + '</b><br><span class="leise">Version ' + p.version + ' · ' + p.karten.length + ' Karten'
+      + (p.datei ? ' · ' + esc(p.datei) : '') + '</span></p>' + (p.beschreibung ? '<p class="leise">' + esc(p.beschreibung) + '</p>' : '')
+      + '<p class="leise">' + (da ? 'Schon vorhanden (v' + da.paket.version + '): Neue und geänderte Karten kommen dazu, dein Lernstand bleibt.' : 'Wird ein neuer Kasten.') + '</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkPaketUebernehmen()">Übernehmen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'karte' && k) {
+    var c = cl.lk.karte ? k.karten.filter(function (x) { return x.id === cl.lk.karte; })[0] : null;
+    return kopf(c ? 'Karte bearbeiten' : 'Neue Karte')
+      + '<label for="lkV">Vorderseite:</label><textarea id="lkV" class="eingabe lk-feld klein">' + esc(c ? c.v : '') + '</textarea>'
+      + '<label for="lkR">Rückseite (Listen mit • - 1.):</label><textarea id="lkR" class="eingabe lk-feld">' + esc(c ? c.r : '') + '</textarea>'
+      + (c && c.w ? '<p class="leise">Fremdwort für die Rückrichtung: ' + esc(c.w) + '</p>' : '')
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkKarteSpeichern()">Speichern</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button>'
+      + (c ? '<button type="button" class="knopf" onclick="lkKarteLoeschen()">Löschen</button>' : '') + '</div>' + zu;
+  }
+  if (f === 'details' && k) {
+    return kopf('Kasten') + '<label for="lkName">Name:</label><input id="lkName" class="eingabe" type="text" autocomplete="off" value="' + esc(k.name) + '">'
+      + '<label for="lkNeuTag">Neue Karten pro Tag:</label><input id="lkNeuTag" class="eingabe" type="number" min="0" max="200" value="' + (Number(k.neuProTag) || 20) + '">'
+      + '<label>Abfrage:</label><div class="wahlreihe">' + LK_RICHTUNGEN.map(function (r) {
+          return '<button type="button"' + ((k.richtung || 'vor') === r[0] ? ' class="an"' : '') + ' onclick="lkRichtung(\'' + r[0] + '\')">' + r[1] + '</button>';
+        }).join('') + '</div>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkDetailsSpeichern()">OK</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="lkFensterAuf(\'zuruecksetzen\')">Alle zurücksetzen…</button>'
+      + '<button type="button" class="knopf" onclick="lkFensterAuf(\'loeschen\')">Löschen…</button></div>' + zu;
+  }
+  if (f === 'zuruecksetzen' && k) {
+    return kopf('Zurücksetzen') + '<p>Alle Karten in „' + esc(k.name) + '“ wieder auf „neu“ setzen?</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkZuruecksetzen()">Zurücksetzen</button><button type="button" class="knopf" onclick="lkFensterAuf(\'details\')">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'loeschen' && k) {
+    return kopf('Löschen') + '<p>„' + esc(k.name) + '“ mit ' + k.karten.length + ' Karten wirklich löschen?</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkKastenLoeschen()">Löschen</button><button type="button" class="knopf" onclick="lkFensterAuf(\'details\')">Abbrechen</button></div>' + zu;
+  }
+  return '';
+}
+
+function lernkarteiHtml() {
+  var v = cl.lk.ansicht;
+  var h = v === 'lernen' ? lkLernenHtml() : (v === 'kasten' ? lkKastenHtml() : (v === 'karten' ? lkKartenHtml() : lkListeHtml()));
+  return h + '<input id="lkDatei" type="file" accept=".json,application/json" class="lk-datei" onchange="lkPaketGewaehlt(this)">' + lkFensterHtml();
+}
+
+function lernkarteiFussHtml() {
+  var v = cl.lk.ansicht;
+  var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
+  if (v === 'lernen') {
+    var s = cl.lk.sitzung;
+    if (s && lkAktuell() && !s.um) { return k('Umdrehen', 'lkUmdrehen()', true) + k('Bearbeiten', 'lkAktuelleBearbeiten()') + k('Fertig', 'lkEbeneHoch()'); }
+    return k('Bearbeiten', 'lkAktuelleBearbeiten()') + k('Fertig', 'lkEbeneHoch()');
+  }
+  if (v === 'kasten') {
+    var d = lkDaten();
+    var kk = lkKasten(d, cl.lk.id);
+    var n = kk ? lkHeuteZahl(d, kk) : 0;
+    return k('Lernen (' + n + ')', 'lkLernen(\'' + esc(cl.lk.id) + '\')', true) + k('Karten', 'lkKartenZeigen()') + k('+ Karte', 'lkKarteOeffnen(\'\')')
+      + k('Einfügen', 'lkFensterAuf(\'einfuegen\')') + k('Details…', 'lkFensterAuf(\'details\')');
+  }
+  if (v === 'karten') { return k('+ Karte', 'lkKarteOeffnen(\'\')') + k('Fertig', 'lkEbeneHoch()'); }
+  return k('Lernen (' + lkAlleHeute() + ')', 'lkLernen(\'\')', true) + k('Neu…', 'lkNeuOeffnen()');
+}
+
+function lkNeuOeffnen() {
+  cl.lk.id = '';
+  lkFensterAuf('neu');
+}
+
+function lkKartenZeigen() {
+  cl.lk.ansicht = 'karten';
+  cl.lk.suche = '';
+  lkZeichnen();
+}
+
+/* Eine Ebene zurück — true, wenn etwas getan wurde */
+function lkEbeneHoch() {
+  if (cl.lk.fenster) { lkFensterZu(); return true; }
+  if (cl.lk.ansicht === 'lernen') { cl.lk.sitzung = null; cl.lk.ansicht = cl.lk.id ? 'kasten' : 'liste'; lkZeichnen(); return true; }
+  if (cl.lk.ansicht === 'karten') { cl.lk.ansicht = 'kasten'; lkZeichnen(); return true; }
+  if (cl.lk.ansicht === 'kasten') { cl.lk.ansicht = 'liste'; cl.lk.id = ''; lkZeichnen(); return true; }
+  return false;
+}
+
+function lkZeichnen() {
+  if (cl.app !== 'lernkartei') { return; }
+  inhaltZeichnen();
+  fussZeichnen();
+  kopfZeichnen();
+}
+
+function lkStatZeile() {
+  var d = lkDaten();
+  var n = d.kaesten.reduce(function (s, k) { return s + k.karten.length; }, 0);
+  return d.kaesten.length + ' · ' + n + ' · ' + lkAlleHeute();
+}
+
+function lkKopfText() {
+  var n = lkAlleHeute();
+  return n ? n + ' fällig' : '';
+}
+
+
 /* ---------- Stones (seit 0.18) ----------
 
    Ein Fallblock-Spiel im LCD-Stil: Feld 10 × 18, sieben Steinformen,
@@ -11451,6 +12138,7 @@ function clZurueck() {
   if (cl.app === 'checklisten' && cl.cls.id) { clsZurListe(); return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }
   if (cl.app === 'schach' && schEbeneHoch()) { return true; }
+  if (cl.app === 'lernkartei' && lkEbeneHoch()) { return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) { drvHoch(); return true; }
   if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
   return false;

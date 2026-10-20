@@ -285,7 +285,7 @@ function uebersichtTest() {
   pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
     'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 13, 'dreizehn Apps im Raster (seit 0.20 mit Schach)');
+  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 14, 'vierzehn Apps im Raster (seit 0.23 mit Lernkartei)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -412,8 +412,8 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","abgleich"]',
-    'genau dreizehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","abgleich"]',
+    'genau vierzehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -3227,6 +3227,110 @@ function schuleTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   53. Lernkartei (0.23)
+   Grund: Lernstand ist Arbeit von Wochen. Falsch einsortierte Karten,
+   ein Paket-Update, das den Lernstand löscht, oder Listen, die sich nicht
+   aufdecken lassen, würden das Lernen kaputt machen.
+   Erkennt: falsche Fächer/Intervalle, Neu-pro-Tag-Grenze, Einfügen und
+   Memo-Übernahme, Paket-Update ohne Verlust, Rückrichtung, Punkt-für-
+   Punkt-Aufdecken, Heute-Hinweis, Zurück-Taste.
+   ============================================================ */
+function lernkarteiTest() {
+  console.log('\n53. Lernkartei (0.23)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-lernkartei'];
+  const heute = S.isoDatum();
+  pruefe(S.lkDaten().kaesten.length === 0, 'leerer Anfang ohne Fehler');
+  /* Text einfügen */
+  const k = S.lkKartenAusText('Haus\nla casa\n\nBrot\nil pane\n\n\nISTQB Teststufen\n- Komponententest\n- Integrationstest\n- Systemtest\n- Abnahmetest');
+  pruefe(k.length === 3 && k[2].r.split('\n').length === 4 && k[0].v === 'Haus', 'Einfügen: Leerzeile trennt, 1. Zeile Vorderseite, Rest Rückseite');
+  const m = S.lkKartenAusMemo('Einleitung ohne Überschrift\n# Begriff A\nErklärung A\n## Begriff B\n[ ] Punkt 1\n[x] Punkt 2\n# Leer\n');
+  pruefe(m.length === 2 && m[1].r === '- Punkt 1\n- Punkt 2', 'Memo: Überschrift → Karte, Kästchen werden Aufzählung, leere fallen weg');
+  /* Kasten mit Karten */
+  const id = S.lkKastenNeu('Test');
+  let d = S.lkDaten();
+  const ka = S.lkKasten(d, id);
+  ka.karten = k; ka.neuProTag = 2;
+  S.lkSichern(d);
+  d = S.lkDaten();
+  pruefe(S.lkNeuFrei(d, S.lkKasten(d, id)) === 2 && S.lkHeuteZahl(d, S.lkKasten(d, id)) === 2, 'Neu pro Tag begrenzt (2 von 3)');
+  /* Lernen: Karte 1 gewusst, Karte 2 nicht */
+  S.oeffne('lernkartei');
+  S.lkKastenOeffnen(id);
+  S.cl.lk.sitzung = null;
+  S.lkLernen(id);
+  pruefe(S.cl.lk.ansicht === 'lernen' && S.cl.lk.sitzung.schlange.length === 2, 'Sitzung mit 2 Karten');
+  pruefe(inhalt().indexOf('lkUmdrehen') >= 0 && inhalt().indexOf('lkBewerten') < 0, 'erst Frage, Bewerten erst nach Umdrehen');
+  S.lkUmdrehen();
+  pruefe(inhalt().indexOf("lkBewerten('g')") >= 0, 'nach Umdrehen: Gewusst / Teilweise / Nicht');
+  const erste = S.cl.lk.sitzung.schlange[0].c;
+  S.lkBewerten('g');
+  let c1 = S.lkDaten().kaesten[0].karten.filter(x => x.id === erste)[0];
+  pruefe(c1.fach === 2 && c1.faellig === S.tagePlus(heute, 2), 'neue Karte gewusst → Fach 2, fällig in 2 Tagen');
+  const zweite = S.cl.lk.sitzung.schlange[1].c;
+  S.lkUmdrehen(); S.lkBewerten('n');
+  let c2 = S.lkDaten().kaesten[0].karten.filter(x => x.id === zweite)[0];
+  pruefe(c2.fach === 1 && S.cl.lk.sitzung.schlange.length === 3, 'nicht gewusst → Fach 1 und heute noch einmal');
+  S.lkUmdrehen(); S.lkBewerten('n');
+  pruefe(S.cl.lk.sitzung.schlange.length === 3 && inhalt().indexOf('Geschafft') >= 0, 'nur einmal wiederholt, dann Ende mit Bilanz');
+  d = S.lkDaten();
+  pruefe(S.lkNeuFrei(d, S.lkKasten(d, id)) === 0, 'Neu-Grenze für heute verbraucht');
+  /* Fach 5 bleibt Fach 5, Teilweise bleibt */
+  c1 = S.lkKasten(d, id).karten.filter(x => x.id === erste)[0];
+  c1.fach = 5; c1.faellig = heute; S.lkSichern(d);
+  S.lkLernen(id);
+  const pos = S.cl.lk.sitzung.schlange.findIndex(e => e.c === erste);
+  S.cl.lk.sitzung.i = pos; S.lkUmdrehen(); S.lkBewerten('g');
+  c1 = S.lkDaten().kaesten[0].karten.filter(x => x.id === erste)[0];
+  pruefe(c1.fach === 5 && c1.faellig === S.tagePlus(heute, 16), 'Fach 5 gewusst → bleibt, 16 Tage');
+  d = S.lkDaten(); c1 = S.lkKasten(d, id).karten.filter(x => x.id === erste)[0]; c1.fach = 3; c1.faellig = heute; S.lkSichern(d);
+  S.lkLernen(id); S.cl.lk.sitzung.i = S.cl.lk.sitzung.schlange.findIndex(e => e.c === erste); S.lkUmdrehen(); S.lkBewerten('t');
+  c1 = S.lkDaten().kaesten[0].karten.filter(x => x.id === erste)[0];
+  pruefe(c1.fach === 3 && c1.faellig === S.tagePlus(heute, 1), 'Teilweise → bleibt im Fach, morgen wieder');
+  /* Liste Punkt für Punkt */
+  const html0 = S.lkTextHtml('Teststufen:\n- A\n- **B**\n- C', 1);
+  pruefe((html0.match(/lk-punkt zu/g) || []).length === 2 && html0.indexOf('>A<') >= 0, 'Liste: 1 von 3 Punkten aufgedeckt');
+  pruefe(S.lkTextHtml('**fett** <x>', -1).indexOf('<b>fett</b> &lt;x&gt;') >= 0, 'fett erlaubt, sonst kein HTML');
+  pruefe(S.lkPunkte('a\n1. x\n2) y\n• z') === 3, 'Aufzählungen mit -, •, 1. und 2) erkannt');
+  /* Rückrichtung */
+  const r = S.lkSeiten({ v: 'il pane', r: 'das Brot\n[il PA-ne]', w: 'das Brot' }, true);
+  pruefe(r.frage === 'das Brot' && r.antwort.indexOf('il pane') === 0, 'Rückrichtung: deutsche Seite fragt, Fremdwort ist Antwort');
+  /* Paket laden und aktualisieren */
+  const paket = { format: 'clie-lernkartei', paket: { id: 'test-paket', name: 'Testpaket', version: 1 }, karten: [{ id: 'a', v: 'A', r: 'eins' }, { id: 'b', v: 'B', r: 'zwei' }] };
+  pruefe(!S.lkPaketPruefen('{"x":1}', 'f.json') && S.lkPaketPruefen(JSON.stringify(paket), 'p.json') && S.cl.lk.fenster === 'paket', 'falsches Format abgelehnt, Paket zeigt Vorschau');
+  S.lkPaketUebernehmen();
+  d = S.lkDaten();
+  let pk = d.kaesten.filter(x => x.paket && x.paket.id === 'test-paket')[0];
+  pruefe(pk && pk.karten.length === 2, 'Paket wird neuer Kasten');
+  pk.karten[0].fach = 4; pk.karten[0].faellig = '2099-01-01'; S.lkSichern(d);
+  paket.paket.version = 2; paket.karten[1].r = 'zwei (neu)'; paket.karten.push({ id: 'c', v: 'C', r: 'drei' });
+  S.lkPaketPruefen(JSON.stringify(paket), 'p.json'); S.lkPaketUebernehmen();
+  d = S.lkDaten();
+  pk = d.kaesten.filter(x => x.paket && x.paket.id === 'test-paket');
+  pruefe(pk.length === 1 && pk[0].karten.length === 3 && pk[0].karten[0].fach === 4 && pk[0].karten[1].r === 'zwei (neu)' && pk[0].paket.version === 2,
+    'Update: kein zweiter Kasten, neue Karte dazu, Text aktualisiert, Lernstand bleibt');
+  /* Heute-Hinweis und Zurück */
+  S.oeffne('heute');
+  pruefe(inhalt().indexOf("oeffne('lernkartei')") >= 0 && inhalt().indexOf('Karten fällig') >= 0, 'Heute zeigt fällige Lernkarten als Hinweis');
+  S.oeffne('lernkartei'); S.lkKastenOeffnen(id); S.lkKartenZeigen();
+  pruefe(inhalt().indexOf('lkSuche') >= 0, 'Kartenliste mit Suche');
+  S.clZurueck(); pruefe(S.cl.lk.ansicht === 'kasten', 'Zurück: Karten → Kasten');
+  S.clZurueck(); pruefe(S.cl.lk.ansicht === 'liste' && S.cl.app === 'lernkartei', 'Zurück: Kasten → Liste');
+  /* Karte bearbeiten und Kasten löschen */
+  S.lkKastenOeffnen(id); S.lkKarteOeffnen('');
+  S.document.getElementById('lkV').value = 'Neu'; S.document.getElementById('lkR').value = 'Rück';
+  S.lkKarteSpeichern();
+  pruefe(S.lkKasten(S.lkDaten(), id).karten.length === 4, 'neue Karte gespeichert');
+  S.lkFensterAuf('details'); S.lkKastenLoeschen();
+  pruefe(!S.lkKasten(S.lkDaten(), id) && S.cl.lk.ansicht === 'liste', 'Kasten gelöscht');
+  delete S.__ablage['clie-lernkartei'];
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -3276,6 +3380,7 @@ function schuleTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { lernkarteiTest(); } catch (e) { fail('Lernkartei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
