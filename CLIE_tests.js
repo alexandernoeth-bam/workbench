@@ -2445,6 +2445,145 @@ function laufZeichenTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   44. Checklisten-Punkte einplanen (0.16, Stufe 1)
+   Grund: Einzelne Punkte einer laufenden Checkliste sollen als Aufgabe in
+   Heute und im Kalender erscheinen — optional, nur einige.
+   Erkennt: Punkt lässt sich nicht einplanen/ausplanen, Marke fehlt,
+   Herkunft fehlt in Heute/Kalender, Abhaken in Heute zählt nicht in der
+   Checkliste (oder umgekehrt), Zurücksetzen/Löschen lassen Reste im Tag,
+   Vorlagen lassen sich einplanen.
+   ============================================================ */
+function clsPlanTest() {
+  console.log('\n44. Checklisten-Punkte einplanen (0.16, Stufe 1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const morgen = S.tagePlus(heute, 1);
+  const feld = (id, v) => { S.document.getElementById(id).value = v; };
+  S.cl.cls.id = ''; S.cl.cls.schreiben = false; S.cl.cls.fenster = null;
+  S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub Borkum', text: '## Vorher\n[] Koffer packen\n[] Müll rausstellen\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'v1', titel: 'Vorlage', text: '[] Punkt', kontext: 'privat', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
+  const c = S.DB.gedanken[0];
+  S.oeffne('checklisten'); S.clsOeffnen('c1');
+  pruefe(/onclick="clsPlanOeffnen\('c1',1\)">Koffer packen<\/button>/.test(inhalt()), 'laufende Checkliste: Tipp auf den Text öffnet „Punkt einplanen“');
+  S.clsOeffnen('v1');
+  pruefe(!/clsPlanOeffnen/.test(inhalt()), 'Vorlage: nichts einzuplanen');
+  S.clsOeffnen('c1');
+  S.clsPlanOeffnen('c1', 1);
+  let a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Punkt einplanen/.test(a) && /id="clsDatum"/.test(a) && /clsPlanZeitUm/.test(a), 'Fenster mit Datum und Uhrzeit');
+  feld('clsDatum', morgen);
+  S.clsPlanOk();
+  pruefe(S.aufGeplant(S.kpSeiteFinden('c1'), 'Koffer packen').datum === morgen && /\[\] Koffer packen/.test(S.kpTagFinden(morgen).text), 'eingeplant: im Tag der Workbench (morgen)');
+  pruefe(new RegExp('<span class="plan-marke">' + S.clWt(morgen) + ' ').test(inhalt()), 'Marke rechts am Punkt');
+  S.clsPlanOeffnen('c1', 2);
+  feld('clsDatum', heute);
+  S.clsPlanZeitUm();
+  feld('clsDatum', heute); feld('clsZeit', '07:00');
+  S.clsPlanOk();
+  const e = S.kpEintraegeFinden('c1', 'Müll rausstellen')[0];
+  pruefe(e && e.woche.datum === heute && e.eintrag.zeit === '07:00', 'mit Uhrzeit eingeplant');
+  S.clsPlanOeffnen('c1', 3);
+  feld('clsDatum', S.tagePlus(heute, -1));
+  S.clsPlanOk();
+  pruefe(!S.kpEintraegeFinden('c1', 'Ladekabel').length, 'ein vergangener Tag wird abgelehnt');
+  S.aufklappZu();
+  /* Heute und Kalender */
+  S.oeffne('heute');
+  let h = inhalt();
+  pruefe(/Müll rausstellen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(h), 'Heute: mit Herkunft „☑ Urlaub Borkum“');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  pruefe(/Müll rausstellen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(inhalt()), 'Kalender-Tag: mit Herkunft');
+  const tag = S.kpTagFinden(heute);
+  const nr = String(tag.text).split('\n').findIndex(z => /Müll rausstellen/.test(z));
+  S.clTagZeileUm(heute, nr);
+  pruefe(/\[x\] Müll rausstellen/.test(c.text), 'in Heute/Kalender abgehakt → in der Checkliste erledigt');
+  S.oeffne('checklisten'); S.clsOeffnen('c1');
+  pruefe(/1\/3/.test(inhalt()), 'der Zähler zählt mit (1/3)');
+  S.clsHaken('c1', 1);
+  pruefe(/\[x\] Koffer packen/.test(S.kpTagFinden(morgen).text), 'in der Checkliste abgehakt → im Tag erledigt');
+  /* Ausplanen mit ✕ */
+  S.clsHaken('c1', 1);
+  S.clsPlanOeffnen('c1', 1);
+  S.clsPlanWeg();
+  pruefe(!/id="clsDatum"[^>]*value="2/.test(S.document.getElementById('aufklapp').innerHTML), '✕ leert das Datum');
+  feld('clsDatum', '');
+  S.clsPlanOk();
+  pruefe(!S.kpEintraegeFinden('c1', 'Koffer packen').length && !/Koffer/.test(S.kpTagFinden(morgen).text), 'OK ohne Datum nimmt ihn heraus');
+  /* Zurücksetzen und Löschen */
+  S.cl.cls.id = 'c1';
+  S.clsZuruecksetzen();
+  pruefe(/\[\] Müll rausstellen/.test(S.kpTagFinden(heute).text) && !/\[x\]/.test(c.text), 'Zurücksetzen: auch im Tag wieder offen');
+  S.cl.cls.id = 'c1';
+  S.clsLoeschen();
+  pruefe(!/Müll/.test(S.kpTagFinden(heute).text) && !S.kpEintraegeFinden('c1', 'Müll rausstellen').length, 'Löschen nimmt Eingeplantes aus dem Tag');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   45. Abstände in der Vorlage, Stichtag beim Start (0.16, Stufe 2)
+   Grund: Wiederkehrende Abläufe (Urlaub …) sollen beim Start ihre Punkte
+   gleich passend vor/nach dem Stichtag einplanen.
+   Erkennt: @-Angabe falsch gelesen, Vorschau falsch, Vergangenes nicht auf
+   heute, „@…“ bleibt im Lauf stehen, „Ohne Termine“ plant trotzdem,
+   Vorlage ohne @ fragt unnötig nach.
+   ============================================================ */
+function clsStichtagTest() {
+  console.log('\n45. Abstände in der Vorlage, Stichtag beim Start (0.16, Stufe 2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const feld = (id, v) => { S.document.getElementById(id).value = v; };
+  S.cl.cls.id = ''; S.cl.cls.schreiben = false; S.cl.cls.fenster = null;
+  const ab = S.clsAbstand('Koffer packen @-1 18:00');
+  pruefe(ab && ab.text === 'Koffer packen' && ab.tage === -1 && ab.zeit === '18:00', '„@-1 18:00“ gelesen');
+  pruefe(S.clsAbstand('Müll @0').tage === 0 && S.clsAbstand('Post @+2 7:30').zeit === '07:30', '„@0“ und „@+2 7:30“');
+  pruefe(S.clsAbstand('Mail an a@b.de') === null && S.clsAbstand('Punkt @-1 25:00') === null && S.clsAbstand('Punkt @-400') === null, 'keine Fehldeutung (E-Mail, 25:00, zu weit)');
+  const text = '## Vorher\n[] Fähre buchen @-30\n[] Koffer packen @-1 18:00\n[] Ladekabel\n## Abreisetag\n[] Müll rausstellen @0 07:00';
+  S.DB.gedanken.push({ id: 'v1', titel: 'Urlaub', text: text, kontext: 'privat', checkliste: 'vorlage', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'v2', titel: 'Ohne', text: '[] A\n[] B', kontext: 'privat', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
+  const stich = S.tagePlus(heute, 10);
+  const vs = S.clsPlanVorschau(text, stich);
+  pruefe(vs.length === 3 && vs[0].datum === heute && vs[1].datum === S.tagePlus(heute, 9) && vs[1].zeit === '18:00' && vs[2].datum === stich,
+    'Vorschau: 3 Punkte, „@-30“ liegt zurück → heute');
+  S.oeffne('checklisten'); S.clsOeffnen('v1');
+  pruefe(/Koffer packen<\/span><span class="plan-marke">−1 T\. 18:00<\/span>/.test(inhalt()) && /Müll rausstellen<\/span><span class="plan-marke">Stichtag 7:00/.test(inhalt()),
+    'Vorlage zeigt den Abstand als Marke');
+  S.clsStarten('v2');
+  pruefe(S.cl.cls.fenster === null && S.DB.gedanken.some(g => g.checkliste === 'lauf' && g.titel === 'Ohne'), 'Vorlage ohne @: startet wie bisher sofort');
+  S.clsStarten('v1');
+  let a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.cls.fenster.modus === 'start' && /id="clsStichtag"/.test(a) && /Wird eingeplant \(3 von 4\)/.test(a), 'mit @: Fenster fragt nach dem Stichtag, Vorschau 3 von 4');
+  feld('clsTitel', 'Urlaub Borkum'); feld('clsStichtag', stich);
+  S.clsStartVorschau();
+  a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(new RegExp('<b>' + S.clWt(stich) + ' [^<]* 7:00</b>Müll rausstellen').test(a), 'Vorschau folgt dem Stichtag');
+  feld('clsTitel', 'Urlaub Borkum'); feld('clsStichtag', stich);
+  S.clsStartOk(true);
+  const lauf = S.DB.gedanken.filter(g => g.checkliste === 'lauf' && g.titel === 'Urlaub Borkum')[0];
+  pruefe(lauf && lauf.text === '## Vorher\n[] Fähre buchen\n[] Koffer packen\n[] Ladekabel\n## Abreisetag\n[] Müll rausstellen' && lauf.stichtag === stich,
+    'laufende Checkliste ohne „@…“, mit Stichtag');
+  const seite = S.kpSeiteFinden(lauf.id);
+  pruefe(S.aufGeplant(seite, 'Fähre buchen').datum === heute && S.aufGeplant(seite, 'Koffer packen').zeit === '18:00'
+    && S.aufGeplant(seite, 'Müll rausstellen').datum === stich && !S.aufGeplant(seite, 'Ladekabel'), 'die drei Punkte sind eingeplant, Ladekabel nicht');
+  pruefe(S.DB.gedanken[0].text === text, 'die Vorlage behält ihre @-Angaben');
+  S.clsStarten('v1');
+  feld('clsTitel', 'Urlaub ohne'); feld('clsStichtag', stich);
+  S.clsStartOk(false);
+  const ohne = S.DB.gedanken.filter(g => g.titel === 'Urlaub ohne')[0];
+  pruefe(ohne && !/@/.test(ohne.text) && !S.aufGeplant(S.kpSeiteFinden(ohne.id), 'Fähre buchen'), '„Ohne Termine“: kein @, nichts eingeplant');
+  S.clsStarten('v1');
+  feld('clsTitel', 'X'); feld('clsStichtag', '');
+  S.clsStartOk(true);
+  pruefe(/Stichtag/.test(S.document.getElementById('toastText').textContent) && !S.DB.gedanken.some(g => g.titel === 'X'), 'ohne Stichtag: Hinweis, kein Start');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2485,6 +2624,8 @@ function laufZeichenTest() {
   try { kopfTest(); } catch (e) { fail('Kopfwerte warf: ' + e.message); }
   try { listeTextTest(); } catch (e) { fail('Liste als Text warf: ' + e.message); }
   try { laufZeichenTest(); } catch (e) { fail('Zeichen ▶ warf: ' + e.message); }
+  try { clsPlanTest(); } catch (e) { fail('Checklisten einplanen warf: ' + e.message); }
+  try { clsStichtagTest(); } catch (e) { fail('Stichtag warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

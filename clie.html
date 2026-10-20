@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.15.2</title>
+<title>CLIE 0.16.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -236,6 +236,10 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .aufg.gewaehlt .k{border-color:var(--lcd)}
 .aufg.hervor{outline:3px dotted var(--px);outline-offset:-1px}
 .plan-marke{flex:0 0 auto;font-size:17.5px;border:2px solid currentColor;border-radius:6px;padding:0 5px;white-space:nowrap}
+/* Checklisten-Punkte in Heute und Kalender (seit 0.16) */
+.herkunft{display:block;font-size:15.5px;color:var(--px-mitte);line-height:1.2}
+.cls-vorschau div{display:flex;gap:8px;font-size:17.5px;padding:2px 0;border-bottom:2px dotted var(--px-zart)}
+.cls-vorschau b{font-weight:400;flex:0 0 auto;min-width:6.5em}
 .aufklapp .schalter{display:flex;margin:6px 8px;border:2px solid var(--px)}
 .aufklapp .schalter button{flex:1;text-align:center;padding:2px 0;font-size:18px;width:auto}
 .aufklapp .schalter button.an{background:var(--px);color:var(--lcd)}
@@ -424,7 +428,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.15.2';
+var APP_VERSION = '0.16.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2851,7 +2855,7 @@ function clHeuteDaten() {
   });
   clTagZeilen(is).forEach(function (z) {
     if (!z.a || !z.a.text) { return; }
-    var p = { art: 'aufgabe', zeit: z.zeit, titel: z.a.text, nr: z.nr };
+    var p = { art: 'aufgabe', zeit: z.zeit, titel: z.a.text, nr: z.nr, cls: z.cls };
     if (z.a.erledigt) { d.erledigt.push(p); }
     else if (z.zeit) { d.posten.push(p); }
     else { d.vorgenommen.push(p); }
@@ -2893,7 +2897,7 @@ function clHeuteZeile(d, p) {
   }
   var erl = d.erledigt.indexOf(p) >= 0;
   var aufruf = (p.art === 'aufgabe') ? 'clTagZeileUm(\'' + d.is + '\',' + p.nr + ')' : 'clRoutineUm(\'' + esc(p.id) + '\',\'' + d.is + '\')';
-  return '<div class="hz' + (erl ? ' erl' : '') + '">' + zt + clKastenHtml(erl, aufruf) + '<span class="tx">' + (p.art === 'aufgabe' ? clPrioHtml(p.titel) : esc(p.titel)) + '</span></div>';
+  return '<div class="hz' + (erl ? ' erl' : '') + '">' + zt + clKastenHtml(erl, aufruf) + '<span class="tx">' + (p.art === 'aufgabe' ? clPrioHtml(p.titel) + clHerkunftHtml(p.cls) : esc(p.titel)) + '</span></div>';
 }
 
 /* „in 25 Min.“ — ab einer Stunde nur noch die Uhrzeit */
@@ -3758,7 +3762,8 @@ function clTagZeilen(is) {
     var quelle = e ? kpSeiteFinden(e.quelle) : null;
     if (quelle && !kpPasstFilter(quelle, cl.filter)) { return null; }
     return { nr: nr, roh: z, a: a, zeit: (e && /^\d{1,2}:\d{2}$/.test(String(e.zeit || ''))) ? e.zeit : '',
-             quelle: quelle ? quelle.titel : '' };
+             quelle: quelle ? quelle.titel : '',
+             cls: (quelle && quelle.__satz && quelle.__satz.checkliste) ? quelle.titel : '' };
   }).filter(function (x) { return x && x.roh.trim(); });
 }
 
@@ -3767,6 +3772,11 @@ function clVorbei(is, ende) {
   if (is < heute) { return true; }
   if (is > heute) { return false; }
   return !!ende && ende <= clUhrzeit();
+}
+
+/* Seit 0.16: eingeplante Checklisten-Punkte zeigen, woher sie kommen */
+function clHerkunftHtml(name) {
+  return name ? '<small class="herkunft">☑ ' + esc(name) + '</small>' : '';
 }
 
 function clKastenHtml(an, aufruf) {
@@ -3793,7 +3803,7 @@ function kalTagHtml(is) {
     if (!z.a || !z.zeit) { return; }
     if (z.a.erledigt && !cl.kal.erlZeigen) { return; }
     posten.push({ zeit: z.zeit, bis: z.zeit, erl: z.a.erledigt, vorbei: clVorbei(is, z.zeit),
-      html: clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')') + '<span class="tx">' + clPrioHtml(z.a.text) + '</span>' });
+      html: clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')') + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml(z.cls) + '</span>' });
   });
   routinen.forEach(function (a) {
     var zt = aufgabeZeitAn(a, is);
@@ -3830,7 +3840,7 @@ function kalTagHtml(is) {
     if (z.a) {
       if (z.a.erledigt && !cl.kal.erlZeigen) { erlWeg++; return; }
       v += '<div class="aufg' + (z.a.erledigt ? ' erl' : '') + '">' + clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')')
-         + '<span class="tx">' + clPrioHtml(z.a.text) + '</span></div>';
+         + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml(z.cls) + '</span></div>';
     } else if (/^\s*#/.test(z.roh)) {
       v += '<div class="unterabschnitt">' + esc(z.roh.replace(/^\s*#+\s*/, '')) + '</div>';
     } else {
@@ -5585,9 +5595,18 @@ function checklisteHtml(g) {
   zeilen.forEach(function (z, nr) {
     var a = kpAufgabe(z);
     if (a) {
-      h += '<div class="aufg' + (a.erledigt ? ' erl' : '') + '">'
-         + (vorlage ? '<span class="k"></span>' : clKastenHtml(a.erledigt, 'clsHaken(\'' + esc(g.id) + '\',' + nr + ')'))
-         + '<span class="tx">' + esc(a.text) + '</span></div>';
+      if (vorlage) {
+        /* Abstand zum Stichtag (seit 0.16) als Marke statt im Text */
+        var ab = clsAbstand(a.text);
+        h += '<div class="aufg"><span class="k"></span><span class="tx">' + esc(ab ? ab.text : a.text) + '</span>'
+           + (ab ? '<span class="plan-marke">' + esc(clsAbstandText(ab)) + '</span>' : '') + '</div>';
+        return;
+      }
+      var lauf = g.checkliste === 'lauf';
+      h += '<div class="aufg' + (a.erledigt ? ' erl' : '') + '">' + clKastenHtml(a.erledigt, 'clsHaken(\'' + esc(g.id) + '\',' + nr + ')')
+         + (lauf ? '<button type="button" class="tx umbruch" onclick="clsPlanOeffnen(\'' + esc(g.id) + '\',' + nr + ')">' + esc(a.text) + '</button>'
+                 : '<span class="tx">' + esc(a.text) + '</span>')
+         + (lauf ? clPlanMarke(kpSeiteFinden(g.id), a) : '') + '</div>';
       return;
     }
     var m = z.match(/^\s*(#{1,3})\s+(.*)$/);
@@ -5647,8 +5666,8 @@ function clsFertigUm() {
 function clsHaken(id, nr) {
   var g = clsFinden(id);
   if (!g || g.checkliste === 'vorlage') { return; }
-  var a = kpAufgabe(String(g.text || '').split('\n')[nr] || '');
-  if (!a || !kpKastenSetzen(g, nr, !a.erledigt)) { return; }
+  /* Seit 0.16 über den Kern: eingeplante Punkte in Tag und Woche ziehen mit */
+  if (!kpSeiteKastenUmKern(kpSeiteFinden(g.id), nr)) { return; }
   spaeterSichern();
   zeichne();
 }
@@ -5656,13 +5675,133 @@ function clsHaken(id, nr) {
 function clsStarten(id) {
   var v = clsFinden(id);
   if (!v || v.checkliste !== 'vorlage') { return; }
-  var g = clsNeuerSatz('lauf', v.titel, clsLeeren(v.text), v.kontext);
+  /* Mit Abständen (@-1 …): erst nach dem Stichtag fragen */
+  if (clsPlanVorschau(v.text, isoDatum()).length) {
+    cl.cls.fenster = { modus: 'start', vorlage: v.id, titel: v.titel, stichtag: isoDatum() };
+    cl.aufklapp = 'checkliste';
+    aufklappNeu();
+    return;
+  }
+  clsStartenMit(v, v.titel, '');
+}
+
+/* Startet eine Vorlage; mit Stichtag werden die @-Punkte eingeplant */
+function clsStartenMit(v, titel, stichtag) {
+  var plan = stichtag ? clsPlanVorschau(v.text, stichtag) : [];
+  var g = clsNeuerSatz('lauf', titel, clsOhneAbstand(clsLeeren(v.text)), v.kontext);
+  var seite = kpSeiteFinden(g.id);
+  plan.forEach(function (p) { aufPlanAnwenden(seite, p.nr, p.datum, p.zeit); });
+  if (stichtag) { g.stichtag = stichtag; }
   g.vorlage = v.id;
   v.benutzt = (Number(v.benutzt) || 0) + 1;
   v.geaendert = jetzt();
   spaeterSichern();
-  melde('„' + v.titel + '“ gestartet.', 'gut');
+  melde('„' + g.titel + '“ gestartet' + (plan.length ? ' — ' + plan.length + ' Punkte eingeplant.' : '.'), 'gut');
+  aufklappZuStill();
   clsOeffnen(g.id);
+}
+
+function clsStartOk(mitTerminen) {
+  var f = clsFensterLesen();
+  var v = f ? clsFinden(f.vorlage) : null;
+  if (!f || !v) { aufklappZu(); return; }
+  var titel = String(f.titel || '').trim();
+  if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  if (mitTerminen && !/^\d{4}-\d{2}-\d{2}$/.test(String(f.stichtag || ''))) { melde('Bitte einen Stichtag wählen.', 'warn'); return; }
+  clsStartenMit(v, titel.slice(0, 200), mitTerminen ? f.stichtag : '');
+}
+
+/* ---- Termine an Checklisten-Punkten (seit 0.16) ----
+   Stufe 1: Punkte einer laufenden Checkliste einplanen — derselbe Weg
+   wie bei Aufgaben (Tag der Workbench), also in Heute und Kalender.
+   Stufe 2: In der Vorlage steht hinter einem Punkt „@-1“, „@0 07:00“
+   oder „@+2“ — der Abstand zum Stichtag, der beim Start erfragt wird. */
+var CLS_ABSTAND = /^(.*\S)\s+@([+-]?\d{1,3})(?:\s+(\d{1,2}):(\d{2}))?\s*$/;
+
+/* „Koffer packen @-1 18:00“ → { text, tage: -1, zeit: '18:00' } — sonst null */
+function clsAbstand(text) {
+  var m = String(text || '').match(CLS_ABSTAND);
+  if (!m) { return null; }
+  var tage = Number(m[2]);
+  var zeit = m[3] ? (m[3].length < 2 ? '0' + m[3] : m[3]) + ':' + m[4] : '';
+  if (Math.abs(tage) > 365 || (zeit && !/^([01]\d|2[0-3]):[0-5]\d$/.test(zeit))) { return null; }
+  return { text: m[1], tage: tage, zeit: zeit };
+}
+
+function clsAbstandText(ab) {
+  var t = ab.tage === 0 ? 'Stichtag' : (ab.tage > 0 ? '+' : '−') + Math.abs(ab.tage) + ' T.';
+  return t + (ab.zeit ? ' ' + clZeitText(ab.zeit) : '');
+}
+
+/* Die Zeilen ohne „@…“ — für die laufende Checkliste */
+function clsOhneAbstand(text) {
+  return String(text || '').split('\n').map(function (z) {
+    var a = kpAufgabe(z);
+    var ab = a ? clsAbstand(a.text) : null;
+    if (!ab) { return z; }
+    var vorne = z.match(/^(\s*\[[ xX-]?\]\s*)/);
+    return (vorne ? vorne[1] : '[] ') + ab.text;
+  }).join('\n');
+}
+
+/* Was beim Start wohin kommt; Vergangenes landet auf heute */
+function clsPlanVorschau(text, stichtag) {
+  var heute = isoDatum();
+  var aus = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(stichtag || ''))) { return aus; }
+  String(text || '').split('\n').forEach(function (z, nr) {
+    var a = kpAufgabe(z);
+    var ab = a ? clsAbstand(a.text) : null;
+    if (!ab) { return; }
+    var d = tagePlus(stichtag, ab.tage);
+    aus.push({ nr: nr, text: ab.text, datum: d < heute ? heute : d, zeit: ab.zeit });
+  });
+  return aus;
+}
+
+/* Stufe 1: Fenster „Punkt einplanen“ */
+function clsPlanOeffnen(id, nr) {
+  var g = clsFinden(id);
+  var seite = kpSeiteFinden(id);
+  var a = g ? kpAufgabe(String(g.text || '').split('\n')[nr] || '') : null;
+  if (!g || g.checkliste !== 'lauf' || !a || !a.text) { return; }
+  var p = a.erledigt ? null : aufGeplant(seite, a.text);
+  cl.cls.fenster = { modus: 'plan', punkt: nr, alt: a.text, erledigt: a.erledigt,
+                     datum: p ? p.datum : '', mitZeit: !!(p && p.zeit), zeit: p ? p.zeit : '' };
+  cl.aufklapp = 'checkliste';
+  aufklappNeu();
+}
+
+function clsPlanZeitUm() {
+  var f = clsFensterLesen();
+  if (!f) { return; }
+  f.mitZeit = !f.mitZeit;
+  if (f.mitZeit && !f.datum) { f.datum = isoDatum(); }
+  aufklappNeu();
+}
+
+function clsPlanWeg() {
+  var f = clsFensterLesen();
+  if (!f) { return; }
+  f.datum = '';
+  f.mitZeit = false;
+  aufklappNeu();
+}
+
+function clsPlanOk() {
+  var f = clsFensterLesen();
+  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
+  if (!f || !g) { aufklappZu(); return; }
+  var seite = kpSeiteFinden(g.id);
+  var nr = aufZeileNr(seite, f.punkt, f.alt);
+  if (nr < 0) { melde('Der Punkt hat sich inzwischen geändert.', 'warn'); aufklappZu(); return; }
+  var datum = String(f.datum || '');
+  var zeit = f.mitZeit ? String(f.zeit || '') : '';
+  if (datum && (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || datum < isoDatum())) { melde('Bitte heute oder einen späteren Tag wählen.', 'warn'); return; }
+  if (f.mitZeit && !/^\d{2}:\d{2}$/.test(zeit)) { melde('Bitte eine Uhrzeit wählen.', 'warn'); return; }
+  aufPlanAnwenden(seite, nr, datum, zeit);
+  spaeterSichern();
+  aufklappZu();
 }
 
 function clsSchreibenUm() {
@@ -5721,7 +5860,19 @@ function clsFensterLesen() {
   var f = cl.cls.fenster;
   var t = document.getElementById('clsTitel');
   if (f && t && typeof t.value === 'string') { f.titel = t.value; }
+  var d = document.getElementById('clsDatum');
+  var z = document.getElementById('clsZeit');
+  var st = document.getElementById('clsStichtag');
+  if (f && f.modus === 'plan' && d && typeof d.value === 'string') { f.datum = d.value; }
+  if (f && f.modus === 'plan' && f.mitZeit && z && typeof z.value === 'string') { f.zeit = z.value; }
+  if (f && f.modus === 'start' && st && typeof st.value === 'string') { f.stichtag = st.value; }
   return f;
+}
+
+/* Neuer Stichtag: die Vorschau neu zeichnen */
+function clsStartVorschau() {
+  if (!clsFensterLesen()) { return; }
+  aufklappNeu();
 }
 
 function clsKontext(k) {
@@ -5764,6 +5915,33 @@ function clsFensterHtml() {
     return kopf('Aus einem Memo') + (s.length ? s.map(function (x) {
       return '<button type="button" class="wahl" onclick="clsAnlegen(\'memo\',\'' + esc(x.id) + '\')">' + clSeitenZeichen(x) + ' ' + esc(x.titel) + '</button>';
     }).join('') : '<p class="leise">Kein Memo mit Punkten.</p>') + abbrechen;
+  }
+  if (f.modus === 'plan' && g) {
+    return kopf('Punkt einplanen') + '<p>' + esc(f.alt) + '</p>'
+      + (f.erledigt ? '<p class="leise">Der Punkt ist schon erledigt.</p>' + abbrechen
+      : '<label for="clsDatum">Datum:</label><div class="zeitpaar">'
+      + '<input id="clsDatum" class="eingabe" type="date" min="' + isoDatum() + '" value="' + esc(f.datum) + '">'
+      + (f.datum ? '<button type="button" class="knopf" onclick="clsPlanWeg()" aria-label="nicht einplanen">✕</button>' : '') + '</div>'
+      + '<div class="zeitpaar"><button type="button" class="knopf' + (f.mitZeit ? ' voll' : '') + '" onclick="clsPlanZeitUm()">Uhrzeit</button>'
+      + (f.mitZeit ? '<input id="clsZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '" aria-label="Uhrzeit">' : '') + '</div>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="clsPlanOk()">OK</button>'
+      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
+      + '<p class="leise">Erscheint dann in „Heute“, im Kalender und im Tag der Workbench. ✕ nimmt ihn wieder heraus.</p></div></div>');
+  }
+  if (f.modus === 'start') {
+    var v = clsFinden(f.vorlage);
+    if (!v) { return ''; }
+    var alle = clsStand(v).alle;
+    var plan = clsPlanVorschau(v.text, f.stichtag);
+    return kopf('„' + esc(v.titel) + '“ starten')
+      + '<label for="clsTitel">Name:</label><input id="clsTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
+      + '<label for="clsStichtag">Stichtag:</label><input id="clsStichtag" class="eingabe" type="date" value="' + esc(f.stichtag) + '" onchange="clsStartVorschau()">'
+      + '<label>Wird eingeplant (' + plan.length + ' von ' + alle + '):</label><div class="cls-vorschau">'
+      + plan.map(function (p) { return '<div><b>' + esc(clPlanText(p.datum, p.zeit)) + '</b>' + esc(p.text) + '</div>'; }).join('') + '</div>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="clsStartOk(true)">Starten</button>'
+      + '<button type="button" class="knopf" onclick="clsStartOk(false)">Ohne Termine</button>'
+      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
+      + '<p class="leise">Liegt ein Tag schon zurück, wird der Punkt für heute eingeplant.</p></div></div>';
   }
   if (f.modus === 'loeschen' && g) {
     return kopf('Löschen') + '<p>„' + esc(g.titel) + '“ wirklich löschen?</p>'
@@ -5839,6 +6017,12 @@ function clsKopieren() {
 function clsZuruecksetzen() {
   var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
   if (!g || g.checkliste === 'vorlage') { return; }
+  /* Erst über den Kern zurück auf offen — eingeplante Punkte ziehen mit */
+  var seite = kpSeiteFinden(g.id);
+  String(g.text || '').split('\n').forEach(function (z, nr) {
+    var a = kpAufgabe(z);
+    if (a && a.erledigt) { kpSeiteKastenUmKern(seite, nr); }
+  });
   g.text = clsLeeren(g.text);
   g.geaendert = jetzt();
   spaeterSichern();
@@ -5867,6 +6051,11 @@ function clsWiederOeffnen() {
 function clsLoeschen() {
   var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
   if (!g) { aufklappZu(); return; }
+  /* Eingeplante Punkte erst aus Tag und Woche nehmen */
+  String(g.text || '').split('\n').forEach(function (z) {
+    var a = kpAufgabe(z);
+    if (a && a.text) { kpEintraegeFinden(g.id, a.text).forEach(function (x) { kpAusplanenKern(x.woche.id, x.eintrag.id); }); }
+  });
   DB.gedanken = (DB.gedanken || []).filter(function (x) { return x !== g; });
   grabsteinSetzen('gedanken', g.id);
   spaeterSichern();
