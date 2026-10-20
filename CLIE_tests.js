@@ -2410,48 +2410,38 @@ function listeTextTest() {
 }
 
 /* ============================================================
-   43. Hauptaufgabe mit Schritten: ▶ (0.15.1)
-   Grund: Wer unter einer Aufgabe eigene Schritte schreibt, will in Liste
-   und Heute sehen, dass diese Aufgabe eine laufende Hauptaufgabe ist —
-   ohne Knopf, ohne Änderung am Text.
-   Erkennt: ▶ fehlt bei eingerückten Zeilen darunter, ▶ erscheint fälschlich
-   bei Leerzeile/nicht eingerückter Zeile/erledigter Aufgabe, Text verändert,
-   ▶ fehlt in Heute.
+   43. Zeichen ▶ „läuft“ in der Schreibleiste (0.15.2)
+   Grund: Eine Oberzeile („- P2 Fenster warten“) soll sichtbar als laufend
+   markiert werden — nur ein Zeichen wie „-“, ohne weitere Funktion.
+   (Die Automatik aus 0.15.1 ist zurückgenommen.)
+   Erkennt: Knopf fehlt, ▶ wird nicht gesetzt/entfernt, „-“ bleibt stehen,
+   Zeilen darunter verändert, Automatik-▶ wieder in Liste oder Heute.
    ============================================================ */
-function hauptTest() {
-  console.log('\n43. Hauptaufgabe mit Schritten: ▶ (0.15.1)');
+function laufZeichenTest() {
+  console.log('\n43. Zeichen ▶ „läuft“ in der Schreibleiste (0.15.2)');
   if (!CL) { return; }
   frisch();
   const S = CL;
-  const text = '[] P1 Fenster warten\n    › Auftrag ausfüllen\n    › Zusage geben\n[] Lampe tauschen\nNotiz ohne Einzug\n[] Steckdose\n\n    › nach Leerzeile\n[x] Erledigt mit Schritt\n    › alt';
-  S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: text, geaendert: 1 });
-  const seite = S.kpSeiteFinden('lh');
-  pruefe(S.clHauptaufgabe(seite, 0) === true, 'eingerückte Zeilen darunter → Hauptaufgabe');
-  pruefe(S.clHauptaufgabe(seite, 3) === false, 'nicht eingerückte Zeile darunter → keine');
-  pruefe(S.clHauptaufgabe(seite, 5) === false, 'Leerzeile darunter → keine');
-  pruefe(S.clHauptaufgabe(seite, 1) === false, 'ein Schritt selbst ist keine Hauptaufgabe');
-  S.oeffne('aufgaben'); S.aufListeSetzen('lh'); S.cl.auf.erlZeigen = true; S.zeichne();
+  const unten = '\n  [] P2 Magnat und Eckert Georg anrufen\n  - Angebot vergeben\n  - Termin machen';
+  S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: '- P2 Fenster und Türen warten lassen' + unten, geaendert: 1 });
+  S.oeffne('aufgaben'); S.aufListeSetzen('lh');
+  S.listeAlsText();
+  pruefe(/onclick="memoZeichen\('lauf'\)" aria-label="läuft">▶<\/button><\/div>/.test(inhalt()), 'Schreibleiste: Knopf ▶ nach •');
+  const feld = S.document.getElementById('memoFeld');
+  feld.value = S.DB.themen[0].text; feld.selectionStart = 3;
+  S.memoZeichen('lauf');
+  pruefe(S.DB.themen[0].text === '▶ P2 Fenster und Türen warten lassen' + unten, 'ein Tipp: „-“ wird zu „▶“, die Zeilen darunter bleiben');
+  feld.selectionStart = 3;
+  S.memoZeichen('lauf');
+  pruefe(S.DB.themen[0].text === 'P2 Fenster und Türen warten lassen' + unten, 'zweiter Tipp nimmt ▶ wieder weg');
+  feld.selectionStart = 3;
+  S.memoZeichen('lauf'); S.memoZeichen('punkt');
+  pruefe(S.DB.themen[0].text === '- P2 Fenster und Türen warten lassen' + unten, '• ersetzt ▶ wieder durch „-“');
+  S.memoZeichen('lauf');
+  S.memoSchreibenUm();
   const h = inhalt();
-  pruefe(/<span class="lf"[^>]*>▶<\/span>Fenster warten/.test(h), 'Liste: ▶ vor „Fenster warten“');
-  pruefe((h.match(/class="lf"/g) || []).length === 1, 'Liste: nur dort — nicht bei Lampe, Steckdose, Erledigtem');
-  pruefe(S.DB.themen[0].text === text, 'der Text bleibt unverändert');
-  S.cl.auf.erlZeigen = false;
-  /* Heute: für heute einplanen */
-  /* Die Testumgebung übernimmt Werte nicht aus dem HTML — wie getippt setzen */
-  S.aufDetails('lh', 0);
-  S.document.getElementById('aufText').value = 'Fenster warten';
-  S.document.getElementById('aufDatum').value = S.isoDatum();
-  S.aufSpeichern();
-  S.aufDetails('lh', 3);
-  S.document.getElementById('aufText').value = 'Lampe tauschen';
-  S.document.getElementById('aufDatum').value = S.isoDatum();
-  S.aufSpeichern();
-  pruefe(S.DB.themen[0].text === text, 'Einplanen lässt Text und Schritte unverändert');
-  S.oeffne('heute');
-  const hh = inhalt();
-  pruefe(/<span class="lf"[^>]*>▶<\/span><span class="prio p1">1<\/span>Fenster warten/.test(hh), 'Heute: ▶ vor der Hauptaufgabe');
-  pruefe((hh.match(/class="lf"/g) || []).length === 1 && /Lampe tauschen/.test(hh), 'Heute: Lampe ohne ▶');
-  pruefe(/\.lf\{display:inline-block;background:var\(--px\)/.test(QUELLE), 'Marke im Stil der Palm-Kästchen');
+  pruefe(/Magnat und Eckert Georg anrufen/.test(h) && !/▶/.test(h) && !/Fenster und Türen/.test(h), 'Liste: nur die Aufgabe, ohne ▶ und ohne Oberzeile');
+  pruefe(typeof S.clHauptaufgabe === 'undefined' && !/\.lf\{/.test(QUELLE), 'Automatik aus 0.15.1 entfernt');
   S.oeffne('uebersicht');
 }
 
@@ -2494,7 +2484,7 @@ function hauptTest() {
   try { datumTest(); } catch (e) { fail('Datumswerte warf: ' + e.message); }
   try { kopfTest(); } catch (e) { fail('Kopfwerte warf: ' + e.message); }
   try { listeTextTest(); } catch (e) { fail('Liste als Text warf: ' + e.message); }
-  try { hauptTest(); } catch (e) { fail('Hauptaufgabe warf: ' + e.message); }
+  try { laufZeichenTest(); } catch (e) { fail('Zeichen ▶ warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
