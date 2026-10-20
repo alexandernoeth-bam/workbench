@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.19.0</title>
+<title>CLIE 0.19.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -471,7 +471,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.19.0';
+var APP_VERSION = '0.19.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -8535,7 +8535,33 @@ var DRV_ORDNER = 'application/vnd.google-apps.folder';
 var DRV_TABS = [['ordner', 'Ordner'], ['zuletzt', 'Zuletzt'], ['favoriten', '★ Favoriten']];
 
 cl.drv = { tab: 'ordner', stapel: [{ id: 'root', name: 'Meine Ablage' }], vorher: 'ordner', q: '',
-           cache: {}, laedt: '', fehler: '', zeilen: [] };
+           cache: {}, laedt: '', fehler: '', zeilen: [], recht: { token: '', stand: '' } };
+
+/* Seit 0.19.1: Ohne das Listenrecht meldet Drive keinen Fehler, sondern
+   liefert nur die Dateien, die CLIE/Workbench selbst angelegt haben.
+   Darum fragen wir Google, welche Rechte der Schlüssel wirklich hat. */
+var DRV_TOKENINFO = 'https://oauth2.googleapis.com/tokeninfo?access_token=';
+
+/* Stand des Rechts für den aktuellen Schlüssel: '' (offen), 'pruefe', 'ja', 'nein', 'fehler' */
+function drvRechtStand() {
+  return (cl.drv.recht.token === zugriffToken) ? cl.drv.recht.stand : '';
+}
+
+function drvRechtPruefen() {
+  if (!tokenGueltig() || typeof fetch !== 'function' || drvRechtStand()) { return; }
+  var token = zugriffToken;
+  cl.drv.recht = { token: token, stand: 'pruefe' };
+  fetch(DRV_TOKENINFO + encodeURIComponent(token)).then(function (r) {
+    return r.ok ? r.json() : null;
+  }).then(function (j) {
+    var rechte = (j && typeof j.scope === 'string') ? j.scope.split(' ') : null;
+    cl.drv.recht = { token: token, stand: rechte ? (rechte.indexOf(DRV_SCOPE) >= 0 ? 'ja' : 'nein') : 'fehler' };
+  }).catch(function () {
+    cl.drv.recht = { token: token, stand: 'fehler' };
+  }).then(function () {
+    if (cl.app === 'drive') { drvZeichnen(); }
+  });
+}
 
 function drvRechtGewuenscht() {
   try { return window.localStorage.getItem(DRV_RECHT_KEY) === 'an'; } catch (e) { return false; }
@@ -8702,6 +8728,7 @@ function drvSuchTaste(e) {
 function drvAktualisieren() {
   cl.drv.cache = {};
   cl.drv.fehler = '';
+  cl.drv.recht = { token: '', stand: '' };
   drvZeichnen();
 }
 
@@ -8710,6 +8737,7 @@ function drvErlauben() {
   try { window.localStorage.setItem(DRV_RECHT_KEY, 'an'); } catch (e) { /* dann nur für jetzt */ }
   cl.drv.fehler = '';
   cl.drv.cache = {};
+  cl.drv.recht = { token: '', stand: '' };
   anmeldeVersuch(false, 'consent').then(function () { if (cl.app === 'drive') { drvZeichnen(); } });
 }
 
@@ -8739,9 +8767,18 @@ function drvListeHtml() {
     return '<p>Für Drive braucht CLIE die Verbindung zu Google.</p>'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="anmelden(false)">Verbinden</button></div>';
   }
-  if (cl.drv.fehler === 'recht') {
+  /* Erst das Recht, dann die Liste (seit 0.19.1) */
+  var stand = drvRechtGewuenscht() ? drvRechtStand() : 'nie';
+  if (stand === '' || stand === 'pruefe') { drvRechtPruefen(); return '<p class="leise">Prüfe die Berechtigung …</p>'; }
+  if (stand === 'fehler') {
+    return '<p class="warn">Google ließ sich nicht nach der Berechtigung fragen.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="drvAktualisieren()">Nochmal</button></div>';
+  }
+  if (stand === 'nie' || stand === 'nein' || cl.drv.fehler === 'recht') {
     return '<p>CLIE darf deine Drive-Liste noch nicht sehen.</p>'
       + '<p class="leise">Mit „Erlauben“ fragt Google einmal nach dem Recht, die Dateiliste zu sehen (nur Namen und Ordner, keine Inhalte).</p>'
+      + (stand === 'nein' ? '<p class="leise">Google hat das Recht bisher nicht erteilt. Bitte im Zustimmungsfenster das Häkchen bei „Drive-Dateien ansehen“ setzen. '
+           + 'Fragt Google gar nicht, fehlt das Recht noch in der Cloud Console (drive.metadata.readonly).</p>' : '')
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="drvErlauben()">Erlauben</button></div>';
   }
   if (cl.drv.fehler === 'anmeldung') {

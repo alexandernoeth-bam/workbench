@@ -2776,6 +2776,7 @@ async function driveTest() {
   };
   let recht = true;
   S.fetch = function (adresse) {
+    if (/tokeninfo/.test(adresse)) { return Promise.resolve({ ok: true, json() { return Promise.resolve({ scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly' }); } }); }
     anfragen.push(decodeURIComponent(adresse));
     if (!recht) { return Promise.resolve({ ok: false, status: 403, json() { return Promise.resolve({}); } }); }
     const q = decodeURIComponent(adresse);
@@ -2787,6 +2788,8 @@ async function driveTest() {
     return Promise.resolve({ ok: true, status: 200, json() { return Promise.resolve({ files: files }); } });
   };
   S.drvAktualisieren();
+  S.cl.drv.recht = { token: 'test', stand: 'ja' };
+  S.drvZeichnen();
   pruefe(/Wird geholt/.test(inhalt()), 'erst „Wird geholt …“');
   await warte(); await warte();
   let h = inhalt();
@@ -2835,10 +2838,59 @@ async function driveTest() {
   recht = false;
   S.drvTab('ordner');
   S.drvAktualisieren();
-  await warte(); await warte();
+  await warte(); await warte(); await warte(); await warte();
   pruefe(/darf deine Drive-Liste noch nicht sehen/.test(inhalt()) && /drvErlauben\(\)/.test(inhalt()), 'fehlendes Recht: Hinweis und „Erlauben“');
   S.oeffne('statistik');
   pruefe(/Drive/.test(inhalt()), 'Statistik: Drive');
+  S.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
+  S.zugriffToken = null; S.tokenAblauf = 0;
+  delete S.__ablage['clie-drive-recht'];
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   49. Drive: Listenrecht wirklich prüfen (0.19.1, Fehler aus 0.19.0)
+   Grund: Ohne drive.metadata.readonly meldet Drive keinen Fehler,
+   sondern liefert nur die Dateien, die CLIE/Workbench angelegt haben.
+   „Erlauben“ erschien deshalb nie — man sah nur Workbench-Dateien.
+   Erkennt: Liste wird ohne erteiltes Recht geholt, kein „Erlauben“ beim
+   ersten Öffnen, abgelehntes Recht wird als erteilt behandelt.
+   ============================================================ */
+async function driveRechtTest() {
+  console.log('\n49. Drive: Listenrecht wirklich prüfen (0.19.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const warte = () => new Promise(r => setImmediate(r));
+  S.cl.drv.tab = 'ordner'; S.cl.drv.stapel = [{ id: 'root', name: 'Meine Ablage' }]; S.cl.drv.cache = {}; S.cl.drv.fehler = ''; S.cl.drv.recht = { token: '', stand: '' };
+  S.zugriffToken = 'nur-drive-file'; S.tokenAblauf = Date.now() + 3600000;
+  delete S.__ablage['clie-drive-recht'];
+  const listen = [];
+  let rechte = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events';
+  S.fetch = function (adresse) {
+    if (/tokeninfo/.test(adresse)) { return Promise.resolve({ ok: true, json() { return Promise.resolve({ scope: rechte }); } }); }
+    listen.push(adresse);
+    /* So antwortet Drive mit nur drive.file: kein Fehler, nur eigene Dateien */
+    return Promise.resolve({ ok: true, status: 200, json() { return Promise.resolve({ files: [{ id: 'w', name: 'workbench.json', mimeType: 'application/json' }] }); } });
+  };
+  S.oeffne('drive');
+  await warte(); await warte();
+  pruefe(/darf deine Drive-Liste noch nicht sehen/.test(inhalt()) && /drvErlauben\(\)/.test(inhalt()) && !listen.length, 'erstes Öffnen: gleich „Erlauben“ — keine Liste ohne Recht');
+  S.__ablage['clie-drive-recht'] = 'an';
+  S.drvZeichnen();
+  pruefe(/Prüfe die Berechtigung/.test(inhalt()), 'nach Erlauben: CLIE prüft das Recht bei Google');
+  await warte(); await warte(); await warte();
+  pruefe(S.cl.drv.recht.stand === 'nein' && /nicht erteilt/.test(inhalt()) && /drvErlauben\(\)/.test(inhalt()) && !listen.length,
+    'Recht nicht erteilt: wieder „Erlauben“ mit Hinweis — keine (falsche) Liste');
+  rechte += ' https://www.googleapis.com/auth/drive.metadata.readonly';
+  S.zugriffToken = 'mit-liste';
+  S.drvZeichnen();
+  await warte(); await warte(); await warte(); await warte();
+  pruefe(S.cl.drv.recht.stand === 'ja' && listen.length === 1 && /workbench\.json/.test(inhalt()), 'Recht erteilt (neuer Schlüssel): jetzt wird die Liste geholt');
+  S.fetch = function () { return Promise.resolve({ ok: false, status: 500 }); };
+  S.drvAktualisieren();
+  await warte(); await warte(); await warte();
+  pruefe(/ließ sich nicht nach der Berechtigung fragen/.test(inhalt()), 'Prüfung schlägt fehl: Hinweis und „Nochmal“');
   S.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
   S.zugriffToken = null; S.tokenAblauf = 0;
   delete S.__ablage['clie-drive-recht'];
@@ -2890,6 +2942,7 @@ async function driveTest() {
   try { ansichtTest(); } catch (e) { fail('Aufgabensicht warf: ' + e.message); }
   try { stonesTest(); } catch (e) { fail('Stones warf: ' + e.message); }
   try { await driveTest(); } catch (e) { fail('Drive warf: ' + e.message); }
+  try { await driveRechtTest(); } catch (e) { fail('Drive-Recht warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
