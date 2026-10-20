@@ -2308,7 +2308,7 @@ function datumTest() {
    Bild. Jetzt stehen bis zu 4 Kopfwerte und die Spaltenüberschrift fest,
    nur die Einträge scrollen.
    Erkennt: Kopf nicht mehr fest (sticky), Überschrift und Spalten nicht
-   bündig, falscher Zeitraum, mehr als 4 Kopfwerte.
+   bündig, falscher Zeitraum, mehr als 6 Kopfwerte (seit 0.14.1).
    ============================================================ */
 function kopfTest() {
   console.log('\n41. Kopfwerte und fester Kopf (0.14)');
@@ -2333,22 +2333,23 @@ function kopfTest() {
   S.cl.app = 'sammlungen'; S.cl.sa.id = g.id; S.cl.sa.ansicht = 'kopf'; S.zeichne();
   pruefe(S.document.getElementById('reiter').textContent === 'Kopfwerte' && /saKopfOeffnen\(-1\)">\+ Kopfwert/.test(S.document.getElementById('fuss').innerHTML), 'Ansicht Kopfwerte mit „+ Kopfwert“');
   const feld = (id, v) => { S.document.getElementById(id).value = v; };
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     S.saKopfOeffnen(-1);
     feld('saKwName', 'K' + i); feld('saKwArt', 'letzter'); feld('saKwFeld', 'kg'); feld('saKwWert', 'w1'); feld('saKwZr', '');
     S.saKopfSpeichern();
   }
-  pruefe(g.kopfwerte.length === 4 && g.kopfwerte[3].name === 'K3', 'höchstens vier Kopfwerte');
+  pruefe(g.kopfwerte.length === 6 && g.kopfwerte[5].name === 'K5', 'höchstens sechs Kopfwerte (seit 0.14.1)');
   S.zeichne();
-  pruefe(/saKopfOeffnen\(-1\)" disabled>\+ Kopfwert/.test(S.document.getElementById('fuss').innerHTML), 'bei vier ist „+ Kopfwert“ gesperrt');
+  pruefe(/saKopfOeffnen\(-1\)" disabled>\+ Kopfwert/.test(S.document.getElementById('fuss').innerHTML), 'bei sechs ist „+ Kopfwert“ gesperrt');
+  pruefe(/<div class="sa-kw sa-kw3">/.test(S.saKopfwerteHtml(g)), 'ab fünf Kacheln drei nebeneinander');
   S.saKopfOeffnen(0);
   feld('saKwName', ''); feld('saKwArt', 'schnitt'); feld('saKwFeld', 'kg'); feld('saKwZr', '30');
   S.saKopfSpeichern();
   pruefe(g.kopfwerte[0].art === 'schnitt' && g.kopfwerte[0].zeitraum === '30' && !g.kopfwerte[0].name, 'Kopfwert ändern');
   S.saKopfSchieben(0, 1);
   pruefe(g.kopfwerte[1].art === 'schnitt', 'Reihenfolge ändern');
-  S.saKopfOeffnen(3); S.saKopfLoeschen();
-  pruefe(g.kopfwerte.length === 3, 'Kopfwert löschen');
+  S.saKopfOeffnen(5); S.saKopfLoeschen(); S.saKopfOeffnen(4); S.saKopfLoeschen(); S.saKopfOeffnen(3); S.saKopfLoeschen();
+  pruefe(g.kopfwerte.length === 3 && /<div class="sa-kw">/.test(S.saKopfwerteHtml(g)), 'Kopfwert löschen — bis vier wieder zwei nebeneinander');
 
   /* Tabelle: fester Kopf und bündige Spalten */
   S.saAnsicht('tabelle');
