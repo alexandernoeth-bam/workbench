@@ -252,7 +252,9 @@ console.log('\n6. Datenmodell');
                     /* seit v6.2.3: die App „Sammlungen“ im CLIE */
                     'sammlungen', 'datensaetze',
                     /* seit v6.3.1: Favoriten der App „Drive“ im CLIE */
-                    'drivefavoriten'];
+                    'drivefavoriten',
+                    /* seit v6.3.2: Lernkartei im CLIE */
+                    'lernkaesten', 'lernstand'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -13028,7 +13030,7 @@ console.log('\n202. Ausblenden im Tag');
 console.log('\n203. CLIE-Bereiche bleiben erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze (und seit 6.3.1 drivefavoriten)');
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13108,7 +13110,7 @@ console.log('\n204. Priorität einer Aufgabe');
 console.log('\n205. Drive-Favoriten des CLIE bleiben erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/'drivefavoriten'\];/.test(QUELLE), 'SAMMLUNGEN kennt drivefavoriten');
+  pruefe(/'drivefavoriten'[\],]/.test(QUELLE), 'SAMMLUNGEN kennt drivefavoriten');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13134,6 +13136,45 @@ console.log('\n205. Drive-Favoriten des CLIE bleiben erhalten');
   if (typeof a.textZuBestand === 'function') {
     const b = a.textZuBestand(JSON.stringify({ drivefavoriten: [{ id: 'f9', datei: 'x', name: 'PDF', geaendert: 1 }] }));
     pruefe(b && b.drivefavoriten && b.drivefavoriten.length === 1, 'Laden: der Bereich überlebt das Einlesen');
+  } else {
+    warn('Laden nicht auswertbar');
+  }
+}
+
+/* ============================================================
+   206. Lernkartei des CLIE bleibt erhalten (v6.3.2)
+   Grund: Kästen und Lernstand der Lernkartei liegen seit CLIE 0.24
+   in der workbench.json, damit Pixel und iPad denselben Stand haben.
+   Eine Workbench ohne diese Bereiche würde Wochen an Lernstand beim
+   Speichern verwerfen.
+   Erkennt: Bereiche fehlen in SAMMLUNGEN/leereDatenbank, Lernstand
+   wird nicht je Karte zusammengeführt (zwei Geräte am selben Tag),
+   gelöschter Kasten kehrt zurück, Bereich überlebt das Laden nicht.
+   ============================================================ */
+console.log('\n206. Lernkartei des CLIE bleibt erhalten');
+{
+  const a = globalThis.__api || {};
+  pruefe(/'lernkaesten','lernstand'\];/.test(QUELLE), 'SAMMLUNGEN kennt lernkaesten und lernstand');
+  if (typeof a.zusammenfuehren !== 'function') {
+    warn('Abgleich nicht auswertbar');
+  } else {
+    const leer = a.leereDatenbank();
+    pruefe(Array.isArray(leer.lernkaesten) && Array.isArray(leer.lernstand), 'die leere Datenbank hat beide Bereiche');
+    const lokal = a.leereDatenbank(); const fremd = a.leereDatenbank();
+    lokal.lernstand = [{ id: 'k1|it-0001', k: 'k1', f: 3, d: '2026-10-24', geaendert: 10 }, { id: 'k1|it-0002', k: 'k1', f: 2, d: '2026-10-22', geaendert: 20 }];
+    fremd.lernstand = [{ id: 'k1|it-0001', k: 'k1', f: 4, d: '2026-10-28', geaendert: 15 }, { id: 'k1|it-0002', k: 'k1', f: 1, d: '2026-10-21', geaendert: 12 }];
+    const m = a.zusammenfuehren(lokal, fremd); const db = m.db || m.ergebnis || m;
+    const f = id => db.lernstand.filter(x => x.id === id)[0];
+    pruefe(f('k1|it-0001').f === 4 && f('k1|it-0002').f === 2, 'Lernstand: je Karte gewinnt der jüngere Stand (Pixel und iPad am selben Tag)');
+    const l2 = a.leereDatenbank(); const f2 = a.leereDatenbank();
+    f2.lernkaesten = [{ id: 'k9', name: 'Weg', geaendert: Date.now() - 60000 }];
+    l2.grabsteine = [{ s: 'lernkaesten', id: 'k9', z: Date.now() }];
+    const m2 = a.zusammenfuehren(l2, f2); const db2 = m2.db || m2.ergebnis || m2;
+    pruefe(!(db2.lernkaesten || []).some(x => x.id === 'k9'), 'gelöschter Kasten (Grabstein) kehrt nicht zurück');
+  }
+  if (typeof a.textZuBestand === 'function') {
+    const b = a.textZuBestand(JSON.stringify({ lernkaesten: [{ id: 'k1', name: 'Italienisch', geaendert: 1 }], lernstand: [{ id: 'k1|x', k: 'k1', f: 1, geaendert: 1 }] }));
+    pruefe(b && b.lernkaesten && b.lernkaesten.length === 1 && b.lernstand && b.lernstand.length === 1, 'Laden: beide Bereiche überleben das Einlesen');
   } else {
     warn('Laden nicht auswertbar');
   }

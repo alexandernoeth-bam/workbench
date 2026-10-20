@@ -2754,7 +2754,7 @@ async function driveTest() {
   const warte = () => new Promise(r => setImmediate(r));
   const heute = S.isoDatum();
   S.cl.drv.tab = 'ordner'; S.cl.drv.stapel = [{ id: 'root', name: 'Meine Ablage' }]; S.cl.drv.cache = {}; S.cl.drv.fehler = ''; S.cl.drv.q = '';
-  pruefe(/'drivefavoriten'\]/.test(QUELLE) && Array.isArray(S.DB.drivefavoriten), 'Bereich drivefavoriten kommt aus der Workbench (6.3.1)');
+  pruefe(/'drivefavoriten'[\],]/.test(QUELLE) && Array.isArray(S.DB.drivefavoriten), 'Bereich drivefavoriten kommt aus der Workbench (6.3.1)');
   pruefe(!/drive\.metadata\.readonly'?\s*;/.test(funktionText(SKRIPT, 'clAnfrage')) && /var SCOPES = 'https:\/\/www\.googleapis\.com\/auth\/drive\.file '/.test(QUELLE) && !/SCOPES = [^;]*metadata/.test(QUELLE),
     'das Listenrecht ist nicht Teil der normalen Anmeldung');
   delete S.__ablage['clie-drive-recht'];
@@ -3228,6 +3228,97 @@ function schuleTest() {
 }
 
 /* ============================================================
+   55. Lernkartei in der workbench.json (0.24)
+   Grund: Pixel und iPad lernen mit demselben Stand. Der Lernstand
+   liegt je Karte in der Datenbank, die großen Paketinhalte bleiben auf
+   dem Gerät. Fehler hier kosten Wochen an Lernstand.
+   Erkennt: Lernstand/Kästen nicht in der DB, Paketinhalte blähen die
+   DB auf, zweites Gerät legt doppelten Kasten an oder verliert den
+   Stand, Abgleich nicht je Karte, Neu-pro-Tag nicht geräteübergreifend,
+   Übernahme aus 0.23 verliert Karten, Löschen ohne Grabstein.
+   ============================================================ */
+function lkSyncTest() {
+  console.log('\n55. Lernkartei in der workbench.json (0.24)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const leeren = () => { delete S.__ablage['clie-lernkartei']; delete S.__ablage['clie-lernkartei-pakete']; S.DB.lernkaesten = []; S.DB.lernstand = []; S.DB.grabsteine = []; };
+  leeren();
+  const heute = S.isoDatum();
+  pruefe(Array.isArray(S.leereDatenbank().lernkaesten) && Array.isArray(S.leereDatenbank().lernstand), 'Workbench-Unterbau kennt lernkaesten und lernstand (6.3.2)');
+  pruefe(S.SAMMLUNGEN.indexOf('lernkaesten') >= 0 && S.SAMMLUNGEN.indexOf('lernstand') >= 0, 'beide Bereiche werden abgeglichen');
+  const karten = []; for (let i = 1; i <= 30; i++) { karten.push({ id: 'x-' + i, v: 'Frage ' + i, r: 'Langer geheimer Antworttext Nummer ' + i }); }
+  const paket = { format: 'clie-lernkartei', paket: { id: 'sync-paket', name: 'Sync', version: 1 }, karten: karten };
+  S.lkPaketPruefen(JSON.stringify(paket), 'sync.json'); S.lkPaketUebernehmen();
+  let d = S.lkDaten(); const k = d.kaesten[0];
+  pruefe(S.DB.lernkaesten.length === 1 && S.DB.lernkaesten[0].paket.id === 'sync-paket', 'Kasten steht in der Datenbank');
+  pruefe(JSON.stringify(S.DB).indexOf('geheimer Antworttext') < 0 && String(S.__ablage['clie-lernkartei-pakete']).indexOf('geheimer Antworttext') >= 0,
+    'Paketinhalte bleiben auf dem Gerät, nicht in der workbench.json');
+  k.neuProTag = 5; S.lkSichern(d);
+  S.lkLernen(k.id); S.lkUmdrehen(); S.lkBewerten('g'); S.lkUmdrehen(); S.lkBewerten('g');
+  pruefe(S.DB.lernstand.length === 2 && S.DB.lernstand.every(s => s.f === 2 && s.e === heute && s.geaendert > 0 && s.id.indexOf(k.id + '|x-') === 0),
+    'Lernstand je Karte in der DB (Fach, Termin, Tag der Einführung, Zeitstempel)');
+  pruefe(JSON.stringify(S.DB.lernstand[0]).length < 140, 'ein Lernstand-Eintrag ist klein (' + JSON.stringify(S.DB.lernstand[0]).length + ' Zeichen)');
+  /* Zweites Gerät: gleiche DB, aber Paket noch nicht geladen */
+  const dbPixel = JSON.parse(JSON.stringify(S.DB));
+  delete S.__ablage['clie-lernkartei-pakete'];
+  d = S.lkDaten();
+  pruefe(d.kaesten.length === 1 && d.kaesten[0].fehlt, 'iPad ohne Paket: Kasten da, als „Paket fehlt“ markiert');
+  S.oeffne('lernkartei'); S.lkWechseln(k.id);
+  pruefe(inhalt().indexOf('lk-hinweis') >= 0 && inhalt().indexOf('lkPaketWaehlen') >= 0, 'Hinweis mit „Paket laden …“');
+  S.lkSichern(S.lkDaten());
+  pruefe(S.DB.lernstand.length === 2, 'Sichern ohne Paket löscht keinen Lernstand');
+  pruefe(S.lkNeuFrei(S.lkDaten(), S.lkDaten().kaesten[0]) === 0, 'ohne Paketkarten keine neuen');
+  S.lkPaketPruefen(JSON.stringify(paket), 'sync.json'); S.lkPaketUebernehmen();
+  d = S.lkDaten();
+  pruefe(d.kaesten.length === 1 && !d.kaesten[0].fehlt && d.kaesten[0].karten.filter(c => c.fach === 2).length === 2, 'Paket auf dem iPad geladen: kein zweiter Kasten, Lernstand da');
+  pruefe(S.lkNeuFrei(d, d.kaesten[0]) === 3, 'Neu pro Tag zählt über Geräte (5 − 2 schon eingeführt)');
+  /* Beide Geräte lernen dieselbe Karte — je Karte gewinnt der jüngere Stand */
+  const ipad = JSON.parse(JSON.stringify(S.DB));
+  const id1 = dbPixel.lernstand[0].id, id2 = dbPixel.lernstand[1].id;
+  dbPixel.lernstand[0].f = 3; dbPixel.lernstand[0].geaendert += 1000;
+  ipad.lernstand.filter(s => s.id === id2)[0].f = 1; ipad.lernstand.filter(s => s.id === id2)[0].geaendert += 2000;
+  const m = S.zusammenfuehren(dbPixel, ipad); const db = m.db || m.ergebnis || m;
+  pruefe(db.lernstand.filter(s => s.id === id1)[0].f === 3 && db.lernstand.filter(s => s.id === id2)[0].f === 1, 'Abgleich: Karte 1 vom Pixel, Karte 2 vom iPad');
+  /* Eigene Karte und Bearbeitung einer Paketkarte reisen mit */
+  S.DB = db; d = S.lkDaten(); const kk = d.kaesten[0];
+  kk.karten.push({ id: 'eig1', v: 'Eigene', r: 'Karte', w: '', p: false, eigen: true, fach: 0, faellig: '', e: '', gesehen: 0 });
+  kk.karten.filter(c => c.id === 'x-5')[0].r = 'korrigiert'; kk.karten.filter(c => c.id === 'x-5')[0].eigen = true;
+  S.lkSichern(d);
+  const satz = S.DB.lernkaesten[0];
+  pruefe(satz.karten.length === 2 && satz.karten.some(c => c.id === 'x-5' && c.r === 'korrigiert'), 'eigene Karte und bearbeitete Paketkarte stehen im Kasten (DB)');
+  delete S.__ablage['clie-lernkartei-pakete'];
+  pruefe(S.lkDaten().kaesten[0].karten.length === 2, 'auf einem Gerät ohne Paket sind sie trotzdem da');
+  S.lkPaketPruefen(JSON.stringify(paket), 'sync.json'); S.lkPaketUebernehmen();
+  d = S.lkDaten();
+  pruefe(d.kaesten[0].karten.length === 31 && d.kaesten[0].karten.filter(c => c.id === 'x-5')[0].r === 'korrigiert', 'mit Paket: Bearbeitung überdeckt den Paketinhalt');
+  /* Paketkarte löschen → merkt sich der Kasten */
+  S.cl.lk.id = d.kaesten[0].id; S.cl.lk.karte = 'x-7'; S.lkKarteLoeschen();
+  pruefe(S.DB.lernkaesten[0].weg.indexOf('x-7') >= 0 && S.lkDaten().kaesten[0].karten.length === 30, 'gelöschte Paketkarte bleibt weg (auch nach Neuladen)');
+  /* Kasten löschen → Grabsteine */
+  const kid = S.DB.lernkaesten[0].id;
+  S.cl.lk.id = kid; S.lkKastenLoeschen();
+  pruefe(!S.DB.lernkaesten.length && !S.DB.lernstand.length && S.DB.grabsteine.some(g => g.s === 'lernkaesten' && g.id === kid) && S.DB.grabsteine.some(g => g.s === 'lernstand'),
+    'Kasten löschen: Kasten und Lernstand mit Grabstein weg');
+  /* Übernahme aus 0.23 */
+  leeren();
+  S.__ablage['clie-lernkartei'] = JSON.stringify({ kaesten: [
+    { id: 'alt1', name: 'Italienisch', paket: { id: 'it', version: 1 }, neuProTag: 10, richtung: 'rueck', karten: [
+      { id: 'q1', q: 'it-0001', v: 'il pane', r: 'das Brot', w: 'das Brot', fach: 3, faellig: '2026-12-01', gesehen: 4 },
+      { id: 'q2', q: 'it-0002', v: 'la casa', r: 'das Haus', w: 'das Haus', fach: 0, faellig: '' },
+      { id: 'own', v: 'Eigene', r: 'Karte', fach: 2, faellig: '2026-11-11', gesehen: 1 }] }], neu: { datum: heute, z: {} } });
+  const n = S.lkAltUebernehmen();
+  d = S.lkDaten();
+  const ka = d.kaesten[0];
+  pruefe(n === 1 && ka && ka.name === 'Italienisch' && ka.richtung === 'rueck' && ka.neuProTag === 10 && ka.karten.length === 3, 'Übernahme aus 0.23: Kasten mit allen Karten und Einstellungen');
+  pruefe(ka.karten.filter(c => c.id === 'it-0001')[0].fach === 3 && ka.karten.filter(c => c.id === 'own')[0].fach === 2 && S.DB.lernstand.length === 2, 'Übernahme: Lernstand bleibt, Schlüssel = Paket-Karten-ID');
+  pruefe(!S.__ablage['clie-lernkartei'] && !!S.__ablage['clie-lernkartei-alt'] && S.lkAltUebernehmen() === 0, 'Übernahme nur einmal, alter Stand als Sicherung behalten');
+  pruefe(QUELLE.indexOf('lkAltUebernehmen();') >= 0, 'Übernahme läuft nach dem Laden der Datenbank');
+  leeren();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    54. Lernkartei umschalten (0.23.1)
    Grund: Mit mehreren Paketen muss der Kasten schnell wechselbar sein.
    Erkennt: Kopf zeigt nicht den offenen Kasten, Aufklappliste fehlt
@@ -3238,7 +3329,7 @@ function lkWahlTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  delete S.__ablage['clie-lernkartei'];
+  delete S.__ablage['clie-lernkartei']; delete S.__ablage['clie-lernkartei-pakete']; S.DB.lernkaesten = []; S.DB.lernstand = [];
   const a = S.lkKastenNeu('Italienisch'); const b = S.lkKastenNeu('Ein sehr langer Kastenname für den Kopf');
   let d = S.lkDaten(); S.lkKasten(d, a).karten = S.lkKartenAusText('A\n1\n\nB\n2'); S.lkSichern(d);
   S.oeffne('lernkartei');
@@ -3256,7 +3347,7 @@ function lkWahlTest() {
   pruefe(S.cl.lk.id === '' && S.cl.lk.ansicht === 'liste', '„Alle Kästen“ führt zur Liste');
   S.lkWechseln('gibtsnicht');
   pruefe(S.cl.lk.ansicht === 'liste', 'unbekannter Kasten → Liste statt Fehler');
-  delete S.__ablage['clie-lernkartei'];
+  delete S.__ablage['clie-lernkartei']; delete S.__ablage['clie-lernkartei-pakete']; S.DB.lernkaesten = []; S.DB.lernstand = [];
   S.oeffne('uebersicht');
 }
 
@@ -3274,7 +3365,7 @@ function lernkarteiTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  delete S.__ablage['clie-lernkartei'];
+  delete S.__ablage['clie-lernkartei']; delete S.__ablage['clie-lernkartei-pakete']; S.DB.lernkaesten = []; S.DB.lernstand = [];
   const heute = S.isoDatum();
   pruefe(S.lkDaten().kaesten.length === 0, 'leerer Anfang ohne Fehler');
   /* Text einfügen */
@@ -3359,7 +3450,7 @@ function lernkarteiTest() {
   pruefe(S.lkKasten(S.lkDaten(), id).karten.length === 4, 'neue Karte gespeichert');
   S.lkFensterAuf('details'); S.lkKastenLoeschen();
   pruefe(!S.lkKasten(S.lkDaten(), id) && S.cl.lk.ansicht === 'liste', 'Kasten gelöscht');
-  delete S.__ablage['clie-lernkartei'];
+  delete S.__ablage['clie-lernkartei']; delete S.__ablage['clie-lernkartei-pakete']; S.DB.lernkaesten = []; S.DB.lernstand = [];
   S.oeffne('uebersicht');
 }
 
@@ -3413,6 +3504,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { lkSyncTest(); } catch (e) { fail('Lernkartei-Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkWahlTest(); } catch (e) { fail('Lernkartei umschalten warf: ' + e.message); }
   try { lernkarteiTest(); } catch (e) { fail('Lernkartei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 

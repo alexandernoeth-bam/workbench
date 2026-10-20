@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.23.1</title>
+<title>CLIE 0.24.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -502,6 +502,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .lk-feld{display:block;width:100%;min-height:150px;font:17.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--px);background:var(--lcd-hell);border:2px solid var(--px);padding:6px;box-sizing:border-box}
 .lk-feld.klein{min-height:64px}
 .lk-datei{display:none}
+.lk-hinweis{border:2px dashed var(--px);padding:8px 10px;margin:6px 0 10px;font-size:17.5px;line-height:1.4}
 .lk-aufklapp{max-height:70vh;overflow:auto;min-width:240px}
 .lk-wahl{display:flex!important;justify-content:space-between;gap:12px;width:100%}
 .lk-wahl b{font-weight:400;color:var(--px-mitte)}
@@ -549,7 +550,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.23.1';
+var APP_VERSION = '0.24.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -584,7 +585,11 @@ var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe
                      bewahrt und gleicht sie nur ab, sie zeigt sie nicht an */
                   'sammlungen','datensaetze',
                   /* seit v6.3.1: Favoriten der App „Drive“ im CLIE — ebenso */
-                  'drivefavoriten'];
+                  'drivefavoriten',
+                  /* seit v6.3.2: App „Lernkartei“ im CLIE — Kästen und
+                     Lernstand je Karte; die Kartentexte der Pakete bleiben
+                     auf dem Gerät. Ebenso nur bewahrt und abgeglichen. */
+                  'lernkaesten','lernstand'];
 
 /* Aus der Workbench: nummerierte Zeilen */
 var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
@@ -629,7 +634,7 @@ var kalenderLaeuft = false;
 var kalenderUhr = null;
 
 /* ============================================================
-   Unterbau aus der Workbench 6.3.1 — wörtlich übernommen:
+   Unterbau aus der Workbench 6.3.2 — wörtlich übernommen:
    Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke,
    Kalender lesen, leere Datenbank und der Aktivitäten-Kern (kp…).
    ============================================================ */
@@ -1512,6 +1517,8 @@ function leereDatenbank() {
     sammlungen:        [],
     datensaetze:       [],
     drivefavoriten:    [],
+    lernkaesten:       [],
+    lernstand:         [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -10675,39 +10682,201 @@ function schKopfText() {
    Nicht gewusst → zurück in Fach 1 (und heute noch einmal).
    Rückseiten mit Absätzen, Aufzählungen und **fett**; Listen lassen sich
    Punkt für Punkt aufdecken. Kästen entstehen von Hand, aus eingefügtem
-   Text, aus einem Memo oder aus einem Kartenpaket (JSON-Datei). Alles
-   bleibt nur auf diesem Gerät. */
+   Text, aus einem Memo oder aus einem Kartenpaket (JSON-Datei).
 
-var LK_KEY = 'clie-lernkartei';
+   Seit 0.24 liegen Kästen und Lernstand in der workbench.json (Bereiche
+   „lernkaesten“ und „lernstand“, Workbench 6.3.2) — so lernen Pixel und
+   iPad mit demselben Stand. Der Lernstand ist je Karte ein Eintrag, beim
+   Abgleich gewinnt je Karte der jüngere. Die Texte der Kartenpakete sind
+   groß und bleiben auf dem Gerät (LK_PAKETE_KEY); jedes Gerät lädt ein
+   Paket einmal. Eigene Karten und bearbeitete Paketkarten stehen im
+   Kasten selbst und reisen mit. */
+
+var LK_KEY = 'clie-lernkartei';                 /* nur noch für die Übernahme aus 0.23 */
+var LK_PAKETE_KEY = 'clie-lernkartei-pakete';
 var LK_INTERVALL = [0, 1, 2, 4, 8, 16];
 var LK_RICHTUNGEN = [['vor', 'Vorder → Rück'], ['rueck', 'Rück → Vorder'], ['gemischt', 'Gemischt']];
 
 cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '' };
 
-function lkDaten() {
-  var d = null;
-  try { d = JSON.parse(window.localStorage.getItem(LK_KEY) || 'null'); } catch (e) { d = null; }
-  d = (d && typeof d === 'object') ? d : {};
-  if (!Array.isArray(d.kaesten)) { d.kaesten = []; }
-  if (!d.neu || typeof d.neu !== 'object') { d.neu = { datum: '', z: {} }; }
-  if (d.neu.datum !== isoDatum()) { d.neu = { datum: isoDatum(), z: {} }; }
-  return d;
+var lkPaketeZwischen = { roh: null, daten: {} };
+
+/* Paketinhalte dieses Geräts: { paketId: { version, name, karten: [{id, v, r, w}] } } */
+function lkPakete() {
+  var roh = null;
+  try { roh = window.localStorage.getItem(LK_PAKETE_KEY); } catch (e) { roh = null; }
+  if (roh !== lkPaketeZwischen.roh) {
+    var d = null;
+    try { d = JSON.parse(roh || 'null'); } catch (e) { d = null; }
+    lkPaketeZwischen = { roh: roh, daten: (d && typeof d === 'object') ? d : {} };
+  }
+  return lkPaketeZwischen.daten;
 }
 
+function lkPaketeSichern(p) {
+  var roh = JSON.stringify(p);
+  try { window.localStorage.setItem(LK_PAKETE_KEY, roh); }
+  catch (e) { melde('Speichern ging nicht — der Speicher dieses Geräts ist voll.', 'warn'); return false; }
+  lkPaketeZwischen = { roh: roh, daten: p };
+  return true;
+}
+
+/* Arbeitsansicht: Kästen mit allen Karten und ihrem Lernstand —
+   gebaut aus der Datenbank und den Paketen dieses Geräts */
+function lkDaten() {
+  var pakete = lkPakete();
+  var stand = {};
+  (Array.isArray(DB.lernstand) ? DB.lernstand : []).forEach(function (s) { if (s && s.id) { stand[s.id] = s; } });
+  var kaesten = (Array.isArray(DB.lernkaesten) ? DB.lernkaesten : []).filter(function (k) { return k && k.id; }).map(function (k) {
+    var eigen = {};
+    (k.karten || []).forEach(function (c) { if (c && c.id) { eigen[c.id] = c; } });
+    var weg = {};
+    (k.weg || []).forEach(function (x) { weg[x] = 1; });
+    var p = (k.paket && k.paket.id) ? pakete[k.paket.id] : null;
+    var karte = function (x, ausPaket, istEigen) {
+      var s = stand[k.id + '|' + x.id] || {};
+      return { id: x.id, v: String(x.v || ''), r: String(x.r || ''), w: x.w ? String(x.w) : '', p: ausPaket, eigen: istEigen,
+               fach: Number(s.f) || 0, faellig: s.d || '', e: s.e || '', gesehen: Number(s.n) || 0 };
+    };
+    var karten = [];
+    var imPaket = {};
+    if (p && Array.isArray(p.karten)) {
+      p.karten.forEach(function (x) {
+        imPaket[x.id] = 1;
+        if (!weg[x.id]) { karten.push(eigen[x.id] ? karte(eigen[x.id], true, true) : karte(x, true, false)); }
+      });
+    }
+    (k.karten || []).forEach(function (c) { if (c && c.id && !imPaket[c.id] && !weg[c.id]) { karten.push(karte(c, false, true)); } });
+    return { id: k.id, name: String(k.name || 'Kasten'), paket: k.paket ? { id: k.paket.id, version: Number(k.paket.version) || 1 } : null,
+             neuProTag: (typeof k.neuProTag === 'number') ? k.neuProTag : 20, richtung: k.richtung || 'vor', angelegt: k.angelegt || '',
+             weg: (k.weg || []).slice(), fehlt: !!(k.paket && k.paket.id && !p), karten: karten };
+  });
+  return { kaesten: kaesten };
+}
+
+/* Schreibt die Arbeitsansicht zurück: nur was sich geändert hat,
+   jeweils mit Zeitstempel; Gelöschtes bekommt einen Grabstein */
 function lkSichern(d) {
-  try { window.localStorage.setItem(LK_KEY, JSON.stringify(d)); return true; }
-  catch (e) { melde('Speichern ging nicht — der Speicher ist voll.', 'warn'); return false; }
+  if (!Array.isArray(DB.lernkaesten)) { DB.lernkaesten = []; }
+  if (!Array.isArray(DB.lernstand)) { DB.lernstand = []; }
+  var z = jetzt();
+  var anders = false;
+  var ansicht = {};
+  d.kaesten.forEach(function (k) { ansicht[k.id] = k; });
+  DB.lernkaesten = DB.lernkaesten.filter(function (k) {
+    if (k && ansicht[k.id]) { return true; }
+    if (k && k.id) { grabsteinSetzen('lernkaesten', k.id); }
+    anders = true;
+    return false;
+  });
+  /* Lernstand: zu gelöschten Kästen und — wenn die Karten bekannt sind — zu gelöschten Karten weg */
+  var bekannt = {};
+  d.kaesten.forEach(function (k) { if (!k.fehlt) { k.karten.forEach(function (c) { bekannt[k.id + '|' + c.id] = 1; }); } });
+  DB.lernstand = DB.lernstand.filter(function (s) {
+    if (!s || !s.id) { anders = true; return false; }
+    var k = ansicht[s.k];
+    if (k && (k.fehlt || bekannt[s.id])) { return true; }
+    grabsteinSetzen('lernstand', s.id);
+    anders = true;
+    return false;
+  });
+  var stand = {};
+  DB.lernstand.forEach(function (s) { stand[s.id] = s; });
+  d.kaesten.forEach(function (k) {
+    var satz = DB.lernkaesten.filter(function (x) { return x.id === k.id; })[0];
+    var neu = { id: k.id, name: k.name, paket: k.paket, neuProTag: k.neuProTag, richtung: k.richtung, angelegt: k.angelegt, weg: k.weg,
+                karten: k.karten.filter(function (c) { return c.eigen; }).map(function (c) { return { id: c.id, v: c.v, r: c.r, w: c.w || '' }; }) };
+    if (!satz) {
+      neu.geaendert = z;
+      DB.lernkaesten.push(neu);
+      anders = true;
+    } else {
+      var alt = JSON.stringify([satz.name, satz.paket || null, satz.neuProTag, satz.richtung, satz.weg || [], satz.karten || []]);
+      if (alt !== JSON.stringify([neu.name, neu.paket || null, neu.neuProTag, neu.richtung, neu.weg, neu.karten])) {
+        satz.name = neu.name; satz.paket = neu.paket; satz.neuProTag = neu.neuProTag; satz.richtung = neu.richtung;
+        satz.weg = neu.weg; satz.karten = neu.karten; satz.geaendert = z;
+        anders = true;
+      }
+    }
+    k.karten.forEach(function (c) {
+      var id = k.id + '|' + c.id;
+      var s = stand[id];
+      var f = Number(c.fach) || 0;
+      var faellig = c.faellig || '';
+      var e = c.e || '';
+      var n = Number(c.gesehen) || 0;
+      if (!s) {
+        if (!f && !n && !e) { return; }
+        s = { id: id, k: k.id, f: f, d: faellig, e: e, n: n, geaendert: z };
+        DB.lernstand.push(s);
+        stand[id] = s;
+        anders = true;
+      } else if (s.f !== f || (s.d || '') !== faellig || (s.e || '') !== e || (Number(s.n) || 0) !== n) {
+        s.f = f; s.d = faellig; s.e = e; s.n = n; s.geaendert = z;
+        anders = true;
+      }
+    });
+  });
+  if (anders) { spaeterSichern(); }
+  return true;
+}
+
+/* Einmalig: den Stand aus 0.23 (nur auf diesem Gerät) in die Datenbank übernehmen */
+function lkAltUebernehmen() {
+  var alt = null;
+  try { alt = JSON.parse(window.localStorage.getItem(LK_KEY) || 'null'); } catch (e) { alt = null; }
+  if (!alt || !Array.isArray(alt.kaesten) || !alt.kaesten.length) { return 0; }
+  var pakete = lkPakete();
+  var vorhanden = lkDaten();
+  var d = { kaesten: vorhanden.kaesten.slice() };
+  alt.kaesten.forEach(function (k) {
+    if (!k || !k.id) { return; }
+    /* Paketkästen: gibt es den Kasten (von einem anderen Gerät) schon, wird er ergänzt */
+    var ziel = (k.paket && k.paket.id) ? d.kaesten.filter(function (x) { return x.paket && x.paket.id === k.paket.id; })[0] : null;
+    if (k.paket && k.paket.id) {
+      var vorher = pakete[k.paket.id];
+      if (!vorher || (Number(vorher.version) || 0) < (Number(k.paket.version) || 1)) {
+        pakete[k.paket.id] = { version: Number(k.paket.version) || 1, name: String(k.name || ''),
+          karten: (k.karten || []).filter(function (c) { return c && c.q; }).map(function (c) { return { id: c.q, v: c.v, r: c.r, w: c.w || '' }; }) };
+      }
+    }
+    if (!ziel) {
+      ziel = { id: k.id, name: String(k.name || 'Kasten'), paket: k.paket ? { id: k.paket.id, version: Number(k.paket.version) || 1 } : null,
+               neuProTag: (typeof k.neuProTag === 'number') ? k.neuProTag : 20, richtung: k.richtung || 'vor', angelegt: k.angelegt || isoDatum(),
+               weg: [], fehlt: false, karten: [] };
+      d.kaesten.push(ziel);
+    }
+    var hier = {};
+    ziel.karten.forEach(function (c) { hier[c.id] = c; });
+    (k.karten || []).forEach(function (c) {
+      if (!c || !c.id) { return; }
+      var schluessel = c.q || c.id;
+      var x = hier[schluessel];
+      if (!x) {
+        x = { id: schluessel, v: c.v, r: c.r, w: c.w || '', p: !!c.q, eigen: !c.q, fach: 0, faellig: '', e: '', gesehen: 0 };
+        ziel.karten.push(x);
+        hier[schluessel] = x;
+      }
+      /* Der weiter fortgeschrittene Stand bleibt */
+      if ((Number(c.fach) || 0) > (Number(x.fach) || 0)) { x.fach = Number(c.fach) || 0; x.faellig = c.faellig || ''; x.gesehen = Number(c.gesehen) || 0; }
+    });
+  });
+  lkPaketeSichern(pakete);
+  lkSichern(d);
+  try { window.localStorage.setItem(LK_KEY + '-alt', JSON.stringify(alt)); window.localStorage.removeItem(LK_KEY); } catch (e) { /* egal */ }
+  return alt.kaesten.length;
 }
 
 function lkKasten(d, id) {
   return d.kaesten.filter(function (k) { return k.id === id; })[0] || null;
 }
 
-/* Wie viele neue Karten heute noch dazukommen dürfen */
+/* Wie viele neue Karten heute noch dazukommen dürfen — gezählt über alle Geräte */
 function lkNeuFrei(d, k) {
-  var schon = Number(d.neu.z[k.id]) || 0;
+  var heute = isoDatum();
+  var schon = k.karten.filter(function (c) { return c.e === heute; }).length;
   var neu = k.karten.filter(function (c) { return !c.fach; }).length;
-  return Math.max(0, Math.min(neu, (Number(k.neuProTag) || 20) - schon));
+  return Math.max(0, Math.min(neu, (Number(k.neuProTag) || 0) - schon));
 }
 
 function lkFaellig(k) {
@@ -10824,7 +10993,7 @@ function lkBewerten(was) {
   if (!s || !a || ['g', 't', 'n'].indexOf(was) < 0) { return; }
   var c = a.c;
   var heute = isoDatum();
-  if (!c.fach) { a.d.neu.z[a.k.id] = (Number(a.d.neu.z[a.k.id]) || 0) + 1; c.fach = 1; }
+  if (!c.fach) { c.e = heute; c.fach = 1; }
   if (was === 'g') { c.fach = Math.min(5, c.fach + 1); c.faellig = tagePlus(heute, LK_INTERVALL[c.fach]); }
   else if (was === 't') { c.faellig = tagePlus(heute, 1); }
   else {
@@ -10846,7 +11015,7 @@ function lkBewerten(was) {
 
 function lkKastenNeu(name) {
   var d = lkDaten();
-  var k = { id: neueKennung(), name: String(name || 'Neuer Kasten').slice(0, 80), karten: [], neuProTag: 20, richtung: 'vor', angelegt: isoDatum() };
+  var k = { id: neueKennung(), name: String(name || 'Neuer Kasten').slice(0, 80), paket: null, karten: [], weg: [], neuProTag: 20, richtung: 'vor', angelegt: isoDatum(), fehlt: false };
   d.kaesten.push(k);
   lkSichern(d);
   return k.id;
@@ -10856,7 +11025,7 @@ function lkKartenAusText(t) {
   return String(t || '').replace(/\r/g, '').split(/\n\s*\n/).map(function (b) {
     var z = b.split('\n').filter(function (x, i) { return i > 0 || x.trim(); });
     var v = (z.shift() || '').trim();
-    return v ? { id: neueKennung(), v: v.slice(0, 500), r: z.join('\n').trim().slice(0, 4000), fach: 0, faellig: '' } : null;
+    return v ? { id: neueKennung(), v: v.slice(0, 500), r: z.join('\n').trim().slice(0, 4000), w: '', p: false, eigen: true, fach: 0, faellig: '', e: '', gesehen: 0 } : null;
   }).filter(function (c) { return !!c; });
 }
 
@@ -10866,7 +11035,7 @@ function lkKartenAusMemo(text) {
   var akt = null;
   String(text || '').split('\n').forEach(function (z) {
     var m = z.match(/^\s*#{1,3}\s+(.*)$/);
-    if (m) { akt = { id: neueKennung(), v: m[1].trim().slice(0, 500), r: '', fach: 0, faellig: '' }; karten.push(akt); return; }
+    if (m) { akt = { id: neueKennung(), v: m[1].trim().slice(0, 500), r: '', w: '', p: false, eigen: true, fach: 0, faellig: '', e: '', gesehen: 0 }; karten.push(akt); return; }
     if (akt) { akt.r += (akt.r ? '\n' : '') + z.replace(/^\s*\[[ xX-]?\]\s*/, '- '); }
   });
   karten.forEach(function (c) { c.r = c.r.trim(); });
@@ -10949,7 +11118,9 @@ function lkKarteSpeichern() {
   var k = lkKasten(d, cl.lk.id);
   if (!k) { lkFensterZu(); return; }
   var c = cl.lk.karte ? k.karten.filter(function (x) { return x.id === cl.lk.karte; })[0] : null;
-  if (!c) { c = { id: neueKennung(), fach: 0, faellig: '' }; k.karten.push(c); }
+  if (!c) { c = { id: neueKennung(), w: '', p: false, fach: 0, faellig: '', e: '', gesehen: 0 }; k.karten.push(c); }
+  /* Auch eine bearbeitete Paketkarte steht dann im Kasten selbst und reist mit */
+  c.eigen = true;
   c.v = v.slice(0, 500);
   c.r = r.slice(0, 4000);
   lkSichern(d);
@@ -10960,6 +11131,9 @@ function lkKarteLoeschen() {
   var d = lkDaten();
   var k = lkKasten(d, cl.lk.id);
   if (!k) { lkFensterZu(); return; }
+  var c = k.karten.filter(function (x) { return x.id === cl.lk.karte; })[0];
+  /* Paketkarten bleiben im Paket — der Kasten merkt sich, dass sie weg sind */
+  if (c && c.p && k.weg.indexOf(c.id) < 0) { k.weg.push(c.id); }
   k.karten = k.karten.filter(function (x) { return x.id !== cl.lk.karte; });
   lkSichern(d);
   lkFensterZu();
@@ -10999,7 +11173,7 @@ function lkZuruecksetzen() {
   var d = lkDaten();
   var k = lkKasten(d, cl.lk.id);
   if (!k) { return; }
-  k.karten.forEach(function (c) { c.fach = 0; c.faellig = ''; });
+  k.karten.forEach(function (c) { c.fach = 0; c.faellig = ''; c.e = ''; });
   lkSichern(d);
   melde('Alle Karten sind wieder neu.', null);
   lkFensterZu();
@@ -11046,32 +11220,37 @@ function lkPaketPruefen(text, dateiname) {
   return true;
 }
 
-/* Übernehmen: neuer Kasten oder Aktualisierung — der Lernstand bleibt */
+/* Übernehmen: Inhalt auf diesem Gerät, Kasten in der Datenbank —
+   gibt es den Kasten schon (auch von einem anderen Gerät), bleibt der Lernstand */
 function lkPaketUebernehmen() {
   var p = cl.lk.paket;
   if (!p) { return; }
-  var d = lkDaten();
-  var k = d.kaesten.filter(function (x) { return x.paket && x.paket.id === p.id; })[0];
+  var pakete = lkPakete();
+  var vorher = pakete[p.id];
+  var alt = {};
+  if (vorher && Array.isArray(vorher.karten)) { vorher.karten.forEach(function (x) { alt[x.id] = x; }); }
   var neu = 0;
   var geaendert = 0;
+  p.karten.forEach(function (x) {
+    var a = alt[x.id];
+    if (!a) { neu++; } else if (a.v !== x.v || a.r !== x.r || (a.w || '') !== (x.w || '')) { geaendert++; }
+  });
+  var kopie = {};
+  Object.keys(pakete).forEach(function (id) { kopie[id] = pakete[id]; });
+  kopie[p.id] = { version: p.version, name: p.name, karten: p.karten };
+  if (!lkPaketeSichern(kopie)) { return; }
+  var d = lkDaten();
+  var k = d.kaesten.filter(function (x) { return x.paket && x.paket.id === p.id; })[0];
+  var hatteKasten = !!k;
   if (!k) {
-    k = { id: neueKennung(), name: p.name, karten: [], neuProTag: 20, richtung: ['vor', 'rueck', 'gemischt'].indexOf(p.richtung) >= 0 ? p.richtung : 'vor', angelegt: isoDatum() };
+    k = { id: neueKennung(), name: p.name, paket: null, karten: [], weg: [], neuProTag: 20, angelegt: isoDatum(), fehlt: false,
+          richtung: ['vor', 'rueck', 'gemischt'].indexOf(p.richtung) >= 0 ? p.richtung : 'vor' };
     d.kaesten.push(k);
   }
-  k.paket = { id: p.id, version: p.version };
-  var vorhanden = {};
-  k.karten.forEach(function (c) { if (c.q) { vorhanden[c.q] = c; } });
-  p.karten.forEach(function (x) {
-    var c = vorhanden[x.id];
-    if (c) {
-      if (c.v !== x.v || c.r !== x.r || (c.w || '') !== x.w) { c.v = x.v; c.r = x.r; c.w = x.w; geaendert++; }
-      return;
-    }
-    k.karten.push({ id: neueKennung(), q: x.id, v: x.v, r: x.r, w: x.w, fach: 0, faellig: '' });
-    neu++;
-  });
-  if (!lkSichern(d)) { return; }
-  melde('„' + k.name + '“: ' + neu + ' neue' + (geaendert ? ', ' + geaendert + ' aktualisierte' : '') + ' Karten.', 'gut');
+  k.paket = { id: p.id, version: Math.max(p.version, k.paket ? k.paket.version : 0) };
+  lkSichern(d);
+  melde('„' + k.name + '“: ' + (hatteKasten && !vorher ? 'Inhalt auf diesem Gerät geladen, Lernstand übernommen.'
+    : neu + ' neue' + (geaendert ? ', ' + geaendert + ' aktualisierte' : '') + ' Karten.'), 'gut');
   cl.lk.paket = null;
   cl.lk.fenster = '';
   lkKastenOeffnen(k.id);
@@ -11105,7 +11284,7 @@ function lkListeHtml() {
     var heute = lkHeuteZahl(d, k);
     var neu = k.karten.filter(function (c) { return !c.fach; }).length;
     return '<button type="button" class="lk-kasten" onclick="lkKastenOeffnen(\'' + esc(k.id) + '\')"><span class="lk-k1"><span>' + esc(k.name) + '</span><b>'
-      + (heute ? heute + ' fällig' : '—') + '</b></span><small>' + (k.paket ? 'Paket · ' : '') + k.karten.length + ' Karten'
+      + (heute ? heute + ' fällig' : '—') + '</b></span><small>' + (k.fehlt ? '⚠ Paket auf diesem Gerät noch laden · ' : (k.paket ? 'Paket · ' : '')) + k.karten.length + ' Karten'
       + (neu ? ' · ' + neu + ' neu' : '') + ' · ' + lkFaecher(k)[5] + ' in Fach 5</small></button>';
   }).join('');
 }
@@ -11117,6 +11296,8 @@ function lkKastenHtml() {
   var faellig = lkFaellig(k).length;
   var neu = lkNeuFrei(d, k);
   return '<div class="lk-titel">' + esc(k.name) + '</div>'
+    + (k.fehlt ? '<div class="lk-hinweis">Die Karten dieses Pakets sind auf diesem Gerät noch nicht geladen. Dein Lernstand ist schon da — lade die Paketdatei einmal, dann geht es weiter.'
+        + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkPaketWaehlen()">Paket laden …</button></div></div>' : '')
     + lkFaecherHtml(k)
     + '<div class="lk-info">' + faellig + ' fällig · ' + neu + ' neue für heute · ' + k.karten.filter(function (c) { return !c.fach; }).length + ' noch nicht gelernt</div>'
     + '<div class="lk-info leise">Abfrage: ' + esc((LK_RICHTUNGEN.filter(function (x) { return x[0] === (k.richtung || 'vor'); })[0] || ['', ''])[1])
@@ -12215,6 +12396,9 @@ function start() {
     ? idbLesen(IDB_KEY).then(function (h) { if (h) { dateiHandle = h; dateiName = h.name || ''; } }).catch(function () { return null; })
     : Promise.resolve(null);
   los.then(function () { return laden(); }).then(function () {
+    /* Lernkartei aus 0.23 (nur auf diesem Gerät) einmalig in die Datenbank */
+    var lkAlt = lkAltUebernehmen();
+    if (lkAlt) { melde('Lernkartei: ' + lkAlt + (lkAlt === 1 ? ' Kasten' : ' Kästen') + ' in die workbench.json übernommen.', 'gut'); }
     zeichne();
     if (tokenGueltig()) { abgleichPlanen(true); verbindungPruefen(); clTermineHolen(false); }
     taktStarten();
