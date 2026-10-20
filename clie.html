@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.14.1</title>
+<title>CLIE 0.15.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -424,7 +424,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.14.1';
+var APP_VERSION = '0.15.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3558,7 +3558,7 @@ function oeffne(id) {
   /* Gerade Abgehaktes verschwindet beim Verlassen der Aufgaben */
   cl.auf.frisch = {};
   cl.auf.wahl = '';
-  if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; }
+  if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; }
   if (id === 'sammlungen' && cl.app !== 'sammlungen') { cl.sa.id = ''; cl.sa.ansicht = 'tabelle'; }
   cl.app = (clApp(id) || id === 'statistik' || id === 'suchen') ? id : 'uebersicht';
@@ -4459,7 +4459,7 @@ var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
 cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, kategorien: true, fenster: null, wahlFuer: '', neueListe: null, prioSort: true };
-cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, fertigAuf: false };
+cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, fertigAuf: false, ausListe: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
    Ziele, alle Listen. Notizen (und damit Checklisten) nicht. */
@@ -5011,7 +5011,10 @@ function listeAufklappHtml() {
     });
   }
   h += '<div class="trenn"></div><button type="button" onclick="listenwahlOeffnen(\'filter\')">Weitere …</button>';
-  if (liste && liste.art === 'liste') { h += '<button type="button" onclick="listeBearbeiten()">„' + esc(liste.titel) + '“ bearbeiten …</button>'; }
+  if (liste && liste.art === 'liste') {
+    h += '<button type="button" onclick="listeBearbeiten()">„' + esc(liste.titel) + '“ bearbeiten …</button>'
+       + '<button type="button" onclick="listeAlsText()">„' + esc(liste.titel) + '“ als Text bearbeiten …</button>';
+  }
   return h + '<div class="trenn"></div><button type="button" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '■' : '▢') + ' Erledigte zeigen</button></div>';
 }
 
@@ -5082,6 +5085,33 @@ function listeBearbeiten() {
   cl.auf.neueListe = { id: s.id, titel: s.titel, kontext: s.kontext === 'beruflich' ? 'beruflich' : 'privat' };
   cl.aufklapp = 'liste-neu';
   aufklappNeu();
+}
+
+/* Seit 0.15.0: die ganze Listenseite als Text — Aufgaben und freie Zeilen
+   (z. B. eigene Schritte unter einer Aufgabe). Geschrieben wird im
+   Schreibfeld des Memo; „Fertig“ und Zurück führen wieder zur Liste. */
+function listeAlsText() {
+  var s = aufListe();
+  if (!s || s.art !== 'liste') { return; }
+  cl.aufklapp = '';
+  cl.app = 'memo';
+  cl.memo.id = s.id;
+  cl.memo.hervor = '';
+  cl.memo.ausListe = s.id;
+  cl.memo.schreiben = true;
+  zeichne();
+  var f = document.getElementById('memoFeld');
+  if (f && f.focus) { f.focus(); }
+}
+
+function listeTextFertig() {
+  var id = cl.memo.ausListe;
+  cl.memo.id = '';
+  cl.memo.schreiben = false;
+  cl.memo.hervor = '';
+  cl.memo.ausListe = '';
+  cl.app = 'aufgaben';
+  aufListeSetzen(id);
 }
 
 function neueListeKontext(k) {
@@ -5291,6 +5321,7 @@ function memoOeffnen(id) {
 }
 
 function memoZurListe() {
+  if (cl.memo.ausListe) { listeTextFertig(); return; }
   cl.memo.id = '';
   cl.memo.schreiben = false;
   cl.memo.hervor = '';
@@ -5322,6 +5353,8 @@ function memoHaken(id, nr) {
 }
 
 function memoSchreibenUm() {
+  /* Aus den Aufgaben als Text geöffnet: „Fertig“ führt zurück zur Liste */
+  if (cl.memo.schreiben && cl.memo.ausListe) { listeTextFertig(); return; }
   cl.memo.schreiben = !cl.memo.schreiben;
   zeichne();
   if (cl.memo.schreiben) {

@@ -2365,6 +2365,50 @@ function kopfTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   42. Liste als Text bearbeiten (0.15)
+   Grund: Eigene Schritte unter einer Aufgabe (freie Textzeilen in der
+   Listenseite) ließen sich in CLIE nicht anlegen — die Aufgabenansicht
+   zeigt nur Kästchen-Zeilen.
+   Erkennt: Menüeintrag fehlt oder steht auch ohne Liste, Schreibfeld
+   zeigt nicht die ganze Seite, Textzeilen oder Aufgaben gehen beim
+   Speichern verloren, „Fertig“/Zurück landen nicht wieder in der Liste.
+   ============================================================ */
+function listeTextTest() {
+  console.log('\n42. Liste als Text bearbeiten (0.15)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: '[] Fenster warten – Magnat anrufen\n[] Lampe tauschen', geaendert: 1 });
+  S.oeffne('aufgaben');
+  S.aufListeSetzen('');
+  S.katUm();
+  pruefe(!/listeAlsText/.test(S.document.getElementById('aufklapp').innerHTML), 'ohne gewählte Liste kein „als Text bearbeiten“');
+  S.aufklappZu();
+  S.aufListeSetzen('lh');
+  S.katUm();
+  pruefe(/onclick="listeAlsText\(\)">„Haus“ als Text bearbeiten …/.test(S.document.getElementById('aufklapp').innerHTML), 'im Reiter-Menü: „Haus“ als Text bearbeiten …');
+  S.listeAlsText();
+  pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && S.cl.aufklapp === ''
+    && inhalt().indexOf('<textarea id="memoFeld" class="memo-feld" spellcheck="true" oninput="memoTextGetippt()">' + S.esc(S.DB.themen[0].text) + '</textarea>') >= 0,
+    'Schreibfeld zeigt die ganze Listenseite');
+  const feld = S.document.getElementById('memoFeld');
+  feld.value = '[] Fenster warten – Magnat anrufen\n    › Auftrag ausfüllen\n    › Wartung einplanen\n[] Lampe tauschen';
+  S.memoTextGetippt();
+  pruefe(/› Auftrag ausfüllen/.test(S.DB.themen[0].text) && S.kpOffeneZahl(S.kpSeiteFinden('lh')) === 2, 'Textzeilen gespeichert, beide Aufgaben bleiben');
+  pruefe(/memoSchreibenUm\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'unten „Fertig“');
+  S.memoSchreibenUm();
+  pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'lh' && !S.cl.memo.id && !S.cl.memo.ausListe, '„Fertig“ führt zurück zur Liste „Haus“');
+  pruefe(/Fenster warten/.test(inhalt()) && !/Auftrag ausfüllen/.test(inhalt()), 'Aufgabenansicht zeigt weiter nur die Aufgaben');
+  S.listeAlsText();
+  S.clZurueck();
+  pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
+  S.listeAlsText();
+  S.oeffne('uebersicht'); S.oeffne('memo');
+  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Seiten|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2403,6 +2447,7 @@ function kopfTest() {
   try { memoRuhtTest(); } catch (e) { fail('Ruhende im Memo warf: ' + e.message); }
   try { datumTest(); } catch (e) { fail('Datumswerte warf: ' + e.message); }
   try { kopfTest(); } catch (e) { fail('Kopfwerte warf: ' + e.message); }
+  try { listeTextTest(); } catch (e) { fail('Liste als Text warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
