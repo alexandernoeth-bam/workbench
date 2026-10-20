@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.24.0</title>
+<title>CLIE 0.25.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -550,7 +550,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.24.0';
+var APP_VERSION = '0.25.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -9877,6 +9877,228 @@ function schAnalyseFertig(id, funde) {
   schZeichnen();
 }
 
+/* ---- Fehler erklären (seit 0.25) ----
+
+   Für einen Fehler aus der Analyse: Was passiert nach dem gespielten Zug,
+   was nach dem besseren — als kurze Folge von Zügen und in Worten
+   (hängende Figur, Gabel, Matt, verpasster Gewinn …) mit einem Merksatz.
+   CLIE rechnet nur wenige Züge tief: Taktik erklärt es gut, Strategie grob. */
+
+var SCH_NAME = { p: ['Bauer', 'den Bauern', 'der'], n: ['Springer', 'den Springer', 'der'], b: ['Läufer', 'den Läufer', 'der'],
+                 r: ['Turm', 'den Turm', 'der'], q: ['Dame', 'die Dame', 'die'], k: ['König', 'den König', 'der'] };
+
+function schFigName(f, fall) {
+  var n = SCH_NAME[schArt(f)] || ['Figur', 'die Figur', 'die'];
+  return fall === 'akk' ? n[1] : n[0];
+}
+
+/* Wahrscheinliche Fortsetzung: m, dann bis zu „weiter“ Halbzüge mit dem besten Zug */
+function schLinie(p0, m, weiter) {
+  var p = schAusFen(schFen(p0));
+  var ich = p.w;
+  var start = schMaterial(p, ich ? 'w' : 'b');
+  var zuege = [];
+  var akt = m;
+  var n = 0;
+  while (akt) {
+    var vorher = akt.art === 'ep' ? (p.w ? 'p' : 'P') : p.b[akt.t];
+    var z = { kurz: schKurz(p, akt), m: akt, fig: p.b[akt.f], weiss: p.w, nr: p.fm, opfer: vorher || '' };
+    schMachen(p, akt);
+    zuege.push(z);
+    if (!schZuege(p).length || n >= weiter) { break; }
+    akt = schKiZug(p, 'mittel', 0);
+    n++;
+  }
+  var matt = !schZuege(p).length && schImSchach(p);
+  /* Matt ist, wer am Zug ist: steht danach die eigene Seite am Zug, ist man selbst matt */
+  return { zuege: zuege, p: p, ende: schMaterial(p, ich ? 'w' : 'b') - start, matt: matt, mattFuerMich: matt && p.w === ich };
+}
+
+function schLinieText(l) {
+  return l.zuege.map(function (z, i) {
+    return (z.weiss ? z.nr + '. ' : (i === 0 ? z.nr + '… ' : '')) + z.kurz;
+  }).join(' ');
+}
+
+/* Figuren der Seite „weiss“, die der Stein auf Feld i angreift (König zählt mit) */
+function schGreiftAn(p, i) {
+  var f = p.b[i];
+  if (f === '') { return []; }
+  var w = schWeiss(f);
+  var aus = [];
+  var j;
+  for (j = 0; j < 64; j++) {
+    var g = p.b[j];
+    if (g === '' || schWeiss(g) === w) { continue; }
+    if (schPseudoZiel(p, i, j)) { aus.push(j); }
+  }
+  return aus;
+}
+
+function schPseudoZiel(p, von, nach) {
+  var w = p.w;
+  p.w = schWeiss(p.b[von]);
+  var ok = schPseudo(p).some(function (x) { return x.f === von && x.t === nach; });
+  p.w = w;
+  return ok;
+}
+
+/* Hängt die Figur auf Feld i? (angegriffen und nicht gedeckt, oder von einer billigeren angegriffen) */
+function schHaengt(p, i) {
+  var f = p.b[i];
+  if (f === '' || schArt(f) === 'k') { return false; }
+  var w = schWeiss(f);
+  if (!schAngegriffen(p, i, !w)) { return false; }
+  if (!schAngegriffen(p, i, w)) { return true; }
+  var billig = false;
+  var j;
+  for (j = 0; j < 64; j++) {
+    var g = p.b[j];
+    if (g !== '' && schWeiss(g) !== w && SCH_WERT[schArt(g)] < SCH_WERT[schArt(f)] && schPseudoZiel(p, j, i)) { billig = true; }
+  }
+  return billig;
+}
+
+/* Gabel: der Stein auf i greift mindestens zwei lohnende Ziele an */
+function schGabel(p, i) {
+  var f = p.b[i];
+  if (f === '') { return []; }
+  var ziele = schGreiftAn(p, i).filter(function (j) {
+    var g = p.b[j];
+    return schArt(g) === 'k' || SCH_WERT[schArt(g)] > SCH_WERT[schArt(f)] || schHaengt(p, j);
+  });
+  return ziele.length >= 2 ? ziele : [];
+}
+
+/* Verlust in Bauern — bei verpasstem oder zugelassenem Matt einfach „Matt“ */
+function schVerlustText(v) {
+  return v >= 5000 ? 'Matt' : '−' + (Math.round(v / 10) / 10).toFixed(1).replace('.', ',');
+}
+
+function schBauern(w) {
+  var b = Math.round(Math.abs(w) / 10) / 10;
+  if (b < 0.5) { return 'kaum Material'; }
+  return (b === 1 ? 'etwa einen Bauern' : 'etwa ' + b.toFixed(1).replace('.', ',').replace(',0', '') + ' Bauern');
+}
+
+/* Erklärt den Fehler „gespielt“ (Kurzschrift) in der Stellung fen; „besser“ ist der Gegenvorschlag */
+function schErklaeren(fen, gespielt, besser) {
+  var p = schAusFen(fen);
+  var m = schAusKurz(p, gespielt);
+  var b = schAusKurz(p, besser);
+  if (!m) { return null; }
+  var ich = p.w;
+  var schlecht = schLinie(p, m, 3);
+  var gut = b ? schLinie(p, b, 3) : null;
+  var grund = '';
+  var plus = '';
+  var merke = '';
+  var allgemein = false;
+  var gutMerke = '';
+  var gutArt = '';
+
+  /* Was war vor dem Zug schon bedroht? */
+  var bedroht = [];
+  var i;
+  for (i = 0; i < 64; i++) { if (p.b[i] !== '' && schWeiss(p.b[i]) === ich && schHaengt(p, i)) { bedroht.push(i); } }
+
+  /* --- Warum schlecht --- */
+  var antwort = schlecht.zuege[1];
+  if (schlecht.mattFuerMich) {
+    grund = 'Danach kann der Gegner mattsetzen: ' + schLinieText(schlecht) + '.';
+    merke = 'Vor jedem Zug die Drohungen des Gegners prüfen — besonders Schachgebote gegen den eigenen König.';
+  } else if (antwort && antwort.opfer && schWeiss(antwort.opfer) === ich && schlecht.ende <= -150) {
+    var feld = schFeldName(antwort.m.t);
+    var warBedroht = bedroht.indexOf(antwort.m.t) >= 0 && antwort.m.t !== m.f;
+    var gezogen = antwort.m.t === m.t;
+    grund = (gezogen ? ((SCH_NAME[schArt(antwort.opfer)] || ['', '', 'der'])[2] === 'die' ? 'Die ' : 'Der ') + schFigName(antwort.opfer) + ' steht auf ' + feld + ' nicht sicher: '
+            : warBedroht ? 'Übersehen: ' + ((SCH_NAME[schArt(antwort.opfer)] || ['', '', 'der'])[2] === 'die' ? 'Deine ' : 'Dein ') + schFigName(antwort.opfer) + ' auf ' + feld + ' war schon angegriffen. '
+            : 'Danach hängt ' + schFigName(antwort.opfer, 'akk') + ' auf ' + feld + ': ')
+      + 'Nach ' + schLinieText(schlecht) + ' verlierst du unterm Strich ' + schBauern(schlecht.ende) + '.';
+    merke = warBedroht ? 'Bevor du etwas Neues anfängst: Ist eine eigene Figur angegriffen? Erst sichern, dann planen.'
+      : 'Nach jedem Zug kurz prüfen: Kann der Gegner jetzt etwas schlagen? Ist das Zielfeld gedeckt?';
+  } else if (antwort && schGabel(schLinie(p, m, 1).p, antwort.m.t).length) {
+    var nach = schLinie(p, m, 1).p;
+    var ziele = schGabel(nach, antwort.m.t);
+    grund = 'Das erlaubt eine Gabel: ' + antwort.kurz + ' greift ' + ziele.map(function (j) { return schFigName(nach.b[j], 'akk') + ' auf ' + schFeldName(j); }).join(' und ')
+      + ' zugleich an. ' + (schlecht.ende < -50 ? 'Nach ' + schLinieText(schlecht) + ' fehlen dir ' + schBauern(schlecht.ende) + '.' : '');
+    merke = 'Auf Felder achten, von denen eine gegnerische Figur zwei deiner Steine gleichzeitig angreift — vor allem Springerfelder.';
+  } else if (m && p.b[m.t] !== '' && schlecht.ende <= -150) {
+    grund = 'Der Schlagzug lohnt sich nicht: Nach ' + schLinieText(schlecht) + ' hast du ' + schBauern(schlecht.ende) + ' weniger.';
+    merke = 'Vor einem Schlagzug durchrechnen, was nach dem Zurückschlagen übrig bleibt.';
+  } else if (schlecht.ende <= -80) {
+    /* Welche eigene Figur geht in der Folge zuerst verloren? */
+    var weg = schlecht.zuege.filter(function (z, k) { return k > 0 && z.weiss !== ich && z.opfer && schWeiss(z.opfer) === ich; })[0];
+    grund = 'Nach ' + schLinieText(schlecht) + (weg ? ' geht ' + ((SCH_NAME[schArt(weg.opfer)] || ['', '', 'der'])[2] === 'die' ? 'deine ' : 'dein ') + schFigName(weg.opfer) + ' auf ' + schFeldName(weg.m.t) + ' verloren — ' : ' ')
+      + 'unterm Strich ' + schBauern(schlecht.ende) + ' weniger.';
+    merke = 'Nach jedem Zug kurz prüfen: Was kann der Gegner jetzt schlagen oder angreifen?';
+    allgemein = true;
+  }
+
+  /* --- Warum besser --- */
+  if (gut) {
+    var meinZug = gut.zuege[0];
+    var nachGut = schLinie(p, b, 0).p;
+    var gabelGut = schGabel(nachGut, b.t);
+    if (gut.matt && !gut.mattFuerMich) {
+      plus = 'setzt matt: ' + schLinieText(gut) + '.';
+      gutArt = 'ein Matt'; gutMerke = 'Zuerst immer prüfen: Schachgebote, Schlagzüge, Drohungen — vielleicht ist es Matt.';
+      if (!merke || !grund) { merke = gutMerke; }
+    } else if (gabelGut.length) {
+      plus = 'Gabel: ' + meinZug.kurz + ' greift ' + gabelGut.map(function (j) { return schFigName(nachGut.b[j], 'akk') + ' auf ' + schFeldName(j); }).join(' und ')
+        + ' zugleich an — nur eins lässt sich retten. ' + (gut.ende >= 150 ? 'Nach ' + schLinieText(gut) + ' gewinnst du ' + schBauern(gut.ende) + '.' : '');
+      gutArt = 'eine Gabel'; gutMerke = 'Suche Felder, von denen eine Figur zwei Ziele zugleich angreift.';
+      if (!merke) { merke = gutMerke; }
+    } else if (meinZug.opfer && gut.ende >= 150) {
+      plus = 'schlägt ' + schFigName(meinZug.opfer, 'akk') + ' auf ' + schFeldName(b.t) + ' — nach ' + schLinieText(gut) + ' bist du ' + schBauern(gut.ende) + ' vorn.';
+      gutArt = 'einen Materialgewinn'; gutMerke = 'Bei jedem Zug zuerst schauen: Kann ich etwas gewinnen — schlagen, Schach, Doppelangriff?';
+      if (!merke) { merke = gutMerke; }
+    } else if (bedroht.indexOf(b.f) >= 0 && !schHaengt(nachGut, b.t)) {
+      plus = 'bringt ' + schFigName(p.b[b.f], 'akk') + ' von ' + schFeldName(b.f) + ' in Sicherheit.';
+    } else if (gut.ende >= 150) {
+      plus = 'nach ' + schLinieText(gut) + ' hast du ' + schBauern(gut.ende) + ' mehr.';
+    } else if (meinZug.kurz.indexOf('+') >= 0) {
+      plus = 'mit Schach behältst du die Initiative: ' + schLinieText(gut) + '.';
+    } else {
+      plus = 'hält die Stellung zusammen: ' + schLinieText(gut) + '.';
+    }
+  }
+  if (!grund && gut && gut.matt && !gut.mattFuerMich) {
+    grund = 'Du hast ein Matt übersehen.';
+  } else if (gutArt && (allgemein || !grund)) {
+    /* Der eigentliche Fehler: die Chance des besseren Zugs nicht gesehen */
+    grund = 'Du hast ' + gutArt + ' übersehen.' + (grund ? ' ' + grund : '');
+    merke = gutMerke;
+  }
+  if (!grund) {
+    grund = 'Der Unterschied liegt in der Stellung, nicht in einer direkten Taktik (' + schBauern(schlecht.ende - (gut ? gut.ende : 0)) + ' laut CLIE). '
+      + 'Mögliche Fortsetzung: ' + schLinieText(schlecht) + '.';
+    if (!merke) { merke = 'Figuren aktiv aufstellen, den König sicher halten und keine Schwächen ohne Grund schaffen.'; }
+  }
+  return {
+    schlecht: grund,
+    gut: besser ? '**' + besser + '** ' + plus : '',
+    merke: merke,
+    text: '**Warum schlecht:** ' + grund + (besser ? '\n**Besser: ' + besser + '** – ' + plus : '') + (merke ? '\n**Merke:** ' + merke : '')
+  };
+}
+
+/* Erklärung zu einem Fund aus der Analyse — beim ersten Mal berechnet, dann gemerkt */
+function schFundErklaerung(partieId, f) {
+  if (f.erkl) { return f.erkl; }
+  var e = null;
+  try { e = schErklaeren(f.fen, f.kurz, f.besser); } catch (x) { e = null; }
+  if (!e) { return ''; }
+  f.erkl = e.text;
+  var l = schPartienLesen();
+  l.forEach(function (pt) {
+    if (pt.id !== partieId) { return; }
+    (pt.analyse || []).forEach(function (g) { if (g.ply === f.ply) { g.erkl = e.text; } });
+  });
+  schPartienSchreiben(l);
+  return e.text;
+}
+
 /* ---- Lernstand (Schule, Eröffnungen) ---- */
 
 function schStand() {
@@ -9900,11 +10122,18 @@ function schEigeneAufgaben() {
   var aus = [];
   schPartienLesen().forEach(function (pt) {
     (pt.analyse || []).forEach(function (f) {
-      aus.push({ id: 'eigen-' + pt.id + '-' + f.ply, typ: 'beste', fen: f.fen, besser: f.besser,
+      aus.push({ id: 'eigen-' + pt.id + '-' + f.ply, typ: 'beste', fen: f.fen, besser: f.besser, partie: pt.id, fund: f,
                  frage: 'Aus „' + pt.name + '“: Du spieltest ' + f.kurz + (f.verlust >= 300 ? '??' : '?') + ' — finde einen besseren Zug.' });
     });
   });
   return aus.slice(0, 60);
+}
+
+/* Erklärung zu einer Aufgabe — bei eigenen Fehlern aus der Analyse berechnet (seit 0.25) */
+function schAufgabeErkl(a) {
+  if (a && typeof a.erkl === 'string' && a.erkl) { return a.erkl; }
+  if (a && a.partie && a.fund) { return schFundErklaerung(a.partie, a.fund); }
+  return '';
 }
 
 function schKapitelListe() {
@@ -10086,7 +10315,7 @@ function schUeZug(m) {
       schUeMachen(m);
       schUeGeloest();
       ue.meldung = 'Richtig! ' + kurz + ' ist gut' + (schOhneZeichen(a.besser) === schOhneZeichen(kurz) ? '.' : ' (CLIE hätte ' + a.besser + ' gespielt).')
-        + (typeof ue.a.erkl === 'string' ? ' ' + ue.a.erkl : '');
+        + (schAufgabeErkl(ue.a) ? (ue.a.fund ? '\n' : ' ') + schAufgabeErkl(ue.a) : '');
     } else {
       ue.fehler++;
       ue.ok = false;
@@ -10199,7 +10428,7 @@ function schUeLoesung() {
   if (typ === 'frage') { ue.meldung = 'Lösung: ' + ue.a.optionen[ue.a.richtig] + '. ' + (ue.a.erkl || ''); ue.ok = false; schZeichnen(); return; }
   if (typ === 'beste') {
     var bm = schKiZug(ue.p, 'stark', 0);
-    ue.meldung = 'Ein guter Zug ist ' + (bm ? schKurz(ue.p, bm) : (ue.a.besser || '')) + '. ' + (typeof ue.a.erkl === 'string' ? ue.a.erkl : '');
+    ue.meldung = 'Ein guter Zug ist ' + (bm ? schKurz(ue.p, bm) : (ue.a.besser || '')) + '.' + (schAufgabeErkl(ue.a) ? (ue.a.fund ? '\n' : ' ') + schAufgabeErkl(ue.a) : '');
     schZeichnen();
     return;
   }
@@ -10487,10 +10716,16 @@ function schPartienHtml() {
     + '<div class="sch-status"><span>' + esc(pt.name) + '</span><b>' + s.pv.k + ' / ' + pt.zuege.length + '</b></div>';
   if (s.pv.laeuft) { h += '<div class="sch-hinweis">Analysiere … ' + s.pv.stand + ' / ' + pt.zuege.length + '</div>'; }
   else if (pt.analyse) {
+    /* Steht das Brett vor einem Fehler: die Erklärung dazu (seit 0.25) */
+    var fund = pt.analyse.filter(function (f) { return f.ply === s.pv.k; })[0];
+    if (fund) {
+      h += '<div class="sch-erkl"><b>' + esc((Math.floor(fund.ply / 2) + 1) + (fund.ply % 2 ? '… ' : '. ') + fund.kurz + (fund.verlust >= 300 ? '??' : '?'))
+        + ' (' + schVerlustText(fund.verlust) + ')</b><br>' + clAuszeichnungKurz(schFundErklaerung(pt.id, fund)) + '</div>';
+    }
     h += '<div class="sch-analyse">' + (pt.analyse.length ? pt.analyse.map(function (f) {
       return '<button type="button" class="sch-zeile" onclick="schNachGehe(' + f.ply + ')"><span>' + (Math.floor(f.ply / 2) + 1) + (f.ply % 2 ? '… ' : '. ')
-        + esc(f.kurz) + (f.verlust >= 300 ? '??' : '?') + '<small>besser: ' + esc(f.besser) + '</small></span><b>−'
-        + (Math.round(f.verlust / 10) / 10).toFixed(1).replace('.', ',') + '</b></button>';
+        + esc(f.kurz) + (f.verlust >= 300 ? '??' : '?') + '<small>besser: ' + esc(f.besser) + '</small></span><b>'
+        + schVerlustText(f.verlust) + '</b></button>';
     }).join('') : '<p class="leise">Keine Fehler gefunden — sauber gespielt!</p>') + '</div>';
   }
   return h + schZugListeHtml(pt.kurz || [], s.pv.k, 'schNachGehe');
@@ -10560,7 +10795,7 @@ function schUeHtml(l) {
       return '<button type="button" class="knopf' + kl + '" onclick="schUeAntwort(' + n + ')">' + esc(o) + '</button>';
     }).join('') + '</div>';
   }
-  if (ue.meldung) { h += '<div class="sch-hinweis' + (ue.ok === true ? ' gut' : '') + '">' + esc(ue.meldung) + '</div>'; }
+  if (ue.meldung) { h += '<div class="sch-hinweis' + (ue.ok === true ? ' gut' : '') + '">' + clAuszeichnungKurz(ue.meldung) + '</div>'; }
   return h + (ue.art === 'ueben' ? schZugListeHtml(schBuchListe(a).slice(0, ue.idx), ue.idx, '') : '');
 }
 
@@ -10697,7 +10932,7 @@ var LK_PAKETE_KEY = 'clie-lernkartei-pakete';
 var LK_INTERVALL = [0, 1, 2, 4, 8, 16];
 var LK_RICHTUNGEN = [['vor', 'Vorder → Rück'], ['rueck', 'Rück → Vorder'], ['gemischt', 'Gemischt']];
 
-cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '' };
+cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '', rolle: null };
 
 var lkPaketeZwischen = { roh: null, daten: {} };
 
@@ -11055,6 +11290,7 @@ function lkFensterZu() {
 }
 
 function lkKastenOeffnen(id) {
+  cl.lk.rolle = null;
   cl.lk.id = id;
   cl.lk.ansicht = 'kasten';
   cl.lk.fenster = '';
@@ -11473,11 +11709,21 @@ function lkEbeneHoch() {
   return false;
 }
 
+/* Fenster stehen oben im Inhalt: Beim Öffnen nach oben rollen, damit sie
+   sichtbar sind, beim Schließen wieder dorthin, wo man war (seit 0.24.1) */
 function lkZeichnen() {
   if (cl.app !== 'lernkartei') { return; }
+  var el = document.getElementById('inhalt');
+  var offen = !!cl.lk.fenster;
+  if (offen && cl.lk.rolle === null) { cl.lk.rolle = el ? (Number(el.scrollTop) || 0) : 0; }
   inhaltZeichnen();
   fussZeichnen();
   kopfZeichnen();
+  if (el) {
+    if (offen) { el.scrollTop = 0; }
+    else if (cl.lk.rolle !== null) { el.scrollTop = cl.lk.rolle; }
+  }
+  if (!offen) { cl.lk.rolle = null; }
 }
 
 function lkStatZeile() {

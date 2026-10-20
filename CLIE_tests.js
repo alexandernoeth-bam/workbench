@@ -3228,6 +3228,77 @@ function schuleTest() {
 }
 
 /* ============================================================
+   57. Schach: Fehler erklären (0.25)
+   Grund: „besser: Sf3“ allein lehrt wenig — die Analyse soll sagen,
+   WARUM ein Zug schlecht und der andere besser ist.
+   Erkennt: Erklärung fehlt oder benennt das Motiv falsch (hängende
+   Figur, Gabel, verpasstes Matt, zugelassenes Matt), Variante nicht
+   spielbar, Erklärung wird nicht gemerkt, Anzeige in Partien und
+   Kapitel 7 fehlt.
+   ============================================================ */
+function schErklTest() {
+  console.log('\n57. Schach: Fehler erklären (0.25)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const fall = (fen, gespielt, besser, muster, was) => {
+    const e = S.schErklaeren(fen, gespielt, besser);
+    const ok = e && muster.every(m => m.test(e.text));
+    pruefe(ok, was + (ok ? '' : ' — ' + (e ? e.text.replace(/\n/g, ' | ') : 'keine Erklärung')));
+    return e;
+  };
+  fall('rnbqkbnr/1ppp1ppp/p7/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3', 'Lb5', 'Lc4', [/Läufer/, /b5/, /Merke/], 'hängende Figur: gezogener Läufer auf b5');
+  fall('r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1', 'Kd2', 'Sc7+', [/Gabel/, /Turm/, /König/], 'verpasste Gabel Sc7+ (König und Turm)');
+  fall('6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', 'h3', 'Ta8#', [/matt/i], 'verpasstes Matt Ta8#');
+  fall('r5k1/5ppp/8/8/8/8/5PPP/1R4K1 w - - 0 1', 'Tb7', 'h3', [/mattsetzen/, /Ta1/, /Drohungen/], 'zugelassenes Grundreihenmatt');
+  const e = S.schErklaeren('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'a3', 'e4');
+  pruefe(e && /Stellung, nicht in einer direkten Taktik/.test(e.text), 'ohne Taktik: ehrliche Aussage statt erfundener Begründung');
+  pruefe(S.schErklaeren('8/8/8/8/8/8/8/K6k w - - 0 1', 'Zz9', 'Kb1') === null, 'unspielbarer Zug → keine Erklärung, kein Absturz');
+  /* Anzeige in „Partien“ und Merken */
+  delete S.__ablage['clie-schach-partien'];
+  const fen = 'r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1';
+  const pt = { id: 'p1', name: 'Test', datum: S.isoDatum(), farbe: 'w', gegner: 'clie', zuege: [], kurz: [], analyse: [{ ply: 0, kurz: 'Kd2', besser: 'Sc7+', verlust: 500, fen: fen }] };
+  S.__ablage['clie-schach-partien'] = JSON.stringify([pt]);
+  const t1 = S.schFundErklaerung('p1', S.schPartienLesen()[0].analyse[0]);
+  pruefe(/Gabel/.test(t1) && /Gabel/.test(S.schPartienLesen()[0].analyse[0].erkl || ''), 'Erklärung wird beim ersten Mal berechnet und in der Partie gemerkt');
+  const a = S.schEigeneAufgaben()[0];
+  pruefe(a && a.partie === 'p1' && /Gabel/.test(S.schAufgabeErkl(a)), 'Kapitel 7: eigene Fehler-Aufgabe bringt die Erklärung mit');
+  pruefe(/clAuszeichnungKurz\(ue\.meldung\)/.test(QUELLE), 'Meldungen zeigen **fett** und Zeilen statt Sternchen');
+  pruefe(/schFundErklaerung\(pt\.id, fund\)/.test(QUELLE), 'Partien: Brett vor dem Fehler zeigt den Erklärkasten');
+  pruefe(S.schVerlustText(100990) === 'Matt' && S.schVerlustText(280) === '−2,8', 'Verlust: „Matt“ statt −1009,1, sonst Bauern');
+  delete S.__ablage['clie-schach-partien'];
+}
+
+/* ============================================================
+   56. Lernkartei: Fenster beim Rollen sichtbar (0.24.1)
+   Grund: Weit unten in der Kartenliste öffnete „Bearbeiten“ das Fenster
+   oben im Inhalt — außerhalb des sichtbaren Bereichs.
+   Erkennt: Fenster öffnet ohne Hochrollen, Rollposition geht nach dem
+   Schließen verloren.
+   ============================================================ */
+function lkRollTest() {
+  console.log('\n56. Lernkartei: Fenster beim Rollen sichtbar (0.24.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-lernkartei-pakete']; S.DB.lernkaesten = []; S.DB.lernstand = [];
+  const id = S.lkKastenNeu('Rollen');
+  const d = S.lkDaten(); S.lkKasten(d, id).karten = S.lkKartenAusText('A\n1\n\nB\n2\n\nC\n3'); S.lkSichern(d);
+  S.oeffne('lernkartei'); S.lkKastenOeffnen(id); S.lkKartenZeigen();
+  const el = S.document.getElementById('inhalt');
+  el.scrollTop = 900;
+  const kid = S.lkDaten().kaesten[0].karten[2].id;
+  S.lkKarteOeffnen(kid);
+  pruefe(el.scrollTop === 0 && inhalt().indexOf('lkV') >= 0, 'Bearbeiten weit unten: Inhalt rollt nach oben, Fenster sichtbar');
+  S.lkFensterZu();
+  pruefe(el.scrollTop === 900, 'nach dem Schließen wieder an der alten Stelle');
+  el.scrollTop = 500; S.lkKarteOeffnen(kid); S.document.getElementById('lkV').value = 'C neu'; S.document.getElementById('lkR').value = '3'; S.lkKarteSpeichern();
+  pruefe(el.scrollTop === 500 && S.lkDaten().kaesten[0].karten[2].v === 'C neu', 'auch nach Speichern zurück an die Stelle');
+  S.DB.lernkaesten = []; S.DB.lernstand = [];
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    55. Lernkartei in der workbench.json (0.24)
    Grund: Pixel und iPad lernen mit demselben Stand. Der Lernstand
    liegt je Karte in der Datenbank, die großen Paketinhalte bleiben auf
@@ -3504,6 +3575,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { schErklTest(); } catch (e) { fail('Schach erklären warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { lkRollTest(); } catch (e) { fail('Lernkartei rollen warf: ' + e.message); }
   try { lkSyncTest(); } catch (e) { fail('Lernkartei-Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkWahlTest(); } catch (e) { fail('Lernkartei umschalten warf: ' + e.message); }
   try { lernkarteiTest(); } catch (e) { fail('Lernkartei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
