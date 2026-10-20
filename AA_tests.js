@@ -250,7 +250,9 @@ console.log('\n6. Datenmodell');
                     'gedanken', 'pinnwand', 'kalenderzuordnung',
                     'notizbuecher', 'notizseiten', 'wochen', 'tage',
                     /* seit v6.2.3: die App „Sammlungen“ im CLIE */
-                    'sammlungen', 'datensaetze'];
+                    'sammlungen', 'datensaetze',
+                    /* seit v6.3.1: Favoriten der App „Drive“ im CLIE */
+                    'drivefavoriten'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -13026,7 +13028,7 @@ console.log('\n202. Ausblenden im Tag');
 console.log('\n203. CLIE-Bereiche bleiben erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen und datensaetze');
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze (und seit 6.3.1 drivefavoriten)');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13092,6 +13094,49 @@ console.log('\n204. Priorität einer Aufgabe');
     const a = skript.match(new RegExp('\\nfunction ' + n + '\\([\\s\\S]*?\\n\\}\\n')); const b = kern.match(new RegExp('\\nfunction ' + n + '\\([\\s\\S]*?\\n\\}\\n'));
     return a && b && a[0] === b[0];
   }), 'kern.js trägt dieselben Funktionen — CLIE übernimmt sie von dort');
+}
+
+/* ============================================================
+   205. Drive-Favoriten des CLIE bleiben erhalten (v6.3.1)
+   Grund: Die App „Drive“ im CLIE speichert ihre Favoriten in der
+   workbench.json, damit sie auf allen Geräten gleich sind. Eine
+   Workbench, die den Bereich nicht kennt, würde ihn beim Speichern
+   verwerfen (wie 2026-10 bei den Sammlungen geschehen).
+   Erkennt: Bereich fehlt in SAMMLUNGEN/leereDatenbank, geht beim Laden
+   oder Zusammenführen verloren, gelöschte Favoriten kehren zurück.
+   ============================================================ */
+console.log('\n205. Drive-Favoriten des CLIE bleiben erhalten');
+{
+  const a = globalThis.__api || {};
+  pruefe(/'drivefavoriten'\];/.test(QUELLE), 'SAMMLUNGEN kennt drivefavoriten');
+  if (typeof a.zusammenfuehren !== 'function') {
+    warn('Abgleich nicht auswertbar');
+  } else {
+    const leer = a.leereDatenbank();
+    pruefe(Array.isArray(leer.drivefavoriten), 'die leere Datenbank hat den Bereich');
+    const lokal = a.leereDatenbank();
+    const fremd = a.leereDatenbank();
+    lokal.drivefavoriten = [{ id: 'f1', datei: 'abc', name: 'Angebot', geaendert: 5 }];
+    fremd.drivefavoriten = [{ id: 'f1', datei: 'abc', name: 'Angebot Magnat', geaendert: 9 }, { id: 'f2', datei: 'def', name: 'Budget', geaendert: 3 }];
+    const m = a.zusammenfuehren(lokal, fremd);
+    const db = m.db || m.ergebnis || m;
+    pruefe(db.drivefavoriten && db.drivefavoriten.length === 2 && db.drivefavoriten.filter(x => x.id === 'f1')[0].name === 'Angebot Magnat',
+      'Abgleich: je Eintrag zusammengeführt, der jüngere gewinnt');
+    const l2 = a.leereDatenbank();
+    const f2 = a.leereDatenbank();
+    /* Grabsteine verfallen nach einiger Zeit — darum echte Zeitstempel */
+    f2.drivefavoriten = [{ id: 'f3', datei: 'ghi', name: 'Weg', geaendert: Date.now() - 60000 }];
+    l2.grabsteine = [{ s: 'drivefavoriten', id: 'f3', z: Date.now() }];
+    const m2 = a.zusammenfuehren(l2, f2);
+    const db2 = m2.db || m2.ergebnis || m2;
+    pruefe(!(db2.drivefavoriten || []).some(x => x.id === 'f3'), 'gelöschter Favorit (Grabstein) kehrt nicht zurück');
+  }
+  if (typeof a.textZuBestand === 'function') {
+    const b = a.textZuBestand(JSON.stringify({ drivefavoriten: [{ id: 'f9', datei: 'x', name: 'PDF', geaendert: 1 }] }));
+    pruefe(b && b.drivefavoriten && b.drivefavoriten.length === 1, 'Laden: der Bereich überlebt das Einlesen');
+  } else {
+    warn('Laden nicht auswertbar');
+  }
 }
 
 /* ============================================================

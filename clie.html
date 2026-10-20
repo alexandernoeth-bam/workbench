@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.18.0</title>
+<title>CLIE 0.19.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -286,6 +286,16 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .cls-kopf{margin:2px 0 6px;font-size:17.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .gruppe.klapp{display:block;width:100%;text-align:left;color:var(--px-mitte)}
 /* Aufgaben: Ansicht und „1. Nächste“ (seit 0.17) */
+/* Drive (seit 0.19) */
+.drv-pfad{font-size:15.5px;color:var(--px-mitte);margin:2px 0 4px;overflow-wrap:anywhere}
+.drv-zeile{display:flex;align-items:center;gap:6px;border-bottom:2px dotted var(--px-zart)}
+.drv-n{flex:1;display:flex;gap:8px;align-items:center;text-align:left;padding:6px 0;min-width:0}
+.drv-sym{width:26px;text-align:center;flex:0 0 26px;font-size:22px;line-height:1;font-family:ui-monospace,Menlo,monospace}
+.drv-n .tx{flex:1;min-width:0;overflow-wrap:anywhere}
+.drv-n small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.drv-n mark{background:var(--px);color:var(--lcd);padding:0 2px}
+.drv-stern{font-size:28px;line-height:1;padding:4px 8px;flex:0 0 auto;font-family:ui-monospace,Menlo,monospace}
+.drv-hoch{display:block;width:100%;text-align:left;padding:6px 0;border-bottom:2px dotted var(--px-zart)}
 /* Stones (seit 0.18) */
 .sto-spiel{display:flex;gap:10px;justify-content:center;--z:min(calc((min(100vw,480px) - 150px) / 10),calc((100vh - 360px) / 18),30px)}
 .sto-feld{display:grid;grid-template-columns:repeat(10,var(--z));grid-template-rows:repeat(18,var(--z));gap:1px;border:2px solid var(--px);padding:2px;background:var(--lcd-hell);touch-action:none;flex:0 0 auto}
@@ -461,7 +471,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.18.0';
+var APP_VERSION = '0.19.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -494,7 +504,9 @@ var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe
                   'kalenderzuordnung','notizbuecher','notizseiten','wochen','tage',
                   /* seit v6.2.3: die App „Sammlungen“ im CLIE — die Workbench
                      bewahrt und gleicht sie nur ab, sie zeigt sie nicht an */
-                  'sammlungen','datensaetze'];
+                  'sammlungen','datensaetze',
+                  /* seit v6.3.1: Favoriten der App „Drive“ im CLIE — ebenso */
+                  'drivefavoriten'];
 
 /* Aus der Workbench: nummerierte Zeilen */
 var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
@@ -539,7 +551,7 @@ var kalenderLaeuft = false;
 var kalenderUhr = null;
 
 /* ============================================================
-   Unterbau aus der Workbench 6.3.0 — wörtlich übernommen:
+   Unterbau aus der Workbench 6.3.1 — wörtlich übernommen:
    Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke,
    Kalender lesen, leere Datenbank und der Aktivitäten-Kern (kp…).
    ============================================================ */
@@ -1421,6 +1433,7 @@ function leereDatenbank() {
     tage:              [],
     sammlungen:        [],
     datensaetze:       [],
+    drivefavoriten:    [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -2668,6 +2681,7 @@ var CL_APPS = [
   { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.' },
   { id: 'einkauf',  name: 'Einkauf',  stufe: '',    was: '' },
   { id: 'rechner',  name: 'Rechner',  stufe: '',    was: '' },
+  { id: 'drive',    name: 'Drive',    stufe: '',    was: '' },
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '' },
   { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '' }
 ];
@@ -2701,6 +2715,8 @@ var CL_BILD = {
          + '<rect x="24" y="29" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="29" width="4" height="4" ' + CL_FUELL + '/><rect x="36" y="29" width="4" height="4" ' + CL_FUELL + '/>'
          + '<rect x="24" y="35" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="35" width="4" height="4" ' + CL_FUELL + '/><rect x="36" y="35" width="4" height="4" ' + CL_FUELL + '/>'
          + '<rect x="24" y="41" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="41" width="4" height="4" ' + CL_FUELL + '/><rect x="36" y="41" width="4" height="4" ' + CL_FUELL + '/>',
+  /* Ordner mit Blatt (seit 0.19) */
+  drive: '<path d="M14 22h13l4 4h19v20H14z" ' + CL_STRICH + '/><path d="M23 35h18M23 41h11" ' + CL_STRICH + '/>',
   /* Vier Steine wie ein gelandeter Stein (seit 0.18) */
   stones: '<rect x="15" y="34" width="10" height="10" ' + CL_FUELL + '/><rect x="27" y="34" width="10" height="10" ' + CL_FUELL + '/>'
         + '<rect x="39" y="34" width="10" height="10" ' + CL_FUELL + '/><rect x="27" y="22" width="10" height="10" ' + CL_FUELL + '/>',
@@ -3360,6 +3376,7 @@ function statistikHtml() {
       ['eigene Vorlagen · Hinweise', saAlle(true).length + ' · ' + saHinweise().length]])
     + clStatBlock('routinen', 'Routinen', [
       ['aktiv · pausiert · heute offen', (rt.length - rtPause) + ' · ' + rtPause + ' · ' + rtOffen]])
+    + clStatBlock('drive', 'Drive', [['Favoriten', String(drvFavoriten().length)]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
     + clStatBlock('abgleich', 'Datei', [
@@ -3444,6 +3461,11 @@ function inhaltZeichnen() {
   if (cl.app === 'abgleich') { el.innerHTML = abgleichHtml(); }
   else if (cl.app === 'rechner') { el.innerHTML = rechnerHtml(); }
   else if (cl.app === 'stones') { el.innerHTML = stonesHtml(); }
+  else if (cl.app === 'drive') {
+    /* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
+    if (cl.drv.tab === 'suche' && el.innerHTML.indexOf('drvFeld') >= 0) { drvZeichnen(); return; }
+    el.innerHTML = driveHtml();
+  }
   else if (cl.app === 'kalender') { el.innerHTML = kalenderHtml(); }
   else if (cl.app === 'aufgaben') { el.innerHTML = aufgabenHtml(); }
   else if (cl.app === 'memo') {
@@ -3487,6 +3509,7 @@ function kopfZeichnen() {
     var liste = (cl.app === 'aufgaben') ? aufListe() : null;
     var saText = (cl.app === 'sammlungen') ? saKatText() : null;
     kat.textContent = (cl.app === 'stones') ? 'Level ' + cl.sto.level
+      : (cl.app === 'drive') ? ''
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
     kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter') ? ' an' : '');
   }
@@ -3584,7 +3607,8 @@ function fussZeichnen() {
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'heute') ? heuteFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
-        : (cl.app === 'stones') ? stonesFussHtml() : '';
+        : (cl.app === 'stones') ? stonesFussHtml()
+        : (cl.app === 'drive') ? driveFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -3621,7 +3645,7 @@ function oeffne(id) {
 }
 
 function katUm() {
-  if (cl.app === 'stones') { return; }
+  if (cl.app === 'stones' || cl.app === 'drive') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
     : (cl.app === 'sammlungen' && saKatText() !== null) ? 'safilter' : 'kat';
@@ -8493,6 +8517,288 @@ function einkaufLoesen() {
   melde('Die Verknüpfung zu Keep ist gelöst.', null);
 }
 
+/* ---------- Drive (seit 0.19) ----------
+
+   Deine Dokumente in Google Drive: Ordner durchblättern, die zuletzt
+   geänderten Dateien, Favoriten und Suche in den Dateinamen. Ein Tipp
+   öffnet die Datei in der passenden Google-App bzw. im Viewer des
+   Handys. CLIE sieht dafür nur die Dateiliste (drive.metadata.readonly)
+   und liest keine Inhalte. Das Recht wird erst angefragt, wenn du es in
+   der App erlaubst. Favoriten liegen in der workbench.json
+   (Bereich „drivefavoriten“, seit Workbench 6.3.1). */
+
+var DRV_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly';
+var DRV_RECHT_KEY = 'clie-drive-recht';
+var DRV_API = 'https://www.googleapis.com/drive/v3/files';
+var DRV_FELDER = 'files(id,name,mimeType,modifiedTime,webViewLink)';
+var DRV_ORDNER = 'application/vnd.google-apps.folder';
+var DRV_TABS = [['ordner', 'Ordner'], ['zuletzt', 'Zuletzt'], ['favoriten', '★ Favoriten']];
+
+cl.drv = { tab: 'ordner', stapel: [{ id: 'root', name: 'Meine Ablage' }], vorher: 'ordner', q: '',
+           cache: {}, laedt: '', fehler: '', zeilen: [] };
+
+function drvRechtGewuenscht() {
+  try { return window.localStorage.getItem(DRV_RECHT_KEY) === 'an'; } catch (e) { return false; }
+}
+
+/* Art einer Datei: Zeichen und Name */
+function drvArt(mime) {
+  var m = String(mime || '');
+  if (m === DRV_ORDNER) { return ['▤', 'Ordner']; }
+  if (m === 'application/vnd.google-apps.document') { return ['✎', 'Google Docs']; }
+  if (m === 'application/vnd.google-apps.spreadsheet') { return ['▦', 'Google Tabellen']; }
+  if (m === 'application/vnd.google-apps.presentation') { return ['▭', 'Google Präsentationen']; }
+  if (m === 'application/pdf') { return ['≣', 'PDF']; }
+  if (m.indexOf('image/') === 0) { return ['▣', 'Bild']; }
+  return ['▫', 'Datei'];
+}
+
+function drvDatum(zeit) {
+  var d = String(zeit || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { return ''; }
+  if (d === isoDatum()) { return 'heute'; }
+  if (d === tagePlus(isoDatum(), -1)) { return 'gestern'; }
+  return clKurzDatum(d);
+}
+
+/* Anfragen an die Drive-API: Ordner, Zuletzt, Suche */
+function drvAdresse(schluessel) {
+  var q;
+  var sort;
+  if (schluessel === 'zuletzt') {
+    q = "trashed=false and mimeType!='" + DRV_ORDNER + "'";
+    sort = 'modifiedTime desc';
+    return DRV_API + '?pageSize=20&orderBy=' + encodeURIComponent(sort) + '&q=' + encodeURIComponent(q) + '&fields=' + encodeURIComponent(DRV_FELDER);
+  }
+  if (schluessel.indexOf('q:') === 0) {
+    q = "trashed=false and name contains '" + schluessel.slice(2).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+    sort = 'folder,modifiedTime desc';
+    return DRV_API + '?pageSize=50&orderBy=' + encodeURIComponent(sort) + '&q=' + encodeURIComponent(q) + '&fields=' + encodeURIComponent(DRV_FELDER);
+  }
+  q = "'" + schluessel.replace(/'/g, '') + "' in parents and trashed=false";
+  return DRV_API + '?pageSize=200&orderBy=' + encodeURIComponent('folder,name') + '&q=' + encodeURIComponent(q) + '&fields=' + encodeURIComponent(DRV_FELDER);
+}
+
+function drvSchluessel() {
+  if (cl.drv.tab === 'zuletzt') { return 'zuletzt'; }
+  if (cl.drv.tab === 'suche') { return cl.drv.q ? 'q:' + cl.drv.q : ''; }
+  if (cl.drv.tab === 'ordner') { return cl.drv.stapel[cl.drv.stapel.length - 1].id; }
+  return '';
+}
+
+/* Holt eine Liste (einmal je Sitzung, „Aktualisieren“ holt neu) */
+function drvLaden(schluessel) {
+  if (!schluessel || cl.drv.cache[schluessel] || cl.drv.laedt === schluessel || !tokenGueltig()) { return; }
+  if (typeof fetch !== 'function') { return; }
+  cl.drv.laedt = schluessel;
+  cl.drv.fehler = '';
+  fetch(drvAdresse(schluessel), { headers: driveKopf() }).then(function (r) {
+    if (r.status === 403) { cl.drv.fehler = 'recht'; return null; }
+    if (r.status === 401) { cl.drv.fehler = 'anmeldung'; return null; }
+    if (!r.ok) { cl.drv.fehler = 'Drive antwortet mit ' + r.status + '.'; return null; }
+    return r.json();
+  }).then(function (j) {
+    if (j) { cl.drv.cache[schluessel] = Array.isArray(j.files) ? j.files : []; }
+  }).catch(function (f) {
+    cl.drv.fehler = 'Keine Verbindung zu Drive.' + (f && f.message ? ' (' + f.message + ')' : '');
+  }).then(function () {
+    cl.drv.laedt = '';
+    if (cl.app === 'drive') { drvZeichnen(); }
+  });
+}
+
+/* ---- Favoriten (in der workbench.json) ---- */
+
+function drvFavoriten() {
+  return (DB.drivefavoriten || []).filter(function (f) { return f && f.datei; }).slice().sort(function (a, b) {
+    var oa = a.mime === DRV_ORDNER ? 0 : 1;
+    var ob = b.mime === DRV_ORDNER ? 0 : 1;
+    return (oa - ob) || String(a.name || '').localeCompare(String(b.name || ''), 'de');
+  });
+}
+
+function drvFavorit(datei) {
+  var l = DB.drivefavoriten || [];
+  var i;
+  for (i = 0; i < l.length; i++) { if (l[i] && l[i].datei === datei) { return l[i]; } }
+  return null;
+}
+
+function drvPfadText() {
+  return cl.drv.stapel.map(function (s) { return s.name; }).join(' › ');
+}
+
+/* Stern an einer Zeile: Favorit an oder aus */
+function drvFavUm(i) {
+  var z = cl.drv.zeilen[i];
+  if (!z) { return; }
+  var f = drvFavorit(z.id);
+  if (f) {
+    DB.drivefavoriten = DB.drivefavoriten.filter(function (x) { return x !== f; });
+    grabsteinSetzen('drivefavoriten', f.id);
+  } else {
+    if (!Array.isArray(DB.drivefavoriten)) { DB.drivefavoriten = []; }
+    DB.drivefavoriten.push({ id: neueKennung(), datei: z.id, name: String(z.name || '').slice(0, 200), mime: z.mimeType || '',
+                             link: z.webViewLink || '', pfad: z.pfad || (cl.drv.tab === 'ordner' ? drvPfadText() : ''), geaendert: jetzt() });
+  }
+  spaeterSichern();
+  drvZeichnen();
+}
+
+/* Tipp auf eine Zeile: Ordner öffnen oder Datei in der Google-App */
+function drvOeffnen(i) {
+  var z = cl.drv.zeilen[i];
+  if (!z) { return; }
+  if (z.mimeType === DRV_ORDNER) {
+    if (cl.drv.tab === 'ordner') { cl.drv.stapel.push({ id: z.id, name: z.name }); }
+    else { cl.drv.stapel = [{ id: 'root', name: 'Meine Ablage' }, { id: z.id, name: z.name }]; }
+    cl.drv.tab = 'ordner';
+    drvZeichnen();
+    return;
+  }
+  var link = z.webViewLink || ('https://drive.google.com/file/d/' + encodeURIComponent(z.id) + '/view');
+  /* Ohne „noopener“ — sonst liefert window.open null (siehe Einkauf) */
+  var w = null;
+  try { w = window.open(link, '_blank'); } catch (e) { w = null; }
+  if (!w) { melde('Die Datei ließ sich nicht öffnen.\nBitte Pop-ups für CLIE erlauben.', 'warn'); }
+}
+
+function drvHoch() {
+  if (cl.drv.stapel.length > 1) { cl.drv.stapel.pop(); drvZeichnen(); }
+}
+
+function drvTab(t) {
+  if (['ordner', 'zuletzt', 'favoriten'].indexOf(t) < 0) { return; }
+  cl.drv.tab = t;
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  drvZeichnen();
+}
+
+function drvSucheOeffnen() {
+  if (cl.drv.tab !== 'suche') { cl.drv.vorher = cl.drv.tab; }
+  cl.drv.tab = 'suche';
+  zeichne();
+  var f = document.getElementById('drvFeld');
+  if (f && f.focus) { f.focus(); }
+}
+
+function drvSucheZu() {
+  cl.drv.tab = cl.drv.vorher || 'ordner';
+  zeichne();
+}
+
+function drvSuchen() {
+  var f = document.getElementById('drvFeld');
+  var q = f ? String(f.value || '').trim() : '';
+  cl.drv.q = q.slice(0, 80);
+  drvZeichnen();
+}
+
+function drvSuchTaste(e) {
+  if (e && e.key === 'Enter') { drvSuchen(); }
+}
+
+function drvAktualisieren() {
+  cl.drv.cache = {};
+  cl.drv.fehler = '';
+  drvZeichnen();
+}
+
+/* Das Recht „Dateiliste sehen“ erbitten — Google fragt einmal nach */
+function drvErlauben() {
+  try { window.localStorage.setItem(DRV_RECHT_KEY, 'an'); } catch (e) { /* dann nur für jetzt */ }
+  cl.drv.fehler = '';
+  cl.drv.cache = {};
+  anmeldeVersuch(false, 'consent').then(function () { if (cl.app === 'drive') { drvZeichnen(); } });
+}
+
+/* ---- Zeichnen ---- */
+
+function drvZeileHtml(z, i, mitPfad) {
+  var art = drvArt(z.mimeType);
+  var fav = !!drvFavorit(z.id);
+  var unter = art[1] + (mitPfad && z.pfad ? ' · ' + z.pfad : (z.modifiedTime && z.mimeType !== DRV_ORDNER ? ' · ' + drvDatum(z.modifiedTime) : ''));
+  var name = esc(z.name || '(ohne Namen)');
+  if (cl.drv.tab === 'suche' && cl.drv.q) { name = suMarkiert(z.name || '', cl.drv.q, false); }
+  return '<div class="drv-zeile"><button type="button" class="drv-n" onclick="drvOeffnen(' + i + ')"><span class="drv-sym">' + art[0] + '</span>'
+    + '<span class="tx">' + name + '<small>' + esc(unter) + '</small></span></button>'
+    + '<button type="button" class="drv-stern' + (fav ? ' an' : '') + '" onclick="drvFavUm(' + i + ')" aria-label="Favorit">' + (fav ? '★' : '☆') + '</button></div>';
+}
+
+function drvListeHtml() {
+  if (cl.drv.tab === 'favoriten') {
+    cl.drv.zeilen = drvFavoriten().map(function (f) {
+      return { id: f.datei, name: f.name, mimeType: f.mime, webViewLink: f.link, pfad: f.pfad };
+    });
+    if (!cl.drv.zeilen.length) { return '<p class="leise">Noch keine Favoriten — ☆ an einer Datei oder einem Ordner tippen.</p>'; }
+    return cl.drv.zeilen.map(function (z, i) { return drvZeileHtml(z, i, true); }).join('')
+      + '<p class="leise">Favoriten werden mit der Workbench abgeglichen — sie sind auf allen Geräten gleich.</p>';
+  }
+  if (!tokenGueltig()) {
+    return '<p>Für Drive braucht CLIE die Verbindung zu Google.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="anmelden(false)">Verbinden</button></div>';
+  }
+  if (cl.drv.fehler === 'recht') {
+    return '<p>CLIE darf deine Drive-Liste noch nicht sehen.</p>'
+      + '<p class="leise">Mit „Erlauben“ fragt Google einmal nach dem Recht, die Dateiliste zu sehen (nur Namen und Ordner, keine Inhalte).</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="drvErlauben()">Erlauben</button></div>';
+  }
+  if (cl.drv.fehler === 'anmeldung') {
+    return '<p>Die Anmeldung ist abgelaufen.</p><div class="knoepfe"><button type="button" class="knopf voll" onclick="anmelden(false)">Verbinden</button></div>';
+  }
+  if (cl.drv.fehler) {
+    return '<p class="warn">' + esc(cl.drv.fehler) + '</p><div class="knoepfe"><button type="button" class="knopf" onclick="drvAktualisieren()">Nochmal</button></div>';
+  }
+  var k = drvSchluessel();
+  if (!k) { return '<p class="leise">Sucht in den Dateinamen der ganzen Drive — Begriff eingeben, dann ⌕.</p>'; }
+  var l = cl.drv.cache[k];
+  if (!l) { drvLaden(k); return '<p class="leise">Wird geholt …</p>'; }
+  var pfad = cl.drv.tab === 'ordner' ? drvPfadText() : '';
+  cl.drv.zeilen = l.map(function (f) {
+    return { id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, webViewLink: f.webViewLink, pfad: pfad };
+  });
+  var h = '';
+  if (cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) {
+    h += '<button type="button" class="drv-hoch" onclick="drvHoch()">‹ zurück zu „' + esc(cl.drv.stapel[cl.drv.stapel.length - 2].name) + '“</button>';
+  }
+  if (!l.length) {
+    return h + '<p class="leise">' + (cl.drv.tab === 'suche' ? 'Nichts gefunden.' : (cl.drv.tab === 'zuletzt' ? 'Keine Dateien.' : 'Dieser Ordner ist leer.')) + '</p>';
+  }
+  return h + cl.drv.zeilen.map(function (z, i) { return drvZeileHtml(z, i, false); }).join('')
+    + (cl.drv.tab === 'ordner' && l.length >= 200 ? '<p class="leise">Nur die ersten 200 Einträge.</p>' : '')
+    + (cl.drv.tab === 'suche' ? '<p class="leise">Sucht in den Dateinamen. Den Inhalt der Dateien liest CLIE nicht.</p>' : '');
+}
+
+function driveHtml() {
+  var h = '';
+  if (cl.drv.tab === 'suche') {
+    h += '<div class="su-feld"><span>⌕</span><input id="drvFeld" type="search" autocomplete="off" placeholder="Dateiname …" value="' + esc(cl.drv.q) + '"'
+       + ' onkeydown="drvSuchTaste(event)"><button type="button" class="knopf" onclick="drvSuchen()">Suchen</button></div>';
+  } else {
+    h += '<div class="auf-leiste"><div class="schalter">' + DRV_TABS.map(function (t) {
+        return '<button type="button"' + (t[0] === cl.drv.tab ? ' class="an"' : '') + ' onclick="drvTab(\'' + t[0] + '\')">' + t[1] + '</button>';
+      }).join('') + '</div></div>';
+    if (cl.drv.tab === 'ordner') { h += '<div class="drv-pfad">' + esc(drvPfadText()) + '</div>'; }
+  }
+  return h + '<div id="drvListe">' + drvListeHtml() + '</div>';
+}
+
+/* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
+function drvZeichnen() {
+  if (cl.app !== 'drive') { return; }
+  var el = document.getElementById('inhalt');
+  var l = document.getElementById('drvListe');
+  if (cl.drv.tab === 'suche' && el && l && el.innerHTML.indexOf('drvFeld') >= 0) { l.innerHTML = drvListeHtml(); return; }
+  if (el) { el.innerHTML = driveHtml(); }
+}
+
+function driveFussHtml() {
+  if (cl.drv.tab === 'suche') { return '<button type="button" class="knopf voll" onclick="drvSucheZu()">Fertig</button>'; }
+  return '<button type="button" class="knopf" onclick="drvSucheOeffnen()">Suchen</button>'
+    + '<button type="button" class="knopf" onclick="drvAktualisieren()">Aktualisieren</button>';
+}
+
 /* ---------- Stones (seit 0.18) ----------
 
    Ein Fallblock-Spiel im LCD-Stil: Feld 10 × 18, sieben Steinformen,
@@ -9102,6 +9408,8 @@ function clKonto() {
 /* Was mit der Anfrage an Google geht: die Aufforderung und das Konto */
 function clAnfrage(aufforderung) {
   var a = { prompt: aufforderung };
+  /* Seit 0.19: hat die Drive-App das Recht erbeten, fragen wir es mit an */
+  if (drvRechtGewuenscht()) { a.scope = SCOPES + ' ' + DRV_SCOPE; a.include_granted_scopes = true; }
   var k = clKonto();
   if (k) { a.hint = k; a.login_hint = k; }
   return a;
@@ -9323,6 +9631,8 @@ function clZurueck() {
   if (cl.app === 'memo' && cl.memo.id) { memoZurListe(); return true; }
   if (cl.app === 'checklisten' && cl.cls.schreiben) { clsSchreibenUm(); return true; }
   if (cl.app === 'checklisten' && cl.cls.id) { clsZurListe(); return true; }
+  if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }
+  if (cl.app === 'drive' && cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) { drvHoch(); return true; }
   if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
   return false;
 }

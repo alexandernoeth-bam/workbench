@@ -285,7 +285,7 @@ function uebersichtTest() {
   pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
     'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 11, 'elf Apps im Raster (seit 0.18 mit Stones)');
+  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 12, 'zwölf Apps im Raster (seit 0.19 mit Drive)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -412,8 +412,8 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","stones","abgleich"]',
-    'genau elf Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Stones, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","abgleich"]',
+    'genau zwölf Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -1382,7 +1382,7 @@ function sammlungenTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  pruefe(/var SAMMLUNGEN = \[[\s\S]*'sammlungen','datensaetze'\]/.test(QUELLE) && Array.isArray(S.DB.sammlungen) && Array.isArray(S.DB.datensaetze),
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*'sammlungen','datensaetze'[,\]]/.test(QUELLE) && Array.isArray(S.DB.sammlungen) && Array.isArray(S.DB.datensaetze),
     'die Bereiche sammlungen und datensaetze kommen aus der Workbench (6.2.3) — sonst gingen sie beim Abgleich verloren');
   const code = (QUELLE.match(/\/\* ---------- Sammlungen \(seit 0\.7\)[\s\S]*?\/\* ---------- Routinen \(seit 0\.5\)/) || [''])[0];
   pruefe(code.length > 1000 && !/padStart|\.repeat\(|=>/.test(code), 'Sammlungen: nur ES5 — kein padStart, repeat oder Pfeilfunktionen');
@@ -2736,6 +2736,115 @@ function stonesTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   48. Drive (0.19)
+   Grund: Dokumente aus Google Drive finden und öffnen — Ordner, Zuletzt,
+   Favoriten (abgeglichen), Suche — mit nur dem Recht, die Dateiliste
+   zu sehen.
+   Erkennt: falsche Anfragen an die API, fehlender Hinweis bei fehlendem
+   Recht/fehlender Anmeldung, Ordner-Navigation/Zurück kaputt, Favoriten
+   nicht in DB.drivefavoriten oder ohne Grabstein gelöscht, Datei öffnet
+   nicht in neuem Fenster, Suchfeld wird beim Neuzeichnen geleert.
+   ============================================================ */
+async function driveTest() {
+  console.log('\n48. Drive (0.19)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const warte = () => new Promise(r => setImmediate(r));
+  const heute = S.isoDatum();
+  S.cl.drv.tab = 'ordner'; S.cl.drv.stapel = [{ id: 'root', name: 'Meine Ablage' }]; S.cl.drv.cache = {}; S.cl.drv.fehler = ''; S.cl.drv.q = '';
+  pruefe(/'drivefavoriten'\]/.test(QUELLE) && Array.isArray(S.DB.drivefavoriten), 'Bereich drivefavoriten kommt aus der Workbench (6.3.1)');
+  pruefe(!/drive\.metadata\.readonly'?\s*;/.test(funktionText(SKRIPT, 'clAnfrage')) && /var SCOPES = 'https:\/\/www\.googleapis\.com\/auth\/drive\.file '/.test(QUELLE) && !/SCOPES = [^;]*metadata/.test(QUELLE),
+    'das Listenrecht ist nicht Teil der normalen Anmeldung');
+  delete S.__ablage['clie-drive-recht'];
+  pruefe(!S.clAnfrage('').scope, 'ohne Erlauben: keine Zusatzrechte bei der Anfrage');
+  S.__ablage['clie-drive-recht'] = 'an';
+  const an = S.clAnfrage('');
+  pruefe(/drive\.metadata\.readonly/.test(an.scope) && /drive\.file/.test(an.scope) && an.include_granted_scopes === true, 'nach Erlauben: Listenrecht wird mit angefragt');
+
+  /* Ohne Anmeldung */
+  S.oeffne('drive');
+  pruefe(/Verbinden/.test(inhalt()) && /drvTab\('zuletzt'\)/.test(inhalt()), 'ohne Anmeldung: Hinweis „Verbinden“, Reiter da');
+  /* Mit Anmeldung: eine kleine Drive */
+  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
+  const anfragen = [];
+  const dateien = {
+    root: [{ id: 'fh', name: 'Haus', mimeType: 'application/vnd.google-apps.folder', modifiedTime: heute + 'T08:00:00Z' },
+           { id: 'd1', name: 'Budget Haus 2026', mimeType: 'application/vnd.google-apps.spreadsheet', modifiedTime: '2026-10-02T08:00:00Z', webViewLink: 'https://docs.google.com/x/d1' }],
+    fh: [{ id: 'p1', name: "Angebot Magnat's Fenster", mimeType: 'application/pdf', modifiedTime: heute + 'T07:00:00Z', webViewLink: 'https://drive.google.com/p1' }]
+  };
+  let recht = true;
+  S.fetch = function (adresse) {
+    anfragen.push(decodeURIComponent(adresse));
+    if (!recht) { return Promise.resolve({ ok: false, status: 403, json() { return Promise.resolve({}); } }); }
+    const q = decodeURIComponent(adresse);
+    let files = [];
+    const m = q.match(/q='([^']+)' in parents/);
+    if (m) { files = dateien[m[1]] || []; }
+    else if (/name contains/.test(q)) { files = dateien.fh; }
+    else { files = dateien.root.concat(dateien.fh).filter(f => !/folder/.test(f.mimeType)); }
+    return Promise.resolve({ ok: true, status: 200, json() { return Promise.resolve({ files: files }); } });
+  };
+  S.drvAktualisieren();
+  pruefe(/Wird geholt/.test(inhalt()), 'erst „Wird geholt …“');
+  await warte(); await warte();
+  let h = inhalt();
+  pruefe(/q='root' in parents and trashed=false/.test(anfragen[0]) && /fields=files\(id,name,mimeType,modifiedTime,webViewLink\)/.test(anfragen[0]) && /orderBy=folder,name/.test(anfragen[0]),
+    'Ordner: nur Namen und Metadaten, Ordner zuerst');
+  pruefe(/Meine Ablage/.test(h) && /▤<\/span><span class="tx">Haus<small>Ordner<\/small>/.test(h) && /▦<\/span><span class="tx">Budget Haus 2026<small>Google Tabellen · 02\.10\.<\/small>/.test(h),
+    'Zeilen mit Zeichen, Art und Datum');
+  S.drvOeffnen(0);
+  await warte(); await warte();
+  h = inhalt();
+  pruefe(S.cl.drv.stapel.length === 2 && /Meine Ablage › Haus/.test(h) && /zurück zu „Meine Ablage“/.test(h) && /Angebot Magnat&#39;s Fenster|Angebot Magnat's Fenster/.test(h),
+    'Ordner öffnen: Pfad und „zurück“');
+  pruefe(/'fh' in parents/.test(anfragen[anfragen.length - 1]), 'Unterordner wird nach seiner Kennung gefragt');
+  const geoeffnet = [];
+  S.open = function (u) { geoeffnet.push(u); return {}; };
+  S.drvOeffnen(0);
+  pruefe(geoeffnet[0] === 'https://drive.google.com/p1' && !/noopener/.test(funktionText(SKRIPT, 'drvOeffnen').replace(/\/\*[\s\S]*?\*\//g, '')), 'Datei: öffnet in neuem Fenster (ohne noopener)');
+  /* Favorit */
+  S.drvFavUm(0);
+  const fav = S.DB.drivefavoriten[0];
+  pruefe(fav && fav.datei === 'p1' && fav.pfad === 'Meine Ablage › Haus' && fav.mime === 'application/pdf' && fav.link && fav.geaendert, 'Favorit: in drivefavoriten mit Pfad und Link');
+  pruefe(/drv-stern an[^>]*>★/.test(inhalt()), 'Stern gefüllt');
+  S.clZurueck();
+  pruefe(S.cl.drv.stapel.length === 1 && S.cl.app === 'drive', 'Zurück-Taste: eine Ordnerebene hoch');
+  S.drvTab('favoriten');
+  h = inhalt();
+  pruefe(/Angebot Magnat/.test(h) && /PDF · Meine Ablage › Haus/.test(h), 'Favoriten: mit Fundort');
+  S.drvFavUm(0);
+  pruefe(!S.DB.drivefavoriten.length && S.DB.grabsteine.some(g => g.s === 'drivefavoriten' && g.id === fav.id), 'Favorit aus: gelöscht mit Grabstein (kommt beim Abgleich nicht zurück)');
+  /* Zuletzt */
+  S.drvTab('zuletzt');
+  await warte(); await warte();
+  pruefe(/pageSize=20/.test(anfragen[anfragen.length - 1]) && /orderBy=modifiedTime desc/.test(anfragen[anfragen.length - 1]) && /Budget Haus 2026/.test(inhalt()) && !/>Haus<small>Ordner/.test(inhalt()),
+    'Zuletzt: 20 zuletzt geänderte Dateien, ohne Ordner');
+  /* Suche */
+  S.drvSucheOeffnen();
+  pruefe(/id="drvFeld"/.test(inhalt()) && /drvSucheZu\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'Suche: Feld und „Fertig“');
+  S.document.getElementById('drvFeld').value = "magnat's";
+  S.drvSuchen();
+  await warte(); await warte();
+  pruefe(/name contains 'magnat\\'s'/.test(anfragen[anfragen.length - 1]), 'Suchbegriff sicher in die Anfrage (Apostroph maskiert)');
+  pruefe(/<mark>/.test(S.document.getElementById('drvListe').innerHTML), 'Treffer markiert');
+  S.clZurueck();
+  pruefe(S.cl.drv.tab === 'zuletzt', 'Zurück: Suche zu, wieder im vorigen Reiter');
+  /* Ohne Recht */
+  recht = false;
+  S.drvTab('ordner');
+  S.drvAktualisieren();
+  await warte(); await warte();
+  pruefe(/darf deine Drive-Liste noch nicht sehen/.test(inhalt()) && /drvErlauben\(\)/.test(inhalt()), 'fehlendes Recht: Hinweis und „Erlauben“');
+  S.oeffne('statistik');
+  pruefe(/Drive/.test(inhalt()), 'Statistik: Drive');
+  S.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
+  S.zugriffToken = null; S.tokenAblauf = 0;
+  delete S.__ablage['clie-drive-recht'];
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2780,6 +2889,7 @@ function stonesTest() {
   try { clsStichtagTest(); } catch (e) { fail('Stichtag warf: ' + e.message); }
   try { ansichtTest(); } catch (e) { fail('Aufgabensicht warf: ' + e.message); }
   try { stonesTest(); } catch (e) { fail('Stones warf: ' + e.message); }
+  try { await driveTest(); } catch (e) { fail('Drive warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
