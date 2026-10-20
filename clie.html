@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.13.0</title>
+<title>CLIE 0.14.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -326,6 +326,14 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-tab th:first-child,.sa-tab td:first-child{width:46%}
 .sa-tab.sa-dat th:first-child,.sa-tab.sa-dat td:first-child{width:22%}
 .sa-tab.sa-vier{font-size:17.5px}
+/* Kopf der Sammlung steht fest, nur die Einträge scrollen (seit 0.14) */
+.sa-fest{position:sticky;top:-6px;z-index:5;background:var(--lcd);margin:-6px -10px 0;padding:6px 10px 0}
+.sa-tab.sa-kopf{margin:0}
+.sa-tab.sa-kopf + .sa-tab{margin-top:0}
+.sa-kw{display:grid;grid-template-columns:1fr 1fr;gap:4px;border:2px solid var(--px);padding:4px;margin:0 0 6px;background:var(--lcd-hell)}
+.sa-kw div{border:2px solid var(--px-zart);padding:2px 6px;line-height:1.15;min-width:0}
+.sa-kw small{display:block;font-size:15.5px;color:var(--px-mitte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-kw b{display:block;font-weight:400;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sa-tab.sa-vier th:first-child,.sa-tab.sa-vier td:first-child{width:34%}
 .sa-tab.sa-vier.sa-dat th:first-child,.sa-tab.sa-vier.sa-dat td:first-child{width:20%}
 .sa-tab .r{text-align:right}
@@ -413,7 +421,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.13.0';
+var APP_VERSION = '0.14.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3502,6 +3510,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saFelder\')">Felder…</button>'
           + '<button type="button" onclick="menueWahl(\'saFilter\')">Filter…</button>'
           + '<button type="button" onclick="menueWahl(\'saWerte\')">Feste Werte…</button>'
+          + '<button type="button" onclick="menueWahl(\'saKopf\')">Kopfwerte…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
       + '<div class="trenn"></div>'
@@ -3593,6 +3602,7 @@ function menueWahl(was) {
   if (was === 'saFelder') { saAnsicht('felder'); return; }
   if (was === 'saFilter') { saAnsicht('filter'); return; }
   if (was === 'saWerte') { saAnsicht('werte'); return; }
+  if (was === 'saKopf') { saAnsicht('kopf'); return; }
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   aufklappZeichnen();
@@ -6393,10 +6403,10 @@ function saBudget(s, l) {
 
 /* Die Kennzahl rechts in der Liste: wie gewählt (seit 0.8.1), sonst nach der Vorlage */
 /* Eine Kennzahl nach Wahl; null = keine Wahl getroffen */
-function saKennzahlNach(s, kz) {
+function saKennzahlNach(s, kz, liste) {
   kz = kz || {};
   if (!kz.art) { return null; }
-  var l = saSaetze(s);
+  var l = liste || saSaetze(s);
   if (kz.art === 'anzahl') { return String(l.length); }
   if (kz.art === 'wert') {
     var w = null;
@@ -6462,6 +6472,115 @@ function saGruppenNamen() {
   });
   eigene.sort(function (a, b) { return a.localeCompare(b, 'de'); });
   return fest.concat(eigene);
+}
+
+/* ---- Kopfwerte (seit 0.14) ----
+   Bis zu 4 Werte, die oben fest über den Einträgen stehen: dieselben
+   Arten wie die Kennzahl in der Liste, dazu ein Zeitraum. */
+
+var SA_KOPF_MAX = 4;
+var SA_ZEITRAEUME = [['', 'alle'], ['woche', 'diese Woche'], ['monat', 'dieser Monat'], ['jahr', 'dieses Jahr'],
+                     ['7', 'letzte 7 Tage'], ['30', 'letzte 30 Tage']];
+var SA_KW_ARTEN = [['letzter', 'letzter Wert'], ['summe', 'Summe'], ['schnitt', 'Ø'], ['min', 'Min'], ['max', 'Max'],
+                   ['anzahl', 'Anzahl der Einträge'], ['wert', 'fester Wert']];
+
+/* Die Einträge eines Zeitraums — nach dem ersten Datumsfeld, sonst nach Anlage */
+function saZeitraumListe(s, zr) {
+  var l = saSaetze(s);
+  if (!zr) { return l; }
+  var df = (s.felder || []).filter(function (f) { return f.typ === 'datum'; })[0];
+  var heute = isoDatum();
+  var von;
+  var bis = heute;
+  if (zr === 'woche') { von = montagVon(heute); bis = tagePlus(von, 6); }
+  else if (zr === 'monat') { von = heute.slice(0, 8) + '01'; bis = heute.slice(0, 8) + '31'; }
+  else if (zr === 'jahr') { von = heute.slice(0, 4) + '-01-01'; bis = heute.slice(0, 4) + '-12-31'; }
+  else { von = tagePlus(heute, -(Math.max(1, Number(zr) || 1) - 1)); }
+  return l.filter(function (d) {
+    var t = df ? String((d.werte || {})[df.id] || '') : ((d.angelegt || d.geaendert) ? isoDatum(new Date(Number(d.angelegt || d.geaendert))) : '');
+    return t && t >= von && t <= bis;
+  });
+}
+
+function saKopfwertText(s, k) {
+  var t = saKennzahlNach(s, k, (k.art === 'wert') ? null : saZeitraumListe(s, k.zeitraum || ''));
+  return (t === null || t === '') ? '—' : t;
+}
+
+/* Eine Bezeichnung, wenn keine eigene vergeben ist: „Ø kg · 30 Tage“ */
+function saKopfwertName(s, k) {
+  if (k.name) { return k.name; }
+  var art = (SA_KW_ARTEN.filter(function (a) { return a[0] === k.art; })[0] || ['', ''])[1];
+  var f = saFeld(s, k.feld);
+  var w = (s.werte || []).filter(function (x) { return x.id === k.wert; })[0];
+  var zr = (SA_ZEITRAEUME.filter(function (z) { return z[0] === (k.zeitraum || ''); })[0] || ['', ''])[1];
+  if (k.art === 'wert') { return w ? w.name : art; }
+  return art + (k.art !== 'anzahl' && f ? ' ' + f.name : '') + (k.zeitraum ? ' · ' + zr : '');
+}
+
+function saKopfwerteHtml(s) {
+  var l = (s.kopfwerte || []).slice(0, SA_KOPF_MAX);
+  if (!l.length) { return ''; }
+  return '<div class="sa-kw">' + l.map(function (k) {
+    return '<div><small>' + esc(saKopfwertName(s, k)) + '</small><b>' + esc(saKopfwertText(s, k)) + '</b></div>';
+  }).join('') + '</div>';
+}
+
+function saKopfListeHtml(s) {
+  var h = '<p class="leise">Bis zu ' + SA_KOPF_MAX + ' Werte, die oben fest über den Einträgen stehen. Antippen zum Ändern.</p>';
+  (s.kopfwerte || []).forEach(function (k, i) {
+    h += '<div class="sa-feldzeile"><button type="button" class="tx" onclick="saKopfOeffnen(' + i + ')">' + esc(saKopfwertName(s, k))
+       + '<small>' + esc(saKopfwertText(s, k)) + '</small></button>'
+       + '<button type="button" class="knopf" onclick="saKopfSchieben(' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + ' aria-label="nach oben">▲</button>'
+       + '<button type="button" class="knopf" onclick="saKopfSchieben(' + i + ',1)"' + (i === s.kopfwerte.length - 1 ? ' disabled' : '') + ' aria-label="nach unten">▼</button></div>';
+  });
+  if (!(s.kopfwerte || []).length) { h += '<p class="leise">Noch kein Kopfwert — „+ Kopfwert“ tippen.</p>'; }
+  return h;
+}
+
+function saKopfOeffnen(i) { saFensterAuf({ modus: 'kopf', nr: i }); }
+
+function saKopfSchieben(i, r) {
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s || !s.kopfwerte || !s.kopfwerte[i] || !s.kopfwerte[i + r]) { return; }
+  var k = s.kopfwerte[i];
+  s.kopfwerte[i] = s.kopfwerte[i + r];
+  s.kopfwerte[i + r] = k;
+  saGeaendert(s);
+  spaeterSichern();
+  zeichne();
+}
+
+function saKopfSpeichern() {
+  var f = cl.sa.fenster;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || !s) { aufklappZu(); return; }
+  var art = saFeldWert('saKwArt');
+  if (!SA_KW_ARTEN.some(function (a) { return a[0] === art; })) { melde('Bitte eine Art wählen.', 'warn'); return; }
+  var feld = saFeldWert('saKwFeld');
+  var wert = saFeldWert('saKwWert');
+  if (art === 'wert' && !(s.werte || []).some(function (w) { return w.id === wert; })) { melde('Bitte einen festen Wert wählen.', 'warn'); return; }
+  if (art !== 'wert' && art !== 'anzahl' && !saFeld(s, feld)) { melde('Bitte ein Feld wählen.', 'warn'); return; }
+  var zr = saFeldWert('saKwZr');
+  var k = { name: String(saFeldWert('saKwName') || '').trim().slice(0, 24), art: art };
+  if (art === 'wert') { k.wert = wert; } else if (art !== 'anzahl') { k.feld = feld; }
+  if (art !== 'wert' && SA_ZEITRAEUME.some(function (z) { return z[0] === zr; }) && zr) { k.zeitraum = zr; }
+  if (!Array.isArray(s.kopfwerte)) { s.kopfwerte = []; }
+  if (f.nr >= 0 && s.kopfwerte[f.nr]) { s.kopfwerte[f.nr] = k; }
+  else if (s.kopfwerte.length < SA_KOPF_MAX) { s.kopfwerte.push(k); }
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
+}
+
+function saKopfLoeschen() {
+  var f = cl.sa.fenster;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || !s || !s.kopfwerte) { aufklappZu(); return; }
+  s.kopfwerte.splice(f.nr, 1);
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
 }
 
 /* ---- Zeichnen ---- */
@@ -6530,9 +6649,14 @@ function saSummenZeile(s, sp, l, klasse, titel) {
 function saTabelleHtml(s) {
   var sp = saSpalten(s);
   var l = saGefiltert(s);
-  var h = '<table class="sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '') + '"><tr>' + sp.map(function (f) {
-    return '<th class="' + (saRechts(f) ? 'r' : '') + '">' + esc(f.name) + '</th>';
-  }).join('') + '</tr>';
+  var klasse = 'sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '');
+  /* Seit 0.14: Überschrift und Kopfwerte stehen fest, nur die Einträge scrollen.
+     Zwei Tabellen mit gleichen Spaltenbreiten — so bleibt alles bündig. */
+  var h = '<div class="sa-fest">' + saKopfwerteHtml(s)
+    + '<table class="' + klasse + ' sa-kopf"><tr>' + sp.map(function (f) {
+        return '<th class="' + (saRechts(f) ? 'r' : '') + '">' + esc(f.name) + '</th>';
+      }).join('') + '</tr></table></div>'
+    + '<table class="' + klasse + '">';
   var zeile = function (d) {
     return '<tr class="sa-z" onclick="saEintrag(\'' + esc(d.id) + '\')">' + sp.map(function (f) {
       if (f.typ === 'link' && saLinkGueltig((d.werte || {})[f.id])) {
@@ -6708,6 +6832,7 @@ function saSammlungHtml(s) {
   if (cl.sa.ansicht === 'felder') { return saFelderHtml(s); }
   if (cl.sa.ansicht === 'filter') { return saFilterListeHtml(s); }
   if (cl.sa.ansicht === 'werte') { return saWerteHtml(s); }
+  if (cl.sa.ansicht === 'kopf') { return saKopfListeHtml(s); }
   var l = saGefiltert(s);
   var h = saTabelleHtml(s);
   if ((s.werte || []).length) {
@@ -6791,6 +6916,10 @@ function sammlungenFussHtml() {
     return '<button type="button" class="knopf voll" onclick="saAnsicht(\'tabelle\')">Fertig</button>'
       + '<button type="button" class="knopf" onclick="saWertOeffnen(\'\')">+ Wert</button>';
   }
+  if (cl.sa.ansicht === 'kopf') {
+    return '<button type="button" class="knopf voll" onclick="saAnsicht(\'tabelle\')">Fertig</button>'
+      + '<button type="button" class="knopf" onclick="saKopfOeffnen(-1)"' + ((s.kopfwerte || []).length >= SA_KOPF_MAX ? ' disabled' : '') + '>+ Kopfwert</button>';
+  }
   return '<button type="button" class="knopf" onclick="saZurListe()">Fertig</button>'
     + '<button type="button" class="knopf" onclick="saEintrag(\'\')">Neu</button>'
     + (s.gruppe && saFeld(s, s.gruppe) ? '<button type="button" class="knopf' + (s.gruppenAn ? ' voll' : '') + '" onclick="saGruppenUm()">Gruppen</button>' : '')
@@ -6803,6 +6932,7 @@ function saReiter() {
   if (cl.sa.ansicht === 'felder') { return 'Felder'; }
   if (cl.sa.ansicht === 'filter') { return 'Filter'; }
   if (cl.sa.ansicht === 'werte') { return 'Feste Werte'; }
+  if (cl.sa.ansicht === 'kopf') { return 'Kopfwerte'; }
   return s.name;
 }
 
@@ -6856,7 +6986,7 @@ function saZurListe() {
 }
 
 function saAnsicht(a) {
-  if (['tabelle', 'felder', 'filter', 'werte'].indexOf(a) < 0) { return; }
+  if (['tabelle', 'felder', 'filter', 'werte', 'kopf'].indexOf(a) < 0) { return; }
   cl.sa.ansicht = a;
   cl.aufklapp = '';
   zeichne();
@@ -7162,6 +7292,25 @@ function saFensterHtml() {
         + (fw ? '<button type="button" class="knopf" onclick="saWertLoeschen()">Löschen</button>' : ''));
   }
 
+  if (f.modus === 'kopf') {
+    var kw = (f.nr >= 0 && s.kopfwerte) ? s.kopfwerte[f.nr] : null;
+    var kv = kw || { name: '', art: 'letzter', feld: ((s.felder || [])[0] || {}).id, zeitraum: '' };
+    var wahl = function (id, an, liste) {
+      return '<select id="' + id + '" class="eingabe">' + liste.map(function (x) {
+        return '<option value="' + esc(x[0]) + '"' + (x[0] === an ? ' selected' : '') + '>' + esc(x[1]) + '</option>';
+      }).join('') + '</select>';
+    };
+    return kopf(kw ? 'Kopfwert' : 'Neuer Kopfwert')
+      + '<label for="saKwName">Bezeichnung (leer = automatisch):</label><input id="saKwName" class="eingabe" type="text" autocomplete="off" value="' + esc(kv.name || '') + '">'
+      + '<label for="saKwArt">Art:</label>' + wahl('saKwArt', kv.art, SA_KW_ARTEN.filter(function (a) { return a[0] !== 'wert' || (s.werte || []).length; }))
+      + '<label for="saKwFeld">… von Feld:</label>' + wahl('saKwFeld', kv.feld || '', (s.felder || []).map(function (x) { return [x.id, x.name]; }))
+      + ((s.werte || []).length ? '<label for="saKwWert">… fester Wert:</label>' + wahl('saKwWert', kv.wert || '', s.werte.map(function (x) { return [x.id, x.name]; })) : '')
+      + '<label for="saKwZr">Zeitraum:</label>' + wahl('saKwZr', kv.zeitraum || '', SA_ZEITRAEUME)
+      + '<p class="leise">Der Zeitraum richtet sich nach dem ersten Datumsfeld, ohne Datumsfeld nach dem Anlegen.</p>'
+      + saKnoepfe('<button type="button" class="knopf voll" onclick="saKopfSpeichern()">OK</button>' + abbrechen
+        + (kw ? '<button type="button" class="knopf" onclick="saKopfLoeschen()">Löschen</button>' : ''));
+  }
+
   if (f.modus === 'feld-loeschen') {
     var fl = saFeld(s, f.id);
     return kopf('Feld löschen') + '<p>Feld „' + esc(fl ? fl.name : '') + '“ löschen? Die Werte darin sind dann nicht mehr zu sehen.</p>'
@@ -7252,6 +7401,7 @@ function saAusVorlage(v, name, alsVorlage, saetze) {
             kontext: (cl.filter === 'beruflich' || cl.filter === 'privat') ? cl.filter : (v.kontext || 'privat'),
             felder: saKopie(v.felder || []), rollen: saKopie(v.rollen || {}), filter: saKopie(v.filter || []),
             gruppe: v.gruppe || '', gruppenAn: !!v.gruppenAn, sort: saKopie(v.sort || {}), werte: saKopie(v.werte || []),
+            kopfwerte: saKopie(v.kopfwerte || []),
             ordnung: saNaechsterRang(), geaendert: jetzt() };
   if (alsVorlage) { s.saetze = saKopie(saetze || []); }
   DB.sammlungen.push(s);

@@ -2302,6 +2302,68 @@ function datumTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   41. Kopfwerte und fester Kopf (0.14)
+   Grund: Bei vielen Einträgen rutschten Werte und Überschrift aus dem
+   Bild. Jetzt stehen bis zu 4 Kopfwerte und die Spaltenüberschrift fest,
+   nur die Einträge scrollen.
+   Erkennt: Kopf nicht mehr fest (sticky), Überschrift und Spalten nicht
+   bündig, falscher Zeitraum, mehr als 4 Kopfwerte.
+   ============================================================ */
+function kopfTest() {
+  console.log('\n41. Kopfwerte und fester Kopf (0.14)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  pruefe(/\.sa-fest\{position:sticky;top:-6px/.test(css), 'der Kopf steht fest (sticky im Inhaltsbereich)');
+  const heute = S.isoDatum();
+  const g = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Gewicht', false, []);
+  g.felder = [{ id: 'dat', name: 'Datum', typ: 'datum', spalte: true }, { id: 'kg', name: 'kg', typ: 'zahl', spalte: true }];
+  g.werte = [{ id: 'w1', name: 'Ziel', wert: 82, einheit: 'kg' }];
+  [[0, 84], [-3, 85], [-10, 86], [-40, 90]].forEach((x, i) => S.DB.datensaetze.push({ id: 'd' + i, sammlung: g.id, werte: { dat: S.tagePlus(heute, x[0]), kg: x[1] }, angelegt: 10 - i, geaendert: 1 }));
+  pruefe(S.saZeitraumListe(g, '').length === 4 && S.saZeitraumListe(g, '7').length === 2 && S.saZeitraumListe(g, '30').length === 3, 'Zeiträume: alle 4, letzte 7 Tage 2, letzte 30 Tage 3');
+  pruefe(S.saKopfwertText(g, { art: 'schnitt', feld: 'kg', zeitraum: '30' }) === '85,0' && S.saKopfwertText(g, { art: 'schnitt', feld: 'kg' }) === '86,3',
+    'Ø über den Zeitraum — und über alle');
+  pruefe(S.saKopfwertText(g, { art: 'letzter', feld: 'kg' }) === '84' && S.saKopfwertText(g, { art: 'wert', wert: 'w1', zeitraum: '7' }) === '82 kg', 'letzter Wert; fester Wert ohne Zeitraum');
+  pruefe(S.saKopfwertName(g, { art: 'schnitt', feld: 'kg', zeitraum: '30' }) === 'Ø kg · letzte 30 Tage' && S.saKopfwertName(g, { name: 'aktuell', art: 'letzter', feld: 'kg' }) === 'aktuell',
+    'Bezeichnung automatisch oder eigene');
+
+  /* Fenster */
+  S.cl.app = 'sammlungen'; S.cl.sa.id = g.id; S.cl.sa.ansicht = 'kopf'; S.zeichne();
+  pruefe(S.document.getElementById('reiter').textContent === 'Kopfwerte' && /saKopfOeffnen\(-1\)">\+ Kopfwert/.test(S.document.getElementById('fuss').innerHTML), 'Ansicht Kopfwerte mit „+ Kopfwert“');
+  const feld = (id, v) => { S.document.getElementById(id).value = v; };
+  for (let i = 0; i < 5; i++) {
+    S.saKopfOeffnen(-1);
+    feld('saKwName', 'K' + i); feld('saKwArt', 'letzter'); feld('saKwFeld', 'kg'); feld('saKwWert', 'w1'); feld('saKwZr', '');
+    S.saKopfSpeichern();
+  }
+  pruefe(g.kopfwerte.length === 4 && g.kopfwerte[3].name === 'K3', 'höchstens vier Kopfwerte');
+  S.zeichne();
+  pruefe(/saKopfOeffnen\(-1\)" disabled>\+ Kopfwert/.test(S.document.getElementById('fuss').innerHTML), 'bei vier ist „+ Kopfwert“ gesperrt');
+  S.saKopfOeffnen(0);
+  feld('saKwName', ''); feld('saKwArt', 'schnitt'); feld('saKwFeld', 'kg'); feld('saKwZr', '30');
+  S.saKopfSpeichern();
+  pruefe(g.kopfwerte[0].art === 'schnitt' && g.kopfwerte[0].zeitraum === '30' && !g.kopfwerte[0].name, 'Kopfwert ändern');
+  S.saKopfSchieben(0, 1);
+  pruefe(g.kopfwerte[1].art === 'schnitt', 'Reihenfolge ändern');
+  S.saKopfOeffnen(3); S.saKopfLoeschen();
+  pruefe(g.kopfwerte.length === 3, 'Kopfwert löschen');
+
+  /* Tabelle: fester Kopf und bündige Spalten */
+  S.saAnsicht('tabelle');
+  const h = inhalt();
+  pruefe(/^<div class="sa-fest"><div class="sa-kw">/.test(h) && /<small>Ø kg · letzte 30 Tage<\/small><b>85,0<\/b>/.test(h), 'Kacheln oben im festen Kopf');
+  pruefe(/<table class="sa-tab sa-dat sa-kopf"><tr><th class="">Datum<\/th><th class="r">kg<\/th><\/tr><\/table><\/div><table class="sa-tab sa-dat">/.test(h),
+    'Überschrift im festen Kopf, Einträge in einer zweiten Tabelle mit gleichen Spalten');
+  const k = S.saAusVorlage(g, 'Kopie', true, []);
+  pruefe(k.kopfwerte.length === 3 && k.kopfwerte !== g.kopfwerte, 'Kopie und Vorlage übernehmen die Kopfwerte');
+  S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
+  pruefe(/menueWahl\('saKopf'\)">Kopfwerte…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü: Kopfwerte…');
+  S.cl.aufklapp = ''; S.cl.sa.id = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2339,6 +2401,7 @@ function datumTest() {
   memoZweiTest();
   try { memoRuhtTest(); } catch (e) { fail('Ruhende im Memo warf: ' + e.message); }
   try { datumTest(); } catch (e) { fail('Datumswerte warf: ' + e.message); }
+  try { kopfTest(); } catch (e) { fail('Kopfwerte warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
