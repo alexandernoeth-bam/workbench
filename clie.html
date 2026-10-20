@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.20.0</title>
+<title>CLIE 0.22.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -321,6 +321,25 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sch-umw button{border:2px solid var(--px);padding:4px;background:var(--lcd)}
 .sch-umw svg{width:40px;height:40px;display:block}
 .sto-fenster .wahlreihe{margin-bottom:4px}
+/* Schach: Bereiche, Partien, Schule, Eröffnungen (seit 0.22) */
+.sch-f.feldmarke{box-shadow:inset 0 0 0 3px var(--px),inset 0 0 0 5px var(--lcd-hell),inset 0 0 0 8px var(--px)}
+.sch-hinweis{background:var(--px);color:var(--lcd);padding:5px 8px;margin:6px 0;font-size:17px;line-height:1.3}
+.sch-hinweis.gut{background:var(--lcd-hell);color:var(--px);border:2px solid var(--px)}
+.sch-erkl{border:2px solid var(--px);background:var(--lcd-hell);padding:6px 8px;margin:6px 0;font-size:17px;line-height:1.35}
+.sch-nav{display:flex;justify-content:center;align-items:center;gap:10px;margin:6px 0}
+.sch-nav button{border:2px solid var(--px);border-radius:50%;width:44px;height:44px;font-size:20px;background:var(--lcd-hell);display:flex;align-items:center;justify-content:center}
+.sch-zeile{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 0;border-bottom:2px dotted var(--px-zart)}
+.sch-zeile small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.sch-zeile b{font-weight:600;white-space:nowrap}
+.sch-balken{flex:0 0 72px;height:12px;border:2px solid var(--px);position:relative}
+.sch-balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
+.sch-kapitel-titel{font-weight:600;border-bottom:2px solid var(--px);margin:2px 0 6px;font-size:18px}
+.sch-gruppe{font-weight:600;border-bottom:2px solid var(--px);margin:10px 0 2px;font-size:16px}
+.sch-aufg-liste,.sch-optionen{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sch-optionen .knopf{white-space:normal;text-align:left;border-radius:8px}
+.knopf.falsch{text-decoration:line-through}
+.sch-zk{padding:0 2px}
+.sch-analyse{margin:4px 0}
 /* Stones (seit 0.18) */
 .sto-spiel{display:flex;gap:10px;justify-content:center;--z:min(calc((min(100vw,480px) - 150px) / 10),calc((100vh - 360px) / 18),30px)}
 .sto-feld{display:grid;grid-template-columns:repeat(10,var(--z));grid-template-rows:repeat(18,var(--z));gap:1px;border:2px solid var(--px);padding:2px;background:var(--lcd-hell);touch-action:none;flex:0 0 auto}
@@ -496,7 +515,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.20.0';
+var APP_VERSION = '0.22.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3621,6 +3640,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
       + (cl.app === 'schach' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'schNeu\')">Neue Partie…</button>'
+          + '<button type="button" onclick="menueWahl(\'schSpeichern\')">Partie speichern…</button>'
           + '<button type="button" onclick="menueWahl(\'schDrehen\')">Brett drehen</button>' : '')
       + (cl.app === 'stones' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'stoNeu\')">Neues Spiel</button>'
@@ -3727,6 +3747,7 @@ function menueWahl(was) {
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   if (was === 'stoNeu') { stoNeuesSpiel(); return; }
   if (was === 'schNeu') { aufklappZeichnen(); schNeuOeffnen(); return; }
+  if (was === 'schSpeichern') { aufklappZeichnen(); schSpeichernOeffnen(); return; }
   if (was === 'schDrehen') { aufklappZeichnen(); schDrehen(); return; }
   if (was === 'stoListe') { stoListeZeigen(); return; }
   aufklappZeichnen();
@@ -9292,18 +9313,28 @@ function schKiZug(p, stufe, zufall) {
 
 /* ---- Partie ---- */
 
+/* Seit 0.22: vier Bereiche — Spielen, Partien, Schule, Eröffnungen.
+   Gespeicherte Partien und der Lernstand bleiben nur auf dem Gerät. */
+var SCH_PARTIEN_KEY = 'clie-schach-partien';
+var SCH_SCHULE_KEY = 'clie-schach-schule';
+var SCH_BEREICHE = [['spielen', 'Spielen'], ['partien', 'Partien'], ['schule', 'Schule'], ['eroeffnungen', 'Eröffnungen']];
+var SCH_ENGLISCH = { K: 'K', D: 'Q', T: 'R', L: 'B', S: 'N' };
+
 cl.sch = { p: null, zuege: [], schluessel: [], geschlagen: [], wahl: -1, gegner: 'clie', stufe: 'mittel', farbe: 'w',
-           dreh: false, ende: '', fenster: '', umw: null, denkt: false, letzt: null, neu: { gegner: 'clie', stufe: 'mittel', farbe: 'w' } };
+           dreh: false, ende: '', fenster: '', umw: null, denkt: false, letzt: null, neu: { gegner: 'clie', stufe: 'mittel', farbe: 'w' },
+           bereich: 'spielen', tipp: '', pv: { id: '', k: 0, laeuft: false, stand: 0 },
+           sv: { kapitel: '', lektion: '', schritt: 0, aufgabe: -1 }, ev: { id: '', k: 0 }, ue: null };
 
 /* Baut die Partie aus der Zugliste neu auf — für Laden und Zurücknehmen */
-function schAufbauen(liste) {
-  var p = schAusFen(SCH_START);
+function schAufbauen(liste, startFen) {
+  var p = schAusFen(startFen || SCH_START);
   cl.sch.p = p;
   cl.sch.zuege = [];
   cl.sch.schluessel = [schSchluessel(p)];
   cl.sch.geschlagen = [];
   cl.sch.letzt = null;
   cl.sch.ende = '';
+  cl.sch.tipp = '';
   (liste || []).every(function (z) {
     var m = null;
     schZuege(p).forEach(function (x) { if (x.f === z.f && x.t === z.t && (x.pr || '') === (z.pr || '')) { m = x; } });
@@ -9322,6 +9353,7 @@ function schZugAusfuehren(m, still) {
   cl.sch.schluessel.push(schSchluessel(p));
   cl.sch.letzt = [m.f, m.t];
   cl.sch.wahl = -1;
+  cl.sch.tipp = '';
   cl.sch.ende = schEndeText();
   if (!still) {
     schSichern();
@@ -9329,16 +9361,17 @@ function schZugAusfuehren(m, still) {
   }
 }
 
-/* Spielende? Text oder '' */
-function schEndeText() {
-  var p = cl.sch.p;
+/* Spielende? Text oder '' — für die Partie oder eine Übungsstellung */
+function schEndeText(p, schluessel) {
+  p = p || cl.sch.p;
+  schluessel = schluessel || cl.sch.schluessel;
   if (!schZuege(p).length) {
     if (schImSchach(p)) { return 'Schachmatt — ' + (p.w ? 'Schwarz' : 'Weiß') + ' gewinnt.'; }
     return 'Patt — remis.';
   }
   if (p.hm >= 100) { return 'Remis (50-Züge-Regel).'; }
-  var k = cl.sch.schluessel[cl.sch.schluessel.length - 1];
-  if (cl.sch.schluessel.filter(function (x) { return x === k; }).length >= 3) { return 'Remis (dreifache Wiederholung).'; }
+  var k = schluessel[schluessel.length - 1];
+  if (schluessel.filter(function (x) { return x === k; }).length >= 3) { return 'Remis (dreifache Wiederholung).'; }
   if (schZuWenig(p)) { return 'Remis (zu wenig Material).'; }
   return '';
 }
@@ -9384,17 +9417,83 @@ function schClieAmZug() {
   return cl.sch.gegner === 'clie' && !cl.sch.ende && (cl.sch.p.w ? 'w' : 'b') !== cl.sch.farbe;
 }
 
-/* CLIE zieht — kurz verzögert, damit „CLIE denkt …“ zu sehen ist */
+/* ---- Eröffnungsbuch (seit 0.22) ---- */
+
+/* Züge eines Buchs als Liste: „e4 e5 Sf3“ → ['e4','e5','Sf3'] */
+function schBuchListe(e) {
+  return String(e.zuege || '').split(/\s+/).filter(function (x) { return !!x; });
+}
+
+function schOhneZeichen(k) {
+  return String(k || '').replace(/[+#!?]+$/g, '');
+}
+
+/* Welche Eröffnung steht auf dem Brett? Die längste gemeinsame Zugfolge zählt (mind. 2 Halbzüge). */
+function schBuchName(kurzListe) {
+  var best = null;
+  var bestN = 1;
+  (typeof SCH_EROEFFNUNGEN !== 'undefined' ? SCH_EROEFFNUNGEN : []).forEach(function (e) {
+    var l = schBuchListe(e);
+    var n = 0;
+    while (n < l.length && n < kurzListe.length && schOhneZeichen(l[n]) === schOhneZeichen(kurzListe[n])) { n++; }
+    if (n > bestN && (n === kurzListe.length || n === l.length)) { best = e; bestN = n; }
+  });
+  return best ? best.name : '';
+}
+
+/* Buchzüge, die auf die bisherige Folge passen */
+function schBuchFortsetzungen(kurzListe) {
+  var aus = [];
+  (typeof SCH_EROEFFNUNGEN !== 'undefined' ? SCH_EROEFFNUNGEN : []).forEach(function (e) {
+    var l = schBuchListe(e);
+    if (l.length <= kurzListe.length) { return; }
+    var i;
+    for (i = 0; i < kurzListe.length; i++) { if (schOhneZeichen(l[i]) !== schOhneZeichen(kurzListe[i])) { return; } }
+    if (aus.indexOf(l[kurzListe.length]) < 0) { aus.push(l[kurzListe.length]); }
+  });
+  return aus;
+}
+
+/* Zug aus Kurzschrift (deutsch) in einer Stellung finden */
+function schAusKurz(p, kurz) {
+  var ziel = schOhneZeichen(kurz);
+  var m = null;
+  schZuege(p).forEach(function (x) { if (!m && schOhneZeichen(schKurz(p, x)) === ziel) { m = x; } });
+  return m;
+}
+
+/* CLIE zieht — kurz verzögert, damit „CLIE denkt …“ zu sehen ist.
+   Am Anfang spielt CLIE abwechselnd verschiedene Buchzüge. */
 function schClieZiehen() {
   if (!schClieAmZug() || cl.sch.denkt) { return; }
   cl.sch.denkt = true;
   schZeichnen();
   setTimeout(function () {
-    var m = schClieAmZug() ? schKiZug(cl.sch.p, cl.sch.stufe) : null;
+    var m = schClieAmZug() ? schClieWahl() : null;
     cl.sch.denkt = false;
     if (m) { schZugAusfuehren(m, false); }
     schZeichnen();
   }, 60);
+}
+
+function schClieWahl() {
+  var buch = schBuchFortsetzungen(cl.sch.zuege.map(function (z) { return z.kurz; }));
+  if (buch.length && cl.sch.stufe !== 'leicht') {
+    var m = schAusKurz(cl.sch.p, buch[Math.floor(Math.random() * buch.length)]);
+    if (m) { return m; }
+  }
+  return schKiZug(cl.sch.p, cl.sch.stufe);
+}
+
+/* „Tipp“: welchen Zug CLIE an deiner Stelle spielen würde */
+function schTippZeigen() {
+  var s = cl.sch;
+  if (!s.p || s.ende || s.denkt || schClieAmZug()) { return; }
+  var m = schKiZug(s.p, 'stark', 0);
+  if (!m) { return; }
+  s.tipp = 'Tipp: CLIE würde ' + schKurz(s.p, m) + ' spielen.';
+  s.wahl = m.f;
+  schZeichnen();
 }
 
 /* Tipp auf ein Feld (in Brett-Koordinaten) */
@@ -9405,7 +9504,7 @@ function schTipp(i) {
   if (s.wahl >= 0) {
     var passend = schZuege(s.p).filter(function (m) { return m.f === s.wahl && m.t === i; });
     if (passend.length) {
-      if (passend.length > 1) { s.umw = { f: s.wahl, t: i }; s.fenster = 'umwandeln'; schZeichnen(); return; }
+      if (passend.length > 1) { s.umw = { f: s.wahl, t: i, wo: 'spiel' }; s.fenster = 'umwandeln'; schZeichnen(); return; }
       schZugAusfuehren(passend[0], false);
       schZeichnen();
       schClieZiehen();
@@ -9416,14 +9515,18 @@ function schTipp(i) {
   schZeichnen();
 }
 
+/* Umwandlung: für die Partie und für Übungsstellungen */
 function schUmwandeln(art) {
   var s = cl.sch;
   if (!s.umw || 'qrbn'.indexOf(art) < 0) { return; }
-  var pr = s.p.w ? art.toUpperCase() : art;
+  var ue = s.umw.wo === 'ue';
+  var p = ue ? s.ue.p : s.p;
+  var pr = p.w ? art.toUpperCase() : art;
   var m = null;
-  schZuege(s.p).forEach(function (x) { if (x.f === s.umw.f && x.t === s.umw.t && x.pr === pr) { m = x; } });
+  schZuege(p).forEach(function (x) { if (x.f === s.umw.f && x.t === s.umw.t && x.pr === pr) { m = x; } });
   s.umw = null;
   s.fenster = '';
+  if (ue) { if (m) { schUeZug(m); } schZeichnen(); return; }
   if (m) { schZugAusfuehren(m, false); }
   schZeichnen();
   schClieZiehen();
@@ -9451,6 +9554,7 @@ function schDrehen() {
 }
 
 function schNeuOeffnen() {
+  cl.sch.bereich = 'spielen';
   cl.sch.neu = { gegner: cl.sch.gegner, stufe: cl.sch.stufe, farbe: cl.sch.farbe };
   cl.sch.fenster = 'neu';
   schZeichnen();
@@ -9483,6 +9587,651 @@ function schFensterZu() {
   schZeichnen();
 }
 
+/* ---- Partien speichern (seit 0.22) ---- */
+
+function schPartienLesen() {
+  var l = [];
+  try { l = JSON.parse(window.localStorage.getItem(SCH_PARTIEN_KEY) || '[]'); } catch (e) { l = []; }
+  return Array.isArray(l) ? l.filter(function (x) { return x && x.id && Array.isArray(x.zuege); }) : [];
+}
+
+function schPartienSchreiben(l) {
+  try { window.localStorage.setItem(SCH_PARTIEN_KEY, JSON.stringify(l)); } catch (e) { melde('Speichern ging nicht — Speicher voll?', 'warn'); }
+}
+
+function schPartieFinden(id) {
+  return schPartienLesen().filter(function (x) { return x.id === id; })[0] || null;
+}
+
+/* Ergebnis wie in PGN: 1-0, 0-1, 1/2-1/2 oder * (läuft) */
+function schErgebnis(ende) {
+  if (!ende) { return '*'; }
+  if (/Weiß gewinnt/.test(ende)) { return '1-0'; }
+  if (/Schwarz gewinnt/.test(ende)) { return '0-1'; }
+  return '1/2-1/2';
+}
+
+function schErgebnisText(e) {
+  return e === '1/2-1/2' ? '½–½' : (e === '*' ? 'läuft' : e.replace('-', '–'));
+}
+
+function schStandardName() {
+  var s = cl.sch;
+  return s.gegner === 'zwei' ? '2 Spieler' : 'Gegen CLIE (' + schKopfStufe() + ')';
+}
+
+function schSpeichernOeffnen() {
+  if (!cl.sch.p) { schLaden(); }
+  if (!cl.sch.zuege.length) { melde('Noch kein Zug — nichts zu speichern.', null); return; }
+  cl.sch.bereich = 'spielen';
+  cl.sch.fenster = 'speichern';
+  schZeichnen();
+}
+
+function schSpeichernOk() {
+  var s = cl.sch;
+  var feld = document.getElementById('schName');
+  var name = String((feld && feld.value) || '').trim() || schStandardName();
+  var l = schPartienLesen();
+  l.unshift({ id: neueKennung(), name: name.slice(0, 80), datum: isoDatum(), gegner: s.gegner, stufe: s.stufe, farbe: s.farbe,
+              zuege: s.zuege.map(function (z) { return { f: z.f, t: z.t, pr: z.pr }; }), kurz: s.zuege.map(function (z) { return z.kurz; }),
+              ergebnis: schErgebnis(s.ende), eroeffnung: schBuchName(s.zuege.map(function (z) { return z.kurz; })), analyse: null });
+  schPartienSchreiben(l.slice(0, 200));
+  s.fenster = s.ende ? 'ansehen' : '';
+  melde('Partie gespeichert: „' + name + '“', 'gut');
+  schZeichnen();
+}
+
+/* Eine Partie bis zum Halbzug k nachgestellt: Stellung, letzter Zug */
+function schNachStellung(partie, k) {
+  var p = schAusFen(SCH_START);
+  var letzt = null;
+  partie.zuege.slice(0, k).every(function (z) {
+    var m = null;
+    schZuege(p).forEach(function (x) { if (x.f === z.f && x.t === z.t && (x.pr || '') === (z.pr || '')) { m = x; } });
+    if (!m) { return false; }
+    schMachen(p, m);
+    letzt = [m.f, m.t];
+    return true;
+  });
+  return { p: p, letzt: letzt };
+}
+
+function schPartieOeffnen(id) {
+  cl.sch.pv = { id: id, k: 0, laeuft: false, stand: 0 };
+  schZeichnen();
+}
+
+function schNachGehe(k) {
+  var partie = schPartieFinden(cl.sch.pv.id);
+  if (!partie) { return; }
+  cl.sch.pv.k = Math.max(0, Math.min(partie.zuege.length, k));
+  schZeichnen();
+}
+
+function schNachSchritt(d) {
+  if (d === -99) { schNachGehe(0); return; }
+  if (d === 99) { schNachGehe(1e6); return; }
+  schNachGehe(cl.sch.pv.k + d);
+}
+
+/* „Ab hier spielen“: die Partie bis zum gezeigten Zug wird die laufende Partie */
+function schAbHier() {
+  var partie = schPartieFinden(cl.sch.pv.id);
+  if (!partie) { return; }
+  cl.sch.gegner = partie.gegner === 'zwei' ? 'zwei' : 'clie';
+  cl.sch.stufe = partie.stufe || 'mittel';
+  cl.sch.farbe = partie.farbe === 'b' ? 'b' : 'w';
+  cl.sch.dreh = false;
+  schAufbauen(partie.zuege.slice(0, cl.sch.pv.k));
+  schSichern();
+  cl.sch.bereich = 'spielen';
+  cl.sch.pv.id = '';
+  kopfZeichnen();
+  schZeichnen();
+  schClieZiehen();
+}
+
+function schMehrOeffnen() {
+  cl.sch.fenster = 'mehr';
+  schZeichnen();
+}
+
+function schUmbenennen() {
+  var feld = document.getElementById('schName');
+  var name = String((feld && feld.value) || '').trim();
+  if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  var l = schPartienLesen();
+  l.forEach(function (x) { if (x.id === cl.sch.pv.id) { x.name = name.slice(0, 80); } });
+  schPartienSchreiben(l);
+  cl.sch.fenster = '';
+  schZeichnen();
+}
+
+function schPartieLoeschen() {
+  schPartienSchreiben(schPartienLesen().filter(function (x) { return x.id !== cl.sch.pv.id; }));
+  cl.sch.fenster = '';
+  cl.sch.pv.id = '';
+  melde('Partie gelöscht.', null);
+  schZeichnen();
+}
+
+/* PGN — das Austauschformat, mit englischen Figurenbuchstaben */
+function schPgn(partie) {
+  var eng = function (k) { return String(k).replace(/^[KDTLS]/, function (b) { return SCH_ENGLISCH[b]; }).replace(/=([DTLS])/, function (g, b) { return '=' + SCH_ENGLISCH[b]; }); };
+  var ich = partie.gegner === 'zwei' ? 'Spieler' : 'Ich';
+  var clie = 'CLIE (' + (partie.stufe || 'mittel') + ')';
+  var weiss = partie.gegner === 'zwei' ? 'Weiß' : (partie.farbe === 'b' ? clie : ich);
+  var schwarz = partie.gegner === 'zwei' ? 'Schwarz' : (partie.farbe === 'b' ? ich : clie);
+  var kopf = '[Event "' + partie.name.replace(/"/g, "'") + '"]\n[Site "CLIE"]\n[Date "' + String(partie.datum || '').replace(/-/g, '.') + '"]\n'
+    + '[White "' + weiss + '"]\n[Black "' + schwarz + '"]\n[Result "' + partie.ergebnis + '"]\n\n';
+  var t = '';
+  (partie.kurz || []).forEach(function (k, i) { t += (i % 2 === 0 ? (i / 2 + 1) + '. ' : '') + eng(k) + ' '; });
+  return kopf + t + partie.ergebnis + '\n';
+}
+
+function schPgnTeilen() {
+  var partie = schPartieFinden(cl.sch.pv.id);
+  if (!partie) { return; }
+  var text = schPgn(partie);
+  var name = 'clie-partie-' + partie.datum + '.pgn';
+  cl.sch.fenster = '';
+  if (window.navigator && typeof window.navigator.share === 'function') {
+    window.navigator.share({ title: partie.name, text: text }).catch(function () { dateiAnbieten(name, text); });
+  } else if (dateiAnbieten(name, text)) { melde('PGN bereitgestellt: ' + name, 'gut'); }
+  schZeichnen();
+}
+
+/* ---- Fehleranalyse (seit 0.22) ---- */
+
+/* Wie viel kostet Zug m gegenüber dem besten Zug? (Bauerneinheiten × 100, aus Sicht des Ziehenden) */
+function schAnalyseZug(p, m) {
+  var ki = { knoten: 0, ruhe: true };
+  var best = -1000000;
+  var bester = null;
+  var gespielt = null;
+  schOrdnen(p, schZuege(p)).forEach(function (x) {
+    var u = schMachen(p, x);
+    var w = -schSuche(p, 1, -1000000, 1000000, ki, 1);
+    schZurueck(p, x, u);
+    if (w > best) { best = w; bester = x; }
+    if (x.f === m.f && x.t === m.t && (x.pr || '') === (m.pr || '')) { gespielt = w; }
+  });
+  if (gespielt === null) { return null; }
+  return { verlust: Math.max(0, best - gespielt), besser: bester ? schKurz(p, bester) : '' };
+}
+
+function schFen(p) {
+  var t = '';
+  var r;
+  for (r = 0; r < 8; r++) {
+    var leer = 0;
+    var c;
+    for (c = 0; c < 8; c++) {
+      var f = p.b[r * 8 + c];
+      if (f === '') { leer++; } else { t += (leer ? String(leer) : '') + f; leer = 0; }
+    }
+    t += (leer ? String(leer) : '') + (r < 7 ? '/' : '');
+  }
+  return t + ' ' + (p.w ? 'w' : 'b') + ' ' + (p.cr || '-') + ' ' + (p.ep >= 0 ? schFeldName(p.ep) : '-') + ' ' + p.hm + ' ' + p.fm;
+}
+
+/* Prüft eine Partie Zug für Zug — in kleinen Schritten, damit die Anzeige mitkommt */
+function schAnalysieren() {
+  var partie = schPartieFinden(cl.sch.pv.id);
+  if (!partie || cl.sch.pv.laeuft) { return; }
+  cl.sch.pv.laeuft = true;
+  cl.sch.pv.stand = 0;
+  var funde = [];
+  var p = schAusFen(SCH_START);
+  var i = 0;
+  var schritt = function () {
+    if (i >= partie.zuege.length || cl.sch.pv.id !== partie.id) {
+      schAnalyseFertig(partie.id, funde);
+      return;
+    }
+    var z = partie.zuege[i];
+    var m = null;
+    schZuege(p).forEach(function (x) { if (x.f === z.f && x.t === z.t && (x.pr || '') === (z.pr || '')) { m = x; } });
+    if (!m) { i = partie.zuege.length; setTimeout(schritt, 0); return; }
+    var meins = partie.gegner === 'zwei' || (p.w ? 'w' : 'b') === partie.farbe;
+    if (meins) {
+      var a = schAnalyseZug(p, m);
+      if (a && a.verlust >= 100) {
+        funde.push({ ply: i, kurz: schKurz(p, m), besser: a.besser, verlust: a.verlust, fen: schFen(p) });
+      }
+    }
+    schMachen(p, m);
+    i++;
+    cl.sch.pv.stand = i;
+    if (cl.app === 'schach') { inhaltZeichnen(); }
+    setTimeout(schritt, 0);
+  };
+  schZeichnen();
+  setTimeout(schritt, 30);
+}
+
+function schAnalyseFertig(id, funde) {
+  var l = schPartienLesen();
+  l.forEach(function (x) { if (x.id === id) { x.analyse = funde; } });
+  schPartienSchreiben(l);
+  cl.sch.pv.laeuft = false;
+  schZeichnen();
+}
+
+/* ---- Lernstand (Schule, Eröffnungen) ---- */
+
+function schStand() {
+  var s = null;
+  try { s = JSON.parse(window.localStorage.getItem(SCH_SCHULE_KEY) || 'null'); } catch (e) { s = null; }
+  s = (s && typeof s === 'object') ? s : {};
+  if (!s.a) { s.a = {}; }
+  if (!s.l) { s.l = {}; }
+  if (!s.e) { s.e = {}; }
+  return s;
+}
+
+function schStandMerken(feld, id) {
+  var s = schStand();
+  s[feld][id] = 1;
+  try { window.localStorage.setItem(SCH_SCHULE_KEY, JSON.stringify(s)); } catch (e) { /* nur für jetzt */ }
+}
+
+/* Kapitel 7: Fehler aus eigenen (analysierten) Partien als Aufgaben */
+function schEigeneAufgaben() {
+  var aus = [];
+  schPartienLesen().forEach(function (pt) {
+    (pt.analyse || []).forEach(function (f) {
+      aus.push({ id: 'eigen-' + pt.id + '-' + f.ply, typ: 'beste', fen: f.fen, besser: f.besser,
+                 frage: 'Aus „' + pt.name + '“: Du spieltest ' + f.kurz + (f.verlust >= 300 ? '??' : '?') + ' — finde einen besseren Zug.' });
+    });
+  });
+  return aus.slice(0, 60);
+}
+
+function schKapitelListe() {
+  var l = (typeof SCH_SCHULE !== 'undefined' ? SCH_SCHULE : []).slice();
+  var eigen = schEigeneAufgaben();
+  l.push({ id: 'k7', titel: 'Aus eigenen Partien lernen',
+           lektionen: [{ id: 'eigen', titel: 'Deine Fehler', schritte: [{ fen: SCH_START.split(' ')[0] + ' w - - 0 1',
+             text: 'Gespeicherte Partien lassen sich unter „Partien“ analysieren. Jeder Fehler (?) und grobe Fehler (??) landet hier als Aufgabe: Finde einen besseren Zug.' }],
+             aufgaben: eigen }] });
+  return l;
+}
+
+function schKapitelFinden(id) {
+  return schKapitelListe().filter(function (k) { return k.id === id; })[0] || null;
+}
+
+function schLektionFinden(id) {
+  var aus = null;
+  schKapitelListe().forEach(function (k) { k.lektionen.forEach(function (l) { if (l.id === id) { aus = l; } }); });
+  return aus;
+}
+
+function schLektionenAlle() {
+  var l = [];
+  (typeof SCH_SCHULE !== 'undefined' ? SCH_SCHULE : []).forEach(function (k) { l = l.concat(k.lektionen); });
+  return l;
+}
+
+/* Fertig = alle Aufgaben gelöst (Lektionen ohne Aufgaben: gelesen) */
+function schLektionFertig(l, st) {
+  if (!l.aufgaben || !l.aufgaben.length) { return !!st.l[l.id]; }
+  return l.aufgaben.every(function (a) { return !!st.a[a.id]; });
+}
+
+function schWeiterlernen() {
+  var st = schStand();
+  var offen = schLektionenAlle().filter(function (l) { return !schLektionFertig(l, st); })[0];
+  if (!offen) { melde('Alle Lektionen sind erledigt — stark!', 'gut'); return; }
+  var kap = '';
+  (SCH_SCHULE || []).forEach(function (k) { if (k.lektionen.indexOf(offen) >= 0) { kap = k.id; } });
+  cl.sch.sv = { kapitel: kap, lektion: offen.id, schritt: 0, aufgabe: -1 };
+  cl.sch.ue = null;
+  schZeichnen();
+}
+
+function schKapitelOeffnen(id) {
+  cl.sch.sv = { kapitel: id, lektion: '', schritt: 0, aufgabe: -1 };
+  schZeichnen();
+}
+
+function schLektionOeffnen(id) {
+  cl.sch.sv.lektion = id;
+  cl.sch.sv.schritt = 0;
+  cl.sch.sv.aufgabe = -1;
+  cl.sch.ue = null;
+  schZeichnen();
+}
+
+function schSchrittGehe(d) {
+  var l = schLektionFinden(cl.sch.sv.lektion);
+  if (!l) { return; }
+  cl.sch.sv.schritt = Math.max(0, Math.min(l.schritte.length - 1, cl.sch.sv.schritt + d));
+  if (cl.sch.sv.schritt === l.schritte.length - 1) { schStandMerken('l', l.id); }
+  schZeichnen();
+}
+
+/* ---- Übungsbrett: Aufgaben, Endspiele, Eröffnungen üben ---- */
+
+function schAufgabeOeffnen(n) {
+  var l = schLektionFinden(cl.sch.sv.lektion);
+  if (!l || !l.aufgaben || n < 0 || n >= l.aufgaben.length) { return; }
+  schStandMerken('l', l.id);
+  cl.sch.sv.aufgabe = n;
+  schUeStart(l.aufgaben[n], 'aufgabe');
+  schZeichnen();
+}
+
+/* Stellung einer Aufgabe: aus FEN oder aus Zügen ab der Grundstellung („vorher“) */
+function schStellungAus(a) {
+  if (!a.vorher) { return schAusFen(a.fen); }
+  var p = schAusFen(SCH_START);
+  String(a.vorher).split(/\s+/).forEach(function (k) {
+    var m = k ? schAusKurz(p, k) : null;
+    if (m) { schMachen(p, m); }
+  });
+  return p;
+}
+
+function schUeStart(a, art) {
+  var p = schStellungAus(a);
+  cl.sch.ue = { art: art, a: a, p: p, idx: 0, ich: p.w ? 'w' : 'b', meldung: '', ok: null, fehler: 0,
+                wahl: -1, letzt: null, denkt: false, verlauf: [], schl: [schSchluessel(p)], zugZahl: 0, antwort: -1 };
+}
+
+function schUeLinie() {
+  var ue = cl.sch.ue;
+  if (!ue) { return []; }
+  if (ue.art === 'ueben') { return schBuchListe(ue.a); }
+  return ue.a.loesung || [];
+}
+
+/* Tipp auf ein Feld des Übungsbretts */
+function schUeTipp(i) {
+  var ue = cl.sch.ue;
+  if (!ue || ue.ok === true || ue.denkt || cl.sch.fenster || ue.a.typ === 'frage') { return; }
+  if (ue.art === 'ueben' && (ue.p.w ? 'w' : 'b') !== ue.ich) { return; }
+  var fig = ue.p.b[i];
+  if (ue.wahl >= 0) {
+    var passend = schZuege(ue.p).filter(function (m) { return m.f === ue.wahl && m.t === i; });
+    if (passend.length) {
+      if (passend.length > 1) { cl.sch.umw = { f: ue.wahl, t: i, wo: 'ue' }; cl.sch.fenster = 'umwandeln'; schZeichnen(); return; }
+      schUeZug(passend[0]);
+      schZeichnen();
+      return;
+    }
+  }
+  ue.wahl = (fig !== '' && schWeiss(fig) === ue.p.w && ue.wahl !== i) ? i : -1;
+  schZeichnen();
+}
+
+function schUeMachen(m) {
+  var ue = cl.sch.ue;
+  var u = schMachen(ue.p, m);
+  ue.verlauf.push({ m: m, u: u });
+  ue.schl.push(schSchluessel(ue.p));
+  ue.letzt = [m.f, m.t];
+  ue.wahl = -1;
+}
+
+/* Material aus Sicht der Seite „ich“ (Bauerneinheiten × 100) */
+function schMaterial(p, ich) {
+  var s = 0;
+  p.b.forEach(function (f) {
+    if (f === '' || schArt(f) === 'k') { return; }
+    s += (schWeiss(f) === (ich === 'w') ? 1 : -1) * SCH_WERT[schArt(f)];
+  });
+  return s;
+}
+
+/* Ein Zug auf dem Übungsbrett — je nach Art geprüft */
+function schUeZug(m) {
+  var ue = cl.sch.ue;
+  var typ = ue.a.typ || 'zug';
+  var kurz = schKurz(ue.p, m);
+  if (ue.art === 'ueben' || typ === 'zug') {
+    var linie = schUeLinie();
+    var soll = linie[ue.idx];
+    var u = schMachen(ue.p, m);
+    var matt = !schZuege(ue.p).length && schImSchach(ue.p);
+    schZurueck(ue.p, m, u);
+    var richtig = soll && schOhneZeichen(kurz) === schOhneZeichen(soll);
+    /* Bei Matt-Aufgaben zählt jedes Matt im letzten Zug */
+    if (!richtig && matt && ue.a.matt && ue.idx === linie.length - 1) { richtig = true; }
+    if (!richtig) {
+      ue.fehler++;
+      ue.ok = false;
+      ue.wahl = -1;
+      ue.meldung = 'Nicht ganz. ' + schUeWiderlegung(m, kurz);
+      if (ue.art === 'ueben') { ue.meldung = 'Hier spielt man ' + soll + '. ' + (schUebenErkl(ue.a, ue.idx + 1) || 'Nochmal?'); }
+      return;
+    }
+    schUeMachen(m);
+    ue.idx++;
+    var meinPly = ue.idx;
+    ue.ok = null;
+    ue.meldung = '';
+    if (ue.idx >= linie.length) { schUeGeloest(); return; }
+    /* Antwort des Gegners aus der Lösung */
+    var gegen = schAusKurz(ue.p, linie[ue.idx]);
+    if (gegen) { schUeMachen(gegen); ue.idx++; }
+    if (ue.idx >= linie.length) { schUeGeloest(); return; }
+    if (ue.art === 'ueben') { ue.meldung = schUebenErkl(ue.a, meinPly) || schUebenErkl(ue.a, meinPly + 1) || ''; }
+    else { ue.meldung = 'Gut! Weiter …'; }
+    return;
+  }
+  if (typ === 'beste') {
+    var a = schAnalyseZug(ue.p, m);
+    if (a && a.verlust <= 30) {
+      schUeMachen(m);
+      schUeGeloest();
+      ue.meldung = 'Richtig! ' + kurz + ' ist gut' + (schOhneZeichen(a.besser) === schOhneZeichen(kurz) ? '.' : ' (CLIE hätte ' + a.besser + ' gespielt).')
+        + (typeof ue.a.erkl === 'string' ? ' ' + ue.a.erkl : '');
+    } else {
+      ue.fehler++;
+      ue.ok = false;
+      ue.meldung = 'Nicht ganz — ' + kurz + ' kostet etwa ' + (Math.round((a ? a.verlust : 0) / 10) / 10).toString().replace('.', ',') + ' Bauern. Nochmal?';
+    }
+    return;
+  }
+  if (typ === 'endspiel') {
+    schUeMachen(m);
+    ue.zugZahl++;
+    if (schUeEndspielPruefen()) { return; }
+    ue.denkt = true;
+    ue.meldung = 'CLIE denkt …';
+    setTimeout(schUeClieZug, 60);
+  }
+}
+
+/* Endspiel: CLIE verteidigt (oder greift an) mit voller Stärke */
+function schUeClieZug() {
+  var ue = cl.sch.ue;
+  if (!ue || !ue.denkt) { return; }
+  var m = schKiZug(ue.p, 'stark', 0);
+  ue.denkt = false;
+  ue.meldung = '';
+  if (m) { schUeMachen(m); }
+  schUeEndspielPruefen();
+  if (cl.app === 'schach') { schZeichnen(); }
+}
+
+/* Ziel erreicht oder verfehlt? true = Aufgabe ist zu Ende */
+function schUeEndspielPruefen() {
+  var ue = cl.sch.ue;
+  var ziel = ue.a.ziel || 'matt';
+  var ende = schEndeText(ue.p, ue.schl);
+  var ichDran = (ue.p.w ? 'w' : 'b') === ue.ich;
+  var mat = schMaterial(ue.p, ue.ich);
+  if (/^Schachmatt/.test(ende)) {
+    if (!ichDran) { schUeGeloest(); ue.meldung = 'Matt! Geschafft in ' + ue.zugZahl + ' Zügen.'; }
+    else { ue.ok = false; ue.meldung = 'Du wurdest matt gesetzt. Neu starten?'; }
+    return true;
+  }
+  if (ende) {
+    if (ziel === 'remis') { schUeGeloest(); ue.meldung = ende + ' Ziel erreicht: Remis gehalten.'; }
+    else { ue.ok = false; ue.meldung = ende + ' Das reicht nicht — neu starten?'; }
+    return true;
+  }
+  if (ziel === 'remis' && mat <= -400) { ue.ok = false; ue.meldung = 'Zu viel Material verloren — das ist nicht mehr zu halten.'; return true; }
+  if (ziel === 'umwandeln' && ichDran && mat >= 500) { schUeGeloest(); ue.meldung = 'Umgewandelt und gesichert — gewonnen!'; return true; }
+  if (ue.a.limit && ue.zugZahl >= ue.a.limit && ichDran) {
+    if (ziel === 'remis') { schUeGeloest(); ue.meldung = ue.a.limit + ' Züge gehalten — Remis!'; }
+    else { ue.ok = false; ue.meldung = 'Mehr als ' + ue.a.limit + ' Züge — versuch es nochmal.'; }
+    return true;
+  }
+  return false;
+}
+
+/* Warum ein Zug nicht klappt: die beste Antwort des Gegners */
+function schUeWiderlegung(m, kurz) {
+  var ue = cl.sch.ue;
+  var u = schMachen(ue.p, m);
+  var antwort = schZuege(ue.p).length ? schKiZug(ue.p, 'mittel', 0) : null;
+  var text = antwort ? 'Auf ' + kurz + ' folgt ' + schKurz(ue.p, antwort) + '.' : '';
+  schZurueck(ue.p, m, u);
+  return text + ' Nochmal?';
+}
+
+function schUebenErkl(e, ply) {
+  return (e.erkl && e.erkl[String(ply)]) || '';
+}
+
+function schUeGeloest() {
+  var ue = cl.sch.ue;
+  ue.ok = true;
+  ue.wahl = -1;
+  ue.meldung = (ue.a.erkl && typeof ue.a.erkl === 'string') ? 'Richtig! ' + ue.a.erkl : 'Richtig!';
+  if (ue.art === 'ueben') {
+    ue.meldung = ue.fehler ? 'Durchgespielt mit ' + ue.fehler + ' Fehler' + (ue.fehler > 1 ? 'n' : '') + '. Nochmal ohne Fehler?' : 'Fehlerfrei durchgespielt — ★ geübt!';
+    if (!ue.fehler) { schStandMerken('e', ue.a.id); }
+    return;
+  }
+  if (ue.a.id) { schStandMerken('a', ue.a.id); }
+}
+
+/* Frage mit Auswahl */
+function schUeAntwort(n) {
+  var ue = cl.sch.ue;
+  if (!ue || ue.a.typ !== 'frage' || ue.ok === true) { return; }
+  ue.antwort = n;
+  if (n === ue.a.richtig) { schUeGeloest(); }
+  else { ue.fehler++; ue.ok = false; ue.meldung = 'Leider nicht. Nochmal?'; }
+  schZeichnen();
+}
+
+function schUeHilfe() {
+  var ue = cl.sch.ue;
+  if (!ue || ue.ok === true) { return; }
+  var typ = ue.a.typ || 'zug';
+  if (typ === 'frage') { ue.meldung = ue.a.tipp || 'Schau genau auf die markierten Felder.'; schZeichnen(); return; }
+  var m = null;
+  if (typ === 'zug' || ue.art === 'ueben') { m = schAusKurz(ue.p, schUeLinie()[ue.idx]); }
+  else { m = schKiZug(ue.p, 'stark', 0); }
+  if (m) { ue.wahl = m.f; ue.meldung = ue.a.tipp || 'Diese Figur ist dran.'; }
+  schZeichnen();
+}
+
+function schUeLoesung() {
+  var ue = cl.sch.ue;
+  if (!ue || ue.ok === true) { return; }
+  var typ = ue.a.typ || 'zug';
+  if (typ === 'frage') { ue.meldung = 'Lösung: ' + ue.a.optionen[ue.a.richtig] + '. ' + (ue.a.erkl || ''); ue.ok = false; schZeichnen(); return; }
+  if (typ === 'beste') {
+    var bm = schKiZug(ue.p, 'stark', 0);
+    ue.meldung = 'Ein guter Zug ist ' + (bm ? schKurz(ue.p, bm) : (ue.a.besser || '')) + '. ' + (typeof ue.a.erkl === 'string' ? ue.a.erkl : '');
+    schZeichnen();
+    return;
+  }
+  if (typ === 'endspiel') { ue.meldung = ue.a.erkl || ''; schZeichnen(); return; }
+  ue.meldung = 'Lösung: ' + schUeLinie().slice(ue.idx).join(' ') + '. ' + (typeof ue.a.erkl === 'string' ? ue.a.erkl : '');
+  schZeichnen();
+}
+
+/* Endspiel: Zug zurück (deiner und CLIEs Antwort) oder neu starten */
+function schUeZurueck() {
+  var ue = cl.sch.ue;
+  if (!ue || ue.denkt || !ue.verlauf.length) { return; }
+  var n = ((ue.p.w ? 'w' : 'b') === ue.ich) ? 2 : 1;
+  while (n-- > 0 && ue.verlauf.length) {
+    var v = ue.verlauf.pop();
+    schZurueck(ue.p, v.m, v.u);
+    ue.schl.pop();
+  }
+  ue.zugZahl = Math.max(0, ue.zugZahl - 1);
+  ue.ok = null;
+  ue.meldung = '';
+  ue.letzt = null;
+  schZeichnen();
+}
+
+function schUeNeu() {
+  var ue = cl.sch.ue;
+  if (!ue) { return; }
+  schUeStart(ue.a, ue.art);
+  schZeichnen();
+}
+
+function schUeWeiter() {
+  var l = schLektionFinden(cl.sch.sv.lektion);
+  if (!l) { return; }
+  if (cl.sch.sv.aufgabe + 1 < l.aufgaben.length) { schAufgabeOeffnen(cl.sch.sv.aufgabe + 1); return; }
+  cl.sch.sv.aufgabe = -1;
+  cl.sch.sv.lektion = '';
+  cl.sch.ue = null;
+  melde('Lektion „' + l.titel + '“ abgeschlossen.', 'gut');
+  schZeichnen();
+}
+
+/* ---- Eröffnungen: durchspielen und üben ---- */
+
+function schEroeffnungFinden(id) {
+  return (typeof SCH_EROEFFNUNGEN !== 'undefined' ? SCH_EROEFFNUNGEN : []).filter(function (e) { return e.id === id; })[0] || null;
+}
+
+function schEroeffnungOeffnen(id) {
+  cl.sch.ev = { id: id, k: 0 };
+  cl.sch.ue = null;
+  schZeichnen();
+}
+
+function schEroeffnungGehe(d) {
+  var e = schEroeffnungFinden(cl.sch.ev.id);
+  if (!e) { return; }
+  var n = schBuchListe(e).length;
+  cl.sch.ev.k = (d === -99) ? 0 : (d === 99 ? n : Math.max(0, Math.min(n, cl.sch.ev.k + d)));
+  schZeichnen();
+}
+
+function schEroeffnungUeben() {
+  var e = schEroeffnungFinden(cl.sch.ev.id);
+  if (!e) { return; }
+  schUeStart({ id: e.id, fen: SCH_START, zuege: e.zuege, erkl: e.erkl, typ: 'zug', name: e.name }, 'ueben');
+  cl.sch.ue.ich = e.seite === 'b' ? 'b' : 'w';
+  /* Spielst du Schwarz, zieht CLIE den ersten Buchzug */
+  if (cl.sch.ue.ich === 'b') {
+    var m = schAusKurz(cl.sch.ue.p, schBuchListe(e)[0]);
+    if (m) { schUeMachen(m); cl.sch.ue.idx = 1; }
+  }
+  schZeichnen();
+}
+
+/* Stellung nach k Buchzügen */
+function schBuchStellung(e, k) {
+  var p = schAusFen(SCH_START);
+  var letzt = null;
+  schBuchListe(e).slice(0, k).every(function (z) {
+    var m = schAusKurz(p, z);
+    if (!m) { return false; }
+    schMachen(p, m);
+    letzt = [m.f, m.t];
+    return true;
+  });
+  return { p: p, letzt: letzt };
+}
+
 /* ---- Zeichnen ---- */
 
 var schBildCache = {};
@@ -9512,33 +10261,37 @@ function schGedreht() {
   return (unten === 'b') !== cl.sch.dreh;
 }
 
-function schBrettHtml() {
-  var s = cl.sch;
-  var p = s.p;
+/* Ein Brett — für Partie, Nachspielen, Lektion und Übung.
+   o: { wahl, letzt, dreh, klick (Name der Funktion), marken: ['f1', …] } */
+function schBrettHtml(p, o) {
+  o = o || {};
   var ziele = {};
-  if (s.wahl >= 0) { schZuege(p).forEach(function (m) { if (m.f === s.wahl) { ziele[m.t] = 1; } }); }
-  var dreh = schGedreht();
+  if (o.wahl >= 0) { schZuege(p).forEach(function (m) { if (m.f === o.wahl) { ziele[m.t] = 1; } }); }
+  var marken = {};
+  (o.marken || []).forEach(function (n) { marken[n] = 1; });
   var schach = schImSchach(p) ? schKoenig(p, p.w) : -1;
   var h = '';
   var vr;
   var vc;
   for (vr = 0; vr < 8; vr++) {
-    var r = dreh ? 7 - vr : vr;
+    var r = o.dreh ? 7 - vr : vr;
     h += '<span class="sch-ko">' + (8 - r) + '</span>';
     for (vc = 0; vc < 8; vc++) {
-      var c = dreh ? 7 - vc : vc;
+      var c = o.dreh ? 7 - vc : vc;
       var i = r * 8 + c;
       var f = p.b[i];
-      var kl = 'sch-f ' + ((r + c) % 2 ? 'd' : 'h') + (s.wahl === i ? ' wahl' : '')
-             + (s.letzt && (s.letzt[0] === i || s.letzt[1] === i) ? ' letzt' : '') + (i === schach ? ' schach' : '');
-      h += '<button type="button" class="' + kl + '" onclick="schTipp(' + i + ')" aria-label="' + schFeldName(i) + '">'
-         + (ziele[i] ? (f !== '' || (schArt(p.b[s.wahl]) === 'p' && i === p.ep) ? '<span class="sch-schlag"></span>' : '<span class="sch-ziel"></span>') : '')
-         + (f ? schFigurSvg(f) : '') + '</button>';
+      var kl = 'sch-f ' + ((r + c) % 2 ? 'd' : 'h') + (o.wahl === i ? ' wahl' : '')
+             + (o.letzt && (o.letzt[0] === i || o.letzt[1] === i) ? ' letzt' : '') + (i === schach ? ' schach' : '')
+             + (marken[schFeldName(i)] ? ' feldmarke' : '');
+      h += (o.klick ? '<button type="button" class="' + kl + '" onclick="' + o.klick + '(' + i + ')"' : '<span class="' + kl + '"')
+         + ' aria-label="' + schFeldName(i) + '">'
+         + (ziele[i] ? (f !== '' || (schArt(p.b[o.wahl]) === 'p' && i === p.ep) ? '<span class="sch-schlag"></span>' : '<span class="sch-ziel"></span>') : '')
+         + (f ? schFigurSvg(f) : '') + (o.klick ? '</button>' : '</span>');
     }
   }
   h += '<span></span>';
-  for (vc = 0; vc < 8; vc++) { h += '<span class="sch-ko">' + 'abcdefgh'.charAt(dreh ? 7 - vc : vc) + '</span>'; }
-  return h;
+  for (vc = 0; vc < 8; vc++) { h += '<span class="sch-ko">' + 'abcdefgh'.charAt(o.dreh ? 7 - vc : vc) + '</span>'; }
+  return '<div class="sch-rahmen' + (o.ruht ? ' ruht' : '') + '"><div class="sch-brett">' + h + '</div></div>';
 }
 
 function schStatusText() {
@@ -9546,38 +10299,60 @@ function schStatusText() {
   if (s.ende) { return s.ende; }
   var farbe = s.p.w ? 'Weiß' : 'Schwarz';
   var schach = schImSchach(s.p) ? ' — Schach!' : '';
-  if (s.gegner === 'zwei') { return farbe + ' am Zug' + schach; }
-  if (s.denkt || schClieAmZug()) { return 'CLIE denkt …'; }
-  return 'Du (' + farbe + ') am Zug' + schach;
+  var buch = schBuchName(s.zuege.map(function (z) { return z.kurz; }));
+  var vorn = buch ? buch + ' · ' : '';
+  if (s.gegner === 'zwei') { return vorn + farbe + ' am Zug' + schach; }
+  if (s.denkt || schClieAmZug()) { return vorn + 'CLIE denkt …'; }
+  return vorn + 'Du (' + farbe + ') am Zug' + schach;
+}
+
+function schWahlReihe(feld, werte) {
+  var s = cl.sch;
+  return '<div class="wahlreihe">' + werte.map(function (x) {
+    return '<button type="button"' + (s.neu[feld] === x[0] ? ' class="an"' : '') + ' onclick="schNeuWahl(\'' + feld + '\',\'' + x[0] + '\')">' + x[1] + '</button>';
+  }).join('') + '</div>';
 }
 
 function schFensterHtml() {
   var s = cl.sch;
-  var reihe = function (feld, werte) {
-    return '<div class="wahlreihe">' + werte.map(function (x) {
-      return '<button type="button"' + (s.neu[feld] === x[0] ? ' class="an"' : '') + ' onclick="schNeuWahl(\'' + feld + '\',\'' + x[0] + '\')">' + x[1] + '</button>';
-    }).join('') + '</div>';
-  };
   if (s.fenster === 'neu') {
     return '<div class="sto-fenster"><div class="titel">Neue Partie</div><div class="rumpf">'
-      + '<label>Gegner:</label>' + reihe('gegner', [['clie', 'CLIE'], ['zwei', '2 Spieler']])
-      + (s.neu.gegner === 'clie' ? '<label>Stufe:</label>' + reihe('stufe', SCH_STUFEN)
-         + '<label>Du spielst:</label>' + reihe('farbe', [['w', 'Weiß'], ['b', 'Schwarz'], ['zufall', 'Zufall']]) : '')
+      + '<label>Gegner:</label>' + schWahlReihe('gegner', [['clie', 'CLIE'], ['zwei', '2 Spieler']])
+      + (s.neu.gegner === 'clie' ? '<label>Stufe:</label>' + schWahlReihe('stufe', SCH_STUFEN)
+         + '<label>Du spielst:</label>' + schWahlReihe('farbe', [['w', 'Weiß'], ['b', 'Schwarz'], ['zufall', 'Zufall']]) : '')
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="schNeuLos()">Los</button>'
       + '<button type="button" class="knopf" onclick="schFensterZu()">Abbrechen</button></div>'
-      + (s.zuege.length && !s.ende ? '<p class="leise">Die laufende Partie wird dabei beendet.</p>' : '') + '</div></div>';
+      + (s.zuege.length && !s.ende ? '<p class="leise">Die laufende Partie wird dabei beendet. Speichern geht vorher über das Menü ▾.</p>' : '') + '</div></div>';
   }
   if (s.fenster === 'umwandeln') {
-    var w = s.p.w;
+    var w = (s.umw && s.umw.wo === 'ue') ? s.ue.p.w : s.p.w;
     return '<div class="sto-fenster"><div class="titel">Umwandeln in</div><div class="rumpf"><div class="sch-umw">'
       + 'qrbn'.split('').map(function (a) {
           return '<button type="button" onclick="schUmwandeln(\'' + a + '\')" aria-label="' + SCH_DEUTSCH[a] + '">' + schFigurSvg(w ? a.toUpperCase() : a) + '</button>';
         }).join('') + '</div><div class="knoepfe"><button type="button" class="knopf" onclick="schFensterZu()">Abbrechen</button></div></div></div>';
   }
-  if (s.ende && s.fenster !== 'ansehen') {
+  if (s.fenster === 'speichern') {
+    return '<div class="sto-fenster"><div class="titel">Partie speichern</div><div class="rumpf">'
+      + '<label for="schName">Name:</label><input id="schName" class="eingabe" type="text" autocomplete="off" value="' + esc(schStandardName()) + '">'
+      + '<p class="leise">' + s.zuege.length + ' Halbzüge · ' + esc(schErgebnisText(schErgebnis(s.ende))) + ' · nur auf diesem Gerät</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="schSpeichernOk()">Speichern</button>'
+      + '<button type="button" class="knopf" onclick="schFensterZu()">Abbrechen</button></div></div></div>';
+  }
+  if (s.fenster === 'mehr') {
+    var pt = schPartieFinden(s.pv.id);
+    if (!pt) { return ''; }
+    return '<div class="sto-fenster"><div class="titel">Partie</div><div class="rumpf">'
+      + '<label for="schName">Name:</label><input id="schName" class="eingabe" type="text" autocomplete="off" value="' + esc(pt.name) + '">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="schUmbenennen()">Umbenennen</button>'
+      + '<button type="button" class="knopf" onclick="schPgnTeilen()">PGN teilen</button></div>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="schPartieLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="schFensterZu()">Abbrechen</button></div></div></div>';
+  }
+  if (s.bereich === 'spielen' && s.ende && s.fenster !== 'ansehen') {
     return '<div class="sto-fenster"><div class="titel">' + (/^Schachmatt/.test(s.ende) ? 'Schachmatt' : 'Remis') + '</div><div class="rumpf">'
       + '<p>' + esc(s.ende.replace(/^Schachmatt — /, '')) + ' Nach ' + Math.ceil(s.zuege.length / 2) + ' Zügen.</p>'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="schNeuOeffnen()">Neue Partie</button>'
+      + '<button type="button" class="knopf" onclick="schSpeichernOeffnen()">Speichern</button>'
       + '<button type="button" class="knopf" onclick="schAnsehen()">Ansehen</button></div></div></div>';
   }
   return '';
@@ -9588,37 +10363,258 @@ function schAnsehen() {
   schZeichnen();
 }
 
+function schZugListeHtml(kurz, aktiv, klick) {
+  var zl = '';
+  var i;
+  for (i = 0; i < kurz.length; i += 2) {
+    var zug = function (j) {
+      if (j >= kurz.length) { return ''; }
+      var t = esc(kurz[j]);
+      if (j + 1 === aktiv) { t = '<b>' + t + '</b>'; }
+      return klick ? '<button type="button" class="sch-zk" onclick="' + klick + '(' + (j + 1) + ')">' + t + '</button>' : t;
+    };
+    zl += '<div><span>' + (i / 2 + 1) + '.</span><span>' + zug(i) + ' ' + zug(i + 1) + '</span></div>';
+  }
+  return zl ? '<div class="sch-zuege">' + zl + '</div>' : '';
+}
+
+function schBereichLeiste() {
+  return '<div class="auf-leiste"><div class="schalter">' + SCH_BEREICHE.map(function (b) {
+    return '<button type="button"' + (cl.sch.bereich === b[0] ? ' class="an"' : '') + ' onclick="schBereich(\'' + b[0] + '\')">' + b[1] + '</button>';
+  }).join('') + '</div></div>';
+}
+
+function schBereich(b) {
+  if (!SCH_BEREICHE.some(function (x) { return x[0] === b; })) { return; }
+  cl.sch.bereich = b;
+  cl.sch.fenster = '';
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  kopfZeichnen();
+  schZeichnen();
+}
+
+/* Bereich Spielen: die laufende Partie */
+function schSpielenHtml() {
+  var s = cl.sch;
+  var geschlagen = s.geschlagen.map(function (f) { return '<span class="sch-mini">' + schFigurSvg(f) + '</span>'; }).join('');
+  return '<div class="sch-geschlagen">' + (geschlagen || '&nbsp;') + '</div>'
+    + schBrettHtml(s.p, { wahl: s.wahl, letzt: s.letzt, dreh: schGedreht(), klick: 'schTipp', ruht: !!(s.fenster && s.fenster !== 'ansehen') })
+    + '<div class="sch-status"><span>' + esc(schStatusText()) + '</span><b>Zug ' + s.p.fm + '</b></div>'
+    + (s.tipp ? '<div class="sch-hinweis">' + esc(s.tipp) + '</div>' : '')
+    + (schZugListeHtml(s.zuege.map(function (z) { return z.kurz; }), -1, '') || '<p class="leise">Tippe eine Figur an, dann ihr Ziel.</p>');
+}
+
+/* Bereich Partien: Liste, Nachspielen, Analyse */
+function schPartienHtml() {
+  var s = cl.sch;
+  var pt = s.pv.id ? schPartieFinden(s.pv.id) : null;
+  if (!pt) {
+    var l = schPartienLesen();
+    if (!l.length) { return '<p class="leise">Noch keine gespeicherte Partie. Speichern geht im Menü ▾ („Partie speichern…“) oder am Ende einer Partie.</p>'; }
+    return l.map(function (x) {
+      return '<button type="button" class="sch-zeile" onclick="schPartieOeffnen(\'' + esc(x.id) + '\')"><span>' + esc(x.name)
+        + '<small>' + esc(clKurzDatum(x.datum)) + ' · ' + (x.gegner === 'zwei' ? '2 Spieler' : (x.farbe === 'b' ? 'Schwarz' : 'Weiß'))
+        + (x.eroeffnung ? ' · ' + esc(x.eroeffnung) : '') + ' · ' + Math.ceil(x.zuege.length / 2) + ' Züge'
+        + (x.analyse ? ' · ' + x.analyse.length + ' Fehler' : '') + '</small></span><b>' + esc(schErgebnisText(x.ergebnis)) + '</b></button>';
+    }).join('') + '<p class="leise">Gespeichert nur auf diesem Gerät.</p>';
+  }
+  var st = schNachStellung(pt, s.pv.k);
+  var dreh = pt.gegner !== 'zwei' && pt.farbe === 'b';
+  var h = schBrettHtml(st.p, { letzt: st.letzt, dreh: dreh })
+    + '<div class="sch-nav"><button type="button" onclick="schNachSchritt(-99)" aria-label="Anfang">⏮</button>'
+    + '<button type="button" onclick="schNachSchritt(-1)" aria-label="zurück">◀</button>'
+    + '<button type="button" onclick="schNachSchritt(1)" aria-label="vor">▶</button>'
+    + '<button type="button" onclick="schNachSchritt(99)" aria-label="Ende">⏭</button></div>'
+    + '<div class="sch-status"><span>' + esc(pt.name) + '</span><b>' + s.pv.k + ' / ' + pt.zuege.length + '</b></div>';
+  if (s.pv.laeuft) { h += '<div class="sch-hinweis">Analysiere … ' + s.pv.stand + ' / ' + pt.zuege.length + '</div>'; }
+  else if (pt.analyse) {
+    h += '<div class="sch-analyse">' + (pt.analyse.length ? pt.analyse.map(function (f) {
+      return '<button type="button" class="sch-zeile" onclick="schNachGehe(' + f.ply + ')"><span>' + (Math.floor(f.ply / 2) + 1) + (f.ply % 2 ? '… ' : '. ')
+        + esc(f.kurz) + (f.verlust >= 300 ? '??' : '?') + '<small>besser: ' + esc(f.besser) + '</small></span><b>−'
+        + (Math.round(f.verlust / 10) / 10).toFixed(1).replace('.', ',') + '</b></button>';
+    }).join('') : '<p class="leise">Keine Fehler gefunden — sauber gespielt!</p>') + '</div>';
+  }
+  return h + schZugListeHtml(pt.kurz || [], s.pv.k, 'schNachGehe');
+}
+
+/* Bereich Schule: Kapitel, Lektionen, Schritte, Aufgaben */
+function schSchuleHtml() {
+  var s = cl.sch;
+  var st = schStand();
+  if (s.sv.lektion) {
+    var l = schLektionFinden(s.sv.lektion);
+    if (!l) { s.sv.lektion = ''; return schSchuleHtml(); }
+    if (s.sv.aufgabe >= 0 && s.ue) { return schUeHtml(l); }
+    var sc = l.schritte[Math.min(s.sv.schritt, l.schritte.length - 1)];
+    var p = schStellungAus(sc);
+    return schBrettHtml(p, { marken: sc.marken, dreh: !!sc.schwarz })
+      + '<div class="sch-erkl">' + clAuszeichnungKurz(sc.text) + '</div>'
+      + (l.schritte.length > 1 ? '<div class="sch-nav"><button type="button" onclick="schSchrittGehe(-1)" aria-label="zurück">◀</button>'
+        + '<span class="leise">' + (s.sv.schritt + 1) + ' / ' + l.schritte.length + '</span>'
+        + '<button type="button" onclick="schSchrittGehe(1)" aria-label="weiter">▶</button></div>' : '')
+      + (l.aufgaben && l.aufgaben.length ? '<div class="sch-aufg-liste">' + l.aufgaben.map(function (a, n) {
+          return '<button type="button" class="knopf' + (st.a[a.id] ? ' voll' : '') + '" onclick="schAufgabeOeffnen(' + n + ')">' + (st.a[a.id] ? '✓ ' : '') + 'Aufgabe ' + (n + 1) + '</button>';
+        }).join('') + '</div>' : '');
+  }
+  if (s.sv.kapitel) {
+    var k = schKapitelFinden(s.sv.kapitel);
+    if (!k) { s.sv.kapitel = ''; return schSchuleHtml(); }
+    return '<div class="sch-kapitel-titel">' + esc(k.titel) + '</div>' + k.lektionen.map(function (x) {
+      var n = (x.aufgaben || []).length;
+      var g = (x.aufgaben || []).filter(function (a) { return st.a[a.id]; }).length;
+      return '<button type="button" class="sch-zeile" onclick="schLektionOeffnen(\'' + esc(x.id) + '\')"><span>' + esc(x.titel)
+        + '<small>' + (n ? g + ' / ' + n + ' Aufgaben gelöst' : (st.l[x.id] ? 'gelesen' : 'noch offen')) + '</small></span><b>' + (schLektionFertig(x, st) ? '✓' : '') + '</b></button>';
+    }).join('');
+  }
+  return schBereichLeiste() + schKapitelListe().map(function (k, i) {
+    var lekt = k.lektionen;
+    var aufg = 0;
+    var gel = 0;
+    lekt.forEach(function (x) { (x.aufgaben || []).forEach(function (a) { aufg++; if (st.a[a.id]) { gel++; } }); });
+    var anteil = aufg ? Math.round(gel * 100 / aufg) : 0;
+    return '<button type="button" class="sch-zeile" onclick="schKapitelOeffnen(\'' + esc(k.id) + '\')"><span>' + (i + 1) + '. ' + esc(k.titel)
+      + '<small>' + (k.id === 'k7' ? aufg + ' Fehler aus deinen Partien zum Üben' : lekt.length + ' Lektionen · ' + aufg + ' Aufgaben') + '</small></span>'
+      + (k.id === 'k7' ? '<b>' + aufg + '</b>' : '<span class="sch-balken"><i style="width:' + anteil + '%"></i></span>') + '</button>';
+  }).join('');
+}
+
+/* Kleine Auszeichnung für Lektionstexte: **fett**, Zeilen mit • */
+function clAuszeichnungKurz(t) {
+  return esc(String(t || '')).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+}
+
+/* Das Übungsbrett */
+function schUeHtml(l) {
+  var ue = cl.sch.ue;
+  var a = ue.a;
+  var typ = a.typ || 'zug';
+  var titel = ue.art === 'ueben' ? 'Üben: ' + a.name : (l ? l.titel + ' · Aufgabe ' + (cl.sch.sv.aufgabe + 1) + ' / ' + l.aufgaben.length : '');
+  var frage = a.frage || (typ === 'endspiel' ? 'Spiele gegen CLIE.' : (ue.p.w ? 'Weiß' : 'Schwarz') + ' am Zug.');
+  if (ue.art === 'ueben') { frage = 'Du spielst ' + (ue.ich === 'w' ? 'Weiß' : 'Schwarz') + ' — ziehe die Buchzüge.'; }
+  var h = '<div class="sch-kapitel-titel">' + esc(titel) + '</div>'
+    + schBrettHtml(ue.p, { wahl: ue.wahl, letzt: ue.letzt, dreh: ue.ich === 'b', klick: typ === 'frage' ? '' : 'schUeTipp', marken: a.marken, ruht: !!cl.sch.fenster })
+    + '<div class="sch-status"><span>' + esc(frage) + '</span>'
+    + (typ === 'endspiel' && a.limit ? '<b>Zug ' + ue.zugZahl + ' / ' + a.limit + '</b>' : (ue.fehler ? '<b>Fehler ' + ue.fehler + '</b>' : '')) + '</div>';
+  if (typ === 'frage') {
+    h += '<div class="sch-optionen">' + a.optionen.map(function (o, n) {
+      var kl = (ue.antwort === n) ? (n === a.richtig ? ' voll' : ' falsch') : '';
+      return '<button type="button" class="knopf' + kl + '" onclick="schUeAntwort(' + n + ')">' + esc(o) + '</button>';
+    }).join('') + '</div>';
+  }
+  if (ue.meldung) { h += '<div class="sch-hinweis' + (ue.ok === true ? ' gut' : '') + '">' + esc(ue.meldung) + '</div>'; }
+  return h + (ue.art === 'ueben' ? schZugListeHtml(schBuchListe(a).slice(0, ue.idx), ue.idx, '') : '');
+}
+
+/* Bereich Eröffnungen: Liste, Durchspielen, Üben */
+function schEroeffnungenHtml() {
+  var s = cl.sch;
+  var st = schStand();
+  if (s.ue && s.ue.art === 'ueben') { return schUeHtml(null); }
+  var e = s.ev.id ? schEroeffnungFinden(s.ev.id) : null;
+  if (!e) {
+    var gruppe = '';
+    return schBereichLeiste() + (typeof SCH_EROEFFNUNGEN !== 'undefined' ? SCH_EROEFFNUNGEN : []).map(function (x) {
+      var g = x.gruppe !== gruppe ? '<div class="sch-gruppe">' + esc(x.gruppe) + '</div>' : '';
+      gruppe = x.gruppe;
+      return g + '<button type="button" class="sch-zeile" onclick="schEroeffnungOeffnen(\'' + esc(x.id) + '\')"><span>' + esc(x.name)
+        + '<small>' + esc(schBuchListe(x).slice(0, 6).join(' ')) + ' · du übst ' + (x.seite === 'b' ? 'Schwarz' : 'Weiß') + '</small></span><b>' + (st.e[x.id] ? '★' : '') + '</b></button>';
+    }).join('');
+  }
+  var liste = schBuchListe(e);
+  var stell = schBuchStellung(e, s.ev.k);
+  var erkl = s.ev.k ? schUebenErkl(e, s.ev.k) : '';
+  return schBrettHtml(stell.p, { letzt: stell.letzt, dreh: e.seite === 'b' })
+    + '<div class="sch-nav"><button type="button" onclick="schEroeffnungGehe(-99)" aria-label="Anfang">⏮</button>'
+    + '<button type="button" onclick="schEroeffnungGehe(-1)" aria-label="zurück">◀</button>'
+    + '<button type="button" onclick="schEroeffnungGehe(1)" aria-label="vor">▶</button>'
+    + '<button type="button" onclick="schEroeffnungGehe(99)" aria-label="Ende">⏭</button></div>'
+    + '<div class="sch-erkl">' + (s.ev.k ? '<b>' + esc((Math.floor((s.ev.k - 1) / 2) + 1) + ((s.ev.k - 1) % 2 ? '… ' : '. ') + liste[s.ev.k - 1]) + '</b> — ' + clAuszeichnungKurz(erkl || '') + '<br>' : '')
+    + '<b>Idee:</b> ' + clAuszeichnungKurz(e.idee) + '<br><b>Achtung:</b> ' + clAuszeichnungKurz(e.falle) + '</div>'
+    + schZugListeHtml(liste, s.ev.k, 'schEroeffnungSetze');
+}
+
+function schEroeffnungSetze(k) {
+  cl.sch.ev.k = k;
+  schZeichnen();
+}
+
 function schachHtml() {
   var s = cl.sch;
   if (!s.p) { schLaden(); }
-  var geschlagen = s.geschlagen.map(function (f) { return '<span class="sch-mini">' + schFigurSvg(f) + '</span>'; }).join('');
-  var zl = '';
-  var i;
-  for (i = 0; i < s.zuege.length; i += 2) {
-    zl += '<div><span>' + (i / 2 + 1) + '.</span><span>' + esc(s.zuege[i].kurz) + (s.zuege[i + 1] ? ' ' + esc(s.zuege[i + 1].kurz) : '') + '</span></div>';
-  }
-  return '<div class="sch-geschlagen">' + (geschlagen || '&nbsp;') + '</div>'
-    + '<div class="sch-rahmen' + (s.fenster && s.fenster !== 'ansehen' ? ' ruht' : '') + '"><div class="sch-brett">' + schBrettHtml() + '</div></div>'
-    + '<div class="sch-status"><span>' + esc(schStatusText()) + '</span><b>Zug ' + s.p.fm + '</b></div>'
-    + (zl ? '<div class="sch-zuege">' + zl + '</div>' : '<p class="leise">Tippe eine Figur an, dann ihr Ziel.</p>')
-    + schFensterHtml();
+  var h;
+  if (s.bereich === 'partien') { h = (s.pv.id ? '' : schBereichLeiste()) + schPartienHtml(); }
+  else if (s.bereich === 'schule') { h = schSchuleHtml(); }
+  else if (s.bereich === 'eroeffnungen') { h = schEroeffnungenHtml(); }
+  else { h = schBereichLeiste() + schSpielenHtml(); }
+  return h + schFensterHtml();
 }
 
 function schachFussHtml() {
-  return '<button type="button" class="knopf" onclick="schNeuOeffnen()">Neu…</button>'
-    + '<button type="button" class="knopf" onclick="schZurueckNehmen()"' + (cl.sch.zuege.length && !cl.sch.denkt ? '' : ' disabled') + '>↶ Zurück</button>'
-    + '<button type="button" class="knopf" onclick="schDrehen()">⇅ Drehen</button>';
+  var s = cl.sch;
+  var k = function (text, aufruf, voll, aus) {
+    return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + aufruf + '"' + (aus ? ' disabled' : '') + '>' + text + '</button>';
+  };
+  if (s.bereich === 'partien' && s.pv.id) {
+    return k('Ab hier spielen', 'schAbHier()', true) + k('Analyse', 'schAnalysieren()', false, s.pv.laeuft) + k('Mehr…', 'schMehrOeffnen()') + k('Fertig', 'schEbeneHoch()');
+  }
+  if ((s.bereich === 'schule' || s.bereich === 'eroeffnungen') && s.ue) {
+    var typ = s.ue.a.typ || 'zug';
+    if (s.ue.ok === true) {
+      return s.ue.art === 'ueben' ? k('Nochmal', 'schEroeffnungUeben()', true) + k('Fertig', 'schEbeneHoch()')
+        : k('Nächste', 'schUeWeiter()', true) + k('Fertig', 'schEbeneHoch()');
+    }
+    if (typ === 'endspiel') { return k('↶ Zurück', 'schUeZurueck()') + k('Tipp', 'schUeHilfe()') + k('Neu starten', 'schUeNeu()') + k('Fertig', 'schEbeneHoch()'); }
+    return k('Tipp', 'schUeHilfe()') + k('Lösung', 'schUeLoesung()') + k('Fertig', 'schEbeneHoch()');
+  }
+  if (s.bereich === 'schule' && s.sv.lektion) {
+    var l = schLektionFinden(s.sv.lektion);
+    var hat = l && l.aufgaben && l.aufgaben.length;
+    return (hat ? k('Zur Aufgabe', 'schAufgabeOeffnen(0)', true) : '') + k('Fertig', 'schEbeneHoch()');
+  }
+  if (s.bereich === 'schule') { return (s.sv.kapitel ? '' : k('Weiterlernen', 'schWeiterlernen()', true)) + (s.sv.kapitel ? k('Fertig', 'schEbeneHoch()') : ''); }
+  if (s.bereich === 'eroeffnungen' && s.ev.id) { return k('Üben', 'schEroeffnungUeben()', true) + k('Fertig', 'schEbeneHoch()'); }
+  if (s.bereich === 'spielen') {
+    return k('Neu…', 'schNeuOeffnen()') + k('↶ Zurück', 'schZurueckNehmen()', false, !(s.zuege.length && !s.denkt))
+      + k('Tipp', 'schTippZeigen()', false, !!(s.ende || s.denkt)) + k('⇅ Drehen', 'schDrehen()');
+  }
+  return '';
+}
+
+/* Eine Ebene zurück (Fertig-Knopf und Android-Zurück). true = etwas getan */
+function schEbeneHoch() {
+  var s = cl.sch;
+  if (s.fenster === 'neu' || s.fenster === 'umwandeln' || s.fenster === 'speichern' || s.fenster === 'mehr') { schFensterZu(); return true; }
+  if (s.bereich === 'partien' && s.pv.id) { s.pv.id = ''; schZeichnen(); return true; }
+  if (s.ue) { s.ue = null; s.sv.aufgabe = -1; schZeichnen(); return true; }
+  if (s.bereich === 'schule' && s.sv.lektion) { s.sv.lektion = ''; schZeichnen(); return true; }
+  if (s.bereich === 'schule' && s.sv.kapitel) { s.sv.kapitel = ''; schZeichnen(); return true; }
+  if (s.bereich === 'eroeffnungen' && s.ev.id) { s.ev.id = ''; schZeichnen(); return true; }
+  return false;
 }
 
 function schZeichnen() {
   if (cl.app !== 'schach') { return; }
   inhaltZeichnen();
   fussZeichnen();
+  kopfZeichnen();
+}
+
+function schKopfStufe() {
+  return (SCH_STUFEN.filter(function (x) { return x[0] === cl.sch.stufe; })[0] || ['', 'Mittel'])[1];
 }
 
 function schKopfText() {
   if (!cl.sch.p) { schLaden(); }
-  return cl.sch.gegner === 'zwei' ? '2 Spieler' : (SCH_STUFEN.filter(function (x) { return x[0] === cl.sch.stufe; })[0] || ['', 'Mittel'])[1];
+  var s = cl.sch;
+  if (s.bereich === 'partien') { return s.pv.id ? 'Nachspielen' : String(schPartienLesen().length); }
+  if (s.bereich === 'schule') {
+    var st = schStand();
+    var alle = schLektionenAlle();
+    return alle.filter(function (l) { return schLektionFertig(l, st); }).length + ' / ' + alle.length;
+  }
+  if (s.bereich === 'eroeffnungen') { return (typeof SCH_EROEFFNUNGEN !== 'undefined' ? SCH_EROEFFNUNGEN.length : 0) + ' Eröffnungen'; }
+  return s.gegner === 'zwei' ? '2 Spieler' : schKopfStufe();
 }
 
 /* ---------- Stones (seit 0.18) ----------
@@ -10454,7 +11450,7 @@ function clZurueck() {
   if (cl.app === 'checklisten' && cl.cls.schreiben) { clsSchreibenUm(); return true; }
   if (cl.app === 'checklisten' && cl.cls.id) { clsZurListe(); return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }
-  if (cl.app === 'schach' && (cl.sch.fenster === 'neu' || cl.sch.fenster === 'umwandeln')) { schFensterZu(); return true; }
+  if (cl.app === 'schach' && schEbeneHoch()) { return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) { drvHoch(); return true; }
   if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
   return false;
@@ -10521,6 +11517,489 @@ function start() {
 }
 
 window.addEventListener('DOMContentLoaded', start);
+
+/* ---------- Schachschule: Inhalte (seit 0.22) ----------
+
+   Kapitel → Lektionen → Schritte (Erklärung am Brett) und Aufgaben.
+   Aufgabentypen:
+     zug      — finde den Zug bzw. die Zugfolge (loesung: Kurzschrift,
+                abwechselnd du und Gegner); matt: true = jedes Matt zählt
+     frage    — Auswahl (optionen, richtig = Index)
+     endspiel — gegen CLIE zu Ende spielen (ziel: matt | umwandeln | remis,
+                limit = höchstens so viele eigene Züge)
+     beste    — finde einen guten Zug (CLIE bewertet, ±0,3 Bauern)
+   Stellungen als FEN oder als Züge ab der Grundstellung („vorher“).
+   Jede Aufgabe wird im Test (CLIE_tests.js, Kategorie 52) nachgerechnet. */
+
+var SCH_SCHULE = [
+  { id: 'k1', titel: 'Besondere Züge und Regeln', lektionen: [
+    { id: 'rochade', titel: 'Rochade', schritte: [
+      { fen: 'r3k2r/pppq1ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPPQ1PPP/R3K2R w KQkq - 0 1', marken: ['e1', 'g1', 'c1'],
+        text: 'Bei der **Rochade** zieht der König zwei Felder zur Seite, der Turm springt über ihn hinweg.\n• Kurze Rochade (O-O): König nach g1, Turm nach f1.\n• Lange Rochade (O-O-O): König nach c1, Turm nach d1.\nSo kommt der König in Sicherheit und der Turm ins Spiel — beides in einem Zug.' },
+      { fen: 'r3k2r/pppq1ppp/b1np1n2/2b1p3/4P3/2N2N2/PPPQ1PPP/R3K2R w KQkq - 0 1', marken: ['f1'],
+        text: '**Rochade ist verboten, wenn …**\n• der König gerade im Schach steht,\n• der König über ein angegriffenes Feld ziehen oder darauf landen müsste — hier greift der Läufer a6 das Feld f1 an,\n• König oder dieser Turm schon einmal gezogen haben.\nDie lange Rochade geht hier trotzdem: Nur der König darf nicht durch Schach ziehen, der Turm schon.' },
+      { fen: 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', marken: ['b1', 'c1', 'd1'],
+        text: 'Zwischen König und Turm muss alles frei sein. Bei der langen Rochade also b1, c1 und d1 — b1 darf aber angegriffen sein.\nTipp: Rochiere früh. Ein König in der Mitte ist ein Ziel.' }],
+      aufgaben: [
+        { id: 'r1', typ: 'zug', vorher: 'e4 e5 Sf3 Sc6 Lc4 Lc5', loesung: ['O-O'], frage: 'Bring deinen König mit der kurzen Rochade in Sicherheit.',
+          erkl: 'Der König steht hinter den Bauern, der Turm kommt nach f1.' },
+        { id: 'r2', typ: 'frage', fen: 'r3k2r/pppq1ppp/b1np1n2/2b1p3/4P3/2N2N2/PPPQ1PPP/R3K2R w KQkq - 0 1', marken: ['f1'],
+          frage: 'Welche Rochade darf Weiß hier spielen?', optionen: ['Nur die kurze', 'Nur die lange', 'Beide', 'Keine'], richtig: 1,
+          erkl: 'Für die kurze Rochade müsste der König über f1 — das greift der Läufer a6 an.' },
+        { id: 'r3', typ: 'zug', fen: 'r3kbnr/pppqpppp/2n5/3p1b2/3P1B2/2N5/PPPQPPPP/R3KBNR b KQkq - 6 5', loesung: ['O-O-O'], frage: 'Schwarz am Zug: Rochiere lang.',
+          erkl: 'Der schwarze König geht nach c8, der Turm nach d8 — er steht sofort auf der zentralen d-Linie und deckt d5.' },
+        { id: 'r4', typ: 'frage', fen: '4k2r/8/8/8/1B6/8/8/4K3 b k - 0 1', marken: ['f8'],
+          frage: 'Darf Schwarz kurz rochieren?', optionen: ['Ja', 'Nein — der König müsste über f8, das greift der Läufer an'], richtig: 1,
+          erkl: 'Der Läufer b4 greift f8 an. Der König darf nicht über ein angegriffenes Feld ziehen.' }] },
+
+    { id: 'enpassant', titel: 'En passant', schritte: [
+      { fen: '4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1', marken: ['d5', 'd6', 'e5'],
+        text: 'Zieht ein Bauer zwei Felder vor und landet **direkt neben** einem gegnerischen Bauern, darf dieser ihn schlagen, als wäre er nur ein Feld gezogen: **en passant** (im Vorbeigehen).\nHier: Schwarz zog d7–d5, Weiß darf exd6 spielen.' },
+      { fen: '4k3/8/8/3pP3/8/8/8/4K3 w - - 2 3', marken: ['d5'],
+        text: 'Wichtig: Das geht **nur im direkt folgenden Zug**. Wer wartet, verliert das Recht.\nEn passant schlagen nur Bauern — und nur Bauern, die gerade den Doppelschritt gemacht haben.' }],
+      aufgaben: [
+        { id: 'ep1', typ: 'zug', vorher: 'e4 d5 e5 f5', loesung: ['exf6'], frage: 'Schwarz zog gerade f7–f5. Schlage en passant.',
+          erkl: 'Der Bauer e5 schlägt nach f6, der Bauer f5 verschwindet.' },
+        { id: 'ep2', typ: 'zug', fen: '4k3/8/8/8/3pP3/8/8/4K3 b - e3 0 1', loesung: ['dxe3'], frage: 'Weiß zog e2–e4. Nutze das aus!',
+          erkl: 'Auch Schwarz darf en passant schlagen — hier auf e3.' },
+        { id: 'ep3', typ: 'frage', fen: '4k3/8/8/3pP3/8/8/8/4K3 w - - 2 3', frage: 'Schwarz zog vor zwei Zügen d7–d5. Darf Weiß jetzt noch exd6 spielen?',
+          optionen: ['Ja', 'Nein — nur direkt im nächsten Zug'], richtig: 1, erkl: 'Das Recht verfällt nach einem Zug.' }] },
+
+    { id: 'umwandlung', titel: 'Umwandlung', schritte: [
+      { fen: '8/4P3/8/8/8/2k5/8/4K3 w - - 0 1', marken: ['e8'],
+        text: 'Erreicht ein Bauer die letzte Reihe, wird er **sofort** zu einer Dame, einem Turm, Läufer oder Springer — fast immer zur Dame.\nDarum sind Bauern, die niemand mehr aufhalten kann (Freibauern), so gefährlich.' },
+      { fen: '8/6P1/8/8/8/8/2K5/k7 w - - 0 1', marken: ['g8'],
+        text: 'Manchmal ist eine kleinere Figur besser — die **Unterverwandlung**: etwa ein Springer, der mit Schach eine Gabel gibt, oder ein Turm statt einer Dame, um ein Patt zu vermeiden.\nHier wäre g8=D patt — g8=T! Ka2 Ta8# gewinnt.' }],
+      aufgaben: [
+        { id: 'u1', typ: 'zug', fen: '8/1P6/8/8/8/5k2/8/4K3 w - - 0 1', loesung: ['b8=D'], frage: 'Wandle den Bauern in eine Dame um.',
+          erkl: 'Mit der neuen Dame setzt Weiß bald matt.' },
+        { id: 'u2', typ: 'zug', fen: 'k7/p1P5/2K5/8/8/8/8/8 w - - 0 1', loesung: ['c8=D'], matt: true, frage: 'Setze mit der Umwandlung matt!',
+          erkl: 'Die neue Dame gibt Schach über die 8. Reihe, b7 wird von deinem König gedeckt, a7 ist verstellt.' },
+        { id: 'u3', typ: 'frage', fen: '8/4P3/8/8/8/2k5/8/4K3 w - - 0 1', frage: 'Darf ein Bauer zu einem zweiten König werden?',
+          optionen: ['Ja', 'Nein — nur zu Dame, Turm, Läufer oder Springer'], richtig: 1 }] },
+
+    { id: 'mattpatt', titel: 'Schach, Matt und Patt', schritte: [
+      { fen: '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', marken: ['a8', 'g8'],
+        text: '**Schach**: Der König wird angegriffen und muss sofort gerettet werden — wegziehen, dazwischenstellen oder den Angreifer schlagen.\n**Matt**: Schach, und nichts hilft mehr. Hier spielt Weiß Ta8 — Matt, weil die eigenen Bauern dem König den Weg versperren.' },
+      { fen: '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1', marken: ['h8'],
+        text: '**Patt**: Wer am Zug ist, steht **nicht** im Schach, hat aber **keinen erlaubten Zug**. Das ist **Remis**!\nAchtung beim Gewinnen: Mit viel Übermaterial nicht aus Versehen patt setzen.' }],
+      aufgaben: [
+        { id: 'mp1', typ: 'frage', fen: '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1', frage: 'Schwarz ist am Zug. Was ist das?',
+          optionen: ['Matt', 'Patt — remis', 'Schach'], richtig: 1, erkl: 'Kein Schach, aber jedes Feld des Königs ist angegriffen.' },
+        { id: 'mp2', typ: 'zug', fen: '7k/8/6K1/8/8/8/8/5Q2 w - - 0 1', loesung: ['Df8'], matt: true, frage: 'Setze matt — aber Vorsicht vor Patt!',
+          erkl: 'Df8 ist Matt. Df7? wäre Patt gewesen.' },
+        { id: 'mp3', typ: 'frage', fen: 'R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 1', frage: 'Schwarz ist am Zug. Was ist das?',
+          optionen: ['Matt', 'Patt', 'Schach — aber noch zu retten'], richtig: 0 },
+        { id: 'mp4', typ: 'zug', fen: '5k2/8/5K2/8/8/8/8/R7 w - - 0 1', loesung: ['Ta8'], matt: true, frage: 'Setze in einem Zug matt.' }] },
+
+    { id: 'remis', titel: 'Remisregeln', schritte: [
+      { fen: '8/8/4k3/8/8/2B5/4K3/8 w - - 0 1',
+        text: 'Eine Partie endet **remis** (unentschieden) bei …\n• **Patt**,\n• **zu wenig Material**: König gegen König, König+Läufer oder König+Springer gegen König,\n• **dreifacher Wiederholung** derselben Stellung (gleicher Spieler am Zug),\n• der **50-Züge-Regel**: 50 Züge beider Seiten ohne Bauernzug und ohne Schlagen,\n• **Einigung** der Spieler.' }],
+      aufgaben: [
+        { id: 'rm1', typ: 'frage', fen: '8/8/4k3/8/8/2B5/4K3/8 w - - 0 1', frage: 'König und Läufer gegen König — wie geht das aus?',
+          optionen: ['Weiß gewinnt', 'Remis — zu wenig Material'], richtig: 1 },
+        { id: 'rm2', typ: 'frage', fen: '8/8/4k3/8/8/2R5/4K3/8 w - - 0 1', frage: 'König und Turm gegen König?',
+          optionen: ['Weiß kann matt setzen', 'Remis'], richtig: 0, erkl: 'Mit König und Turm gelingt das Matt immer — das übst du im Kapitel Endspiel.' },
+        { id: 'rm3', typ: 'frage', fen: '8/8/4k3/8/8/2R5/4K3/8 w - - 0 1', frage: 'Wann gilt die 50-Züge-Regel?',
+          optionen: ['50 Züge ohne Schach', '50 Züge ohne Bauernzug und ohne Schlagen', 'Nach 50 Zügen insgesamt'], richtig: 1 },
+        { id: 'rm4', typ: 'frage', fen: '8/8/4k3/8/8/2R5/4K3/8 w - - 0 1', frage: 'Dieselbe Stellung kommt zum dritten Mal vor, derselbe Spieler ist am Zug. Was gilt?',
+          optionen: ['Es wird weitergespielt', 'Remis durch dreifache Wiederholung'], richtig: 1 }] },
+
+    { id: 'notation', titel: 'Notation lesen', schritte: [
+      { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', marken: ['a1', 'h1', 'a8', 'e4'],
+        text: 'Jedes Feld hat einen Namen: Linie a–h und Reihe 1–8, etwa **e4**.\nFiguren: **K** König, **D** Dame, **T** Turm, **L** Läufer, **S** Springer — Bauern haben keinen Buchstaben.\n**Sf3** = Springer zieht nach f3, **exd5** = Bauer e schlägt auf d5.\n**+** Schach, **#** Matt, **O-O** kurze, **O-O-O** lange Rochade, **e8=D** Umwandlung.' }],
+      aufgaben: [
+        { id: 'n1', typ: 'frage', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', frage: 'Was bedeutet „Sxe5+“?',
+          optionen: ['Springer schlägt auf e5 und gibt Schach', 'Springer zieht nach e5', 'Läufer schlägt auf e5'], richtig: 0 },
+        { id: 'n2', typ: 'frage', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', frage: 'Was bedeutet „O-O-O“?',
+          optionen: ['Kurze Rochade', 'Lange Rochade', 'Remisangebot'], richtig: 1 },
+        { id: 'n3', typ: 'zug', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', loesung: ['Sf3'], frage: 'Spiele „Sf3“.' }] }
+  ] },
+
+  { id: 'k2', titel: 'Denken am Brett', lektionen: [
+    { id: 'werte', titel: 'Figurenwerte und Tauschen', schritte: [
+      { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        text: 'Faustregel für den Wert der Figuren:\n• Bauer **1**\n• Springer **3**, Läufer **3**\n• Turm **5**\n• Dame **9**\nDer König ist unbezahlbar. Beim Tauschen zählst du, was du gibst und was du bekommst.' },
+      { fen: 'r1bqkb1r/ppp2ppp/2n2n2/3p4/3P4/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 6', marken: ['d5'],
+        text: 'Bevor du schlägst: **Zähle Angreifer und Verteidiger**.\nDer Bauer d5 wird nur vom Springer c3 angegriffen, aber von Springer f6 und Dame d8 verteidigt — Sxd5 würde einen Springer kosten.' }],
+      aufgaben: [
+        { id: 'w1', typ: 'frage', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', frage: 'Was ist mehr wert?',
+          optionen: ['Ein Turm', 'Springer und Bauer'], richtig: 0, erkl: 'Turm 5, Springer + Bauer 4.' },
+        { id: 'w2', typ: 'frage', fen: 'r1bqkb1r/ppp2ppp/2n2n2/3p4/3P4/2N2N2/PPP2PPP/R1BQKB1R w KQkq - 0 6', marken: ['d5'], frage: 'Darf Weiß auf d5 schlagen (Sxd5)?',
+          optionen: ['Ja, das gewinnt einen Bauern', 'Nein — d5 ist zweimal gedeckt, nur einmal angegriffen'], richtig: 1 },
+        { id: 'w3', typ: 'zug', fen: 'r1bqkb1r/pppp1ppp/5n2/4n3/8/8/PPPP1PPP/RNBQR1K1 w kq - 0 6', loesung: ['Txe5+'], gewinn: 250,
+          frage: 'Gewinne Material: Eine schwarze Figur ist ungedeckt.', erkl: 'Der Springer e5 war ungedeckt — und das ist sogar Schach.' },
+        { id: 'w4', typ: 'frage', fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', frage: 'Du kannst deinen Läufer gegen einen Turm tauschen. Lohnt das?',
+          optionen: ['Ja — 5 für 3, die „Qualität“ gewonnen', 'Nein'], richtig: 0 }] },
+
+    { id: 'sst', titel: 'Schach — Schlagen — Drohung', schritte: [
+      { fen: '4k3/8/8/8/4n3/8/8/3QK3 w - - 0 1', marken: ['a4', 'e8', 'e4'],
+        text: 'Vor jedem Zug prüfst du **in dieser Reihenfolge**:\n1. Welche **Schachgebote** habe ich?\n2. Was kann ich **schlagen**?\n3. Welche **Drohungen** kann ich aufstellen?\nSo findest du Taktik, die sonst übersehen wird — etwa hier Da4+: Schach und gleichzeitig Angriff auf den Springer e4.' }],
+      aufgaben: [
+        { id: 's1', typ: 'zug', fen: '4k3/8/8/8/4n3/8/8/3QK3 w - - 0 1', loesung: ['Da4+', 'Kf7', 'Dxe4'], gewinn: 300,
+          frage: 'Gewinne den Springer — mit einem Schachgebot.', erkl: 'Schach mit Angriff auf eine zweite Figur: ein Doppelangriff.' },
+        { id: 's2', typ: 'zug', fen: 'r3k2r/ppp2ppp/8/1N1q4/8/8/PPP2PPP/R3K2R w KQkq - 0 1', loesung: ['Sxc7+', 'Kd8', 'Sxd5'], gewinn: 800,
+          frage: 'Ein Schachgebot gewinnt die Dame.', erkl: 'Der Springer greift König, Dame und Turm zugleich an — eine Springergabel.' },
+        { id: 's3', typ: 'zug', fen: 'q3k3/8/8/1N6/8/8/8/4K3 w - - 0 1', loesung: ['Sc7+', 'Kd8', 'Sxa8'], gewinn: 800,
+          frage: 'Schach — und dann schlagen.' }] },
+
+    { id: 'patzer', titel: 'Was will der Gegner?', schritte: [
+      { fen: '6k1/1b3ppp/8/6q1/8/8/5PPP/3Q1RK1 w - - 0 1', marken: ['g2'],
+        text: 'Bevor du deinen Plan verfolgst: **Was droht der Gegner?**\nHier droht Schwarz Dxg2 — Matt, denn Dame und Läufer greifen g2 gemeinsam an. Erst verteidigen, dann angreifen — und auch die Verteidigung prüfen: Hängt danach etwas?' }],
+      aufgaben: [
+        { id: 'pz1', typ: 'beste', fen: '6k1/1b3ppp/8/6q1/8/8/5PPP/3Q1RK1 w - - 0 1', marken: ['g2'],
+          frage: 'Schwarz droht Dxg2#. Finde eine Verteidigung.', erkl: 'Zum Beispiel f3 oder g3. Vorsicht: Df3?? scheitert an Lxf3.' },
+        { id: 'pz2', typ: 'beste', vorher: 'e4 e5 Lc4 Sc6 Dh5', frage: 'Weiß droht Dxf7#. Verteidige!',
+          erkl: 'g6 oder De7 halten alles — nur nicht Sf6??, dann folgt Dxf7#.' },
+        { id: 'pz3', typ: 'frage', vorher: 'e4 e5 Lc4 Sc6 Dh5 Sf6', frage: 'Schwarz spielte Sf6 und greift die Dame an. Was ist richtig?',
+          optionen: ['Dame zurückziehen', 'Dxf7 — Matt!'], richtig: 1, erkl: 'Sf6?? hat die Drohung übersehen.' }] },
+
+    { id: 'plan', titel: 'Drei Fragen vor jedem Zug', schritte: [
+      { fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4',
+        text: 'Eine einfache Denkroutine für jeden Zug:\n1. **Was hat der Gegner mit seinem letzten Zug vor?**\n2. **Welche Figur steht schlecht** — bei mir und bei ihm?\n3. **Ist mein Zug sicher?** Prüfe nach dem Ziehen: Hängt jetzt etwas?\nWer das jedes Mal tut, stellt viel seltener Figuren ein.' }],
+      aufgaben: [
+        { id: 'pl1', typ: 'frage', fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4', frage: 'Welche Frage stellst du dir zuerst?',
+          optionen: ['Was will mein Gegner?', 'Welcher Zug sieht am schönsten aus?'], richtig: 0 },
+        { id: 'pl2', typ: 'zug', fen: 'rnbqkbnr/ppp2ppp/3p4/4p3/4P1Q1/8/PPPP1PPP/RNB1KBNR b KQkq - 1 3', loesung: ['Lxg4'], gewinn: 800,
+          frage: 'Schwarz am Zug: Was hat Weiß übersehen?', erkl: 'Die Dame stand auf der Diagonale des Läufers c8 — nach d6 ist der Weg frei.' }] }
+  ] },
+
+  { id: 'k3', titel: 'Fallen und Mattbilder', lektionen: [
+    { id: 'schaefer', titel: 'Schäfermatt', schritte: [
+      { vorher: 'e4 e5 Lc4 Sc6 Dh5 Sf6', marken: ['f7'],
+        text: 'Das **Schäfermatt**: Dame und Läufer greifen gemeinsam f7 an — das Feld deckt am Anfang nur der König.\nHier hat Schwarz mit Sf6?? die Drohung übersehen: Dxf7 ist Matt.' }],
+      aufgaben: [
+        { id: 'sm1', typ: 'zug', vorher: 'e4 e5 Lc4 Sc6 Dh5 Sf6', loesung: ['Dxf7'], matt: true, frage: 'Setze matt!' },
+        { id: 'sm2', typ: 'beste', vorher: 'e4 e5 Lc4 Sc6 Dh5', frage: 'Schwarz am Zug: Wehre das Schäfermatt ab.', erkl: 'g6 oder De7 — danach steht die weiße Dame sogar etwas ungeschickt.' },
+        { id: 'sm3', typ: 'frage', vorher: 'f3 e5 g4', frage: 'Schwarz am Zug. Was geht hier?', optionen: ['Dh4 — Matt (Narrenmatt)', 'Nichts Besonderes'], richtig: 0,
+          erkl: 'Das kürzeste Matt überhaupt: Weiß hat die Diagonale e1–h4 geöffnet.' }] },
+
+    { id: 'grundreihe', titel: 'Grundreihenmatt', schritte: [
+      { fen: '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', marken: ['a8', 'f7', 'g7', 'h7'],
+        text: 'Steht der König hinter seinen eigenen Bauern und die Grundreihe ist ungeschützt, genügt ein Turm oder die Dame: **Grundreihenmatt**.\nVorbeugung: ein „Luftloch“ wie h6 (h3) — dann hat der König ein Fluchtfeld.' }],
+      aufgaben: [
+        { id: 'gr1', typ: 'zug', fen: '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', loesung: ['Ta8'], matt: true, frage: 'Setze matt.' },
+        { id: 'gr2', typ: 'zug', fen: '3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1', loesung: ['Txd8'], matt: true, frage: 'Schlage — mit Matt!' },
+        { id: 'gr3', typ: 'zug', fen: '6k1/5ppp/8/1n6/8/8/5PPP/3Q2K1 w - - 0 1', loesung: ['Dd8'], matt: true, frage: 'Matt in einem Zug.' },
+        { id: 'gr4', typ: 'zug', fen: '1r4k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1', loesung: ['Tb1'], matt: true, frage: 'Schwarz am Zug: Auch Weiß hat kein Luftloch.' }] },
+
+    { id: 'mattzwei', titel: 'Matt in zwei Zügen', schritte: [
+      { fen: '7k/8/8/8/8/8/R7/1R4K1 w - - 0 1', marken: ['a7', 'b8'],
+        text: 'Viele Matts brauchen einen **Vorbereitungszug**: Erst nimmst du dem König Felder weg, dann folgt das Matt.\n• Zwei Türme: Einer sperrt eine Reihe, der andere setzt matt — das **Treppenmatt**.\n• Dame und König: Die Dame drängt, der König deckt.' }],
+      aufgaben: [
+        { id: 'mz1', typ: 'zug', fen: '7k/8/8/8/8/8/R7/1R4K1 w - - 0 1', loesung: ['Ta7', 'Kg8', 'Tb8'], matt: true, frage: 'Matt in zwei Zügen mit den Türmen.' },
+        { id: 'mz3', typ: 'zug', fen: '6k1/R7/8/8/8/8/8/1R4K1 w - - 0 1', loesung: ['Tb8'], matt: true, frage: 'Und hier geht es sogar in einem Zug.' },
+        { id: 'mz4', typ: 'zug', fen: '7k/8/6K1/8/8/8/8/1Q6 w - - 0 1', loesung: ['Db8'], matt: true, frage: 'Matt in einem Zug — Dame und König.' }] },
+
+    { id: 'ersticktes', titel: 'Ersticktes Matt', schritte: [
+      { fen: '6rk/5Npp/8/8/8/8/8/6K1 b - - 0 1', marken: ['h8', 'f7'],
+        text: 'Der König ist von seinen eigenen Figuren eingeschlossen — ein einziger **Springer** setzt matt. Das heißt **ersticktes Matt**.' }],
+      aufgaben: [
+        { id: 'em1', typ: 'zug', fen: 'r5rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1', loesung: ['Sf7'], matt: true, frage: 'Ersticke den König!' },
+        { id: 'em2', typ: 'zug', fen: '2r3rk/6pp/8/4N3/8/8/8/6K1 w - - 0 1', loesung: ['Sf7'], matt: true, frage: 'Matt in einem Zug.' }] },
+
+    { id: 'mattbilder', titel: 'Mattbilder', schritte: [
+      { fen: '7k/7R/5N2/8/8/8/8/6K1 b - - 0 1', marken: ['h7', 'f6', 'g8'],
+        text: '**Arabisches Matt**: Turm und Springer arbeiten zusammen. Der Springer deckt den Turm und das Fluchtfeld g8.' },
+      { fen: '8/4N1pk/8/7R/8/8/8/6K1 b - - 0 1', marken: ['e7', 'h5'],
+        text: '**Anastasias Matt**: Der Springer sperrt g8 und g6, der Turm setzt auf der Randlinie matt.' },
+      { fen: '2kr4/3p4/B7/8/5B2/8/8/6K1 b - - 0 1', marken: ['c8', 'a6', 'f4'],
+        text: '**Bodens Matt**: Zwei Läufer auf gekreuzten Diagonalen gegen den lang rochierten König.' }],
+      aufgaben: [
+        { id: 'mb1', typ: 'zug', fen: '7k/R7/5N2/8/8/8/8/6K1 w - - 0 1', loesung: ['Th7'], matt: true, frage: 'Arabisches Matt in einem Zug.' },
+        { id: 'mb2', typ: 'zug', fen: '8/4N1pk/8/R7/8/8/8/6K1 w - - 0 1', loesung: ['Th5'], matt: true, frage: 'Anastasias Matt in einem Zug.' },
+        { id: 'mb3', typ: 'zug', fen: '2kr4/3p4/8/8/5B2/8/4B3/6K1 w - - 0 1', loesung: ['La6'], matt: true, frage: 'Bodens Matt in einem Zug.' },
+        { id: 'mb4', typ: 'zug', fen: '6k1/5p1p/5PpQ/8/8/8/5PPP/6K1 w - - 0 1', loesung: ['Dg7'], matt: true, frage: 'Der Bauer f6 hilft: Matt in einem Zug.',
+          erkl: 'Die Dame setzt auf g7 matt, gedeckt vom Bauern f6.' }] },
+
+    { id: 'eroeffnungsfallen', titel: 'Fallen in der Eröffnung', schritte: [
+      { vorher: 'e4 e5 Sf3 d6 Lc4 Lg4 Sc3 g6', marken: ['e5', 'd1'],
+        text: '**Legals Matt**: Weiß „opfert“ die Dame — nimmt Schwarz sie, folgt Matt mit den Leichtfiguren.\nMerke: Eine Fesselung gegen die Dame ist keine echte Fesselung.' },
+      { vorher: 'e4 e5 Sf3 Sc6 Lc4 Sd4', marken: ['d4', 'e5'],
+        text: '**Achtung Falle**: Nach 3… Sd4 sieht Sxe5 verlockend aus. Doch 4… Dg5! greift e5 und g2 an — und Weiß gerät in große Not.' }],
+      aufgaben: [
+        { id: 'ef1', typ: 'zug', vorher: 'e4 e5 Sf3 d6 Lc4 Lg4 Sc3 g6', loesung: ['Sxe5', 'Lxd1', 'Lxf7+', 'Ke7', 'Sd5'], matt: true,
+          frage: 'Weiß am Zug: Spiele Legals Matt (Schwarz nimmt die Dame).', erkl: 'Drei Leichtfiguren setzen matt — die Dame war ein Köder.' },
+        { id: 'ef2', typ: 'zug', vorher: 'e4 e5 Sf3 Sc6 Lc4 Sd4 Sxe5', loesung: ['Dg5', 'Sxf7', 'Dxg2', 'Tf1', 'Dxe4+', 'Le2', 'Sf3'], matt: true,
+          frage: 'Schwarz am Zug: Weiß hat auf e5 geschlagen. Bestrafe das!', erkl: 'Dg5 greift g2 an, danach folgt das Matt mit Sf3.' },
+        { id: 'ef3', typ: 'zug', vorher: 'e4 e5 Sf3 Sf6 Sxe5 Sc6 Sxc6 dxc6 d3 Lc5 Lg5', loesung: ['Sxe4', 'Lxd8', 'Lxf2+', 'Ke2', 'Lg4'], matt: true,
+          frage: 'Schwarz am Zug: Weiß fesselt den Springer f6 an die Dame. Opfere sie!', erkl: 'Lxf2+ und Lg4# — das Matt ist mehr wert als die Dame.' }] },
+
+    { id: 'h7opfer', titel: 'Läuferopfer auf h7', schritte: [
+      { fen: 'rnbq1rk1/pppn1ppp/4p3/3pP3/1b1P4/2NB1N2/PPP2PPP/R1BQK2R w KQ - 0 7', marken: ['h7', 'g5', 'h5'],
+        text: 'Das „griechische Geschenk“: **Lxh7+ Kxh7, Sg5+** und die Dame kommt nach h5.\nEs funktioniert meist, wenn …\n• ein Läufer auf d3 nach h7 zielt,\n• ein Springer nach g5 kann,\n• die Dame schnell nach h5 kommt,\n• kein schwarzer Springer auf f6 verteidigt.' }],
+      aufgaben: [
+        { id: 'h1', typ: 'frage', fen: 'rnbq1rk1/pppn1ppp/4p3/3pP3/1b1P4/2NB1N2/PPP2PPP/R1BQK2R w KQ - 0 7', frage: 'Was fehlt Schwarz zur Verteidigung von h7?',
+          optionen: ['Ein Springer auf f6', 'Ein Bauer auf a6'], richtig: 0, erkl: 'Der Springer auf f6 deckt h7 und h5 — hier steht er auf d7.' }] }
+  ] },
+
+  { id: 'k4', titel: 'Taktik', lektionen: [
+    { id: 'gabel', titel: 'Gabel', schritte: [
+      { fen: 'r3k2r/ppp2ppp/8/1N1q4/8/8/PPP2PPP/R3K2R w KQkq - 0 1', marken: ['c7', 'e8', 'd5', 'a8'],
+        text: 'Eine **Gabel** greift zwei (oder mehr) Figuren gleichzeitig an — der Gegner kann nur eine retten.\nSpringer sind Gabel-Meister, aber auch Bauern, Damen und sogar Könige gabeln.' }],
+      aufgaben: [
+        { id: 'g1', typ: 'zug', fen: 'r1b1k2r/ppp2ppp/8/3q4/8/2N5/PPP2PPP/R3K2R w KQkq - 0 1', loesung: ['Sxd5'], gewinn: 800, frage: 'Erst das Einfachste: Hängt etwas?',
+          erkl: 'Die Dame stand ungedeckt — vor jeder Gabel schaust du, ob etwas einfach so geschlagen werden kann.' },
+        { id: 'g5', typ: 'zug', fen: 'r3k3/8/8/3N4/8/8/8/4K3 w q - 0 1', loesung: ['Sc7+', 'Kd7', 'Sxa8'], gewinn: 450, frage: 'Springergabel gegen König und Turm!' },
+        { id: 'g6', typ: 'zug', fen: '4k3/8/8/4p3/8/3N1R2/8/4K3 b - - 0 1', loesung: ['e4', 'Tf4', 'exd3'], gewinn: 300, frage: 'Schwarz am Zug: Auch Schwarz kann gabeln.' },
+        { id: 'g2', typ: 'zug', fen: '4k3/8/2n1b3/8/3P4/8/8/4K3 w - - 0 1', loesung: ['d5', 'Lf5', 'dxc6'], gewinn: 250, frage: 'Ein Bauer gabelt zwei Figuren.' },
+        { id: 'g3', typ: 'frage', fen: '6k1/5ppp/8/8/8/2n5/5PPP/2rQ2K1 w - - 0 1', frage: 'Der Turm c1 hängt — darf Weiß Dxc1 spielen?',
+          optionen: ['Ja, ein Turm gratis', 'Nein — Se2+ gabelt König und Dame'], richtig: 1,
+          erkl: 'Dxc1? Se2+ — die Springergabel holt die Dame zurück. Immer erst prüfen, ob es eine Falle ist!' }] },
+
+
+    { id: 'fesselung', titel: 'Fesselung', schritte: [
+      { fen: '4k3/3q4/8/1B6/P7/8/8/4K3 b - - 0 1', marken: ['b5', 'd7', 'e8'],
+        text: 'Eine **Fesselung**: Eine Figur darf (oder sollte) nicht ziehen, weil dahinter eine wertvollere steht.\nSteht dahinter der König, ist die Fesselung **absolut** — die Figur darf gar nicht ziehen.' }],
+      aufgaben: [
+        { id: 'f1', typ: 'zug', fen: '4k3/3q4/8/8/P7/8/8/4KB2 w - - 0 1', loesung: ['Lb5', 'Dxb5', 'axb5'], gewinn: 500, frage: 'Fessle die Dame an den König.' },
+        { id: 'f2', typ: 'zug', fen: '4k3/8/4n3/8/5P2/8/8/4R1K1 w - - 0 1', loesung: ['f5', 'Kf7', 'fxe6+'], gewinn: 300, frage: 'Der Springer ist gefesselt — greife ihn an!' },
+        { id: 'f4', typ: 'zug', fen: '4k3/4q3/8/8/8/8/8/4RK2 w - - 0 1', loesung: ['Txe7+', 'Kxe7'], gewinn: 350, frage: 'Die Dame ist gefesselt — schlag zu!',
+          erkl: 'Turm gegen Dame — ein guter Tausch.' },
+        { id: 'f3', typ: 'frage', fen: '4k3/3q4/8/1B6/P7/8/8/4K3 b - - 0 1', frage: 'Darf die schwarze Dame hier nach d6 ziehen?',
+          optionen: ['Ja', 'Nein — sie ist an den König gefesselt'], richtig: 1 }] },
+
+    { id: 'spiess', titel: 'Spieß', schritte: [
+      { fen: '8/8/8/q3k2R/8/8/8/6K1 b - - 0 1', marken: ['e5', 'a5'],
+        text: 'Der **Spieß** ist eine umgekehrte Fesselung: Die **wertvollere** Figur steht vorn, muss ausweichen — und die dahinter fällt.' }],
+      aufgaben: [
+        { id: 'sp1', typ: 'zug', fen: '8/8/8/q3k3/8/8/8/6KR w - - 0 1', loesung: ['Th5+', 'Kd4', 'Txa5'], gewinn: 800, frage: 'Spieß!' },
+        { id: 'sp2', typ: 'zug', fen: '8/8/2q5/8/4k3/8/8/1K3B2 w - - 0 1', loesung: ['Lg2+', 'Kd3', 'Lxc6'], gewinn: 800, frage: 'Spieß mit dem Läufer.' }] },
+
+    { id: 'abzug', titel: 'Abzugsschach und Doppelschach', schritte: [
+      { fen: 'q3k3/8/8/8/4B3/8/8/4R1K1 w - - 0 1', marken: ['e1', 'e4', 'e8'],
+        text: '**Abzugsschach**: Eine Figur zieht weg und gibt damit den Weg für ein Schach frei. Die wegziehende Figur darf dabei alles schlagen — der Gegner muss sich erst um sein Schach kümmern.\n**Doppelschach**: Beide Figuren geben Schach — dann hilft nur ein Königszug.' }],
+      aufgaben: [
+        { id: 'ab1', typ: 'zug', fen: 'q3k3/8/8/8/4B3/8/8/4R1K1 w - - 0 1', loesung: ['Lxa8+'], gewinn: 800, frage: 'Gewinne die Dame mit Abzugsschach.' },
+        { id: 'ab3', typ: 'zug', fen: '4k3/8/8/8/q7/8/4N3/4R1K1 w - - 0 1', loesung: ['Sc3+', 'Kd7', 'Sxa4'], gewinn: 800, frage: 'Der Springer zieht — und der Turm gibt Schach.' },
+        { id: 'ab2', typ: 'frage', fen: 'q3k3/8/8/8/4B3/8/8/4R1K1 w - - 0 1', frage: 'Bei Doppelschach — was kann der Gegner tun?',
+          optionen: ['Eine Figur dazwischenstellen', 'Nur mit dem König ziehen', 'Einen Angreifer schlagen'], richtig: 1 }] },
+
+    { id: 'ablenkung', titel: 'Ablenkung und Überlastung', schritte: [
+      { fen: '4r1k1/5ppp/8/4n3/8/8/5PPP/3QR1K1 w - - 0 1', marken: ['e8', 'e5'],
+        text: '**Überlastung**: Eine Figur hat zu viele Aufgaben — sie kann nicht alles gleichzeitig decken.\n**Ablenkung**: Du zwingst einen Verteidiger weg, damit etwas anderes fällt.' }],
+      aufgaben: [
+        { id: 'al1', typ: 'zug', fen: '4r1k1/5ppp/8/4n3/8/8/5PPP/3QR1K1 w - - 0 1', loesung: ['Txe5', 'Txe5', 'Dd8+', 'Te8', 'Dxe8'], matt: true,
+          frage: 'Der Turm e8 muss den Springer und die Grundreihe decken — zu viel!', erkl: 'Nimmt der Turm zurück, ist die Grundreihe offen: Dd8+ und Matt.' },
+        { id: 'al2', typ: 'frage', fen: '4r1k1/5ppp/8/4n3/8/8/5PPP/3QR1K1 w - - 0 1', frage: 'Warum ist der schwarze Turm hier „überlastet“?',
+          optionen: ['Er soll den Springer e5 und die Grundreihe gleichzeitig decken', 'Er steht auf einer offenen Linie'], richtig: 0 }] },
+
+    { id: 'zwischenzug', titel: 'Zwischenzug', schritte: [
+      { fen: '4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1', marken: [],
+        text: 'Ein **Zwischenzug** kommt „dazwischen“: Statt sofort zurückzuschlagen, gibst du erst ein Schach oder stellst eine stärkere Drohung auf.\nVor jedem „erzwungenen“ Zug fragen: Gibt es etwas Besseres?' }],
+      aufgaben: [
+        { id: 'zz1', typ: 'frage', fen: '4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1', frage: 'Der Gegner schlägt eine Figur von dir. Was fragst du dich, bevor du zurückschlägst?',
+          optionen: ['Gibt es vorher ein Schach oder eine stärkere Drohung?', 'Nichts — sofort zurückschlagen'], richtig: 0 },
+        { id: 'zz2', typ: 'frage', fen: '4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1', frage: 'Was ist ein Zwischenzug?',
+          optionen: ['Ein Zug, der vor dem erwarteten Zug eingeschoben wird — oft ein Schach', 'Ein Zug in der Mitte der Partie'], richtig: 0 }] },
+
+    { id: 'damenfang', titel: 'Damenfang', schritte: [
+      { vorher: 'd4 Sf6 Lg5 c5 d5 Db6 Sc3 Dxb2', marken: ['b2', 'b1'],
+        text: 'Eine Dame, die früh auf Bauernraub geht, steht schnell **abseits**: Nach Ld2 und Tb1 muss sie flüchten, und Weiß gewinnt Zeit für die Entwicklung. Im schlimmsten Fall wird sie **eingefangen** — Leichtfiguren und Bauern nehmen ihr alle Felder.\nMerke: Bring deine Dame nicht zu früh ins Spiel, und schau vor dem Bauernraub, wie sie wieder zurückkommt.' }],
+      aufgaben: [
+        { id: 'df2', typ: 'frage', vorher: 'd4 Sf6 Lg5 c5 d5 Db6 Sc3 Dxb2', frage: 'Was lernst du aus dieser Stellung?',
+          optionen: ['Bauernraub mit der Dame ist riskant', 'Die Dame gehört an den Rand'], richtig: 0 }] }
+  ] },
+
+  { id: 'k5', titel: 'Mittelspiel und Strategie', lektionen: [
+    { id: 'zentrum', titel: 'Zentrum und Entwicklung', schritte: [
+      { vorher: 'e4 e5 Sf3 Sc6 Lc4 Lc5 O-O Sf6', marken: ['d4', 'e4', 'd5', 'e5'],
+        text: 'Die drei Eröffnungsregeln:\n1. **Zentrum** besetzen (e4, d4) — von dort wirken Figuren am weitesten.\n2. **Figuren entwickeln**: erst Springer, dann Läufer — jede Figur nur einmal ziehen.\n3. **Rochieren**: König in Sicherheit, Türme verbinden.' }],
+      aufgaben: [
+        { id: 'z1', typ: 'frage', vorher: 'e4 e5 Sf3 Sc6', frage: 'Welcher Zug folgt den Regeln am besten?',
+          optionen: ['Lc4 — Läufer entwickeln', 'h4 — Randbauer', 'Dh5 — Dame früh raus'], richtig: 0 },
+        { id: 'z2', typ: 'beste', vorher: 'e4 e5 Sf3 Sc6 Lc4 Lc5', frage: 'Finde einen guten Entwicklungs- oder Rochadezug.' },
+        { id: 'z3', typ: 'frage', vorher: 'e4 e5', frage: 'Warum ist e4 ein guter erster Zug?',
+          optionen: ['Er besetzt das Zentrum und öffnet Läufer und Dame', 'Er greift den König an'], richtig: 0 },
+        { id: 'z4', typ: 'frage', vorher: 'e4 e5 Sf3 Sc6', frage: 'Wie oft solltest du in der Eröffnung dieselbe Figur ziehen?',
+          optionen: ['Möglichst nur einmal', 'So oft wie möglich'], richtig: 0, erkl: 'Jeder Zug soll eine neue Figur ins Spiel bringen.' }] },
+
+    { id: 'koenig', titel: 'Königssicherheit', schritte: [
+      { fen: 'r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 1', marken: ['g1', 'g8', 'f2', 'g2', 'h2'],
+        text: 'Ein rochierter König mit unversehrten Bauern davor ist sicher.\n• Ziehe die Bauern vor deinem König nur mit gutem Grund.\n• Ein König in der Mitte wird bei geöffneten Linien schnell angegriffen.\n• Haben die Könige auf **verschiedenen Seiten** rochiert, gewinnt oft der schnellere Bauernangriff.' }],
+      aufgaben: [
+        { id: 'ks1', typ: 'frage', fen: 'r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 1', frage: 'Welcher Bauernzug schwächt deinen König am meisten?',
+          optionen: ['g4', 'a3', 'h3'], richtig: 0, erkl: 'g4 reißt eine Lücke vor dem eigenen König — der Gegner kann eingreifen.' },
+        { id: 'ks2', typ: 'frage', fen: 'r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 1', frage: 'Weiß und Schwarz haben kurz rochiert. Wer sollte die Bauern vor dem eigenen König vorrücken?',
+          optionen: ['Am besten keiner ohne Grund', 'Beide möglichst schnell'], richtig: 0 }] },
+
+    { id: 'linien', titel: 'Offene Linien und 7. Reihe', schritte: [
+      { fen: '2r3k1/pp3ppp/8/8/8/7P/PP3PP1/3R2K1 w - - 0 1', marken: ['d1', 'd7'],
+        text: 'Türme gehören auf **offene Linien** (ohne Bauern). Von dort dringen sie bis zur **7. Reihe** vor und greifen die Bauern von hinten an. (Hier hat Weiß mit h3 vorher ein Luftloch gemacht — sonst drohte Tc1+ mit Grundreihenmatt.)\nZwei Türme auf der 7. Reihe sind oft spielentscheidend.' }],
+      aufgaben: [
+        { id: 'li1', typ: 'beste', fen: '2r3k1/pp3ppp/8/8/8/7P/PP3PP1/3R2K1 w - - 0 1', frage: 'Finde den stärksten Turmzug.', erkl: 'Td7! — der Turm frisst sich durch die 7. Reihe.' },
+        { id: 'li2', typ: 'frage', fen: '2r3k1/pp3ppp/8/8/8/7P/PP3PP1/3R2K1 w - - 0 1', frage: 'Wohin gehört ein Turm?',
+          optionen: ['Auf eine offene Linie', 'Hinter die eigenen Bauern in die Ecke'], richtig: 0 },
+        { id: 'li3', typ: 'frage', fen: '2r3k1/pp3ppp/8/8/8/7P/PP3PP1/3R2K1 w - - 0 1', frage: 'Was ist eine offene Linie?',
+          optionen: ['Eine Linie ohne Bauern', 'Eine Linie ohne Figuren', 'Die Linie vor dem König'], richtig: 0 }] },
+
+    { id: 'leicht', titel: 'Springer, Läufer, Läuferpaar', schritte: [
+      { fen: '6k1/pp4pp/2p5/3pN3/3P4/2P5/PP3PPP/6K1 w - - 0 1', marken: ['e5'],
+        text: '• **Springer** lieben **Vorposten**: Felder im gegnerischen Lager, die kein Bauer mehr angreifen kann (hier e5).\n• **Läufer** lieben **offene** Stellungen und lange Diagonalen.\n• Ein „schlechter“ Läufer steht hinter eigenen Bauern auf seiner Farbe.\n• Das **Läuferpaar** ist in offenen Stellungen etwa einen halben Bauern wert.' }],
+      aufgaben: [
+        { id: 'lf1', typ: 'frage', fen: '6k1/pp4pp/2p5/3pN3/3P4/2P5/PP3PPP/6K1 w - - 0 1', frage: 'Warum steht der Springer auf e5 so gut?',
+          optionen: ['Kein schwarzer Bauer kann ihn vertreiben — ein Vorposten', 'Weil er am Rand steht'], richtig: 0 },
+        { id: 'lf2', typ: 'frage', fen: '6k1/pp4pp/2p5/3pN3/3P4/2P5/PP3PPP/6K1 w - - 0 1', frage: 'In welcher Stellung ist ein Läufer meist besser als ein Springer?',
+          optionen: ['In offenen Stellungen mit Bauern auf beiden Flügeln', 'In geschlossenen Stellungen mit blockierten Bauern'], richtig: 0 }] },
+
+    { id: 'bauern', titel: 'Bauernstrukturen', schritte: [
+      { fen: '6k1/pp3ppp/8/8/3P4/8/P4PPP/6K1 w - - 0 1', marken: ['d4'],
+        text: '• **Isolierter Bauer** (hier d4): kein Nachbarbauer kann ihn decken — schwach im Endspiel, aber gibt Raum im Mittelspiel.\n• **Doppelbauern**: zwei Bauern auf einer Linie — schwer zu verteidigen.\n• **Freibauer**: kein gegnerischer Bauer kann ihn aufhalten — „muss laufen“.\n• **Bauernmehrheit** auf einem Flügel erzeugt einen Freibauern.' }],
+      aufgaben: [
+        { id: 'bs1', typ: 'frage', fen: '6k1/pp3ppp/8/8/3P4/8/P4PPP/6K1 w - - 0 1', frage: 'Wie nennt man den Bauern d4?',
+          optionen: ['Isolierter Bauer', 'Doppelbauer', 'Rückständiger Bauer'], richtig: 0 },
+        { id: 'bs2', typ: 'frage', fen: '8/5k2/8/1P6/8/8/5K2/8 w - - 0 1', frage: 'Was gilt für den Bauern b5?', optionen: ['Er ist ein Freibauer', 'Er ist ein Doppelbauer'], richtig: 0 },
+        { id: 'bs3', typ: 'frage', fen: '6k1/5ppp/8/8/8/2P5/2P2PPP/6K1 w - - 0 1', frage: 'Was ist mit den Bauern c2 und c3?', optionen: ['Doppelbauern — eine Schwäche', 'Ein Freibauer'], richtig: 0 },
+        { id: 'bs4', typ: 'frage', fen: '8/5k2/8/1P6/8/8/5K2/8 w - - 0 1', frage: 'Was gilt für Freibauern?', optionen: ['Freibauern müssen laufen', 'Freibauern lässt man stehen'], richtig: 0 }] },
+
+    { id: 'tausch', titel: 'Wann tauschen?', schritte: [
+      { fen: '6k1/5ppp/8/8/8/8/5PPP/3RR1K1 w - - 0 1',
+        text: 'Faustregeln:\n• **Mehr Material**: Figuren tauschen (nicht Bauern) — das Endspiel ist leichter zu gewinnen.\n• **Angreifen**: Figuren behalten.\n• **Weniger Platz**: tauschen befreit.\n• Tausche deine schlechte Figur gegen eine gute des Gegners.' }],
+      aufgaben: [
+        { id: 'ta1', typ: 'frage', fen: '6k1/5ppp/8/8/8/8/5PPP/3RR1K1 w - - 0 1', frage: 'Du hast einen Turm mehr. Was solltest du tun?',
+          optionen: ['Figuren tauschen', 'Alle Bauern tauschen', 'Keine Figur tauschen'], richtig: 0 },
+        { id: 'ta2', typ: 'frage', fen: '6k1/5ppp/8/8/8/8/5PPP/3RR1K1 w - - 0 1', frage: 'Du greifst den König an. Und jetzt?', optionen: ['Figuren behalten', 'Damen tauschen'], richtig: 0 }] },
+
+    { id: 'plan2', titel: 'Einen Plan finden', schritte: [
+      { fen: 'r2q1rk1/pp2bppp/2n1pn2/3p4/3P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 0 10',
+        text: 'Wenn keine Taktik da ist, brauchst du einen **Plan**:\n1. Wo ist der Gegner schwach (Bauern, König, Felder)?\n2. Welche meiner Figuren steht am schlechtesten? Verbessere sie.\n3. Auf welchem Flügel habe ich mehr Bauern oder Raum? Dort angreifen.' }],
+      aufgaben: [
+        { id: 'pn1', typ: 'frage', fen: 'r2q1rk1/pp2bppp/2n1pn2/3p4/3P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 0 10', frage: 'Keine Taktik in Sicht — womit beginnt ein Plan?',
+          optionen: ['Mit der Frage: Welche Figur steht am schlechtesten?', 'Mit einem zufälligen Bauernzug'], richtig: 0 },
+        { id: 'pn2', typ: 'beste', fen: 'r2q1rk1/pp2bppp/2n1pn2/3p4/3P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 0 10', frage: 'Finde einen sinnvollen Zug für Weiß.' }] }
+  ] },
+
+  { id: 'k6', titel: 'Endspiel', lektionen: [
+    { id: 'damenmatt', titel: 'Matt mit Dame', schritte: [
+      { fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1',
+        text: 'König und Dame gegen König:\n1. Die Dame schränkt den König ein — im **Springerabstand** folgen, so dass er Reihe für Reihe an den Rand muss.\n2. Steht er am Rand, kommt der eigene König heran.\n3. Dann matt — und vorher prüfen: **kein Patt**!' }],
+      aufgaben: [
+        { id: 'e1', typ: 'endspiel', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1', ziel: 'matt', limit: 20, frage: 'Setze matt in höchstens 20 Zügen.',
+          erkl: 'Dame im Springerabstand zum König, Rand, König heran, matt.' },
+        { id: 'e4', typ: 'endspiel', fen: '8/8/3k4/8/8/8/8/K6Q w - - 0 1', ziel: 'matt', limit: 20, frage: 'Noch einmal: matt in höchstens 20 Zügen.' }] },
+
+    { id: 'turmmatt', titel: 'Matt mit Turm', schritte: [
+      { fen: '8/8/8/3k4/8/4K3/8/7R w - - 0 1',
+        text: 'König und Turm gegen König:\n• Der Turm schneidet den König ab (eine Linie oder Reihe).\n• Der eigene König kommt heran — oft in **Opposition** (die Könige stehen sich gegenüber).\n• Dann gibt der Turm Schach und schiebt den König eine Reihe weiter, bis zum Rand.' }],
+      aufgaben: [
+        { id: 'e2', typ: 'endspiel', fen: '8/8/8/3k4/8/4K3/8/7R w - - 0 1', ziel: 'matt', limit: 30, frage: 'Setze matt in höchstens 30 Zügen.',
+          erkl: 'Turm schneidet ab, König in Opposition, Schach vom Turm — Reihe für Reihe.' },
+        { id: 'e3', typ: 'endspiel', fen: '8/8/2k5/8/8/8/8/R3K2R w - - 0 1', ziel: 'matt', limit: 12, frage: 'Zwei Türme: Treppenmatt in höchstens 12 Zügen.',
+          erkl: 'Die Türme ziehen abwechselnd eine Reihe vor — wie eine Treppe.' }] },
+
+    { id: 'opposition', titel: 'Opposition', schritte: [
+      { fen: '4k3/8/4K3/4P3/8/8/8/8 w - - 0 1', marken: ['e6', 'e8'],
+        text: '**Opposition**: Die Könige stehen sich mit einem Feld Abstand gegenüber. Wer **nicht** ziehen muss, hat die Opposition — der andere muss ausweichen.\nMerke: Steht dein König **vor** dem Bauern auf der 6. Reihe, gewinnst du immer (außer mit dem Randbauern).' }],
+      aufgaben: [
+        { id: 'o1', typ: 'endspiel', fen: '4k3/8/4K3/4P3/8/8/8/8 w - - 0 1', ziel: 'umwandeln', limit: 12, frage: 'Bring den Bauern durch.',
+          erkl: 'Kd6 (oder Kf6) — danach e6, e7 und der König deckt das Umwandlungsfeld.' },
+        { id: 'o2', typ: 'endspiel', fen: '8/8/4k3/8/4K3/8/4P3/8 w - - 0 1', ziel: 'umwandeln', limit: 16, frage: 'Gewinne mit der Opposition.',
+          erkl: 'Zuerst e3! — ein Wartezug: Jetzt hat Weiß die Opposition, Schwarz muss ausweichen. Dann König vor den Bauern.' },
+        { id: 'o3', typ: 'frage', fen: '4k3/8/4K3/4P3/8/8/8/8 w - - 0 1', frage: 'Was bedeutet Opposition?',
+          optionen: ['Die Könige stehen sich mit einem Feld Abstand gegenüber', 'Ein Bauer blockiert einen anderen'], richtig: 0 },
+        { id: 'o4', typ: 'frage', fen: '8/8/4k3/8/4K3/8/8/8 w - - 0 1', frage: 'Weiß ist am Zug. Wer hat die Opposition?',
+          optionen: ['Weiß', 'Schwarz — Weiß muss ausweichen'], richtig: 1 }] },
+
+    { id: 'quadrat', titel: 'Quadratregel', schritte: [
+      { fen: '8/8/8/8/P7/8/5k2/7K w - - 0 1', marken: ['a4', 'e4', 'e8', 'a8'],
+        text: 'Kann der König einen Bauern noch einholen? Zieh in Gedanken ein **Quadrat** vom Bauern bis zur Grundreihe.\nSteht der König darin (oder kann hineinziehen, wenn er am Zug ist), holt er den Bauern ein. Sonst nicht.' }],
+      aufgaben: [
+        { id: 'q1', typ: 'frage', fen: '8/8/8/8/P7/8/5k2/7K w - - 0 1', frage: 'Weiß am Zug: Holt der schwarze König den Bauern ein?',
+          optionen: ['Ja', 'Nein — er steht außerhalb des Quadrats'], richtig: 1 },
+        { id: 'q2', typ: 'frage', fen: '8/8/8/8/P2k4/8/8/7K w - - 0 1', frage: 'Und jetzt — holt er ihn ein?', optionen: ['Ja — nach a5 tritt er mit Kc5 ins Quadrat', 'Nein'], richtig: 0,
+          erkl: 'a5 Kc5 a6 Kb6 a7 Kxa7 — knapp, aber er schafft es.' },
+        { id: 'q3', typ: 'endspiel', fen: '8/8/8/8/P7/8/5k2/7K w - - 0 1', ziel: 'umwandeln', limit: 6, frage: 'Lauf!', erkl: 'Einfach a5, a6, a7, a8 — der König kommt zu spät.' }] },
+
+    { id: 'durchbruch', titel: 'Durchbruch', schritte: [
+      { fen: '7k/ppp5/8/PPP5/8/8/8/7K w - - 0 1', marken: ['b6'],
+        text: 'Drei gegen drei Bauern, die Könige weit weg: **b6!** bricht durch.\nNach axb6 folgt c6! und nach bxc6 läuft a6 durch (oder umgekehrt). Ein Bauer kommt immer zur Dame.' }],
+      aufgaben: [
+        { id: 'd1', typ: 'endspiel', fen: '7k/ppp5/8/PPP5/8/8/8/7K w - - 0 1', ziel: 'umwandeln', limit: 8, frage: 'Brich durch und wandle um!', erkl: 'b6! — dann c6 oder a6.' }] },
+
+    { id: 'freibauer', titel: 'Freibauern und Türme', schritte: [
+      { fen: '8/5pk1/8/P7/8/8/5PK1/R7 w - - 0 1', marken: ['a1', 'a5'],
+        text: '• **Freibauern müssen laufen** — und werden vom König oder Turm begleitet.\n• Der **Turm gehört hinter den Freibauern** — hinter den eigenen (er schiebt mit) und hinter den gegnerischen (er bremst von hinten).\n• Ein **entfernter Freibauer** lenkt den gegnerischen König ab, während dein König die anderen Bauern holt.' }],
+      aufgaben: [
+        { id: 'fb1', typ: 'frage', fen: '8/5pk1/8/P7/8/8/5PK1/R7 w - - 0 1', frage: 'Wo steht der Turm beim eigenen Freibauern am besten?',
+          optionen: ['Hinter dem Bauern', 'Vor dem Bauern'], richtig: 0 },
+        { id: 'fb2', typ: 'endspiel', fen: '8/8/5k2/8/P7/8/5K2/8 w - - 0 1', ziel: 'umwandeln', limit: 10, frage: 'Bring den Freibauern durch.', erkl: 'Der König ist außerhalb des Quadrats — einfach laufen.' }] },
+
+    { id: 'lucena', titel: 'Turmendspiel: Lucena', schritte: [
+      { fen: '1K6/1P1k4/8/8/8/8/r7/2R5 w - - 0 1', marken: ['b8', 'b7', 'c1'],
+        text: 'Die **Lucena-Stellung** ist gewonnen: Der eigene König steht vor dem Bauern, der gegnerische ist abgeschnitten.\nGewinnweg: **„Brücke bauen“** — erst Td1+ (König weiter weg), dann Td4. Der König kommt heraus, und gegen die Turmschachs von hinten stellt sich der Turm auf der 4. Reihe dazwischen.' }],
+      aufgaben: [
+        { id: 'lu1', typ: 'endspiel', fen: '1K6/1P1k4/8/8/8/8/r7/2R5 w - - 0 1', ziel: 'umwandeln', limit: 20, frage: 'Gewinne die Lucena-Stellung.',
+          erkl: 'Td1+ Ke7, Td4! — dann Kc7; gegen die Schachs Kb6, Kc6, Kb5 — und Tb4 deckt ab.' }] },
+
+    { id: 'philidor', titel: 'Turmendspiel: Philidor', schritte: [
+      { fen: '4k3/R7/1r6/4PK2/8/8/8/8 b - - 0 1', marken: ['b6'],
+        text: 'Die **Philidor-Stellung** ist remis — wenn der Verteidiger es weiß:\n• Der Turm bleibt auf der **6. Reihe** (aus Sicht des Angreifers) und hält den weißen König fern.\n• Erst wenn der Bauer auf die 6. Reihe zieht, geht der Turm nach hinten und gibt **Schach von hinten**.' }],
+      aufgaben: [
+        { id: 'ph1', typ: 'endspiel', fen: '4k3/R7/1r6/4PK2/8/8/8/8 b - - 0 1', ziel: 'remis', limit: 15, frage: 'Du spielst Schwarz: Halte 15 Züge Remis.',
+          erkl: 'Turm auf der 6. Reihe lassen (Tb6/Tc6). Kommt e6, dann Tb1 und Schach von hinten.' }] },
+
+    { id: 'festungen', titel: 'Remisfestungen', schritte: [
+      { fen: '7k/8/7K/7P/8/8/2B5/8 w - - 0 1', marken: ['h8'],
+        text: 'Nicht jedes Mehr gewinnt:\n• **Falscher Läufer**: Randbauer und ein Läufer, der das Umwandlungsfeld nicht beherrscht (hier h8 dunkel, Läufer hell) — steht der König in der Ecke, ist es remis.\n• **Ungleichfarbige Läufer**: oft remis, sogar mit zwei Bauern weniger.\n• König gegen **Turmbauer**: Erreicht der König die Ecke, ist es remis.' }],
+      aufgaben: [
+        { id: 'fs1', typ: 'frage', fen: '7k/8/7K/7P/8/8/2B5/8 w - - 0 1', frage: 'Kann Weiß hier gewinnen?',
+          optionen: ['Ja', 'Nein — falscher Läufer, der König sitzt in der Ecke'], richtig: 1 },
+        { id: 'fs2', typ: 'frage', fen: '4k3/8/8/3b4/8/4P3/3BK3/8 w - - 0 1', frage: 'Läufer verschiedener Farbe, Weiß hat einen Bauern mehr. Meist …',
+          optionen: ['… gewinnt Weiß leicht', '… ist es remis'], richtig: 1 },
+        { id: 'fs3', typ: 'frage', fen: '7k/8/6K1/7P/8/8/8/8 w - - 0 1', frage: 'König und Randbauer gegen König in der Ecke. Wie endet das?',
+          optionen: ['Weiß gewinnt', 'Remis — Weiß kann den König nicht aus der Ecke vertreiben'], richtig: 1 }] }
+  ] }
+];
+
+/* Zehn Grunderöffnungen: Hauptvariante, Erklärungen je Halbzug (1 = erster Zug) */
+var SCH_EROEFFNUNGEN = [
+  { id: 'italienisch', name: 'Italienische Partie', gruppe: '1. e4 e5 — Offene Spiele', seite: 'w',
+    zuege: 'e4 e5 Sf3 Sc6 Lc4 Lc5 c3 Sf6 d3 d6 O-O O-O',
+    erkl: { 1: 'Zentrum besetzen, Läufer und Dame bekommen Luft.', 3: 'Entwickelt und greift e5 an.', 5: 'Der Läufer zielt auf f7, den schwächsten Punkt bei Schwarz.',
+            7: 'Bereitet d4 vor — Weiß will das Zentrum.', 9: 'Ruhig und solide: e4 ist gedeckt.', 11: 'König in Sicherheit, Turm ins Spiel.' },
+    idee: 'Schnell entwickeln, f7 im Blick behalten, später mit d4 (oder Sbd2–f1–g3) spielen.',
+    falle: 'Nicht zu früh auf f7 losgehen — und auf 3… Sd4 nicht gierig Sxe5? (siehe Kapitel 3).' },
+  { id: 'spanisch', name: 'Spanische Partie', gruppe: '1. e4 e5 — Offene Spiele', seite: 'w',
+    zuege: 'e4 e5 Sf3 Sc6 Lb5 a6 La4 Sf6 O-O Le7 Te1 b5 Lb3 d6 c3 O-O',
+    erkl: { 5: 'Der Läufer greift den Verteidiger von e5 an.', 6: 'Schwarz stellt die Frage an den Läufer.', 7: 'Der Läufer bleibt auf der Diagonale.',
+            9: 'Erst rochieren — der Bauer e4 ist indirekt gedeckt.', 11: 'Deckt e4 und bereitet c3/d4 vor.', 15: 'Vorbereitung für d4.' },
+    idee: 'Langfristiger Druck auf e5 und das Zentrum; c3 und d4 sind der Plan.',
+    falle: 'Nach 4. Lxc6 dxc6 5. Sxe5? holt Schwarz den Bauern mit Dd4 zurück.' },
+  { id: 'schottisch', name: 'Schottische Partie', gruppe: '1. e4 e5 — Offene Spiele', seite: 'w',
+    zuege: 'e4 e5 Sf3 Sc6 d4 exd4 Sxd4 Sf6 Sxc6 bxc6 e5 De7 De2 Sd5',
+    erkl: { 5: 'Sofort das Zentrum öffnen.', 7: 'Zurückschlagen mit Zentrumsspringer.', 9: 'Tausch, um mit e5 Raum zu gewinnen.', 11: 'Vertreibt den Springer.' },
+    idee: 'Offenes Spiel, klare Pläne, freie Figuren.', falle: 'Nach 4… Dh4 greift Schwarz e4 an — Weiß antwortet mit Sc3 oder Sb5.' },
+  { id: 'sizilianisch', name: 'Sizilianische Verteidigung', gruppe: '1. e4 — Halboffene Spiele', seite: 'b',
+    zuege: 'e4 c5 Sf3 d6 d4 cxd4 Sxd4 Sf6 Sc3 a6',
+    erkl: { 2: 'Schwarz kämpft von der Seite um d4 — unsymmetrisch und scharf.', 4: 'Hält e5 unter Kontrolle.', 6: 'Tauscht einen Flügelbauern gegen einen Zentrumsbauern.',
+            8: 'Greift e4 an.', 10: 'Najdorf: verhindert Sb5 und bereitet e5 oder b5 vor.' },
+    idee: 'Schwarz bekommt die halboffene c-Linie und spielt auf dem Damenflügel, Weiß greift oft am Königsflügel an.',
+    falle: 'Nicht zu langsam spielen — in Sizilianisch zählt jedes Tempo.' },
+  { id: 'franzoesisch', name: 'Französische Verteidigung', gruppe: '1. e4 — Halboffene Spiele', seite: 'b',
+    zuege: 'e4 e6 d4 d5 Sc3 Sf6 Lg5 Le7 e5 Sfd7',
+    erkl: { 2: 'Bereitet d5 vor — solide.', 4: 'Greift e4 sofort an.', 6: 'Erhöht den Druck auf e4.', 8: 'Löst die Fesselung.', 10: 'Der Springer weicht nach d7 aus und plant c5.' },
+    idee: 'Schwarz greift die weiße Bauernkette mit c5 (und später f6) an.', falle: 'Der Läufer c8 bleibt leicht eingesperrt — er braucht einen Plan (b6/La6).' },
+  { id: 'carokann', name: 'Caro-Kann', gruppe: '1. e4 — Halboffene Spiele', seite: 'b',
+    zuege: 'e4 c6 d4 d5 Sc3 dxe4 Sxe4 Lf5 Sg3 Lg6',
+    erkl: { 2: 'Bereitet d5 vor, ohne den Läufer c8 einzusperren.', 6: 'Tauscht im Zentrum.', 8: 'Der Läufer kommt vor die Bauernkette.', 10: 'Bleibt auf der Diagonale.' },
+    idee: 'Sehr solide: gesunde Bauern, aktiver Damenläufer, später e6 und c5.', falle: 'Nicht zu passiv werden — Schwarz braucht später c5 oder e5.' },
+  { id: 'skandinavisch', name: 'Skandinavische Verteidigung', gruppe: '1. e4 — Halboffene Spiele', seite: 'b',
+    zuege: 'e4 d5 exd5 Dxd5 Sc3 Da5 d4 Sf6 Sf3 c6',
+    erkl: { 2: 'Sofort gegen e4.', 4: 'Die Dame schlägt zurück — sie wird gleich angegriffen.', 6: 'Die Dame geht nach a5, dort ist sie sicher.', 10: 'Gibt der Dame einen Rückzug und bereitet Lf5 vor.' },
+    idee: 'Einfach und klar: Schwarz entwickelt den Läufer nach f5 oder g4.', falle: 'Die Dame nicht zu oft ziehen — Weiß gewinnt Entwicklungsvorsprung.' },
+  { id: 'damengambit', name: 'Damengambit', gruppe: '1. d4 — Geschlossene Spiele', seite: 'w',
+    zuege: 'd4 d5 c4 e6 Sc3 Sf6 Lg5 Le7 e3 O-O Sf3 Sbd7',
+    erkl: { 3: 'Weiß bietet einen Bauern an, um das Zentrum zu gewinnen.', 4: 'Abgelehnt: Schwarz hält d5.', 7: 'Fesselt den Springer f6.', 9: 'Öffnet den Läufer f1.' },
+    idee: 'Druck gegen d5, Minoritätsangriff (b4–b5) oder Angriff am Königsflügel.', falle: 'Nach 2… dxc4 sollte Schwarz den Bauern nicht mit b5 halten wollen — nach e3 und a4 kommt er zurück, oft mit Vorteil für Weiß.' },
+  { id: 'koenigsindisch', name: 'Königsindische Verteidigung', gruppe: '1. d4 — Geschlossene Spiele', seite: 'b',
+    zuege: 'd4 Sf6 c4 g6 Sc3 Lg7 e4 d6 Sf3 O-O Le2 e5',
+    erkl: { 4: 'Bereitet Lg7 vor — Fianchetto.', 6: 'Läufer auf der langen Diagonale.', 10: 'König in Sicherheit.', 12: 'Schwarz greift das Zentrum an.' },
+    idee: 'Weiß bekommt Raum, Schwarz kontert mit e5 (oder c5) und greift oft am Königsflügel mit f5 an.', falle: 'Nicht zu passiv bleiben — ohne e5 oder c5 erstickt Schwarz.' },
+  { id: 'london', name: 'Londoner System', gruppe: '1. d4 — Geschlossene Spiele', seite: 'w',
+    zuege: 'd4 d5 Lf4 Sf6 e3 e6 Sf3 c5 c3 Sc6 Sbd2 Ld6',
+    erkl: { 3: 'Der Läufer kommt vor die Bauernkette.', 5: 'Stabiles Zentrum.', 9: 'Festigt d4.', 11: 'Springer nach d2, bereitet e4 oder Se5 vor.' },
+    idee: 'Ein System gegen fast alles: gleiche Aufstellung, wenig Theorie, solide.', falle: 'Auf Db6 (Angriff auf b2) achten — Db3 oder Dc1 decken.' }
+];
 
 var DB = leereDatenbank();
 

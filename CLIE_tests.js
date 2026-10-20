@@ -2999,6 +2999,234 @@ function schachTest() {
   S.cl.sch.p = null;
 }
 
+/* ============================================================
+   51. Schach: Bereiche, Partien speichern, Nachspielen, PGN, Analyse, Tipp, Buch (0.22)
+   Grund: Partien sollen bleiben, nachgespielt, geteilt und auf Fehler
+   geprüft werden; CLIE spielt am Anfang Buchzüge und gibt Tipps.
+   Erkennt: Speichern/Laden kaputt, falsche PGN, Nachspielen springt
+   falsch, „Ab hier spielen“ verliert Züge, Analyse erkennt groben Fehler
+   nicht, Kapitel 7 bekommt keine eigenen Fehler, Buch falsch erkannt.
+   ============================================================ */
+function schachPartienTest() {
+  console.log('\n51. Schach: Partien, Nachspielen, PGN, Analyse, Tipp, Buch (0.22)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-schach']; delete S.__ablage['clie-schach-partien']; delete S.__ablage['clie-schach-schule'];
+  S.cl.sch.p = null; S.cl.sch.bereich = 'spielen'; S.cl.sch.fenster = ''; S.cl.sch.pv = { id: '', k: 0, laeuft: false, stand: 0 }; S.cl.sch.ue = null;
+  S.oeffne('schach');
+  let h = inhalt();
+  pruefe(/schBereich\('spielen'\)[\s\S]*schBereich\('partien'\)[\s\S]*schBereich\('schule'\)[\s\S]*schBereich\('eroeffnungen'\)/.test(h), 'vier Bereiche: Spielen, Partien, Schule, Eröffnungen');
+  pruefe(/schTippZeigen\(\)">Tipp/.test(S.document.getElementById('fuss').innerHTML), 'Spielen: Knopf „Tipp“');
+  /* Buch */
+  pruefe(S.schBuchName(['e4', 'e5', 'Sf3', 'Sc6', 'Lc4']) === 'Italienische Partie' && S.schBuchName(['e4', 'c5']) === 'Sizilianische Verteidigung' && S.schBuchName(['a3']) === '',
+    'Eröffnung wird erkannt');
+  const fort = S.schBuchFortsetzungen(['e4', 'e5', 'Sf3', 'Sc6']);
+  pruefe(fort.indexOf('Lc4') >= 0 && fort.indexOf('Lb5') >= 0 && fort.indexOf('d4') >= 0, 'Buchzüge zur Auswahl: Lc4, Lb5, d4');
+  /* Partie zu zweit spielen und speichern */
+  S.cl.sch.gegner = 'zwei'; S.cl.sch.farbe = 'w'; S.cl.sch.stufe = 'mittel'; S.cl.sch.dreh = false;
+  S.schAufbauen([]);
+  ['e4', 'e5', 'Sf3', 'Sc6', 'Lc4'].forEach(k => S.schZugAusfuehren(S.schAusKurz(S.cl.sch.p, k), false));
+  S.zeichne();
+  pruefe(/Italienische Partie · Schwarz am Zug/.test(inhalt()), 'Statuszeile nennt die Eröffnung');
+  S.schTippZeigen();
+  pruefe(/^Tipp: CLIE würde \S+ spielen\.$/.test(S.cl.sch.tipp) && S.cl.sch.wahl >= 0 && /class="sch-hinweis"/.test(inhalt()), 'Tipp zeigt den Zug von CLIE und markiert die Figur');
+  S.schSpeichernOeffnen();
+  pruefe(/Partie speichern/.test(inhalt()) && /id="schName"[^>]*value="2 Spieler"/.test(inhalt()), 'Speichern: Fenster mit Namensvorschlag');
+  S.document.getElementById('schName').value = 'Testpartie';
+  S.schSpeichernOk();
+  let l = JSON.parse(S.__ablage['clie-schach-partien']);
+  pruefe(l.length === 1 && l[0].name === 'Testpartie' && l[0].zuege.length === 5 && l[0].kurz.join(' ') === 'e4 e5 Sf3 Sc6 Lc4' && l[0].ergebnis === '*' && l[0].eroeffnung === 'Italienische Partie',
+    'gespeichert: Name, Züge, Kurzschrift, Ergebnis, Eröffnung — nur auf dem Gerät');
+  pruefe(!/Testpartie/.test(JSON.stringify(S.DB)), 'nicht in der workbench.json');
+  const pgn = S.schPgn(l[0]);
+  pruefe(/\[Event "Testpartie"\]/.test(pgn) && /\[Result "\*"\]/.test(pgn) && /1\. e4 e5 2\. Nf3 Nc6 3\. Bc4 \*/.test(pgn), 'PGN mit englischen Figurenbuchstaben');
+  /* Nachspielen */
+  S.schBereich('partien');
+  pruefe(/Testpartie/.test(inhalt()) && /Italienische Partie · 3 Züge/.test(inhalt()) && S.document.getElementById('katKnopf').textContent === '1', 'Liste der Partien');
+  S.schPartieOeffnen(l[0].id);
+  pruefe(/0 \/ 5/.test(inhalt()) && /schAbHier\(\)/.test(S.document.getElementById('fuss').innerHTML), 'Nachspielen: Anfang, Knöpfe');
+  S.schNachSchritt(1); S.schNachSchritt(1);
+  pruefe(S.cl.sch.pv.k === 2 && /2 \/ 5/.test(inhalt()) && /<b>e5<\/b>/.test(inhalt()), '▶ zweimal: nach 1… e5, Zug hervorgehoben');
+  S.schNachSchritt(99);
+  pruefe(S.cl.sch.pv.k === 5, '⏭ ans Ende');
+  S.schNachGehe(3);
+  S.schAbHier();
+  pruefe(S.cl.sch.bereich === 'spielen' && S.cl.sch.zuege.map(z => z.kurz).join(' ') === 'e4 e5 Sf3', '„Ab hier spielen“ übernimmt die ersten drei Halbzüge');
+  /* Umbenennen und Löschen */
+  S.schBereich('partien'); S.schPartieOeffnen(l[0].id); S.schMehrOeffnen();
+  S.document.getElementById('schName').value = 'Neu benannt';
+  S.schUmbenennen();
+  pruefe(JSON.parse(S.__ablage['clie-schach-partien'])[0].name === 'Neu benannt', 'umbenennen');
+  /* Analyse */
+  const pb = S.schAusFen('rnbqkbnr/ppp2ppp/3p4/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3');
+  const ana = S.schAnalyseZug(pb, S.schAusKurz(pb, 'Dg4'));
+  pruefe(ana && ana.verlust >= 600 && ana.besser && ana.besser !== 'Dg4', 'Analyse erkennt den groben Fehler Dg4?? (' + (ana && ana.verlust) + ')');
+  S.schAnalyseFertig(l[0].id, [{ ply: 2, kurz: 'Dg4', besser: 'Sf3', verlust: 900, fen: S.schFen(pb) }]);
+  S.zeichne();
+  pruefe(/Dg4\?\?<small>besser: Sf3<\/small>/.test(inhalt()) && /−9,0/.test(inhalt()), 'Analyse-Ergebnis: ?? mit besserem Zug und Bauernwert');
+  const eig = S.schEigeneAufgaben();
+  pruefe(eig.length === 1 && eig[0].typ === 'beste' && S.schKapitelListe().slice(-1)[0].id === 'k7' && S.schKapitelListe().slice(-1)[0].lektionen[0].aufgaben.length === 1,
+    'Kapitel 7: der Fehler wird zur Aufgabe');
+  pruefe(S.schFen(S.schAusFen(S.SCH_START)) === S.SCH_START, 'FEN hin und zurück');
+  S.schEbeneHoch();
+  pruefe(!S.cl.sch.pv.id && /Neu benannt/.test(inhalt()), 'Fertig/Zurück: wieder zur Liste');
+  S.schPartieOeffnen(l[0].id); S.schPartieLoeschen();
+  pruefe(JSON.parse(S.__ablage['clie-schach-partien']).length === 0, 'löschen');
+  /* Spielende bietet Speichern */
+  S.schBereich('spielen');
+  S.cl.sch.gegner = 'zwei';
+  S.schAufbauen([]);
+  ['f3', 'e5', 'g4', 'Dh4'].forEach(k => S.schZugAusfuehren(S.schAusKurz(S.cl.sch.p, k), true));
+  S.cl.sch.fenster = '';
+  S.zeichne();
+  pruefe(/Schachmatt/.test(inhalt()) && /schSpeichernOeffnen\(\)">Speichern/.test(inhalt()), 'Spielende: „Speichern“ im Fenster');
+  delete S.__ablage['clie-schach'];
+  S.cl.sch.p = null;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   52. Schachschule und Eröffnungen (0.22)
+   Grund: Lernen mit Lektionen, Aufgaben, Endspielen und Eröffnungen.
+   Falsche Inhalte (unmögliche Züge, Matt ohne Matt, „Gewinn“ ohne
+   Gewinn) würden falsch lehren — darum wird jede Aufgabe nachgerechnet.
+   Erkennt: inhaltliche Fehler, Aufgabe nimmt richtige Züge nicht an
+   oder falsche an, Fortschritt geht verloren, Endspiel-/Übungsablauf
+   kaputt, Weiterlernen springt falsch.
+   ============================================================ */
+function schuleTest() {
+  console.log('\n52. Schachschule und Eröffnungen (0.22)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-schach-schule']; delete S.__ablage['clie-schach-partien'];
+  /* Inhalte nachrechnen */
+  let lekt = 0, aufg = 0, fehlerL = [];
+  const ids = {};
+  const pruefStellung = (x) => { const p = S.schStellungAus(x); return S.schKoenig(p, true) >= 0 && S.schKoenig(p, false) >= 0 && !S.schAngegriffen(p, S.schKoenig(p, !p.w), p.w) ? p : null; };
+  S.SCH_SCHULE.forEach(k => k.lektionen.forEach(l => {
+    lekt++;
+    l.schritte.forEach(sc => { if (!pruefStellung(sc)) { fehlerL.push(l.id + ' Schritt'); } (sc.marken || []).forEach(m => { if (!/^[a-h][1-8]$/.test(m)) { fehlerL.push(l.id + ' Marke'); } }); });
+    (l.aufgaben || []).forEach(a => {
+      aufg++;
+      if (ids[a.id]) { fehlerL.push(a.id + ' doppelt'); } ids[a.id] = 1;
+      if (a.vorher) { let q = S.schAusFen(S.SCH_START); a.vorher.split(' ').forEach(z => { const m = S.schAusKurz(q, z); if (!m) { fehlerL.push(a.id + ' vorher ' + z); } else { S.schMachen(q, m); } }); }
+      const p = pruefStellung(a);
+      if (!p) { fehlerL.push(a.id + ' Stellung'); return; }
+      const typ = a.typ || 'zug';
+      if (typ === 'frage') { if (!(a.optionen && a.richtig >= 0 && a.richtig < a.optionen.length)) { fehlerL.push(a.id + ' Frage'); } return; }
+      if (typ === 'endspiel') { if (['matt', 'umwandeln', 'remis'].indexOf(a.ziel) < 0 || !(a.limit > 0)) { fehlerL.push(a.id + ' Ziel'); } return; }
+      if (typ === 'beste') { if (!S.schZuege(p).length) { fehlerL.push(a.id + ' keine Züge'); } return; }
+      const ich = p.w ? 'w' : 'b';
+      const vor = S.schMaterial(p, ich);
+      for (const z of a.loesung) { const m = S.schAusKurz(p, z); if (!m) { fehlerL.push(a.id + ' Zug ' + z); return; } S.schMachen(p, m); }
+      if (a.matt && !(S.schImSchach(p) && !S.schZuege(p).length)) { fehlerL.push(a.id + ' kein Matt'); }
+      if (a.gewinn > 0 && S.schMaterial(p, ich) - vor < a.gewinn) { fehlerL.push(a.id + ' kein Gewinn'); }
+    });
+  }));
+  pruefe(lekt >= 38 && aufg >= 100, 'Umfang: ' + lekt + ' Lektionen, ' + aufg + ' Aufgaben');
+  pruefe(!fehlerL.length, 'alle Stellungen legal, alle Lösungen spielbar, jedes Matt ist Matt, jeder Gewinn ist Gewinn' + (fehlerL.length ? ' — ' + fehlerL.join(', ') : ''));
+  const ef = [];
+  S.SCH_EROEFFNUNGEN.forEach(e => {
+    const p = S.schAusFen(S.SCH_START); const z = S.schBuchListe(e);
+    z.forEach(k => { const m = S.schAusKurz(p, k); if (!m) { ef.push(e.id + ' ' + k); } else { S.schMachen(p, m); } });
+    Object.keys(e.erkl || {}).forEach(n => { if (+n < 1 || +n > z.length) { ef.push(e.id + ' erkl ' + n); } });
+    if (!e.idee || !e.falle) { ef.push(e.id + ' Text'); }
+  });
+  pruefe(S.SCH_EROEFFNUNGEN.length === 10 && !ef.length, '10 Eröffnungen, alle Züge spielbar' + (ef.length ? ' — ' + ef.join(', ') : ''));
+
+  /* Oberfläche */
+  S.cl.sch.p = null; S.cl.sch.bereich = 'schule'; S.cl.sch.sv = { kapitel: '', lektion: '', schritt: 0, aufgabe: -1 }; S.cl.sch.ue = null; S.cl.sch.fenster = '';
+  S.oeffne('schach');
+  let h = inhalt();
+  pruefe((h.match(/schKapitelOeffnen\('/g) || []).length === 7 && /Aus eigenen Partien lernen/.test(h) && /schWeiterlernen\(\)/.test(S.document.getElementById('fuss').innerHTML), 'Schule: 7 Kapitel und „Weiterlernen“');
+  pruefe(/^0 \/ \d+$/.test(S.document.getElementById('katKnopf').textContent), 'oben rechts: erledigte Lektionen');
+  S.schWeiterlernen();
+  pruefe(S.cl.sch.sv.lektion === 'rochade' && /Rochade/.test(inhalt()) && /sch-f [hd][^"]*feldmarke/.test(inhalt()), 'Weiterlernen öffnet die erste Lektion, Felder markiert');
+  S.schSchrittGehe(1);
+  pruefe(S.cl.sch.sv.schritt === 1 && /verboten/.test(inhalt()), 'Schritt weiter');
+  const zieh = (k) => { const m = S.schAusKurz(S.cl.sch.ue.p, k); S.schUeTipp(m.f); S.schUeTipp(m.t); };
+  S.schAufgabeOeffnen(0);
+  pruefe(S.cl.sch.ue && /Bring deinen König/.test(inhalt()), 'Aufgabe 1 offen');
+  zieh('O-O');
+  pruefe(S.cl.sch.ue.ok === true && JSON.parse(S.__ablage['clie-schach-schule']).a.r1 === 1 && /schUeWeiter\(\)">Nächste/.test(S.document.getElementById('fuss').innerHTML), 'richtig gelöst: gemerkt, „Nächste“');
+  S.schUeWeiter();
+  pruefe(S.cl.sch.sv.aufgabe === 1 && /Welche Rochade darf/.test(inhalt()) && /schUeAntwort\(1\)/.test(inhalt()), 'nächste Aufgabe: Frage mit Auswahl');
+  S.schUeAntwort(0);
+  pruefe(S.cl.sch.ue.ok === false && S.cl.sch.ue.fehler === 1 && /class="knopf falsch"/.test(inhalt()), 'falsche Antwort: markiert, Fehler gezählt');
+  S.schUeAntwort(1);
+  pruefe(S.cl.sch.ue.ok === true && /Läufer a6/.test(inhalt()), 'richtige Antwort mit Erklärung');
+  /* Kombination mit Antwort des Gegners, falscher Zug */
+  S.cl.sch.sv = { kapitel: 'k2', lektion: 'sst', schritt: 0, aufgabe: -1 };
+  S.schAufgabeOeffnen(0);
+  zieh('Dd8+');
+  pruefe(S.cl.sch.ue.ok === false && /^Nicht ganz\./.test(S.cl.sch.ue.meldung) && S.cl.sch.ue.p.b.join('') === S.schStellungAus(S.cl.sch.ue.a).b.join(''), 'falscher Zug: „Nicht ganz“, Stellung bleibt');
+  zieh('Da4+');
+  pruefe(S.cl.sch.ue.idx === 2 && S.cl.sch.ue.ok === null && /Gut! Weiter/.test(S.cl.sch.ue.meldung), 'richtiger Zug, Gegner antwortet aus der Lösung');
+  zieh('Dxe4');
+  pruefe(S.cl.sch.ue.ok === true, 'Kombination gelöst');
+  /* Matt mit Umwandlung: jedes Matt zählt */
+  S.cl.sch.sv = { kapitel: 'k1', lektion: 'umwandlung', schritt: 0, aufgabe: -1 };
+  S.schAufgabeOeffnen(1);
+  const mu = S.schZuege(S.cl.sch.ue.p).filter(m => m.pr === 'R')[0];
+  S.schUeTipp(mu.f); S.schUeTipp(mu.t);
+  pruefe(S.cl.sch.fenster === 'umwandeln' && /Umwandeln in/.test(inhalt()), 'Umwandlung im Übungsbrett: Auswahl');
+  S.schUmwandeln('r');
+  pruefe(S.cl.sch.ue.ok === true, 'auch c8=T ist Matt — wird angenommen');
+  /* Beste-Aufgabe */
+  S.cl.sch.sv = { kapitel: 'k2', lektion: 'patzer', schritt: 0, aufgabe: -1 };
+  S.schAufgabeOeffnen(0);
+  zieh('h3');
+  pruefe(S.cl.sch.ue.ok === false && /kostet/.test(S.cl.sch.ue.meldung), 'beste: schlechter Zug wird abgelehnt');
+  zieh('Df3');
+  pruefe(S.cl.sch.ue.ok === false, 'beste: Df3?? (Lxf3) wird abgelehnt');
+  zieh('g3');
+  pruefe(S.cl.sch.ue.ok === true, 'beste: g3 verteidigt — angenommen');
+  /* Endspiel gegen CLIE */
+  S.cl.sch.sv = { kapitel: 'k6', lektion: 'opposition', schritt: 0, aufgabe: -1 };
+  S.schAufgabeOeffnen(0);
+  pruefe(/Zug 0 \/ 12/.test(inhalt()) && /schUeZurueck\(\)/.test(S.document.getElementById('fuss').innerHTML), 'Endspiel: Zugzähler, Zurück, Neu starten');
+  zieh('Kd6');
+  pruefe(S.cl.sch.ue.denkt === true && S.cl.sch.ue.zugZahl === 1, 'nach deinem Zug denkt CLIE');
+  S.schUeClieZug();
+  pruefe(!S.cl.sch.ue.denkt && S.cl.sch.ue.p.w && S.cl.sch.ue.verlauf.length === 2, 'CLIE antwortet');
+  S.schUeZurueck();
+  pruefe(S.cl.sch.ue.verlauf.length === 0 && S.cl.sch.ue.zugZahl === 0, 'Zurück nimmt beide Halbzüge zurück');
+  /* Ziel erreicht: Umwandlung gesichert */
+  S.cl.sch.ue.p = S.schAusFen('8/4P1k1/4K3/8/8/8/8/8 w - - 0 1'); S.cl.sch.ue.schl = [S.schSchluessel(S.cl.sch.ue.p)];
+  const mp = S.schAusKurz(S.cl.sch.ue.p, 'e8=D');
+  S.schUeTipp(mp.f); S.schUeTipp(mp.t); S.schUmwandeln('q');
+  S.schUeClieZug();
+  pruefe(S.cl.sch.ue.ok === true && /gewonnen/.test(S.cl.sch.ue.meldung), 'Umwandlung gesichert: Ziel erreicht');
+  /* Eröffnung üben */
+  S.cl.sch.ue = null;
+  S.schBereich('eroeffnungen');
+  pruefe((inhalt().match(/schEroeffnungOeffnen\('/g) || []).length === 10, 'Eröffnungen: 10 in der Liste');
+  S.schEroeffnungOeffnen('italienisch');
+  S.schEroeffnungGehe(5);
+  pruefe(/3\. Lc4<\/b> — Der Läufer zielt auf f7/.test(inhalt()) && /Idee:/.test(inhalt()), 'Durchspielen: Zug 3. Lc4 mit Erklärung, Idee');
+  S.schEroeffnungUeben();
+  zieh('e4');
+  pruefe(S.cl.sch.ue.idx === 2 && S.cl.sch.ue.ok === null, 'Üben: e4 richtig, CLIE antwortet e5');
+  zieh('d4');
+  pruefe(S.cl.sch.ue.ok === false && /Hier spielt man Sf3/.test(S.cl.sch.ue.meldung), 'Üben: falscher Zug — Hinweis auf den Buchzug');
+  ['Sf3', 'Lc4', 'c3', 'd3', 'O-O'].forEach(zieh);
+  pruefe(S.cl.sch.ue.ok === true && JSON.parse(S.__ablage['clie-schach-schule']).e.italienisch === undefined, 'durchgespielt — mit Fehler noch kein ★');
+  S.schEroeffnungUeben();
+  ['e4', 'Sf3', 'Lc4', 'c3', 'd3', 'O-O'].forEach(zieh);
+  pruefe(JSON.parse(S.__ablage['clie-schach-schule']).e.italienisch === 1, 'fehlerfrei: ★ geübt');
+  S.cl.sch.ue = null; S.cl.sch.ev.id = '';
+  S.zeichne();
+  pruefe(/Italienische Partie<small>[^<]*<\/small><\/span><b>★<\/b>/.test(inhalt()), 'in der Liste mit ★');
+  S.schEroeffnungOeffnen('sizilianisch');
+  S.schEroeffnungUeben();
+  pruefe(S.cl.sch.ue.ich === 'b' && S.cl.sch.ue.idx === 1 && !S.cl.sch.ue.p.w, 'Schwarz üben: CLIE spielt den ersten Zug');
+  S.cl.sch.ue = null; S.cl.sch.ev.id = ''; S.cl.sch.bereich = 'spielen';
+  delete S.__ablage['clie-schach-schule'];
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -3046,6 +3274,8 @@ function schachTest() {
   try { await driveTest(); } catch (e) { fail('Drive warf: ' + e.message); }
   try { await driveRechtTest(); } catch (e) { fail('Drive-Recht warf: ' + e.message); }
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
+  try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
+  try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
