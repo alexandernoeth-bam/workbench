@@ -841,13 +841,13 @@ function aufgabenTest() {
     'alle offenen Aufgaben aus laufenden Projekten, Zielen und Listen');
   pruefe(!/versteckt/.test(h) && !/Pläne/.test(h) && !/Teich/.test(h) && !/in einer Notiz/.test(h),
     'nicht: Ruhendes, Erledigtes, nicht Relevantes, Notizen');
-  pruefe(/<div class="gruppe">◎ Büro<\/div>/.test(h) && /<div class="gruppe">≡ Garten<\/div>/.test(h) && !/class="q">/.test(h),
-    'seit 0.6 nach Liste gruppiert — keine zweite Spalte, der Titel hat die volle Breite');
+  pruefe(/class="gruppe klick" onclick="aufGanzUm\('p1'\)"><span>◎ Büro<\/span><small>1<\/small><\/button>/.test(h) && /<span>≡ Garten<\/span>/.test(h) && !/class="q">/.test(h),
+    'nach Liste gruppiert (Überschrift mit Zahl, seit 0.17) — keine zweite Spalte, der Titel hat die volle Breite');
   pruefe(/class="tx umbruch"/.test(h), 'lange Titel brechen um');
-  CL.aufKategorienUm();
-  pruefe(!/class="gruppe"/.test(inhalt()) && CL.__ablage['clie-aufgaben-kategorien'] === 'aus' && /Kategorien an/.test(CL.document.getElementById('fuss').innerHTML),
-    '„Kategorien aus“: flache Liste ohne Herkunft, gemerkt');
-  CL.aufKategorienUm();
+  CL.aufAnsicht('prio');
+  pruefe(!/class="gruppe/.test(inhalt()) && CL.__ablage['clie-aufgaben-ansicht'] === 'prio' && /<small class="herkunft">◎ Büro<\/small>/.test(inhalt()),
+    'Ansicht Prio (seit 0.17 statt „Kategorien aus“): flach, mit Herkunft, gemerkt');
+  CL.aufAnsicht('gruppiert');
   CL.aufFilter('beruflich');
   pruefe(/Angebot einholen/.test(inhalt()) && !/Fenster messen/.test(inhalt()), 'der Filter Beruf zeigt nur berufliche Seiten');
   CL.aufFilter('alle');
@@ -1289,8 +1289,8 @@ function feinschliffTest() {
   CL.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Laub', geaendert: 1, eintraege: [{ id: 'e1', abschnitt: 'h', text: 'Laub', quelle: 't1', erledigt: false }] });
   CL.oeffne('aufgaben');
   const h = inhalt();
-  pruefe(!/>Geplant</.test(h) && /≡ Garten<\/div><div class="aufg[^"]*">[\s\S]*?Laub<\/button><span class="plan-marke">heute<\/span>/.test(h),
-    'keine Gruppe „Geplant“ — die Aufgabe steht bei ihrer Liste mit der Marke „heute“');
+  pruefe(!/class="zw"/.test(h) && /≡ Garten<\/span><small>[^<]*<\/small><\/button><div class="aufg[^"]*">[\s\S]*?Laub<\/button><span class="plan-marke">heute<\/span>/.test(h),
+    'Gruppiert: keine Gruppe „Geplant“ — die Aufgabe steht bei ihrer Liste mit der Marke „heute“');
   pruefe(CL.document.getElementById('uhr').textContent === '', 'auf App-Seiten keine Uhrzeit im Kopf');
   CL.oeffne('uebersicht');
   pruefe(/^\d{2}:\d{2}$/.test(CL.document.getElementById('uhr').textContent), 'auf der Übersicht bleibt die Uhr');
@@ -2157,16 +2157,16 @@ function prioTest() {
   S.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Keller aufräumen\n[] P2 Rasen vertikutieren', geaendert: 1, eintraege: [
     { id: 'e1', abschnitt: 'h', text: 'Keller aufräumen', quelle: 'l1', erledigt: false },
     { id: 'e2', abschnitt: 'h', text: 'P2 Rasen vertikutieren', quelle: 'l1', erledigt: false }] });
-  S.cl.auf.prioSort = true;
+  S.cl.auf.ansicht = 'prio'; S.cl.auf.naechste = false;
   S.oeffne('aufgaben');
   let h = inhalt();
-  const reihe = (h.match(/class="tx umbruch"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
+  const reihe = (h.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
   pruefe(reihe.join(' | ') === 'Statik anfragen | Rasen vertikutieren | Ablage | Keller aufräumen', 'nach Priorität sortiert, ohne Kürzel im Text — ' + reihe.join(' | '));
   pruefe(/class="prio p1" onclick="aufPrioUm\('l1',2\)"[^>]*>1</.test(h) && /class="prio p0" onclick="aufPrioUm\('l1',0\)"[^>]*><\/button>/.test(h), 'Zeichen 1 … und ein leerer Platz zum Setzen');
-  S.aufPrioSortUm();
-  const reihe2 = (inhalt().match(/class="tx umbruch"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
-  pruefe(reihe2[0] === 'Keller aufräumen' && !S.cl.auf.prioSort, '„↕ Liste“: Reihenfolge wie in der Liste');
-  S.aufPrioSortUm();
+  S.aufAnsicht('gruppiert');
+  const reihe2 = (inhalt().match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
+  pruefe(reihe2[0] === 'Keller aufräumen' && S.cl.auf.ansicht === 'gruppiert', 'Gruppiert (seit 0.17 statt „↕ Liste“): Reihenfolge wie in der Liste');
+  S.aufAnsicht('prio');
 
   /* Antippen schaltet weiter — die Einplanung im Tag zieht mit */
   S.aufPrioUm('l1', 0);
@@ -2410,38 +2410,24 @@ function listeTextTest() {
 }
 
 /* ============================================================
-   43. Zeichen ▶ „läuft“ in der Schreibleiste (0.15.2)
-   Grund: Eine Oberzeile („- P2 Fenster warten“) soll sichtbar als laufend
-   markiert werden — nur ein Zeichen wie „-“, ohne weitere Funktion.
-   (Die Automatik aus 0.15.1 ist zurückgenommen.)
-   Erkennt: Knopf fehlt, ▶ wird nicht gesetzt/entfernt, „-“ bleibt stehen,
-   Zeilen darunter verändert, Automatik-▶ wieder in Liste oder Heute.
+   43. Kein ▶-Knopf mehr (0.15.2 eingeführt, 0.17.0 zurückgebaut)
+   Grund: Aufgaben mit Unteraufgaben bekommen eine eigene Liste; das
+   Zeichen ▶ wurde dafür nicht mehr gebraucht.
+   Erkennt: ▶-Knopf oder seine Sonderbehandlung kehren zurück, die
+   Schreibleiste verliert [ ] H •.
    ============================================================ */
 function laufZeichenTest() {
-  console.log('\n43. Zeichen ▶ „läuft“ in der Schreibleiste (0.15.2)');
+  console.log('\n43. Kein ▶-Knopf mehr (zurückgebaut in 0.17.0)');
   if (!CL) { return; }
   frisch();
   const S = CL;
-  const unten = '\n  [] P2 Magnat und Eckert Georg anrufen\n  - Angebot vergeben\n  - Termin machen';
-  S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: '- P2 Fenster und Türen warten lassen' + unten, geaendert: 1 });
+  S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: '- Fenster warten\n[] Lampe', geaendert: 1 });
   S.oeffne('aufgaben'); S.aufListeSetzen('lh');
   S.listeAlsText();
-  pruefe(/onclick="memoZeichen\('lauf'\)" aria-label="läuft">▶<\/button><\/div>/.test(inhalt()), 'Schreibleiste: Knopf ▶ nach •');
-  const feld = S.document.getElementById('memoFeld');
-  feld.value = S.DB.themen[0].text; feld.selectionStart = 3;
-  S.memoZeichen('lauf');
-  pruefe(S.DB.themen[0].text === '▶ P2 Fenster und Türen warten lassen' + unten, 'ein Tipp: „-“ wird zu „▶“, die Zeilen darunter bleiben');
-  feld.selectionStart = 3;
-  S.memoZeichen('lauf');
-  pruefe(S.DB.themen[0].text === 'P2 Fenster und Türen warten lassen' + unten, 'zweiter Tipp nimmt ▶ wieder weg');
-  feld.selectionStart = 3;
-  S.memoZeichen('lauf'); S.memoZeichen('punkt');
-  pruefe(S.DB.themen[0].text === '- P2 Fenster und Türen warten lassen' + unten, '• ersetzt ▶ wieder durch „-“');
-  S.memoZeichen('lauf');
-  S.memoSchreibenUm();
   const h = inhalt();
-  pruefe(/Magnat und Eckert Georg anrufen/.test(h) && !/▶/.test(h) && !/Fenster und Türen/.test(h), 'Liste: nur die Aufgabe, ohne ▶ und ohne Oberzeile');
-  pruefe(typeof S.clHauptaufgabe === 'undefined' && !/\.lf\{/.test(QUELLE), 'Automatik aus 0.15.1 entfernt');
+  pruefe(/memoZeichen\('kasten'\)/.test(h) && /memoZeichen\('h'\)/.test(h) && /memoZeichen\('punkt'\)" aria-label="Aufzählung">•<\/button><\/div>/.test(h), 'Schreibleiste: [ ] H • — und nichts danach');
+  pruefe(!/memoZeichen\('lauf'\)/.test(h) && !/'lauf'|▶ '/.test(funktionText(SKRIPT, 'memoZeichen')), 'kein ▶-Knopf, keine ▶-Sonderbehandlung');
+  S.memoSchreibenUm();
   S.oeffne('uebersicht');
 }
 
@@ -2584,6 +2570,89 @@ function clsStichtagTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   46. Aufgabensicht: Gruppiert | Prio | Geplant, „1. Nächste“ (0.17)
+   Grund: „Alle Aufgaben“ soll Projekte, Listen und laufende Checklisten
+   (nur Eingeplantes) zeigen — gruppiert oder flach nach Prio bzw. Tag —
+   und auf Wunsch je Gruppe nur die nächste Aufgabe.
+   Erkennt: falsche Quellen (Ruhendes, ungeplante Checklisten-Punkte),
+   falsche Gruppenfolge, Sortierfehler, fehlende Tageszeilen/Herkunft,
+   „Nächste“ zeigt mehr/weniger oder falsches „+n“, Wahl nicht gemerkt,
+   alter Knopf „↕ Prio“/„Kategorien“ wieder da.
+   ============================================================ */
+function ansichtTest() {
+  console.log('\n46. Aufgabensicht: Gruppiert | Prio | Geplant, „1. Nächste“ (0.17)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const morgen = S.tagePlus(heute, 1);
+  S.cl.auf.liste = ''; S.cl.auf.frisch = {}; S.cl.auf.erlZeigen = false; S.cl.auf.ganz = {}; S.cl.auf.wahl = '';
+  S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.naechste = false;
+  S.DB.themen.push({ id: 'lh', name: 'Haus', text: '[] Lampe tauschen\n[] P1 Steckdose\n[] Dach prüfen', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'pc', name: 'Carport', flaeche: '[] P2 Statik anfragen\n[] Nachbar informieren', status: 'laufend', kontext: 'privat', ordnung: 50, geaendert: 1 });
+  S.DB.projekte.push({ id: 'pr', name: 'Ruht', flaeche: '[] unsichtbar', status: 'ruht', kontext: 'privat', ordnung: 60, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'cb', titel: 'Urlaub Borkum', text: '[] Fähre buchen\n[] Koffer packen\n[] Ladekabel\n[x] Hotel', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 70, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'cv', titel: 'Vorlage', text: '[] nie', kontext: 'privat', checkliste: 'vorlage', ordnung: 80, geaendert: 1 });
+  const plane = (id, nr, d, z) => S.aufPlanAnwenden(S.kpSeiteFinden(id), nr, d, z || '');
+  plane('cb', 1, morgen, '18:00'); plane('cb', 0, heute); plane('pc', 1, heute, '09:00'); plane('lh', 2, morgen);
+  S.oeffne('aufgaben');
+  let h = inhalt();
+  const titel = (x) => (x.match(/class="gruppe klick"[^>]*><span>([^<]+)<\/span>/g) || []).map(y => y.replace(/.*<span>/, '').replace(/<\/span>$/, ''));
+  pruefe(titel(h).join(' | ') === '◎ Carport | ≡ Haus | ☑ Urlaub Borkum', 'Gruppen: erst Projekte, dann Listen, dann laufende Checklisten — ' + titel(h).join(' | '));
+  pruefe(!/unsichtbar/.test(h) && !/>nie</.test(h), 'nicht: ruhende Projekte, Vorlagen');
+  pruefe(/Fähre buchen/.test(h) && /Koffer packen/.test(h) && !/Ladekabel/.test(h) && !/Hotel/.test(h), 'Checkliste: nur eingeplante, offene Punkte');
+  pruefe(/<span>☑ Urlaub Borkum<\/span><small>1\/4 · 2 geplant<\/small>/.test(h) && /<span>≡ Haus<\/span><small>3<\/small>/.test(h), 'Gruppenzahl: offen bzw. Stand · geplant');
+  const zeilen = (x) => (x.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(y => y.replace(/.*>/, '').replace(/<$/, ''));
+  pruefe(zeilen(h).slice(2, 5).join(' | ') === 'Lampe tauschen | Steckdose | Dach prüfen', 'Gruppiert: Reihenfolge der Seite');
+  pruefe(!/aufPrioSortUm|aufKategorienUm|↕/.test(S.document.getElementById('fuss').innerHTML), 'unten nur noch Neu und Details…');
+  pruefe(/class="an" onclick="aufAnsicht\('gruppiert'\)">Gruppiert/.test(h) && /onclick="aufNaechsteUm\(\)">1\. Nächste/.test(h), 'oben der Schalter und „1. Nächste“');
+
+  S.aufAnsicht('prio');
+  h = inhalt();
+  pruefe(zeilen(h).join(' | ') === 'Steckdose | Statik anfragen | Nachbar informieren | Fähre buchen | Koffer packen | Dach prüfen | Lampe tauschen',
+    'Prio: P1, P2, dann ohne — bei gleicher Prio früher Geplantes zuerst — ' + zeilen(h).join(' | '));
+  pruefe(/Steckdose<small class="herkunft">≡ Haus<\/small>/.test(h) && /Fähre buchen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(h) && !/class="gruppe/.test(h), 'Prio: flach, Herkunft unter jeder Aufgabe');
+  pruefe(S.__ablage['clie-aufgaben-ansicht'] === 'prio', 'die Wahl wird gemerkt');
+
+  S.aufAnsicht('geplant');
+  h = inhalt();
+  const zw = (h.match(/<div class="zw">([^<]+)<\/div>/g) || []).map(y => y.replace(/<[^>]+>/g, ''));
+  pruefe(zw.join(' | ') === 'Heute | ' + S.clWt(morgen) + ' ' + S.clKurzDatum(morgen) + ' | Ohne Datum', 'Geplant: Zwischenzeilen Heute, morgen, Ohne Datum — ' + zw.join(' | '));
+  pruefe(zeilen(h).join(' | ') === 'Nachbar informieren | Fähre buchen | Koffer packen | Dach prüfen | Steckdose | Statik anfragen | Lampe tauschen',
+    'Geplant: Uhrzeit vor ohne, ohne Datum nach Prio — ' + zeilen(h).join(' | '));
+  pruefe(/Koffer packen<small class="herkunft">☑ Urlaub Borkum<\/small><\/button><span class="plan-marke">18:00<\/span>/.test(h), 'Geplant: Marke nur noch Uhrzeit');
+
+  /* 1. Nächste */
+  S.aufAnsicht('gruppiert');
+  S.aufNaechsteUm();
+  h = inhalt();
+  pruefe(zeilen(h).join(' | ') === 'Statik anfragen | Lampe tauschen | Fähre buchen', 'Nächste: je Gruppe eine — Checkliste: die früheste — ' + zeilen(h).join(' | '));
+  pruefe(/Statik anfragen<\/button><button type="button" class="mehr" onclick="aufGanzUm\('pc'\)"[^>]*>\+1</.test(h) && /aufGanzUm\('lh'\)"[^>]*>\+2</.test(h), '„+n“ zeigt, wie viele warten');
+  pruefe(S.__ablage['clie-aufgaben-naechste'] === 'an', '„1. Nächste“ wird gemerkt');
+  S.aufGanzUm('lh');
+  pruefe(zeilen(inhalt()).filter(t => /Lampe|Steckdose|Dach/.test(t)).length === 3 && !/aufGanzUm\('lh'\)"[^>]*>\+/.test(inhalt()), 'Tipp: die Gruppe ganz zeigen');
+  S.aufGanzUm('lh');
+  S.aufHaken('lh', 0);
+  h = inhalt();
+  pruefe(/class="aufg erl[^"]*"[\s\S]*?Lampe tauschen/.test(h) && /Steckdose/.test(h) && !/Dach prüfen/.test(h), 'abgehakt: bleibt durchgestrichen, die nächste rückt nach');
+  S.aufAnsicht('prio');
+  h = inhalt();
+  pruefe(/Steckdose/.test(h) && /Statik anfragen/.test(h) && /Fähre buchen/.test(h) && !/Nachbar|Koffer|Dach/.test(h), 'Nächste wirkt auch bei Prio');
+  S.aufNaechsteUm();
+
+  /* Eine Liste gewählt: keine Gruppen, keine Herkunft */
+  S.aufListeSetzen('lh');
+  h = inhalt();
+  pruefe(!/class="gruppe/.test(h) && !/class="herkunft"/.test(h) && /Steckdose/.test(h), 'einzelne Liste: ohne Überschrift und Herkunft');
+  S.aufListeSetzen('');
+  /* Details zu einem Checklisten-Punkt: in die Checkliste */
+  S.aufDetails('cb', 0);
+  pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'cb' && S.cl.aufklapp === '', 'Details zu einem Checklisten-Punkt öffnen die Checkliste');
+  S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.frisch = {};
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2626,6 +2695,7 @@ function clsStichtagTest() {
   try { laufZeichenTest(); } catch (e) { fail('Zeichen ▶ warf: ' + e.message); }
   try { clsPlanTest(); } catch (e) { fail('Checklisten einplanen warf: ' + e.message); }
   try { clsStichtagTest(); } catch (e) { fail('Stichtag warf: ' + e.message); }
+  try { ansichtTest(); } catch (e) { fail('Aufgabensicht warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

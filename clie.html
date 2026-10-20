@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.16.0</title>
+<title>CLIE 0.17.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -285,6 +285,17 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .cls-zahl{font-size:18px;white-space:nowrap;margin-left:6px}
 .cls-kopf{margin:2px 0 6px;font-size:17.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .gruppe.klapp{display:block;width:100%;text-align:left;color:var(--px-mitte)}
+/* Aufgaben: Ansicht und „1. Nächste“ (seit 0.17) */
+.auf-leiste{display:flex;gap:6px;margin:2px 0 4px}
+.auf-leiste .schalter{display:flex;flex:1;border:2px solid var(--px)}
+.auf-leiste .schalter button{flex:1;text-align:center;padding:2px 0;font-size:17.5px;border-right:2px solid var(--px)}
+.auf-leiste .schalter button:last-child{border-right:0}
+.auf-leiste .schalter button.an,.auf-leiste .naechste.an{background:var(--px);color:var(--lcd)}
+.auf-leiste .naechste{border:2px solid var(--px);padding:2px 6px;font-size:17.5px;white-space:nowrap}
+.gruppe.klick{display:flex;justify-content:space-between;align-items:baseline;gap:8px;width:100%;text-align:left}
+.gruppe.klick small{font-weight:400;font-size:15.5px;color:var(--px-mitte);white-space:nowrap}
+.aufg .mehr{flex:0 0 auto;font-size:15.5px;color:var(--px-mitte);border:2px dotted var(--px-mitte);border-radius:6px;padding:0 4px}
+#inhalt > .zw{font-size:15.5px;color:var(--px-mitte);border-bottom:2px solid var(--px-mitte);margin:10px 0 2px}
 .fuss{flex-wrap:wrap}
 
 /* Routinen (seit 0.5) */
@@ -302,6 +313,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 /* 0.6: umbrechende Titel, Auszeichnungen, Tabellen, Verweise */
 .tx.umbruch{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2}
 .tx.umbruch small{display:block;font-size:16px;color:var(--px-mitte);-webkit-line-clamp:1}
+.tx.umbruch.drei{-webkit-line-clamp:3}
 .aufg.gewaehlt .tx small{color:var(--lcd-hell)}
 .memo-punkt .nr{color:var(--px-mitte)}
 .memo-text a,.memo-punkt a,.memo-tabelle a{color:inherit;text-decoration:underline}
@@ -428,7 +440,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.16.0';
+var APP_VERSION = '0.17.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2897,7 +2909,7 @@ function clHeuteZeile(d, p) {
   }
   var erl = d.erledigt.indexOf(p) >= 0;
   var aufruf = (p.art === 'aufgabe') ? 'clTagZeileUm(\'' + d.is + '\',' + p.nr + ')' : 'clRoutineUm(\'' + esc(p.id) + '\',\'' + d.is + '\')';
-  return '<div class="hz' + (erl ? ' erl' : '') + '">' + zt + clKastenHtml(erl, aufruf) + '<span class="tx">' + (p.art === 'aufgabe' ? clPrioHtml(p.titel) + clHerkunftHtml(p.cls) : esc(p.titel)) + '</span></div>';
+  return '<div class="hz' + (erl ? ' erl' : '') + '">' + zt + clKastenHtml(erl, aufruf) + '<span class="tx">' + (p.art === 'aufgabe' ? clPrioHtml(p.titel) + clHerkunftHtml('☑', p.cls) : esc(p.titel)) + '</span></div>';
 }
 
 /* „in 25 Min.“ — ab einer Stunde nur noch die Uhrzeit */
@@ -3775,8 +3787,8 @@ function clVorbei(is, ende) {
 }
 
 /* Seit 0.16: eingeplante Checklisten-Punkte zeigen, woher sie kommen */
-function clHerkunftHtml(name) {
-  return name ? '<small class="herkunft">☑ ' + esc(name) + '</small>' : '';
+function clHerkunftHtml(zeichen, name) {
+  return name ? '<small class="herkunft">' + esc(zeichen) + ' ' + esc(name) + '</small>' : '';
 }
 
 function clKastenHtml(an, aufruf) {
@@ -3803,7 +3815,7 @@ function kalTagHtml(is) {
     if (!z.a || !z.zeit) { return; }
     if (z.a.erledigt && !cl.kal.erlZeigen) { return; }
     posten.push({ zeit: z.zeit, bis: z.zeit, erl: z.a.erledigt, vorbei: clVorbei(is, z.zeit),
-      html: clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')') + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml(z.cls) + '</span>' });
+      html: clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')') + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml('☑', z.cls) + '</span>' });
   });
   routinen.forEach(function (a) {
     var zt = aufgabeZeitAn(a, is);
@@ -3840,7 +3852,7 @@ function kalTagHtml(is) {
     if (z.a) {
       if (z.a.erledigt && !cl.kal.erlZeigen) { erlWeg++; return; }
       v += '<div class="aufg' + (z.a.erledigt ? ' erl' : '') + '">' + clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')')
-         + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml(z.cls) + '</span></div>';
+         + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml('☑', z.cls) + '</span></div>';
     } else if (/^\s*#/.test(z.roh)) {
       v += '<div class="unterabschnitt">' + esc(z.roh.replace(/^\s*#+\s*/, '')) + '</div>';
     } else {
@@ -4464,11 +4476,14 @@ function terminLoeschen() {
    Seite, Tag und Woche zusammenbleiben — wie in der Workbench. */
 
 var AUF_LISTE_KEY = 'clie-aufgaben-liste';
-var AUF_KAT_KEY = 'clie-aufgaben-kategorien';
+/* Seit 0.17: Ansicht Gruppiert | Prio | Geplant und „1. Nächste“ */
+var AUF_ANSICHT_KEY = 'clie-aufgaben-ansicht';
+var AUF_NAECHSTE_KEY = 'clie-aufgaben-naechste';
+var AUF_ANSICHTEN = [['gruppiert', 'Gruppiert'], ['prio', 'Prio'], ['geplant', 'Geplant']];
 var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
-cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, kategorien: true, fenster: null, wahlFuer: '', neueListe: null, prioSort: true };
+cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null };
 cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, fertigAuf: false, ausListe: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
@@ -4489,16 +4504,18 @@ function aufWaehlbar(mitLeeren) {
   });
 }
 
-function aufPrioLaden() {
-  try { cl.auf.prioSort = window.localStorage.getItem(AUF_PRIO_KEY) !== 'aus'; } catch (e) { cl.auf.prioSort = true; }
+function aufAnsichtLaden() {
+  var a = '';
+  var n = '';
+  try { a = window.localStorage.getItem(AUF_ANSICHT_KEY) || ''; n = window.localStorage.getItem(AUF_NAECHSTE_KEY) || ''; } catch (e) { a = ''; }
+  cl.auf.ansicht = AUF_ANSICHTEN.some(function (x) { return x[0] === a; }) ? a : 'gruppiert';
+  cl.auf.naechste = (n === 'an');
 }
 
 function aufListeLaden() {
   var l = '';
-  var k = null;
-  try { l = window.localStorage.getItem(AUF_LISTE_KEY) || ''; k = window.localStorage.getItem(AUF_KAT_KEY); } catch (e) { l = ''; }
+  try { l = window.localStorage.getItem(AUF_LISTE_KEY) || ''; } catch (e) { l = ''; }
   cl.auf.liste = l;
-  cl.auf.kategorien = (k !== 'aus');
 }
 
 function zuletztListe() {
@@ -4534,6 +4551,7 @@ function aufListeSetzen(id) {
 function clSeitenZeichen(s) {
   if (!s) { return ''; }
   if (s.art === 'vorhaben') { return s.typ === 'ziel' ? '◇' : '◎'; }
+  if (s.__satz && s.__satz.checkliste) { return '☑'; }
   return s.art === 'liste' ? '≡' : '✎';
 }
 
@@ -4573,50 +4591,100 @@ function clPlanText(datum, zeit) {
 
 function aufSchluessel(seite, nr) { return seite.id + '|' + nr; }
 
+/* Woher die Aufgaben in „Alle Aufgaben“ kommen (seit 0.17): erst
+   laufende Projekte und Ziele, dann Listen, dann laufende Checklisten —
+   von diesen nur die eingeplanten Punkte. */
+function aufQuellen() {
+  var seiten = aufSeiten();
+  var art = function (s) { return s.art === 'vorhaben' ? 0 : 1; };
+  var l = seiten.map(function (s, i) { return { s: s, i: i }; })
+    .sort(function (a, b) { return (art(a.s) - art(b.s)) || (a.i - b.i); })
+    .map(function (x) { return x.s; });
+  return l.concat(clsAlle('lauf').map(function (g) { return kpSeiteFinden(g.id); }).filter(function (s) { return !!s; }));
+}
+
+function aufIstCheckliste(s) {
+  return !!(s && s.__satz && s.__satz.checkliste);
+}
+
 /* Alle Aufgaben der Ansicht — offene, dazu gerade Abgehakte (bleiben
    bis zum Verlassen der App durchgestrichen stehen). */
 function aufAufgaben() {
   var liste = aufListe();
-  var seiten = liste ? [liste] : aufSeiten();
+  var seiten = liste ? [liste] : aufQuellen();
   var aus = [];
   seiten.forEach(function (s) {
+    var cls = aufIstCheckliste(s);
     String(s.text || '').split('\n').forEach(function (z, nr) {
       var a = kpAufgabe(z);
       if (!a || !a.text) { return; }
       var key = aufSchluessel(s, nr);
-      if (a.erledigt && !cl.auf.frisch[key] && !cl.auf.erlZeigen) { return; }
+      var frisch = !!cl.auf.frisch[key];
+      if (a.erledigt && !frisch && !cl.auf.erlZeigen) { return; }
       var g = a.erledigt ? null : aufGeplant(s, a.text);
-      aus.push({ seite: s, nr: nr, a: a, key: key, datum: g ? g.datum : '', zeit: g ? g.zeit : '' });
+      /* Checklisten: nur Eingeplantes (oder gerade hier Abgehaktes) */
+      if (cls && !g && !frisch) { return; }
+      aus.push({ seite: s, nr: nr, a: a, key: key, datum: g ? g.datum : '', zeit: g ? g.zeit : '', cls: cls });
     });
   });
   return aus;
 }
 
-function aufNachPlan(l) {
+/* Sortierschlüssel: Tag + Uhrzeit (ohne Datum ans Ende) und Priorität */
+function aufPlanSchluessel(x) { return x.datum ? x.datum + ' ' + (x.zeit || '99:99') : '9999'; }
+function aufPrioRang(x) { return kpPrio(x.a.text).p || 9; }
+
+/* Prio: P1 → P3 → ohne, bei gleicher Prio das frühere Datum zuerst.
+   Geplant: nach Tag und Uhrzeit, dann Prio; ohne Datum am Ende. */
+function aufSortiert(l, ansicht) {
   return l.map(function (x, i) { return { x: x, i: i }; }).sort(function (p, q) {
-    var dp = p.x.datum + ' ' + (p.x.zeit || '99:99');
-    var dq = q.x.datum + ' ' + (q.x.zeit || '99:99');
-    if (p.x.datum && q.x.datum && dp !== dq) { return dp < dq ? -1 : 1; }
-    if (!!p.x.datum !== !!q.x.datum) { return p.x.datum ? -1 : 1; }
-    return p.i - q.i;
-  }).map(function (p) { return p.x; });
+    var pp = aufPrioRang(p.x) - aufPrioRang(q.x);
+    var pd = aufPlanSchluessel(p.x) < aufPlanSchluessel(q.x) ? -1 : (aufPlanSchluessel(p.x) > aufPlanSchluessel(q.x) ? 1 : 0);
+    return (ansicht === 'prio' ? (pp || pd) : (pd || pp)) || (p.i - q.i);
+  }).map(function (y) { return y.x; });
 }
 
-function aufZeileHtml(x) {
-  var marke = x.datum ? '<span class="plan-marke">' + esc(clPlanText(x.datum, x.zeit)) + '</span>' : '';
+/* „1. Nächste“: je Seite nur die nächste offene Aufgabe — die oberste,
+   bei Checklisten die am frühesten geplante. Gerade Abgehaktes bleibt
+   stehen. Ergebnis: die Zeilen und je Seite, wie viele noch warten. */
+function aufNaechste(l) {
+  var rest = {};
+  var nimm = {};
+  l.forEach(function (x) {
+    if (x.a.erledigt) { return; }
+    var id = x.seite.id;
+    rest[id] = (rest[id] || 0) + 1;
+    var b = nimm[id];
+    if (!b || (x.cls && aufPlanSchluessel(x) < aufPlanSchluessel(b))) { nimm[id] = x; }
+  });
+  var aus = l.filter(function (x) {
+    return x.a.erledigt || cl.auf.ganz[x.seite.id] || nimm[x.seite.id] === x;
+  });
+  Object.keys(rest).forEach(function (id) { rest[id] = cl.auf.ganz[id] ? 0 : rest[id] - 1; });
+  return { zeilen: aus, rest: rest };
+}
+
+/* Eine Zeile. o.herkunft: Seite klein darunter; o.ohneTag: nur die
+   Uhrzeit als Marke (der Tag steht schon in der Zwischenzeile);
+   o.mehr: „+n“ — so viele warten noch (tippen klappt die Seite auf). */
+function aufZeileHtml(x, o) {
+  o = o || {};
+  var plan = o.ohneTag ? (x.zeit ? clZeitText(x.zeit) : '') : clPlanText(x.datum, x.zeit);
+  var marke = plan ? '<span class="plan-marke">' + esc(plan) + '</span>' : '';
   var pr = kpPrio(x.a.text);
   return '<div class="aufg' + (x.a.erledigt ? ' erl' : '') + (cl.auf.wahl === x.key ? ' gewaehlt' : '') + '">'
     /* Priorität (seit 0.12): antippen schaltet – → 1 → 2 → 3 → – */
     + '<button type="button" class="prio p' + pr.p + '" onclick="aufPrioUm(\'' + esc(x.seite.id) + '\',' + x.nr + ')" aria-label="Priorität">' + (pr.p || '') + '</button>'
     + clKastenHtml(x.a.erledigt, 'aufHaken(\'' + esc(x.seite.id) + '\',' + x.nr + ')')
-    + '<button type="button" class="tx umbruch" onclick="aufTippen(\'' + esc(x.seite.id) + '\',' + x.nr + ')">' + esc(clSchlicht(pr.text))
-    + '</button>'
-    + marke + '</div>';
+    /* Mit Herkunft darf der Text zwei Zeilen haben, die Herkunft eine dritte */
+    + '<button type="button" class="tx umbruch' + (o.herkunft ? ' drei' : '') + '" onclick="aufTippen(\'' + esc(x.seite.id) + '\',' + x.nr + ')">' + esc(clSchlicht(pr.text))
+    + (o.herkunft ? clHerkunftHtml(clSeitenZeichen(x.seite), x.seite.titel) : '') + '</button>'
+    + marke
+    + (o.mehr ? '<button type="button" class="mehr" onclick="aufGanzUm(\'' + esc(x.seite.id) + '\')" aria-label="alle zeigen">+' + o.mehr + '</button>' : '')
+    + '</div>';
 }
 
 /* ---- Priorität (seit 0.12) — als Kürzel „P1 “ vor dem Text, Kern der Workbench ---- */
-
-var AUF_PRIO_KEY = 'clie-aufgaben-prio';
 
 /* Stabil sortieren: P1, P2, P3, dann ohne — sonst bleibt die Reihenfolge */
 function clNachPrio(l, text) {
@@ -4624,17 +4692,6 @@ function clNachPrio(l, text) {
   return l.map(function (x, i) { return { x: x, i: i }; })
     .sort(function (a, b) { return (rang(a.x) - rang(b.x)) || (a.i - b.i); })
     .map(function (y) { return y.x; });
-}
-
-/* In den Aufgaben: die Listen behalten ihre Reihenfolge, sortiert wird darin */
-function aufNachPrio(l) {
-  var seiten = [];
-  l.forEach(function (x) { if (seiten.indexOf(x.seite.id) < 0) { seiten.push(x.seite.id); } });
-  var aus = [];
-  seiten.forEach(function (id) {
-    aus = aus.concat(clNachPrio(l.filter(function (x) { return x.seite.id === id; }), function (x) { return x.a.text; }));
-  });
-  return aus;
 }
 
 function aufPrioUm(seiteId, nr) {
@@ -4647,12 +4704,6 @@ function aufPrioUm(seiteId, nr) {
   }
 }
 
-function aufPrioSortUm() {
-  cl.auf.prioSort = !cl.auf.prioSort;
-  try { window.localStorage.setItem(AUF_PRIO_KEY, cl.auf.prioSort ? 'an' : 'aus'); } catch (e) { /* nur für jetzt */ }
-  zeichne();
-}
-
 function aufPrioWahl(p) {
   var f = aufFensterLesen();
   if (!f || p < 0 || p > 3) { return; }
@@ -4662,43 +4713,81 @@ function aufPrioWahl(p) {
 }
 
 function aufgabenHtml() {
-  var l = aufAufgaben();
   var liste = aufListe();
+  var ansicht = cl.auf.ansicht;
+  var h = '<div class="auf-leiste"><div class="schalter">' + AUF_ANSICHTEN.map(function (a) {
+      return '<button type="button"' + (a[0] === ansicht ? ' class="an"' : '') + ' onclick="aufAnsicht(\'' + a[0] + '\')">' + a[1] + '</button>';
+    }).join('') + '</div>'
+    + '<button type="button" class="naechste' + (cl.auf.naechste ? ' an' : '') + '" onclick="aufNaechsteUm()">1. Nächste</button></div>';
+  var l = aufAufgaben();
   if (!l.length) {
-    return '<p class="leise">' + (liste ? 'In „' + esc(liste.titel) + '“ ist nichts offen.' : 'Keine offenen Aufgaben.') + '</p>';
+    return h + '<p class="leise">' + (liste ? 'In „' + esc(liste.titel) + '“ ist nichts offen.' : 'Keine offenen Aufgaben.') + '</p>';
   }
-  /* Nach Priorität innerhalb jeder Liste (seit 0.12, umschaltbar) */
-  if (cl.auf.prioSort) { l = aufNachPrio(l); }
-  /* Eine Liste gewählt oder Kategorien aus: eine Liste, Eingeplantes oben */
-  if (liste || !cl.auf.kategorien) {
-    return aufNachPlan(l).map(function (x) { return aufZeileHtml(x); }).join('');
+  var rest = {};
+  if (cl.auf.naechste) { var n = aufNaechste(l); l = n.zeilen; rest = n.rest; }
+  var herkunft = !liste;
+  if (ansicht === 'prio') {
+    return h + aufSortiert(l, 'prio').map(function (x) { return aufZeileHtml(x, { herkunft: herkunft }); }).join('');
   }
-  /* Kategorien: je Liste ihre Aufgaben — Eingeplantes bleibt bei seiner
-     Liste und trägt seine Marke (seit 0.6.1 ohne eigene Gruppe „Geplant“) */
-  var h = '';
+  if (ansicht === 'geplant') {
+    var tag = null;
+    aufSortiert(l, 'geplant').forEach(function (x) {
+      if (x.datum !== tag) {
+        tag = x.datum;
+        h += '<div class="zw">' + (!tag ? 'Ohne Datum' : (tag === isoDatum() ? 'Heute' : esc(clWt(tag) + ' ' + clKurzDatum(tag)))) + '</div>';
+      }
+      h += aufZeileHtml(x, { herkunft: herkunft, ohneTag: true });
+    });
+    return h;
+  }
+  /* Gruppiert: je Seite ihre Aufgaben in der Reihenfolge der Seite */
   var seitenId = '';
   l.forEach(function (x) {
-    if (x.seite.id !== seitenId) {
+    if (!liste && x.seite.id !== seitenId) {
       seitenId = x.seite.id;
-      h += '<div class="gruppe">' + esc(clSeitenZeichen(x.seite) + ' ' + x.seite.titel) + '</div>';
+      h += '<button type="button" class="gruppe klick" onclick="aufGanzUm(\'' + esc(x.seite.id) + '\')"><span>'
+         + esc(clSeitenZeichen(x.seite) + ' ' + x.seite.titel) + '</span><small>' + esc(aufGruppenZahl(x.seite)) + '</small></button>';
     }
-    h += aufZeileHtml(x);
+    h += aufZeileHtml(x, { mehr: rest[x.seite.id] && !x.a.erledigt ? rest[x.seite.id] : 0 });
   });
   return h;
 }
 
-function aufFussHtml() {
-  return '<button type="button" class="knopf" onclick="aufNeu()">Neu</button>'
-    + '<button type="button" class="knopf" onclick="aufDetailsGewaehlt()">Details…</button>'
-    + '<button type="button" class="knopf" onclick="aufPrioSortUm()">↕ ' + (cl.auf.prioSort ? 'Prio' : 'Liste') + '</button>'
-    + '<button type="button" class="knopf' + (cl.auf.kategorien ? '' : ' voll') + '" onclick="aufKategorienUm()">'
-    + (cl.auf.kategorien ? 'Kategorien aus' : 'Kategorien an') + '</button>';
+/* Zahl rechts an der Gruppe: offene Aufgaben — bei Checklisten Stand und Geplantes */
+function aufGruppenZahl(s) {
+  if (!aufIstCheckliste(s)) { return String(kpOffeneZahl(s)); }
+  var st = clsStand(s.__satz);
+  var geplant = String(s.text || '').split('\n').filter(function (z) {
+    var a = kpAufgabe(z);
+    return a && a.text && !a.erledigt && !!aufGeplant(s, a.text);
+  }).length;
+  return st.fertig + '/' + st.alle + ' · ' + geplant + ' geplant';
 }
 
-function aufKategorienUm() {
-  cl.auf.kategorien = !cl.auf.kategorien;
-  try { window.localStorage.setItem(AUF_KAT_KEY, cl.auf.kategorien ? 'an' : 'aus'); } catch (e) { /* nur für jetzt */ }
+function aufAnsicht(a) {
+  if (!AUF_ANSICHTEN.some(function (x) { return x[0] === a; })) { return; }
+  cl.auf.ansicht = a;
+  try { window.localStorage.setItem(AUF_ANSICHT_KEY, a); } catch (e) { /* nur für jetzt */ }
   zeichne();
+}
+
+function aufNaechsteUm() {
+  cl.auf.naechste = !cl.auf.naechste;
+  cl.auf.ganz = {};
+  try { window.localStorage.setItem(AUF_NAECHSTE_KEY, cl.auf.naechste ? 'an' : 'aus'); } catch (e) { /* nur für jetzt */ }
+  zeichne();
+}
+
+/* Bei „1. Nächste“: eine Seite ganz zeigen (und wieder einklappen) */
+function aufGanzUm(id) {
+  if (!cl.auf.naechste) { return; }
+  if (cl.auf.ganz[id]) { delete cl.auf.ganz[id]; } else { cl.auf.ganz[id] = true; }
+  inhaltZeichnen();
+}
+
+function aufFussHtml() {
+  return '<button type="button" class="knopf" onclick="aufNeu()">Neu</button>'
+    + '<button type="button" class="knopf" onclick="aufDetailsGewaehlt()">Details…</button>';
 }
 
 function aufErlUm() {
@@ -4749,6 +4838,8 @@ function aufNeuAm(datum, zeit) {
 
 function aufDetails(seiteId, nr) {
   var s = kpSeiteFinden(seiteId);
+  /* Checklisten-Punkt (seit 0.17): dort einplanen und bearbeiten */
+  if (aufIstCheckliste(s)) { aufklappZuStill(); oeffne('checklisten'); clsOeffnen(s.id); return; }
   var zeilen = s ? String(s.text || '').split('\n') : [];
   var a = (nr >= 0 && nr < zeilen.length) ? kpAufgabe(zeilen[nr]) : null;
   if (!a) { return; }
@@ -5228,8 +5319,7 @@ function memoSeiteHtml(s) {
     return h + '<div class="schreibleiste">'
       + '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'kasten\')" aria-label="Aufgabe">[ ]</button>'
       + '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'h\')" aria-label="Überschrift">H</button>'
-      + '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'punkt\')" aria-label="Aufzählung">•</button>'
-      + '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'lauf\')" aria-label="läuft">▶</button></div>'
+      + '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'punkt\')" aria-label="Aufzählung">•</button></div>'
       + '<textarea id="memoFeld" class="memo-feld" spellcheck="true" oninput="memoTextGetippt()">' + esc(s.text) + '</textarea>';
   }
   var zeilen = String(s.text || '').split('\n');
@@ -5391,9 +5481,8 @@ function memoZeichen(was) {
   var pos = f.selectionStart || 0;
   var anfang = v.lastIndexOf('\n', pos - 1) + 1;
   var zeile = v.slice(anfang).split('\n')[0];
-  /* ▶ (seit 0.15.2): reines Zeichen „das läuft“ — wie „-“, ohne weitere Funktion */
-  var ohne = zeile.replace(/^\s*(\[[ xX-]?\]|#{1,3}|[-•*▶])\s*/, '');
-  var vorne = { kasten: '[] ', h: '## ', lauf: '▶ ' }[was] || '- ';
+  var ohne = zeile.replace(/^\s*(\[[ xX-]?\]|#{1,3}|[-•*])\s*/, '');
+  var vorne = (was === 'kasten') ? '[] ' : ((was === 'h') ? '## ' : '- ');
   var neu = (zeile.indexOf(vorne.trim()) === 0) ? ohne : vorne + ohne;
   f.value = v.slice(0, anfang) + neu + v.slice(anfang + zeile.length);
   var ende = anfang + neu.length;
@@ -8854,7 +8943,7 @@ function start() {
   clFilterLaden();
   clWocheTageLaden();
   aufListeLaden();
-  aufPrioLaden();
+  aufAnsichtLaden();
   rtLaden();
   saFilterLaden();
   suLaden();
