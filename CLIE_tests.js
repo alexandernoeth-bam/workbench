@@ -1548,7 +1548,9 @@ async function neustartTest() {
   CL.termineNachTag[heute] = [{ id: 't', zeit: '10:00', bis: '11:00', titel: 'T', kontext: 'privat' }];
   CL.oeffne('uebersicht');
   let h = inhalt();
-  pruefe(!/class="zahl"/.test(h) && /onclick="oeffne\('statistik'\)">CLIE v[\d.]+ · <u>Statistik<\/u>/.test(h), 'Übersicht ohne Zahlen, die Versionszeile führt zur Statistik');
+  /* Seit 0.9 darf an „Heute“ eine Zahl stehen — je nach Uhrzeit; sonst nirgends */
+  const ohneHeute = h.replace(/oeffne\('heute'\)"><span class="sym">[\s\S]*?<\/button>/, '');
+  pruefe(!/class="zahl"/.test(ohneHeute) && /onclick="oeffne\('statistik'\)">CLIE v[\d.]+ · <u>Statistik<\/u>/.test(h), 'Übersicht ohne Zahlen (außer an „Heute“), die Versionszeile führt zur Statistik');
   CL.cl.aufklapp = 'menue'; CL.aufklappZeichnen();
   pruefe(/menueWahl\('statistik'\)">Statistik/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: Statistik');
   CL.cl.aufklapp = '';
@@ -2240,6 +2242,66 @@ function memoRuhtTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   40. Feste Werte als Datum, Tage in Formeln (0.13)
+   Grund: Feste Werte sollen auch ein Datum sein können, und Formeln
+   sollen Tage zwischen zwei Daten rechnen (auch bis/seit heute).
+   Erkennt: falsche Tageszahl (Zeitumstellung, Schaltjahr), Datum als
+   Zahl angezeigt, „heute“ nicht erkannt, Wechsel Zahl/Datum kaputt.
+   ============================================================ */
+function datumTest() {
+  console.log('\n40. Feste Werte als Datum, Tage in Formeln (0.13)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(S.saTagNr('2026-10-25') - S.saTagNr('2026-10-24') === 1 && S.saTagNr('2026-03-30') - S.saTagNr('2026-03-28') === 2, 'Tage über die Zeitumstellung hinweg');
+  pruefe(S.saTagNr('2028-03-01') - S.saTagNr('2028-02-28') === 2 && S.saTagNr('2026-13-01') === null && S.saTagNr('') === null, 'Schaltjahr, ungültige Daten leer');
+  const heute = S.isoDatum();
+  pruefe(S.saFormelAuswerten('heute - 1', () => null) === S.saTagNr(heute) - 1 && S.saFormelAuswerten('HEUTE', () => null) === S.saTagNr(heute), '„heute“ in Formeln (Groß/klein egal)');
+  const g = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Projekt', false, []);
+  g.felder = [{ id: 'dat', name: 'Datum', typ: 'datum', spalte: true }, { id: 'fae', name: 'Fällig', typ: 'datum' },
+              { id: 'tage', name: 'Tag', typ: 'formel', formel: '[Datum] - [Start]', dez: 0, spalte: true },
+              { id: 'rest', name: 'Rest', typ: 'formel', formel: '[Ziel] - heute', dez: 0, vorzeichen: true },
+              { id: 'verz', name: 'Verzug', typ: 'formel', formel: '[Datum] - [Fällig]', dez: 0 },
+              { id: 'abst', name: 'Abstand', typ: 'formel', formel: '[Datum] - vorher[Datum]', dez: 0 }];
+  g.werte = [{ id: 'w1', name: 'Start', typ: 'datum', wert: '2026-10-01' }, { id: 'w2', name: 'Ziel', typ: 'datum', wert: S.tagePlus(heute, 72) }];
+  S.DB.datensaetze.push({ id: 'a', sammlung: g.id, werte: { dat: '2026-10-11', fae: '2026-10-08' }, angelegt: 1, geaendert: 1 });
+  S.DB.datensaetze.push({ id: 'b', sammlung: g.id, werte: { dat: '2026-10-20' }, angelegt: 2, geaendert: 2 });
+  const w = (id, f) => S.saWertText(S.saFeld(g, f), S.saRoh(g, S.saSatzFinden(id), S.saFeld(g, f)));
+  pruefe(w('a', 'tage') === '10' && w('b', 'tage') === '19', 'Datum minus fester Datumswert = Tage seit dem Start');
+  pruefe(w('a', 'rest') === '+72', 'fester Datumswert minus heute = Tage bis dahin');
+  pruefe(w('a', 'verz') === '3' && w('b', 'verz') === '', 'zwei Datumsfelder: Verzug — fehlt eines, bleibt es leer');
+  pruefe(w('b', 'abst') === '9' && w('a', 'abst') === '', 'Tage seit dem vorigen Eintrag');
+  S.cl.app = 'sammlungen'; S.cl.sa.id = g.id; S.cl.sa.ansicht = 'tabelle'; S.zeichne();
+  pruefe(/Start<\/span><span>01\.10\.2026</.test(inhalt()), 'fester Datumswert unter der Tabelle als Datum');
+  g.kennzahl = { art: 'wert', wert: 'w1' };
+  pruefe(S.saKennzahl(g) === '01.10.2026', 'auch als Kennzahl');
+  pruefe(S.saFormelPruefen(g, '[Ziel] - heute', S.saFeld(g, 'rest')) === '', 'Prüfen kennt „heute“');
+
+  /* Fenster: Art wechseln, speichern */
+  S.saWertOeffnen('');
+  const feld = (id, v) => { S.document.getElementById(id).value = v; };
+  feld('saWertName', 'Abgabe');
+  S.saWertArt('datum');
+  pruefe(S.cl.sa.fenster.name === 'Abgabe' && /id="saWertDatum" class="eingabe" type="date"/.test(S.saFensterHtml()) && !/saWertZahl/.test(S.saFensterHtml()), 'Art „Datum“: Datumsfeld statt Zahl — der Name bleibt');
+  feld('saWertName', 'Abgabe'); feld('saWertDatum', '');
+  S.saWertSpeichern();
+  pruefe(g.werte.length === 2 && S.cl.aufklapp === 'sa', 'ohne Datum wird nicht gespeichert');
+  feld('saWertDatum', '2026-12-31');
+  S.saWertSpeichern();
+  const ab = g.werte[2];
+  pruefe(ab && ab.typ === 'datum' && ab.wert === '2026-12-31' && !('einheit' in ab), 'Datumswert gespeichert');
+  S.saWertOeffnen(ab.id);
+  pruefe(/class="an" onclick="saWertArt\('datum'\)"/.test(S.saFensterHtml()) && /value="2026-12-31"/.test(S.saFensterHtml()), 'beim Öffnen steht die Art auf Datum');
+  feld('saWertName', 'Abgabe');
+  S.saWertArt('zahl');
+  feld('saWertName', 'Abgabe'); feld('saWertZahl', '5'); feld('saWertEinheit', 'Tage');
+  S.saWertSpeichern();
+  pruefe(!('typ' in ab) && ab.wert === 5 && ab.einheit === 'Tage', 'zurück auf Zahl');
+  S.cl.aufklapp = ''; S.cl.sa.id = '';
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2276,6 +2338,7 @@ function memoRuhtTest() {
   try { prioTest(); } catch (e) { fail('Prioritäten warf: ' + e.message); }
   memoZweiTest();
   try { memoRuhtTest(); } catch (e) { fail('Ruhende im Memo warf: ' + e.message); }
+  try { datumTest(); } catch (e) { fail('Datumswerte warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS

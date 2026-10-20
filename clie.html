@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.12.2</title>
+<title>CLIE 0.13.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -413,7 +413,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.12.2';
+var APP_VERSION = '0.13.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6111,6 +6111,8 @@ function saFormelTeile(text) {
       i = j + 1;
       continue;
     }
+    /* heute — als Tageszahl, für Tage bis oder seit einem Datum (seit 0.13) */
+    if (/^heute\b/i.test(s.slice(i))) { teile.push({ art: 'heute' }); i += 5; continue; }
     var m = s.slice(i).match(/^[0-9]+([.,][0-9]+)?/);
     if (m) {
       teile.push({ art: 'zahl', w: Number(m[0].replace(',', '.')) });
@@ -6155,6 +6157,7 @@ function saFormelAuswerten(text, wert) {
     if (x.art === '-') { var v = faktor(); return v === null ? null : -v; }
     if (x.art === '+') { return faktor(); }
     if (x.art === 'zahl') { return x.w; }
+    if (x.art === 'heute') { return saTagNr(isoDatum()); }
     if (x.art === 'name') { return wert(x.w, !!x.vorher); }
     if (x.art === '(') {
       var r = ausdruck();
@@ -6169,6 +6172,23 @@ function saFormelAuswerten(text, wert) {
   return (e === null || !isFinite(e)) ? null : e;
 }
 
+/* Ein Datum als Tageszahl — so ergibt Datum minus Datum die Tage dazwischen (seit 0.13) */
+/* Ein fester Wert zum Anzeigen: Datum als 31.12.2026, Zahl mit Einheit */
+function saFesterWertText(w) {
+  if (!w) { return '—'; }
+  if (w.typ === 'datum') { return saDatumText(w.wert) || '—'; }
+  return saZahlKurz(Number(w.wert)) + (w.einheit ? ' ' + w.einheit : '');
+}
+
+function saTagNr(is) {
+  var m = String(is || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) { return null; }
+  var t = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  /* Ungültiges (13. Monat, 31.02.) nicht stillschweigend weiterrechnen */
+  if (t.getUTCMonth() !== Number(m[2]) - 1 || t.getUTCDate() !== Number(m[3])) { return null; }
+  return Math.round(t.getTime() / 86400000);
+}
+
 /* Wert eines Namens: zuerst ein Feld des Eintrags, dann ein fester Wert */
 function saNamensWert(s, d, name, ohne, tiefe) {
   var n = String(name || '').toLowerCase();
@@ -6178,10 +6198,13 @@ function saNamensWert(s, d, name, ohne, tiefe) {
     if (g === ohne || String(g.name).toLowerCase() !== n) { continue; }
     if (g.typ === 'formel') { return (tiefe < 5) ? saFormelWert(s, d, g, tiefe + 1) : null; }
     var w = (d.werte || {})[g.id];
+    if (g.typ === 'datum') { return saTagNr(w); }
     return (w === null || w === undefined || w === '' || typeof w === 'boolean') ? null : saZahlLesen(w);
   }
   for (i = 0; i < (s.werte || []).length; i++) {
-    if (String(s.werte[i].name).toLowerCase() === n) { return saZahlLesen(s.werte[i].wert); }
+    if (String(s.werte[i].name).toLowerCase() === n) {
+      return (s.werte[i].typ === 'datum') ? saTagNr(s.werte[i].wert) : saZahlLesen(s.werte[i].wert);
+    }
   }
   return null;
 }
@@ -6378,7 +6401,7 @@ function saKennzahlNach(s, kz) {
   if (kz.art === 'wert') {
     var w = null;
     (s.werte || []).forEach(function (x) { if (x.id === kz.wert) { w = x; } });
-    return w ? saZahlKurz(Number(w.wert)) + (w.einheit ? ' ' + w.einheit : '') : '—';
+    return saFesterWertText(w);
   }
   var f = kz.feld ? saFeld(s, kz.feld) : null;
   if (kz.art && f) {
@@ -6689,7 +6712,7 @@ function saSammlungHtml(s) {
   var h = saTabelleHtml(s);
   if ((s.werte || []).length) {
     h += '<div class="sa-box"><div class="leise">Feste Werte</div>' + s.werte.map(function (x) {
-      return reihe(x.name, saZahlKurz(Number(x.wert)) + (x.einheit ? ' ' + x.einheit : ''));
+      return reihe(x.name, saFesterWertText(x));
     }).join('') + '</div>';
   }
   if (s.art === 'budget') { h += saBudgetHtml(s, l); }
@@ -6723,7 +6746,7 @@ function saWerteHtml(s) {
   var h = '<p class="leise">Werte, die für die ganze Sammlung gelten. In Formeln mit [Name].</p>';
   (s.werte || []).forEach(function (x) {
     h += '<button type="button" class="sa-zeile" onclick="saWertOeffnen(\'' + esc(x.id) + '\')"><span class="tx">' + esc(x.name) + '</span>'
-       + '<span class="sa-kz">' + esc(saZahlKurz(Number(x.wert)) + (x.einheit ? ' ' + x.einheit : '')) + '</span></button>';
+       + '<span class="sa-kz">' + esc(saFesterWertText(x)) + '</span></button>';
   });
   if (!(s.werte || []).length) { h += '<p class="leise">Noch kein fester Wert — „+ Wert“ tippen.</p>'; }
   return h;
@@ -6926,6 +6949,14 @@ function saFeldOeffnen(id) { saFensterAuf({ modus: 'feld', id: id }); }
 function saFeldNeu() { saFensterAuf({ modus: 'feld', id: '' }); }
 function saFilterOeffnen(id) { saFensterAuf({ modus: 'filter', id: id }); }
 function saWertOeffnen(id) { saFensterAuf({ modus: 'wert', id: id }); }
+
+function saWertArt(art) {
+  var f = cl.sa.fenster;
+  if (!f || (art !== 'zahl' && art !== 'datum')) { return; }
+  f.name = saFeldWert('saWertName');
+  f.art = art;
+  aufklappNeu();
+}
 function saKopierenOeffnen() { saFensterAuf({ modus: 'kopie', als: 'vorlage', mit: 'geruest' }); }
 function saDetailsOeffnen() {
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
@@ -7091,7 +7122,7 @@ function saFensterHtml() {
       + '<label for="saFeldFormel">Formel (nur bei Typ Formel):</label>'
       + '<input id="saFeldFormel" class="eingabe sa-formel" type="text" autocomplete="off" spellcheck="false" value="' + esc(x.formel || '') + '">'
       + '<p class="leise sa-formel">Erlaubt: + − × ÷ ( ) und Zahlen. Namen: ' + esc(saFormelNamen(s, fe2).join(' '))
-      + '. vorher[Name] = Wert im vorigen Eintrag, z. B. [kg] - vorher[kg]</p>'
+      + '. vorher[Name] = Wert im vorigen Eintrag, z. B. [kg] - vorher[kg]. Daten zählen in Tagen, heute = heutiges Datum, z. B. [Ziel] - heute</p>'
       + '<label for="saFeldDez">Nachkommastellen:</label><select id="saFeldDez" class="eingabe">' + [0, 1, 2, 3].map(function (n) {
           return '<option value="' + n + '"' + (n === ((x.dez >= 0 && x.dez <= 3) ? x.dez : 2) ? ' selected' : '') + '>' + n + '</option>';
         }).join('') + '</select>'
@@ -7112,11 +7143,21 @@ function saFensterHtml() {
     var fw = null;
     (s.werte || []).forEach(function (y) { if (y.id === f.id) { fw = y; } });
     var wv = fw || { name: '', wert: '', einheit: '' };
+    /* Art: Zahl oder Datum (seit 0.13) — die Wahl im Fenster gilt vor dem Gespeicherten */
+    var art = f.art || (wv.typ === 'datum' ? 'datum' : 'zahl');
+    var name = (f.name !== undefined) ? f.name : wv.name;
     return kopf(fw ? 'Fester Wert' : 'Neuer fester Wert')
-      + '<label for="saWertName">Name:</label><input id="saWertName" class="eingabe" type="text" autocomplete="off" value="' + esc(wv.name) + '">'
-      + '<label for="saWertZahl">Wert:</label><input id="saWertZahl" class="eingabe" type="text" inputmode="decimal" autocomplete="off" value="'
-      + esc(wv.wert === '' ? '' : String(wv.wert).replace('.', ',')) + '">'
-      + '<label for="saWertEinheit">Einheit (z. B. kg, €):</label><input id="saWertEinheit" class="eingabe" type="text" autocomplete="off" value="' + esc(wv.einheit || '') + '">'
+      + '<label for="saWertName">Name:</label><input id="saWertName" class="eingabe" type="text" autocomplete="off" value="' + esc(name) + '">'
+      + '<label>Art:</label><div class="wahlreihe">'
+      + [['zahl', 'Zahl'], ['datum', 'Datum']].map(function (a) {
+          return '<button type="button"' + (art === a[0] ? ' class="an"' : '') + ' onclick="saWertArt(\'' + a[0] + '\')">' + a[1] + '</button>';
+        }).join('') + '</div>'
+      + (art === 'datum'
+        ? '<label for="saWertDatum">Datum:</label><input id="saWertDatum" class="eingabe" type="date" value="' + esc(wv.typ === 'datum' ? wv.wert : '') + '">'
+          + '<p class="leise sa-formel">In Formeln zählt ein Datum in Tagen: [' + esc(name || 'Datum') + '] - heute = Tage bis dahin.</p>'
+        : '<label for="saWertZahl">Wert:</label><input id="saWertZahl" class="eingabe" type="text" inputmode="decimal" autocomplete="off" value="'
+          + esc((wv.wert === '' || wv.typ === 'datum') ? '' : String(wv.wert).replace('.', ',')) + '">'
+          + '<label for="saWertEinheit">Einheit (z. B. kg, €):</label><input id="saWertEinheit" class="eingabe" type="text" autocomplete="off" value="' + esc(wv.einheit || '') + '">')
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saWertSpeichern()">OK</button>' + abbrechen
         + (fw ? '<button type="button" class="knopf" onclick="saWertLoeschen()">Löschen</button>' : ''));
   }
@@ -7448,9 +7489,14 @@ function saWertSpeichern() {
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
   if (!f || !s) { aufklappZu(); return; }
   var name = String(saFeldWert('saWertName') || '').trim();
-  var zahl = saZahlLesen(saFeldWert('saWertZahl'));
+  var vorher = null;
+  (s.werte || []).forEach(function (y) { if (y.id === f.id) { vorher = y; } });
+  var art = f.art || ((vorher && vorher.typ === 'datum') ? 'datum' : 'zahl');
+  var zahl = (art === 'datum') ? null : saZahlLesen(saFeldWert('saWertZahl'));
+  var datum = (art === 'datum') ? String(saFeldWert('saWertDatum') || '') : '';
   if (!name || /[\[\]]/.test(name)) { melde('Bitte einen Namen ohne eckige Klammern eingeben.', 'warn'); return; }
-  if (zahl === null) { melde('Bitte eine Zahl eingeben, z. B. 82,5.', 'warn'); return; }
+  if (art === 'zahl' && zahl === null) { melde('Bitte eine Zahl eingeben, z. B. 82,5.', 'warn'); return; }
+  if (art === 'datum' && saTagNr(datum) === null) { melde('Bitte ein Datum wählen.', 'warn'); return; }
   var doppelt = (s.felder || []).concat(s.werte || []).some(function (y) { return y.id !== f.id && String(y.name).toLowerCase() === name.toLowerCase(); });
   if (doppelt) { melde('Den Namen „' + name + '“ gibt es in dieser Sammlung schon.', 'warn'); return; }
   if (!Array.isArray(s.werte)) { s.werte = []; }
@@ -7458,8 +7504,15 @@ function saWertSpeichern() {
   s.werte.forEach(function (y) { if (y.id === f.id) { w = y; } });
   if (!w) { w = { id: 'w' + neueKennung() }; s.werte.push(w); }
   w.name = name.slice(0, 40);
-  w.wert = zahl;
-  w.einheit = String(saFeldWert('saWertEinheit') || '').trim().slice(0, 12);
+  if (art === 'datum') {
+    w.typ = 'datum';
+    w.wert = datum;
+    delete w.einheit;
+  } else {
+    delete w.typ;
+    w.wert = zahl;
+    w.einheit = String(saFeldWert('saWertEinheit') || '').trim().slice(0, 12);
+  }
   saGeaendert(s);
   spaeterSichern();
   aufklappZu();
