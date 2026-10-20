@@ -2409,6 +2409,52 @@ function listeTextTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   43. Hauptaufgabe mit Schritten: ▶ (0.15.1)
+   Grund: Wer unter einer Aufgabe eigene Schritte schreibt, will in Liste
+   und Heute sehen, dass diese Aufgabe eine laufende Hauptaufgabe ist —
+   ohne Knopf, ohne Änderung am Text.
+   Erkennt: ▶ fehlt bei eingerückten Zeilen darunter, ▶ erscheint fälschlich
+   bei Leerzeile/nicht eingerückter Zeile/erledigter Aufgabe, Text verändert,
+   ▶ fehlt in Heute.
+   ============================================================ */
+function hauptTest() {
+  console.log('\n43. Hauptaufgabe mit Schritten: ▶ (0.15.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const text = '[] P1 Fenster warten\n    › Auftrag ausfüllen\n    › Zusage geben\n[] Lampe tauschen\nNotiz ohne Einzug\n[] Steckdose\n\n    › nach Leerzeile\n[x] Erledigt mit Schritt\n    › alt';
+  S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: text, geaendert: 1 });
+  const seite = S.kpSeiteFinden('lh');
+  pruefe(S.clHauptaufgabe(seite, 0) === true, 'eingerückte Zeilen darunter → Hauptaufgabe');
+  pruefe(S.clHauptaufgabe(seite, 3) === false, 'nicht eingerückte Zeile darunter → keine');
+  pruefe(S.clHauptaufgabe(seite, 5) === false, 'Leerzeile darunter → keine');
+  pruefe(S.clHauptaufgabe(seite, 1) === false, 'ein Schritt selbst ist keine Hauptaufgabe');
+  S.oeffne('aufgaben'); S.aufListeSetzen('lh'); S.cl.auf.erlZeigen = true; S.zeichne();
+  const h = inhalt();
+  pruefe(/<span class="lf"[^>]*>▶<\/span>Fenster warten/.test(h), 'Liste: ▶ vor „Fenster warten“');
+  pruefe((h.match(/class="lf"/g) || []).length === 1, 'Liste: nur dort — nicht bei Lampe, Steckdose, Erledigtem');
+  pruefe(S.DB.themen[0].text === text, 'der Text bleibt unverändert');
+  S.cl.auf.erlZeigen = false;
+  /* Heute: für heute einplanen */
+  /* Die Testumgebung übernimmt Werte nicht aus dem HTML — wie getippt setzen */
+  S.aufDetails('lh', 0);
+  S.document.getElementById('aufText').value = 'Fenster warten';
+  S.document.getElementById('aufDatum').value = S.isoDatum();
+  S.aufSpeichern();
+  S.aufDetails('lh', 3);
+  S.document.getElementById('aufText').value = 'Lampe tauschen';
+  S.document.getElementById('aufDatum').value = S.isoDatum();
+  S.aufSpeichern();
+  pruefe(S.DB.themen[0].text === text, 'Einplanen lässt Text und Schritte unverändert');
+  S.oeffne('heute');
+  const hh = inhalt();
+  pruefe(/<span class="lf"[^>]*>▶<\/span><span class="prio p1">1<\/span>Fenster warten/.test(hh), 'Heute: ▶ vor der Hauptaufgabe');
+  pruefe((hh.match(/class="lf"/g) || []).length === 1 && /Lampe tauschen/.test(hh), 'Heute: Lampe ohne ▶');
+  pruefe(/\.lf\{display:inline-block;background:var\(--px\)/.test(QUELLE), 'Marke im Stil der Palm-Kästchen');
+  S.oeffne('uebersicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2448,6 +2494,7 @@ function listeTextTest() {
   try { datumTest(); } catch (e) { fail('Datumswerte warf: ' + e.message); }
   try { kopfTest(); } catch (e) { fail('Kopfwerte warf: ' + e.message); }
   try { listeTextTest(); } catch (e) { fail('Liste als Text warf: ' + e.message); }
+  try { hauptTest(); } catch (e) { fail('Hauptaufgabe warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
