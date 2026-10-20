@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.19.1</title>
+<title>CLIE 0.20.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -296,6 +296,31 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .drv-n mark{background:var(--px);color:var(--lcd);padding:0 2px}
 .drv-stern{font-size:28px;line-height:1;padding:4px 8px;flex:0 0 auto;font-family:ui-monospace,Menlo,monospace}
 .drv-hoch{display:block;width:100%;text-align:left;padding:6px 0;border-bottom:2px dotted var(--px-zart)}
+/* Schach (seit 0.20) */
+.sch-geschlagen{min-height:20px;display:flex;flex-wrap:wrap;gap:1px;margin-bottom:2px}
+.sch-mini svg{width:16px;height:16px;display:block}
+.sch-rahmen{border:2px solid var(--px);padding:2px;width:max-content;margin:0 auto;--q:min(calc((min(100vw,480px) - 60px) / 8),calc((100vh - 400px) / 8),52px)}
+.sch-rahmen.ruht{opacity:.4}
+.sch-brett{display:grid;grid-template-columns:16px repeat(8,var(--q));grid-template-rows:repeat(8,var(--q)) 18px}
+.sch-ko{font-size:15.5px;color:var(--px-mitte);display:flex;align-items:center;justify-content:center}
+.sch-f{position:relative;display:flex;align-items:center;justify-content:center;padding:0;width:var(--q);height:var(--q)}
+.sch-f.h{background:var(--lcd-hell)}
+.sch-f.d{background:var(--px-zart)}
+.sch-f.wahl{box-shadow:inset 0 0 0 3px var(--px)}
+.sch-f.letzt{box-shadow:inset 0 0 0 2px var(--px-mitte)}
+.sch-f.schach{box-shadow:inset 0 0 0 3px var(--px),inset 0 0 0 6px var(--lcd-hell)}
+.sch-f svg{width:84%;height:84%;position:relative;display:block}
+.sch-ziel{position:absolute;width:26%;height:26%;background:var(--px);border-radius:50%}
+.sch-schlag{position:absolute;inset:6%;border:3px solid var(--px);border-radius:50%}
+.sch-status{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 4px;font-size:17.5px}
+.sch-status b{background:var(--px);color:var(--lcd);font-weight:400;padding:0 6px;white-space:nowrap}
+.sch-zuege{font-size:16px;border-top:2px solid var(--px);padding-top:4px;column-count:2;column-gap:14px}
+.sch-zuege div{display:flex;gap:6px;break-inside:avoid}
+.sch-zuege span:first-child{color:var(--px-mitte);min-width:2em}
+.sch-umw{display:flex;gap:8px;justify-content:center;margin:4px 0}
+.sch-umw button{border:2px solid var(--px);padding:4px;background:var(--lcd)}
+.sch-umw svg{width:40px;height:40px;display:block}
+.sto-fenster .wahlreihe{margin-bottom:4px}
 /* Stones (seit 0.18) */
 .sto-spiel{display:flex;gap:10px;justify-content:center;--z:min(calc((min(100vw,480px) - 150px) / 10),calc((100vh - 360px) / 18),30px)}
 .sto-feld{display:grid;grid-template-columns:repeat(10,var(--z));grid-template-rows:repeat(18,var(--z));gap:1px;border:2px solid var(--px);padding:2px;background:var(--lcd-hell);touch-action:none;flex:0 0 auto}
@@ -471,7 +496,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.19.1';
+var APP_VERSION = '0.20.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2683,6 +2708,7 @@ var CL_APPS = [
   { id: 'rechner',  name: 'Rechner',  stufe: '',    was: '' },
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '' },
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '' },
+  { id: 'schach',   name: 'Schach',   stufe: '',    was: '' },
   { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '' }
 ];
 
@@ -2717,6 +2743,12 @@ var CL_BILD = {
          + '<rect x="24" y="41" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="41" width="4" height="4" ' + CL_FUELL + '/><rect x="36" y="41" width="4" height="4" ' + CL_FUELL + '/>',
   /* Ordner mit Blatt (seit 0.19) */
   drive: '<path d="M14 22h13l4 4h19v20H14z" ' + CL_STRICH + '/><path d="M23 35h18M23 41h11" ' + CL_STRICH + '/>',
+  /* Springer in Pixeln (seit 0.20) */
+  schach: '<rect x="29" y="16" width="3" height="3" ' + CL_FUELL + '/><rect x="35" y="16" width="3" height="3" ' + CL_FUELL + '/><rect x="26" y="19" width="18" height="3" ' + CL_FUELL + '/>'
+        + '<rect x="23" y="22" width="21" height="3" ' + CL_FUELL + '/><rect x="20" y="25" width="12" height="3" ' + CL_FUELL + '/><rect x="35" y="25" width="9" height="3" ' + CL_FUELL + '/>'
+        + '<rect x="20" y="28" width="9" height="3" ' + CL_FUELL + '/><rect x="35" y="28" width="9" height="3" ' + CL_FUELL + '/><rect x="32" y="31" width="12" height="3" ' + CL_FUELL + '/>'
+        + '<rect x="29" y="34" width="15" height="3" ' + CL_FUELL + '/><rect x="26" y="37" width="18" height="3" ' + CL_FUELL + '/><rect x="23" y="40" width="21" height="3" ' + CL_FUELL + '/>'
+        + '<rect x="20" y="43" width="27" height="3" ' + CL_FUELL + '/>',
   /* Vier Steine wie ein gelandeter Stein (seit 0.18) */
   stones: '<rect x="15" y="34" width="10" height="10" ' + CL_FUELL + '/><rect x="27" y="34" width="10" height="10" ' + CL_FUELL + '/>'
         + '<rect x="39" y="34" width="10" height="10" ' + CL_FUELL + '/><rect x="27" y="22" width="10" height="10" ' + CL_FUELL + '/>',
@@ -3377,6 +3409,7 @@ function statistikHtml() {
     + clStatBlock('routinen', 'Routinen', [
       ['aktiv · pausiert · heute offen', (rt.length - rtPause) + ' · ' + rtPause + ' · ' + rtOffen]])
     + clStatBlock('drive', 'Drive', [['Favoriten', String(drvFavoriten().length)]])
+    + clStatBlock('schach', 'Schach', [['gegen CLIE: gewonnen · verloren · remis', schBilanzLesen().g + ' · ' + schBilanzLesen().v + ' · ' + schBilanzLesen().r]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
     + clStatBlock('abgleich', 'Datei', [
@@ -3461,6 +3494,7 @@ function inhaltZeichnen() {
   if (cl.app === 'abgleich') { el.innerHTML = abgleichHtml(); }
   else if (cl.app === 'rechner') { el.innerHTML = rechnerHtml(); }
   else if (cl.app === 'stones') { el.innerHTML = stonesHtml(); }
+  else if (cl.app === 'schach') { el.innerHTML = schachHtml(); }
   else if (cl.app === 'drive') {
     /* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
     if (cl.drv.tab === 'suche' && el.innerHTML.indexOf('drvFeld') >= 0) { drvZeichnen(); return; }
@@ -3510,6 +3544,7 @@ function kopfZeichnen() {
     var saText = (cl.app === 'sammlungen') ? saKatText() : null;
     kat.textContent = (cl.app === 'stones') ? 'Level ' + cl.sto.level
       : (cl.app === 'drive') ? ''
+      : (cl.app === 'schach') ? schKopfText()
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
     kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter') ? ' an' : '');
   }
@@ -3584,6 +3619,9 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saKopf\')">Kopfwerte…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
+      + (cl.app === 'schach' ? '<div class="trenn"></div>'
+          + '<button type="button" onclick="menueWahl(\'schNeu\')">Neue Partie…</button>'
+          + '<button type="button" onclick="menueWahl(\'schDrehen\')">Brett drehen</button>' : '')
       + (cl.app === 'stones' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'stoNeu\')">Neues Spiel</button>'
           + '<button type="button" onclick="menueWahl(\'stoListe\')">Bestenliste</button>' : '')
@@ -3608,7 +3646,8 @@ function fussZeichnen() {
         : (cl.app === 'heute') ? heuteFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
-        : (cl.app === 'drive') ? driveFussHtml() : '';
+        : (cl.app === 'drive') ? driveFussHtml()
+        : (cl.app === 'schach') ? schachFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -3642,10 +3681,12 @@ function oeffne(id) {
   if (el) { el.scrollTop = 0; }
   zeichne();
   if (cl.app === 'suchen') { suFokus(); }
+  /* Ist CLIE beim Zurückkommen am Zug, zieht es jetzt */
+  if (cl.app === 'schach') { schClieZiehen(); }
 }
 
 function katUm() {
-  if (cl.app === 'stones' || cl.app === 'drive') { return; }
+  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
     : (cl.app === 'sammlungen' && saKatText() !== null) ? 'safilter' : 'kat';
@@ -3685,6 +3726,8 @@ function menueWahl(was) {
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   if (was === 'stoNeu') { stoNeuesSpiel(); return; }
+  if (was === 'schNeu') { aufklappZeichnen(); schNeuOeffnen(); return; }
+  if (was === 'schDrehen') { aufklappZeichnen(); schDrehen(); return; }
   if (was === 'stoListe') { stoListeZeigen(); return; }
   aufklappZeichnen();
   melde('CLIE ' + APP_VERSION + '\nauf ' + DATEINAME + ' · Unterbau aus der Workbench', null);
@@ -8836,6 +8879,748 @@ function driveFussHtml() {
     + '<button type="button" class="knopf" onclick="drvAktualisieren()">Aktualisieren</button>';
 }
 
+/* ---------- Schach (seit 0.20) ----------
+
+   Schach im LCD-Stil mit eigenen Pixel-Figuren: gegen CLIE (Leicht,
+   Mittel, Stark) oder zu zweit an einem Gerät. Alle Regeln: Rochade,
+   en passant, Umwandlung, Schach/Matt/Patt, dreifache Wiederholung,
+   50-Züge-Regel, zu wenig Material. Die Partie bleibt nur auf dem Gerät
+   (als Zugliste) und übersteht App-Wechsel und Neustart.
+
+   Brett: 64 Felder, Index = Reihe * 8 + Linie, Reihe 0 = 8. Reihe.
+   Figuren: „PNBRQK“ Weiß, „pnbrqk“ Schwarz, '' leer. */
+
+var SCH_START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+var SCH_KEY = 'clie-schach';
+var SCH_BILANZ_KEY = 'clie-schach-bilanz';
+var SCH_WERT = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+/* Deutsche Kurzschrift: König, Dame, Turm, Läufer, Springer */
+var SCH_DEUTSCH = { k: 'K', q: 'D', r: 'T', b: 'L', n: 'S', p: '' };
+var SCH_STUFEN = [['leicht', 'Leicht'], ['mittel', 'Mittel'], ['stark', 'Stark']];
+var SCH_SPRINGER = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
+var SCH_KOENIG = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+var SCH_LAEUFER = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+var SCH_TURM = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+/* Feldwerte aus Sicht von Weiß (Reihe 0 = 8. Reihe) — einfache Tabellen */
+var SCH_FELD = {
+  p: [0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 10, 10, 20, 30, 30, 20, 10, 10, 5, 5, 10, 25, 25, 10, 5, 5,
+      0, 0, 0, 20, 20, 0, 0, 0, 5, -5, -10, 0, 0, -10, -5, 5, 5, 10, 10, -20, -20, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0],
+  n: [-50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15, 10, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30,
+      -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15, 15, 10, 5, -30, -40, -20, 0, 5, 5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50],
+  b: [-20, -10, -10, -10, -10, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 10, 10, 5, 0, -10, -10, 5, 5, 10, 10, 5, 5, -10,
+      -10, 0, 10, 10, 10, 10, 0, -10, -10, 10, 10, 10, 10, 10, 10, -10, -10, 5, 0, 0, 0, 0, 5, -10, -20, -10, -10, -10, -10, -10, -10, -20],
+  r: [0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, 10, 10, 10, 10, 5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5,
+      -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 5, 5, 0, 0, 0],
+  q: [-20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 5, 5, 5, 0, -10, -5, 0, 5, 5, 5, 5, 0, -5,
+      0, 0, 5, 5, 5, 5, 0, -5, -10, 5, 5, 5, 5, 5, 0, -10, -10, 0, 5, 0, 0, 0, 0, -10, -20, -10, -10, -5, -5, -10, -10, -20],
+  k: [-30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30,
+      -20, -30, -30, -40, -40, -30, -30, -20, -10, -20, -20, -20, -20, -20, -20, -10, 20, 20, 0, 0, 0, 0, 20, 20, 20, 30, 10, 0, 0, 10, 30, 20]
+};
+/* Pixel-Figuren 12 × 12 (# = Fläche); Weiß bekommt helle Füllung */
+var SCH_BILD = {
+  p: ['............', '.....##.....', '....####....', '....####....', '.....##.....', '....####....', '.....##.....', '.....##.....', '....####....', '...######...', '..########..', '............'],
+  r: ['............', '..##.##.##..', '..########..', '...######...', '...######...', '...######...', '...######...', '...######...', '..########..', '.##########.', '.##########.', '............'],
+  n: ['............', '.....#.#....', '....######..', '...#######..', '..####.###..', '..###..###..', '......####..', '.....#####..', '....######..', '...#######..', '..#########.', '............'],
+  b: ['............', '.....##.....', '....#.##....', '...##.###...', '...###.##...', '...######...', '....####....', '.....##.....', '....####....', '...######...', '..########..', '............'],
+  q: ['.#...##...#.', '.##..##..##.', '.###.##.###.', '.##########.', '..########..', '...######...', '...######...', '....####....', '...######...', '..########..', '.##########.', '............'],
+  k: ['.....##.....', '....####....', '.....##.....', '..##.##.##..', '.##########.', '.##########.', '..########..', '...######...', '...######...', '...######...', '..########..', '............']
+};
+
+function schWeiss(f) { return f !== '' && f === f.toUpperCase(); }
+function schArt(f) { return f.toLowerCase(); }
+function schFeldName(i) { return 'abcdefgh'.charAt(i % 8) + (8 - Math.floor(i / 8)); }
+
+/* ---- Stellung ---- */
+
+function schAusFen(fen) {
+  var t = String(fen).split(' ');
+  var b = [];
+  t[0].split('/').forEach(function (reihe) {
+    reihe.split('').forEach(function (z) {
+      if (/\d/.test(z)) { var n; for (n = 0; n < Number(z); n++) { b.push(''); } } else { b.push(z); }
+    });
+  });
+  var ep = -1;
+  if (t[3] && t[3] !== '-') { ep = (8 - Number(t[3].charAt(1))) * 8 + 'abcdefgh'.indexOf(t[3].charAt(0)); }
+  return { b: b, w: t[1] !== 'b', cr: (t[2] && t[2] !== '-') ? t[2] : '', ep: ep, hm: Number(t[4]) || 0, fm: Number(t[5]) || 1 };
+}
+
+/* Schlüssel für die Wiederholung: Brett, Zugrecht, Rochaden, en passant */
+function schSchluessel(p) {
+  return p.b.map(function (f) { return f || '.'; }).join('') + (p.w ? 'w' : 'b') + p.cr + p.ep;
+}
+
+function schKoenig(p, weiss) {
+  var k = weiss ? 'K' : 'k';
+  var i;
+  for (i = 0; i < 64; i++) { if (p.b[i] === k) { return i; } }
+  return -1;
+}
+
+/* Wird Feld i von der Seite „weiss“ angegriffen? */
+function schAngegriffen(p, i, weiss) {
+  var r = Math.floor(i / 8);
+  var c = i % 8;
+  var b = p.b;
+  var eigen = function (f, art) { return f !== '' && schWeiss(f) === weiss && schArt(f) === art; };
+  /* Bauern: Weiß greift nach oben an, steht also eine Reihe tiefer */
+  var br = weiss ? r + 1 : r - 1;
+  if (br >= 0 && br < 8) {
+    if (c > 0 && eigen(b[br * 8 + c - 1], 'p')) { return true; }
+    if (c < 7 && eigen(b[br * 8 + c + 1], 'p')) { return true; }
+  }
+  var k;
+  for (k = 0; k < 8; k++) {
+    var sr = r + SCH_SPRINGER[k][0];
+    var sc = c + SCH_SPRINGER[k][1];
+    if (sr >= 0 && sr < 8 && sc >= 0 && sc < 8 && eigen(b[sr * 8 + sc], 'n')) { return true; }
+    var kr = r + SCH_KOENIG[k][0];
+    var kc = c + SCH_KOENIG[k][1];
+    if (kr >= 0 && kr < 8 && kc >= 0 && kc < 8 && eigen(b[kr * 8 + kc], 'k')) { return true; }
+  }
+  var strahl = function (richt, arten) {
+    var j;
+    for (j = 0; j < richt.length; j++) {
+      var rr = r + richt[j][0];
+      var cc = c + richt[j][1];
+      while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+        var f = b[rr * 8 + cc];
+        if (f !== '') {
+          if (schWeiss(f) === weiss && arten.indexOf(schArt(f)) >= 0) { return true; }
+          break;
+        }
+        rr += richt[j][0];
+        cc += richt[j][1];
+      }
+    }
+    return false;
+  };
+  return strahl(SCH_LAEUFER, 'bq') || strahl(SCH_TURM, 'rq');
+}
+
+function schImSchach(p) {
+  var k = schKoenig(p, p.w);
+  return k >= 0 && schAngegriffen(p, k, !p.w);
+}
+
+/* Alle Züge ohne Rücksicht auf den eigenen König: {f, t, pr, art} */
+function schPseudo(p) {
+  var z = [];
+  var b = p.b;
+  var w = p.w;
+  var i;
+  var add = function (f, t, art) {
+    var r = Math.floor(t / 8);
+    if (schArt(b[f]) === 'p' && (r === 0 || r === 7)) {
+      'qrbn'.split('').forEach(function (x) { z.push({ f: f, t: t, pr: w ? x.toUpperCase() : x, art: art }); });
+    } else {
+      z.push({ f: f, t: t, pr: '', art: art });
+    }
+  };
+  for (i = 0; i < 64; i++) {
+    var fig = b[i];
+    if (fig === '' || schWeiss(fig) !== w) { continue; }
+    var r = Math.floor(i / 8);
+    var c = i % 8;
+    var a = schArt(fig);
+    if (a === 'p') {
+      var d = w ? -1 : 1;
+      var vr = r + d;
+      if (vr >= 0 && vr < 8) {
+        if (b[vr * 8 + c] === '') {
+          add(i, vr * 8 + c, '');
+          var start = w ? 6 : 1;
+          if (r === start && b[(r + 2 * d) * 8 + c] === '') { z.push({ f: i, t: (r + 2 * d) * 8 + c, pr: '', art: 'doppel' }); }
+        }
+        var s;
+        for (s = -1; s <= 1; s += 2) {
+          var sc = c + s;
+          if (sc < 0 || sc > 7) { continue; }
+          var t = vr * 8 + sc;
+          if (b[t] !== '' && schWeiss(b[t]) !== w) { add(i, t, ''); }
+          else if (t === p.ep) { z.push({ f: i, t: t, pr: '', art: 'ep' }); }
+        }
+      }
+      continue;
+    }
+    if (a === 'n' || a === 'k') {
+      var tab = a === 'n' ? SCH_SPRINGER : SCH_KOENIG;
+      var k;
+      for (k = 0; k < 8; k++) {
+        var rr = r + tab[k][0];
+        var cc = c + tab[k][1];
+        if (rr < 0 || rr > 7 || cc < 0 || cc > 7) { continue; }
+        var ziel = b[rr * 8 + cc];
+        if (ziel === '' || schWeiss(ziel) !== w) { z.push({ f: i, t: rr * 8 + cc, pr: '', art: '' }); }
+      }
+      if (a === 'k') {
+        /* Rochade: Felder frei, König nicht im Schach und zieht nicht durch Schach */
+        var kurz = w ? 'K' : 'k';
+        var lang = w ? 'Q' : 'q';
+        var basis = w ? 60 : 4;
+        var turm = w ? 'R' : 'r';
+        if (i === basis && p.cr.indexOf(kurz) >= 0 && b[basis + 1] === '' && b[basis + 2] === '' && b[basis + 3] === turm
+            && !schAngegriffen(p, basis, !w) && !schAngegriffen(p, basis + 1, !w) && !schAngegriffen(p, basis + 2, !w)) {
+          z.push({ f: i, t: basis + 2, pr: '', art: 'kurz' });
+        }
+        if (i === basis && p.cr.indexOf(lang) >= 0 && b[basis - 1] === '' && b[basis - 2] === '' && b[basis - 3] === '' && b[basis - 4] === turm
+            && !schAngegriffen(p, basis, !w) && !schAngegriffen(p, basis - 1, !w) && !schAngegriffen(p, basis - 2, !w)) {
+          z.push({ f: i, t: basis - 2, pr: '', art: 'lang' });
+        }
+      }
+      continue;
+    }
+    var richt = a === 'b' ? SCH_LAEUFER : (a === 'r' ? SCH_TURM : SCH_LAEUFER.concat(SCH_TURM));
+    var j;
+    for (j = 0; j < richt.length; j++) {
+      var r2 = r + richt[j][0];
+      var c2 = c + richt[j][1];
+      while (r2 >= 0 && r2 < 8 && c2 >= 0 && c2 < 8) {
+        var f2 = b[r2 * 8 + c2];
+        if (f2 === '') { z.push({ f: i, t: r2 * 8 + c2, pr: '', art: '' }); }
+        else {
+          if (schWeiss(f2) !== w) { z.push({ f: i, t: r2 * 8 + c2, pr: '', art: '' }); }
+          break;
+        }
+        r2 += richt[j][0];
+        c2 += richt[j][1];
+      }
+    }
+  }
+  return z;
+}
+
+/* Zug ausführen; zurück kommt, was zum Zurücknehmen nötig ist */
+function schMachen(p, m) {
+  var b = p.b;
+  var fig = b[m.f];
+  var u = { cap: b[m.t], cr: p.cr, ep: p.ep, hm: p.hm, capFeld: m.t };
+  if (m.art === 'ep') {
+    u.capFeld = m.t + (p.w ? 8 : -8);
+    u.cap = b[u.capFeld];
+    b[u.capFeld] = '';
+  }
+  b[m.t] = m.pr || fig;
+  b[m.f] = '';
+  if (m.art === 'kurz') { b[m.t - 1] = b[m.t + 1]; b[m.t + 1] = ''; }
+  if (m.art === 'lang') { b[m.t + 1] = b[m.t - 2]; b[m.t - 2] = ''; }
+  /* Rochaderechte: König oder Turm bewegt, Turm geschlagen */
+  var weg = function (feld) {
+    if (feld === 60) { p.cr = p.cr.replace('K', '').replace('Q', ''); }
+    if (feld === 4) { p.cr = p.cr.replace('k', '').replace('q', ''); }
+    if (feld === 63) { p.cr = p.cr.replace('K', ''); }
+    if (feld === 56) { p.cr = p.cr.replace('Q', ''); }
+    if (feld === 7) { p.cr = p.cr.replace('k', ''); }
+    if (feld === 0) { p.cr = p.cr.replace('q', ''); }
+  };
+  weg(m.f);
+  weg(m.t);
+  p.ep = (m.art === 'doppel') ? (m.f + m.t) / 2 : -1;
+  p.hm = (schArt(fig) === 'p' || u.cap !== '') ? 0 : p.hm + 1;
+  if (!p.w) { p.fm++; }
+  p.w = !p.w;
+  return u;
+}
+
+function schZurueck(p, m, u) {
+  var b = p.b;
+  p.w = !p.w;
+  if (!p.w) { p.fm--; }
+  var fig = m.pr ? (p.w ? 'P' : 'p') : b[m.t];
+  b[m.f] = fig;
+  b[m.t] = '';
+  b[u.capFeld] = u.cap;
+  if (m.art === 'kurz') { b[m.t + 1] = b[m.t - 1]; b[m.t - 1] = ''; }
+  if (m.art === 'lang') { b[m.t - 2] = b[m.t + 1]; b[m.t + 1] = ''; }
+  p.cr = u.cr;
+  p.ep = u.ep;
+  p.hm = u.hm;
+}
+
+/* Erlaubte Züge: der eigene König steht danach nicht im Schach */
+function schZuege(p) {
+  var w = p.w;
+  return schPseudo(p).filter(function (m) {
+    var u = schMachen(p, m);
+    var k = schKoenig(p, w);
+    var gut = k >= 0 && !schAngegriffen(p, k, !w);
+    schZurueck(p, m, u);
+    return gut;
+  });
+}
+
+/* Zählt alle Zugfolgen bis zur Tiefe — Prüfstein für die Regeln */
+function schPerft(p, tiefe) {
+  if (tiefe === 0) { return 1; }
+  var l = schZuege(p);
+  if (tiefe === 1) { return l.length; }
+  var n = 0;
+  l.forEach(function (m) {
+    var u = schMachen(p, m);
+    n += schPerft(p, tiefe - 1);
+    schZurueck(p, m, u);
+  });
+  return n;
+}
+
+/* Kurzschrift (deutsch): e4, Sf3, Lxb5+, O-O, exd6, e8=D# */
+function schKurz(p, m) {
+  var fig = p.b[m.f];
+  var a = schArt(fig);
+  var s;
+  if (m.art === 'kurz') { s = 'O-O'; }
+  else if (m.art === 'lang') { s = 'O-O-O'; }
+  else {
+    var schlag = p.b[m.t] !== '' || m.art === 'ep';
+    if (a === 'p') {
+      s = (schlag ? schFeldName(m.f).charAt(0) + 'x' : '') + schFeldName(m.t) + (m.pr ? '=' + SCH_DEUTSCH[schArt(m.pr)] : '');
+    } else {
+      var andere = schZuege(p).filter(function (x) { return x.t === m.t && x.f !== m.f && p.b[x.f] === fig; });
+      var zusatz = '';
+      if (andere.length) {
+        var gleicheLinie = andere.some(function (x) { return x.f % 8 === m.f % 8; });
+        var gleicheReihe = andere.some(function (x) { return Math.floor(x.f / 8) === Math.floor(m.f / 8); });
+        zusatz = !gleicheLinie ? schFeldName(m.f).charAt(0) : (!gleicheReihe ? schFeldName(m.f).charAt(1) : schFeldName(m.f));
+      }
+      s = SCH_DEUTSCH[a] + zusatz + (schlag ? 'x' : '') + schFeldName(m.t);
+    }
+  }
+  var u = schMachen(p, m);
+  if (schImSchach(p)) { s += schZuege(p).length ? '+' : '#'; }
+  schZurueck(p, m, u);
+  return s;
+}
+
+/* Zu wenig Material: K–K, K+L–K, K+S–K, K+L–K+L (gleichfarbige Läufer) */
+function schZuWenig(p) {
+  var rest = [];
+  var i;
+  for (i = 0; i < 64; i++) {
+    var f = p.b[i];
+    if (f === '' || schArt(f) === 'k') { continue; }
+    if ('bn'.indexOf(schArt(f)) < 0) { return false; }
+    rest.push({ a: schArt(f), farbe: (Math.floor(i / 8) + i % 8) % 2, w: schWeiss(f) });
+  }
+  if (rest.length <= 1) { return true; }
+  return rest.length === 2 && rest[0].a === 'b' && rest[1].a === 'b' && rest[0].w !== rest[1].w && rest[0].farbe === rest[1].farbe;
+}
+
+/* ---- CLIE als Gegner ---- */
+
+function schBewerten(p) {
+  var s = 0;
+  var i;
+  for (i = 0; i < 64; i++) {
+    var f = p.b[i];
+    if (f === '') { continue; }
+    var a = schArt(f);
+    if (schWeiss(f)) { s += SCH_WERT[a] + SCH_FELD[a][i]; }
+    else { s -= SCH_WERT[a] + SCH_FELD[a][(7 - Math.floor(i / 8)) * 8 + i % 8]; }
+  }
+  return p.w ? s : -s;
+}
+
+/* Schlagzüge zuerst: wertvolles Opfer mit billigem Täter */
+function schOrdnen(p, l) {
+  return l.map(function (m) {
+    var opfer = p.b[m.t] !== '' ? SCH_WERT[schArt(p.b[m.t])] : (m.art === 'ep' ? 100 : 0);
+    var w = opfer ? 10 * opfer - SCH_WERT[schArt(p.b[m.f])] / 10 : 0;
+    if (m.pr) { w += SCH_WERT[schArt(m.pr)]; }
+    return { m: m, w: w };
+  }).sort(function (a, b) { return b.w - a.w; }).map(function (x) { return x.m; });
+}
+
+/* Ruhesuche: nur Schlagzüge, bis die Stellung ruhig ist */
+function schRuhe(p, alpha, beta, tiefe, ki) {
+  ki.knoten++;
+  var steht = schBewerten(p);
+  if (steht >= beta) { return beta; }
+  if (steht > alpha) { alpha = steht; }
+  if (tiefe <= 0) { return alpha; }
+  var l = schOrdnen(p, schZuege(p).filter(function (m) { return p.b[m.t] !== '' || m.art === 'ep' || m.pr; }));
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var u = schMachen(p, l[i]);
+    var w = -schRuhe(p, -beta, -alpha, tiefe - 1, ki);
+    schZurueck(p, l[i], u);
+    if (w >= beta) { return beta; }
+    if (w > alpha) { alpha = w; }
+  }
+  return alpha;
+}
+
+function schSuche(p, tiefe, alpha, beta, ki, abstand) {
+  ki.knoten++;
+  var l = schZuege(p);
+  if (!l.length) { return schImSchach(p) ? -100000 + abstand : 0; }
+  if (p.hm >= 100) { return 0; }
+  if (tiefe <= 0) { return ki.ruhe ? schRuhe(p, alpha, beta, 4, ki) : schBewerten(p); }
+  l = schOrdnen(p, l);
+  var i;
+  for (i = 0; i < l.length; i++) {
+    var u = schMachen(p, l[i]);
+    var w = -schSuche(p, tiefe - 1, -beta, -alpha, ki, abstand + 1);
+    schZurueck(p, l[i], u);
+    if (w >= beta) { return beta; }
+    if (w > alpha) { alpha = w; }
+  }
+  return alpha;
+}
+
+/* Bester Zug für die Seite am Zug. Leicht: 1 Halbzug, mit Zufall unter
+   ähnlich guten Zügen. Mittel: 2 Halbzüge + Ruhesuche. Stark: 3. */
+function schKiZug(p, stufe, zufall) {
+  var tiefe = stufe === 'stark' ? 3 : (stufe === 'mittel' ? 2 : 1);
+  var ki = { knoten: 0, ruhe: stufe !== 'leicht' };
+  var l = schOrdnen(p, schZuege(p));
+  if (!l.length) { return null; }
+  var spanne = stufe === 'leicht' ? 60 : (stufe === 'mittel' ? 15 : 0);
+  /* Wer schlechter als „Bester − Spanne“ ist, interessiert nicht —
+     das Fenster der Suche wird damit enger und die Suche schneller */
+  var best = -1000000;
+  var bewertet = l.map(function (m) {
+    var u = schMachen(p, m);
+    var w = -schSuche(p, tiefe - 1, -1000000, -(best - spanne - 1), ki, 1);
+    schZurueck(p, m, u);
+    if (w > best) { best = w; }
+    return { m: m, w: w };
+  });
+  var kandidaten = bewertet.filter(function (x) { return x.w >= best - spanne; });
+  var r = (typeof zufall === 'number') ? zufall : Math.random();
+  return kandidaten[Math.min(kandidaten.length - 1, Math.floor(r * kandidaten.length))].m;
+}
+
+/* ---- Partie ---- */
+
+cl.sch = { p: null, zuege: [], schluessel: [], geschlagen: [], wahl: -1, gegner: 'clie', stufe: 'mittel', farbe: 'w',
+           dreh: false, ende: '', fenster: '', umw: null, denkt: false, letzt: null, neu: { gegner: 'clie', stufe: 'mittel', farbe: 'w' } };
+
+/* Baut die Partie aus der Zugliste neu auf — für Laden und Zurücknehmen */
+function schAufbauen(liste) {
+  var p = schAusFen(SCH_START);
+  cl.sch.p = p;
+  cl.sch.zuege = [];
+  cl.sch.schluessel = [schSchluessel(p)];
+  cl.sch.geschlagen = [];
+  cl.sch.letzt = null;
+  cl.sch.ende = '';
+  (liste || []).every(function (z) {
+    var m = null;
+    schZuege(p).forEach(function (x) { if (x.f === z.f && x.t === z.t && (x.pr || '') === (z.pr || '')) { m = x; } });
+    if (!m) { return false; }
+    schZugAusfuehren(m, true);
+    return true;
+  });
+}
+
+function schZugAusfuehren(m, still) {
+  var p = cl.sch.p;
+  var kurz = schKurz(p, m);
+  var u = schMachen(p, m);
+  if (u.cap) { cl.sch.geschlagen.push(u.cap); }
+  cl.sch.zuege.push({ f: m.f, t: m.t, pr: m.pr || '', kurz: kurz });
+  cl.sch.schluessel.push(schSchluessel(p));
+  cl.sch.letzt = [m.f, m.t];
+  cl.sch.wahl = -1;
+  cl.sch.ende = schEndeText();
+  if (!still) {
+    schSichern();
+    if (cl.sch.ende) { schBilanz(); }
+  }
+}
+
+/* Spielende? Text oder '' */
+function schEndeText() {
+  var p = cl.sch.p;
+  if (!schZuege(p).length) {
+    if (schImSchach(p)) { return 'Schachmatt — ' + (p.w ? 'Schwarz' : 'Weiß') + ' gewinnt.'; }
+    return 'Patt — remis.';
+  }
+  if (p.hm >= 100) { return 'Remis (50-Züge-Regel).'; }
+  var k = cl.sch.schluessel[cl.sch.schluessel.length - 1];
+  if (cl.sch.schluessel.filter(function (x) { return x === k; }).length >= 3) { return 'Remis (dreifache Wiederholung).'; }
+  if (schZuWenig(p)) { return 'Remis (zu wenig Material).'; }
+  return '';
+}
+
+/* Bilanz gegen CLIE: gewonnen, verloren, remis (nur dieses Gerät) */
+function schBilanzLesen() {
+  var b = null;
+  try { b = JSON.parse(window.localStorage.getItem(SCH_BILANZ_KEY) || 'null'); } catch (e) { b = null; }
+  return (b && typeof b.g === 'number') ? b : { g: 0, v: 0, r: 0 };
+}
+
+function schBilanz() {
+  if (cl.sch.gegner !== 'clie') { return; }
+  var b = schBilanzLesen();
+  var matt = /^Schachmatt/.test(cl.sch.ende);
+  if (!matt) { b.r++; }
+  else if ((cl.sch.p.w ? 'b' : 'w') === cl.sch.farbe) { b.g++; } else { b.v++; }
+  try { window.localStorage.setItem(SCH_BILANZ_KEY, JSON.stringify(b)); } catch (e) { /* nur für jetzt */ }
+}
+
+function schSichern() {
+  var d = { zuege: cl.sch.zuege.map(function (z) { return { f: z.f, t: z.t, pr: z.pr }; }),
+            gegner: cl.sch.gegner, stufe: cl.sch.stufe, farbe: cl.sch.farbe, dreh: cl.sch.dreh };
+  try { window.localStorage.setItem(SCH_KEY, JSON.stringify(d)); } catch (e) { /* nur für jetzt */ }
+}
+
+function schLaden() {
+  var d = null;
+  try { d = JSON.parse(window.localStorage.getItem(SCH_KEY) || 'null'); } catch (e) { d = null; }
+  if (d && Array.isArray(d.zuege)) {
+    cl.sch.gegner = d.gegner === 'zwei' ? 'zwei' : 'clie';
+    cl.sch.stufe = ['leicht', 'mittel', 'stark'].indexOf(d.stufe) >= 0 ? d.stufe : 'mittel';
+    cl.sch.farbe = d.farbe === 'b' ? 'b' : 'w';
+    cl.sch.dreh = !!d.dreh;
+    schAufbauen(d.zuege);
+  } else {
+    schAufbauen([]);
+  }
+}
+
+/* Wer am Zug ist: Mensch oder CLIE */
+function schClieAmZug() {
+  return cl.sch.gegner === 'clie' && !cl.sch.ende && (cl.sch.p.w ? 'w' : 'b') !== cl.sch.farbe;
+}
+
+/* CLIE zieht — kurz verzögert, damit „CLIE denkt …“ zu sehen ist */
+function schClieZiehen() {
+  if (!schClieAmZug() || cl.sch.denkt) { return; }
+  cl.sch.denkt = true;
+  schZeichnen();
+  setTimeout(function () {
+    var m = schClieAmZug() ? schKiZug(cl.sch.p, cl.sch.stufe) : null;
+    cl.sch.denkt = false;
+    if (m) { schZugAusfuehren(m, false); }
+    schZeichnen();
+  }, 60);
+}
+
+/* Tipp auf ein Feld (in Brett-Koordinaten) */
+function schTipp(i) {
+  var s = cl.sch;
+  if (!s.p || s.ende || s.denkt || s.fenster || schClieAmZug()) { return; }
+  var fig = s.p.b[i];
+  if (s.wahl >= 0) {
+    var passend = schZuege(s.p).filter(function (m) { return m.f === s.wahl && m.t === i; });
+    if (passend.length) {
+      if (passend.length > 1) { s.umw = { f: s.wahl, t: i }; s.fenster = 'umwandeln'; schZeichnen(); return; }
+      schZugAusfuehren(passend[0], false);
+      schZeichnen();
+      schClieZiehen();
+      return;
+    }
+  }
+  s.wahl = (fig !== '' && schWeiss(fig) === s.p.w && s.wahl !== i) ? i : -1;
+  schZeichnen();
+}
+
+function schUmwandeln(art) {
+  var s = cl.sch;
+  if (!s.umw || 'qrbn'.indexOf(art) < 0) { return; }
+  var pr = s.p.w ? art.toUpperCase() : art;
+  var m = null;
+  schZuege(s.p).forEach(function (x) { if (x.f === s.umw.f && x.t === s.umw.t && x.pr === pr) { m = x; } });
+  s.umw = null;
+  s.fenster = '';
+  if (m) { schZugAusfuehren(m, false); }
+  schZeichnen();
+  schClieZiehen();
+}
+
+/* Zurück: gegen CLIE bis wieder du am Zug bist, zu zweit ein Halbzug */
+function schZurueckNehmen() {
+  var s = cl.sch;
+  if (s.denkt || !s.zuege.length) { return; }
+  var l = s.zuege.slice(0, -1);
+  if (s.gegner === 'clie') {
+    while (l.length && ((l.length % 2 === 0 ? 'w' : 'b') !== s.farbe)) { l.pop(); }
+  }
+  schAufbauen(l.map(function (z) { return { f: z.f, t: z.t, pr: z.pr }; }));
+  s.fenster = '';
+  schSichern();
+  schZeichnen();
+  schClieZiehen();
+}
+
+function schDrehen() {
+  cl.sch.dreh = !cl.sch.dreh;
+  schSichern();
+  schZeichnen();
+}
+
+function schNeuOeffnen() {
+  cl.sch.neu = { gegner: cl.sch.gegner, stufe: cl.sch.stufe, farbe: cl.sch.farbe };
+  cl.sch.fenster = 'neu';
+  schZeichnen();
+}
+
+function schNeuWahl(feld, wert) {
+  if (['gegner', 'stufe', 'farbe'].indexOf(feld) < 0) { return; }
+  cl.sch.neu[feld] = wert;
+  schZeichnen();
+}
+
+function schNeuLos() {
+  var n = cl.sch.neu;
+  cl.sch.gegner = n.gegner === 'zwei' ? 'zwei' : 'clie';
+  cl.sch.stufe = n.stufe;
+  cl.sch.farbe = n.farbe === 'zufall' ? (Math.random() < 0.5 ? 'w' : 'b') : n.farbe;
+  cl.sch.dreh = false;
+  cl.sch.fenster = '';
+  cl.sch.denkt = false;
+  schAufbauen([]);
+  schSichern();
+  kopfZeichnen();
+  schZeichnen();
+  schClieZiehen();
+}
+
+function schFensterZu() {
+  cl.sch.fenster = '';
+  cl.sch.umw = null;
+  schZeichnen();
+}
+
+/* ---- Zeichnen ---- */
+
+var schBildCache = {};
+
+function schFigurSvg(f) {
+  if (schBildCache[f]) { return schBildCache[f]; }
+  var m = SCH_BILD[schArt(f)];
+  var weiss = schWeiss(f);
+  var h = '<svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true">';
+  var y;
+  var x;
+  for (y = 0; y < 12; y++) {
+    for (x = 0; x < 12; x++) {
+      if (m[y].charAt(x) !== '#') { continue; }
+      var innen = weiss && y > 0 && y < 11 && x > 0 && x < 11 && m[y - 1].charAt(x) === '#' && m[y + 1].charAt(x) === '#'
+                  && m[y].charAt(x - 1) === '#' && m[y].charAt(x + 1) === '#';
+      h += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + (innen ? '#E3E9D6' : '#1C2116') + '"/>';
+    }
+  }
+  schBildCache[f] = h + '</svg>';
+  return schBildCache[f];
+}
+
+/* Unten steht, wer am Gerät spielt; „Drehen“ kehrt das um */
+function schGedreht() {
+  var unten = (cl.sch.gegner === 'clie') ? cl.sch.farbe : 'w';
+  return (unten === 'b') !== cl.sch.dreh;
+}
+
+function schBrettHtml() {
+  var s = cl.sch;
+  var p = s.p;
+  var ziele = {};
+  if (s.wahl >= 0) { schZuege(p).forEach(function (m) { if (m.f === s.wahl) { ziele[m.t] = 1; } }); }
+  var dreh = schGedreht();
+  var schach = schImSchach(p) ? schKoenig(p, p.w) : -1;
+  var h = '';
+  var vr;
+  var vc;
+  for (vr = 0; vr < 8; vr++) {
+    var r = dreh ? 7 - vr : vr;
+    h += '<span class="sch-ko">' + (8 - r) + '</span>';
+    for (vc = 0; vc < 8; vc++) {
+      var c = dreh ? 7 - vc : vc;
+      var i = r * 8 + c;
+      var f = p.b[i];
+      var kl = 'sch-f ' + ((r + c) % 2 ? 'd' : 'h') + (s.wahl === i ? ' wahl' : '')
+             + (s.letzt && (s.letzt[0] === i || s.letzt[1] === i) ? ' letzt' : '') + (i === schach ? ' schach' : '');
+      h += '<button type="button" class="' + kl + '" onclick="schTipp(' + i + ')" aria-label="' + schFeldName(i) + '">'
+         + (ziele[i] ? (f !== '' || (schArt(p.b[s.wahl]) === 'p' && i === p.ep) ? '<span class="sch-schlag"></span>' : '<span class="sch-ziel"></span>') : '')
+         + (f ? schFigurSvg(f) : '') + '</button>';
+    }
+  }
+  h += '<span></span>';
+  for (vc = 0; vc < 8; vc++) { h += '<span class="sch-ko">' + 'abcdefgh'.charAt(dreh ? 7 - vc : vc) + '</span>'; }
+  return h;
+}
+
+function schStatusText() {
+  var s = cl.sch;
+  if (s.ende) { return s.ende; }
+  var farbe = s.p.w ? 'Weiß' : 'Schwarz';
+  var schach = schImSchach(s.p) ? ' — Schach!' : '';
+  if (s.gegner === 'zwei') { return farbe + ' am Zug' + schach; }
+  if (s.denkt || schClieAmZug()) { return 'CLIE denkt …'; }
+  return 'Du (' + farbe + ') am Zug' + schach;
+}
+
+function schFensterHtml() {
+  var s = cl.sch;
+  var reihe = function (feld, werte) {
+    return '<div class="wahlreihe">' + werte.map(function (x) {
+      return '<button type="button"' + (s.neu[feld] === x[0] ? ' class="an"' : '') + ' onclick="schNeuWahl(\'' + feld + '\',\'' + x[0] + '\')">' + x[1] + '</button>';
+    }).join('') + '</div>';
+  };
+  if (s.fenster === 'neu') {
+    return '<div class="sto-fenster"><div class="titel">Neue Partie</div><div class="rumpf">'
+      + '<label>Gegner:</label>' + reihe('gegner', [['clie', 'CLIE'], ['zwei', '2 Spieler']])
+      + (s.neu.gegner === 'clie' ? '<label>Stufe:</label>' + reihe('stufe', SCH_STUFEN)
+         + '<label>Du spielst:</label>' + reihe('farbe', [['w', 'Weiß'], ['b', 'Schwarz'], ['zufall', 'Zufall']]) : '')
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="schNeuLos()">Los</button>'
+      + '<button type="button" class="knopf" onclick="schFensterZu()">Abbrechen</button></div>'
+      + (s.zuege.length && !s.ende ? '<p class="leise">Die laufende Partie wird dabei beendet.</p>' : '') + '</div></div>';
+  }
+  if (s.fenster === 'umwandeln') {
+    var w = s.p.w;
+    return '<div class="sto-fenster"><div class="titel">Umwandeln in</div><div class="rumpf"><div class="sch-umw">'
+      + 'qrbn'.split('').map(function (a) {
+          return '<button type="button" onclick="schUmwandeln(\'' + a + '\')" aria-label="' + SCH_DEUTSCH[a] + '">' + schFigurSvg(w ? a.toUpperCase() : a) + '</button>';
+        }).join('') + '</div><div class="knoepfe"><button type="button" class="knopf" onclick="schFensterZu()">Abbrechen</button></div></div></div>';
+  }
+  if (s.ende && s.fenster !== 'ansehen') {
+    return '<div class="sto-fenster"><div class="titel">' + (/^Schachmatt/.test(s.ende) ? 'Schachmatt' : 'Remis') + '</div><div class="rumpf">'
+      + '<p>' + esc(s.ende.replace(/^Schachmatt — /, '')) + ' Nach ' + Math.ceil(s.zuege.length / 2) + ' Zügen.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="schNeuOeffnen()">Neue Partie</button>'
+      + '<button type="button" class="knopf" onclick="schAnsehen()">Ansehen</button></div></div></div>';
+  }
+  return '';
+}
+
+function schAnsehen() {
+  cl.sch.fenster = 'ansehen';
+  schZeichnen();
+}
+
+function schachHtml() {
+  var s = cl.sch;
+  if (!s.p) { schLaden(); }
+  var geschlagen = s.geschlagen.map(function (f) { return '<span class="sch-mini">' + schFigurSvg(f) + '</span>'; }).join('');
+  var zl = '';
+  var i;
+  for (i = 0; i < s.zuege.length; i += 2) {
+    zl += '<div><span>' + (i / 2 + 1) + '.</span><span>' + esc(s.zuege[i].kurz) + (s.zuege[i + 1] ? ' ' + esc(s.zuege[i + 1].kurz) : '') + '</span></div>';
+  }
+  return '<div class="sch-geschlagen">' + (geschlagen || '&nbsp;') + '</div>'
+    + '<div class="sch-rahmen' + (s.fenster && s.fenster !== 'ansehen' ? ' ruht' : '') + '"><div class="sch-brett">' + schBrettHtml() + '</div></div>'
+    + '<div class="sch-status"><span>' + esc(schStatusText()) + '</span><b>Zug ' + s.p.fm + '</b></div>'
+    + (zl ? '<div class="sch-zuege">' + zl + '</div>' : '<p class="leise">Tippe eine Figur an, dann ihr Ziel.</p>')
+    + schFensterHtml();
+}
+
+function schachFussHtml() {
+  return '<button type="button" class="knopf" onclick="schNeuOeffnen()">Neu…</button>'
+    + '<button type="button" class="knopf" onclick="schZurueckNehmen()"' + (cl.sch.zuege.length && !cl.sch.denkt ? '' : ' disabled') + '>↶ Zurück</button>'
+    + '<button type="button" class="knopf" onclick="schDrehen()">⇅ Drehen</button>';
+}
+
+function schZeichnen() {
+  if (cl.app !== 'schach') { return; }
+  inhaltZeichnen();
+  fussZeichnen();
+}
+
+function schKopfText() {
+  if (!cl.sch.p) { schLaden(); }
+  return cl.sch.gegner === 'zwei' ? '2 Spieler' : (SCH_STUFEN.filter(function (x) { return x[0] === cl.sch.stufe; })[0] || ['', 'Mittel'])[1];
+}
+
 /* ---------- Stones (seit 0.18) ----------
 
    Ein Fallblock-Spiel im LCD-Stil: Feld 10 × 18, sieben Steinformen,
@@ -9669,6 +10454,7 @@ function clZurueck() {
   if (cl.app === 'checklisten' && cl.cls.schreiben) { clsSchreibenUm(); return true; }
   if (cl.app === 'checklisten' && cl.cls.id) { clsZurListe(); return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }
+  if (cl.app === 'schach' && (cl.sch.fenster === 'neu' || cl.sch.fenster === 'umwandeln')) { schFensterZu(); return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) { drvHoch(); return true; }
   if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
   return false;

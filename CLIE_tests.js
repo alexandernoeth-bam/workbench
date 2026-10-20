@@ -285,7 +285,7 @@ function uebersichtTest() {
   pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
     'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 12, 'zwölf Apps im Raster (seit 0.19 mit Drive)');
+  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 13, 'dreizehn Apps im Raster (seit 0.20 mit Schach)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -412,8 +412,8 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","abgleich"]',
-    'genau zwölf Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","abgleich"]',
+    'genau dreizehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2897,6 +2897,108 @@ async function driveRechtTest() {
   S.oeffne('uebersicht');
 }
 
+/* ============================================================
+   50. Schach (0.20)
+   Grund: Neues Spiel mit allen Regeln und CLIE als Gegner. Fehler in
+   den Regeln merkt man oft erst spät — darum zählt der Test alle
+   Zugfolgen bekannter Prüfstellungen (perft) und prüft Sonderregeln,
+   Kurzschrift, Spielende, Bedienung, Zurücknehmen und Speichern.
+   Erkennt: falsche/fehlende Züge (Rochade, en passant, Umwandlung,
+   Fesselung), falsche Kurzschrift, kein Matt/Patt/Remis, CLIE übersieht
+   Matt in 1, Partie geht beim Neustart verloren.
+   ============================================================ */
+function schachTest() {
+  console.log('\n50. Schach (0.20)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-schach']; delete S.__ablage['clie-schach-bilanz'];
+  const perft = (fen, erw) => erw.every((e, d) => S.schPerft(S.schAusFen(fen), d + 1) === e);
+  pruefe(perft('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', [20, 400, 8902]), 'perft Grundstellung 20 / 400 / 8902');
+  pruefe(perft('r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1', [48, 2039]), 'perft „Kiwipete“ 48 / 2039 (Rochaden, en passant, Fesselung)');
+  pruefe(perft('8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1', [14, 191, 2812]), 'perft Endspiel 14 / 191 / 2812 (en passant mit Fesselung)');
+  pruefe(perft('r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1', [6, 264]), 'perft Stellung 4: 6 / 264 (Umwandlung, Schach)');
+  pruefe(perft('rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8', [44, 1486]), 'perft Stellung 5: 44 / 1486');
+
+  /* Kurzschrift */
+  const kurz = (fen, f, t, pr) => { const p = S.schAusFen(fen); const m = S.schZuege(p).filter(x => S.schFeldName(x.f) === f && S.schFeldName(x.t) === t && (x.pr || '') === (pr || ''))[0]; return m ? S.schKurz(p, m) : '—'; };
+  pruefe(kurz('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'e1', 'g1') === 'O-O' && kurz('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'e1', 'c1') === 'O-O-O', 'Rochade: O-O und O-O-O');
+  pruefe(kurz('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1', 'e5', 'd6') === 'exd6', 'en passant: exd6');
+  pruefe(kurz('8/1P2k3/8/8/8/8/8/4K3 w - - 0 1', 'b7', 'b8', 'Q') === 'b8=D' && kurz('8/1P2k3/8/8/8/8/8/4K3 w - - 0 1', 'b7', 'b8', 'N') === 'b8=S', 'Umwandlung: b8=D, b8=S');
+  pruefe(kurz('4k3/8/8/8/8/8/8/R4RK1 w - - 0 1', 'a1', 'd1') === 'Tad1' && kurz('4k3/8/8/8/R7/8/8/R3K3 w - - 0 1', 'a1', 'a2') === 'T1a2', 'Mehrdeutigkeit: Tad1, T1a2');
+  pruefe(kurz('6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', 'a1', 'a8') === 'Ta8#' && kurz('4k3/8/8/8/8/8/8/4K2Q w - - 0 1', 'h1', 'h5') === 'Dh5+', 'Schach „+“ und Matt „#“');
+  pruefe(!S.schZuege(S.schAusFen('4k3/8/8/8/8/8/4r3/4K3 w - - 0 1')).some(x => S.schFeldName(x.t) === 'e1') && S.schZuege(S.schAusFen('r3k2r/8/8/8/8/8/8/R3K2R w - - 0 1')).every(x => Math.abs(x.t - x.f) !== 2 || S.schFeldName(x.f) !== 'e1'),
+    'keine Rochade ohne Recht');
+  pruefe(!S.schZuege(S.schAusFen('4k3/8/8/8/8/8/5r2/R3K2R w KQ - 0 1')).some(x => S.schFeldName(x.f) === 'e1' && S.schFeldName(x.t) === 'g1'), 'keine Rochade durch ein angegriffenes Feld');
+
+  /* Spielende */
+  S.oeffne('schach');
+  const lade = (fen) => { S.cl.sch.p = S.schAusFen(fen); S.cl.sch.schluessel = [S.schSchluessel(S.cl.sch.p)]; S.cl.sch.zuege = []; S.cl.sch.geschlagen = []; return S.schEndeText(); };
+  pruefe(/^Schachmatt — Weiß gewinnt/.test(lade('R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 1')), 'Matt erkannt');
+  pruefe(/^Patt/.test(lade('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1')), 'Patt erkannt');
+  pruefe(/zu wenig Material/.test(lade('8/8/4k3/8/8/2B5/4K3/8 w - - 0 1')) && !lade('8/8/4k3/8/8/2R5/4K3/8 w - - 0 1'), 'zu wenig Material (K+L gegen K) — mit Turm nicht');
+  pruefe(/50-Züge/.test(lade('8/8/4k3/8/8/2R5/4K3/8 w - - 100 80')), '50-Züge-Regel');
+  S.schAufbauen([]);
+  const z = (f, t) => { const m = S.schZuege(S.cl.sch.p).filter(x => S.schFeldName(x.f) === f && S.schFeldName(x.t) === t)[0]; S.schZugAusfuehren(m, true); };
+  ['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1', 'f6g8'].forEach(x => z(x.slice(0, 2), x.slice(2)));
+  pruefe(/dreifache Wiederholung/.test(S.cl.sch.ende), 'dreifache Wiederholung');
+
+  /* Bedienung gegen CLIE */
+  S.cl.sch.gegner = 'clie'; S.cl.sch.farbe = 'w'; S.cl.sch.stufe = 'mittel'; S.cl.sch.dreh = false; S.cl.sch.fenster = ''; S.cl.sch.denkt = false;
+  S.schAufbauen([]);
+  S.zeichne();
+  let h = inhalt();
+  pruefe((h.match(/class="sch-f /g) || []).length === 64 && /<svg viewBox="0 0 12 12"/.test(h) && /Du \(Weiß\) am Zug/.test(h), 'Brett mit 64 Feldern und Pixel-Figuren');
+  pruefe(S.document.getElementById('katKnopf').textContent === 'Mittel', 'oben rechts: Stufe');
+  S.schTipp(52);
+  h = inhalt();
+  pruefe(S.cl.sch.wahl === 52 && (h.match(/sch-ziel/g) || []).length === 2, 'Figur antippen: zwei Ziele für e2');
+  S.schTipp(36);
+  pruefe(S.cl.sch.zuege.length === 1 && S.cl.sch.zuege[0].kurz === 'e4' && S.cl.sch.denkt === true, 'Ziel antippen: e4 — dann denkt CLIE');
+  S.schTipp(51);
+  pruefe(S.cl.sch.wahl === -1, 'während CLIE denkt: keine Eingabe');
+  S.cl.sch.denkt = false;
+  S.schZugAusfuehren(S.schKiZug(S.cl.sch.p, 'mittel', 0), false);
+  pruefe(S.cl.sch.zuege.length === 2 && JSON.parse(S.__ablage['clie-schach']).zuege.length === 2, 'CLIE zieht, die Partie wird gespeichert');
+  S.schZurueckNehmen();
+  pruefe(S.cl.sch.zuege.length === 0 || (S.cl.sch.zuege.length % 2 === 0), 'Zurück gegen CLIE: bis du wieder am Zug bist');
+  /* Laden nach Neustart */
+  S.__ablage['clie-schach'] = JSON.stringify({ zuege: [{ f: 52, t: 36, pr: '' }, { f: 12, t: 28, pr: '' }, { f: 62, t: 45, pr: '' }], gegner: 'zwei', stufe: 'stark', farbe: 'w', dreh: true });
+  S.cl.sch.p = null;
+  S.schLaden();
+  pruefe(S.cl.sch.zuege.map(x => x.kurz).join(' ') === 'e4 e5 Sf3' && S.cl.sch.gegner === 'zwei' && !S.cl.sch.p.w && S.schGedreht(), 'Neustart: Partie, Gegner und Drehung kommen wieder');
+  S.zeichne();
+  pruefe(/Schwarz am Zug/.test(inhalt()) && /<span>1\.<\/span><span>e4 e5<\/span>/.test(inhalt()) && /aria-label="h1"/.test(inhalt().slice(0, inhalt().indexOf('aria-label="a1"'))), 'zu zweit: „Schwarz am Zug“, Zugliste, Brett gedreht');
+  /* Umwandlung über das Fenster */
+  S.cl.sch.gegner = 'zwei';
+  lade('8/1P2k3/8/8/8/8/8/4K3 w - - 0 1');
+  S.cl.sch.ende = ''; S.cl.sch.wahl = -1;
+  S.schTipp(9); S.schTipp(1);
+  pruefe(S.cl.sch.fenster === 'umwandeln' && /Umwandeln in/.test(inhalt()), 'Umwandlung: Fenster zur Wahl');
+  S.schUmwandeln('n');
+  pruefe(S.cl.sch.p.b[1] === 'N' && S.cl.sch.zuege[0].kurz === 'b8=S' && !S.cl.sch.fenster, 'gewählt: Springer');
+  /* Neue Partie */
+  S.schNeuOeffnen();
+  pruefe(/Neue Partie/.test(inhalt()) && /schNeuWahl\('stufe','stark'\)/.test(inhalt()) === false, 'Neue Partie: bei 2 Spielern keine Stufe');
+  S.schNeuWahl('gegner', 'clie'); S.schNeuWahl('stufe', 'stark'); S.schNeuWahl('farbe', 'b');
+  pruefe(/schNeuWahl\('stufe','stark'\)/.test(inhalt()), 'gegen CLIE: Stufe wählbar');
+  S.schNeuLos();
+  pruefe(S.cl.sch.farbe === 'b' && S.cl.sch.stufe === 'stark' && S.cl.sch.denkt === true && S.schGedreht(), 'du spielst Schwarz: CLIE beginnt, Brett von Schwarz aus');
+  S.cl.sch.denkt = false;
+  /* CLIE übersieht kein Matt in 1 */
+  const pm = S.schAusFen('r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1');
+  pruefe(['leicht', 'mittel', 'stark'].every(st => S.schKurz(pm, S.schKiZug(pm, st, 0)) === 'Dxf7#'), 'alle Stufen finden Matt in 1');
+  /* Bilanz */
+  S.cl.sch.gegner = 'clie'; S.cl.sch.farbe = 'w';
+  lade('R5k1/5ppp/8/8/8/8/8/6K1 b - - 0 1');
+  S.cl.sch.ende = S.schEndeText(); S.schBilanz();
+  S.oeffne('statistik');
+  pruefe(/Schach/.test(inhalt()) && /1 · 0 · 0/.test(inhalt()), 'Statistik: gewonnen · verloren · remis');
+  S.oeffne('uebersicht');
+  delete S.__ablage['clie-schach'];
+  S.cl.sch.p = null;
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -2943,6 +3045,7 @@ async function driveRechtTest() {
   try { stonesTest(); } catch (e) { fail('Stones warf: ' + e.message); }
   try { await driveTest(); } catch (e) { fail('Drive warf: ' + e.message); }
   try { await driveRechtTest(); } catch (e) { fail('Drive-Recht warf: ' + e.message); }
+  try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
 
   /* ============================================================
      ERGEBNIS
