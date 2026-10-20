@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.23.0</title>
+<title>CLIE 0.23.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -502,6 +502,10 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .lk-feld{display:block;width:100%;min-height:150px;font:17.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--px);background:var(--lcd-hell);border:2px solid var(--px);padding:6px;box-sizing:border-box}
 .lk-feld.klein{min-height:64px}
 .lk-datei{display:none}
+.lk-aufklapp{max-height:70vh;overflow:auto;min-width:240px}
+.lk-wahl{display:flex!important;justify-content:space-between;gap:12px;width:100%}
+.lk-wahl b{font-weight:400;color:var(--px-mitte)}
+.lk-wahl.an b{color:inherit}
 </style>
 </head>
 <body>
@@ -545,7 +549,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.23.0';
+var APP_VERSION = '0.23.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3600,9 +3604,9 @@ function kopfZeichnen() {
     kat.textContent = (cl.app === 'stones') ? 'Level ' + cl.sto.level
       : (cl.app === 'drive') ? ''
       : (cl.app === 'schach') ? schKopfText()
-      : (cl.app === 'lernkartei') ? lkKopfText()
+      : (cl.app === 'lernkartei') ? '▼ ' + lkKopfText()
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
-    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter') ? ' an' : '');
+    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl') ? ' an' : '');
   }
   uhrZeichnen();
 }
@@ -3651,6 +3655,8 @@ function aufklappZeichnen() {
     /* Ein offenes Eingabefenster bleibt beim Neuzeichnen stehen. */
     if (el.innerHTML.indexOf('saFenster') >= 0) { return; }
     el.innerHTML = saFensterHtml();
+  } else if (cl.aufklapp === 'lkwahl') {
+    el.innerHTML = lkWahlHtml();
   } else if (cl.aufklapp === 'safilter') {
     el.innerHTML = saFilterAufklappHtml();
   } else if (cl.aufklapp === 'sasort') {
@@ -3748,9 +3754,10 @@ function oeffne(id) {
 }
 
 function katUm() {
-  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'lernkartei') { return; }
+  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
+    : (cl.app === 'lernkartei') ? 'lkwahl'
     : (cl.app === 'sammlungen' && saKatText() !== null) ? 'safilter' : 'kat';
   cl.aufklapp = (cl.aufklapp === wohin) ? '' : wohin;
   kopfZeichnen();
@@ -11298,9 +11305,37 @@ function lkStatZeile() {
   return d.kaesten.length + ' · ' + n + ' · ' + lkAlleHeute();
 }
 
+/* Kopf: welcher Kasten offen ist (seit 0.23.1 zum Umschalten) */
 function lkKopfText() {
-  var n = lkAlleHeute();
-  return n ? n + ' fällig' : '';
+  var d = lkDaten();
+  var k = cl.lk.id ? lkKasten(d, cl.lk.id) : null;
+  var name = k ? k.name : 'Alle Kästen';
+  return name.length > 18 ? name.slice(0, 17) + '…' : name;
+}
+
+/* Aufklappliste im Kopf: alle Kästen mit ihren fälligen Karten */
+function lkWahlHtml() {
+  var d = lkDaten();
+  var zeile = function (id, name, n, an) {
+    return '<button type="button" class="lk-wahl' + (an ? ' an' : '') + '" onclick="lkWechseln(\'' + esc(id) + '\')"><span>' + esc(name) + '</span><b>' + (n || '') + '</b></button>';
+  };
+  return '<div class="aufklapp lk-aufklapp" style="top:49px;right:6px">'
+    + zeile('', 'Alle Kästen', lkAlleHeute(), !cl.lk.id)
+    + (d.kaesten.length ? '<div class="trenn"></div>' : '')
+    + d.kaesten.map(function (k) { return zeile(k.id, k.name, lkHeuteZahl(d, k), k.id === cl.lk.id); }).join('') + '</div>';
+}
+
+function lkWechseln(id) {
+  cl.aufklapp = '';
+  cl.lk.sitzung = null;
+  cl.lk.fenster = '';
+  cl.lk.suche = '';
+  var d = lkDaten();
+  if (id && lkKasten(d, id)) { cl.lk.id = id; cl.lk.ansicht = 'kasten'; }
+  else { cl.lk.id = ''; cl.lk.ansicht = 'liste'; }
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
 }
 
 

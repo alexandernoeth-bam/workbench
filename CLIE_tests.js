@@ -3228,6 +3228,39 @@ function schuleTest() {
 }
 
 /* ============================================================
+   54. Lernkartei umschalten (0.23.1)
+   Grund: Mit mehreren Paketen muss der Kasten schnell wechselbar sein.
+   Erkennt: Kopf zeigt nicht den offenen Kasten, Aufklappliste fehlt
+   oder ohne Fälligkeit, Wechsel lässt alte Sitzung/Fenster offen.
+   ============================================================ */
+function lkWahlTest() {
+  console.log('\n54. Lernkartei umschalten (0.23.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  delete S.__ablage['clie-lernkartei'];
+  const a = S.lkKastenNeu('Italienisch'); const b = S.lkKastenNeu('Ein sehr langer Kastenname für den Kopf');
+  let d = S.lkDaten(); S.lkKasten(d, a).karten = S.lkKartenAusText('A\n1\n\nB\n2'); S.lkSichern(d);
+  S.oeffne('lernkartei');
+  pruefe(S.lkKopfText() === 'Alle Kästen', 'Kopf zeigt „Alle Kästen“ in der Liste');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'lkwahl', 'Tipp auf den Kopf öffnet die Kastenwahl');
+  const h = S.lkWahlHtml();
+  pruefe(h.indexOf("lkWechseln('" + a + "')") >= 0 && h.indexOf("lkWechseln('" + b + "')") >= 0 && h.indexOf("lkWechseln('')") >= 0, 'Wahl listet alle Kästen und „Alle“');
+  pruefe(/Italienisch<\/span><b>2<\/b>/.test(h), 'Wahl zeigt die heute fälligen/neuen Karten je Kasten');
+  S.lkLernen(a); S.cl.lk.fenster = 'details';
+  S.lkWechseln(b);
+  pruefe(S.cl.lk.id === b && S.cl.lk.ansicht === 'kasten' && !S.cl.lk.sitzung && !S.cl.lk.fenster && !S.cl.aufklapp, 'Wechsel öffnet den Kasten, beendet Sitzung und Fenster');
+  pruefe(S.lkKopfText().length <= 18 && /…$/.test(S.lkKopfText()), 'langer Name im Kopf gekürzt');
+  S.lkWechseln('');
+  pruefe(S.cl.lk.id === '' && S.cl.lk.ansicht === 'liste', '„Alle Kästen“ führt zur Liste');
+  S.lkWechseln('gibtsnicht');
+  pruefe(S.cl.lk.ansicht === 'liste', 'unbekannter Kasten → Liste statt Fehler');
+  delete S.__ablage['clie-lernkartei'];
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    53. Lernkartei (0.23)
    Grund: Lernstand ist Arbeit von Wochen. Falsch einsortierte Karten,
    ein Paket-Update, das den Lernstand löscht, oder Listen, die sich nicht
@@ -3380,6 +3413,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { lkWahlTest(); } catch (e) { fail('Lernkartei umschalten warf: ' + e.message); }
   try { lernkarteiTest(); } catch (e) { fail('Lernkartei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
