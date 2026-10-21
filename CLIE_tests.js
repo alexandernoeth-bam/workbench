@@ -3232,6 +3232,96 @@ function schuleTest() {
 }
 
 /* ============================================================
+   62. Vorlesen: Lesezeichen (0.29)
+   Grund: Wichtige Stücke eines Buchs sollen sich merken und wieder
+   anhören lassen — auf allen Geräten und auch nach neuem Auslesen.
+   Erkennt: Merken hält das Vorlesen an, Umfang falsch, Lesezeichen nicht
+   in der Datenbank, Stück wird nicht am Ende angehalten, „Alle anhören“
+   springt nicht weiter, verschobene Satznummern nicht wiedergefunden.
+   ============================================================ */
+function vlMarkenTest() {
+  console.log('\n62. Vorlesen: Lesezeichen (0.29)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const gesagt = [];
+  S.speechSynthesis = { getVoices() { return [{ name: 'Anna', lang: 'de-DE', voiceURI: 'anna' }]; }, speak(u) { gesagt.push(u); }, cancel() {} };
+  S.SpeechSynthesisUtterance = function (x) { this.text = x; };
+  const doc = { saetze: ['A1.', 'A2.', 'A3.', 'B1.', 'B2.', 'C1.', 'C2.', 'C3.', 'D1.'], seite: [1, 1, 1, 1, 2, 2, 2, 2, 3], absatz: [0, 0, 0, 1, 1, 2, 2, 2, 3], kapitel: [], titel: 'T', seiten: 3 };
+  S.DB.vorlesen = [{ id: 'vl-t', titel: 'T', art: 'pdf', satz: 0, saetze: 9, seiten: 3, geaendert: 1 }];
+  S.oeffne('vorlesen'); S.vlOeffnen('vl-t', doc);
+  S.vlGehe(1); S.vlStarten();
+  S.vlMerkenDruck(); S.vlMerkenTipp();
+  const d = S.vlDokument('vl-t');
+  pruefe(S.cl.vl.laeuft && d.marken.length === 1 && d.marken[0].von === 0 && d.marken[0].bis === 2 && d.marken[0].anfang === 'A1.', 'kurzer Tipp: Absatz gemerkt, Vorlesen läuft weiter');
+  S.vlMerkenTipp();
+  pruefe(d.marken.length === 1, 'derselbe Absatz nicht doppelt');
+  S.vlGehe(7); S.cl.vl.druck = Date.now() - 800; S.vlMerkenTipp();
+  pruefe(S.cl.vl.fenster === 'marke' && S.cl.vl.marke.anker === 7, 'langer Tipp öffnet das Fenster');
+  S.vlMarkeUmfang('davor'); S.document.getElementById('vlNotiz').value = 'Wichtig!'; S.vlMarkeSpeichern();
+  const m2 = d.marken.filter(x => x.notiz === 'Wichtig!')[0];
+  pruefe(m2 && m2.von === 5 && m2.bis === 7 && d.geaendert > 1, '„+ die 2 davor“ mit Notiz, in der Datenbank');
+  S.vlAnhalten();
+  pruefe(/vl-mark/.test(inhalt()) || S.cl.vl.doc.seite[S.cl.vl.i] === 2, 'markierter Absatz im Text erkennbar');
+  /* Ein Stück anhören */
+  S.vlMarkeHoeren(d.marken[0].id);
+  pruefe(S.cl.vl.i === 0 && S.cl.vl.bis === 2 && S.cl.vl.laeuft, 'Stück startet am Anfang des Lesezeichens');
+  gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend();
+  pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 2, 'am Ende des Stücks wird angehalten');
+  /* Alle anhören */
+  S.vlMarkenAlle();
+  gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend();
+  pruefe(S.cl.vl.laeuft && S.cl.vl.i === 5 && S.cl.vl.bis === 7, '„Alle anhören“ springt zum nächsten Lesezeichen');
+  gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend();
+  pruefe(!S.cl.vl.laeuft, 'nach dem letzten Lesezeichen Schluss');
+  /* Neu ausgelesen: Satznummern verschoben */
+  const neu = { saetze: ['Vorwort.', 'Noch etwas.'].concat(doc.saetze), seite: [1, 1].concat(doc.seite), absatz: [9, 9].concat(doc.absatz), kapitel: [], titel: 'T', seiten: 3 };
+  S.vlMarkenAnpassen(d, neu);
+  pruefe(d.marken[0].von === 2 && d.marken[0].bis === 4 && m2.von === 7, 'verschobene Lesezeichen über den Satzanfang wiedergefunden');
+  S.cl.vl.ansicht = 'marken'; S.zeichne();
+  pruefe(/vlMarkeHoeren/.test(inhalt()) && /Wichtig!/.test(inhalt()) && /vlMarkenAlle/.test(S.document.getElementById('fuss').innerHTML), 'Liste mit ▶, Notiz und „Alle anhören“');
+  S.clZurueck(); pruefe(S.cl.vl.ansicht === 'lesen', 'Zurück aus der Liste zum Lesen');
+  delete S.speechSynthesis; delete S.SpeechSynthesisUtterance;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   61. Vorlesen: ein Dokument bleibt ein Eintrag (0.28.1)
+   Grund: Dasselbe PDF erschien zweimal, weil die Kennung am ausgelesenen
+   Text hing — nach besserer Aufbereitung (0.27) ergab sich eine andere.
+   Erkennt: Kennung nicht aus dem Fingerabdruck, Doppelte bleiben, falscher
+   Eintrag behalten, Lesestelle springt bei geänderter Satzzahl falsch,
+   Doppelte ohne Grabstein (kämen vom anderen Gerät zurück).
+   ============================================================ */
+async function vlDoppeltTest() {
+  console.log('\n61. Vorlesen: ein Dokument bleibt ein Eintrag (0.28.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.vorlesen = [
+    { id: 'vl-alt-pc', titel: 'Mein Weg bis 2046', art: 'pdf', satz: 40, seite: 5, saetze: 300, seiten: 45, zuletzt: '2026-10-21T09:00', geaendert: 1 },
+    { id: 'vl-alt-pixel', titel: 'Mein Weg bis 2046', art: 'pdf', satz: 0, seite: 1, saetze: 310, seiten: 45, zuletzt: '2026-10-21T11:58', geaendert: 2 },
+    { id: 'vl-anderes', titel: 'Anderes Buch', art: 'pdf', satz: 3, seite: 1, saetze: 50, seiten: 45, geaendert: 3 }];
+  const saetze = [], seite = [], absatz = [];
+  for (let i = 0; i < 400; i++) { saetze.push('Satz ' + i + '.'); seite.push(Math.floor(i / 9) + 1); absatz.push(i); }
+  const t = { saetze, seite, absatz, kapitel: [], titel: 'Mein Weg bis 2046', seiten: 45, fp: 'abc123fingerabdruck' };
+  await S.vlUebernehmen(t, 'pdf', {});
+  const l = S.DB.vorlesen.filter(d => /Mein Weg/.test(d.titel));
+  pruefe(l.length === 1 && l[0].id === 'vl-alt-pc', 'Doppelte zusammengeführt — behalten wird die weiteste Lesestelle (Seite 5)');
+  pruefe(l[0].fp === 'abc123fingerabdruck' && l[0].saetze === 400 && S.DB.vorlesen.some(d => d.id === 'vl-anderes'), 'Fingerabdruck gemerkt, Satzzahl neu, anderes Buch unberührt');
+  pruefe(seite[l[0].satz] === 5 && seite[l[0].satz - 1] === 4, 'geänderte Satzzahl: weiter am Anfang der gemerkten Seite 5');
+  pruefe(S.DB.grabsteine.some(g => g.s === 'vorlesen' && g.id === 'vl-alt-pixel'), 'der doppelte Eintrag bekommt einen Grabstein (kommt nicht vom anderen Gerät zurück)');
+  /* Ganz neu: Kennung aus dem Fingerabdruck, unabhängig vom Text */
+  const t2 = { saetze: ['A.', 'B.'], seite: [1, 2], absatz: [0, 1], kapitel: [], titel: 'Neu', seiten: 2, fp: 'xyz' };
+  const t3 = { saetze: ['A anders.', 'B.', 'C.'], seite: [1, 1, 2], absatz: [0, 0, 1], kapitel: [], titel: 'Neu', seiten: 2, fp: 'xyz' };
+  await S.vlUebernehmen(t2, 'pdf', {}); const id2 = t2.id;
+  await S.vlUebernehmen(t3, 'pdf', {});
+  pruefe(/^vl-f/.test(id2) && t3.id === id2 && S.DB.vorlesen.filter(d => d.titel === 'Neu').length === 1, 'gleiche Datei, anders ausgelesen → dieselbe Kennung, ein Eintrag');
+  pruefe(/-webkit-line-clamp:2/.test(QUELLE), 'lange Titel in der Bibliothek auf zwei Zeilen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    60. Kurs (0.28)
    Grund: Lebensbereiche, Prinzipien, Vorab-Check und Wochenrückblick
    sollen bewusstere Entscheidungen stützen. Falsche Empfehlung, doppelte
@@ -3847,6 +3937,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { vlMarkenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { await vlDoppeltTest(); } catch (e) { fail('Vorlesen doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kursTest(); } catch (e) { fail('Kurs warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { neu027Test(); } catch (e) { fail('0.27 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vorlesenTest(); } catch (e) { fail('Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.28.0</title>
+<title>CLIE 0.29.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -508,8 +508,18 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .lk-wahl b{font-weight:400;color:var(--px-mitte)}
 .lk-wahl.an b{color:inherit}
 /* Vorlesen (seit 0.26) */
+.vl-text p.vl-mark{border-left:4px solid var(--px);padding-left:6px;margin-left:-2px}
+.vl-markknopf{font-size:15.5px;margin-right:4px}
+.vl-lz{border-bottom:2px dotted var(--px-zart);padding:6px 0}
+.vl-lz-t{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;font-size:19px}
+.vl-lz-t b{font-weight:400;color:var(--px-mitte);font-size:16px;white-space:nowrap}
+.vl-lz-text{display:block;width:100%;text-align:left;font-size:16px;color:var(--px-mitte)}
+.vl-lz-text q{display:block;quotes:"„" "“"}
+.vl-lz-text i{display:block;color:var(--px)}
 .vl-doc{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px}
 .vl-t{display:flex;justify-content:space-between;gap:8px;font-size:20px}
+.vl-t span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vl-t b{height:fit-content}
 .vl-t b{font-weight:400;background:var(--px);color:var(--lcd);padding:0 6px;white-space:nowrap;font-size:17px}
 .vl-doc small{display:block;font-size:16px;color:var(--px-mitte)}
 .vl-doc small.vl-fehlt{color:var(--px)}
@@ -630,7 +640,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.28.0';
+var APP_VERSION = '0.29.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -12050,7 +12060,7 @@ var VL_ABKUERZUNGEN = ['z', 'B', 'd', 'h', 'u', 'a', 'usw', 'bzw', 'ca', 'Dr', '
   'f', 'ff', 'z.B', 'd.h', 'u.a', 'i', 'e', 'Mr', 'Mrs', 'Ms', 'vs', 'insb', 'allg', 'Tel', 'Str', 'gem', 'lt', 'rd', 'jew', 'al', 'Vgl', 'Ggf', 'Bzw'];
 
 cl.vl = { ansicht: 'liste', id: '', doc: null, i: 0, laeuft: false, fenster: '', gesperrt: false, gen: 0, laden: null,
-          timerBis: 0, timerKapitel: -1, wach: null, gemerkt: 0, ziel: '' };
+          timerBis: 0, timerKapitel: -1, wach: null, gemerkt: 0, ziel: '', bis: -1, runde: [], marke: null, druck: 0 };
 
 /* ---- Text aufbereiten (rein, ohne Browser — geprüft in den Tests) ---- */
 
@@ -12428,6 +12438,9 @@ function vlPdfVerarbeiten(puffer, titel, quelle) {
       }).filter(function (k) { return k.i >= 0; });
       t.titel = titel;
       t.seiten = seiten.length;
+      /* Fingerabdruck der Datei — gleich auf jedem Gerät und in jeder CLIE-Fassung (seit 0.28.1) */
+      var fpRoh = (pdf.fingerprints && pdf.fingerprints[0]) || pdf.fingerprint || '';
+      t.fp = fpRoh ? vlHash(String(fpRoh)) : '';
       return vlUebernehmen(t, 'pdf', quelle);
     });
   }).catch(function (f) {
@@ -12440,19 +12453,61 @@ function vlPdfVerarbeiten(puffer, titel, quelle) {
 }
 
 /* Aufbereiteten Text speichern, Dokument eintragen und öffnen */
+/* Dasselbe Dokument finden: gleicher Fingerabdruck, gleiche Drive-Datei oder (für ältere Einträge)
+   gleicher Titel mit gleicher Seitenzahl. Behalten wird der mit der weitesten Lesestelle,
+   die übrigen verschwinden auf allen Geräten (seit 0.28.1 — vorher hing die Kennung am
+   ausgelesenen Text und änderte sich mit jeder besseren Aufbereitung). */
+function vlGleiche(t, art, quelle, id) {
+  var norm = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+  return (Array.isArray(DB.vorlesen) ? DB.vorlesen : []).filter(function (d) {
+    if (!d || !d.id) { return false; }
+    if (d.id === id) { return true; }
+    if (t.fp && d.fp === t.fp) { return true; }
+    if (quelle && quelle.drive && d.drive === quelle.drive) { return true; }
+    return art === 'pdf' && d.art === 'pdf' && !!t.titel && norm(d.titel) === norm(t.titel) && Number(d.seiten) === Number(t.seiten || 1);
+  }).sort(function (a, b) {
+    return (Number(b.seite) || 1) - (Number(a.seite) || 1) || String(b.zuletzt || '').localeCompare(String(a.zuletzt || ''));
+  });
+}
+
+function vlHash(s) {
+  var h1 = 5381;
+  var h2 = 52711;
+  var i;
+  for (i = 0; i < s.length; i++) { var c = s.charCodeAt(i); h1 = ((h1 * 33) ^ c) >>> 0; h2 = ((h2 * 31) + c) >>> 0; }
+  return h1.toString(36) + h2.toString(36);
+}
+
 function vlUebernehmen(t, art, quelle) {
-  var id = vlKennung(t.saetze);
+  var neuId = t.fp ? 'vl-f' + vlHash(t.fp + '|' + (t.seiten || 1)) : vlKennung(t.saetze);
+  var gleiche = vlGleiche(t, art, quelle, neuId);
+  var vorher = gleiche[0] || null;
+  var id = vorher ? vorher.id : neuId;
   t.id = id;
+  /* Doppelte zusammenführen */
+  gleiche.slice(1).forEach(function (x) {
+    DB.vorlesen = DB.vorlesen.filter(function (d) { return d !== x; });
+    grabsteinSetzen('vorlesen', x.id);
+    vlLokalSetzen(x.id, false);
+    if (idbDa()) { idbLoeschen('vl-text-' + x.id).catch(function () { return null; }); }
+  });
+  /* Hat sich die Satzzahl geändert (bessere Aufbereitung), gilt die gemerkte Seite */
+  if (vorher && Number(vorher.saetze) !== t.saetze.length && vorher.seite) {
+    var j = 0;
+    while (j < t.seite.length - 1 && t.seite[j] < Number(vorher.seite)) { j++; }
+    vorher.satz = j;
+  }
   var speichern = idbDa() ? idbSchreiben('vl-text-' + id, t) : Promise.resolve(false);
   return speichern.catch(function () { return false; }).then(function (ok) {
     if (!ok) { melde('Der Text ließ sich auf diesem Gerät nicht speichern.', 'warn'); }
     vlLokalSetzen(id, true);
-    var vorher = vlDokument(id);
     var d = vlEintragen({ id: id, titel: vorher ? vorher.titel : t.titel, art: art, saetze: t.saetze.length, seiten: t.seiten || 1,
                           drive: quelle && quelle.drive, memo: quelle && quelle.memo });
+    if (t.fp) { d.fp = t.fp; }
     cl.vl.laden = null;
     cl.vl.fenster = '';
-    melde(vorher ? '„' + d.titel + '“ ist jetzt auch auf diesem Gerät — weiter bei Seite ' + (t.seite[d.satz] || 1) + '.'
+    melde(vorher ? '„' + d.titel + '“ ist jetzt auf diesem Gerät — weiter bei Seite ' + (t.seite[d.satz] || 1) + '.'
+      + (gleiche.length > 1 ? ' ' + (gleiche.length - 1) + (gleiche.length > 2 ? ' doppelte Einträge' : ' doppelter Eintrag') + ' zusammengeführt.' : '')
       : '„' + d.titel + '“: ' + t.saetze.length + ' Sätze bereit.', 'gut');
     return vlOeffnen(id, t);
   });
@@ -12555,6 +12610,7 @@ function vlOeffnen(id, text) {
       return null;
     }
     cl.vl.doc = t;
+    vlMarkenAnpassen(d, t);
     cl.vl.i = Math.max(0, Math.min(t.saetze.length - 1, Number(d.satz) || 0));
     if (d.fertig) { cl.vl.i = 0; }
     vlZeichnen();
@@ -12676,6 +12732,21 @@ function vlNaechster() {
     vlZeichnen();
     return;
   }
+  /* Ein Lesezeichen anhören: am Ende des Stücks zum nächsten der Runde oder anhalten (seit 0.29) */
+  if (cl.vl.bis >= 0 && cl.vl.i >= cl.vl.bis) {
+    var naechste = cl.vl.runde.shift();
+    if (naechste) {
+      cl.vl.i = naechste.von;
+      cl.vl.bis = naechste.bis;
+      vlStelleMerken(false);
+      vlAktuellZeigen();
+      vlSatzSprechen();
+      return;
+    }
+    vlAnhalten();
+    melde('Lesezeichen zu Ende.', null);
+    return;
+  }
   cl.vl.i++;
   if ((cl.vl.timerBis && jetzt() >= cl.vl.timerBis) || (cl.vl.timerKapitel >= 0 && cl.vl.i >= cl.vl.timerKapitel)) {
     vlAnhalten();
@@ -12689,6 +12760,8 @@ function vlNaechster() {
 
 function vlAnhalten() {
   cl.vl.gen++;
+  cl.vl.bis = -1;
+  cl.vl.runde = [];
   var war = cl.vl.laeuft;
   cl.vl.laeuft = false;
   if (window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') { window.speechSynthesis.cancel(); }
@@ -12878,7 +12951,12 @@ function vlLesenHtml() {
   var i;
   for (i = 0; i < doc.saetze.length; i++) {
     if (doc.seite[i] !== seite) { if (doc.seite[i] > seite) { break; } continue; }
-    if (doc.absatz[i] !== absatz) { h += (absatz >= 0 ? '</p>' : '') + '<p>'; absatz = doc.absatz[i]; }
+    if (doc.absatz[i] !== absatz) {
+      var mk = vlMarkeBei(i, doc);
+      h += (absatz >= 0 ? '</p>' : '') + '<p' + (mk ? ' class="vl-mark"' : '') + '>'
+        + (mk ? '<button type="button" class="vl-markknopf" onclick="vlMarkeOeffnen(\'' + esc(mk.id) + '\')" aria-label="Lesezeichen">🔖</button>' : '');
+      absatz = doc.absatz[i];
+    }
     h += '<span id="vls' + i + '" class="vl-s' + (i < cl.vl.i ? ' gelesen' : (i === cl.vl.i ? ' akt' : '')) + '" onclick="vlSatzTipp(' + i + ')">' + esc(doc.saetze[i]) + ' </span>';
   }
   h += (absatz >= 0 ? '</p>' : '') + '</div>';
@@ -12895,6 +12973,7 @@ function vlLesenHtml() {
     + '<div class="vl-chips"><button type="button" class="knopf" onclick="vlFensterAuf(\'stimme\')">' + String(e.tempo).replace('.', ',') + '×</button>'
     + '<button type="button" class="knopf" onclick="vlFensterAuf(\'stimme\')">' + esc(stimme ? stimme.name.replace(/\s*\(.*\)$/, '').slice(0, 14) : 'Stimme') + '</button>'
     + '<button type="button" class="knopf" onclick="vlFensterAuf(\'stimme\')">◔ ' + esc(timer) + '</button>'
+    + '<button type="button" class="knopf" onpointerdown="vlMerkenDruck()" onclick="vlMerkenTipp()">🔖 Merken</button>'
     + '<button type="button" class="knopf" onclick="vlSperren()">🔒 Sperren</button></div>';
 }
 
@@ -13002,6 +13081,19 @@ function vlFensterHtml() {
     }).join('') : '<p class="leise">Dieses PDF bringt kein Inhaltsverzeichnis mit — „Seite…“ geht immer.</p>')
       + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlFensterZu()">Schließen</button></div>' + zu;
   }
+  if (f === 'marke' && cl.vl.marke) {
+    var m = cl.vl.marke;
+    var ber = vlMarkeBereich(m.anker, m.umfang);
+    var vorschau = cl.vl.doc ? cl.vl.doc.saetze.slice(ber.von, ber.bis + 1).join(' ') : '';
+    return kopf(m.id ? 'Lesezeichen' : 'Neues Lesezeichen') + '<label>Was soll gemerkt werden?</label><div class="wahlreihe">'
+      + [['satz', 'dieser Satz'], ['absatz', 'Absatz'], ['davor', '+ die 2 davor']].map(function (u) {
+        return '<button type="button"' + (m.umfang === u[0] ? ' class="an"' : '') + ' onclick="vlMarkeUmfang(\'' + u[0] + '\')">' + u[1] + '</button>';
+      }).join('') + '</div>'
+      + '<label for="vlNotiz">Notiz (optional):</label><textarea id="vlNotiz" class="eingabe lk-feld klein">' + esc(m.notiz || '') + '</textarea>'
+      + '<p class="leise">„' + esc(vorschau.slice(0, 160)) + (vorschau.length > 160 ? ' …' : '') + '“ · S. ' + ((cl.vl.doc && cl.vl.doc.seite[ber.von]) || 1) + '</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlMarkeSpeichern()">Merken</button><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button>'
+      + (m.id ? '<button type="button" class="knopf" onclick="vlMarkeLoeschen()">Löschen</button>' : '') + '</div>' + zu;
+  }
   if (f === 'details') {
     var d = vlDokument(cl.vl.id);
     if (!d) { return ''; }
@@ -13101,15 +13193,188 @@ function vlEntfernen() {
   vlZeichnen();
 }
 
+/* ---- Lesezeichen (seit 0.29) ----
+   Je Dokument in der Datenbank (d.marken, reist mit): von/bis als Satznummern, dazu
+   der Anfang des ersten Satzes — passt die Nummer nach neuem Auslesen nicht mehr,
+   findet CLIE die Stelle über diesen Text wieder. */
+
+function vlMarken() {
+  var d = vlDokument(cl.vl.id);
+  return (d && Array.isArray(d.marken)) ? d.marken.slice().sort(function (a, b) { return a.von - b.von; }) : [];
+}
+
+function vlMarkeBei(i, doc) {
+  var a = doc.absatz[i];
+  return vlMarken().filter(function (m) {
+    var k;
+    for (k = m.von; k <= m.bis; k++) { if (doc.absatz[k] === a) { return true; } }
+    return false;
+  })[0] || null;
+}
+
+/* Bereich um einen Satz: nur der Satz, der Absatz oder der Satz mit den zwei davor */
+function vlMarkeBereich(anker, umfang) {
+  var doc = cl.vl.doc;
+  if (!doc) { return { von: anker, bis: anker }; }
+  if (umfang === 'satz') { return { von: anker, bis: anker }; }
+  if (umfang === 'davor') { return { von: Math.max(0, anker - 2), bis: anker }; }
+  var a = doc.absatz[anker];
+  var von = anker;
+  var bis = anker;
+  while (von > 0 && doc.absatz[von - 1] === a) { von--; }
+  while (bis < doc.saetze.length - 1 && doc.absatz[bis + 1] === a) { bis++; }
+  return { von: von, bis: bis };
+}
+
+function vlMerkenDruck() {
+  cl.vl.druck = jetzt();
+}
+
+/* Kurzer Tipp: Absatz merken, ohne anzuhalten. Langer Tipp (ab ½ s): Fenster. */
+function vlMerkenTipp() {
+  var lang = cl.vl.druck && jetzt() - cl.vl.druck >= 500;
+  cl.vl.druck = 0;
+  if (!cl.vl.doc) { return; }
+  if (lang) { cl.vl.marke = { id: '', anker: cl.vl.i, umfang: 'absatz', notiz: '' }; vlFensterAuf('marke'); return; }
+  var schon = vlMarkeBei(cl.vl.i, cl.vl.doc);
+  if (schon) { melde('Dieser Absatz ist schon gemerkt — Tipp auf 🔖 am Absatz zum Bearbeiten.', null); return; }
+  vlMarkeAnlegen(cl.vl.i, 'absatz', '');
+  melde('🔖 Gemerkt.', 'gut');
+}
+
+function vlMarkeAnlegen(anker, umfang, notiz) {
+  var d = vlDokument(cl.vl.id);
+  var doc = cl.vl.doc;
+  if (!d || !doc) { return null; }
+  var b = vlMarkeBereich(anker, umfang);
+  if (!Array.isArray(d.marken)) { d.marken = []; }
+  var m = { id: neueKennung(), anker: anker, umfang: umfang, von: b.von, bis: b.bis, seite: doc.seite[b.von] || 1,
+            anfang: String(doc.saetze[b.von] || '').slice(0, 60), notiz: String(notiz || '').slice(0, 300), angelegt: isoDatum() };
+  d.marken.push(m);
+  d.geaendert = jetzt();
+  spaeterSichern();
+  if (!cl.vl.laeuft || cl.vl.ansicht !== 'lesen') { vlZeichnen(); }
+  else { var alt = document.getElementById('vlText'); var r = alt ? alt.scrollTop : 0; vlZeichnen(); var neu = document.getElementById('vlText'); if (neu) { neu.scrollTop = r; } }
+  return m;
+}
+
+function vlMarkeOeffnen(id) {
+  var m = vlMarken().filter(function (x) { return x.id === id; })[0];
+  if (!m) { return; }
+  cl.vl.marke = { id: m.id, anker: typeof m.anker === 'number' ? m.anker : m.von, umfang: m.umfang || 'absatz', notiz: m.notiz || '' };
+  vlFensterAuf('marke');
+}
+
+function vlMarkeUmfang(u) {
+  if (!cl.vl.marke) { return; }
+  var n = document.getElementById('vlNotiz');
+  if (n) { cl.vl.marke.notiz = String(n.value || ''); }
+  cl.vl.marke.umfang = u;
+  vlZeichnen();
+}
+
+function vlMarkeSpeichern() {
+  var m = cl.vl.marke;
+  var d = vlDokument(cl.vl.id);
+  if (!m || !d || !cl.vl.doc) { vlFensterZu(); return; }
+  var n = document.getElementById('vlNotiz');
+  var notiz = n ? String(n.value || '').trim() : m.notiz;
+  if (!m.id) { cl.vl.fenster = ''; vlMarkeAnlegen(m.anker, m.umfang, notiz); cl.vl.marke = null; return; }
+  var b = vlMarkeBereich(m.anker, m.umfang);
+  (d.marken || []).forEach(function (x) {
+    if (x.id !== m.id) { return; }
+    x.umfang = m.umfang; x.von = b.von; x.bis = b.bis; x.seite = cl.vl.doc.seite[b.von] || 1;
+    x.anfang = String(cl.vl.doc.saetze[b.von] || '').slice(0, 60); x.notiz = notiz.slice(0, 300);
+  });
+  d.geaendert = jetzt();
+  spaeterSichern();
+  cl.vl.marke = null;
+  vlFensterZu();
+}
+
+function vlMarkeLoeschen() {
+  var d = vlDokument(cl.vl.id);
+  if (d && cl.vl.marke) { d.marken = (d.marken || []).filter(function (x) { return x.id !== cl.vl.marke.id; }); d.geaendert = jetzt(); spaeterSichern(); }
+  cl.vl.marke = null;
+  vlFensterZu();
+}
+
+/* Nach dem Laden: Stimmt der Text an der Stelle nicht mehr, über den Satzanfang wiederfinden */
+function vlMarkenAnpassen(d, t) {
+  if (!d || !Array.isArray(d.marken) || !d.marken.length) { return; }
+  var anders = false;
+  d.marken.forEach(function (m) {
+    if (!m.anfang || String(t.saetze[m.von] || '').slice(0, 60) === m.anfang) { return; }
+    var probe = m.anfang.slice(0, 40);
+    var beste = -1;
+    var i;
+    for (i = 0; i < t.saetze.length; i++) {
+      if (t.saetze[i].indexOf(probe) === 0 && (beste < 0 || Math.abs(i - m.von) < Math.abs(beste - m.von))) { beste = i; }
+    }
+    if (beste < 0) { return; }
+    var diff = beste - m.von;
+    m.von += diff;
+    m.bis = Math.min(t.saetze.length - 1, m.bis + diff);
+    if (typeof m.anker === 'number') { m.anker += diff; }
+    anders = true;
+  });
+  if (anders) { d.geaendert = jetzt(); spaeterSichern(); }
+}
+
+function vlMarkenZeigen() {
+  cl.vl.ansicht = 'marken';
+  cl.vl.fenster = '';
+  vlZeichnen();
+}
+
+function vlMarkeHoeren(id) {
+  var m = vlMarken().filter(function (x) { return x.id === id; })[0];
+  if (!m || !cl.vl.doc) { return; }
+  vlAnhalten();
+  cl.vl.i = m.von;
+  cl.vl.ansicht = 'lesen';
+  vlStarten();
+  cl.vl.bis = m.bis;
+  cl.vl.runde = [];
+}
+
+function vlMarkenAlle() {
+  var l = vlMarken();
+  if (!l.length || !cl.vl.doc) { return; }
+  vlAnhalten();
+  cl.vl.i = l[0].von;
+  cl.vl.ansicht = 'lesen';
+  vlStarten();
+  cl.vl.bis = l[0].bis;
+  cl.vl.runde = l.slice(1).map(function (m) { return { von: m.von, bis: m.bis }; });
+}
+
+function vlMarkenHtml() {
+  var d = vlDokument(cl.vl.id);
+  var l = vlMarken();
+  var h = '<div class="abschnitt">' + esc(d ? d.titel : '') + ' · ' + l.length + '</div>';
+  if (!l.length) { return h + '<p class="leise">Noch keine Lesezeichen. Beim Hören „🔖 Merken“ tippen — kurz für den Absatz, lang für mehr Auswahl und eine Notiz.</p>'; }
+  return h + l.map(function (m) {
+    var kap = vlKapitelVon(m.von);
+    return '<div class="vl-lz"><button type="button" class="vl-lz-t" onclick="vlMarkeHoeren(\'' + esc(m.id) + '\')"><span>▶ ' + esc(kap || ('Seite ' + m.seite)) + '</span><b>S. ' + m.seite + '</b></button>'
+      + '<button type="button" class="vl-lz-text" onclick="vlMarkeOeffnen(\'' + esc(m.id) + '\')"><q>' + esc(m.anfang || '') + ' …</q>'
+      + (m.notiz ? '<i>✎ ' + esc(m.notiz) + '</i>' : '') + '</button></div>';
+  }).join('') + '<p class="leise">▶ hört genau dieses Stück und hält danach an. „Alle anhören“ spielt alle nacheinander — deine Zusammenfassung. Tipp auf den Text: bearbeiten.</p>';
+}
+
 function vorlesenHtml() {
-  var h = cl.vl.ansicht === 'lesen' ? vlLesenHtml() : vlListeHtml();
+  var h = cl.vl.ansicht === 'lesen' ? vlLesenHtml() : (cl.vl.ansicht === 'marken' ? vlMarkenHtml() : vlListeHtml());
   return h + '<input id="vlDatei" type="file" accept=".pdf,application/pdf" class="lk-datei" onchange="vlDateiGewaehlt(this)">' + vlFensterHtml();
 }
 
 function vorlesenFussHtml() {
   var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
   if (cl.vl.ansicht === 'lesen') {
-    return (cl.vl.doc ? k('Seite…', 'vlFensterAuf(\'seite\')') + k('Kapitel…', 'vlFensterAuf(\'kapitel\')') : '') + k('Details…', 'vlFensterAuf(\'details\')') + k('Fertig', 'vlEbeneHoch()');
+    return (cl.vl.doc ? k('Seite…', 'vlFensterAuf(\'seite\')') + k('Kapitel…', 'vlFensterAuf(\'kapitel\')') + k('🔖 ' + vlMarken().length, 'vlMarkenZeigen()') : '')
+      + k('Details…', 'vlFensterAuf(\'details\')') + k('Fertig', 'vlEbeneHoch()');
+  }
+  if (cl.vl.ansicht === 'marken') {
+    return (vlMarken().length ? k('▶ Alle anhören', 'vlMarkenAlle()', true) : '') + k('Fertig', 'vlEbeneHoch()');
   }
   var weiter = vlDokumente().filter(function (d) { return !d.fertig && d.zuletzt; })[0];
   return (weiter ? k('Weiterhören', 'vlOeffnen(\'' + esc(weiter.id) + '\')', true) : '') + k('+ PDF…', 'vlDateiWaehlen()') + k('+ Text…', 'vlFensterAuf(\'text\')')
@@ -13117,6 +13382,7 @@ function vorlesenFussHtml() {
 }
 
 function vlKopfText() {
+  if (cl.vl.ansicht === 'marken') { return 'Lesezeichen'; }
   if (cl.vl.ansicht === 'lesen' && cl.vl.doc) {
     var doc = cl.vl.doc;
     var max = doc.seite[doc.seite.length - 1] || 1;
@@ -13129,6 +13395,7 @@ function vlKopfText() {
 function vlEbeneHoch() {
   if (cl.vl.gesperrt) { return true; }
   if (cl.vl.fenster) { vlFensterZu(); return true; }
+  if (cl.vl.ansicht === 'marken') { cl.vl.ansicht = 'lesen'; vlZeichnen(); vlAktuellZeigen(); return true; }
   if (cl.vl.ansicht === 'lesen') { vlStelleMerken(true); cl.vl.ansicht = 'liste'; vlZeichnen(); return true; }
   return false;
 }
