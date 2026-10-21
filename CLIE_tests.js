@@ -3230,6 +3230,77 @@ function schuleTest() {
 }
 
 /* ============================================================
+   59. Vorlesen besser, Checklisten-Zahl, Verweise zwischen Sammlungen (0.27)
+   Grund: Beim Vorlesen rissen Sätze an Zeilenumbrüchen (zerteilte Zeilen,
+   Überschrift-Erkennung an jedem großgeschriebenen Wort), WÖRTER IN
+   GROSSBUCHSTABEN wurden buchstabiert, der markierte Satz rollte aus dem
+   Bild. Sammlungen sollen Werte anderer Sammlungen nutzen (Gewicht).
+   Erkennt: versetzte Stücke einer Zeile ergeben zwei Zeilen, Satz endet
+   an kurzer Zeile mit großem Wortanfang, Großbuchstaben bleiben, echte
+   Abkürzungen werden verändert, Rollen über offsetTop, Zahl an
+   Checklisten fehlt, Verweis rechnet mit dem falschen Stand.
+   ============================================================ */
+function neu027Test() {
+  console.log('\n59. Vorlesen besser, Checklisten-Zahl, Sammlungs-Verweise (0.27)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  /* Zeilen: kursiv/fett minimal versetzt bleibt eine Zeile, auch in ungünstiger Reihenfolge */
+  const z = S.vlZeilenAusStuecken([
+    { str: 'wichtig', transform: [10, 0, 0, 10, 120, 501.8], height: 10 }, { str: 'Das ist', transform: [10, 0, 0, 10, 50, 500], height: 10 },
+    { str: 'Folgezeile', transform: [10, 0, 0, 10, 50, 487], height: 10 }, { str: 'hier.', transform: [10, 0, 0, 10, 180, 499.2], height: 10 }]);
+  pruefe(z.length === 2 && z[0].t === 'Das ist wichtig hier.' && z[1].t === 'Folgezeile', 'versetzte Stücke (fett/kursiv) bleiben eine Zeile, von links nach rechts');
+  const fn = S.vlZeilenAusStuecken([{ str: 'Ende des Satzes.', transform: [10, 0, 0, 10, 50, 500], height: 10 }, { str: '1', transform: [6, 0, 0, 6, 140, 504], height: 6 },
+    { str: 'Danach weiter', transform: [10, 0, 0, 10, 150, 500], height: 10 }]);
+  pruefe(fn.length === 1 && fn[0].t === 'Ende des Satzes. Danach weiter', 'hochgestellte Fußnotenziffer wird nicht mitgelesen');
+  /* Kurze Zeile + großes Substantiv am nächsten Zeilenanfang: kein neuer Absatz */
+  const zl = (t, y, h) => ({ t: t, y: y, h: h || 10 });
+  const a = S.vlAufbereiten([{ zeilen: [zl('Eine ganz normale lange Zeile mit sehr viel Text darin, wie im Buch', 700), zl('und eine kurze', 687), zl('Zeile, die im Satz weitergeht und dann endet.', 674),
+    zl('Überschrift', 640, 14), zl('Danach kommt wieder der normale Text des Absatzes hier.', 620)] }]);
+  pruefe(a.saetze[0] === 'Eine ganz normale lange Zeile mit sehr viel Text darin, wie im Buch und eine kurze Zeile, die im Satz weitergeht und dann endet.',
+    'kurze Zeile vor großem Wortanfang reißt den Satz nicht mehr');
+  pruefe(a.saetze[1] === 'Überschrift' && a.absatz[1] !== a.absatz[0] && a.absatz[2] !== a.absatz[1], 'echte Überschrift (größere Schrift) bleibt eigener Absatz');
+  const b = S.vlAufbereiten([{ zeilen: [zl('Ein Satz geht über die', 700), zl('', 0)].filter(x => x.t) }, { zeilen: [zl('Seite hinaus und endet hier.', 700)] }]);
+  pruefe(b.saetze.length === 1, 'Satz über den Seitenwechsel bleibt ein Satz');
+  /* Großbuchstaben */
+  pruefe(S.vlSprechText('E S IST DIE FÄHIGKEIT ZU WÄHLEN.') === 'Es Ist Die Fähigkeit Zu Wählen.', 'Großbuchstaben-Satz und Initiale: normal gesprochen');
+  pruefe(S.vlSprechText('C ONSTANTIN Z ÖLLER') === 'Constantin Zöller' && S.vlSprechText('Nicht-Essentialist DENKT: Essentialist WEIß:') === 'Nicht-Essentialist Denkt: Essentialist Weiß:',
+    'Kapitälchen-Anfänge zusammengefügt, Wörter in Großbuchstaben normal');
+  pruefe(S.vlSprechText('Die ISTQB-Prüfung und die EU sind wichtig.') === 'Die ISTQB-Prüfung und die EU sind wichtig.', 'echte Abkürzungen bleiben');
+  pruefe(/vlSprechText\(text\)/.test(QUELLE) && /getBoundingClientRect/.test(QUELLE.slice(QUELLE.indexOf('function vlTextRollen'), QUELLE.indexOf('function vlTextRollen') + 900)),
+    'Stimme bekommt den Sprechtext; Mitrollen über Bildschirm-Rechtecke');
+  /* Checklisten-Zahl */
+  S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub', text: '[] a', checkliste: 'lauf', geaendert: 1 }, { id: 'c2', titel: 'Fenster', text: '[] b', checkliste: 'lauf', geaendert: 1 },
+    { id: 'c3', titel: 'Vorlage', text: '[] c', checkliste: 'vorlage', geaendert: 1 });
+  S.oeffne('uebersicht');
+  pruefe(/oeffne\('checklisten'\)"><span class="sym"><svg[^]*?<span class="zahl">2</.test(inhalt()), 'Checklisten-Symbol zeigt 2 laufende (Vorlagen zählen nicht)');
+  S.DB.gedanken = []; S.zeichne();
+  pruefe(!/oeffne\('checklisten'\)"><span class="sym"><svg[^<]*?(<[^b][^]*?)?<span class="zahl">/.test(inhalt().replace(/oeffne\('heute'\)[\s\S]*?<\/button>/, '')), 'ohne laufende keine Zahl');
+  /* Verweise zwischen Sammlungen */
+  const k = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Körper', false, []);
+  k.felder = [{ id: 'kd', name: 'Datum', typ: 'datum' }, { id: 'kg', name: 'Gewicht', typ: 'zahl' }];
+  k.kopfwerte = [{ name: 'Gewicht', art: 'letzter', feld: 'kg' }];
+  const e = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Essen', false, []);
+  e.felder = [{ id: 'ed', name: 'Tag', typ: 'datum' }, { id: 'kc', name: 'kcal', typ: 'zahl' }, { id: 'pk', name: 'kcal je kg', typ: 'formel', formel: '[kcal] / [Körper: Gewicht]', dez: 1 }];
+  [['2026-10-01', 90], ['2026-10-10', 88], ['2026-10-20', 86]].forEach((x, i) => S.DB.datensaetze.push({ id: 'k' + i, sammlung: k.id, werte: { kd: x[0], kg: x[1] }, angelegt: i + 1, geaendert: i + 1 }));
+  S.DB.datensaetze.push({ id: 'e1', sammlung: e.id, werte: { ed: '2026-10-05', kc: 1800 }, angelegt: 5, geaendert: 5 });
+  S.DB.datensaetze.push({ id: 'e2', sammlung: e.id, werte: { ed: '2026-10-21', kc: 1720 }, angelegt: 6, geaendert: 6 });
+  const pk = e.felder[2];
+  pruefe(S.saFormelWert(e, S.saSatzFinden('e1'), pk, 0) === 20 && S.saFormelWert(e, S.saSatzFinden('e2'), pk, 0) === 20,
+    'Eintrag rechnet mit dem Gewicht zu seinem Datum (5.10. → 90 kg, 21.10. → 86 kg)');
+  pruefe(S.saFremdZahl('Körper: Gewicht', '', 0) === 86 && S.saFremdZahl('körper : gewicht', '2026-10-12', 0) === 88, 'Verweis: Groß-/Kleinschreibung egal, Stand je Datum');
+  pruefe(S.saFormelPruefen(e, '[kcal] / [Körper: Gewicht]', pk) === '' && /gibt es nicht/.test(S.saFormelPruefen(e, '[kcal] / [Körper: Puls]', pk)), 'Formel-Prüfung kennt Verweise und meldet unbekannte');
+  pruefe(S.saVerweisListe(e).indexOf('Körper: Gewicht') >= 0 && S.saVerweisListe(e).every(x => x.indexOf('Essen:') !== 0), 'Auswahlliste: Werte der anderen Sammlungen, nicht der eigenen');
+  e.kopfwerte = [{ art: 'fremd', ref: 'Körper: Gewicht' }];
+  pruefe(S.saKopfwertText(e, e.kopfwerte[0]) === '86' && S.saKopfwertName(e, e.kopfwerte[0]) === 'Gewicht', 'Kopfwert „aus anderer Sammlung“ zeigt den aktuellen Stand');
+  k.felder.push({ id: 'ix', name: 'Index', typ: 'formel', formel: '[Essen: kcal je kg]' });
+  e.felder[2].formel = '[kcal] / [Körper: Index]';
+  pruefe(S.saFormelWert(e, S.saSatzFinden('e1'), e.felder[2], 0) === null, 'gegenseitige Verweise laufen nicht endlos (leer statt Absturz)');
+  S.DB.datensaetze = []; S.DB.sammlungen = [];
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    58. Vorlesen (0.26)
    Grund: PDFs werden vorgelesen — Text muss sauber aufbereitet sein
    (keine Kopfzeilen, Seitenzahlen, Trennstriche), Sätze richtig geteilt,
@@ -3690,6 +3761,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { neu027Test(); } catch (e) { fail('0.27 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vorlesenTest(); } catch (e) { fail('Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schErklTest(); } catch (e) { fail('Schach erklären warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkRollTest(); } catch (e) { fail('Lernkartei rollen warf: ' + e.message); }

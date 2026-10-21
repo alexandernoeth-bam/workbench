@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.26.0</title>
+<title>CLIE 0.27.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -579,7 +579,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.26.0';
+var APP_VERSION = '0.27.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3078,6 +3078,12 @@ function clHeuteDaten() {
 
 function clHeuteZahl() { return clHeuteDaten().zahl; }
 
+/* Anzahl gestarteter (laufender) Checklisten am Symbol (seit 0.27) */
+function clsLaufZahlHtml() {
+  var n = clsAlle('lauf').length;
+  return n ? '<span class="zahl">' + n + '</span>' : '';
+}
+
 function clHeuteZahlHtml() {
   var n = clHeuteZahl();
   return n ? '<span class="zahl">' + n + '</span>' : '';
@@ -3549,10 +3555,10 @@ function uebersichtHtml() {
   var h = '<div class="apps">';
   CL_APPS.forEach(function (a) {
     h += '<button type="button" class="app" onclick="oeffne(\'' + a.id + '\')">'
-       + '<span class="sym">' + clSymbol(a.id) + (a.id === 'heute' ? clHeuteZahlHtml() : '') + '</span>'
+       + '<span class="sym">' + clSymbol(a.id) + (a.id === 'heute' ? clHeuteZahlHtml() : '') + (a.id === 'checklisten' ? clsLaufZahlHtml() : '') + '</span>'
        + esc(a.name) + '</button>';
   });
-  /* Seit 0.7.1 keine Zahlen an den Symbolen — außer an „Heute“ (seit 0.9) */
+  /* Seit 0.7.1 keine Zahlen an den Symbolen — außer an „Heute“ (seit 0.9) und laufenden Checklisten (seit 0.27, zum Ausprobieren) */
   return h + '</div><button type="button" class="fassung" onclick="oeffne(\'statistik\')">CLIE v' + esc(APP_VERSION) + ' · <u>Statistik</u></button>';
 }
 
@@ -6786,13 +6792,123 @@ function saNamensWert(s, d, name, ohne, tiefe) {
 function saFormelWert(s, d, f, tiefe) {
   try {
     return saFormelAuswerten(f.formel, function (name, vorher) {
+      var e = vorher ? saVorher(s, d) : d;
+      /* [Sammlung: Wert] — aus einer anderen Sammlung, Stand zum Datum des Eintrags (seit 0.27) */
+      if (e && saVerweisTeilen(name) && !saEigenerName(s, name)) { return saFremdZahl(name, saEintragDatum(s, e), (tiefe || 0) + 1); }
       if (!vorher) { return saNamensWert(s, d, name, f, tiefe || 0); }
-      var v = saVorher(s, d);
-      return v ? saNamensWert(s, v, name, null, (tiefe || 0) + 1) : null;
+      return e ? saNamensWert(s, e, name, null, (tiefe || 0) + 1) : null;
     });
   } catch (e) {
     return null;
   }
+}
+
+/* ---- Verweise auf andere Sammlungen (seit 0.27) ----
+   [Sammlung: Name] in Formeln: Name ist ein Kopfwert, ein Feld oder ein
+   fester Wert der anderen Sammlung. In Einträgen gilt der Stand zum Datum
+   des Eintrags (beim „letzten Wert“ der letzte bis zu diesem Tag), als
+   Kopfwert der aktuelle. */
+
+function saVerweisTeilen(name) {
+  var i = String(name || '').indexOf(':');
+  if (i <= 0) { return null; }
+  var a = String(name).slice(0, i).trim();
+  var b = String(name).slice(i + 1).trim();
+  return (a && b) ? { sammlung: a, wert: b } : null;
+}
+
+function saEigenerName(s, name) {
+  var n = String(name || '').toLowerCase();
+  return (s.felder || []).some(function (f) { return String(f.name).toLowerCase() === n; })
+    || (s.werte || []).some(function (w) { return String(w.name).toLowerCase() === n; });
+}
+
+function saAlleEchten() {
+  return (DB.sammlungen || []).filter(function (s) { return s && !s.vorlage; });
+}
+
+/* Datum eines Eintrags: erstes Datumsfeld, sonst Anlage */
+function saEintragDatum(s, d) {
+  var df = (s.felder || []).filter(function (f) { return f.typ === 'datum'; })[0];
+  var w = df ? String((d.werte || {})[df.id] || '') : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(w)) { return w; }
+  var z = Number(d.angelegt || d.geaendert);
+  return z ? isoDatum(new Date(z)) : isoDatum();
+}
+
+/* Zahl eines Felds in einem Eintrag (Formel gerechnet, Datum als Tageszahl) */
+function saFeldZahl(s, d, f, tiefe) {
+  if (f.typ === 'formel') { return (tiefe < 5) ? saFormelWert(s, d, f, tiefe) : null; }
+  var w = (d.werte || {})[f.id];
+  if (f.typ === 'datum') { return saTagNr(w); }
+  return (w === null || w === undefined || w === '' || typeof w === 'boolean') ? null : saZahlLesen(w);
+}
+
+/* Letzter vorhandener Wert eines Felds bis einschließlich „bis“ (leer = bis heute und darüber hinaus) */
+function saLetzterZahl(s, f, bis, tiefe) {
+  var l = saSaetze(s).filter(function (d) { return !bis || saEintragDatum(s, d) <= bis; });
+  l.sort(function (a, b) {
+    var da = saEintragDatum(s, a);
+    var db = saEintragDatum(s, b);
+    if (da !== db) { return da < db ? -1 : 1; }
+    return (Number(a.angelegt || a.geaendert) || 0) - (Number(b.angelegt || b.geaendert) || 0);
+  });
+  var i;
+  for (i = l.length - 1; i >= 0; i--) {
+    var z = saFeldZahl(s, l[i], f, tiefe);
+    if (z !== null) { return z; }
+  }
+  return null;
+}
+
+/* Zahl eines Kopfwerts; „letzter Wert“ richtet sich nach „bis“, die übrigen nach ihrem Zeitraum */
+function saKopfwertZahl(s, k, bis, tiefe) {
+  if (k.art === 'wert') {
+    var w = (s.werte || []).filter(function (x) { return x.id === k.wert; })[0];
+    return w ? (w.typ === 'datum' ? saTagNr(w.wert) : saZahlLesen(w.wert)) : null;
+  }
+  if (k.art === 'fremd') { return (tiefe < 5) ? saFremdZahl(k.ref, bis, tiefe + 1) : null; }
+  var l = saZeitraumListe(s, k.zeitraum || '');
+  if (k.art === 'anzahl') { return l.length; }
+  var f = saFeld(s, k.feld);
+  if (!f) { return null; }
+  if (k.art === 'letzter') { return saLetzterZahl(s, f, bis, tiefe); }
+  return saAuswerten(k.art, l.map(function (d) { return saFeldZahl(s, d, f, tiefe); }));
+}
+
+function saFremdZahl(name, bis, tiefe) {
+  var v = saVerweisTeilen(name);
+  if (!v || tiefe > 5) { return null; }
+  var sn = v.sammlung.toLowerCase();
+  var s = saAlleEchten().filter(function (x) { return String(x.name).toLowerCase() === sn; })[0];
+  if (!s) { return null; }
+  var n = v.wert.toLowerCase();
+  var k = (s.kopfwerte || []).filter(function (x) { return String(saKopfwertName(s, x)).toLowerCase() === n; })[0];
+  if (k) { return saKopfwertZahl(s, k, bis, tiefe); }
+  var f = (s.felder || []).filter(function (x) { return String(x.name).toLowerCase() === n; })[0];
+  if (f) { return saLetzterZahl(s, f, bis, tiefe); }
+  var w = (s.werte || []).filter(function (x) { return String(x.name).toLowerCase() === n; })[0];
+  if (w) { return w.typ === 'datum' ? saTagNr(w.wert) : saZahlLesen(w.wert); }
+  return null;
+}
+
+/* Alle Verweise, die es gibt: Kopfwerte, Zahlenfelder und feste Werte der anderen Sammlungen */
+function saVerweisListe(ohne) {
+  var aus = [];
+  saAlleEchten().forEach(function (s) {
+    if (ohne && s.id === ohne.id) { return; }
+    var namen = [];
+    (s.kopfwerte || []).forEach(function (k) { if (k.art !== 'fremd') { namen.push(saKopfwertName(s, k)); } });
+    (s.felder || []).forEach(function (f) { if (['zahl', 'betrag', 'formel', 'datum'].indexOf(f.typ) >= 0) { namen.push(f.name); } });
+    (s.werte || []).forEach(function (w) { namen.push(w.name); });
+    namen.forEach(function (n) { var x = s.name + ': ' + n; if (aus.indexOf(x) < 0) { aus.push(x); } });
+  });
+  return aus;
+}
+
+function saVerweisBekannt(name, ohne) {
+  var n = String(name || '').toLowerCase().replace(/\s*:\s*/, ': ');
+  return saVerweisListe(ohne).some(function (x) { return x.toLowerCase() === n; });
 }
 
 /* Der vorige Eintrag: nach dem ersten Datumsfeld, sonst nach Anlage.
@@ -6972,6 +7088,8 @@ function saKennzahlNach(s, kz, liste) {
   if (!kz.art) { return null; }
   var l = liste || saSaetze(s);
   if (kz.art === 'anzahl') { return String(l.length); }
+  /* Aus anderer Sammlung: der aktuelle Stand (seit 0.27) */
+  if (kz.art === 'fremd') { var fz = saFremdZahl(kz.ref, '', 0); return fz === null ? '—' : saZahlKurz(fz); }
   if (kz.art === 'wert') {
     var w = null;
     (s.werte || []).forEach(function (x) { if (x.id === kz.wert) { w = x; } });
@@ -7046,7 +7164,7 @@ var SA_KOPF_MAX = 6;   /* seit 0.14.1 sechs (vorher vier) */
 var SA_ZEITRAEUME = [['', 'alle'], ['woche', 'diese Woche'], ['monat', 'dieser Monat'], ['jahr', 'dieses Jahr'],
                      ['7', 'letzte 7 Tage'], ['30', 'letzte 30 Tage']];
 var SA_KW_ARTEN = [['letzter', 'letzter Wert'], ['summe', 'Summe'], ['schnitt', 'Ø'], ['min', 'Min'], ['max', 'Max'],
-                   ['anzahl', 'Anzahl der Einträge'], ['wert', 'fester Wert']];
+                   ['anzahl', 'Anzahl der Einträge'], ['wert', 'fester Wert'], ['fremd', 'aus anderer Sammlung']];
 
 /* Die Einträge eines Zeitraums — nach dem ersten Datumsfeld, sonst nach Anlage */
 function saZeitraumListe(s, zr) {
@@ -7079,6 +7197,7 @@ function saKopfwertName(s, k) {
   var w = (s.werte || []).filter(function (x) { return x.id === k.wert; })[0];
   var zr = (SA_ZEITRAEUME.filter(function (z) { return z[0] === (k.zeitraum || ''); })[0] || ['', ''])[1];
   if (k.art === 'wert') { return w ? w.name : art; }
+  if (k.art === 'fremd') { return String(k.ref || '').replace(/^.*?:\s*/, '') || art; }
   return art + (k.art !== 'anzahl' && f ? ' ' + f.name : '') + (k.zeitraum ? ' · ' + zr : '');
 }
 
@@ -7125,11 +7244,13 @@ function saKopfSpeichern() {
   var feld = saFeldWert('saKwFeld');
   var wert = saFeldWert('saKwWert');
   if (art === 'wert' && !(s.werte || []).some(function (w) { return w.id === wert; })) { melde('Bitte einen festen Wert wählen.', 'warn'); return; }
-  if (art !== 'wert' && art !== 'anzahl' && !saFeld(s, feld)) { melde('Bitte ein Feld wählen.', 'warn'); return; }
+  var ref = saFeldWert('saKwRef');
+  if (art === 'fremd' && saVerweisListe(s).indexOf(ref) < 0) { melde('Bitte einen Wert aus einer anderen Sammlung wählen.', 'warn'); return; }
+  if (art !== 'wert' && art !== 'anzahl' && art !== 'fremd' && !saFeld(s, feld)) { melde('Bitte ein Feld wählen.', 'warn'); return; }
   var zr = saFeldWert('saKwZr');
   var k = { name: String(saFeldWert('saKwName') || '').trim().slice(0, 24), art: art };
-  if (art === 'wert') { k.wert = wert; } else if (art !== 'anzahl') { k.feld = feld; }
-  if (art !== 'wert' && SA_ZEITRAEUME.some(function (z) { return z[0] === zr; }) && zr) { k.zeitraum = zr; }
+  if (art === 'wert') { k.wert = wert; } else if (art === 'fremd') { k.ref = ref; } else if (art !== 'anzahl') { k.feld = feld; }
+  if (art !== 'wert' && art !== 'fremd' && SA_ZEITRAEUME.some(function (z) { return z[0] === zr; }) && zr) { k.zeitraum = zr; }
   if (!Array.isArray(s.kopfwerte)) { s.kopfwerte = []; }
   if (f.nr >= 0 && s.kopfwerte[f.nr]) { s.kopfwerte[f.nr] = k; }
   else if (s.kopfwerte.length < SA_KOPF_MAX) { s.kopfwerte.push(k); }
@@ -7818,6 +7939,8 @@ function saFensterHtml() {
       + '<input id="saFeldFormel" class="eingabe sa-formel" type="text" autocomplete="off" spellcheck="false" value="' + esc(x.formel || '') + '">'
       + '<p class="leise sa-formel">Erlaubt: + − × ÷ ( ) und Zahlen. Namen: ' + esc(saFormelNamen(s, fe2).join(' '))
       + '. vorher[Name] = Wert im vorigen Eintrag, z. B. [kg] - vorher[kg]. Daten zählen in Tagen, heute = heutiges Datum, z. B. [Ziel] - heute</p>'
+      + (saVerweisListe(s).length ? '<p class="leise sa-formel">Aus anderen Sammlungen (Stand zum Datum des Eintrags): '
+          + esc(saVerweisListe(s).slice(0, 24).map(function (x) { return '[' + x + ']'; }).join(' ')) + '</p>' : '')
       + '<label for="saFeldDez">Nachkommastellen:</label><select id="saFeldDez" class="eingabe">' + [0, 1, 2, 3].map(function (n) {
           return '<option value="' + n + '"' + (n === ((x.dez >= 0 && x.dez <= 3) ? x.dez : 2) ? ' selected' : '') + '>' + n + '</option>';
         }).join('') + '</select>'
@@ -7867,9 +7990,10 @@ function saFensterHtml() {
     };
     return kopf(kw ? 'Kopfwert' : 'Neuer Kopfwert')
       + '<label for="saKwName">Bezeichnung (leer = automatisch):</label><input id="saKwName" class="eingabe" type="text" autocomplete="off" value="' + esc(kv.name || '') + '">'
-      + '<label for="saKwArt">Art:</label>' + wahl('saKwArt', kv.art, SA_KW_ARTEN.filter(function (a) { return a[0] !== 'wert' || (s.werte || []).length; }))
+      + '<label for="saKwArt">Art:</label>' + wahl('saKwArt', kv.art, SA_KW_ARTEN.filter(function (a) { return (a[0] !== 'wert' || (s.werte || []).length) && (a[0] !== 'fremd' || saVerweisListe(s).length); }))
       + '<label for="saKwFeld">… von Feld:</label>' + wahl('saKwFeld', kv.feld || '', (s.felder || []).map(function (x) { return [x.id, x.name]; }))
       + ((s.werte || []).length ? '<label for="saKwWert">… fester Wert:</label>' + wahl('saKwWert', kv.wert || '', s.werte.map(function (x) { return [x.id, x.name]; })) : '')
+      + (saVerweisListe(s).length ? '<label for="saKwRef">… aus anderer Sammlung:</label>' + wahl('saKwRef', kv.ref || '', saVerweisListe(s).map(function (x) { return [x, x]; })) : '')
       + '<label for="saKwZr">Zeitraum:</label>' + wahl('saKwZr', kv.zeitraum || '', SA_ZEITRAEUME)
       + '<p class="leise">Der Zeitraum richtet sich nach dem ersten Datumsfeld, ohne Datumsfeld nach dem Anlegen.</p>'
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saKopfSpeichern()">OK</button>' + abbrechen
@@ -8130,8 +8254,9 @@ function saFormelPruefen(s, formel, ohne) {
   try {
     saFormelAuswerten(formel, function (name, vorher) {
       /* vorher[…] darf auch das Feld selbst meinen (etwa den vorigen Trend) */
-      if ((vorher ? alleFelder : namen).indexOf('[' + String(name).toLowerCase() + ']') < 0) { throw new Error('[' + name + '] gibt es nicht'); }
-      return 1;
+      if ((vorher ? alleFelder : namen).indexOf('[' + String(name).toLowerCase() + ']') >= 0) { return 1; }
+      if (saVerweisTeilen(name) && saVerweisBekannt(name, s)) { return 1; }
+      throw new Error('[' + name + '] gibt es nicht');
     });
   } catch (e) {
     return e.message;
@@ -11873,20 +11998,32 @@ function vlZeilenAusStuecken(stuecke) {
   }).map(function (s) {
     return { t: s.str, x: Number(s.transform[4]) || 0, y: Number(s.transform[5]) || 0, h: Math.abs(Number(s.height) || Number(s.transform[3]) || 10) };
   });
-  l.sort(function (a, b) { return (Math.abs(b.y - a.y) > Math.min(a.h, b.h) * 0.5) ? b.y - a.y : a.x - b.x; });
-  var zeilen = [];
+  /* Erst nach Höhe gruppieren (fett/kursiv/hochgestellt liegt oft minimal versetzt), dann je Zeile von links nach rechts
+     — seit 0.27 in zwei Schritten, vorher zerriss ein unbeständiger Vergleich manche Zeile in zwei */
+  l.sort(function (a, b) { return b.y - a.y; });
+  var gruppen = [];
   l.forEach(function (s) {
-    var z = zeilen[zeilen.length - 1];
-    if (z && Math.abs(z.y - s.y) <= Math.max(2, Math.min(z.h, s.h) * 0.5)) {
-      var luecke = s.x - z.ende;
-      z.t += (luecke > s.h * 0.15 && !/\s$/.test(z.t) && !/^\s/.test(s.t) ? ' ' : '') + s.t;
-      z.ende = Math.max(z.ende, s.x + (s.t.length * s.h * 0.45));
-      z.h = Math.max(z.h, s.h);
-    } else {
-      zeilen.push({ t: s.t, y: s.y, h: s.h, ende: s.x + s.t.length * s.h * 0.45 });
-    }
+    var g = gruppen[gruppen.length - 1];
+    if (g && Math.abs(g.y - s.y) <= Math.max(2, Math.max(g.h, s.h) * 0.5)) { g.stuecke.push(s); if (s.h > g.h) { g.h = s.h; g.y = s.y; } }
+    else { gruppen.push({ y: s.y, h: s.h, stuecke: [s] }); }
   });
-  return zeilen.map(function (z) { return { t: z.t.replace(/\s+/g, ' ').trim(), y: z.y, h: z.h }; }).filter(function (z) { return z.t; });
+  var zeilen = gruppen.map(function (g) {
+    g.stuecke.sort(function (a, b) { return a.x - b.x; });
+    var t = '';
+    var ende = -1e9;
+    var hauptH = 0;
+    g.stuecke.forEach(function (s) { if (s.t.trim().length > 2 && s.h > hauptH) { hauptH = s.h; } });
+    g.stuecke.forEach(function (s) {
+      /* Hochgestellte Fußnotenziffern (kleiner gesetzt) nicht mitlesen (seit 0.27) */
+      if (hauptH && s.h < hauptH * 0.8 && /^\s*\d{1,3}\*?\s*$/.test(s.t)) { return; }
+      var luecke = s.x - ende;
+      t += (t && luecke > s.h * 0.15 && !/\s$/.test(t) && !/^\s/.test(s.t) ? ' ' : '') + s.t;
+      ende = Math.max(ende, s.x + s.t.length * s.h * 0.45);
+      if (s.t.trim().length > 2 && s.h > hauptH) { hauptH = s.h; }
+    });
+    return { t: t.replace(/\s+/g, ' ').trim(), y: g.y, h: hauptH || g.h };
+  });
+  return zeilen.filter(function (z) { return z.t; });
 }
 
 function vlSchluesselZeile(t) {
@@ -11940,18 +12077,37 @@ function vlAufbereiten(seiten) {
       } else if (akt) {
         var luecke = abst[zi - 1];
         var vorher = zeilen[zi - 1];
+        /* Überschrift nur, wenn die kurze Zeile anders groß gesetzt ist — Großschreibung allein (jedes Substantiv) reicht nicht */
         neu = (mitte > 0 && luecke > mitte * 1.45) || (/[.!?:…"“”»]$/.test(vorher.t) && vorher.t.length < voll * 0.7)
-          || (vorher.t.length < voll * 0.5 && !/[,;\-]$/.test(vorher.t) && /^[A-ZÄÖÜ0-9„"»•\-–]/.test(z.t));
+          || (vorher.t.length < voll * 0.5 && !/[,;\-]$/.test(vorher.t) && Math.abs(vorher.h - z.h) > Math.min(vorher.h, z.h) * 0.12)
+          /* allein stehende kurze Zeile ohne Satzzeichen = Zwischenüberschrift */
+          || (akt.zeilen === 1 && vorher.t.length < voll * 0.6 && !/[.!?:…,;\-"“”»)]$/.test(vorher.t) && /^[A-ZÄÖÜ„"»]/.test(z.t));
       }
-      if (neu) { akt = { text: z.t, seite: si + 1, letzte: z.t, letzteKurz: z.t.length < voll * 0.7 }; absaetze.push(akt); return; }
+      if (neu) { akt = { text: z.t, seite: si + 1, letzte: z.t, letzteKurz: z.t.length < voll * 0.7, h: z.h, letzteH: z.h, zeilen: 1 }; absaetze.push(akt); return; }
       /* Zeilen verbinden: Trennstrich am Zeilenende vor Kleinbuchstaben weg */
       if (/[a-zäöüß][\-\u00AD\u2010¬]$/.test(akt.text) && /^[a-zäöüß]/.test(z.t)) { akt.text = akt.text.replace(/[\-\u00AD\u2010¬]$/, '') + z.t; }
       else if (/\-$/.test(akt.text) && /^[A-ZÄÖÜa-zäöü]/.test(z.t) && /[A-Za-zäöü]\-$/.test(akt.text)) { akt.text += z.t; }
       else { akt.text += ' ' + z.t; }
       akt.letzte = z.t;
       akt.letzteKurz = z.t.length < voll * 0.7;
+      akt.letzteH = z.h;
+      akt.zeilen++;
     });
   });
+  /* Absätze ohne Satzende, auf die gleich große Schrift folgt, gehören zusammen (zerrissene Sätze, seit 0.27) */
+  var zusammen = [];
+  absaetze.forEach(function (a) {
+    var v = zusammen[zusammen.length - 1];
+    if (v && !/[.!?…:"“”»)\]]$/.test(v.text) && v.text.length > 25 && Math.abs(v.letzteH - a.h) <= Math.min(v.letzteH, a.h) * 0.12
+        && (/^[a-zäöü(,;–\-]/.test(a.text) || v.letzteKurz === false)) {
+      v.text += (/[a-zäöüß][\-\u2010]$/.test(v.text) && /^[a-zäöüß]/.test(a.text)) ? '' : ' ';
+      v.text = v.text.replace(/[\-\u2010]$/, function (x) { return /^[a-zäöüß]/.test(a.text) ? '' : x; }) + a.text;
+      v.letzte = a.letzte; v.letzteKurz = a.letzteKurz; v.letzteH = a.letzteH;
+      return;
+    }
+    zusammen.push(a);
+  });
+  absaetze = zusammen;
   var aus = { saetze: [], seite: [], absatz: [] };
   absaetze.forEach(function (a, ai) {
     vlSaetze(a.text).forEach(function (s) { aus.saetze.push(s); aus.seite.push(a.seite); aus.absatz.push(ai); });
@@ -12370,11 +12526,32 @@ function vlStimme() {
   return l.filter(function (v) { return v.voiceURI === e.stimme; })[0] || l.filter(function (v) { return /de-DE/i.test(v.lang); })[0] || l[0] || null;
 }
 
+/* Für die Stimme: WÖRTER IN GROSSBUCHSTABEN normal schreiben (sonst buchstabiert sie),
+   zerlegte Initialen („E S IST“) zusammenfügen. Echte Abkürzungen bleiben. (seit 0.27) */
+function vlSprechText(text) {
+  var t = String(text || '');
+  var buchst = t.replace(/[^A-Za-zÄÖÜäöüß]/g, '');
+  var gross = t.replace(/[^A-ZÄÖÜ]/g, '').length;
+  var meistGross = buchst.length >= 6 && gross / buchst.length > 0.6;
+  if (meistGross) {
+    /* Initiale am Satzanfang („E S IST“ → „ES IST“), dann Kapitälchen-Anfänge („C HARAKTER“ → „CHARAKTER“) */
+    t = t.replace(/^([„"»(]?)([A-ZÄÖÜ]) (?=[A-ZÄÖÜ])/, '$1$2');
+  }
+  t = t.replace(/(^|[\s„"»(])([B-DF-HJ-NP-TV-ZÄÖÜ]) (?=[A-ZÄÖÜ]{4,})/g, '$1$2');
+  var grossWoerter = (t.match(/\b[A-ZÄÖÜ]{3,}\b/g) || []).length;
+  return t.replace(/[A-ZÄÖÜ][A-ZÄÖÜß]+/g, function (w, pos) {
+    var ganz = !/[A-Za-zÄÖÜäöüß]/.test(t.charAt(pos - 1) || ' ') && !/[a-zäöüß]/.test(t.charAt(pos + w.length) || ' ');
+    if (!ganz) { return w; }
+    if (w.length >= 6 || (w.length >= 3 && grossWoerter >= 2) || meistGross) { return w.charAt(0) + w.slice(1).toLowerCase(); }
+    return w;
+  });
+}
+
 function vlSprechen(text, fertig) {
   var s = window.speechSynthesis;
   if (!s || typeof window.SpeechSynthesisUtterance !== 'function') { melde('Dieses Gerät kann nicht vorlesen (keine Sprachausgabe).', 'warn'); return false; }
   var e = vlEinstellungen();
-  var u = new window.SpeechSynthesisUtterance(text);
+  var u = new window.SpeechSynthesisUtterance(vlSprechText(text));
   var v = vlStimme();
   u.lang = v ? v.lang : 'de-DE';
   if (v) { u.voice = v; }
@@ -12683,7 +12860,11 @@ function vlAktuellZeigen() {
 function vlTextRollen(el) {
   var kasten = document.getElementById('vlText');
   if (!el || !kasten || typeof el.offsetTop !== 'number') { return; }
-  var ziel = el.offsetTop - kasten.offsetTop - Math.max(0, (kasten.clientHeight - (el.offsetHeight || 0)) / 2);
+  /* Lage über die Bildschirm-Rechtecke — unabhängig davon, worauf sich offsetTop bezieht (seit 0.27) */
+  var re = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+  var rk = kasten.getBoundingClientRect ? kasten.getBoundingClientRect() : null;
+  if (!re || !rk) { return; }
+  var ziel = kasten.scrollTop + (re.top - rk.top) - Math.max(0, (kasten.clientHeight - re.height) / 2);
   if (typeof kasten.scrollTo === 'function') { kasten.scrollTo({ top: Math.max(0, ziel), behavior: 'smooth' }); } else { kasten.scrollTop = Math.max(0, ziel); }
 }
 
@@ -12743,7 +12924,7 @@ function vlFensterHtml() {
           return '<button type="button"' + (e.timer === t[0] ? ' class="an"' : '') + ' onclick="vlTimerWahl(' + t[0] + ')">' + t[1] + '</button>';
         }).join('') + '</div>'
       + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlProbe()">▶ Probe hören</button><button type="button" class="knopf voll" onclick="vlFensterZu()">OK</button></div>'
-      + '<p class="leise">Nur deutsche Stimmen dieses Geräts. Bessere Stimmen: iPad → Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen; Pixel → Einstellungen → Sprachausgabe.</p>' + zu;
+      + '<p class="leise">Nur deutsche Stimmen dieses Geräts. iPad: Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen. Pixel: Chrome nutzt je Sprache die in „Speech Services by Google“ gewählte Stimme — dort unter Deutsch eine Stimme <b>auswählen</b> (nicht nur laden), dann CLIE und Chrome ganz schließen. „Deutsch (Österreich)“ und „Deutsch (Schweiz)“ haben eigene Stimmen. Tiefere Stimme: Tonhöhe nach links.</p>' + zu;
   }
   if (f === 'seite' && cl.vl.doc) {
     var max = cl.vl.doc.seite[cl.vl.doc.seite.length - 1] || 1;
