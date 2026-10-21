@@ -282,10 +282,11 @@ function uebersichtTest() {
   CL.zeichne();
   const h = inhalt();
   pruefe(CL.clOffeneAufgaben() === 4, 'offene Aufgaben: nur [] aus laufenden Projekten und Listen, nicht [x], [-], Ruhendes oder Notizen');
-  pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
-    'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
+  /* Seit 0.28 steht „Heute“ nur noch unten in der Leiste — dort trägt es die Zahl, das Raster hat keine (ohne laufende Checklisten) */
+  pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
+    '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 15, 'fünfzehn Apps im Raster (seit 0.26 mit Vorlesen)');
+  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 16, 'fünfzehn Apps im Raster, „Heute“ nur in der Leiste (seit 0.28 mit Kurs)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -412,12 +413,13 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","vorlesen","abgleich"]',
-    'genau fünfzehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Vorlesen, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","kurs","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","vorlesen","abgleich"]'
+    && CL.clApp('heute') && CL.clApp('heute').raster === false,
+    'genau fünfzehn Apps im Raster: Kalender, Kurs (statt Heute, seit 0.28), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Vorlesen, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === CL.CL_APPS.length, 'jede App hat ein Symbol als dunkle runde Scheibe (' + syms + '/' + CL.CL_APPS.length + ')');
+  pruefe(syms === 15, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/15)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -1873,7 +1875,7 @@ function heuteTest() {
   pruefe(S.clHeuteDaten().posten.map(p => p.titel).join(' | ') === 'Elternabend', 'der Filter ▼ gilt auch hier');
   S.katSetzen('alle');
   S.oeffne('uebersicht');
-  pruefe(/oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">5</.test(inhalt()), 'auf der Übersicht dieselbe Zahl an „Heute“');
+  pruefe(!/class="app" onclick="oeffne\('heute'\)"/.test(inhalt()) && S.clHeuteZahl() === 5, 'Heute nicht im Raster (seit 0.28) — die Zahl steht unten in der Leiste');
   pruefe(/onclick="oeffne\('heute'\)"><b>◉<\/b>Heute<span id="heuteZahl"/.test(QUELLE) && !/<nav class="silk"[^]*?menueUm\(\)[^]*?<\/nav>/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE),
     'Leiste unten: Heute statt Menü, Suchen bleibt');
   pruefe(/onclick="aufNeuAm\(isoDatum\(\),\\?'\\?'\)">Neu/.test(SKRIPT) || /aufNeuAm\(isoDatum\(\)/.test(SKRIPT), 'unten: Neu für heute');
@@ -3230,6 +3232,90 @@ function schuleTest() {
 }
 
 /* ============================================================
+   60. Kurs (0.28)
+   Grund: Lebensbereiche, Prinzipien, Vorab-Check und Wochenrückblick
+   sollen bewusstere Entscheidungen stützen. Falsche Empfehlung, doppelte
+   Bereiche auf zwei Geräten oder verlorene Rückblicke würden das Werkzeug
+   unglaubwürdig machen.
+   Erkennt: Bereiche ohne feste Kennung, Fokus falsch, Empfehlung
+   widerspricht der Regel, Entscheidung nicht gemerkt, mehr als drei
+   Wesentliche, Rückblick ohne Verlauf, Heute-Hinweis fehlt, Zurück.
+   ============================================================ */
+function kursTest() {
+  console.log('\n60. Kurs (0.28)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(/'kurs'\]/.test(QUELLE) && Array.isArray(S.DB.kurs), 'Bereich „kurs“ kommt aus der Workbench (6.3.4)');
+  S.oeffne('kurs');
+  const b = S.krBereiche(false);
+  pruefe(b.length === 7 && b[0].id === 'kb-gesundheit' && b.every(x => /^kb-/.test(x.id)), 'beim ersten Öffnen sieben Bereiche mit festen Kennungen (keine Doppelten auf zwei Geräten)');
+  S.krAnfangen();
+  pruefe(S.krBereiche(true).length === 7, 'kein zweites Anlegen');
+  /* Ist/Soll setzen: Gesundheit 4→8 (Rang 1), Familie 5→9 (Rang 2), Haus 8→6 */
+  const setze = (id, ist, soll) => { const x = S.krFinden(id); x.ist = ist; x.soll = soll; };
+  b.forEach(x => { x.ist = 7; x.soll = 7; });
+  setze('kb-gesundheit', 4, 8); setze('kb-beziehungen', 5, 9); setze('kb-haus', 8, 6); setze('kb-finanzen', 5, 7);
+  pruefe(JSON.stringify(S.krFokus()) === '["kb-gesundheit","kb-beziehungen"]', 'Fokus: wichtig und große Lücke (Gesundheit, Familie), nicht Haus (über Soll)');
+  S.zeichne();
+  pruefe((inhalt().match(/kr-fokus/g) || []).length === 2 && /kr-skala/.test(inhalt()), 'Bilanz zeigt Ist/Soll und zweimal „Fokus“');
+  S.krRang('kb-finanzen', -1);
+  pruefe(S.krBereiche(false).map(x => x.id).indexOf('kb-finanzen') === 5, 'Rang verschieben');
+  /* Prinzipien */
+  S.krVorschlagNehmen(7);
+  S.krPrinzipOeffnen(''); S.document.getElementById('krPText').value = 'Abends gehört der Familie'; S.document.getElementById('krPKonkret').value = 'Nach 18 Uhr keine Arbeit'; S.krPrinzipSpeichern();
+  const p = S.krPrinzipien();
+  pruefe(p.length === 2 && p[0].text === 'Kein Ja aus schlechtem Gewissen.' && p[1].konkret === 'Nach 18 Uhr keine Arbeit', 'Prinzipien: Vorschlag übernommen und eigenes angelegt');
+  /* Vorab-Check */
+  S.krCheckNeu();
+  S.document.getElementById('krWas').value = '';
+  S.krCheckSchritt(1);
+  pruefe(S.cl.kr.check.schritt === 1, 'ohne Beschreibung kein Weiter');
+  S.document.getElementById('krWas').value = 'Vereinsvorstand übernehmen'; S.krCheckSetzen('bereich', 'kb-freizeit'); S.krCheckSchritt(1);
+  S.document.getElementById('krStunden').value = '3'; S.document.getElementById('krGeld').value = ''; S.document.getElementById('krZulasten').value = 'kb-beziehungen'; S.krCheckSchritt(1);
+  S.krCheckSetzen('regel', p[1].id); S.krCheckSetzen('regel', p[1].id);
+  pruefe(S.cl.kr.check.regeln[p[1].id] === 'nein' && S.cl.kr.check.zulasten === 'kb-beziehungen', 'Regel per Tipp: passt → verletzt; Felder werden übernommen');
+  S.krCheckSchritt(1);
+  pruefe(S.cl.kr.check.schritt === 3, 'ohne „Wollen“ kein Weiter');
+  S.krCheckSetzen('wollen', 6); S.krCheckSchritt(1);
+  const c = S.cl.kr.check;
+  pruefe(c.schritt === 4 && c.wahl === 'nein' && /deshalb sage ich bei „Vereinsvorstand übernehmen“ diesmal ab/.test(S.krAntwortText(c)) && /Abends gehört der Familie/.test(S.krAntwortText(c)),
+    'Regel verletzt und kein klares Ja → Empfehlung Nein, Absage nennt die Regel');
+  pruefe(S.krEmpfehlung({ regeln: {}, wollen: 10, zulasten: 'kb-gesundheit', fokus: ['kb-gesundheit'] }).wahl === 'kleiner'
+    && S.krEmpfehlung({ regeln: {}, wollen: 10, zulasten: '', fokus: [] }).wahl === 'ja'
+    && S.krEmpfehlung({ regeln: {}, wollen: 3, zulasten: '', fokus: [] }).wahl === 'nein'
+    && S.krEmpfehlung({ regeln: {}, wollen: 7, zulasten: '', fokus: [] }).wahl === 'kleiner', 'Empfehlung: Fokus belastet → kleiner, klares Ja → Ja, wenig Wollen → Nein, mittel → kleiner');
+  S.krCheckSetzen('wahl', 'spaeter');
+  pruefe(/in ein paar Wochen/.test(S.krAntwortText(S.cl.kr.check)), 'eigene Wahl „Später“ ändert den Text');
+  S.krCheckMerken();
+  const e = S.krEntscheidungen('')[0];
+  pruefe(e && e.wahl === 'spaeter' && e.empfehlung === 'nein' && e.datum === S.isoDatum() && S.cl.kr.ansicht === 'bilanz', 'Entscheidung im Buch: Wahl, Empfehlung, Datum');
+  /* Woche */
+  S.krAnsicht('woche');
+  for (let i = 0; i < 4; i++) { S.krWesentlichOeffnen(); S.document.getElementById('krWText').value = 'Ding ' + i; S.krWesentlichSpeichern(); }
+  const w = S.krWoche(false);
+  pruefe(w.wesentliche.length === 3 && w.wesentliche[0].bereich === 'kb-gesundheit', 'höchstens drei Wesentliche, Vorschlag aus dem Fokus');
+  S.krWesentlichUm(w.wesentliche[0].id);
+  pruefe(S.krWoche(false).wesentliche[0].erledigt === true && /Vereinsvorstand/.test(inhalt()), 'abhaken; Entscheidungsbuch der Woche sichtbar');
+  S.krFensterAuf('rueckblick'); S.document.getElementById('krRb-kb-gesundheit').value = '5';
+  S.krBereiche(false).forEach(x => { if (x.id !== 'kb-gesundheit') { S.document.getElementById('krRb-' + x.id).value = String(x.ist); } });
+  S.krRueckblickSpeichern();
+  pruefe(S.krFinden('kb-gesundheit').ist === 5 && JSON.stringify(S.krVerlauf('kb-gesundheit')) === '[5]' && /^kw-\d{4}-\d{2}$/.test(S.krWoche(false).id), 'Rückblick: Ist aktualisiert, Verlauf je Woche');
+  pruefe(S.krKurveSvg([4, 5, 6], 8, false).indexOf('polyline') > 0 && /kr-leer/.test(S.krKurveSvg([], 8, false)), 'Kurve je Bereich');
+  /* Heute-Hinweis (nur sonntags, solange kein Rückblick) */
+  const w2 = S.krWoche(false); const rb = w2.rueckblick; w2.rueckblick = null;
+  const sonntag = new Date().getDay() === 0;
+  pruefe(S.krRueckblickFaellig() === sonntag, 'Rückblick-Hinweis nur sonntags');
+  w2.rueckblick = rb;
+  pruefe(/krRueckblickFaellig\(\) \? \['<button type="button" class="hz"/.test(QUELLE), 'Hinweis steht unter „Heute“ bei den Hinweisen');
+  /* Zurück */
+  S.krCheckNeu(); S.document.getElementById('krWas').value = 'x'; S.krCheckSchritt(1);
+  S.clZurueck(); pruefe(S.cl.kr.check.schritt === 1, 'Zurück im Check: ein Schritt zurück');
+  S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz' && !S.cl.kr.check, 'dann zur Bilanz');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    59. Vorlesen besser, Checklisten-Zahl, Verweise zwischen Sammlungen (0.27)
    Grund: Beim Vorlesen rissen Sätze an Zeilenumbrüchen (zerteilte Zeilen,
    Überschrift-Erkennung an jedem großgeschriebenen Wort), WÖRTER IN
@@ -3761,6 +3847,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { kursTest(); } catch (e) { fail('Kurs warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { neu027Test(); } catch (e) { fail('0.27 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vorlesenTest(); } catch (e) { fail('Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schErklTest(); } catch (e) { fail('Schach erklären warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

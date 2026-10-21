@@ -256,7 +256,9 @@ console.log('\n6. Datenmodell');
                     /* seit v6.3.2: Lernkartei im CLIE */
                     'lernkaesten', 'lernstand',
                     /* seit v6.3.3: Vorlesen im CLIE */
-                    'vorlesen'];
+                    'vorlesen',
+                    /* seit v6.3.4: Kurs im CLIE */
+                    'kurs'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -13032,7 +13034,7 @@ console.log('\n202. Ausblenden im Tag');
 console.log('\n203. CLIE-Bereiche bleiben erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand',[\s\S]*?'vorlesen'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand',[\s\S]*?'vorlesen',[\s\S]*?'kurs'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13193,7 +13195,7 @@ console.log('\n206. Lernkartei des CLIE bleibt erhalten');
 console.log('\n207. Vorlesen des CLIE bleibt erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/'vorlesen'\];/.test(QUELLE), 'SAMMLUNGEN kennt vorlesen');
+  pruefe(/'vorlesen'[\],]/.test(QUELLE), 'SAMMLUNGEN kennt vorlesen');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13213,6 +13215,41 @@ console.log('\n207. Vorlesen des CLIE bleibt erhalten');
   if (typeof a.textZuBestand === 'function') {
     const b = a.textZuBestand(JSON.stringify({ vorlesen: [{ id: 'vl-1', titel: 'Buch', satz: 1, geaendert: 1 }] }));
     pruefe(b && b.vorlesen && b.vorlesen.length === 1, 'Laden: der Bereich überlebt das Einlesen');
+  } else {
+    warn('Laden nicht auswertbar');
+  }
+}
+
+/* ============================================================
+   208. Kurs des CLIE bleibt erhalten (v6.3.4)
+   Grund: Lebensbereiche, Prinzipien, Entscheidungen und Wochenrückblicke
+   der App „Kurs“ liegen in der workbench.json (ein Bereich, Feld „typ“).
+   Ohne den Bereich gingen sie beim Speichern verloren.
+   Erkennt: Bereich fehlt, Einträge nicht je Kennung zusammengeführt,
+   Gelöschtes kehrt zurück, Bereich überlebt das Laden nicht.
+   ============================================================ */
+console.log('\n208. Kurs des CLIE bleibt erhalten');
+{
+  const a = globalThis.__api || {};
+  pruefe(/'kurs'\];/.test(QUELLE), 'SAMMLUNGEN kennt kurs');
+  if (typeof a.zusammenfuehren !== 'function') {
+    warn('Abgleich nicht auswertbar');
+  } else {
+    pruefe(Array.isArray(a.leereDatenbank().kurs), 'die leere Datenbank hat den Bereich');
+    const lokal = a.leereDatenbank(); const fremd = a.leereDatenbank();
+    lokal.kurs = [{ id: 'kb-gesundheit', typ: 'bereich', ist: 4, geaendert: 10 }, { id: 'ke-1', typ: 'entscheidung', wahl: 'nein', geaendert: 5 }];
+    fremd.kurs = [{ id: 'kb-gesundheit', typ: 'bereich', ist: 5, geaendert: 20 }, { id: 'kp-1', typ: 'prinzip', text: 'Weniger, aber besser', geaendert: 3 }];
+    const m = a.zusammenfuehren(lokal, fremd); const db = m.db || m.ergebnis || m;
+    pruefe(db.kurs.length === 3 && db.kurs.filter(x => x.id === 'kb-gesundheit')[0].ist === 5, 'je Eintrag zusammengeführt, der jüngere gewinnt');
+    const l2 = a.leereDatenbank(); const f2 = a.leereDatenbank();
+    f2.kurs = [{ id: 'kp-9', typ: 'prinzip', geaendert: Date.now() - 60000 }];
+    l2.grabsteine = [{ s: 'kurs', id: 'kp-9', z: Date.now() }];
+    const m2 = a.zusammenfuehren(l2, f2); const db2 = m2.db || m2.ergebnis || m2;
+    pruefe(!(db2.kurs || []).some(x => x.id === 'kp-9'), 'gelöschtes Prinzip (Grabstein) kehrt nicht zurück');
+  }
+  if (typeof a.textZuBestand === 'function') {
+    const b = a.textZuBestand(JSON.stringify({ kurs: [{ id: 'kb-arbeit', typ: 'bereich', geaendert: 1 }] }));
+    pruefe(b && b.kurs && b.kurs.length === 1, 'Laden: der Bereich überlebt das Einlesen');
   } else {
     warn('Laden nicht auswertbar');
   }
