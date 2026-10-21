@@ -254,7 +254,9 @@ console.log('\n6. Datenmodell');
                     /* seit v6.3.1: Favoriten der App „Drive“ im CLIE */
                     'drivefavoriten',
                     /* seit v6.3.2: Lernkartei im CLIE */
-                    'lernkaesten', 'lernstand'];
+                    'lernkaesten', 'lernstand',
+                    /* seit v6.3.3: Vorlesen im CLIE */
+                    'vorlesen'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -13030,7 +13032,7 @@ console.log('\n202. Ausblenden im Tag');
 console.log('\n203. CLIE-Bereiche bleiben erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand',[\s\S]*?'vorlesen'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13154,7 +13156,7 @@ console.log('\n205. Drive-Favoriten des CLIE bleiben erhalten');
 console.log('\n206. Lernkartei des CLIE bleibt erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/'lernkaesten','lernstand'\];/.test(QUELLE), 'SAMMLUNGEN kennt lernkaesten und lernstand');
+  pruefe(/'lernkaesten','lernstand'[\],]/.test(QUELLE), 'SAMMLUNGEN kennt lernkaesten und lernstand');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13175,6 +13177,42 @@ console.log('\n206. Lernkartei des CLIE bleibt erhalten');
   if (typeof a.textZuBestand === 'function') {
     const b = a.textZuBestand(JSON.stringify({ lernkaesten: [{ id: 'k1', name: 'Italienisch', geaendert: 1 }], lernstand: [{ id: 'k1|x', k: 'k1', f: 1, geaendert: 1 }] }));
     pruefe(b && b.lernkaesten && b.lernkaesten.length === 1 && b.lernstand && b.lernstand.length === 1, 'Laden: beide Bereiche überleben das Einlesen');
+  } else {
+    warn('Laden nicht auswertbar');
+  }
+}
+
+/* ============================================================
+   207. Vorlesen des CLIE bleibt erhalten (v6.3.3)
+   Grund: Die App „Vorlesen“ merkt sich je Dokument die Lesestelle in
+   der workbench.json, damit Pixel und iPad an derselben Stelle
+   weiterlesen. Ohne den Bereich ginge die Stelle beim Speichern verloren.
+   Erkennt: Bereich fehlt, Lesestelle nicht je Dokument zusammengeführt,
+   gelöschtes Dokument kehrt zurück, Bereich überlebt das Laden nicht.
+   ============================================================ */
+console.log('\n207. Vorlesen des CLIE bleibt erhalten');
+{
+  const a = globalThis.__api || {};
+  pruefe(/'vorlesen'\];/.test(QUELLE), 'SAMMLUNGEN kennt vorlesen');
+  if (typeof a.zusammenfuehren !== 'function') {
+    warn('Abgleich nicht auswertbar');
+  } else {
+    pruefe(Array.isArray(a.leereDatenbank().vorlesen), 'die leere Datenbank hat den Bereich');
+    const lokal = a.leereDatenbank(); const fremd = a.leereDatenbank();
+    lokal.vorlesen = [{ id: 'vl-1', titel: 'Buch', satz: 120, geaendert: 10 }, { id: 'vl-2', titel: 'Memo', satz: 5, geaendert: 30 }];
+    fremd.vorlesen = [{ id: 'vl-1', titel: 'Buch', satz: 340, geaendert: 20 }, { id: 'vl-2', titel: 'Memo', satz: 2, geaendert: 25 }];
+    const m = a.zusammenfuehren(lokal, fremd); const db = m.db || m.ergebnis || m;
+    const f = id => db.vorlesen.filter(x => x.id === id)[0];
+    pruefe(f('vl-1').satz === 340 && f('vl-2').satz === 5, 'Lesestelle: je Dokument gewinnt die jüngere');
+    const l2 = a.leereDatenbank(); const f2 = a.leereDatenbank();
+    f2.vorlesen = [{ id: 'vl-9', titel: 'Weg', geaendert: Date.now() - 60000 }];
+    l2.grabsteine = [{ s: 'vorlesen', id: 'vl-9', z: Date.now() }];
+    const m2 = a.zusammenfuehren(l2, f2); const db2 = m2.db || m2.ergebnis || m2;
+    pruefe(!(db2.vorlesen || []).some(x => x.id === 'vl-9'), 'gelöschtes Dokument (Grabstein) kehrt nicht zurück');
+  }
+  if (typeof a.textZuBestand === 'function') {
+    const b = a.textZuBestand(JSON.stringify({ vorlesen: [{ id: 'vl-1', titel: 'Buch', satz: 1, geaendert: 1 }] }));
+    pruefe(b && b.vorlesen && b.vorlesen.length === 1, 'Laden: der Bereich überlebt das Einlesen');
   } else {
     warn('Laden nicht auswertbar');
   }

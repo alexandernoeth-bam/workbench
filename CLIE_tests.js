@@ -134,7 +134,7 @@ console.log('\n1. Aufbau der Datei');
   const ohne = SKRIPT.replace(/\/\*[\s\S]*?\*\//g, ' ');
   const bekannt = new Set(('if for while switch return function typeof catch String Number Boolean Array Object JSON Math Date RegExp '
     + 'Error Promise parseInt parseFloat isNaN encodeURIComponent decodeURIComponent setTimeout clearTimeout setInterval '
-    + 'clearInterval fetch Blob URL new fehler fertig isFinite __').split(' '));
+    + 'clearInterval fetch Blob URL new fehler fertig isFinite __ Uint8Array').split(' '));
   /* „__(“ steht in einem regulären Ausdruck von kpAuszeichnen (Workbench), ist kein Aufruf. */
   const code = ohne.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
   const fremdCode = [...new Set([...code.matchAll(/(^|[^.\w$])([A-Za-z_]\w*)\s*\(/g)].map(m => m[2]))]
@@ -285,7 +285,7 @@ function uebersichtTest() {
   pruefe((h.match(/class="zahl"/g) || []).length === 1 && /oeffne\('heute'\)"><span class="sym"><svg[^]*?<span class="zahl">\d+</.test(h) && typeof CL.clAppZahl === 'undefined',
     'eine Zahl nur an „Heute“ (seit 0.9), sonst keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 14, 'vierzehn Apps im Raster (seit 0.23 mit Lernkartei)');
+  pruefe((h.match(/class="app"/g) || []).length === CL.CL_APPS.length && CL.CL_APPS.length === 15, 'fünfzehn Apps im Raster (seit 0.26 mit Vorlesen)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -412,8 +412,8 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","abgleich"]',
-    'genau vierzehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Abgleich');
+  pruefe(JSON.stringify(CL.CL_APPS.map(a => a.id)) === '["kalender","heute","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","vorlesen","abgleich"]',
+    'genau fünfzehn Apps: Kalender, Heute, Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Vorlesen, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -1175,7 +1175,9 @@ function routinenTest() {
   pruefe(neu.titel === 'Joggen' && JSON.stringify(neu.wiederholung) === JSON.stringify({ takt: 'woche', intervall: 1, tage: [2, 4, 6], tag: neu.wiederholung.tag })
     && neu.uhrzeit === '18:00' && neu.ab === heute && neu.art === 'haupt' && neu.planung === 'backlog' && neu.status === 'offen',
     'die neue Routine hat die Gestalt der Workbench');
-  pruefe(CL.aufgabeFaelligAn(neu, CL.tagePlus(CL.montagVon(heute), 1)) || CL.montagVon(heute) > heute, 'und ist an ihren Tagen fällig');
+  /* Nächster Di/Do/Sa ab heute — unabhängig vom Wochentag des Testlaufs (seit 0.26; vorher je nach Tag falsch) */
+  let naechster = heute; while ([2, 4, 6].indexOf(CL.ausIso(naechster).getDay()) < 0) { naechster = CL.tagePlus(naechster, 1); }
+  pruefe(CL.aufgabeFaelligAn(neu, naechster), 'und ist an ihren Tagen fällig');
 
   CL.rtTippen('r2'); CL.rtTippen('r2');
   f = CL.document.getElementById('aufklapp').innerHTML;
@@ -3228,6 +3230,119 @@ function schuleTest() {
 }
 
 /* ============================================================
+   58. Vorlesen (0.26)
+   Grund: PDFs werden vorgelesen — Text muss sauber aufbereitet sein
+   (keine Kopfzeilen, Seitenzahlen, Trennstriche), Sätze richtig geteilt,
+   die Lesestelle darf nicht verloren gehen und muss auf das andere Gerät
+   reisen; Schlaftimer und Sperre müssen greifen.
+   Erkennt: Abkürzungen/Ordnungszahlen zerreißen Sätze, Kopfzeilen oder
+   Seitenzahlen werden mitgelesen, Silbentrennung bleibt, Wasserzeichen
+   stört, Kennung nicht stabil, Vorlesen springt nicht weiter, Stelle nicht
+   gemerkt, Timer/Kapitelende stoppt nicht, Sperre lässt „Zurück“ durch,
+   Drive-Recht fehlt in der Anmeldung.
+   ============================================================ */
+function vorlesenTest() {
+  console.log('\n58. Vorlesen (0.26)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  /* Sätze */
+  const s1 = S.vlSaetze('Das ist z. B. gut. Am 3. Mai kam er. Siehe Kapitel 2.7.3 dazu. Er sagte („Wir sitzen alle in einem Boot.“) und ging. Fertig!');
+  pruefe(s1.length === 5 && s1[0] === 'Das ist z. B. gut.' && s1[1] === 'Am 3. Mai kam er.' && /2\.7\.3/.test(s1[2]) && /Boot\.“\) und ging\./.test(s1[3]),
+    'Sätze: Abkürzungen, Ordnungszahlen, Kapitelnummern und Klammerzitate bleiben heil (' + s1.length + ')');
+  const lang = S.vlSaetze(('Dies ist ein sehr langer Satz, der immer weiter geht, ' ).repeat(12) + 'und endet.');
+  pruefe(lang.length > 1 && lang.every(x => x.length <= 280), 'überlange Sätze werden an Satzzeichen geteilt (für die Stimme)');
+  pruefe(S.vlSaetze('Motivation ( kurz ) ist wichtig .')[0] === 'Motivation (kurz) ist wichtig.', 'Leerzeichen vor Satzzeichen und in Klammern werden bereinigt');
+  /* Zeilen aus pdf.js-Stücken */
+  const z = S.vlZeilenAusStuecken([
+    { str: 'Hallo', transform: [10, 0, 0, 10, 50, 500], height: 10 }, { str: 'Welt', transform: [10, 0, 0, 10, 80, 500], height: 10 },
+    { str: 'Wasserzeichen', transform: [0, 5, -5, 0, 10, 300], height: 5 }, { str: 'Zweite Zeile', transform: [10, 0, 0, 10, 50, 487], height: 10 }]);
+  pruefe(z.length === 2 && z[0].t === 'Hallo Welt' && z[1].t === 'Zweite Zeile', 'Zeilen: Stücke einer Höhe verbunden, gedrehter Text (Wasserzeichen) weg');
+  /* Aufbereiten: Kopfzeile, Seitenzahl, Trennung, Absätze */
+  const seite = (n, zeilen) => ({ zeilen: [{ t: 'Das Buch der Gewohnheiten', y: 800, h: 9 }].concat(zeilen.map((t, i) => ({ t: t, y: 700 - i * 13, h: 10 })), [{ t: String(n), y: 40, h: 9 }]) });
+  const seiten = [
+    seite(1, ['Erste Zeile eines langen Absatzes mit einem Verhal‐', 'tensmuster, das wir kennen. Dann geht es weiter mit', 'einem zweiten Satz ohne Ende']),
+    seite(2, ['und hier endet er auf der nächsten Seite.']),
+    seite(3, ['Neuer Gedanke auf Seite drei.']),
+    seite(4, ['Noch ein Absatz.']),
+    seite(5, ['Und der letzte Satz.'])
+  ];
+  seiten[2].zeilen.splice(2, 0, { t: 'Neuer Absatz nach großer Lücke.', y: 640, h: 10 });
+  const a = S.vlAufbereiten(seiten);
+  const alles = a.saetze.join(' | ');
+  pruefe(!/Das Buch der Gewohnheiten/.test(alles) && !/\| ?\d \|/.test(' | ' + alles + ' | '), 'Kopfzeile (wiederkehrend) und Seitenzahlen werden nicht vorgelesen');
+  pruefe(/Verhaltensmuster/.test(alles), 'Silbentrennung am Zeilenende zusammengefügt');
+  pruefe(a.saetze.some(x => /^Dann geht es weiter mit einem zweiten Satz ohne Ende und hier endet er auf der nächsten Seite\.$/.test(x)), 'Satz über den Seitenwechsel bleibt ein Satz');
+  const iL = a.saetze.findIndex(x => /^Neuer Absatz nach großer Lücke/.test(x));
+  pruefe(iL > 0 && a.absatz[iL] !== a.absatz[iL - 1] && a.seite[iL] === 3, 'große Lücke = neuer Absatz, Seitenzahl je Satz stimmt');
+  /* Kennung */
+  pruefe(S.vlKennung(a.saetze) === S.vlKennung(a.saetze.slice()) && S.vlKennung(a.saetze) !== S.vlKennung(a.saetze.concat(['x'])) && /^vl-/.test(S.vlKennung(a.saetze)),
+    'Kennung aus dem Text: gleich für denselben Text, anders für anderen');
+  /* Memo-Text */
+  const m = S.vlAusText('# Überschrift\n- [ ] Aufgabe eins\n[x] erledigt\n- Punkt mit **fett**\n\nAbsatz. Zweiter Satz.');
+  pruefe(m.saetze[0] === 'Überschrift' && m.saetze[1] === 'Aufgabe eins' && m.saetze[3] === 'Punkt mit fett' && m.saetze.length === 6, 'Memo: Überschriften, Kästchen, Aufzählungen und ** werden nicht mitgelesen');
+  /* Vorlesen mit nachgebauter Sprachausgabe */
+  const gesagt = [];
+  S.speechSynthesis = { getVoices() { return [{ name: 'Anna', lang: 'de-DE', voiceURI: 'anna', localService: true }, { name: 'Samantha', lang: 'en-US', voiceURI: 'sam' }, { name: 'Martin', lang: 'de-DE', voiceURI: 'martin' }]; },
+    speak(u) { gesagt.push(u); }, cancel() {} };
+  S.SpeechSynthesisUtterance = function (t) { this.text = t; };
+  delete S.__ablage['clie-vorlesen-stimme']; delete S.__ablage['clie-vorlesen-lokal'];
+  pruefe(S.vlStimmen().length === 2 && S.vlStimme().voiceURI === 'anna', 'nur deutsche Stimmen zur Auswahl');
+  S.vlStimmeWahl('martin'); S.vlTimerWahl(0);
+  const doc = { saetze: ['Eins.', 'Zwei.', 'Drei.', 'Vier.', 'Fünf.', 'Sechs.'], seite: [1, 1, 1, 2, 2, 2], absatz: [0, 0, 1, 2, 2, 3], kapitel: [{ t: 'Teil 2', i: 3, ebene: 0 }], titel: 'Test', seiten: 2 };
+  const id = S.vlKennung(doc.saetze);
+  S.vlEintragen({ id: id, titel: 'Test', art: 'pdf', saetze: 6, seiten: 2 });
+  S.oeffne('vorlesen'); S.vlOeffnen(id, doc);
+  pruefe(S.cl.vl.ansicht === 'lesen' && inhalt().indexOf('vls0') >= 0 && inhalt().indexOf('vls3') < 0, 'Lesen zeigt die Sätze der aktuellen Seite');
+  S.vlStarten();
+  pruefe(gesagt.length === 1 && gesagt[0].text === 'Eins.' && gesagt[0].voice.voiceURI === 'martin' && gesagt[0].lang === 'de-DE', 'Vorlesen startet mit der gewählten deutschen Stimme');
+  gesagt[0].onend();
+  pruefe(S.cl.vl.i === 1 && gesagt[1].text === 'Zwei.', 'nach dem Satz geht es von selbst weiter');
+  S.vlSchritt('absatz+');
+  pruefe(S.cl.vl.i === 2 && gesagt[gesagt.length - 1].text === 'Drei.', 'Absatz vor springt an den nächsten Absatz und liest dort');
+  const alt = gesagt[gesagt.length - 2]; alt.onend();
+  pruefe(S.cl.vl.i === 2, 'ein überholter Satz (nach Sprung) schiebt nicht weiter');
+  S.vlAnhalten();
+  const d1 = S.vlDokument(id);
+  pruefe(!S.cl.vl.laeuft && d1.satz === 2 && d1.geraet && d1.zuletzt && d1.geaendert > 0, 'Anhalten merkt die Lesestelle in der Datenbank (mit Gerät und Zeit)');
+  /* Kapitel-Schlaftimer */
+  S.vlTimerWahl(-1); S.vlStarten();
+  gesagt[gesagt.length - 1].onend();
+  pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 3, 'Schlaftimer „Kapitel“ hält am Kapitelende an');
+  /* Minuten-Schlaftimer */
+  S.vlTimerWahl(15); S.vlStarten(); S.cl.vl.timerBis = 1;
+  gesagt[gesagt.length - 1].onend();
+  pruefe(!S.cl.vl.laeuft, 'Minuten-Schlaftimer hält nach Ablauf an');
+  /* Ende */
+  S.vlTimerWahl(0); S.vlGehe(5); S.vlStarten(); gesagt[gesagt.length - 1].onend();
+  pruefe(!S.cl.vl.laeuft && S.vlDokument(id).fertig === true, 'am Ende: fertig und angehalten');
+  /* Sperre */
+  S.vlGehe(0); S.vlStarten(); S.vlSperren();
+  const vorher = S.cl.app;
+  pruefe(S.clZurueck() === true && S.cl.app === vorher && S.cl.vl.gesperrt && S.cl.vl.laeuft, 'gesperrt: „Zurück“ tut nichts, das Vorlesen läuft weiter');
+  S.vlEntsperren(); S.vlAnhalten();
+  pruefe(!S.cl.vl.gesperrt, 'Wisch entsperrt');
+  pruefe(/vl-wisch/.test(QUELLE) && /touchmove/.test(QUELLE) && /wakeLock\.request\('screen'\)/.test(QUELLE), 'Sperre mit Wischleiste und wach gehaltenem Bildschirm');
+  /* Anderes Gerät ohne Text */
+  S.__ablage['clie-vorlesen-lokal'] = '{}';
+  S.cl.vl.doc = null; S.cl.vl.ansicht = 'lesen'; S.vlZeichnen();
+  pruefe(/Lesestelle \(Seite/.test(inhalt()) && /vlDateiWaehlen/.test(inhalt()), 'ohne Text auf dem Gerät: Lesestelle da, „PDF laden …“ angeboten');
+  S.vlEbeneHoch();
+  pruefe(/PDF auf diesem Gerät noch laden/.test(inhalt()), 'Bibliothek zeigt fehlende Texte');
+  /* Drive */
+  const zeile = S.drvZeileHtml({ id: 'f1', name: 'Buch.pdf', mimeType: 'application/pdf' }, 0, false);
+  pruefe(/vlAusDriveZeile\(0\)/.test(zeile) && !/vlAusDriveZeile/.test(S.drvZeileHtml({ id: 'f2', name: 'Text', mimeType: 'text/plain' }, 1, false)), 'Drive: „🔊“ nur bei PDFs');
+  S.__ablage['clie-drive-lesen'] = 'an';
+  pruefe(S.clAnfrage('').scope.indexOf(S.VL_DRIVE_SCOPE) >= 0, 'Anmeldung fragt das Recht drive.readonly mit an, sobald erlaubt');
+  delete S.__ablage['clie-drive-lesen'];
+  /* Entfernen */
+  S.cl.vl.id = id; S.vlEntfernen();
+  pruefe(!S.vlDokument(id) && S.DB.grabsteine.some(g => g.s === 'vorlesen' && g.id === id), 'Entfernen: weg mit Grabstein (auf allen Geräten)');
+  delete S.speechSynthesis; delete S.SpeechSynthesisUtterance;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    57. Schach: Fehler erklären (0.25)
    Grund: „besser: Sf3“ allein lehrt wenig — die Analyse soll sagen,
    WARUM ein Zug schlecht und der andere besser ist.
@@ -3575,6 +3690,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { vorlesenTest(); } catch (e) { fail('Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schErklTest(); } catch (e) { fail('Schach erklären warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkRollTest(); } catch (e) { fail('Lernkartei rollen warf: ' + e.message); }
   try { lkSyncTest(); } catch (e) { fail('Lernkartei-Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

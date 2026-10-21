@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.25.0</title>
+<title>CLIE 0.26.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -507,6 +507,35 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .lk-wahl{display:flex!important;justify-content:space-between;gap:12px;width:100%}
 .lk-wahl b{font-weight:400;color:var(--px-mitte)}
 .lk-wahl.an b{color:inherit}
+/* Vorlesen (seit 0.26) */
+.vl-doc{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px}
+.vl-t{display:flex;justify-content:space-between;gap:8px;font-size:20px}
+.vl-t b{font-weight:400;background:var(--px);color:var(--lcd);padding:0 6px;white-space:nowrap;font-size:17px}
+.vl-doc small{display:block;font-size:16px;color:var(--px-mitte)}
+.vl-doc small.vl-fehlt{color:var(--px)}
+.vl-balken{display:block;height:8px;border:2px solid var(--px);margin-top:5px}
+.vl-balken i{display:block;height:100%;background:var(--px)}
+.vl-laeuft{display:flex;justify-content:space-between;align-items:center;gap:8px;border:2px solid var(--px);padding:4px 8px;margin:4px 0 8px;font-size:18px}
+.vl-kopf{margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vl-text{font-size:20px;line-height:1.55;height:calc(100vh - 445px);height:calc(100dvh - 445px);min-height:150px;overflow-y:auto;padding-right:4px}
+.vl-text p{margin:0 0 12px}
+.vl-s{cursor:pointer}
+.vl-s.gelesen{color:var(--px-mitte)}
+.vl-s.akt{background:var(--px);color:var(--lcd);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:0 2px}
+.vl-status{display:flex;justify-content:space-between;gap:8px;font-size:16px;color:var(--px-mitte);border-top:2px solid var(--px);padding-top:6px;margin-top:8px}
+.vl-steuer{display:flex;justify-content:space-between;align-items:center;margin:6px 4px}
+.vl-steuer button{width:48px;height:48px;border:2px solid var(--px);border-radius:50%;font-size:20px;display:flex;align-items:center;justify-content:center}
+.vl-steuer button.gross{width:66px;height:66px;background:var(--px);color:var(--lcd);font-size:28px}
+.vl-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+.vl-stimme{display:flex!important;justify-content:space-between;gap:8px}
+.vl-stimme.an{font-weight:600}
+.vl-unter{padding-left:22px!important}
+.vl-regler{width:100%;accent-color:var(--px)}
+.vl-sperre{position:fixed;inset:0;z-index:10000;background:#040504;color:#3f4a37;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:12vh;font-size:17px;touch-action:none;user-select:none;-webkit-user-select:none}
+.vl-lauf{position:absolute;top:38%;left:0;right:0;text-align:center;line-height:1.7}
+.vl-entsperren{text-align:center}
+.vl-wisch{width:240px;height:46px;border:2px solid #2b3326;border-radius:23px;display:flex;align-items:center;padding:0 4px;margin:10px auto 0;touch-action:none}
+.vl-wisch i{width:36px;height:36px;border-radius:50%;background:#2b3326;color:#6a775f;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:20px}
 </style>
 </head>
 <body>
@@ -550,7 +579,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.25.0';
+var APP_VERSION = '0.26.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -589,7 +618,10 @@ var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe
                   /* seit v6.3.2: App „Lernkartei“ im CLIE — Kästen und
                      Lernstand je Karte; die Kartentexte der Pakete bleiben
                      auf dem Gerät. Ebenso nur bewahrt und abgeglichen. */
-                  'lernkaesten','lernstand'];
+                  'lernkaesten','lernstand',
+                  /* seit v6.3.3: App „Vorlesen“ im CLIE — Dokumente und
+                     Lesestelle; der Text selbst bleibt auf dem Gerät */
+                  'vorlesen'];
 
 /* Aus der Workbench: nummerierte Zeilen */
 var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
@@ -634,7 +666,7 @@ var kalenderLaeuft = false;
 var kalenderUhr = null;
 
 /* ============================================================
-   Unterbau aus der Workbench 6.3.2 — wörtlich übernommen:
+   Unterbau aus der Workbench 6.3.3 — wörtlich übernommen:
    Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke,
    Kalender lesen, leere Datenbank und der Aktivitäten-Kern (kp…).
    ============================================================ */
@@ -732,6 +764,23 @@ function idbLesen(schluessel) {
       a.onerror   = function () { db.close(); fehler(a.error); };
     });
   });
+}
+
+function idbLoeschen(schluessel) {
+  return idbOeffnen().then(function (db) {
+    return new Promise(function (fertig, fehler) {
+      var t = db.transaction(IDB_STORE, 'readwrite');
+      t.objectStore(IDB_STORE).delete(schluessel);
+      t.oncomplete = function () { db.close(); fertig(true); };
+      t.onerror    = function () { db.close(); fehler(t.error); };
+    });
+  });
+}
+
+function kurzDatum(is) {
+  if (!is) { return ''; }
+  var d = ausIso(is);
+  return ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.';
 }
 
 function rechtePruefen(handle) {
@@ -1519,6 +1568,7 @@ function leereDatenbank() {
     drivefavoriten:    [],
     lernkaesten:       [],
     lernstand:         [],
+    vorlesen:          [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -2770,6 +2820,7 @@ var CL_APPS = [
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '' },
   { id: 'schach',   name: 'Schach',   stufe: '',    was: '' },
   { id: 'lernkartei', name: 'Lernkartei', stufe: '', was: '' },
+  { id: 'vorlesen', name: 'Vorlesen', stufe: '', was: '' },
   { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '' }
 ];
 
@@ -2816,6 +2867,8 @@ var CL_BILD = {
   /* Zwei Karteikarten, die vordere mit Zeilen (seit 0.23) */
   lernkartei: '<rect x="22" y="14" width="26" height="18" rx="2" ' + CL_STRICH + '/><rect x="14" y="26" width="28" height="22" rx="2" ' + CL_FUELL + '/>'
         + '<rect x="18" y="32" width="20" height="3" fill="#1C2116"/><rect x="18" y="39" width="14" height="3" fill="#1C2116"/>',
+  /* Lautsprecher mit Schallbögen (seit 0.26) */
+  vorlesen: '<path d="M14 27h8l10-8v26l-10-8h-8z" ' + CL_FUELL + '/><path d="M38 25c3 4 3 10 0 14" ' + CL_STRICH + '/><path d="M43 20c6 7 6 17 0 24" ' + CL_STRICH + '/>',
   abgleich: '<path d="M22 38c0-9 5-17 16-17" ' + CL_STRICH + '/><path d="M34 15l6 6-6 6" ' + CL_STRICH + '/><path d="M42 26c0 9-5 17-16 17" ' + CL_STRICH + '/><path d="M30 49l-6-6 6-6" ' + CL_STRICH + '/>'
 };
 
@@ -3475,6 +3528,7 @@ function statistikHtml() {
     + clStatBlock('drive', 'Drive', [['Favoriten', String(drvFavoriten().length)]])
     + clStatBlock('schach', 'Schach', [['gegen CLIE: gewonnen · verloren · remis', schBilanzLesen().g + ' · ' + schBilanzLesen().v + ' · ' + schBilanzLesen().r]])
     + clStatBlock('lernkartei', 'Lernkartei', [['Kästen · Karten · heute fällig', lkStatZeile()]])
+    + clStatBlock('vorlesen', 'Vorlesen', [['Dokumente · fertig gehört', vlStatZeile()]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
     + clStatBlock('abgleich', 'Datei', [
@@ -3561,6 +3615,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'stones') { el.innerHTML = stonesHtml(); }
   else if (cl.app === 'schach') { el.innerHTML = schachHtml(); }
   else if (cl.app === 'lernkartei') { el.innerHTML = lernkarteiHtml(); }
+  else if (cl.app === 'vorlesen') { el.innerHTML = vorlesenHtml(); }
   else if (cl.app === 'drive') {
     /* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
     if (cl.drv.tab === 'suche' && el.innerHTML.indexOf('drvFeld') >= 0) { drvZeichnen(); return; }
@@ -3612,6 +3667,7 @@ function kopfZeichnen() {
       : (cl.app === 'drive') ? ''
       : (cl.app === 'schach') ? schKopfText()
       : (cl.app === 'lernkartei') ? '▼ ' + lkKopfText()
+      : (cl.app === 'vorlesen') ? vlKopfText()
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
     kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl') ? ' an' : '');
   }
@@ -3695,6 +3751,10 @@ function aufklappZeichnen() {
       + (cl.app === 'lernkartei' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'lkNeu\')">Neu…</button>'
           + '<button type="button" onclick="menueWahl(\'lkPaket\')">Kartenpaket laden…</button>' : '')
+      + (cl.app === 'vorlesen' ? '<div class="trenn"></div>'
+          + '<button type="button" onclick="menueWahl(\'vlPdf\')">PDF laden…</button>'
+          + '<button type="button" onclick="menueWahl(\'vlText\')">Text vorlesen…</button>'
+          + '<button type="button" onclick="menueWahl(\'vlStimme\')">Stimme…</button>' : '')
       + (cl.app === 'stones' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'stoNeu\')">Neues Spiel</button>'
           + '<button type="button" onclick="menueWahl(\'stoListe\')">Bestenliste</button>' : '')
@@ -3721,7 +3781,8 @@ function fussZeichnen() {
         : (cl.app === 'stones') ? stonesFussHtml()
         : (cl.app === 'drive') ? driveFussHtml()
         : (cl.app === 'schach') ? schachFussHtml()
-        : (cl.app === 'lernkartei') ? lernkarteiFussHtml() : '';
+        : (cl.app === 'lernkartei') ? lernkarteiFussHtml()
+        : (cl.app === 'vorlesen') ? vorlesenFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -3761,7 +3822,7 @@ function oeffne(id) {
 }
 
 function katUm() {
-  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach') { return; }
+  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
     : (cl.app === 'lernkartei') ? 'lkwahl'
@@ -3802,6 +3863,9 @@ function menueWahl(was) {
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   if (was === 'stoNeu') { stoNeuesSpiel(); return; }
+  if (was === 'vlPdf') { aufklappZeichnen(); vlDateiWaehlen(); return; }
+  if (was === 'vlText') { aufklappZeichnen(); vlFensterAuf('text'); return; }
+  if (was === 'vlStimme') { aufklappZeichnen(); vlFensterAuf('stimme'); return; }
   if (was === 'lkNeu') { aufklappZeichnen(); lkNeuOeffnen(); return; }
   if (was === 'lkPaket') { aufklappZeichnen(); cl.lk.id = ''; lkPaketWaehlen(); return; }
   if (was === 'schNeu') { aufklappZeichnen(); schNeuOeffnen(); return; }
@@ -8873,6 +8937,8 @@ function drvZeileHtml(z, i, mitPfad) {
   if (cl.drv.tab === 'suche' && cl.drv.q) { name = suMarkiert(z.name || '', cl.drv.q, false); }
   return '<div class="drv-zeile"><button type="button" class="drv-n" onclick="drvOeffnen(' + i + ')"><span class="drv-sym">' + art[0] + '</span>'
     + '<span class="tx">' + name + '<small>' + esc(unter) + '</small></span></button>'
+    /* PDFs lassen sich vorlesen (seit 0.26) */
+    + (z.mimeType === 'application/pdf' ? '<button type="button" class="drv-stern" onclick="vlAusDriveZeile(' + i + ')" aria-label="Vorlesen">🔊</button>' : '')
     + '<button type="button" class="drv-stern' + (fav ? ' an' : '') + '" onclick="drvFavUm(' + i + ')" aria-label="Favorit">' + (fav ? '★' : '☆') + '</button></div>';
 }
 
@@ -11766,6 +11832,1088 @@ function lkWechseln(id) {
 }
 
 
+/* ---------- Vorlesen (seit 0.26) ----------
+
+   PDFs, Memos und eingefügter Text werden mit einer deutschen Stimme des
+   Geräts vorgelesen (Sprachausgabe des Browsers). Der Text eines PDFs wird
+   mit pdf.js herausgelesen und aufbereitet: Silbentrennung zusammengefügt,
+   Kopf-/Fußzeilen und Seitenzahlen weggelassen, Absätze erkannt, in Sätze
+   geteilt. Der aufbereitete Text bleibt auf dem Gerät (IndexedDB), die
+   Lesestelle steht in der workbench.json (Bereich „vorlesen“, Workbench
+   6.3.3) — so geht es auf dem anderen Gerät an derselben Stelle weiter.
+   Die Kennung eines Dokuments wird aus seinem Text berechnet: Dasselbe PDF
+   ergibt auf jedem Gerät dieselbe Kennung.
+
+   Während des Vorlesens bleibt der Bildschirm an (sonst stoppt der Browser
+   die Stimme). „Sperren“ legt eine schwarze Fläche darüber, die Berührungen
+   schluckt; nur ein Wisch über die Leiste entsperrt. */
+
+var VL_PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var VL_PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var VL_STIMME_KEY = 'clie-vorlesen-stimme';
+var VL_LOKAL_KEY = 'clie-vorlesen-lokal';
+var VL_DRIVE_KEY = 'clie-drive-lesen';
+var VL_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+var VL_ZEICHEN_JE_SEKUNDE = 14;
+var VL_TIMER = [[0, 'aus'], [15, '15'], [30, '30'], [60, '60'], [-1, 'Kapitel']];
+var VL_ABKUERZUNGEN = ['z', 'B', 'd', 'h', 'u', 'a', 'usw', 'bzw', 'ca', 'Dr', 'Prof', 'Nr', 'S', 'Kap', 'vgl', 'etc', 'evtl', 'ggf', 'inkl', 'Mio',
+  'Mrd', 'bspw', 'sog', 'ä', 'o', 'Abb', 'Tab', 'St', 'Hr', 'Fr', 'Jh', 'v', 'Chr', 'n', 'Std', 'Min', 'max', 'min', 'zzgl', 'Bd', 'Aufl', 'Hrsg',
+  'f', 'ff', 'z.B', 'd.h', 'u.a', 'i', 'e', 'Mr', 'Mrs', 'Ms', 'vs', 'insb', 'allg', 'Tel', 'Str', 'gem', 'lt', 'rd', 'jew', 'al', 'Vgl', 'Ggf', 'Bzw'];
+
+cl.vl = { ansicht: 'liste', id: '', doc: null, i: 0, laeuft: false, fenster: '', gesperrt: false, gen: 0, laden: null,
+          timerBis: 0, timerKapitel: -1, wach: null, gemerkt: 0, ziel: '' };
+
+/* ---- Text aufbereiten (rein, ohne Browser — geprüft in den Tests) ---- */
+
+/* Zeilen einer Seite aus den Textstücken von pdf.js: {str, transform:[a,b,c,d,x,y], height} */
+function vlZeilenAusStuecken(stuecke) {
+  /* Schräg oder senkrecht gesetzter Text (Wasserzeichen, Randvermerke) bleibt weg */
+  var l = (stuecke || []).filter(function (s) {
+    return s && typeof s.str === 'string' && s.transform && Math.abs(Number(s.transform[1]) || 0) < 0.01 && Math.abs(Number(s.transform[2]) || 0) < 0.01;
+  }).map(function (s) {
+    return { t: s.str, x: Number(s.transform[4]) || 0, y: Number(s.transform[5]) || 0, h: Math.abs(Number(s.height) || Number(s.transform[3]) || 10) };
+  });
+  l.sort(function (a, b) { return (Math.abs(b.y - a.y) > Math.min(a.h, b.h) * 0.5) ? b.y - a.y : a.x - b.x; });
+  var zeilen = [];
+  l.forEach(function (s) {
+    var z = zeilen[zeilen.length - 1];
+    if (z && Math.abs(z.y - s.y) <= Math.max(2, Math.min(z.h, s.h) * 0.5)) {
+      var luecke = s.x - z.ende;
+      z.t += (luecke > s.h * 0.15 && !/\s$/.test(z.t) && !/^\s/.test(s.t) ? ' ' : '') + s.t;
+      z.ende = Math.max(z.ende, s.x + (s.t.length * s.h * 0.45));
+      z.h = Math.max(z.h, s.h);
+    } else {
+      zeilen.push({ t: s.t, y: s.y, h: s.h, ende: s.x + s.t.length * s.h * 0.45 });
+    }
+  });
+  return zeilen.map(function (z) { return { t: z.t.replace(/\s+/g, ' ').trim(), y: z.y, h: z.h }; }).filter(function (z) { return z.t; });
+}
+
+function vlSchluesselZeile(t) {
+  return String(t).toLowerCase().replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
+}
+
+/* Seiten [{zeilen:[{t,y,h}]}] → { saetze:[], seite:[], absatz:[] } */
+function vlAufbereiten(seiten) {
+  var n = seiten.length;
+  /* Wiederkehrende Zeilen (Kopf, Fuß, Wasserzeichen) zählen */
+  var zaehl = {};
+  seiten.forEach(function (s) {
+    var gesehen = {};
+    s.zeilen.forEach(function (z) { var k = vlSchluesselZeile(z.t); if (!gesehen[k]) { gesehen[k] = 1; zaehl[k] = (zaehl[k] || 0) + 1; } });
+  });
+  /* Am Rand (Kopf/Fuß) reicht dreimal — laufende Kolumnentitel wiederholen sich je Kapitel */
+  var oft = function (k, rand) { return n >= 4 && zaehl[k] >= (rand ? 3 : Math.max(3, n * 0.5)); };
+  /* Erst filtern, dann Zeilenabstand und Zeilenlänge über das ganze Dokument bestimmen */
+  var gefiltert = seiten.map(function (s) {
+    return s.zeilen.filter(function (z, zi) {
+      var k = vlSchluesselZeile(z.t);
+      var rand = zi < 2 || zi >= s.zeilen.length - 2;
+      if (/^[#\s.\-–—|]*$/.test(k) && z.t.length <= 12) { return false; }           /* nur Seitenzahl */
+      if (rand && /^[ivxlc]+$/.test(k)) { return false; }                            /* römische Seitenzahl */
+      return !oft(k, rand);
+    });
+  });
+  var alleAbst = [];
+  var alleLaengen = [];
+  gefiltert.forEach(function (zeilen) {
+    var i;
+    for (i = 1; i < zeilen.length; i++) { var d = Math.abs(zeilen[i - 1].y - zeilen[i].y); if (d > 0) { alleAbst.push(d); } }
+    zeilen.forEach(function (z) { alleLaengen.push(z.t.length); });
+  });
+  alleAbst.sort(function (x, y) { return x - y; });
+  alleLaengen.sort(function (x, y) { return x - y; });
+  var mitte = alleAbst.length ? alleAbst[Math.floor(alleAbst.length / 2)] : 0;
+  var voll = alleLaengen[Math.floor(alleLaengen.length * 0.8)] || 60;
+  var absaetze = [];
+  var akt = null;
+  gefiltert.forEach(function (zeilen, si) {
+    if (!zeilen.length) { return; }
+    var abst = [];
+    var i;
+    for (i = 1; i < zeilen.length; i++) { abst.push(Math.abs(zeilen[i - 1].y - zeilen[i].y)); }
+    zeilen.forEach(function (z, zi) {
+      var neu = !akt;
+      if (akt && zi === 0) {
+        /* Seitenwechsel: neuer Absatz nur nach Satzende */
+        neu = /[.!?:…"“”»]$/.test(akt.letzte) && (akt.letzteKurz || /[.!?…]["“”»]?$/.test(akt.letzte));
+      } else if (akt) {
+        var luecke = abst[zi - 1];
+        var vorher = zeilen[zi - 1];
+        neu = (mitte > 0 && luecke > mitte * 1.45) || (/[.!?:…"“”»]$/.test(vorher.t) && vorher.t.length < voll * 0.7)
+          || (vorher.t.length < voll * 0.5 && !/[,;\-]$/.test(vorher.t) && /^[A-ZÄÖÜ0-9„"»•\-–]/.test(z.t));
+      }
+      if (neu) { akt = { text: z.t, seite: si + 1, letzte: z.t, letzteKurz: z.t.length < voll * 0.7 }; absaetze.push(akt); return; }
+      /* Zeilen verbinden: Trennstrich am Zeilenende vor Kleinbuchstaben weg */
+      if (/[a-zäöüß][\-\u00AD\u2010¬]$/.test(akt.text) && /^[a-zäöüß]/.test(z.t)) { akt.text = akt.text.replace(/[\-\u00AD\u2010¬]$/, '') + z.t; }
+      else if (/\-$/.test(akt.text) && /^[A-ZÄÖÜa-zäöü]/.test(z.t) && /[A-Za-zäöü]\-$/.test(akt.text)) { akt.text += z.t; }
+      else { akt.text += ' ' + z.t; }
+      akt.letzte = z.t;
+      akt.letzteKurz = z.t.length < voll * 0.7;
+    });
+  });
+  var aus = { saetze: [], seite: [], absatz: [] };
+  absaetze.forEach(function (a, ai) {
+    vlSaetze(a.text).forEach(function (s) { aus.saetze.push(s); aus.seite.push(a.seite); aus.absatz.push(ai); });
+  });
+  return aus;
+}
+
+/* Text in Sätze teilen — Abkürzungen, Ordnungszahlen und Aufzählungen bleiben heil */
+function vlSaetze(text) {
+  var t = String(text || '').replace(/\u00AD/g, '').replace(/\s+/g, ' ').replace(/ ([,.;:!?)\]])/g, '$1').replace(/([(\[„]) /g, '$1').trim();
+  if (!t) { return []; }
+  var stuecke = t.match(/[^.!?…]+(?:[.!?…]+["“”»«')\]]*|$)\s*/g) || [t];
+  var roh = [];
+  stuecke.forEach(function (st) {
+    var s = st.trim();
+    if (!s) { return; }
+    var vorher = roh.length ? roh[roh.length - 1].trim() : '';
+    if (vorher) {
+      var letztesWort = (vorher.match(/(\S+)\.$/) || ['', ''])[1].replace(/^[(„"»]/, '');
+      var anhaengen = /^[a-zäöü,;)]/.test(s)                                               /* geht klein weiter */
+        || (/\.$/.test(vorher) && (/^\d{1,4}(\.\d{1,4})*$/.test(letztesWort)              /* 3. Mai, 2.2.2 */
+          || VL_ABKUERZUNGEN.indexOf(letztesWort) >= 0 || /^[A-Za-zÄÖÜ]$/.test(letztesWort)))
+        || vorher.length < 3;
+      /* Original-Abstand behalten: „2.2.2“ bleibt „2.2.2“ */
+      if (anhaengen) { roh[roh.length - 1] += st; return; }
+    }
+    roh.push(st);
+  });
+  var saetze = roh.map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+  /* Sehr lange Sätze an Satzzeichen teilen — die Stimme bricht sonst manchmal ab */
+  var aus = [];
+  saetze.forEach(function (s) {
+    while (s.length > 280) {
+      var schnitt = -1;
+      var muster = [/; /g, /: /g, /, /g, / – /g, / /g];
+      var m;
+      for (m = 0; m < muster.length && schnitt < 0; m++) {
+        var r;
+        var best = -1;
+        muster[m].lastIndex = 0;
+        while ((r = muster[m].exec(s)) !== null) { if (r.index > 80 && r.index < 260) { best = r.index + 1; } }
+        schnitt = best;
+      }
+      if (schnitt < 0) { schnitt = 260; }
+      aus.push(s.slice(0, schnitt).trim());
+      s = s.slice(schnitt).trim();
+    }
+    if (s) { aus.push(s); }
+  });
+  return aus;
+}
+
+/* Kennung aus dem Text — dasselbe Dokument ergibt überall dieselbe */
+function vlKennung(saetze) {
+  var probe = saetze.length + '|' + saetze.slice(0, 60).join(' ').slice(0, 4000);
+  var h1 = 5381;
+  var h2 = 52711;
+  var i;
+  for (i = 0; i < probe.length; i++) {
+    var c = probe.charCodeAt(i);
+    h1 = ((h1 * 33) ^ c) >>> 0;
+    h2 = ((h2 * 31) + c) >>> 0;
+  }
+  return 'vl-' + h1.toString(36) + h2.toString(36);
+}
+
+/* Memo-Text: Überschriften, Kästchen und Aufzählungszeichen weg, jede Zeile ein Absatz */
+function vlAusText(text) {
+  var aus = { saetze: [], seite: [], absatz: [] };
+  String(text || '').replace(/\r/g, '').split('\n').forEach(function (z, ai) {
+    var t = z.replace(/^\s*#{1,6}\s+/, '').replace(/^\s*[-*•]\s*\[[ xX-]?\]\s*/, '').replace(/^\s*\[[ xX-]?\]\s*/, '')
+      .replace(/^\s*[-*•]\s+/, '').replace(/\*\*([^*]+)\*\*/g, '$1').trim();
+    if (!t) { return; }
+    vlSaetze(t).forEach(function (s) { aus.saetze.push(s); aus.seite.push(1); aus.absatz.push(ai); });
+  });
+  return aus;
+}
+
+/* ---- Datenbank: Dokumente und Lesestelle ---- */
+
+function vlDokumente() {
+  return (Array.isArray(DB.vorlesen) ? DB.vorlesen : []).filter(function (d) { return d && d.id; }).slice().sort(function (a, b) {
+    return String(b.zuletzt || '').localeCompare(String(a.zuletzt || '')) || String(a.titel).localeCompare(String(b.titel));
+  });
+}
+
+function vlDokument(id) {
+  return (Array.isArray(DB.vorlesen) ? DB.vorlesen : []).filter(function (d) { return d && d.id === id; })[0] || null;
+}
+
+function vlGeraet() {
+  var n = window.navigator || {};
+  var u = n.userAgent || '';
+  if (/iPad/.test(u) || (/Macintosh/.test(u) && n.maxTouchPoints > 1)) { return 'iPad'; }
+  return /Android/.test(u) ? 'Pixel' : 'PC';
+}
+
+/* Neues oder vorhandenes Dokument in der Datenbank (Lesestelle bleibt) */
+function vlEintragen(feld) {
+  if (!Array.isArray(DB.vorlesen)) { DB.vorlesen = []; }
+  var d = vlDokument(feld.id);
+  if (!d) {
+    d = { id: feld.id, titel: feld.titel, art: feld.art, satz: 0, saetze: feld.saetze, seiten: feld.seiten || 1, fertig: false,
+          zuletzt: '', geraet: '', geaendert: jetzt() };
+    DB.vorlesen.push(d);
+  }
+  if (feld.drive) { d.drive = feld.drive; }
+  if (feld.memo) { d.memo = feld.memo; }
+  d.saetze = feld.saetze;
+  d.seiten = feld.seiten || d.seiten || 1;
+  d.geaendert = jetzt();
+  spaeterSichern();
+  return d;
+}
+
+/* Lesestelle merken — beim Lesen höchstens alle 30 Sekunden, sonst sofort */
+function vlStelleMerken(sofort) {
+  var d = vlDokument(cl.vl.id);
+  if (!d || !cl.vl.doc) { return; }
+  var z = jetzt();
+  if (!sofort && z - cl.vl.gemerkt < 30000) { return; }
+  cl.vl.gemerkt = z;
+  var fertig = cl.vl.i >= cl.vl.doc.saetze.length - 1 && !cl.vl.laeuft && cl.vl.i > 0;
+  if (d.satz === cl.vl.i && d.fertig === fertig && d.geraet === vlGeraet()) { return; }
+  d.satz = cl.vl.i;
+  d.seite = cl.vl.doc.seite[cl.vl.i] || 1;
+  d.fertig = fertig;
+  var jz = new Date();
+  d.zuletzt = isoDatum(jz) + 'T' + zwei(jz.getHours()) + ':' + zwei(jz.getMinutes());
+  d.geraet = vlGeraet();
+  d.geaendert = z;
+  spaeterSichern();
+}
+
+/* Welche Dokumente liegen auf diesem Gerät? (für die Liste ohne Warten auf IndexedDB) */
+function vlLokal() {
+  var l = null;
+  try { l = JSON.parse(window.localStorage.getItem(VL_LOKAL_KEY) || 'null'); } catch (e) { l = null; }
+  return (l && typeof l === 'object') ? l : {};
+}
+
+function vlLokalSetzen(id, da) {
+  var l = vlLokal();
+  if (da) { l[id] = 1; } else { delete l[id]; }
+  try { window.localStorage.setItem(VL_LOKAL_KEY, JSON.stringify(l)); } catch (e) { /* egal */ }
+}
+
+/* Text eines Dokuments: Memo live, sonst aus IndexedDB */
+function vlTextHolen(d) {
+  if (d.art === 'memo') {
+    var s = kpSeiteFinden(d.memo);
+    if (!s) { return Promise.resolve(null); }
+    var t = vlAusText(s.titel + '\n' + s.text);
+    t.kapitel = [];
+    t.titel = s.titel;
+    return Promise.resolve(t);
+  }
+  if (!idbDa()) { return Promise.resolve(null); }
+  return idbLesen('vl-text-' + d.id).catch(function () { return null; });
+}
+
+/* ---- Laden: PDF, Text, Memo, Drive ---- */
+
+function vlPdfJs() {
+  if (window.pdfjsLib) { return Promise.resolve(window.pdfjsLib); }
+  return new Promise(function (fertig, fehler) {
+    var s = document.createElement('script');
+    s.src = VL_PDFJS;
+    s.onload = function () {
+      if (!window.pdfjsLib) { fehler(new Error('PDF-Baustein fehlt')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = VL_PDFJS_WORKER;
+      fertig(window.pdfjsLib);
+    };
+    s.onerror = function () { fehler(new Error('Der PDF-Baustein ließ sich nicht laden — ist das Gerät online?')); };
+    document.head.appendChild(s);
+  });
+}
+
+function vlDateiWaehlen() {
+  var f = document.getElementById('vlDatei');
+  if (f && f.click) { f.value = ''; f.click(); }
+}
+
+/* Dateiname als Titel: ohne Endung, Unterstriche als Leerzeichen */
+function vlDateiTitel(name) {
+  return String(name || 'Dokument').replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Dokument';
+}
+
+function vlDateiGewaehlt(feld) {
+  var datei = feld && feld.files && feld.files[0];
+  if (!datei || typeof window.FileReader !== 'function') { return; }
+  var leser = new window.FileReader();
+  leser.onload = function () { vlPdfVerarbeiten(leser.result, vlDateiTitel(datei.name), {}); };
+  leser.readAsArrayBuffer(datei);
+}
+
+/* Inhaltsverzeichnis des PDFs → Kapitel mit Seitenzahl */
+function vlGliederung(pdf) {
+  return pdf.getOutline().then(function (o) {
+    var flach = [];
+    (o || []).forEach(function (e) {
+      flach.push({ t: e.title, dest: e.dest, ebene: 0 });
+      (e.items || []).forEach(function (u) { flach.push({ t: u.title, dest: u.dest, ebene: 1 }); });
+    });
+    return Promise.all(flach.slice(0, 200).map(function (e) {
+      var d = (typeof e.dest === 'string') ? pdf.getDestination(e.dest) : Promise.resolve(e.dest);
+      return d.then(function (ziel) { return (ziel && ziel[0]) ? pdf.getPageIndex(ziel[0]) : -1; })
+        .then(function (i) { return { t: String(e.t || '').trim(), seite: i + 1, ebene: e.ebene }; })
+        .catch(function () { return null; });
+    }));
+  }).then(function (l) { return (l || []).filter(function (x) { return x && x.t && x.seite > 0; }); }).catch(function () { return []; });
+}
+
+function vlPdfVerarbeiten(puffer, titel, quelle) {
+  cl.vl.laden = { titel: titel, seite: 0, seiten: 0 };
+  cl.vl.fenster = 'laden';
+  vlZeichnen();
+  var pdf = null;
+  return vlPdfJs().then(function (lib) {
+    return lib.getDocument({ data: new Uint8Array(puffer) }).promise;
+  }).then(function (p) {
+    pdf = p;
+    cl.vl.laden.seiten = pdf.numPages;
+    var seiten = [];
+    var nr = 1;
+    var naechste = function () {
+      if (nr > pdf.numPages) { return Promise.resolve(seiten); }
+      return pdf.getPage(nr).then(function (seite) { return seite.getTextContent(); }).then(function (inhalt) {
+        seiten.push({ zeilen: vlZeilenAusStuecken(inhalt.items) });
+        cl.vl.laden.seite = nr;
+        if (nr % 5 === 0) { vlZeichnen(); }
+        nr++;
+        return naechste();
+      });
+    };
+    return naechste();
+  }).then(function (seiten) {
+    var t = vlAufbereiten(seiten);
+    var zeichen = t.saetze.join('').length;
+    if (zeichen < Math.max(200, seiten.length * 40)) {
+      cl.vl.laden = null;
+      cl.vl.fenster = '';
+      melde('In diesem PDF steht kaum Text — wohl ein Scan. Vorlesen geht nur mit echtem Text.', 'warn');
+      vlZeichnen();
+      return null;
+    }
+    return pdf.getMetadata().then(function (m) {
+      var mt = m && m.info && typeof m.info.Title === 'string' ? m.info.Title.trim() : '';
+      if (mt.length > 3 && !/^(untitled|unbenannt|microsoft|document|dokument)/i.test(mt) && !/\.(docx?|pdf|indd)$/i.test(mt)) { titel = mt; }
+    }).catch(function () { return null; }).then(function () { return vlGliederung(pdf); }).then(function (gl) {
+      t.kapitel = gl.map(function (k) {
+        var i = t.seite.indexOf(t.seite.filter(function (s) { return s >= k.seite; })[0]);
+        return { t: k.t, i: i, ebene: k.ebene };
+      }).filter(function (k) { return k.i >= 0; });
+      t.titel = titel;
+      t.seiten = seiten.length;
+      return vlUebernehmen(t, 'pdf', quelle);
+    });
+  }).catch(function (f) {
+    cl.vl.laden = null;
+    cl.vl.fenster = '';
+    melde('PDF ließ sich nicht lesen: ' + (f && f.message ? f.message : 'unbekannter Fehler'), 'warn');
+    vlZeichnen();
+    return null;
+  });
+}
+
+/* Aufbereiteten Text speichern, Dokument eintragen und öffnen */
+function vlUebernehmen(t, art, quelle) {
+  var id = vlKennung(t.saetze);
+  t.id = id;
+  var speichern = idbDa() ? idbSchreiben('vl-text-' + id, t) : Promise.resolve(false);
+  return speichern.catch(function () { return false; }).then(function (ok) {
+    if (!ok) { melde('Der Text ließ sich auf diesem Gerät nicht speichern.', 'warn'); }
+    vlLokalSetzen(id, true);
+    var vorher = vlDokument(id);
+    var d = vlEintragen({ id: id, titel: vorher ? vorher.titel : t.titel, art: art, saetze: t.saetze.length, seiten: t.seiten || 1,
+                          drive: quelle && quelle.drive, memo: quelle && quelle.memo });
+    cl.vl.laden = null;
+    cl.vl.fenster = '';
+    melde(vorher ? '„' + d.titel + '“ ist jetzt auch auf diesem Gerät — weiter bei Seite ' + (t.seite[d.satz] || 1) + '.'
+      : '„' + d.titel + '“: ' + t.saetze.length + ' Sätze bereit.', 'gut');
+    return vlOeffnen(id, t);
+  });
+}
+
+function vlTextOk() {
+  var titel = String((document.getElementById('vlTitel') || {}).value || '').trim() || 'Text vom ' + isoDatum();
+  var text = String((document.getElementById('vlText') || {}).value || '');
+  var t = vlAusText(text);
+  if (!t.saetze.length) { melde('Bitte Text einfügen.', 'warn'); return; }
+  t.titel = titel.slice(0, 120);
+  t.kapitel = [];
+  t.seiten = 1;
+  vlUebernehmen(t, 'text', {});
+}
+
+function vlMemoWaehlen(id) {
+  var s = kpSeiteFinden(id);
+  if (!s) { return; }
+  var did = 'vl-memo-' + s.id;
+  var t = vlAusText(s.titel + '\n' + s.text);
+  if (!t.saetze.length) { melde('Dieses Memo ist leer.', 'warn'); return; }
+  vlEintragen({ id: did, titel: s.titel, art: 'memo', saetze: t.saetze.length, seiten: 1, memo: s.id });
+  cl.vl.fenster = '';
+  t.kapitel = [];
+  t.titel = s.titel;
+  vlOeffnen(did, t);
+}
+
+/* Drive: braucht das Recht, Dateiinhalte zu lesen */
+function vlDriveGewuenscht() {
+  try { return window.localStorage.getItem(VL_DRIVE_KEY) === 'an'; } catch (e) { return false; }
+}
+
+function vlDriveRechtPruefen() {
+  if (!tokenGueltig() || typeof fetch !== 'function') { return Promise.resolve(false); }
+  return fetch(DRV_TOKENINFO + encodeURIComponent(zugriffToken)).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    var rechte = (j && typeof j.scope === 'string') ? j.scope.split(' ') : [];
+    return rechte.indexOf(VL_DRIVE_SCOPE) >= 0 || rechte.indexOf('https://www.googleapis.com/auth/drive') >= 0;
+  }).catch(function () { return false; });
+}
+
+function vlDriveErlauben() {
+  try { window.localStorage.setItem(VL_DRIVE_KEY, 'an'); } catch (e) { /* nur für jetzt */ }
+  cl.vl.fenster = '';
+  anmeldeVersuch(false, 'consent').then(function () {
+    if (cl.vl.ziel) { var z = cl.vl.ziel; cl.vl.ziel = ''; vlAusDrive(z.id, z.name); }
+  });
+}
+
+function vlAusDriveZeile(i) {
+  var z = cl.drv.zeilen[i];
+  if (z) { vlAusDrive(z.id, z.name); }
+}
+
+function vlAusDrive(dateiId, name) {
+  var vorhanden = (Array.isArray(DB.vorlesen) ? DB.vorlesen : []).filter(function (d) { return d.drive === dateiId; })[0];
+  if (vorhanden && vlLokal()[vorhanden.id]) { oeffne('vorlesen'); vlOeffnen(vorhanden.id); return; }
+  if (!tokenGueltig()) { melde('Für Drive braucht CLIE die Verbindung zu Google.', 'warn'); return; }
+  oeffne('vorlesen');
+  cl.vl.laden = { titel: name, seite: 0, seiten: 0 };
+  cl.vl.fenster = 'laden';
+  vlZeichnen();
+  vlDriveRechtPruefen().then(function (ja) {
+    if (!ja) {
+      cl.vl.laden = null;
+      cl.vl.ziel = { id: dateiId, name: name };
+      cl.vl.fenster = 'recht';
+      vlZeichnen();
+      return null;
+    }
+    return fetch(DRV_API + '/' + encodeURIComponent(dateiId) + '?alt=media', { headers: driveKopf() }).then(function (r) {
+      if (!r.ok) { throw new Error('Drive antwortet mit ' + r.status + '.'); }
+      return r.arrayBuffer();
+    }).then(function (puffer) {
+      return vlPdfVerarbeiten(puffer, vlDateiTitel(name), { drive: dateiId });
+    });
+  }).catch(function (f) {
+    cl.vl.laden = null;
+    cl.vl.fenster = '';
+    melde('Laden aus Drive ging nicht: ' + (f && f.message ? f.message : ''), 'warn');
+    vlZeichnen();
+  });
+}
+
+/* ---- Öffnen und Vorlesen ---- */
+
+function vlOeffnen(id, text) {
+  var d = vlDokument(id);
+  if (!d) { return Promise.resolve(null); }
+  if (cl.vl.id !== id) { vlAnhalten(); }
+  cl.vl.id = id;
+  cl.vl.ansicht = 'lesen';
+  cl.vl.fenster = '';
+  var weiter = function (t) {
+    if (!t || !Array.isArray(t.saetze) || !t.saetze.length) {
+      cl.vl.doc = null;
+      vlLokalSetzen(id, false);
+      vlZeichnen();
+      return null;
+    }
+    cl.vl.doc = t;
+    cl.vl.i = Math.max(0, Math.min(t.saetze.length - 1, Number(d.satz) || 0));
+    if (d.fertig) { cl.vl.i = 0; }
+    vlZeichnen();
+    vlAktuellZeigen();
+    return t;
+  };
+  if (text) { return Promise.resolve(weiter(text)); }
+  cl.vl.doc = null;
+  vlZeichnen();
+  return vlTextHolen(d).then(weiter);
+}
+
+function vlEinstellungen() {
+  var e = null;
+  try { e = JSON.parse(window.localStorage.getItem(VL_STIMME_KEY) || 'null'); } catch (x) { e = null; }
+  e = (e && typeof e === 'object') ? e : {};
+  return { stimme: e.stimme || '', tempo: Number(e.tempo) || 1, hoehe: Number(e.hoehe) || 1, timer: (typeof e.timer === 'number') ? e.timer : 0 };
+}
+
+function vlEinstellungenSichern(e) {
+  try { window.localStorage.setItem(VL_STIMME_KEY, JSON.stringify(e)); } catch (x) { /* nur für jetzt */ }
+}
+
+function vlStimmen() {
+  var s = window.speechSynthesis;
+  if (!s || typeof s.getVoices !== 'function') { return []; }
+  return s.getVoices().filter(function (v) { return /^de/i.test(v.lang || ''); });
+}
+
+function vlStimme() {
+  var e = vlEinstellungen();
+  var l = vlStimmen();
+  return l.filter(function (v) { return v.voiceURI === e.stimme; })[0] || l.filter(function (v) { return /de-DE/i.test(v.lang); })[0] || l[0] || null;
+}
+
+function vlSprechen(text, fertig) {
+  var s = window.speechSynthesis;
+  if (!s || typeof window.SpeechSynthesisUtterance !== 'function') { melde('Dieses Gerät kann nicht vorlesen (keine Sprachausgabe).', 'warn'); return false; }
+  var e = vlEinstellungen();
+  var u = new window.SpeechSynthesisUtterance(text);
+  var v = vlStimme();
+  u.lang = v ? v.lang : 'de-DE';
+  if (v) { u.voice = v; }
+  u.rate = e.tempo;
+  u.pitch = e.hoehe;
+  if (fertig) {
+    u.onend = function () { fertig(true); };
+    u.onerror = function (x) { fertig(!(x && (x.error === 'interrupted' || x.error === 'canceled'))); };
+  }
+  s.cancel();
+  s.speak(u);
+  return true;
+}
+
+/* Ende des Kapitels, in dem Satz i steht */
+function vlKapitelEnde(i) {
+  var k = (cl.vl.doc && cl.vl.doc.kapitel) || [];
+  var n = k.filter(function (x) { return x.i > i; }).map(function (x) { return x.i; }).sort(function (a, b) { return a - b; })[0];
+  return (typeof n === 'number') ? n : -1;
+}
+
+function vlStarten() {
+  if (!cl.vl.doc) { return; }
+  if (cl.vl.i >= cl.vl.doc.saetze.length) { cl.vl.i = 0; }
+  var e = vlEinstellungen();
+  cl.vl.laeuft = true;
+  cl.vl.timerBis = e.timer > 0 ? jetzt() + e.timer * 60000 : 0;
+  cl.vl.timerKapitel = e.timer === -1 ? vlKapitelEnde(cl.vl.i) : -1;
+  if (e.timer === -1 && cl.vl.timerKapitel < 0) { cl.vl.timerKapitel = cl.vl.doc.saetze.length; }
+  vlWachHalten(true);
+  vlStelleMerken(true);
+  vlSatzSprechen();
+  vlZeichnen();
+}
+
+function vlSatzSprechen() {
+  if (!cl.vl.laeuft || !cl.vl.doc) { return; }
+  var g = ++cl.vl.gen;
+  var ok = vlSprechen(cl.vl.doc.saetze[cl.vl.i], function (normal) {
+    if (g !== cl.vl.gen || !cl.vl.laeuft) { return; }
+    if (!normal) { vlAnhalten(); return; }
+    vlNaechster();
+  });
+  if (!ok) { cl.vl.laeuft = false; vlZeichnen(); }
+}
+
+/* Nach einem Satz: weiter, außer Ende, Schlaftimer oder Kapitelende */
+function vlNaechster() {
+  var doc = cl.vl.doc;
+  if (!doc) { return; }
+  if (cl.vl.i >= doc.saetze.length - 1) {
+    cl.vl.laeuft = false;
+    vlWachHalten(false);
+    vlStelleMerken(true);
+    var d = vlDokument(cl.vl.id);
+    if (d) { d.fertig = true; d.geaendert = jetzt(); spaeterSichern(); }
+    melde('Fertig vorgelesen.', 'gut');
+    vlZeichnen();
+    return;
+  }
+  cl.vl.i++;
+  if ((cl.vl.timerBis && jetzt() >= cl.vl.timerBis) || (cl.vl.timerKapitel >= 0 && cl.vl.i >= cl.vl.timerKapitel)) {
+    vlAnhalten();
+    melde('Schlaftimer: angehalten.', null);
+    return;
+  }
+  vlStelleMerken(false);
+  vlAktuellZeigen();
+  vlSatzSprechen();
+}
+
+function vlAnhalten() {
+  cl.vl.gen++;
+  var war = cl.vl.laeuft;
+  cl.vl.laeuft = false;
+  if (window.speechSynthesis && typeof window.speechSynthesis.cancel === 'function') { window.speechSynthesis.cancel(); }
+  vlWachHalten(false);
+  if (war) { vlStelleMerken(true); }
+  if (cl.vl.gesperrt) { vlSperreZeichnen(); }
+  vlZeichnen();
+}
+
+function vlUm() {
+  if (cl.vl.laeuft) { vlAnhalten(); } else { vlStarten(); }
+}
+
+/* Springen: Satz (±1), Absatz (±2), oder direkt auf Satz i */
+function vlGehe(i) {
+  var doc = cl.vl.doc;
+  if (!doc) { return; }
+  cl.vl.i = Math.max(0, Math.min(doc.saetze.length - 1, i));
+  vlStelleMerken(true);
+  if (cl.vl.laeuft) { vlSatzSprechen(); }
+  vlAktuellZeigen();
+}
+
+function vlSchritt(was) {
+  var doc = cl.vl.doc;
+  if (!doc) { return; }
+  var i = cl.vl.i;
+  if (was === 'satz+') { vlGehe(i + 1); return; }
+  if (was === 'satz-') { vlGehe(i - 1); return; }
+  var a = doc.absatz[i];
+  if (was === 'absatz+') {
+    while (i < doc.saetze.length - 1 && doc.absatz[i] === a) { i++; }
+    vlGehe(i);
+    return;
+  }
+  /* Absatz zurück: an den Anfang des Absatzes, steht man dort schon, an den Anfang des vorigen */
+  var anfang = i;
+  while (anfang > 0 && doc.absatz[anfang - 1] === a) { anfang--; }
+  if (anfang === i && anfang > 0) { anfang--; a = doc.absatz[anfang]; while (anfang > 0 && doc.absatz[anfang - 1] === a) { anfang--; } }
+  vlGehe(anfang);
+}
+
+function vlSatzTipp(i) {
+  vlGehe(i);
+  if (!cl.vl.laeuft) { vlStarten(); }
+}
+
+/* Bildschirm wach halten, solange vorgelesen wird */
+function vlWachHalten(an) {
+  var n = window.navigator;
+  if (!an) {
+    if (cl.vl.wach && typeof cl.vl.wach.release === 'function') { cl.vl.wach.release().catch(function () { return null; }); }
+    cl.vl.wach = null;
+    return;
+  }
+  if (cl.vl.wach || !n || !n.wakeLock || typeof n.wakeLock.request !== 'function') { return; }
+  n.wakeLock.request('screen').then(function (w) {
+    if (!cl.vl.laeuft) { w.release(); return; }
+    cl.vl.wach = w;
+    w.addEventListener('release', function () { if (cl.vl.wach === w) { cl.vl.wach = null; } });
+  }).catch(function () { return null; });
+}
+
+/* Zurück aus dem Hintergrund: Wachhalten erneuern (der Browser gibt es beim Wechsel frei) */
+function vlSichtbarkeit() {
+  if (document.visibilityState === 'visible' && cl.vl.laeuft) { vlWachHalten(true); }
+  if (document.visibilityState === 'hidden' && cl.vl.laeuft) { vlStelleMerken(true); }
+}
+
+/* ---- Sperre ---- */
+
+function vlSperren() {
+  cl.vl.gesperrt = true;
+  vlSperreZeichnen();
+}
+
+function vlSperreZeichnen() {
+  var el = document.getElementById('vlSperre');
+  if (!cl.vl.gesperrt) { if (el && el.parentNode) { el.parentNode.removeChild(el); } return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'vlSperre';
+    el.className = 'vl-sperre';
+    var schlucken = function (e) { if (!e.target || !e.target.closest || !e.target.closest('.vl-wisch')) { e.preventDefault(); e.stopPropagation(); } };
+    ['touchstart', 'touchmove', 'touchend', 'click', 'mousedown', 'contextmenu'].forEach(function (art) { el.addEventListener(art, schlucken, { passive: false }); });
+    document.body.appendChild(el);
+  }
+  var d = vlDokument(cl.vl.id);
+  var rest = cl.vl.timerBis ? Math.max(0, Math.ceil((cl.vl.timerBis - jetzt()) / 60000)) : 0;
+  el.innerHTML = '<div class="vl-lauf">' + (cl.vl.laeuft ? '▶ liest vor …' : '⏸ angehalten') + '<br>' + esc(d ? d.titel : '')
+    + (cl.vl.doc ? ' · Seite ' + (cl.vl.doc.seite[cl.vl.i] || 1) : '') + (rest ? '<br>◔ noch ' + rest + ' Min.' : '') + '</div>'
+    + '<div class="vl-entsperren">Zum Entsperren wischen<div class="vl-wisch" id="vlWisch"><i id="vlKnauf">»</i></div></div>';
+  vlWischAnbinden();
+}
+
+function vlWischAnbinden() {
+  var bahn = document.getElementById('vlWisch');
+  var knauf = document.getElementById('vlKnauf');
+  if (!bahn || !knauf || !bahn.addEventListener) { return; }
+  var start = null;
+  var breite = function () { return Math.max(1, (bahn.clientWidth || 200) - (knauf.clientWidth || 30)); };
+  var x = function (e) { var p = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e; return Number(p.clientX) || 0; };
+  var an = function (e) { start = x(e); e.preventDefault(); };
+  var zieh = function (e) {
+    if (start === null) { return; }
+    e.preventDefault();
+    var dx = Math.max(0, Math.min(breite(), x(e) - start));
+    knauf.style.transform = 'translateX(' + dx + 'px)';
+    if (dx >= breite() * 0.85) { start = null; vlEntsperren(); }
+  };
+  var los = function () { start = null; knauf.style.transform = ''; };
+  bahn.addEventListener('touchstart', an, { passive: false });
+  bahn.addEventListener('touchmove', zieh, { passive: false });
+  bahn.addEventListener('touchend', los);
+  bahn.addEventListener('mousedown', an);
+  bahn.addEventListener('mousemove', zieh);
+  bahn.addEventListener('mouseup', los);
+}
+
+function vlEntsperren() {
+  cl.vl.gesperrt = false;
+  vlSperreZeichnen();
+  vlZeichnen();
+}
+
+/* ---- Zeichnen ---- */
+
+function vlRestText(ab) {
+  var doc = cl.vl.doc;
+  if (!doc) { return ''; }
+  var zeichen = 0;
+  var i;
+  for (i = ab; i < doc.saetze.length; i++) { zeichen += doc.saetze[i].length + 1; }
+  var min = Math.round(zeichen / (VL_ZEICHEN_JE_SEKUNDE * vlEinstellungen().tempo) / 60);
+  return min >= 60 ? 'noch ' + Math.floor(min / 60) + ' Std. ' + (min % 60) + ' Min.' : 'noch ' + Math.max(1, min) + ' Min.';
+}
+
+function vlKapitelVon(i) {
+  var k = ((cl.vl.doc && cl.vl.doc.kapitel) || []).filter(function (x) { return x.i <= i; });
+  return k.length ? k[k.length - 1].t : '';
+}
+
+function vlListeHtml() {
+  var l = vlDokumente();
+  var lokal = vlLokal();
+  var h = '';
+  if (cl.vl.laeuft && vlDokument(cl.vl.id)) {
+    h += '<div class="vl-laeuft"><span>▶ ' + esc(vlDokument(cl.vl.id).titel) + '</span><button type="button" class="knopf" onclick="vlAnhalten()">⏸ Anhalten</button></div>';
+  }
+  if (!l.length) {
+    return h + '<p>Noch nichts zum Vorlesen.</p><p class="leise">„+ PDF…“ lädt eine PDF-Datei, „+ Text…“ liest ein Memo oder eingefügten Text vor. In der Drive-App gibt es bei PDFs „🔊“.</p>';
+  }
+  var zeile = function (d) {
+    var pz = d.saetze ? Math.round((d.fertig ? d.saetze : (Number(d.satz) || 0)) * 100 / d.saetze) : 0;
+    var da = d.art === 'memo' || lokal[d.id];
+    var art = d.art === 'memo' ? 'Memo' : (d.art === 'text' ? 'Text' : 'PDF' + (d.drive ? ' · aus Drive' : ''));
+    var info = art + (d.art === 'pdf' && d.seiten > 1 ? ' · Seite ' + (d.seite || 1) + ' von ' + d.seiten : '')
+      + (d.zuletzt ? ' · zuletzt ' + (d.geraet ? d.geraet + ', ' : '') + kurzDatum(d.zuletzt.slice(0, 10)) : '');
+    return '<button type="button" class="vl-doc" onclick="vlOeffnen(\'' + esc(d.id) + '\')"><span class="vl-t"><span>' + esc(d.titel) + '</span><b>'
+      + (d.fertig ? 'fertig' : (pz ? pz + ' %' : 'neu')) + '</b></span><small>' + esc(info) + '</small>'
+      + (da ? '' : '<small class="vl-fehlt">⚠ ' + (d.drive ? 'Tippen lädt das PDF aus Drive' : 'PDF auf diesem Gerät noch laden') + '</small>')
+      + '<span class="vl-balken"><i style="width:' + Math.min(100, pz) + '%"></i></span></button>';
+  };
+  var weiter = l.filter(function (d) { return !d.fertig && d.zuletzt; })[0];
+  if (weiter) { h += '<div class="abschnitt">Weiterhören</div>' + zeile(weiter); }
+  h += '<div class="abschnitt">Alle</div>' + l.filter(function (d) { return d !== weiter; }).map(zeile).join('');
+  return h;
+}
+
+function vlLesenHtml() {
+  var d = vlDokument(cl.vl.id);
+  var doc = cl.vl.doc;
+  if (!d) { cl.vl.ansicht = 'liste'; return vlListeHtml(); }
+  if (!doc) {
+    if (d.art === 'memo') { return '<p class="leise">Das Memo gibt es nicht mehr.</p>'; }
+    if (!vlLokal()[d.id]) {
+      return '<div class="lk-titel">' + esc(d.titel) + '</div><div class="lk-hinweis">Der Text ist auf diesem Gerät noch nicht da. Deine Lesestelle (Seite '
+        + (d.seite || 1) + ') ist schon da — lade das PDF einmal' + (d.drive ? ' aus Drive' : '') + ', dann geht es dort weiter.'
+        + '<div class="knoepfe">' + (d.drive ? '<button type="button" class="knopf voll" onclick="vlAusDrive(\'' + esc(d.drive) + '\', \'' + esc(d.titel) + '\')">Aus Drive laden</button>'
+          : '<button type="button" class="knopf voll" onclick="vlDateiWaehlen()">PDF laden …</button>') + '</div></div>';
+    }
+    return '<p class="leise">Lade den Text …</p>';
+  }
+  var seite = doc.seite[cl.vl.i];
+  var h = '<div class="vl-kopf leise">' + esc(d.titel) + (vlKapitelVon(cl.vl.i) ? ' · ' + esc(vlKapitelVon(cl.vl.i)) : '') + '</div><div class="vl-text" id="vlText">';
+  var absatz = -1;
+  var i;
+  for (i = 0; i < doc.saetze.length; i++) {
+    if (doc.seite[i] !== seite) { if (doc.seite[i] > seite) { break; } continue; }
+    if (doc.absatz[i] !== absatz) { h += (absatz >= 0 ? '</p>' : '') + '<p>'; absatz = doc.absatz[i]; }
+    h += '<span id="vls' + i + '" class="vl-s' + (i < cl.vl.i ? ' gelesen' : (i === cl.vl.i ? ' akt' : '')) + '" onclick="vlSatzTipp(' + i + ')">' + esc(doc.saetze[i]) + ' </span>';
+  }
+  h += (absatz >= 0 ? '</p>' : '') + '</div>';
+  var e = vlEinstellungen();
+  var stimme = vlStimme();
+  var rest = cl.vl.timerBis ? Math.max(0, Math.ceil((cl.vl.timerBis - jetzt()) / 60000)) : 0;
+  var timer = cl.vl.laeuft ? (rest ? rest + ' Min.' : (cl.vl.timerKapitel >= 0 ? 'Kapitel' : 'aus')) : (VL_TIMER.filter(function (t) { return t[0] === e.timer; })[0] || [0, 'aus'])[1] + (e.timer > 0 ? ' Min.' : '');
+  return h + '<div class="vl-status"><span id="vlStand">Satz ' + (cl.vl.i + 1) + ' von ' + doc.saetze.length + '</span><span id="vlRest">' + vlRestText(cl.vl.i) + '</span></div>'
+    + '<div class="vl-steuer"><button type="button" onclick="vlSchritt(\'absatz-\')" aria-label="Absatz zurück">⏮</button>'
+    + '<button type="button" onclick="vlSchritt(\'satz-\')" aria-label="Satz zurück">◀</button>'
+    + '<button type="button" class="gross" onclick="vlUm()" aria-label="' + (cl.vl.laeuft ? 'Anhalten' : 'Vorlesen') + '">' + (cl.vl.laeuft ? '⏸' : '▶') + '</button>'
+    + '<button type="button" onclick="vlSchritt(\'satz+\')" aria-label="Satz vor">▶</button>'
+    + '<button type="button" onclick="vlSchritt(\'absatz+\')" aria-label="Absatz vor">⏭</button></div>'
+    + '<div class="vl-chips"><button type="button" class="knopf" onclick="vlFensterAuf(\'stimme\')">' + String(e.tempo).replace('.', ',') + '×</button>'
+    + '<button type="button" class="knopf" onclick="vlFensterAuf(\'stimme\')">' + esc(stimme ? stimme.name.replace(/\s*\(.*\)$/, '').slice(0, 14) : 'Stimme') + '</button>'
+    + '<button type="button" class="knopf" onclick="vlFensterAuf(\'stimme\')">◔ ' + esc(timer) + '</button>'
+    + '<button type="button" class="knopf" onclick="vlSperren()">🔒 Sperren</button></div>';
+}
+
+/* Nur die Markierung nachziehen; auf einer neuen Seite alles neu zeichnen */
+function vlAktuellZeigen() {
+  if (cl.app !== 'vorlesen' || cl.vl.ansicht !== 'lesen') { if (cl.vl.gesperrt) { vlSperreZeichnen(); } return; }
+  var el = document.getElementById('vls' + cl.vl.i);
+  if (!el || !el.classList) { vlZeichnen(); el = document.getElementById('vls' + cl.vl.i); }
+  else {
+    var alt = document.querySelectorAll ? document.querySelectorAll('#vlText .vl-s') : [];
+    var k;
+    for (k = 0; k < alt.length; k++) {
+      var n = Number(String(alt[k].id).slice(3));
+      alt[k].className = 'vl-s' + (n < cl.vl.i ? ' gelesen' : (n === cl.vl.i ? ' akt' : ''));
+    }
+    var st = document.getElementById('vlStand');
+    if (st) { st.textContent = 'Satz ' + (cl.vl.i + 1) + ' von ' + cl.vl.doc.saetze.length; }
+    var re = document.getElementById('vlRest');
+    if (re) { re.textContent = vlRestText(cl.vl.i); }
+    kopfZeichnen();
+  }
+  vlTextRollen(el);
+  if (cl.vl.gesperrt) { vlSperreZeichnen(); }
+}
+
+/* Der Text rollt in seinem eigenen Kasten — die Knöpfe darunter bleiben sichtbar */
+function vlTextRollen(el) {
+  var kasten = document.getElementById('vlText');
+  if (!el || !kasten || typeof el.offsetTop !== 'number') { return; }
+  var ziel = el.offsetTop - kasten.offsetTop - Math.max(0, (kasten.clientHeight - (el.offsetHeight || 0)) / 2);
+  if (typeof kasten.scrollTo === 'function') { kasten.scrollTo({ top: Math.max(0, ziel), behavior: 'smooth' }); } else { kasten.scrollTop = Math.max(0, ziel); }
+}
+
+function vlFensterAuf(f) {
+  cl.vl.fenster = f;
+  vlZeichnen();
+}
+
+function vlFensterZu() {
+  cl.vl.fenster = '';
+  vlZeichnen();
+}
+
+function vlFensterHtml() {
+  var f = cl.vl.fenster;
+  if (!f) { return ''; }
+  var kopf = function (t) { return '<div class="fenster vl-fenster"><div class="titel">' + t + '</div><div class="rumpf">'; };
+  var zu = '</div></div>';
+  if (f === 'laden' && cl.vl.laden) {
+    var ld = cl.vl.laden;
+    return kopf('Lese PDF') + '<p>' + esc(ld.titel) + '</p><p class="leise">' + (ld.seiten ? 'Seite ' + ld.seite + ' von ' + ld.seiten : 'Hole die Datei …') + '</p>' + zu;
+  }
+  if (f === 'recht') {
+    return kopf('Drive: Dateien lesen') + '<p>Zum Vorlesen muss CLIE den Inhalt der PDF-Datei aus Drive laden dürfen.</p>'
+      + '<p class="leise">Einmalig in der Google Cloud Console beim Zustimmungsbildschirm den Bereich <b>drive.readonly</b> hinzufügen, dann hier erlauben.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlDriveErlauben()">Erlauben</button><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'text') {
+    return kopf('+ Text') + '<button type="button" class="wahl" onclick="vlFensterAuf(\'memo\')">Aus einem Memo …</button>'
+      + '<button type="button" class="wahl" onclick="vlFensterAuf(\'einfuegen\')">Text einfügen …</button>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'memo') {
+    var seiten = kpNachRang(kpSeitenAlle()).filter(function (s) { return String(s.text || '').trim(); });
+    return kopf('Memo vorlesen') + (seiten.length ? seiten.slice(0, 80).map(function (s) {
+      return '<button type="button" class="wahl" onclick="vlMemoWaehlen(\'' + esc(s.id) + '\')">' + clSeitenZeichen(s) + ' ' + esc(s.titel) + '</button>';
+    }).join('') : '<p class="leise">Kein Memo mit Text.</p>') + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'einfuegen') {
+    return kopf('Text einfügen') + '<label for="vlTitel">Titel:</label><input id="vlTitel" class="eingabe" type="text" autocomplete="off" value="">'
+      + '<label for="vlText">Text:</label><textarea id="vlText" class="eingabe lk-feld"></textarea>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlTextOk()">Vorlesen</button><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'stimme') {
+    var e = vlEinstellungen();
+    var l = vlStimmen();
+    var akt = vlStimme();
+    return kopf('Stimme') + (l.length ? l.map(function (v) {
+        var an = akt && v.voiceURI === akt.voiceURI;
+        return '<button type="button" class="wahl vl-stimme' + (an ? ' an' : '') + '" onclick="vlStimmeWahl(\'' + esc(v.voiceURI).replace(/'/g, '&#39;') + '\')"><span>'
+          + (an ? '● ' : '○ ') + esc(v.name) + '</span><small>' + (v.localService === false ? 'online' : '') + '</small></button>';
+      }).join('') : '<p class="leise">Keine deutsche Stimme gefunden — die Liste kommt manchmal erst nach einem Moment.</p>')
+      + '<label for="vlTempo">Tempo: <span id="vlTempoWert">' + String(e.tempo).replace('.', ',') + '×</span></label>'
+      + '<input id="vlTempo" class="vl-regler" type="range" min="0.7" max="2" step="0.1" value="' + e.tempo + '" oninput="vlReglerGeaendert()">'
+      + '<label for="vlHoehe">Tonhöhe</label><input id="vlHoehe" class="vl-regler" type="range" min="0.5" max="1.5" step="0.1" value="' + e.hoehe + '" oninput="vlReglerGeaendert()">'
+      + '<label>Schlaftimer</label><div class="wahlreihe">' + VL_TIMER.map(function (t) {
+          return '<button type="button"' + (e.timer === t[0] ? ' class="an"' : '') + ' onclick="vlTimerWahl(' + t[0] + ')">' + t[1] + '</button>';
+        }).join('') + '</div>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlProbe()">▶ Probe hören</button><button type="button" class="knopf voll" onclick="vlFensterZu()">OK</button></div>'
+      + '<p class="leise">Nur deutsche Stimmen dieses Geräts. Bessere Stimmen: iPad → Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen; Pixel → Einstellungen → Sprachausgabe.</p>' + zu;
+  }
+  if (f === 'seite' && cl.vl.doc) {
+    var max = cl.vl.doc.seite[cl.vl.doc.seite.length - 1] || 1;
+    return kopf('Gehe zu Seite') + '<label for="vlSeite">Seite (1–' + max + '):</label><input id="vlSeite" class="eingabe" type="number" min="1" max="' + max + '" value="' + (cl.vl.doc.seite[cl.vl.i] || 1) + '">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlSeiteOk()">Gehe zu</button><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'kapitel' && cl.vl.doc) {
+    var k = cl.vl.doc.kapitel || [];
+    return kopf('Kapitel') + (k.length ? k.map(function (x) {
+      return '<button type="button" class="wahl' + (x.ebene ? ' vl-unter' : '') + '" onclick="vlKapitelGehe(' + x.i + ')">' + esc(x.t) + '<small> · S. ' + (cl.vl.doc.seite[x.i] || 1) + '</small></button>';
+    }).join('') : '<p class="leise">Dieses PDF bringt kein Inhaltsverzeichnis mit — „Seite…“ geht immer.</p>')
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlFensterZu()">Schließen</button></div>' + zu;
+  }
+  if (f === 'details') {
+    var d = vlDokument(cl.vl.id);
+    if (!d) { return ''; }
+    return kopf('Dokument') + '<label for="vlName">Titel:</label><input id="vlName" class="eingabe" type="text" autocomplete="off" value="' + esc(d.titel) + '">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlUmbenennen()">OK</button><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlVonVorn()">Von vorn</button><button type="button" class="knopf" onclick="vlFensterAuf(\'entfernen\')">Entfernen…</button></div>' + zu;
+  }
+  if (f === 'entfernen') {
+    var d2 = vlDokument(cl.vl.id);
+    return kopf('Entfernen') + '<p>„' + esc(d2 ? d2.titel : '') + '“ aus der Bibliothek entfernen? (Auf allen Geräten.)</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlEntfernen()">Entfernen</button><button type="button" class="knopf" onclick="vlFensterAuf(\'details\')">Abbrechen</button></div>' + zu;
+  }
+  return '';
+}
+
+function vlStimmeWahl(uri) {
+  var e = vlEinstellungen();
+  e.stimme = uri;
+  vlEinstellungenSichern(e);
+  if (cl.vl.laeuft) { vlSatzSprechen(); }
+  vlZeichnen();
+}
+
+function vlReglerGeaendert() {
+  var e = vlEinstellungen();
+  var t = Number((document.getElementById('vlTempo') || {}).value);
+  var h = Number((document.getElementById('vlHoehe') || {}).value);
+  if (t >= 0.5 && t <= 2.5) { e.tempo = Math.round(t * 10) / 10; }
+  if (h >= 0.5 && h <= 1.5) { e.hoehe = Math.round(h * 10) / 10; }
+  vlEinstellungenSichern(e);
+  var w = document.getElementById('vlTempoWert');
+  if (w) { w.textContent = String(e.tempo).replace('.', ',') + '×'; }
+}
+
+function vlTimerWahl(m) {
+  var e = vlEinstellungen();
+  e.timer = m;
+  vlEinstellungenSichern(e);
+  if (cl.vl.laeuft) {
+    cl.vl.timerBis = m > 0 ? jetzt() + m * 60000 : 0;
+    cl.vl.timerKapitel = m === -1 ? vlKapitelEnde(cl.vl.i) : -1;
+    if (m === -1 && cl.vl.timerKapitel < 0 && cl.vl.doc) { cl.vl.timerKapitel = cl.vl.doc.saetze.length; }
+  }
+  vlZeichnen();
+}
+
+function vlProbe() {
+  vlAnhalten();
+  cl.vl.fenster = 'stimme';
+  vlSprechen('So klinge ich. Ich lese dir gern vor.', null);
+}
+
+function vlSeiteOk() {
+  var n = Math.round(Number((document.getElementById('vlSeite') || {}).value));
+  var doc = cl.vl.doc;
+  if (!doc || !(n >= 1)) { return; }
+  var i = 0;
+  while (i < doc.seite.length - 1 && doc.seite[i] < n) { i++; }
+  cl.vl.fenster = '';
+  vlGehe(i);
+  vlZeichnen();
+}
+
+function vlKapitelGehe(i) {
+  cl.vl.fenster = '';
+  vlGehe(i);
+  vlZeichnen();
+}
+
+function vlUmbenennen() {
+  var d = vlDokument(cl.vl.id);
+  var n = String((document.getElementById('vlName') || {}).value || '').trim();
+  if (d && n) { d.titel = n.slice(0, 120); d.geaendert = jetzt(); spaeterSichern(); }
+  vlFensterZu();
+}
+
+function vlVonVorn() {
+  var d = vlDokument(cl.vl.id);
+  if (d) { d.satz = 0; d.seite = 1; d.fertig = false; d.geaendert = jetzt(); spaeterSichern(); }
+  cl.vl.fenster = '';
+  vlGehe(0);
+  vlZeichnen();
+}
+
+function vlEntfernen() {
+  var id = cl.vl.id;
+  vlAnhalten();
+  DB.vorlesen = (Array.isArray(DB.vorlesen) ? DB.vorlesen : []).filter(function (d) { return d.id !== id; });
+  grabsteinSetzen('vorlesen', id);
+  spaeterSichern();
+  vlLokalSetzen(id, false);
+  if (idbDa()) { idbLoeschen('vl-text-' + id).catch(function () { return null; }); }
+  cl.vl.id = '';
+  cl.vl.doc = null;
+  cl.vl.ansicht = 'liste';
+  cl.vl.fenster = '';
+  vlZeichnen();
+}
+
+function vorlesenHtml() {
+  var h = cl.vl.ansicht === 'lesen' ? vlLesenHtml() : vlListeHtml();
+  return h + '<input id="vlDatei" type="file" accept=".pdf,application/pdf" class="lk-datei" onchange="vlDateiGewaehlt(this)">' + vlFensterHtml();
+}
+
+function vorlesenFussHtml() {
+  var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
+  if (cl.vl.ansicht === 'lesen') {
+    return (cl.vl.doc ? k('Seite…', 'vlFensterAuf(\'seite\')') + k('Kapitel…', 'vlFensterAuf(\'kapitel\')') : '') + k('Details…', 'vlFensterAuf(\'details\')') + k('Fertig', 'vlEbeneHoch()');
+  }
+  var weiter = vlDokumente().filter(function (d) { return !d.fertig && d.zuletzt; })[0];
+  return (weiter ? k('Weiterhören', 'vlOeffnen(\'' + esc(weiter.id) + '\')', true) : '') + k('+ PDF…', 'vlDateiWaehlen()') + k('+ Text…', 'vlFensterAuf(\'text\')')
+    + k('Stimme…', 'vlFensterAuf(\'stimme\')');
+}
+
+function vlKopfText() {
+  if (cl.vl.ansicht === 'lesen' && cl.vl.doc) {
+    var doc = cl.vl.doc;
+    var max = doc.seite[doc.seite.length - 1] || 1;
+    return max > 1 ? 'Seite ' + (doc.seite[cl.vl.i] || 1) + ' / ' + max : '';
+  }
+  return 'Bibliothek';
+}
+
+/* Zurück: Fenster zu, dann aus dem Dokument zur Bibliothek (das Vorlesen läuft weiter) */
+function vlEbeneHoch() {
+  if (cl.vl.gesperrt) { return true; }
+  if (cl.vl.fenster) { vlFensterZu(); return true; }
+  if (cl.vl.ansicht === 'lesen') { vlStelleMerken(true); cl.vl.ansicht = 'liste'; vlZeichnen(); return true; }
+  return false;
+}
+
+function vlZeichnen() {
+  if (cl.app !== 'vorlesen') { return; }
+  var el = document.getElementById('inhalt');
+  /* Beim Einfügen von Text nicht neu zeichnen — Getipptes bliebe sonst nicht stehen */
+  if (cl.vl.fenster === 'einfuegen' && el && el.innerHTML.indexOf('id="vlText"') >= 0 && el.innerHTML.indexOf('vl-fenster') >= 0) { return; }
+  inhaltZeichnen();
+  fussZeichnen();
+  kopfZeichnen();
+  /* Beim Lesen steht alles auf einer Seite: Text rollt im Kasten, Knöpfe bleiben sichtbar */
+  if (el && (cl.vl.fenster || cl.vl.ansicht === 'lesen')) { el.scrollTop = 0; }
+}
+
+function vlStatZeile() {
+  var l = vlDokumente();
+  return l.length + ' · ' + l.filter(function (d) { return d.fertig; }).length;
+}
+
+/* Die Stimmenliste kommt in manchen Browsern erst nach einem Moment */
+if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
+  window.speechSynthesis.addEventListener('voiceschanged', function () { if (cl.app === 'vorlesen' && cl.vl.fenster === 'stimme') { vlZeichnen(); } });
+}
+if (typeof document !== 'undefined' && document && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', vlSichtbarkeit);
+}
+
+
 /* ---------- Stones (seit 0.18) ----------
 
    Ein Fallblock-Spiel im LCD-Stil: Feld 10 × 18, sieben Steinformen,
@@ -12376,7 +13524,10 @@ function clKonto() {
 function clAnfrage(aufforderung) {
   var a = { prompt: aufforderung };
   /* Seit 0.19: hat die Drive-App das Recht erbeten, fragen wir es mit an */
-  if (drvRechtGewuenscht()) { a.scope = SCOPES + ' ' + DRV_SCOPE; a.include_granted_scopes = true; }
+  if (drvRechtGewuenscht() || vlDriveGewuenscht()) {
+    a.scope = SCOPES + (drvRechtGewuenscht() ? ' ' + DRV_SCOPE : '') + (vlDriveGewuenscht() ? ' ' + VL_DRIVE_SCOPE : '');
+    a.include_granted_scopes = true;
+  }
   var k = clKonto();
   if (k) { a.hint = k; a.login_hint = k; }
   return a;
@@ -12601,6 +13752,8 @@ function clZurueck() {
   if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }
   if (cl.app === 'schach' && schEbeneHoch()) { return true; }
   if (cl.app === 'lernkartei' && lkEbeneHoch()) { return true; }
+  if (cl.vl.gesperrt) { return true; }
+  if (cl.app === 'vorlesen' && vlEbeneHoch()) { return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) { drvHoch(); return true; }
   if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
   return false;
