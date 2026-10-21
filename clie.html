@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.31.0</title>
+<title>CLIE 0.31.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -687,7 +687,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.31.0';
+var APP_VERSION = '0.31.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3753,8 +3753,15 @@ function inhaltZeichnen() {
   else if (cl.app === 'schach') { el.innerHTML = schachHtml(); }
   else if (cl.app === 'lernkartei') { el.innerHTML = lernkarteiHtml(); }
   else if (cl.app === 'vorlesen') { el.innerHTML = vorlesenHtml(); }
-  else if (cl.app === 'kurs') { el.innerHTML = kursHtml(); }
-  else if (cl.app === 'ideen') { el.innerHTML = ideenHtml(); }
+  else if (cl.app === 'kurs') {
+    /* Neuzeichnen im Hintergrund (Abgleich, Kalender) lässt Eingabefelder stehen — sonst ginge Getipptes verloren (seit 0.31.1) */
+    if (!cl.kr.frisch && el.innerHTML.indexOf('kr-form kr-app') >= 0 && el.innerHTML.indexOf('class="eingabe') >= 0) { return; }
+    el.innerHTML = kursHtml();
+  }
+  else if (cl.app === 'ideen') {
+    if (!cl.iw.frisch && el.innerHTML.indexOf('kr-form iw-form') >= 0 && el.innerHTML.indexOf('class="eingabe') >= 0) { return; }
+    el.innerHTML = ideenHtml();
+  }
   else if (cl.app === 'drive') {
     /* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
     if (cl.drv.tab === 'suche' && el.innerHTML.indexOf('drvFeld') >= 0) { drvZeichnen(); return; }
@@ -3841,6 +3848,8 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'liste-neu') {
     if (el.innerHTML.indexOf('listeTitel') >= 0) { return; }
     el.innerHTML = neueListeHtml();
+  } else if (cl.aufklapp === 'liste-loeschen') {
+    el.innerHTML = listeLoeschenHtml();
   } else if (cl.aufklapp === 'listenwahl') {
     el.innerHTML = listenwahlHtml();
   } else if (cl.aufklapp === 'aufgabe') {
@@ -5625,7 +5634,48 @@ function neueListeHtml() {
         return '<button type="button"' + (n.kontext === k[0] ? ' class="an"' : '') + ' onclick="neueListeKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
       }).join('') + '</div>'
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="neueListeSpeichern()">OK</button>'
-    + '<button type="button" class="knopf" onclick="listenwahlZurueck()">Abbrechen</button></div></div></div>';
+    + '<button type="button" class="knopf" onclick="listenwahlZurueck()">Abbrechen</button>'
+    + (n.id ? '<button type="button" class="knopf" onclick="listeLoeschenFragen()">Löschen…</button>' : '') + '</div></div></div>';
+}
+
+/* Liste löschen (seit 0.31.1) — mit Rückfrage; offene Aufgaben werden genannt */
+function listeLoeschenFragen() {
+  var n = cl.auf.neueListe;
+  var t = document.getElementById('listeTitel');
+  if (!n || !n.id) { return; }
+  if (t && typeof t.value === 'string') { n.titel = t.value; }
+  cl.aufklapp = 'liste-loeschen';
+  aufklappNeu();
+}
+
+function listeLoeschenHtml() {
+  var n = cl.auf.neueListe;
+  var s = n && n.id ? kpSeiteFinden(n.id) : null;
+  if (!s) { return ''; }
+  var offen = kpOffeneZahl(s);
+  return '<div class="fenster"><div class="titel">Liste löschen</div><div class="rumpf">'
+    + '<p>„' + esc(s.titel) + '“ samt allen Zeilen löschen?</p>'
+    + (offen ? '<p><b>Achtung:</b> Die Liste hat noch ' + offen + ' offene Aufgabe' + (offen === 1 ? '' : 'n') + '.</p>' : '<p class="leise">Alle Aufgaben sind erledigt.</p>')
+    + '<p class="leise">Die Liste verschwindet auch in der Workbench.</p>'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="listeLoeschen()">Löschen</button>'
+    + '<button type="button" class="knopf" onclick="listeBearbeiten()">Abbrechen</button></div></div></div>';
+}
+
+function listeLoeschen() {
+  var n = cl.auf.neueListe;
+  var s = n && n.id ? kpSeiteFinden(n.id) : null;
+  if (!s || s.art !== 'liste') { aufklappZu(); return; }
+  var sammlung = kpSammlungVon(s);
+  var l = DB[sammlung] || [];
+  var stelle = l.indexOf(s.__satz);
+  if (stelle < 0) { aufklappZu(); return; }
+  l.splice(stelle, 1);
+  grabsteinSetzen(sammlung, s.id);
+  try { window.localStorage.setItem(ZULETZT_KEY, JSON.stringify(zuletztListe().filter(function (x) { return x !== s.id; }))); } catch (e) { /* nur für jetzt */ }
+  cl.auf.neueListe = null;
+  spaeterSichern();
+  melde('Liste „' + s.titel + '“ gelöscht.', 'gut');
+  aufListeSetzen('');
 }
 
 function neueListeSpeichern() {
@@ -14508,7 +14558,7 @@ function kursHtml() {
   var h = v === 'bereich' ? krBereichHtml() : v === 'prinzipien' ? krPrinzipienHtml() : v === 'check' ? krCheckHtml()
     : v === 'woche' ? krWocheHtml() : v === 'buch' ? krBuchHtml() : v === 'bilanz' ? krBilanzHtml()
     : v === 'morgen' ? krMorgenHtml() : v === 'abend' ? krAbendHtml() : v === 'pfade' ? krPfadeHtml() : krHeuteHtml();
-  return '<div class="kr-form">' + h + '</div>' + krFensterHtml();
+  return '<div class="kr-form kr-app">' + h + '</div>' + krFensterHtml();
 }
 
 function kursFussHtml() {
@@ -14572,7 +14622,10 @@ function krEbeneHoch() {
 
 function krZeichnen() {
   if (cl.app !== 'kurs') { return; }
+  /* Vom Nutzer ausgelöst: ganz neu zeichnen */
+  cl.kr.frisch = true;
   inhaltZeichnen();
+  cl.kr.frisch = false;
   fussZeichnen();
   kopfZeichnen();
   var el = document.getElementById('inhalt');
@@ -14596,7 +14649,7 @@ var IW_STUFEN = [[1, 'Einfangen', 'Fang'], [2, 'Klären', 'Klären'], [3, 'Auslo
 var IW_RISIKO = [['gering', 'gering'], ['mittel', 'mittel'], ['hoch', 'hoch']];
 var IW_WOCHE = [['kurs', 'auf Kurs'], ['justieren', 'nachjustieren'], ['pause', 'pausieren'], ['fertig', 'abschließen']];
 
-cl.iw = { ansicht: 'liste', id: '', stufe: 1, fenster: '', alle: false, wahl: '' };
+cl.iw = { ansicht: 'liste', id: '', stufe: 1, fenster: '', alle: false, wahl: '', frisch: false };
 
 function iwAlle() {
   return (Array.isArray(DB.ideen) ? DB.ideen : []).filter(function (x) { return x && x.id; });
@@ -15080,7 +15133,7 @@ function iwStufeHtml() {
 }
 
 function ideenHtml() {
-  return '<div class="kr-form">' + (cl.iw.ansicht === 'stufe' ? iwStufeHtml() : iwListeHtml()) + '</div>';
+  return '<div class="kr-form iw-form">' + (cl.iw.ansicht === 'stufe' ? iwStufeHtml() : iwListeHtml()) + '</div>';
 }
 
 function ideenFussHtml() {
@@ -15116,7 +15169,10 @@ function iwEbeneHoch() {
 
 function iwZeichnen() {
   if (cl.app !== 'ideen') { return; }
+  /* Vom Nutzer ausgelöst: ganz neu zeichnen */
+  cl.iw.frisch = true;
   inhaltZeichnen();
+  cl.iw.frisch = false;
   fussZeichnen();
   kopfZeichnen();
 }

@@ -3233,6 +3233,62 @@ function schuleTest() {
 }
 
 /* ============================================================
+   66. Getipptes bleibt stehen · Liste löschen (0.31.1)
+   Grund: Ein Neuzeichnen im Hintergrund (Abgleich, Kalender) leerte das
+   Formular der Ideenwerkstatt — Getipptes war weg. Listen ließen sich in
+   CLIE nicht löschen.
+   Erkennt: Hintergrund-Neuzeichnen überschreibt Eingaben (Ideen, Kurs),
+   Nutzer-Aktionen zeichnen nicht mehr neu, Löschen ohne Rückfrage, ohne
+   Grabstein, Liste bleibt gewählt.
+   ============================================================ */
+function eingabeTest() {
+  console.log('\n66. Getipptes bleibt stehen · Liste löschen (0.31.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const el = S.document.getElementById('inhalt');
+  S.oeffne('ideen'); S.iwNeu();
+  pruefe(/iwTitel/.test(el.innerHTML), 'Ideen: Formular steht');
+  el.innerHTML = el.innerHTML + '<!--getippt-->';
+  S.zeichne();
+  pruefe(/<!--getippt-->/.test(el.innerHTML), 'Ideen: Neuzeichnen im Hintergrund lässt das Formular stehen');
+  S.iwZeichnen();
+  pruefe(!/<!--getippt-->/.test(el.innerHTML) && /iwTitel/.test(el.innerHTML), 'Ideen: eigene Aktion zeichnet neu');
+  S.iwZurListe();
+  el.innerHTML = el.innerHTML + '<!--alt-->'; S.zeichne();
+  pruefe(!/<!--alt-->/.test(el.innerHTML), 'Ideen: Liste ohne Eingabefelder wird im Hintergrund neu gezeichnet');
+  S.oeffne('kurs'); S.krMorgenStarten(); S.krRundeSetzen('energie', 3); S.krRundeSchritt(1); S.krRundeSchritt(1);
+  pruefe(/krWennDann/.test(el.innerHTML), 'Kurs: Morgen-Runde mit Eingabefeld');
+  el.innerHTML = el.innerHTML + '<!--getippt-->'; S.zeichne();
+  pruefe(/<!--getippt-->/.test(el.innerHTML), 'Kurs: Neuzeichnen im Hintergrund lässt das Formular stehen');
+  S.krZeichnen();
+  pruefe(!/<!--getippt-->/.test(el.innerHTML), 'Kurs: eigene Aktion zeichnet neu');
+  S.cl.kr.runde = null; S.cl.kr.ansicht = 'heute';
+  S.oeffne('ideen'); el.innerHTML = '<div class="kr-form kr-app"><input class="eingabe"></div>'; S.zeichne();
+  pruefe(/iw-form/.test(el.innerHTML), 'App-Wechsel: fremdes Formular wird nicht festgehalten');
+  /* Liste löschen */
+  S.cl.filter = 'alle';
+  const s = S.kpSeiteAnlegen('liste', 'Wegwerfliste', 'privat', '');
+  s.text = '[x] erledigt';
+  S.oeffne('aufgaben'); S.aufListeSetzen(s.id);
+  S.listeBearbeiten();
+  pruefe(/listeLoeschenFragen\(\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Liste bearbeiten: Knopf „Löschen…“');
+  S.document.getElementById('listeTitel').value = 'Wegwerfliste';
+  S.listeLoeschenFragen();
+  const h = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'liste-loeschen' && /Wegwerfliste/.test(h) && /Alle Aufgaben sind erledigt/.test(h) && S.kpSeiteFinden(s.id), 'Rückfrage vor dem Löschen, Liste noch da');
+  S.listeLoeschen();
+  pruefe(!S.kpSeiteFinden(s.id) && S.cl.auf.liste === '' && !S.cl.aufklapp, 'gelöscht, Auswahl zurück auf „Alle Aufgaben“');
+  pruefe((S.DB.grabsteine || []).some(g => g.s === 'themen' && g.id === s.id), 'Grabstein gesetzt (Löschen kommt in die Workbench)');
+  const s2 = S.kpSeiteAnlegen('liste', 'Noch offen', 'privat', ''); s2.text = '[] offen';
+  S.aufListeSetzen(s2.id); S.listeBearbeiten(); S.document.getElementById('listeTitel').value = 'Noch offen'; S.listeLoeschenFragen();
+  pruefe(/1 offene Aufgabe\./.test(S.document.getElementById('aufklapp').innerHTML), 'Rückfrage nennt offene Aufgaben');
+  S.listeBearbeiten();
+  pruefe(S.cl.aufklapp === 'liste-neu' && S.kpSeiteFinden(s2.id), 'Abbrechen: Liste bleibt');
+  S.aufklappZu(); S.oeffne('uebersicht');
+}
+
+/* ============================================================
    65. Ideenwerkstatt: von der Idee zur Umsetzung (0.31)
    Grund: Neue App. Eine Idee läuft durch sechs Stufen; Entscheidungen
    (Go/Später/Verwerfen), Plan, Projekt in der Workbench, nächster Schritt
@@ -4161,6 +4217,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { eingabeTest(); } catch (e) { fail('Getipptes/Liste löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ideenTest(); } catch (e) { fail('Ideenwerkstatt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kurs2Test(); } catch (e) { fail('Kurs 2.0 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { naechsteFaelligTest(); } catch (e) { fail('1. Nächste warf: ' + e.message); }
