@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 16 && CL.CL_APPS.length === 17, 'sechzehn Apps im Raster, „Heute“ nur in der Leiste (seit 0.31 mit Ideenwerkstatt)');
+  pruefe((h.match(/class="app"/g) || []).length === 16 && CL.CL_APPS.length === 20, 'sechzehn Apps im Raster, „Heute“ nur in der Leiste, Sudoku/Solitär/Stones im Spiele-Fenster (seit 0.32)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -413,9 +413,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","kurs","ideen","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","vorlesen","abgleich"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","kurs","ideen","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","spiele","schach","lernkartei","vorlesen","abgleich"]'
     && CL.clApp('heute') && CL.clApp('heute').raster === false,
-    'genau sechzehn Apps im Raster: Kalender, Kurs (statt Heute, seit 0.28), Ideenwerkstatt (seit 0.31), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Vorlesen, Abgleich');
+    'genau sechzehn Apps im Raster: Kalender, Kurs (statt Heute, seit 0.28), Ideenwerkstatt (seit 0.31), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Spiele (seit 0.32 statt Stones), Schach, Lernkartei, Vorlesen, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -3233,6 +3233,178 @@ function schuleTest() {
 }
 
 /* ============================================================
+   67. Spiele-Fenster und Sudoku (0.32)
+   Grund: Neue App „Spiele“: ein Fenster mit Sudoku, Solitär und Stones.
+   Sudoku mit drei Stufen, eindeutig lösbar, Notizen, Rückgängig, Tipp,
+   Bestzeit; Spielstand nur auf dem Gerät.
+   Erkennt: Rätsel mit mehreren Lösungen, Eingabe in vorgegebene Felder,
+   Notizen nicht entfernt, Rückgängig/Tipp ohne Wirkung, Bestzeit trotz
+   Tipp, Spielstand in der workbench.json, Zurück nicht ins Fenster.
+   ============================================================ */
+function spieleSudokuTest() {
+  console.log('\n67. Spiele-Fenster und Sudoku (0.32)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.localStorage.removeItem('clie-sudoku'); S.localStorage.removeItem('clie-sudoku-beste');
+  S.cl.sd.spiel = null; S.cl.sd.notiz = false; S.cl.sd.fehler = false;
+  pruefe(S.CL_BILD.spiele && S.CL_BILD.sudoku && S.CL_BILD.solitaer, 'Symbole für Spiele, Sudoku und Solitär');
+  S.oeffne('spiele');
+  const fen = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'spiele' && /spWahl\('sudoku'\)/.test(fen) && /spWahl\('solitaer'\)/.test(fen) && /spWahl\('stones'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 3,
+    'Spiele öffnet ein Fenster mit Sudoku, Solitär und Stones als App-Symbole');
+  pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitär:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
+  /* Erzeuger: eindeutig lösbar */
+  const stufen = { leicht: 0, mittel: 0, schwer: 0 };
+  let eindeutig = true; let gueltig = true;
+  Object.keys(stufen).forEach(st => {
+    const e = S.sdErzeugen(st);
+    const g = e.aufgabe.split('').map(Number);
+    stufen[st] = g.filter(x => x).length;
+    if (S.sdLoesen(g.slice(), 2, false) !== 1) { eindeutig = false; }
+    const l = e.loesung.split('').map(Number);
+    for (let i = 0; i < 81; i++) { if (!S.sdPasst(l, i, l[i]) || (g[i] && g[i] !== l[i])) { gueltig = false; } }
+  });
+  pruefe(eindeutig && gueltig, 'jedes Rätsel hat genau eine Lösung, die Lösung ist gültig');
+  pruefe(stufen.leicht > stufen.mittel && stufen.mittel > stufen.schwer && stufen.schwer >= 22, 'Stufen: leicht hat mehr Vorgaben als mittel, mittel mehr als schwer (' + stufen.leicht + '/' + stufen.mittel + '/' + stufen.schwer + ')');
+  S.spWahl('sudoku');
+  pruefe(S.cl.app === 'sudoku' && !S.cl.aufklapp && S.cl.sd.spiel && S.cl.sd.spiel.stufe === 'mittel' && /sd-gitter/.test(inhalt()) && (inhalt().match(/onclick="sdFeld\(/g) || []).length === 81,
+    'Sudoku startet mit einem mittleren Rätsel, 81 Felder');
+  const s = S.cl.sd.spiel;
+  const gi = s.aufgabe.split('').findIndex(c => c !== '0');
+  const li = s.aufgabe.split('').findIndex(c => c === '0');
+  S.sdFeld(gi); S.sdZiffer(5);
+  pruefe(s.werte[gi] === 0, 'vorgegebene Felder lassen sich nicht ändern');
+  /* Notizen */
+  S.sdFeld(li); S.sdNotizUm(); S.sdZiffer(3); S.sdZiffer(7);
+  pruefe(s.notizen[li] === ((1 << 3) | (1 << 7)) && s.werte[li] === 0 && /<i>3<\/i>/.test(inhalt()), 'Notiz-Modus: kleine Merker-Ziffern');
+  S.sdNotizUm();
+  const nb = [...Array(81).keys()].find(k => k !== li && S.sdNachbar(li, k) && s.aufgabe[k] === '0');
+  const richtig = Number(s.loesung[nb]);
+  s.notizen[li] = (1 << richtig);
+  S.cl.sd.wahl = nb; S.sdZiffer(richtig);
+  pruefe(s.werte[nb] === richtig && !(s.notizen[li] & (1 << richtig)), 'Ziffer setzen entfernt sie aus den Notizen der Nachbarn');
+  pruefe(/class="[^"]*\bf\b/.test(inhalt()) && /class="[^"]*\bg\b/.test(inhalt()), 'gewähltes Feld und Zeile/Spalte/Kasten hervorgehoben');
+  S.sdRueck();
+  pruefe(s.werte[nb] === 0, 'Rückgängig nimmt die Ziffer zurück');
+  /* Fehler zeigen */
+  const falsch = (Number(s.loesung[nb]) % 9) + 1;
+  S.cl.sd.wahl = nb; S.sdZiffer(falsch);
+  pruefe(!/class="[^"]*\bx\b/.test(inhalt()), 'Fehler bleiben ohne Wunsch unsichtbar');
+  S.sdFehlerUm();
+  pruefe(S.cl.sd.fehler && /class="[^"]*\bx\b/.test(inhalt()) && /passt nicht/.test(inhalt()), '„Fehler zeigen“ markiert falsche Ziffern');
+  S.sdFehlerUm();
+  /* Tipp */
+  S.cl.sd.wahl = nb; S.sdTipp();
+  pruefe(s.werte[nb] === Number(s.loesung[nb]) && s.tipps === 1, 'Tipp deckt das gewählte (falsche) Feld auf');
+  /* Spielstand nur auf dem Gerät */
+  pruefe(S.localStorage.getItem('clie-sudoku') && JSON.parse(S.localStorage.getItem('clie-sudoku')).werte[nb] === s.werte[nb] && !S.DB.sudoku && !/'sudoku'/.test((QUELLE.match(/var SAMMLUNGEN = \[[^\]]*\]/) || [''])[0]),
+    'Spielstand im Gerät gespeichert, nicht in der workbench.json');
+  S.cl.sd.spiel = null;
+  pruefe(S.sdSpiel().werte[nb] === s.werte[nb], 'angefangenes Rätsel wird wieder geladen');
+  /* Lösen: Bestzeit nur ohne Tipp */
+  const t = S.cl.sd.spiel;
+  for (let i = 0; i < 81; i++) { if (t.aufgabe[i] === '0') { t.werte[i] = Number(t.loesung[i]); } }
+  t.werte[nb] = 0; S.cl.sd.wahl = nb; S.sdZiffer(Number(t.loesung[nb]));
+  pruefe(t.fertig && /Gelöst/.test(inhalt()) && !(JSON.parse(S.localStorage.getItem('clie-sudoku-beste') || '{}').mittel), 'gelöst; mit Tipp keine Bestzeit');
+  S.sdNeu('leicht');
+  const u = S.cl.sd.spiel;
+  pruefe(u.stufe === 'leicht' && !u.fertig && u.tipps === 0, 'Neu: leichtes Rätsel');
+  for (let i = 0; i < 81; i++) { if (u.aufgabe[i] === '0') { u.werte[i] = Number(u.loesung[i]); } }
+  const letzt = u.aufgabe.indexOf('0'); u.werte[letzt] = 0; S.cl.sd.wahl = letzt; S.sdZiffer(Number(u.loesung[letzt]));
+  pruefe(u.fertig && typeof JSON.parse(S.localStorage.getItem('clie-sudoku-beste')).leicht === 'number' && /—/.test(S.sdStatZeile()), 'ohne Tipp: Bestzeit je Stufe für die Statistik');
+  /* Kopf und Auswahl */
+  pruefe(S.document.getElementById('katKnopf').textContent === '▼ Leicht', 'Kopf zeigt die Stufe');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'sdwahl' && /sdNeu\('schwer'\)/.test(S.document.getElementById('aufklapp').innerHTML), '▼ bietet neue Rätsel je Stufe');
+  S.aufklappZu();
+  /* Zeit: Pausen über eine Minute zählen nicht */
+  const z = { zeitMs: 0, letzte: Date.now() - 5 * 60000 };
+  S.spZug(z);
+  pruefe(z.zeitMs === 60000 && S.spZeitText(75) === '1:15' && S.spZeitText(3725) === '1:02:05', 'Spielzeit: Pausen höchstens eine Minute, Anzeige m:ss');
+  /* Zurück */
+  S.clZurueck();
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'spiele', 'Zurück aus dem Spiel: ins Spiele-Fenster');
+  S.clZurueck();
+  pruefe(!S.cl.aufklapp, 'nochmal Zurück: Fenster zu');
+  pruefe(/Sudoku/.test(S.statistikHtml()) && /Solitär/.test(S.statistikHtml()), 'Statistik zeigt Sudoku und Solitär');
+}
+
+/* ============================================================
+   68. Solitär (0.32)
+   Grund: Klondike mit 1 oder 3 Karten, Tippen statt Ziehen, Doppeltipp
+   auf die Ablage, Rückgängig, Tipp, „Fertig legen“, Bilanz.
+   Erkennt: falsche Anlegeregeln (Farbe, Wert, König auf leere Spalte),
+   Stapel nicht wieder aufgefüllt, verdeckte Karte nicht aufgedeckt,
+   Rückgängig ohne Wirkung, Sieg nicht gezählt.
+   ============================================================ */
+function solitaerTest() {
+  console.log('\n68. Solitär (0.32)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.localStorage.removeItem('clie-solitaer'); S.localStorage.removeItem('clie-solitaer-bilanz');
+  S.cl.so.spiel = null;
+  S.oeffne('solitaer');
+  const s = S.cl.so.spiel;
+  const alle = s.stapel.length + s.spalten.reduce((a, sp) => a + sp.length, 0);
+  pruefe(alle === 52 && s.spalten.every((sp, i) => sp.length === i + 1 && sp[i].o && sp.slice(0, i).every(k => !k.o)) && s.stapel.length === 24,
+    'Austeilen: 7 Spalten (1–7 Karten, oberste offen), 24 im Stapel');
+  pruefe(new Set(s.stapel.concat(...s.spalten).map(k => k.f + k.w)).size === 52, '52 verschiedene Karten');
+  pruefe(S.soBilanz().spiele === 1 && S.document.getElementById('katKnopf').textContent === '▼ 1 Karte', 'Bilanz zählt das Spiel; Kopf „▼ 1 Karte“');
+  /* Regeln */
+  const K = (f, w, o) => ({ f: f, w: w, o: o !== false });
+  pruefe(S.soAufSpalteOk(K('H', 8), [K('P', 9)]) && !S.soAufSpalteOk(K('K', 8), [K('H', 9)]) && !S.soAufSpalteOk(K('H', 7), [K('P', 9)]), 'Spalte: abwechselnd Farbe, eins kleiner');
+  pruefe(S.soAufSpalteOk(K('T', 13), []) && !S.soAufSpalteOk(K('T', 12), []), 'leere Spalte: nur ein König');
+  pruefe(S.soAufAblageOk(K('P', 1), []) && S.soAufAblageOk(K('P', 2), [K('P', 1)]) && !S.soAufAblageOk(K('H', 2), [K('P', 1)]), 'Ablage: ab As, gleiche Farbe aufwärts');
+  /* Gestellte Lage */
+  s.spalten = [[K('P', 9)], [K('T', 4, false), K('H', 8)], [], [K('K', 1)], [K('T', 13)], [K('H', 2)], [K('P', 5)]];
+  s.ablage = [[], [], [], []]; s.stapel = [K('K', 3, false), K('T', 6, false)]; s.abwurf = [];
+  S.cl.so.verlauf = [];
+  S.soTippen('spalte', 1, 1);
+  pruefe(S.cl.so.wahl && S.cl.so.wahl.s === 1 && /so-k[^"]*gew/.test(inhalt()), 'Karte antippen: ausgewählt');
+  S.soTippen('spalte', 0, 0);
+  pruefe(s.spalten[0].length === 2 && s.spalten[0][1].w === 8 && s.spalten[1].length === 1 && s.spalten[1][0].o, 'Ziel antippen: Herz 8 auf Pik 9, verdeckte Karte aufgedeckt');
+  S.soRueck();
+  pruefe(S.cl.so.spiel.spalten[1].length === 2 && !S.cl.so.spiel.spalten[1][0].o, 'Rückgängig: Zug und Aufdecken zurück');
+  const t = S.cl.so.spiel;
+  S.soTippen('spalte', 3, 0); S.soTippen('spalte', 3, 0);
+  pruefe(t.ablage.some(a => a.length === 1 && a[0].w === 1) && t.spalten[3].length === 0, 'Doppeltipp: As auf die Ablage');
+  S.soTippen('spalte', 4, 0); S.soTippen('leer', 3, 0);
+  pruefe(t.spalten[3].length === 1 && t.spalten[3][0].w === 13 && t.spalten[4].length === 0, 'König auf leere Spalte');
+  S.soTippen('spalte', 6, 0); S.soTippen('leer', 4, 0);
+  pruefe(t.spalten[6].length === 1 && t.spalten[4].length === 0, 'Pik 5 nicht auf leere Spalte');
+  S.cl.so.wahl = null;
+  S.soZiehen();
+  pruefe(t.abwurf.length === 1 && t.abwurf[0].o && t.stapel.length === 1, 'Stapel antippen: eine Karte aufgedeckt');
+  S.soZiehen(); S.soZiehen();
+  pruefe(t.stapel.length === 2 && t.abwurf.length === 0 && t.stapel.every(k => !k.o), 'leerer Stapel: Abwurf wird wieder Stapel');
+  t.ziehen = 3; S.soZiehen();
+  pruefe(t.abwurf.length === 2 && t.stapel.length === 0, '3 Karten ziehen (so viele da sind)');
+  const tipp = S.soTippSuchen(t);
+  pruefe(tipp && /Ablage|auf|ziehen|Spalten/.test(tipp.text), 'Tipp findet einen Zug: ' + (tipp ? tipp.text : '—'));
+  /* Fertig legen und Sieg */
+  const farben = ['P', 'H', 'K', 'T'];
+  t.ablage = farben.map(f => [...Array(12).keys()].map(i => K(f, i + 1)));
+  t.spalten = [[K('P', 13)], [K('H', 13)], [K('K', 13)], [K('T', 13)], [], [], []];
+  t.stapel = []; t.abwurf = []; t.fertig = false;
+  pruefe(S.soKannFertig(t) && /soFertigLegen\(\)/.test(S.document.getElementById('fuss').innerHTML.concat(S.solitaerFussHtml())), '„Fertig legen“, wenn alles offen und der Stapel leer ist');
+  S.soFertigLegen();
+  pruefe(t.fertig && t.ablage.every(a => a.length === 13) && S.soBilanz().siege === 1 && S.soBilanz().beste >= 0 && /Gewonnen/.test(inhalt()), 'gewonnen: Sieg und Bestzeit in der Bilanz');
+  pruefe(/^1 · 1 · /.test(S.soStatZeile()), 'Statistik: Spiele · gewonnen · Bestzeit');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'sowahl' && /soNeu\(3\)/.test(S.document.getElementById('aufklapp').innerHTML), '▼: neues Spiel mit 1 oder 3 Karten');
+  S.soNeu(3);
+  pruefe(S.cl.so.spiel.ziehen === 3 && S.soBilanz().spiele === 2 && !S.cl.aufklapp, 'neues Spiel mit 3 Karten');
+  S.cl.so.spiel = null;
+  pruefe(S.soSpiel().ziehen === 3 && S.soSpiel().stapel.length === 24, 'angefangenes Spiel wird wieder geladen');
+  S.clZurueck();
+  pruefe(S.cl.aufklapp === 'spiele', 'Zurück: ins Spiele-Fenster');
+  S.aufklappZu();
+  pruefe(/\.so-k\.zu\{/.test(QUELLE) && /\.sd-gitter\{/.test(QUELLE), 'Gestaltung für Sudoku und Solitär vorhanden');
+}
+
+/* ============================================================
    66. Getipptes bleibt stehen · Liste löschen (0.31.1)
    Grund: Ein Neuzeichnen im Hintergrund (Abgleich, Kalender) leerte das
    Formular der Ideenwerkstatt — Getipptes war weg. Listen ließen sich in
@@ -4217,6 +4389,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { spieleSudokuTest(); } catch (e) { fail('Sudoku warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { solitaerTest(); } catch (e) { fail('Solitär warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { eingabeTest(); } catch (e) { fail('Getipptes/Liste löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ideenTest(); } catch (e) { fail('Ideenwerkstatt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kurs2Test(); } catch (e) { fail('Kurs 2.0 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
