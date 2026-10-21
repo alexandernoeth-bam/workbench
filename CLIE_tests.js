@@ -2631,18 +2631,19 @@ function ansichtTest() {
   S.aufAnsicht('gruppiert');
   S.aufNaechsteUm();
   h = inhalt();
-  pruefe(zeilen(h).join(' | ') === 'Statik anfragen | Lampe tauschen | Fähre buchen', 'Nächste: je Gruppe eine — Checkliste: die früheste — ' + zeilen(h).join(' | '));
-  pruefe(/Statik anfragen<\/button><button type="button" class="mehr" onclick="aufGanzUm\('pc'\)"[^>]*>\+1</.test(h) && /aufGanzUm\('lh'\)"[^>]*>\+2</.test(h), '„+n“ zeigt, wie viele warten');
+  /* Seit 0.29.1: in jeder Gruppe die am frühesten fällige, ohne Daten die oberste */
+  pruefe(zeilen(h).join(' | ') === 'Nachbar informieren | Dach prüfen | Fähre buchen', 'Nächste: je Gruppe die nächste fällige — ' + zeilen(h).join(' | '));
+  pruefe(/Nachbar informieren<small[^]*?<button type="button" class="mehr" onclick="aufGanzUm\('pc'\)"[^>]*>\+1</.test(h) || /Nachbar informieren<\/button>[^]*?aufGanzUm\('pc'\)"[^>]*>\+1</.test(h) && /aufGanzUm\('lh'\)"[^>]*>\+2</.test(h), '„+n“ zeigt, wie viele warten');
   pruefe(S.__ablage['clie-aufgaben-naechste'] === 'an', '„1. Nächste“ wird gemerkt');
   S.aufGanzUm('lh');
   pruefe(zeilen(inhalt()).filter(t => /Lampe|Steckdose|Dach/.test(t)).length === 3 && !/aufGanzUm\('lh'\)"[^>]*>\+/.test(inhalt()), 'Tipp: die Gruppe ganz zeigen');
   S.aufGanzUm('lh');
   S.aufHaken('lh', 0);
   h = inhalt();
-  pruefe(/class="aufg erl[^"]*"[\s\S]*?Lampe tauschen/.test(h) && /Steckdose/.test(h) && !/Dach prüfen/.test(h), 'abgehakt: bleibt durchgestrichen, die nächste rückt nach');
+  pruefe(/class="aufg erl[^"]*"[\s\S]*?Lampe tauschen/.test(h) && /Dach prüfen/.test(h) && !/Steckdose/.test(h), 'abgehakt: bleibt durchgestrichen, die nächste fällige bleibt vorn');
   S.aufAnsicht('prio');
   h = inhalt();
-  pruefe(/Steckdose/.test(h) && /Statik anfragen/.test(h) && /Fähre buchen/.test(h) && !/Nachbar|Koffer|Dach/.test(h), 'Nächste wirkt auch bei Prio');
+  pruefe(/Nachbar informieren/.test(h) && /Dach prüfen/.test(h) && /Fähre buchen/.test(h) && !/Statik|Koffer|Steckdose/.test(h), 'Nächste wirkt auch bei Prio');
   S.aufNaechsteUm();
 
   /* Eine Liste gewählt: keine Gruppen, keine Herkunft */
@@ -3229,6 +3230,30 @@ function schuleTest() {
   S.cl.sch.ue = null; S.cl.sch.ev.id = ''; S.cl.sch.bereich = 'spielen';
   delete S.__ablage['clie-schach-schule'];
   S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   63. Aufgaben „1. Nächste“: die nächste fällige (0.29.1)
+   Grund: Hat eine Liste Aufgaben mit Datum, soll „1. Nächste“ die am
+   frühesten fällige zeigen — sonst die oberste. Bisher galt das nur für
+   Checklisten, Listen zeigten immer die oberste.
+   Erkennt: oberste statt fälliger, Uhrzeit am selben Tag ignoriert,
+   ohne Datum nicht die oberste, Erledigte gezählt.
+   ============================================================ */
+function naechsteFaelligTest() {
+  console.log('\n63. Aufgaben „1. Nächste“: die nächste fällige (0.29.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const x = (seite, nr, datum, zeit, erl) => ({ seite: { id: seite }, nr: nr, datum: datum || '', zeit: zeit || '', a: { erledigt: !!erl, text: 'A' + nr }, key: seite + nr });
+  S.cl.auf.ganz = {};
+  const l = [x('L1', 1), x('L1', 2, '2026-11-05'), x('L1', 3, '2026-10-30', '18:00'), x('L1', 4, '2026-10-30', '09:00'), x('L1', 5, '2026-10-01', '', true),
+             x('L2', 1), x('L2', 2), x('L2', 3)];
+  const n = S.aufNaechste(l);
+  const z = id => n.zeilen.filter(y => y.seite.id === id && !y.a.erledigt).map(y => y.nr);
+  pruefe(JSON.stringify(z('L1')) === '[4]', 'Liste mit Daten: die am frühesten fällige (30.10. 09:00 vor 18:00 und vor der obersten ohne Datum)');
+  pruefe(JSON.stringify(z('L2')) === '[1]', 'Liste ohne Daten: die oberste');
+  pruefe(n.rest.L1 === 3 && n.rest.L2 === 2, '„+n“ zählt die übrigen offenen (Erledigte nicht)');
 }
 
 /* ============================================================
@@ -3937,6 +3962,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { naechsteFaelligTest(); } catch (e) { fail('1. Nächste warf: ' + e.message); }
   try { vlMarkenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await vlDoppeltTest(); } catch (e) { fail('Vorlesen doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kursTest(); } catch (e) { fail('Kurs warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
