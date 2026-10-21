@@ -3233,6 +3233,78 @@ function schuleTest() {
 }
 
 /* ============================================================
+   64. Kurs 2.0: der Tag (0.30)
+   Grund: Kurs soll täglich führen — Morgen-Runde, das Eine, Plan B,
+   Abend-Runde mit Vorschlag, Pfade, die nur bei getanem Schritt weiterrücken.
+   Erkennt: Runde ohne Pflichtangaben, kleine Form bei wenig Energie fehlt,
+   „das Eine“ nicht gespeichert oder nicht als Aufgabe für heute, Plan B fehlt,
+   Pfad rückt ohne Schritt oder doppelt weiter, Kette falsch, Hinweise fehlen,
+   Pfadinhalte unvollständig.
+   ============================================================ */
+function kurs2Test() {
+  console.log('\n64. Kurs 2.0: der Tag (0.30)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const fehlt = [];
+  pruefe(S.KR_PFADE.length === 3 && S.KR_PFADE.every(p => p.schritte.length >= 20 && p.schritte.every(x => x.titel && x.impuls && x.uebung && x.eines && x.klein) && S.KR_BEREICHE.some(b => b[0] === p.bereich)),
+    'drei Pfade mit je ≥ 20 vollständigen Schritten, jeder an einem Bereich');
+  S.oeffne('kurs');
+  pruefe(S.cl.kr.ansicht === 'heute' && /Morgen-Runde/.test(inhalt()) && /Abend-Runde/.test(inhalt()) && /krAnsicht\('pfade'\)/.test(S.document.getElementById('fuss').innerHTML),
+    'Start: „Heute im Kurs“ mit Morgen- und Abend-Karte, unten Pfade');
+  S.krPfadStarten('bewegung-schlaf');
+  pruefe(S.krAktiverPfad().pfad.id === 'bewegung-schlaf' && S.krAktiverPfad().nr === 1, 'Pfad gestartet, Tag 1');
+  S.krPfadStarten('familie');
+  pruefe(S.krPfadStaende().filter(x => x.aktiv).length === 1 && S.krAktiverPfad().pfad.id === 'familie', 'nur ein Pfad aktiv');
+  S.krPfadStarten('bewegung-schlaf');
+  /* Morgen-Runde */
+  S.krMorgenStarten(); S.krRundeSchritt(1);
+  pruefe(S.cl.kr.runde.schritt === 1, 'ohne Energie kein Weiter');
+  S.krRundeSetzen('energie', 2); S.krRundeSchritt(1);
+  const sch = S.KR_PFADE[0].schritte[0];
+  pruefe(inhalt().indexOf(S.esc(sch.titel)) >= 0, 'Impuls des Tages aus dem Pfad');
+  S.krRundeSchritt(1);
+  const v = S.krEinesVorschlaege(2);
+  pruefe(v[0].text === sch.klein && /kleine Form/.test(v[0].quelle), 'Energie 2 → die kleine Form des Pfadschritts');
+  S.krRundeSchritt(1);
+  pruefe(S.cl.kr.runde.schritt === 3, 'ohne Wahl kein Weiter');
+  S.krRundeSetzen('wahl', '0'); S.document.getElementById('krWennDann').value = 'Wenn ich heimkomme, dann gehe ich direkt los.';
+  S.document.getElementById('krAufgabe').checked = true; S.krRundeSchritt(1);
+  const tag = S.krTag(false);
+  const liste = S.kpSeitenAlle().filter(x => x.titel === 'Kurs')[0];
+  pruefe(tag.eines.text === sch.klein && /heimkomme/.test(tag.eines.wennDann) && liste && liste.text.indexOf(sch.klein) >= 0, '„das Eine“ mit Wenn-dann gespeichert und als Aufgabe in der Liste „Kurs“');
+  pruefe(S.kpEintraegeFinden(liste.id, sch.klein).some(x => x.woche.datum === S.isoDatum()), 'die Aufgabe ist für heute eingeplant');
+  S.krRundeSetzen('hindernis', 'zeit');
+  pruefe(/Mini-Version/.test(S.cl.kr.runde.planB) && S.cl.kr.runde.planB.indexOf(sch.klein) >= 0, 'Hindernis → Plan B vorgeschlagen');
+  S.document.getElementById('krPlanB').value = S.cl.kr.runde.planB;
+  S.krRundeSchritt(1);
+  S.krPrinzipOeffnen(''); S.document.getElementById('krPText').value = 'Weniger, aber besser'; S.document.getElementById('krPKonkret').value = ''; S.krPrinzipSpeichern();
+  S.krMorgenFertig();
+  pruefe(S.krTag(false).morgenAm && S.krTag(false).planB && S.krTag(false).energie === 2 && S.krTag(false).regel && S.cl.kr.ansicht === 'heute', 'Morgen-Runde gespeichert (Energie, Plan B, Regel des Tages)');
+  pruefe(/Das Eine heute/.test(inhalt()) && /krEinesErledigt/.test(inhalt()), 'Heute zeigt „das Eine“ mit Erledigt');
+  /* Abend: Nein → Grund → Vorschlag, Pfad rückt nicht */
+  S.krAbendStarten(); S.krAbendSetzen('ergebnis', 'nein'); S.krAbendSetzen('grund', 'lust');
+  pruefe(/Vorschlag für morgen/.test(inhalt()) && /zwei Minuten/.test(inhalt()), 'Nein + „keine Lust“ → konkreter Vorschlag');
+  S.document.getElementById('krNotiz').value = 'Abends zu müde'; S.krAbendSpeichern();
+  pruefe(S.krAktiverPfad().nr === 1 && S.krTag(false).abend.ergebnis === 'nein' && /zwei Minuten/.test(S.krTag(false).abend.vorschlag), 'nicht geschafft: Pfad bleibt bei Tag 1');
+  /* Abend erneut: Ja → Pfad rückt einmal */
+  S.krAbendStarten(); S.krAbendSetzen('ergebnis', 'ja'); S.krAbendSpeichern();
+  S.krAbendStarten(); S.krAbendSetzen('ergebnis', 'ja'); S.krAbendSpeichern();
+  pruefe(S.krAktiverPfad().nr === 2 && S.krTag(false).eines.erledigt === true, 'geschafft: Pfad rückt genau einen Tag weiter (auch bei zweimal Speichern)');
+  const k = S.krKette();
+  pruefe(k.length === 7 && k[6].e === 'ja' && k[6].heute, 'Kette: heute ✓');
+  pruefe(/class="an heute">✓/.test(inhalt()), 'Kette auf „Heute im Kurs“');
+  /* Hinweise unter Heute */
+  pruefe(/krTagesHinweis\(\) \? \['<button type="button" class="hz"/.test(QUELLE) && typeof S.krTagesHinweis() === 'string', 'Hinweise Morgen/Abend unter „Heute“');
+  /* Zurück */
+  S.krMorgenStarten(); S.krRundeSchritt(1); S.krRundeSchritt(1);
+  S.clZurueck(); pruefe(S.cl.kr.runde.schritt === 2, 'Zurück in der Morgen-Runde: ein Schritt');
+  S.clZurueck(); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'heute', 'dann zu „Heute im Kurs“');
+  S.krAnsicht('prinzipien'); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz', 'Prinzipien → zurück zur Bilanz');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    63. Aufgaben „1. Nächste“: die nächste fällige (0.29.1)
    Grund: Hat eine Liste Aufgaben mit Datum, soll „1. Nächste“ die am
    frühesten fällige zeigen — sonst die oberste. Bisher galt das nur für
@@ -3372,7 +3444,7 @@ function kursTest() {
   b.forEach(x => { x.ist = 7; x.soll = 7; });
   setze('kb-gesundheit', 4, 8); setze('kb-beziehungen', 5, 9); setze('kb-haus', 8, 6); setze('kb-finanzen', 5, 7);
   pruefe(JSON.stringify(S.krFokus()) === '["kb-gesundheit","kb-beziehungen"]', 'Fokus: wichtig und große Lücke (Gesundheit, Familie), nicht Haus (über Soll)');
-  S.zeichne();
+  S.krAnsicht('bilanz');
   pruefe((inhalt().match(/kr-fokus/g) || []).length === 2 && /kr-skala/.test(inhalt()), 'Bilanz zeigt Ist/Soll und zweimal „Fokus“');
   S.krRang('kb-finanzen', -1);
   pruefe(S.krBereiche(false).map(x => x.id).indexOf('kb-finanzen') === 5, 'Rang verschieben');
@@ -3404,7 +3476,7 @@ function kursTest() {
   pruefe(/in ein paar Wochen/.test(S.krAntwortText(S.cl.kr.check)), 'eigene Wahl „Später“ ändert den Text');
   S.krCheckMerken();
   const e = S.krEntscheidungen('')[0];
-  pruefe(e && e.wahl === 'spaeter' && e.empfehlung === 'nein' && e.datum === S.isoDatum() && S.cl.kr.ansicht === 'bilanz', 'Entscheidung im Buch: Wahl, Empfehlung, Datum');
+  pruefe(e && e.wahl === 'spaeter' && e.empfehlung === 'nein' && e.datum === S.isoDatum() && S.cl.kr.ansicht === 'heute', 'Entscheidung im Buch: Wahl, Empfehlung, Datum (zurück zu „Heute im Kurs“)');
   /* Woche */
   S.krAnsicht('woche');
   for (let i = 0; i < 4; i++) { S.krWesentlichOeffnen(); S.document.getElementById('krWText').value = 'Ding ' + i; S.krWesentlichSpeichern(); }
@@ -3426,7 +3498,7 @@ function kursTest() {
   /* Zurück */
   S.krCheckNeu(); S.document.getElementById('krWas').value = 'x'; S.krCheckSchritt(1);
   S.clZurueck(); pruefe(S.cl.kr.check.schritt === 1, 'Zurück im Check: ein Schritt zurück');
-  S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz' && !S.cl.kr.check, 'dann zur Bilanz');
+  S.clZurueck(); pruefe(S.cl.kr.ansicht === 'heute' && !S.cl.kr.check, 'dann zu „Heute im Kurs“ (seit 0.30)');
   S.oeffne('uebersicht');
 }
 
@@ -3962,6 +4034,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { kurs2Test(); } catch (e) { fail('Kurs 2.0 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { naechsteFaelligTest(); } catch (e) { fail('1. Nächste warf: ' + e.message); }
   try { vlMarkenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await vlDoppeltTest(); } catch (e) { fail('Vorlesen doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

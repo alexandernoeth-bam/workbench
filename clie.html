@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.29.1</title>
+<title>CLIE 0.30.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -547,6 +547,34 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .vl-wisch{width:240px;height:46px;border:2px solid #2b3326;border-radius:23px;display:flex;align-items:center;padding:0 4px;margin:10px auto 0;touch-action:none}
 .vl-wisch i{width:36px;height:36px;border-radius:50%;background:#2b3326;color:#6a775f;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:20px}
 /* Kurs (seit 0.28) */
+.kr-karte{display:block;width:100%;text-align:left;border:2px solid var(--px);background:var(--lcd-hell);padding:8px 10px;margin:8px 0}
+.kr-karte.jetzt{box-shadow:3px 3px 0 var(--px)}
+.kr-karte.fertig{background:var(--lcd);border-style:dashed}
+.kr-karte small{display:block;font-size:16px;color:var(--px-mitte);margin-top:3px}
+.kr-kh{display:flex;justify-content:space-between;gap:8px;font-size:18px}
+.kr-kh span{font-size:16px;color:var(--px-mitte);white-space:nowrap}
+.kr-eines{font-size:21px;line-height:1.3;margin:4px 0}
+.kr-kette{display:flex;gap:5px;margin:6px 0}
+.kr-kette i{flex:1;max-width:38px;height:30px;border:2px solid var(--px);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:16px}
+.kr-kette i.an{background:var(--px);color:var(--lcd)}
+.kr-kette i.halb{background:repeating-linear-gradient(45deg,var(--px-zart) 0 3px,transparent 3px 6px)}
+.kr-kette i.heute{outline:2px solid var(--px);outline-offset:2px}
+.kr-stufen{display:flex;gap:3px;margin:2px 0 10px}
+.kr-stufen span{flex:1;text-align:center;font-size:15.5px;border:2px solid var(--px);padding:1px 0}
+.kr-stufen span.an{background:var(--px);color:var(--lcd)}
+.kr-gross{font-size:21px;line-height:1.4;margin:8px 0 12px}
+.kr-hinweis{border-left:4px solid var(--px);padding:6px 10px;background:var(--lcd-hell);font-size:17.5px;margin:8px 0;line-height:1.4}
+.kr-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.kr-chips button{border:2px solid var(--px);padding:4px 10px;font-size:17px}
+.kr-chips button.an{background:var(--px);color:var(--lcd)}
+.kr-var{display:block;width:100%;text-align:left;border:2px solid var(--px);padding:6px 9px;margin:6px 0;font-size:16px;color:var(--px-mitte)}
+.kr-var b{display:block;font-size:19px;color:var(--px)}
+.kr-var.an{background:var(--px);color:var(--lcd)}
+.kr-var.an b{color:var(--lcd)}
+.kr-pfad{border:2px solid var(--px);padding:8px 10px;margin:8px 0}
+.kr-pfad.an{box-shadow:3px 3px 0 var(--px);background:var(--lcd-hell)}
+.kr-pfad small{display:block;font-size:16px;color:var(--px-mitte);margin:3px 0}
+.kr-skala.klein{height:10px}
 .kr-form label{display:block;margin-top:10px;color:var(--px-mitte);font-size:17.5px}
 .kr-form label.haken{display:flex;gap:8px;align-items:center;color:var(--px)}
 .kr-leer{flex:1;text-align:center}
@@ -640,7 +668,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.29.1';
+var APP_VERSION = '0.30.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3201,7 +3229,9 @@ function heuteHtml() {
   var hinweise = clsAlle('lauf').map(function (g) {
     var st = clsStand(g);
     return '<button type="button" class="hz" onclick="oeffne(\'checklisten\');clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">☑ ' + esc(g.titel) + ' · ' + st.fertig + '/' + st.alle + '</span></button>';
-  }).concat(krRueckblickFaellig() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');krAnsicht(\'woche\');krFensterAuf(\'rueckblick\')"><span class="tx">◎ Kurs: Wochenrückblick</span></button>'] : [])
+  }).concat(krTagesHinweis() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');' + (krTagesHinweis() === 'morgen' ? 'krMorgenStarten()' : 'krAbendStarten()') + '"><span class="tx">'
+    + (krTagesHinweis() === 'morgen' ? '☀ Kurs: Morgen-Runde' : '☾ Kurs: Abend-Runde') + '</span></button>'] : [])
+    .concat(krRueckblickFaellig() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');krAnsicht(\'woche\');krFensterAuf(\'rueckblick\')"><span class="tx">◎ Kurs: Wochenrückblick</span></button>'] : [])
     .concat(lkAlleHeute() ? ['<button type="button" class="hz" onclick="oeffne(\'lernkartei\')"><span class="tx">▤ Lernkartei · ' + lkAlleHeute() + ' Karten fällig</span></button>'] : []).concat(saHinweise().map(function (x) {
     return '<button type="button" class="hz" onclick="oeffne(\'sammlungen\');saOeffnen(\'' + esc(x.s.id) + '\')"><span class="tx">⚠ ' + esc(x.name) + ' kündbar bis ' + esc(saDatumText(x.bis).slice(0, 6)) + '</span></button>';
   }));
@@ -13453,7 +13483,7 @@ var KR_VORSCHLAEGE = [
   ['Mit mir selbst freundlich sein.', 'Rückschläge gehören dazu — weitermachen statt aufgeben (Schweinehund).']
 ];
 
-cl.kr = { ansicht: 'bilanz', bereich: '', fenster: '', nr: '', check: null };
+cl.kr = { ansicht: 'heute', bereich: '', fenster: '', nr: '', check: null, runde: null };
 
 function krAlle(typ) {
   return (Array.isArray(DB.kurs) ? DB.kurs : []).filter(function (x) { return x && x.typ === typ; });
@@ -13636,7 +13666,7 @@ function krCheckMerken() {
                         empfehlung: krEmpfehlung(c).wahl, wahl: c.wahl, antwort: krAntwortText(c) });
   melde('Entscheidung gemerkt: ' + krWahlName(e.wahl) + '.', 'gut');
   cl.kr.check = null;
-  cl.kr.ansicht = 'bilanz';
+  cl.kr.ansicht = 'heute';
   krZeichnen();
 }
 
@@ -14019,10 +14049,427 @@ function krFensterHtml() {
   return '';
 }
 
+/* ---- Kurs 2.0: der Tag (seit 0.30) ----
+   „Heute im Kurs“: Morgen-Runde (Energie, Impuls, das Eine, Vorwegnehmen,
+   Regel) und Abend-Runde (geschafft? was war im Weg? Vorschlag für morgen).
+   Ein Tag ist ein Eintrag „tag“ (kt-JJJJ-MM-TT), der aktive Pfad ein Eintrag
+   „pfad“ (kpf-…) mit dem erreichten Schritt. Die Inhalte der Pfade stehen in
+   KR_PFADE (cl_pfade.js). */
+
+var KR_HINDERNISSE = [
+  ['zeit', 'keine Zeit', 'Wenn es zeitlich eng wird, dann mache ich die Mini-Version: '],
+  ['wetter', 'Wetter', 'Wenn das Wetter nicht passt, dann weiche ich aus: drinnen statt draußen — '],
+  ['lust', 'keine Lust', 'Wenn ich keine Lust habe, dann fange ich nur für zwei Minuten an: '],
+  ['termin', 'Termin zieht sich', 'Wenn sich ein Termin zieht, dann verschiebe ich es fest auf direkt danach: '],
+  ['vergessen', 'vergessen', 'Damit ich es nicht vergesse, koppele ich es an etwas Festes und stelle eine Erinnerung: '],
+  ['muede', 'müde', 'Wenn ich müde bin, dann mache ich die leichteste Form: ']
+];
+var KR_GRUENDE = [
+  ['zeit', 'keine Zeit', 'Mach es halb so groß und gib ihm einen festen Platz: direkt nach etwas, das sowieso passiert (Kaffee, Mittagessen, Heimkommen).'],
+  ['lust', 'keine Lust', 'Mach den Anfang lächerlich klein — zwei Minuten. Und mach es angenehmer: Musik, Podcast oder zusammen mit jemandem.'],
+  ['vergessen', 'vergessen', 'Lege dir schon heute Abend etwas sichtbar hin (Schuhe an die Tür, Buch aufs Kissen) und koppele es an eine feste Gewohnheit.'],
+  ['dazwischen', 'kam was dazwischen', 'Plane morgen einen Puffer ein und lege einen Plan B fest: Wenn es wieder eng wird, dann die Mini-Version.'],
+  ['muede', 'zu müde', 'Leg es auf eine Zeit, zu der du mehr Energie hast — oft vormittags. Und: Schlaf ist Teil des Plans, nicht der Gegner.']
+];
+var KR_IMPULSE = [
+  ['Weniger, aber besser.', 'Was wäre heute das Wichtigste — wenn du nur eine Sache schaffen könntest?'],
+  ['Jede Handlung ist eine Stimme.', 'Jeder kleine Schritt sagt: So jemand bin ich. Welche Stimme gibst du heute ab?'],
+  ['Wenn es kein klares Ja ist …', '… ist es ein Nein. Wozu sagst du heute bewusst Nein, damit Platz bleibt?'],
+  ['Freundlich mit dir selbst.', 'Ein Rückschlag ist kein Urteil. Was wäre heute ein kleiner, machbarer Schritt?']
+];
+
+function krTagId(is) { return 'kt-' + (is || isoDatum()); }
+
+function krTag(anlegen, is) {
+  var id = krTagId(is);
+  var t = krFinden(id);
+  if (!t && anlegen) {
+    t = { id: id, typ: 'tag', datum: is || isoDatum(), energie: 0, eines: null, hindernisse: [], planB: '', regel: '', morgenAm: '', abend: null };
+    if (!Array.isArray(DB.kurs)) { DB.kurs = []; }
+    DB.kurs.push(t);
+  }
+  return t;
+}
+
+function krStunde() { return new Date().getHours(); }
+
+/* ---- Pfade ---- */
+
+function krPfadDaten(id) {
+  return (typeof KR_PFADE !== 'undefined' ? KR_PFADE : []).filter(function (p) { return p.id === id; })[0] || null;
+}
+
+function krPfadStaende() { return krAlle('pfad'); }
+
+function krAktiverPfad() {
+  var s = krPfadStaende().filter(function (x) { return x.aktiv; })[0];
+  var p = s ? krPfadDaten(s.pfad) : null;
+  return (s && p) ? { stand: s, pfad: p, schritt: p.schritte[Math.min(p.schritte.length - 1, Number(s.tag) || 0)], nr: Math.min(p.schritte.length, (Number(s.tag) || 0) + 1) } : null;
+}
+
+function krPfadStarten(id) {
+  var p = krPfadDaten(id);
+  if (!p) { return; }
+  krPfadStaende().forEach(function (s) { if (s.aktiv && s.pfad !== id) { s.aktiv = false; krSpeichern(s); } });
+  var s = krFinden('kpf-' + id);
+  if (!s) { s = { id: 'kpf-' + id, typ: 'pfad', pfad: id, tag: 0, gestartet: isoDatum() }; }
+  s.aktiv = true;
+  krSpeichern(s);
+  melde('Pfad „' + p.name + '“ ist aktiv — morgen früh geht es los, oder gleich mit der Morgen-Runde.', 'gut');
+  krZeichnen();
+}
+
+function krPfadPause(id) {
+  var s = krFinden('kpf-' + id);
+  if (s) { s.aktiv = false; krSpeichern(s); }
+  krZeichnen();
+}
+
+/* ---- Morgen-Runde ---- */
+
+function krMorgenStarten() {
+  var t = krTag(true);
+  cl.kr.runde = { art: 'morgen', schritt: 1, energie: t.energie || 0, wahl: t.eines ? 'gewaehlt' : '', eigen: '', wennDann: t.eines ? t.eines.wennDann || '' : '',
+                  aufgabe: true, hindernisse: (t.hindernisse || []).slice(), planB: t.planB || '' };
+  cl.kr.ansicht = 'morgen';
+  cl.kr.fenster = '';
+  krZeichnen();
+}
+
+/* Vorschläge für „das Eine“: Pfad (bei wenig Energie die kleine Form), offene Wesentliche der Woche */
+function krEinesVorschlaege(energie) {
+  var l = [];
+  var ap = krAktiverPfad();
+  if (ap && ap.schritt) {
+    l.push({ text: (energie && energie <= 2 && ap.schritt.klein) ? ap.schritt.klein : ap.schritt.eines, bereich: ap.pfad.bereich,
+             quelle: 'Pfad ' + ap.pfad.name + ' · Tag ' + ap.nr + (energie && energie <= 2 ? ' · kleine Form' : '') });
+  }
+  var w = krWoche(false);
+  ((w && w.wesentliche) || []).filter(function (x) { return !x.erledigt; }).forEach(function (x) {
+    l.push({ text: x.text, bereich: x.bereich, quelle: 'Wesentliches der Woche' });
+  });
+  return l;
+}
+
+function krRundeLesen() {
+  var r = cl.kr.runde;
+  if (!r) { return; }
+  var w = function (id) { var e = document.getElementById(id); return e && typeof e.value === 'string' ? e.value : null; };
+  if (w('krEigen') !== null) { r.eigen = String(w('krEigen')); }
+  if (w('krWennDann') !== null) { r.wennDann = String(w('krWennDann')); }
+  if (w('krPlanB') !== null) { r.planB = String(w('krPlanB')); }
+  var a = document.getElementById('krAufgabe');
+  if (a && typeof a.checked === 'boolean') { r.aufgabe = a.checked; }
+}
+
+function krRundeSetzen(feld, wert) {
+  var r = cl.kr.runde;
+  if (!r) { return; }
+  krRundeLesen();
+  if (feld === 'hindernis') {
+    var i = r.hindernisse.indexOf(wert);
+    if (i >= 0) { r.hindernisse.splice(i, 1); } else { r.hindernisse.push(wert); }
+    r.planB = krPlanBVorschlag(r);
+  } else if (feld === 'energie') { r.energie = Number(wert) || 0; }
+  else { r[feld] = wert; }
+  krZeichnen();
+}
+
+function krPlanBVorschlag(r) {
+  if (!r.hindernisse.length) { return ''; }
+  var h = KR_HINDERNISSE.filter(function (x) { return x[0] === r.hindernisse[0]; })[0];
+  var ap = krAktiverPfad();
+  var klein = (ap && ap.schritt && ap.schritt.klein) ? ap.schritt.klein : 'die kleinste Form davon';
+  return h ? h[2] + klein + '.' : '';
+}
+
+/* Gewähltes „Eines“ aus der Runde */
+function krEinesAusRunde(r) {
+  var t = krTag(false);
+  if (r.wahl === 'gewaehlt' && t && t.eines) { return { text: t.eines.text, bereich: t.eines.bereich, quelle: t.eines.quelle }; }
+  if (r.wahl === '' || r.wahl === null || r.wahl === undefined) { return null; }
+  if (r.wahl === 'eigen') { return r.eigen.trim() ? { text: r.eigen.trim().slice(0, 120), bereich: '', quelle: 'eigen' } : null; }
+  var v = krEinesVorschlaege(r.energie)[Number(r.wahl)];
+  return v || null;
+}
+
+function krRundeSchritt(d) {
+  var r = cl.kr.runde;
+  if (!r) { return; }
+  krRundeLesen();
+  if (d > 0 && r.schritt === 1 && !r.energie) { melde('Wie viel Energie hast du heute? Bitte 1–5 wählen.', 'warn'); return; }
+  if (d > 0 && r.schritt === 3) {
+    var e = krEinesAusRunde(r);
+    if (!e) { melde('Was ist heute das Eine? Bitte wählen oder eintragen.', 'warn'); return; }
+    if (!String(r.wennDann || '').trim()) { r.wennDann = ''; }
+    var t = krTag(true);
+    var neu = !t.eines || t.eines.text !== e.text;
+    t.eines = { text: e.text, bereich: e.bereich || '', quelle: e.quelle || '', wennDann: String(r.wennDann || '').trim().slice(0, 200),
+                erledigt: neu ? false : !!t.eines.erledigt };
+    if (r.aufgabe && neu) { krAlsAufgabe(e.text); }
+    r.wahl = 'gewaehlt';
+    krSpeichern(t);
+  }
+  r.schritt = Math.max(1, Math.min(5, r.schritt + d));
+  krZeichnen();
+}
+
+/* Als Aufgabe für heute: in die Liste „Kurs“ (wird bei Bedarf angelegt) */
+function krAlsAufgabe(text) {
+  var s = kpSeitenAlle().filter(function (x) { return x.art === 'liste' && x.titel === 'Kurs'; })[0];
+  if (!s) { s = kpSeiteAnlegen('liste', 'Kurs', 'privat', ''); }
+  if (!s) { return false; }
+  var zeilen = String(s.text || '').split('\n');
+  var nr = -1;
+  zeilen.forEach(function (z, i) { var a = kpAufgabe(z); if (a && !a.erledigt && a.text === text) { nr = i; } });
+  if (nr < 0) { nr = aufZeileAnhaengen(s, text); }
+  aufPlanAnwenden(s, nr, isoDatum(), '');
+  spaeterSichern();
+  return true;
+}
+
+function krMorgenFertig() {
+  var r = cl.kr.runde;
+  var t = krTag(true);
+  if (r) {
+    krRundeLesen();
+    t.energie = r.energie;
+    t.hindernisse = r.hindernisse.slice();
+    t.planB = String(r.planB || '').trim().slice(0, 240);
+  }
+  t.regel = (krRegelDesTages() || {}).id || '';
+  t.morgenAm = isoZeitJetzt();
+  krSpeichern(t);
+  cl.kr.runde = null;
+  cl.kr.ansicht = 'heute';
+  melde('Guten Tag — auf Kurs!', 'gut');
+  krZeichnen();
+}
+
+function isoZeitJetzt() {
+  var d = new Date();
+  return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
+}
+
+/* Regel des Tages: deine Prinzipien im Wechsel, Tag für Tag eine andere */
+function krRegelDesTages() {
+  var p = krPrinzipien();
+  if (!p.length) { return null; }
+  return p[Math.abs(saTagNr(isoDatum()) || 0) % p.length];
+}
+
+function krImpuls() {
+  var ap = krAktiverPfad();
+  if (ap && ap.schritt) { return { titel: ap.schritt.titel, text: ap.schritt.impuls, uebung: ap.schritt.uebung, quelle: ap.schritt.quelle, kopf: 'Pfad ' + ap.pfad.name + ' · Tag ' + ap.nr }; }
+  var i = KR_IMPULSE[Math.abs(saTagNr(isoDatum()) || 0) % KR_IMPULSE.length];
+  return { titel: i[0], text: i[1], uebung: '', quelle: '', kopf: 'Impuls · noch kein Pfad aktiv' };
+}
+
+/* ---- Das Eine erledigen ---- */
+
+function krEinesErledigt() {
+  var t = krTag(false);
+  if (!t || !t.eines) { return; }
+  t.eines.erledigt = !t.eines.erledigt;
+  krSpeichern(t);
+  if (t.eines.erledigt) { melde('Stark — eine Stimme für den, der du sein willst.', 'gut'); }
+  krZeichnen();
+}
+
+/* ---- Abend-Runde ---- */
+
+function krAbendStarten() {
+  var t = krTag(true);
+  var a = t.abend || {};
+  cl.kr.runde = { art: 'abend', ergebnis: a.ergebnis || (t.eines && t.eines.erledigt ? 'ja' : ''), grund: a.grund || '', notiz: a.notiz || '' };
+  cl.kr.ansicht = 'abend';
+  cl.kr.fenster = '';
+  krZeichnen();
+}
+
+function krAbendSetzen(feld, wert) {
+  var r = cl.kr.runde;
+  if (!r) { return; }
+  var n = document.getElementById('krNotiz');
+  if (n) { r.notiz = String(n.value || ''); }
+  r[feld] = wert;
+  if (feld === 'ergebnis' && wert === 'ja') { r.grund = ''; }
+  krZeichnen();
+}
+
+function krAbendVorschlag(r) {
+  var g = KR_GRUENDE.filter(function (x) { return x[0] === r.grund; })[0];
+  return g ? g[2] : '';
+}
+
+function krAbendSpeichern() {
+  var r = cl.kr.runde;
+  if (!r || !r.ergebnis) { melde('Geschafft? Bitte Ja, Teilweise oder Nein wählen.', 'warn'); return; }
+  var n = document.getElementById('krNotiz');
+  if (n) { r.notiz = String(n.value || ''); }
+  var t = krTag(true);
+  var vorher = t.abend && t.abend.ergebnis;
+  t.abend = { ergebnis: r.ergebnis, grund: r.ergebnis === 'ja' ? '' : r.grund, notiz: String(r.notiz || '').trim().slice(0, 400), vorschlag: krAbendVorschlag(r), am: isoZeitJetzt() };
+  if (t.eines) { t.eines.erledigt = r.ergebnis === 'ja'; }
+  /* Der Pfad rückt nur weiter, wenn der Schritt (ganz oder teilweise) getan ist — und nur einmal am Tag */
+  var ap = krAktiverPfad();
+  var pfadSchritt = ap && t.eines && /^Pfad /.test(t.eines.quelle || '');
+  if (pfadSchritt && (r.ergebnis === 'ja' || r.ergebnis === 'teil') && !(vorher === 'ja' || vorher === 'teil')) {
+    ap.stand.tag = Math.min(ap.pfad.schritte.length, (Number(ap.stand.tag) || 0) + 1);
+    if (ap.stand.tag >= ap.pfad.schritte.length) { ap.stand.aktiv = false; ap.stand.fertig = isoDatum(); melde('Pfad „' + ap.pfad.name + '“ geschafft — Glückwunsch!', 'gut'); }
+    krSpeichern(ap.stand);
+  }
+  krSpeichern(t);
+  cl.kr.runde = null;
+  cl.kr.ansicht = 'heute';
+  krZeichnen();
+}
+
+/* Kette: die letzten sieben Tage (✓ geschafft, ~ teilweise, · nicht/nichts) */
+function krKette() {
+  var l = [];
+  var i;
+  for (i = 6; i >= 0; i--) {
+    var is = tagePlus(isoDatum(), -i);
+    var t = krFinden(krTagId(is));
+    var e = t && t.abend ? t.abend.ergebnis : (t && t.eines && t.eines.erledigt ? 'ja' : '');
+    l.push({ datum: is, e: e, heute: i === 0 });
+  }
+  return l;
+}
+
+/* Hinweise unter „Heute“: Morgen bis 11 Uhr, Abend ab 18 Uhr — solange offen */
+function krTagesHinweis() {
+  if (!krAlle('bereich').length) { return ''; }
+  var t = krTag(false);
+  var h = krStunde();
+  if (h >= 5 && h < 11 && !(t && t.morgenAm)) { return 'morgen'; }
+  if (h >= 18 && !(t && t.abend) && (t && (t.morgenAm || t.eines))) { return 'abend'; }
+  return '';
+}
+
+/* ---- Zeichnen ---- */
+
+function krHeuteHtml() {
+  krAnfangen();
+  var t = krTag(false);
+  var ap = krAktiverPfad();
+  var h = '';
+  /* Morgen */
+  if (t && t.morgenAm) {
+    var regel = krFinden(t.regel);
+    h += '<button type="button" class="kr-karte fertig" onclick="krMorgenStarten()"><span class="kr-kh"><b>☀ Morgen-Runde</b><span>✓ ' + esc(t.morgenAm) + '</span></span>'
+      + '<small>Energie ' + (t.energie || '—') + (regel ? ' · Regel: ' + esc(regel.text) : '') + '</small></button>';
+  } else {
+    h += '<button type="button" class="kr-karte jetzt" onclick="krMorgenStarten()"><span class="kr-kh"><b>☀ Morgen-Runde</b><span>ca. 3 Min.</span></span>'
+      + '<small>Energie, Impuls, das Eine für heute, Plan B, Regel des Tages.</small></button>';
+  }
+  /* Das Eine */
+  if (t && t.eines) {
+    var b = krFinden(t.eines.bereich);
+    h += '<div class="kr-karte' + (t.eines.erledigt ? ' fertig' : ' jetzt') + '"><span class="kr-kh"><b>◎ Das Eine heute</b><span>' + esc(b ? b.name : '') + '</span></span>'
+      + '<div class="kr-eines' + (t.eines.erledigt ? ' kr-erledigt' : '') + '">' + esc(t.eines.text) + '</div>'
+      + (t.eines.wennDann ? '<small>' + esc(t.eines.wennDann) + '</small>' : '')
+      + (t.planB ? '<small>Plan B: ' + esc(t.planB) + '</small>' : '')
+      + '<div class="knoepfe"><button type="button" class="knopf' + (t.eines.erledigt ? '' : ' voll') + '" onclick="krEinesErledigt()">' + (t.eines.erledigt ? '↶ doch nicht' : '✓ Erledigt') + '</button></div></div>';
+  }
+  /* Abend */
+  if (t && t.abend) {
+    var erg = { ja: '✓ geschafft', teil: '~ teilweise', nein: '✗ nicht geschafft' }[t.abend.ergebnis] || '';
+    h += '<button type="button" class="kr-karte fertig" onclick="krAbendStarten()"><span class="kr-kh"><b>☾ Abend-Runde</b><span>✓ ' + esc(t.abend.am || '') + '</span></span>'
+      + '<small>' + esc(erg) + (t.abend.vorschlag ? ' · Für morgen: ' + esc(t.abend.vorschlag) : '') + '</small></button>';
+  } else {
+    h += '<button type="button" class="kr-karte' + (krStunde() >= 17 ? ' jetzt' : '') + '" onclick="krAbendStarten()"><span class="kr-kh"><b>☾ Abend-Runde</b><span>' + (krStunde() >= 17 ? 'jetzt' : 'ab 18 Uhr') + '</span></span>'
+      + '<small>2 Minuten: Wie lief’s, was war im Weg, was nehme ich mit?</small></button>';
+  }
+  /* Pfad und Kette */
+  var kette = krKette();
+  var auf = kette.filter(function (k) { return k.e === 'ja' || k.e === 'teil'; }).length;
+  h += '<div class="abschnitt kr-ab"><span>' + (ap ? 'Pfad: ' + esc(ap.pfad.name) : 'Kein Pfad aktiv') + '</span><span class="leise">' + (ap ? 'Tag ' + ap.nr + ' / ' + ap.pfad.schritte.length : '') + '</span></div>'
+    + '<div class="kr-kette">' + kette.map(function (k) {
+      return '<i class="' + (k.e === 'ja' ? 'an' : (k.e === 'teil' ? 'halb' : '')) + (k.heute ? ' heute' : '') + '">' + (k.e === 'ja' ? '✓' : (k.e === 'teil' ? '~' : (k.heute ? '·' : ''))) + '</i>';
+    }).join('') + '</div><p class="leise">' + auf + ' von 7 Tagen auf Kurs.' + (ap ? '' : ' Unter „Pfade“ wählst du einen Pfad — er führt dich Tag für Tag.') + '</p>';
+  if (krRueckblickFaellig()) { h += '<div class="kr-box">◎ Heute ist Sonntag — Zeit für den Wochenrückblick (unter „Woche“).</div>'; }
+  return h;
+}
+
+function krMorgenHtml() {
+  var r = cl.kr.runde;
+  if (!r) { cl.kr.ansicht = 'heute'; return krHeuteHtml(); }
+  var namen = ['Energie', 'Impuls', 'Das Eine', 'Vorweg', 'Regel'];
+  var h = '<div class="kr-stufen">' + namen.map(function (n, i) { return '<span' + (i < r.schritt ? ' class="an"' : '') + '>' + n + '</span>'; }).join('') + '</div>';
+  if (r.schritt === 1) {
+    return h + '<div class="kr-gross">Guten Morgen. Wie viel Energie hast du heute?</div><div class="kr-zahlen">'
+      + [1, 2, 3, 4, 5].map(function (n) { return '<button type="button"' + (r.energie === n ? ' class="an"' : '') + ' onclick="krRundeSetzen(\'energie\',' + n + ')">' + n + '</button>'; }).join('')
+      + '</div><p class="leise">Bei 1–2 schlägt Kurs heute bewusst einen kleineren Schritt vor. Auch kleine Schritte zählen.</p>';
+  }
+  if (r.schritt === 2) {
+    var im = krImpuls();
+    return h + '<div class="leise">' + esc(im.kopf) + '</div><div class="kr-gross"><b>' + esc(im.titel) + '</b><br>' + esc(im.text) + '</div>'
+      + (im.uebung ? '<div class="kr-hinweis"><b>Mini-Übung:</b> ' + esc(im.uebung) + '</div>' : '')
+      + (im.quelle ? '<p class="leise">nach: ' + esc(im.quelle) + '</p>' : '');
+  }
+  if (r.schritt === 3) {
+    var t = krTag(false);
+    var v = krEinesVorschlaege(r.energie);
+    var opt = function (wert, titel, unter) {
+      return '<button type="button" class="kr-var' + (String(r.wahl) === String(wert) ? ' an' : '') + '" onclick="krRundeSetzen(\'wahl\',\'' + wert + '\')"><b>' + esc(titel) + '</b>' + esc(unter) + '</button>';
+    };
+    var bn = function (id) { var b = krFinden(id); return b ? ' · ' + b.name : ''; };
+    return h + '<div class="kr-gross">Was ist heute <b>das Eine</b>?</div>'
+      + (t && t.eines ? opt('gewaehlt', t.eines.text, 'heute schon gewählt' + bn(t.eines.bereich)) : '')
+      + v.map(function (x, i) { return (t && t.eines && t.eines.text === x.text) ? '' : opt(i, x.text, x.quelle + bn(x.bereich)); }).join('')
+      + opt('eigen', 'Eigenes …', '') + (r.wahl === 'eigen' ? '<input id="krEigen" class="eingabe" type="text" autocomplete="off" value="' + esc(r.eigen) + '" placeholder="Was ist heute das Eine?">' : '')
+      + '<label for="krWennDann">Wann und wo genau? (Wenn …, dann …)</label><input id="krWennDann" class="eingabe" type="text" autocomplete="off" value="' + esc(r.wennDann) + '" placeholder="Wenn ich …, dann …">'
+      + '<label class="haken"><input id="krAufgabe" type="checkbox"' + (r.aufgabe ? ' checked' : '') + '> als Aufgabe für heute einplanen (Liste „Kurs“)</label>';
+  }
+  if (r.schritt === 4) {
+    return h + '<div class="kr-gross">Was könnte heute dazwischenkommen?</div><div class="kr-chips">'
+      + KR_HINDERNISSE.map(function (x) { return '<button type="button"' + (r.hindernisse.indexOf(x[0]) >= 0 ? ' class="an"' : '') + ' onclick="krRundeSetzen(\'hindernis\',\'' + x[0] + '\')">' + esc(x[1]) + '</button>'; }).join('')
+      + '</div><label for="krPlanB">Dein Plan B:</label><textarea id="krPlanB" class="eingabe kr-feld" placeholder="Wenn …, dann …">' + esc(r.planB) + '</textarea>'
+      + '<p class="leise">Wer Hindernisse vorher bedenkt, setzt Vorsätze deutlich öfter um (mentales Kontrastieren, Schweinehund).</p>';
+  }
+  var regel = krRegelDesTages();
+  return h + '<div class="kr-gross">Deine Regel für heute</div>'
+    + (regel ? '<div class="kr-karte jetzt"><b>' + esc(regel.text) + '</b>' + (regel.konkret ? '<small>' + esc(regel.konkret) + '</small>' : '') + '</div>'
+      : '<p class="leise">Noch keine Prinzipien — unter „Bilanz → Prinzipien“ legst du 3–7 eigene Spielregeln an.</p>')
+    + '<p class="leise">Einen guten Tag! Am Abend schaust du in zwei Minuten zurück.</p>';
+}
+
+function krAbendHtml() {
+  var r = cl.kr.runde;
+  if (!r) { cl.kr.ansicht = 'heute'; return krHeuteHtml(); }
+  var t = krTag(false);
+  var chip = function (feld, wert, text) { return '<button type="button"' + (r[feld] === wert ? ' class="an"' : '') + ' onclick="krAbendSetzen(\'' + feld + '\',\'' + wert + '\')">' + text + '</button>'; };
+  var h = '<div class="kr-gross">' + (t && t.eines ? 'Das Eine heute: <b>' + esc(t.eines.text) + '</b> — geschafft?' : 'Wie war dein Tag — warst du auf Kurs?') + '</div>'
+    + '<div class="kr-ergebnis">' + chip('ergebnis', 'ja', '✓ Ja') + chip('ergebnis', 'teil', '~ Teilweise') + chip('ergebnis', 'nein', '✗ Nein') + '</div>';
+  if (r.ergebnis === 'nein' || r.ergebnis === 'teil') {
+    h += '<div class="kr-frage">Was war im Weg?</div><div class="kr-chips">' + KR_GRUENDE.map(function (g) { return chip('grund', g[0], esc(g[1])); }).join('') + '</div>';
+    if (r.grund) { h += '<div class="kr-hinweis"><b>Vorschlag für morgen:</b> ' + esc(krAbendVorschlag(r)) + '</div>'; }
+  }
+  if (r.ergebnis === 'ja') { h += '<div class="kr-hinweis">Gut gemacht. Kleine Schritte, oft wiederholt, verändern am meisten.</div>'; }
+  return h + '<label for="krNotiz">Was nehme ich mit? (optional)</label><textarea id="krNotiz" class="eingabe kr-feld">' + esc(r.notiz || '') + '</textarea>';
+}
+
+function krPfadeHtml() {
+  var l = (typeof KR_PFADE !== 'undefined' ? KR_PFADE : []);
+  return '<div class="abschnitt kr-ab"><span>Pfade</span><span class="leise">einer aktiv</span></div>' + l.map(function (p) {
+    var s = krFinden('kpf-' + p.id);
+    var tag = s ? Number(s.tag) || 0 : 0;
+    var b = krFinden(p.bereich);
+    return '<div class="kr-pfad' + (s && s.aktiv ? ' an' : '') + '"><span class="kr-kh"><b>' + esc(p.name) + '</b><span>' + (s && s.fertig ? '✓ geschafft' : (s ? tag + ' / ' + p.schritte.length : p.schritte.length + ' Schritte')) + '</span></span>'
+      + '<small>' + esc(p.beschreibung || '') + (b ? ' · ' + esc(b.name) : '') + '</small>'
+      + '<span class="kr-skala klein"><i style="width:' + Math.round(tag * 100 / p.schritte.length) + '%"></i></span>'
+      + '<div class="knoepfe">' + (s && s.aktiv ? '<button type="button" class="knopf" onclick="krPfadPause(\'' + esc(p.id) + '\')">Pausieren</button>'
+        : '<button type="button" class="knopf voll" onclick="krPfadStarten(\'' + esc(p.id) + '\')">' + (s ? 'Fortsetzen' : 'Starten') + '</button>') + '</div></div>';
+  }).join('') + '<p class="leise">Ein Pfad führt dich Tag für Tag: Impuls am Morgen, ein konkreter Schritt, und er rückt nur weiter, wenn du den Schritt getan hast.</p>';
+}
+
 function kursHtml() {
   var v = cl.kr.ansicht;
   var h = v === 'bereich' ? krBereichHtml() : v === 'prinzipien' ? krPrinzipienHtml() : v === 'check' ? krCheckHtml()
-    : v === 'woche' ? krWocheHtml() : v === 'buch' ? krBuchHtml() : krBilanzHtml();
+    : v === 'woche' ? krWocheHtml() : v === 'buch' ? krBuchHtml() : v === 'bilanz' ? krBilanzHtml()
+    : v === 'morgen' ? krMorgenHtml() : v === 'abend' ? krAbendHtml() : v === 'pfade' ? krPfadeHtml() : krHeuteHtml();
   return '<div class="kr-form">' + h + '</div>' + krFensterHtml();
 }
 
@@ -14043,7 +14490,16 @@ function kursFussHtml() {
     return k('Rückblick…', 'krFensterAuf(\'rueckblick\')', true) + (((w && w.wesentliche) || []).length < 3 ? k('+ Wesentliches', 'krWesentlichOeffnen()') : '') + k('Fertig', 'krEbeneHoch()');
   }
   if (v === 'buch') { return k('Vorab-Check', 'krCheckNeu()', true) + k('Fertig', 'krEbeneHoch()'); }
-  return k('Vorab-Check', 'krCheckNeu()', true) + k('Woche', 'krAnsicht(\'woche\')') + k('Prinzipien', 'krAnsicht(\'prinzipien\')') + k('Buch', 'krAnsicht(\'buch\')');
+  if (v === 'bilanz') { return k('Prinzipien', 'krAnsicht(\'prinzipien\')') + k('Buch', 'krAnsicht(\'buch\')') + k('+ Bereich', 'krBereichOeffnen(\'\')') + k('Fertig', 'krEbeneHoch()'); }
+  if (v === 'morgen') {
+    var r = cl.kr.runde;
+    return (r && r.schritt > 1 ? k('◀', 'krRundeSchritt(-1)') : k('Später', 'krEbeneHoch()'))
+      + (r && r.schritt >= 5 ? k('✓ Los geht’s', 'krMorgenFertig()', true) : k('Weiter ▶', 'krRundeSchritt(1)', true));
+  }
+  if (v === 'abend') { return k('Speichern', 'krAbendSpeichern()', true) + k('Abbrechen', 'krEbeneHoch()'); }
+  if (v === 'pfade') { return k('Fertig', 'krEbeneHoch()'); }
+  /* Heute im Kurs (seit 0.30) */
+  return k('Vorab-Check', 'krCheckNeu()', true) + k('Woche', 'krAnsicht(\'woche\')') + k('Bilanz', 'krAnsicht(\'bilanz\')') + k('Pfade', 'krAnsicht(\'pfade\')');
 }
 
 function krAnsicht(v) {
@@ -14060,14 +14516,19 @@ function krFensterAuf(f) {
 function krKopfText() {
   var v = cl.kr.ansicht;
   if (v === 'woche') { return 'KW ' + kalenderwoche(montagVon(isoDatum())); }
-  return { bereich: 'Bereich', prinzipien: 'Prinzipien', check: 'Vorab-Check', buch: 'Entscheidungen' }[v] || 'Bilanz';
+  if (v === 'morgen') { return 'Morgen ' + ((cl.kr.runde && cl.kr.runde.schritt) || 1) + '/5'; }
+  if (v === 'heute') { return kurzDatum(isoDatum()); }
+  return { bereich: 'Bereich', prinzipien: 'Prinzipien', check: 'Vorab-Check', buch: 'Entscheidungen', bilanz: 'Bilanz', abend: 'Abend', pfade: 'Pfade' }[v] || '';
 }
 
 /* Zurück: Fenster zu, dann zur Bilanz — der Vorab-Check geht schrittweise zurück */
 function krEbeneHoch() {
   if (cl.kr.fenster) { krFensterZu(); return true; }
   if (cl.kr.ansicht === 'check' && cl.kr.check && cl.kr.check.schritt > 1) { krCheckSchritt(-1); return true; }
-  if (cl.kr.ansicht !== 'bilanz') { cl.kr.check = null; cl.kr.ansicht = 'bilanz'; krZeichnen(); return true; }
+  if (cl.kr.ansicht === 'morgen' && cl.kr.runde && cl.kr.runde.schritt > 1) { krRundeSchritt(-1); return true; }
+  /* Unter der Bilanz liegen Bereich, Prinzipien und Buch — von dort eine Ebene zurück zur Bilanz */
+  if (['bereich', 'prinzipien', 'buch'].indexOf(cl.kr.ansicht) >= 0) { cl.kr.ansicht = 'bilanz'; krZeichnen(); return true; }
+  if (cl.kr.ansicht !== 'heute') { cl.kr.check = null; cl.kr.runde = null; cl.kr.ansicht = 'heute'; krZeichnen(); return true; }
   return false;
 }
 
@@ -15476,6 +15937,91 @@ var SCH_EROEFFNUNGEN = [
     zuege: 'd4 d5 Lf4 Sf6 e3 e6 Sf3 c5 c3 Sc6 Sbd2 Ld6',
     erkl: { 3: 'Der Läufer kommt vor die Bauernkette.', 5: 'Stabiles Zentrum.', 9: 'Festigt d4.', 11: 'Springer nach d2, bereitet e4 oder Se5 vor.' },
     idee: 'Ein System gegen fast alles: gleiche Aufstellung, wenig Theorie, solide.', falle: 'Auf Db6 (Angriff auf b2) achten — Db3 oder Dc1 decken.' }
+];
+
+/* ---------- Kurs: Pfade (seit 0.30) — geführte Tagesschritte, eigene Worte ---------- */
+var KR_PFADE = [
+  { id: 'bewegung-schlaf', name: 'Bewegung & Schlaf', bereich: 'kb-gesundheit', beschreibung: 'Vom Zwei-Minuten-Anfang zu Bewegung und Schlaf, die einfach zu deinem Alltag gehören.', schritte: [
+    { titel: 'Mach es lächerlich klein', impuls: 'Große Vorsätze scheitern selten am Willen, sondern an der Einstiegshürde. Fang so klein an, dass ein Nein albern wäre. Zwei Minuten zählen – sie machen aus einer Absicht eine erste Spur.', uebung: 'Schreib auf: Welche Bewegung könntest du so klein machen, dass sie in zwei Minuten erledigt ist?', eines: '2 Minuten Bewegung: Treppe, Kniebeugen oder ums Haus', klein: 'Schuhe anziehen und einmal ums Haus', quelle: '1%-Methode: Zwei-Minuten-Regel' },
+    { titel: 'Dein Warum in einem Satz', impuls: 'Bewegung und Schlaf sind kein Selbstzweck. Wofür willst du mehr Energie – für die Kinder, einen klaren Kopf, die Projekte am Haus? Ein klares Warum trägt dich durch zähe Tage.', uebung: 'Notiere einen Satz: „Ich bewege mich und schlafe besser, damit …“ Häng ihn dort auf, wo du ihn täglich siehst.', eines: '5 Minuten spazieren und dabei an dein Warum denken', klein: 'Den Warum-Satz einmal laut lesen', quelle: 'Schweinehund: Motive klären' },
+    { titel: 'Schau ehrlich auf deinen Schlaf', impuls: 'Bevor du etwas änderst, schau hin. Wann gehst du wirklich ins Bett, wann schläfst du ein, wie wach bist du morgens? Beobachten ohne zu urteilen ist der erste Schritt.', uebung: 'Schätze: Wie viele Stunden schläfst du an Werktagen? Was hält dich abends am häufigsten wach?', eines: 'Heute Abend Bettzeit, morgen früh Aufwachzeit notieren', klein: 'Nur die Uhrzeit beim Hinlegen merken', quelle: '' },
+    { titel: 'Häng es an etwas Bestehendes', impuls: 'Neue Gewohnheiten halten besser, wenn sie an etwas andocken, das du ohnehin tust. Kaffee, Zähneputzen, Feierabend – jeder feste Moment kann zum Auslöser werden.', uebung: 'Ergänze: „Nach dem ___ mache ich ___.“ Wähle einen Moment, der an jedem Tag sicher vorkommt.', eines: 'Nach dem Morgenkaffee 3 Minuten dehnen', klein: 'Nach dem Kaffee einmal kräftig strecken', quelle: '1%-Methode: Gewohnheiten stapeln' },
+    { titel: 'Wenn-dann statt irgendwann', impuls: '„Ich sollte mich mehr bewegen“ ist ein Wunsch. „Wenn ich mittags vom Tisch aufstehe, gehe ich zehn Minuten raus“ ist ein Plan. Konkrete Wenn-dann-Sätze nehmen dir die Entscheidung im Moment ab.', uebung: 'Formuliere zwei Wenn-dann-Pläne: einen für Bewegung, einen für das Zubettgehen.', eines: '10 Minuten spazieren nach dem Mittagessen', klein: '3 Minuten an die frische Luft', quelle: 'Schweinehund: Wenn-dann-Pläne' },
+    { titel: 'Mach es offensichtlich', impuls: 'Was du siehst, tust du eher. Laufschuhe an der Tür, Matte ausgerollt, Ladegerät außerhalb des Schlafzimmers – deine Umgebung entscheidet oft, bevor du es tust.', uebung: 'Geh gedanklich durch Flur und Schlafzimmer: Was erleichtert Bewegung, was stört den Schlaf? Notiere je eine Änderung.', eines: 'Sportsachen sichtbar bereitlegen, Ladegerät raus aus dem Schlafzimmer', klein: 'Schuhe direkt an die Haustür stellen', quelle: '1%-Methode: Umgebung gestalten' },
+    { titel: 'Ein Abendsignal für den Kopf', impuls: 'Dein Kopf braucht einen Übergang vom Tun zum Ruhen. Ein kleines, immer gleiches Ritual – Licht dimmen, Tee, drei Zeilen notieren – sagt dem Körper: Jetzt ist Feierabend.', uebung: 'Entwirf ein Abendritual aus drei Schritten, das höchstens 15 Minuten dauert.', eines: '30 Minuten vor dem Schlafen alle Bildschirme weglegen', klein: '10 Minuten vor dem Schlafen das Handy weglegen', quelle: '' },
+    { titel: 'Belohne den Abschluss', impuls: 'Eine Gewohnheit läuft als Schleife: Auslöser, Verlangen, Handlung, Belohnung. Fühlt sich der Abschluss gut an, will dein Gehirn mehr davon. Gönn dir ein sichtbares Häkchen oder einen kleinen Genuss.', uebung: 'Überlege, welche kleine Belohnung direkt nach der Bewegung passt – ein Haken, eine Tasse Tee, ein Lieblingslied.', eines: 'Die Bewegung des Tages machen und sofort abhaken', klein: 'Ein Häkchen für zwei Minuten Bewegung setzen', quelle: '1%-Methode: Gewohnheitsschleife' },
+    { titel: 'Sieh das Hindernis voraus', impuls: 'Nur positiv denken macht eher träge. Wirksamer ist es, das Ziel und das größte innere Hindernis zugleich vor Augen zu haben – und dann einen Plan dagegen zu fassen.', uebung: 'Wunsch, bestes Ergebnis, größtes Hindernis, Plan – schreib zu jedem ein Stichwort auf.', eines: '15 Minuten Bewegung, egal in welcher Form', klein: '5 Minuten Bewegung, egal welche', quelle: 'Schweinehund: mentales Kontrastieren' },
+    { titel: 'Wenn es regnet, dann …', impuls: 'Wetter, Termine, müde Kinder: Die üblichen Ausreden kommen zuverlässig. Leg dir für jede eine Ausweichvariante zurecht, dann kippt nicht gleich der ganze Tag.', uebung: 'Schreib deine drei häufigsten Ausreden auf und daneben je eine Ausweichvariante.', eines: 'Den Ausweichplan testen: 10 Minuten Übungen drinnen', klein: '2 Minuten Kniebeugen im Wohnzimmer', quelle: 'Schweinehund: Hindernisse vorwegnehmen' },
+    { titel: 'Der späte Abend gegen dich', impuls: 'Spätabends holen sich viele die Zeit zurück, die der Tag ihnen genommen hat – auf Kosten des Schlafs. Erkenne das Muster und gönn dir deine freie Zeit lieber früher am Abend.', uebung: 'Was tust du typischerweise nach 22 Uhr? Was davon ist dir wirklich wichtig, was nur Gewohnheit?', eines: 'Heute 20 Minuten früher ins Bett gehen', klein: '5 Minuten früher das Licht ausmachen', quelle: '' },
+    { titel: 'Nie zweimal aussetzen', impuls: 'Ein ausgelassener Tag ist normal. Zwei hintereinander sind der Anfang einer neuen, ungewollten Gewohnheit. Wenn du einmal raus bist, mach am nächsten Tag wenigstens die kleinste Version.', uebung: 'Notiere deine absolute Minimalversion – die, die du selbst an schlechten Tagen schaffst.', eines: 'Heute bewegen, auch wenn gestern nichts war', klein: 'Die Minimalversion – egal wie kurz', quelle: '1%-Methode: Nie zweimal aussetzen' },
+    { titel: 'Sei freundlich mit dir', impuls: 'Selbstkritik fühlt sich nach Disziplin an, lähmt aber. Sprich mit dir wie mit einem guten Freund nach einem schlechten Tag: verständnisvoll und mit Blick nach vorn.', uebung: 'Schreib auf, was du einem Freund sagen würdest, der eine Woche Sport ausgelassen hat. Lies es dir selbst vor.', eines: '10 Minuten ruhige Bewegung: Spaziergang oder Dehnen', klein: 'Dreimal tief durchatmen, Schultern lockern', quelle: 'Schweinehund: Selbstmitgefühl' },
+    { titel: 'Wer willst du sein?', impuls: 'Dauerhafte Veränderung beginnt bei der Identität. Statt „Ich will fitter werden“ heißt es „Ich bin jemand, der sich bewegt“. Jede kleine Handlung ist eine Stimme für dieses Bild.', uebung: 'Ergänze: „Ich bin jemand, der …“ – einmal für Bewegung, einmal für Schlaf.', eines: '15 Minuten Bewegung als Beweis für dein neues Bild', klein: '3 Minuten Bewegung – jede Stimme zählt', quelle: '1%-Methode: identitätsbasierte Gewohnheiten' },
+    { titel: 'Ein bisschen mehr', impuls: 'Wenn der Anfang sitzt, darfst du behutsam steigern. Nicht verdoppeln – ein paar Minuten mehr reichen. Kleine Schritte summieren sich über Wochen zu großen Veränderungen.', uebung: 'Wo stehst du heute? Lege fest, um wie viele Minuten du in der nächsten Woche steigerst.', eines: 'Deine übliche Bewegung um 5 Minuten verlängern', klein: 'Die übliche Runde mit einem kleinen Umweg', quelle: '1%-Methode: jeden Tag ein Prozent' },
+    { titel: 'Bewegung mit der Familie', impuls: 'Bewegung muss keine Zeit von der Familie stehlen. Radtour, Fußball im Garten, Abendspaziergang – so wird sie gemeinsame Zeit statt Konkurrenz.', uebung: 'Sammle drei Bewegungsideen, die die Kinder mögen und die ohne Planung gehen.', eines: '20 Minuten gemeinsam raus: Rad, Ball oder Spaziergang', klein: '5 Minuten mit den Kindern toben', quelle: '' },
+    { titel: 'Eine feste Schlafenszeit', impuls: 'Dein Körper liebt Regelmäßigkeit. Eine feste Zeit zum Hinlegen – auch am Wochenende ungefähr gleich – stabilisiert deinen Rhythmus mehr als jede lange Nacht.', uebung: 'Rechne rückwärts: Wann musst du aufstehen, wie viel Schlaf brauchst du? Daraus ergibt sich deine Zielzeit.', eines: 'Erinnerung 30 Minuten vor der Zielzeit stellen und befolgen', klein: 'Zur Zielzeit wenigstens ins Schlafzimmer gehen', quelle: '' },
+    { titel: 'Bewegungsinseln im Arbeitstag', impuls: 'Als Kopfarbeiter sitzt du viel. Kurze Bewegungsinseln zwischen Terminen – Treppe statt Aufzug, Telefonat im Gehen – halten Körper und Konzentration wach.', uebung: 'Schau in deinen Kalender von morgen: Wo passen zwei kurze Bewegungsinseln hinein?', eines: 'Ein Telefonat heute im Stehen oder Gehen führen', klein: 'Einmal die Treppe statt den Aufzug nehmen', quelle: '' },
+    { titel: 'Mach Fortschritt sichtbar', impuls: 'Was du siehst, motiviert. Ein einfacher Strich im Kalender für jeden Tag mit Bewegung zeigt dir die Kette – und du willst sie nicht reißen lassen.', uebung: 'Zähle, an wie vielen Tagen der letzten zwei Wochen du dich bewegt hast. Was hat an diesen Tagen geholfen?', eines: 'Bewegen und den Tag im Kalender markieren', klein: 'Den Strich für die Minimalversion setzen', quelle: '1%-Methode: Gewohnheiten verfolgen' },
+    { titel: 'Was trägt, was nicht?', impuls: 'Nach knapp drei Wochen weißt du mehr über dich. Manche Auslöser funktionieren, andere nicht. Behalte, was trägt, und ändere den Rest ohne schlechtes Gewissen.', uebung: 'Drei Spalten: Was hat funktioniert? Was nicht? Was ändere ich?', eines: 'Deine wirksamste Bewegung heute wiederholen', klein: '2 Minuten von dem, was am leichtesten fiel', quelle: '' },
+    { titel: 'Langweilig ist gut', impuls: 'Wenn Bewegung sich nicht mehr wie Anstrengung anfühlt, sondern wie Zähneputzen, ist sie Teil deines Alltags geworden. Dranbleiben, auch wenn der Reiz des Neuen weg ist, macht den Unterschied.', uebung: 'Woran merkst du, dass etwas schon Gewohnheit ist? Notiere ein Beispiel aus den letzten Tagen.', eines: '20 Minuten Bewegung, ohne vorher mit dir zu verhandeln', klein: '5 Minuten, ohne lange nachzudenken', quelle: '1%-Methode: Langeweile aushalten' },
+    { titel: 'Ein Plan für Chaoswochen', impuls: 'Urlaub, Krankheit, Projektstress – es wird Phasen geben, in denen alles durcheinandergerät. Wer vorher weiß, was die Notversion ist, findet danach leichter zurück.', uebung: 'Schreib eine Notversion für Bewegung und Schlaf auf, die selbst in Chaoswochen funktioniert.', eines: 'Den Notfallplan auf eine Karte schreiben und aufhängen', klein: 'Die Notversion in einem Satz festhalten', quelle: 'Schweinehund: Wenn-dann-Pläne' },
+    { titel: 'Schlaf als Investition', impuls: 'Guter Schlaf ist kein Luxus, sondern die Grundlage für klare Entscheidungen. Wer ausgeschlafen ist, schafft mehr in weniger Zeit – und hat abends noch Geduld für die Familie.', uebung: 'Wie hast du nach guten Nächten gearbeitet, entschieden, mit den Kindern geredet? Notiere den Unterschied.', eines: 'Heute zur Zielzeit ins Bett, ohne Ausnahme', klein: 'Das Handy 15 Minuten früher weglegen', quelle: 'Essentialismus: Schlaf schützen' },
+    { titel: 'Dein Weg in Zahlen', impuls: 'Schau zurück auf die letzten Wochen. Zähl die Tage, die Minuten, die frühen Nächte. Nicht um dich zu bewerten, sondern um zu sehen, was du dir bewiesen hast.', uebung: 'Zähle Bewegungstage und Nächte zur Zielzeit. Schreib einen Satz dazu, was dich überrascht hat.', eines: 'Eine Lieblingsrunde gehen und dabei zurückblicken', klein: '5 Minuten raus und kurz zurückblicken', quelle: '' },
+    { titel: 'Weiter als jemand, der sich bewegt', impuls: 'Der Pfad endet, die Gewohnheit bleibt. Lege fest, was du weiterführst und welchen kleinen nächsten Schritt du dir vornimmst. Du bist jetzt jemand, der sich bewegt und gut schläft.', uebung: 'Notiere: Was behalte ich? Was ist mein nächster Ein-Prozent-Schritt?', eines: 'Den nächsten Schritt in den Kalender der kommenden Woche eintragen', klein: 'Den Identitätssatz noch einmal aufschreiben', quelle: '1%-Methode: Identität' }
+  ] },
+  { id: 'familie', name: 'Zeit für die Familie', bereich: 'kb-beziehungen', beschreibung: 'Mit kleinen Ritualen und klaren Grenzen wirklich da sein für die Menschen, die dir am wichtigsten sind.', schritte: [
+    { titel: 'Wo bist du gerade?', impuls: 'Oft bist du zu Hause, aber mit dem Kopf noch im Büro. Präsenz beginnt mit dem Bemerken: Bin ich gerade wirklich hier? Ohne Vorwurf, nur hinsehen.', uebung: 'Notiere drei Momente von gestern, in denen du körperlich bei der Familie warst, gedanklich aber woanders.', eines: 'Beim Abendessen das Handy in einen anderen Raum legen', klein: 'Beim nächsten Gespräch das Handy umdrehen', quelle: '' },
+    { titel: 'Was zählt für dich?', impuls: 'Familie ist dir wichtig – aber was genau? Gemeinsames Lachen, Gespräche, Verlässlichkeit? Wenn du es benennst, kannst du gezielter Zeit dafür freihalten.', uebung: 'Schreib auf: Woran sollen sich deine Kinder später erinnern, wenn sie an diese Jahre denken?', eines: 'Jedem Kind heute 10 Minuten ungeteilte Aufmerksamkeit schenken', klein: 'Jedem Kind eine echte Frage zum Tag stellen', quelle: 'Essentialismus: das Wesentliche erkennen' },
+    { titel: 'Fang mit fünf Minuten an', impuls: 'Du musst keinen Familientag planen, um etwas zu verändern. Fünf Minuten volle Zuwendung wirken mehr als eine Stunde mit halbem Kopf. Klein anfangen gilt auch hier.', uebung: 'Wann am Tag hättest du realistisch fünf ungestörte Minuten mit Partnerin, Partner oder Kindern?', eines: '5 Minuten ungeteilte Zeit mit einem Familienmitglied', klein: 'Eine Umarmung mit voller Aufmerksamkeit', quelle: '1%-Methode: Zwei-Minuten-Regel' },
+    { titel: 'Ankommen nach der Arbeit', impuls: 'Der Wechsel vom Büro zur Familie passiert oft in einer Sekunde an der Haustür. Ein kurzes Übergangsritual hilft dir, den Arbeitstag abzulegen, bevor du hereinkommst.', uebung: 'Entwirf ein Ritual für die letzten zwei Minuten vor der Haustür oder nach dem Zuklappen des Laptops.', eines: 'Vor dem Heimkommen 2 Minuten bewusst durchatmen', klein: 'An der Tür einmal tief durchatmen', quelle: '' },
+    { titel: 'Handyfreie Zonen', impuls: 'Das Handy zieht Aufmerksamkeit an, auch wenn es still daliegt. Feste Zeiten und Orte ohne Bildschirm – Esstisch, Zubettbringen – schaffen Raum, in dem die Familie Vorrang hat.', uebung: 'Wähle eine Zeit und einen Ort, die ab heute handyfrei sind. Schreib die Regel auf.', eines: 'Den Esstisch heute komplett handyfrei halten', klein: 'Beim Zubettbringen das Handy draußen lassen', quelle: '1%-Methode: Umgebung gestalten' },
+    { titel: 'Wenn ich heimkomme, dann …', impuls: 'Gute Absichten verpuffen im Trubel. Ein fester Wenn-dann-Plan macht Zuwendung zum Automatismus: Wenn ich zur Tür hereinkomme, begrüße ich zuerst jeden persönlich.', uebung: 'Formuliere einen Wenn-dann-Plan für den Moment, in dem du heimkommst oder den Arbeitstag beendest.', eines: 'Beim Heimkommen jeden einzeln begrüßen, Handy in der Tasche', klein: 'Zuerst „Hallo“ sagen, dann alles andere', quelle: 'Schweinehund: Wenn-dann-Pläne' },
+    { titel: 'Ein kleines Ritual', impuls: 'Rituale geben Kindern Halt und dir einen festen Anker. Es muss nichts Großes sein: die Gutenachtgeschichte, der Sonntagsspaziergang, Pfannkuchen am Samstag.', uebung: 'Welche Rituale gibt es schon? Welches kleine Ritual würdest du gern einführen? Notiere eines.', eines: 'Ein neues kleines Ritual heute zum ersten Mal ausprobieren', klein: 'Beim Zubettgehen fragen: „Was war heute schön?“', quelle: '1%-Methode: Gewohnheiten stapeln' },
+    { titel: 'Gute Dinge am Tisch', impuls: 'Gemeinsames Erzählen verbindet. Wenn beim Abendessen jeder kurz sagt, was heute gut war, entsteht ein Ritual, das Aufmerksamkeit und Dankbarkeit verbindet.', uebung: 'Überlege, wie du die Frage einführst, ohne dass sie wie eine Pflicht klingt.', eines: 'Beim Abendessen jeden fragen: Was war heute gut?', klein: 'Selbst ein gutes Erlebnis des Tages erzählen', quelle: '' },
+    { titel: 'Was dich wegzieht', impuls: 'Stell dir einen gelungenen Familienabend vor – und dann das, was ihn meistens verhindert: Mails, Müdigkeit, Hausprojekte. Wer das Hindernis kennt, kann es einplanen.', uebung: 'Wunsch, bestes Ergebnis, Hindernis, Plan: Schreib je ein Stichwort für einen ungestörten Familienabend.', eines: 'Heute 30 Minuten ohne Arbeit und Handy für die Familie', klein: '10 Minuten nur für die Familie, ohne Ablenkung', quelle: 'Schweinehund: mentales Kontrastieren' },
+    { titel: 'Eine klare Grenze zur Arbeit', impuls: 'Wenn die Arbeit kein Ende hat, frisst sie die Familienzeit. Ein klarer Feierabend – Laptop zu, Mail-App aus – ist kein Mangel an Einsatz, sondern Schutz für das Wichtige.', uebung: 'Lege eine feste Feierabendzeit fest und notiere, was du tust, wenn danach noch etwas hereinkommt.', eines: 'Zur festgelegten Zeit Laptop zuklappen, Mail-App schließen', klein: 'Mail-Benachrichtigungen heute Abend ausschalten', quelle: 'Essentialismus: Grenzen setzen' },
+    { titel: 'Wenn das Telefon klingelt', impuls: 'Ein dienstlicher Anruf, eine Nachricht – und schon bist du weg. Lege vorher fest, was wirklich sofort sein muss und was bis morgen warten kann. Meist ist es sehr wenig.', uebung: 'Schreib auf: Welche Anrufe oder Nachrichten rechtfertigen es, die Familienzeit zu unterbrechen?', eines: 'Eine Nachricht heute Abend bewusst erst morgen beantworten', klein: 'Eine Benachrichtigung liegen lassen, bis die Kinder schlafen', quelle: 'Schweinehund: Hindernisse vorwegnehmen' },
+    { titel: 'Müde und trotzdem da', impuls: 'Nach einem langen Tag ist die Geduld knapp. Plane für solche Abende eine Mini-Version ein, die dich nicht überfordert und trotzdem Nähe schafft.', uebung: 'Was könntest du an einem erschöpften Abend mit den Kindern tun, das wenig Energie braucht? Sammle drei Ideen.', eines: 'Gemeinsam auf dem Sofa ein Buch lesen', klein: 'Fünf Minuten nebeneinander sitzen und zuhören', quelle: '' },
+    { titel: 'Wenn es nicht klappt', impuls: 'Es wird Abende geben, an denen du ungeduldig oder abgelenkt warst. Statt dich zu verurteilen: Entschuldige dich, wenn es passt, und fang morgen neu an.', uebung: 'Denk an einen Moment, in dem du nicht so warst, wie du sein wolltest. Was würdest du einem Freund in derselben Lage sagen?', eines: 'Einen schwierigen Moment ansprechen und neu anfangen', klein: 'Dir selbst einen freundlichen Satz sagen', quelle: 'Schweinehund: Selbstmitgefühl' },
+    { titel: 'Ein Vater, der da ist', impuls: 'Statt „Ich sollte mehr Zeit mit der Familie verbringen“ versuch es mit: „Ich bin ein Vater, der zuhört und da ist.“ Jede kleine Zuwendung bestätigt dieses Bild.', uebung: 'Schreib deinen Identitätssatz für deine Rolle in der Familie. Welche kleine Handlung würde ihn heute beweisen?', eines: 'Genau diese eine Handlung heute ausführen', klein: 'Einem Kind sagen, was du an ihm magst', quelle: '1%-Methode: Identität' },
+    { titel: 'Richtig zuhören', impuls: 'Zuhören heißt nicht, auf die eigene Antwort zu warten. Schau dein Gegenüber an, frag nach, fass zusammen. Kinder und Partner spüren sofort, ob du wirklich bei ihnen bist.', uebung: 'Überlege dir zwei offene Fragen, die du heute stellen willst – statt „Wie war’s?“.', eines: 'Ein Gespräch führen, in dem du nur fragst und zuhörst', klein: 'Einmal nachfragen statt sofort zu antworten', quelle: 'Gentleman-Prinzip: Aufmerksamkeit' },
+    { titel: 'Zeit zu zweit', impuls: 'Die Partnerschaft ist das Fundament der Familie und kommt im Alltag oft zu kurz. Schon eine regelmäßige halbe Stunde zu zweit hält die Verbindung lebendig.', uebung: 'Wann hättet ihr in den nächsten zwei Wochen Zeit nur für euch? Notiere zwei Möglichkeiten.', eines: 'Einen festen Abend zu zweit im Kalender eintragen', klein: 'Heute 10 Minuten reden, ohne Orga-Themen', quelle: '' },
+    { titel: 'Ein Erlebnis planen', impuls: 'Gemeinsame Erlebnisse bleiben in Erinnerung, der Alltag verschwimmt. Plane etwas Besonderes – es muss nicht teuer sein: Lagerfeuer, Ausflug, Nachtwanderung.', uebung: 'Sammle mit der Familie drei Ideen für ein Erlebnis in den nächsten vier Wochen.', eines: 'Ein Familienerlebnis mit Datum in den Kalender eintragen', klein: 'Beim Essen nach Ausflugsideen fragen', quelle: 'Essentialismus: bewusst planen' },
+    { titel: 'Einzelzeit mit jedem Kind', impuls: 'In der Gruppe geht jedes Kind ein wenig unter. Exklusive Zeit nur mit dir – auch kurz – zeigt jedem: Du bist mir wichtig, so wie du bist.', uebung: 'Was macht jedes deiner Kinder gerade besonders gern? Notiere für jedes eine Idee für Zeit zu zweit.', eines: '20 Minuten Einzelzeit mit einem Kind, das sie gestaltet', klein: '5 Minuten spielen, was ein Kind aussucht', quelle: '' },
+    { titel: 'Respekt im Kleinen', impuls: 'Höflichkeit gilt nicht nur draußen. Bitte, Danke, Ausredenlassen, Versprechen halten – gerade zu Hause zeigen kleine Gesten, wie viel dir die anderen wert sind.', uebung: 'Wo bist du zu Hause weniger aufmerksam als im Büro? Notiere eine Geste, die du heute bewusst einsetzt.', eines: 'Heute ein kleines Versprechen geben und halten', klein: 'Jedem heute einmal ausdrücklich danken', quelle: 'Gentleman-Prinzip: Haltung im Alltag' },
+    { titel: 'Dankbarkeit aussprechen', impuls: 'Vieles, was die anderen für dich tun, wird selbstverständlich. Ausgesprochene Dankbarkeit stärkt die Beziehung – und deinen Blick für das Gute.', uebung: 'Schreib für jedes Familienmitglied eine Sache auf, für die du dankbar bist.', eines: 'Einem Familienmitglied heute konkret danken', klein: 'Einen Dankessatz auf einen Zettel schreiben', quelle: '' },
+    { titel: 'Was hat sich verändert?', impuls: 'Nach drei Wochen lohnt ein Blick zurück. Welche Abende waren anders? Was haben die Kinder bemerkt? Kleine Veränderungen sind oft größer, als sie sich anfühlen.', uebung: 'Notiere: Was mache ich jetzt anders? Was hat die Familie davon gespürt?', eines: 'Die Familie fragen, was ihr in letzter Zeit gefallen hat', klein: 'Eine gute Veränderung aufschreiben', quelle: '' },
+    { titel: 'Rituale festhalten', impuls: 'Was sich bewährt hat, verdient einen festen Platz. Schreibt eure Rituale gemeinsam auf und hängt sie auf – so werden sie Teil eurer Familienkultur.', uebung: 'Liste die Rituale und Regeln auf, die in den letzten Wochen entstanden sind. Welche wollt ihr behalten?', eines: 'Gemeinsam die Familienrituale auf ein Blatt schreiben', klein: 'Ein Ritual nennen, das bleiben soll', quelle: '1%-Methode: Gewohnheiten festigen' },
+    { titel: 'Für volle Wochen gerüstet', impuls: 'Projektphasen und volle Kalender kommen wieder. Lege fest, was selbst dann bleibt – ein Anruf, das Gutenachtritual, ein gemeinsames Frühstück.', uebung: 'Was ist deine Familien-Notversion für Wochen mit viel Arbeit? Schreib sie in einem Satz auf.', eines: 'Die Notversion mit Partnerin oder Partner besprechen', klein: 'Die Notversion in einem Satz notieren', quelle: 'Schweinehund: Wenn-dann-Pläne' },
+    { titel: 'Ein gemeinsamer Moment', impuls: 'Feiere den Weg mit dem, worum es geht: Zeit miteinander. Etwas Einfaches reicht – ein Spieleabend, ein Spaziergang, ein besonderes Essen.', uebung: 'Was würde der Familie heute oder am Wochenende Freude machen? Plane es in drei Stichworten.', eines: '30 Minuten Spieleabend oder gemeinsamer Spaziergang', klein: 'Ein Lieblingslied zusammen hören', quelle: '' },
+    { titel: 'Präsent bleiben', impuls: 'Der Pfad endet, die Familie bleibt das Wesentliche. Präsenz ist keine Leistung, sondern eine tägliche Entscheidung. Halte fest, wofür du dich weiter entscheiden willst.', uebung: 'Notiere: Was behalte ich? Was ist mein nächster kleiner Schritt? Was soll meine Familie von mir spüren?', eines: 'Den nächsten Familienschritt fest in den Kalender eintragen', klein: 'Den Identitätssatz noch einmal aufschreiben', quelle: 'Essentialismus: das Wesentliche schützen' }
+  ] },
+  { id: 'weniger', name: 'Weniger, aber besser', bereich: 'kb-haus', beschreibung: 'Verpflichtungen sichten, freundlich Nein sagen und Raum schaffen für das, was wirklich zählt.', schritte: [
+    { titel: 'Weniger, aber besser', impuls: 'Nicht alles, was gut ist, ist auch wichtig. Wer alles ein bisschen macht, macht wenig richtig. Dieser Pfad hilft dir, Raum zu schaffen für das, was wirklich zählt.', uebung: 'Schreib auf: Wenn ich nur drei Dinge in meinem Leben gut machen dürfte – welche wären es?', eines: '10 Minuten in Ruhe über diese drei Dinge nachdenken', klein: 'Eines der drei Dinge notieren', quelle: 'Essentialismus: weniger, aber besser' },
+    { titel: 'Alles auf den Tisch', impuls: 'Bevor du entscheiden kannst, brauchst du den Überblick. Job, Haus, Ehrenamt, Zusagen an Freunde – schreib alles auf, was gerade Zeit oder Gedanken bindet.', uebung: 'Liste alle laufenden Verpflichtungen und Projekte auf, ohne zu bewerten. Lass nichts weg.', eines: '20 Minuten Bestandsaufnahme auf einem Blatt Papier', klein: 'Die fünf größten Verpflichtungen aufschreiben', quelle: 'Essentialismus: erkunden' },
+    { titel: 'Was kostet dich was?', impuls: 'Jede Verpflichtung kostet Zeit, Energie oder Aufmerksamkeit. Wenn du das sichtbar machst, erkennst du, wo viel hineinfließt und wenig zurückkommt.', uebung: 'Markiere auf deiner Liste: Was gibt mir Energie (+), was kostet mich viel (–)?', eines: 'Deine Liste mit Plus und Minus markieren', klein: 'Das größte Minus einkreisen', quelle: '' },
+    { titel: 'Erst Pause, dann Antwort', impuls: 'Viele Zusagen passieren im Reflex. Gewöhn dir an, bei jeder Anfrage kurz durchzuatmen und zu sagen: „Ich melde mich.“ Diese kleine Pause schützt deinen Kalender.', uebung: 'Formuliere einen Satz, mit dem du um Bedenkzeit bittest, ohne unhöflich zu wirken.', eines: 'Bei der nächsten Anfrage um Bedenkzeit bitten', klein: 'Bei einer Anfrage innerlich bis drei zählen', quelle: 'Essentialismus: Pause vor der Zusage' },
+    { titel: 'Die 90-Prozent-Regel', impuls: 'Frag bei einer Option nicht „Ist das gut?“, sondern „Ist das ein klares Ja?“ Alles unter 90 Prozent ist eigentlich ein Nein. So bleibt Platz für das, was dir wirklich wichtig ist.', uebung: 'Bewerte drei Punkte deiner Liste von 0 bis 100. Was liegt unter 90?', eines: 'Eine aktuelle Entscheidung nach der 90-Prozent-Regel prüfen', klein: 'Einen Punkt der Liste von 0 bis 100 bewerten', quelle: 'Essentialismus: 90-Prozent-Regel' },
+    { titel: 'Ein fester Wochenblick', impuls: 'Ohne regelmäßigen Überblick schleichen sich neue Verpflichtungen ein. Ein kurzer, fester Wochenblick – immer am selben Tag – hält deine Liste ehrlich.', uebung: 'Wähle einen festen Zeitpunkt für einen 15-minütigen Wochenblick. Welche Fragen willst du dort jedes Mal stellen?', eines: 'Einen wiederkehrenden Termin für den Wochenblick eintragen', klein: 'Den Wochentag für den Wochenblick festlegen', quelle: '1%-Methode: feste Auslöser' },
+    { titel: 'Ein Nein üben', impuls: 'Nein sagen fällt schwer, weil wir niemanden enttäuschen wollen. Doch ein ehrliches, freundliches Nein ist respektvoller als ein halbherziges Ja – und es lässt sich üben.', uebung: 'Schreib drei freundliche Formulierungen für ein Nein auf, z. B. „Diesmal nicht – danke, dass du an mich gedacht hast.“', eines: 'Eine kleine Anfrage heute freundlich ablehnen', klein: 'Ein Nein im Kopf durchspielen', quelle: 'Essentialismus: elegant Nein sagen' },
+    { titel: 'Wenn jemand fragt, dann …', impuls: 'Ein Wenn-dann-Plan hilft auch beim Nein: Wenn mich jemand um etwas bittet, prüfe ich zuerst, ob es zu meinen drei Prioritäten passt. So wird die Prüfung zur Gewohnheit.', uebung: 'Formuliere deinen Wenn-dann-Plan für neue Anfragen und schreib ihn auf eine Karte.', eines: 'Die Karte sichtbar an den Arbeitsplatz legen', klein: 'Den Plan einmal laut aussprechen', quelle: 'Schweinehund: Wenn-dann-Pläne' },
+    { titel: 'Die Sorge hinter dem Nein', impuls: 'Hinter jedem schwierigen Nein steckt eine Sorge: Was denken die anderen? Wenn du sie benennst, verliert sie oft an Kraft. Meist ist die Reaktion milder als befürchtet.', uebung: 'Denk an ein Nein, das du vor dir herschiebst. Was befürchtest du? Wie wahrscheinlich ist das wirklich?', eines: 'Ein aufgeschobenes Nein heute aussprechen oder schreiben', klein: 'Das aufgeschobene Nein als Entwurf formulieren', quelle: 'Schweinehund: mentales Kontrastieren' },
+    { titel: 'Würdest du heute anfangen?', impuls: '„Ich habe schon so viel hineingesteckt“ ist kein guter Grund weiterzumachen. Frag lieber: Würde ich heute damit anfangen, wenn ich noch nicht dabei wäre?', uebung: 'Prüfe ein laufendes Projekt mit dieser Frage. Notiere ehrlich deine Antwort.', eines: 'Ein Projekt bewusst beenden oder auf Eis legen', klein: 'Ein Projekt markieren, das du beenden könntest', quelle: 'Essentialismus: versunkene Kosten' },
+    { titel: 'Fertig statt perfekt', impuls: 'Halbfertige Projekte am Haus oder im Job belasten mehr, als man denkt. Oft fehlt nur ein kleiner Schritt. Lege fest, was „fertig genug“ heißt, und schließ ab.', uebung: 'Wähle ein angefangenes Projekt. Was ist der kleinste Schritt, damit es als erledigt gelten darf?', eines: '30 Minuten an einem fast fertigen Projekt arbeiten', klein: 'Den nächsten konkreten Schritt aufschreiben', quelle: '' },
+    { titel: 'Puffer einplanen', impuls: 'Alles dauert länger als gedacht. Wer ohne Puffer plant, gerät ständig unter Druck. Rechne bewusst Reserve ein – gern die Hälfte der geschätzten Zeit zusätzlich.', uebung: 'Schau auf die Termine dieser Woche: Wo fehlt Luft? Wo kannst du einen Puffer von 30 Minuten einbauen?', eines: 'Einen 30-Minuten-Puffer in diese Woche eintragen', klein: 'Zwischen zwei Terminen 10 Minuten freihalten', quelle: 'Essentialismus: Puffer' },
+    { titel: 'Kein Selbstvorwurf', impuls: 'Du wirst merken, dass du Dinge zugesagt hast, die du lieber gelassen hättest. Das ist menschlich. Sei freundlich mit dir und nutze es als Lernmoment statt als Beweis für Schwäche.', uebung: 'Denk an eine Zusage, die du bereust. Was lernst du daraus für die nächste Anfrage?', eines: 'Eine bereute Zusage offen und freundlich nachverhandeln', klein: 'Den Lernmoment in einem Satz notieren', quelle: 'Schweinehund: Selbstmitgefühl' },
+    { titel: 'Ich bin jemand, der wählt', impuls: 'Weniger, aber besser ist eine Haltung: Du entscheidest bewusst, statt dich treiben zu lassen. Formuliere es als Identität: „Ich bin jemand, der wählt, was wichtig ist.“', uebung: 'Schreib deinen Identitätssatz und eine Situation von heute, in der du danach handeln kannst.', eines: 'Heute eine Entscheidung bewusst nach diesem Satz treffen', klein: 'Den Satz morgens einmal lesen', quelle: '1%-Methode: Identität' },
+    { titel: 'Eine Sache abgeben', impuls: 'Nicht alles muss von dir erledigt werden. Manches lässt sich abgeben, vereinfachen oder ganz streichen. Jede Entlastung schafft Raum für das, was nur du tun kannst.', uebung: 'Geh deine Liste durch: Was kannst du abgeben, vereinfachen oder streichen? Markiere je ein Beispiel.', eines: 'Eine Aufgabe heute abgeben oder streichen', klein: 'Eine Aufgabe zum Abgeben auswählen', quelle: 'Essentialismus: eliminieren' },
+    { titel: 'Das eine Hausprojekt', impuls: 'Haus und Garten bieten endlose Baustellen. Statt fünf Projekte gleichzeitig anzufassen, wähle das eine, das jetzt den größten Unterschied macht, und lass die anderen bewusst ruhen.', uebung: 'Liste deine Hausprojekte. Welches eine bringt der Familie jetzt am meisten? Was darf bewusst warten?', eines: 'Für das gewählte Hausprojekt den nächsten Schritt erledigen', klein: 'Die übrigen Hausprojekte auf eine Warteliste setzen', quelle: 'Essentialismus: Prioritäten setzen' },
+    { titel: 'Eine Schublade, nicht der Keller', impuls: 'Dinge binden Aufmerksamkeit: Sie wollen gepflegt, sortiert und gesucht werden. Weniger Kram heißt weniger Entscheidungen. Fang mit einer Schublade an, nicht mit dem Keller.', uebung: 'Wähle einen kleinen Bereich, der dich regelmäßig stört. Was davon hast du im letzten Jahr gebraucht?', eines: '15 Minuten eine Schublade oder ein Regalfach ausmisten', klein: 'Fünf Dinge aussortieren', quelle: '' },
+    { titel: 'Fokuszeit schützen', impuls: 'Wichtige Arbeit braucht ungestörte Zeit. Blocke dir feste Fokusphasen, in denen Mails und Chat warten müssen. Behandle sie wie einen Termin mit dir selbst.', uebung: 'Wann bist du am konzentriertesten? Lege einen festen Fokusblock für die kommende Woche fest.', eines: 'Heute 30 Minuten Fokuszeit ohne Mails und Chat', klein: '10 Minuten an einer Sache, Benachrichtigungen aus', quelle: 'Essentialismus: Raum zum Denken' },
+    { titel: 'Weniger Kanäle', impuls: 'Jede App, jeder Newsletter, jede Gruppe will etwas von dir. Prüfe, welche Informationsquellen dir wirklich nützen, und verabschiede dich vom Rest.', uebung: 'Liste die Apps, Gruppen und Newsletter, die dich täglich erreichen. Welche drei würdest du nicht vermissen?', eines: 'Drei Newsletter oder Benachrichtigungen abbestellen', klein: 'Einen Newsletter abbestellen', quelle: '' },
+    { titel: 'Was ist leichter geworden?', impuls: 'Schau zurück: Welche Verpflichtungen hast du gelöst, welche Neins ausgesprochen, welche Projekte beendet? Spür nach, wie sich das anfühlt.', uebung: 'Vergleiche deine Bestandsaufnahme von Tag 2 mit heute. Was ist weggefallen, was dazugekommen?', eines: 'Die Liste von Tag 2 aktualisieren', klein: 'Eine Sache notieren, die leichter geworden ist', quelle: '' },
+    { titel: 'Routine für das Wesentliche', impuls: 'Mach das Wichtige zur Routine, damit es nicht jeden Tag neu erkämpft werden muss. Welche deiner Prioritäten braucht einen festen Platz im Alltag?', uebung: 'Wähle eine Priorität und gib ihr einen festen Wochentag oder Zeitpunkt.', eines: 'Diesen festen Platz als wiederkehrenden Termin eintragen', klein: 'Den Zeitpunkt für die Priorität festlegen', quelle: 'Essentialismus: Routine' },
+    { titel: 'Deine Nicht-Liste', impuls: 'Neben der Aufgabenliste hilft eine Liste der Dinge, die du bewusst nicht tust. Sie erinnert dich an deine Entscheidungen, wenn alte Muster zurückkommen.', uebung: 'Schreib fünf Dinge auf, die du ab jetzt bewusst nicht mehr tust oder zusagst.', eines: 'Deine Nicht-Liste sichtbar aufhängen oder ablegen', klein: 'Zwei Punkte für die Nicht-Liste notieren', quelle: '' },
+    { titel: 'Wenn es wieder voll wird', impuls: 'Neue Anfragen und Projekte kommen bestimmt. Lege fest, woran du erkennst, dass es zu viel wird – und was du dann als Erstes streichst.', uebung: 'Formuliere: „Wenn ich merke, dass …, dann streiche ich zuerst …“', eines: 'Den Frühwarnplan auf eine Karte schreiben', klein: 'Ein Warnsignal für Überlastung notieren', quelle: 'Schweinehund: Wenn-dann-Pläne' },
+    { titel: 'Ein freier Abend', impuls: 'Gönn dir, was du dir erarbeitet hast: Raum. Ein Abend ohne Verpflichtungen und Projekte – nur für dich oder die Familie. Erholung ist kein Luxus, sondern Voraussetzung.', uebung: 'Welchen Abend in den nächsten zwei Wochen kannst du komplett freihalten? Was soll dort nicht passieren?', eines: 'Einen freien Abend im Kalender blocken', klein: 'Heute eine Stunde bewusst nichts planen', quelle: 'Essentialismus: Spiel und Erholung' },
+    { titel: 'Weniger, aber besser – weiter', impuls: 'Weniger zu tun ist kein Verzicht, sondern eine Entscheidung für Qualität. Halte fest, was du behalten willst, und nimm dir einen nächsten kleinen Schritt vor.', uebung: 'Notiere: Was waren die drei wichtigsten Erkenntnisse? Was ist mein nächster Schritt?', eines: 'Den nächsten Schritt in den Kalender eintragen', klein: 'Deine drei Prioritäten noch einmal aufschreiben', quelle: 'Essentialismus: weniger, aber besser' }
+  ] }
 ];
 
 var DB = leereDatenbank();
