@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 16, 'fünfzehn Apps im Raster, „Heute“ nur in der Leiste (seit 0.28 mit Kurs)');
+  pruefe((h.match(/class="app"/g) || []).length === 16 && CL.CL_APPS.length === 17, 'sechzehn Apps im Raster, „Heute“ nur in der Leiste (seit 0.31 mit Ideenwerkstatt)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -413,13 +413,13 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","kurs","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","vorlesen","abgleich"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","kurs","ideen","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","stones","schach","lernkartei","vorlesen","abgleich"]'
     && CL.clApp('heute') && CL.clApp('heute').raster === false,
-    'genau fünfzehn Apps im Raster: Kalender, Kurs (statt Heute, seit 0.28), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Vorlesen, Abgleich');
+    'genau sechzehn Apps im Raster: Kalender, Kurs (statt Heute, seit 0.28), Ideenwerkstatt (seit 0.31), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Stones, Schach, Lernkartei, Vorlesen, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 15, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/15)');
+  pruefe(syms === 16, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/16)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -3233,6 +3233,133 @@ function schuleTest() {
 }
 
 /* ============================================================
+   65. Ideenwerkstatt: von der Idee zur Umsetzung (0.31)
+   Grund: Neue App. Eine Idee läuft durch sechs Stufen; Entscheidungen
+   (Go/Später/Verwerfen), Plan, Projekt in der Workbench, nächster Schritt
+   als Vorschlag in der Kurs-Morgen-Runde, Hinweise unter „Heute“.
+   Erkennt: Stufen überspringbar, Weiter ohne Pflichtangaben, „Später“
+   ohne Wiedervorlage, Projekt ohne Aufgaben, Kurs-Haken ohne Wirkung,
+   fehlende Felder in iwSetzen (z. B. „zulasten“), Zurück-Taste, Raster.
+   ============================================================ */
+function ideenTest() {
+  console.log('\n65. Ideenwerkstatt: von der Idee zur Umsetzung (0.31)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const setz = (o) => Object.keys(o).forEach(k => { S.document.getElementById(k).value = o[k]; });
+  const leer = (l) => l.forEach(k => { S.document.getElementById(k).value = ''; });
+  pruefe(S.clApp('ideen') && /Ideen-<br>werkstatt/.test((S.oeffne('uebersicht'), inhalt())) && S.CL_BILD.ideen, 'App „Ideenwerkstatt“ im Raster (zweizeilig) mit eigenem Symbol');
+  pruefe(Array.isArray(S.DB.ideen) && /'ideen'[\],]/.test(QUELLE), 'Bereich „ideen“ kommt aus der Workbench (6.3.5)');
+  S.oeffne('ideen');
+  pruefe(/Noch keine Idee/.test(inhalt()) && /iwNeu\(\)/.test(S.document.getElementById('fuss').innerHTML), 'leere Liste mit „+ Idee“');
+  S.iwNeu();
+  setz({ iwTitel: '', iwWarum: '', iwBereich: '' });
+  S.iwWeiter();
+  pruefe(S.iwAlle().length === 0 && S.cl.iw.stufe === 1, 'ohne Satz keine Idee');
+  setz({ iwTitel: 'Fotobuch für die Großeltern', iwWarum: 'Weihnachten', iwBereich: 'kb-beziehungen' });
+  S.iwWeiter();
+  const x = S.iwAlle()[0];
+  pruefe(x && x.titel === 'Fotobuch für die Großeltern' && x.bereich === 'kb-beziehungen' && S.cl.iw.stufe === 2 && x.stufe === 2, 'Einfangen: gespeichert, weiter zu „Klären“');
+  S.iwStufeZeigen(5);
+  pruefe(S.cl.iw.stufe === 2, 'Stufen lassen sich nicht überspringen');
+  setz({ iwErgebnis: '', iwFuerWen: '', iwErfolg: '', iwNicht: '' });
+  S.iwWeiter();
+  pruefe(S.cl.iw.stufe === 2, 'ohne Ergebnisbild kein Weiter');
+  setz({ iwErgebnis: 'Ein Buch' });
+  S.iwLesen();
+  const hw = S.iwHinweiseKlaeren(x);
+  pruefe(hw.some(h => /kein Datum/.test(h)) && hw.some(h => /NICHT/.test(h)) && hw.some(h => /Erfolg|gelungen/.test(h)), 'Klären: Hinweise auf Datum/Zahl, Grenzen und Erfolg');
+  setz({ iwErgebnis: 'Bis 20.12. liegen drei gedruckte Fotobücher unterm Baum.', iwFuerWen: 'Oma und Opa', iwErfolg: 'Sie blättern es durch', iwNicht: 'kein Kalender' });
+  S.iwWeiter();
+  pruefe(S.iwHinweiseKlaeren(x).length === 0 && S.cl.iw.stufe === 3, 'gutes Ergebnisbild: keine Hinweise, weiter zu „Ausloten“');
+  setz({ iwVS: '', iwVM: '', iwVL: '', iwKS: '', iwKM: '', iwKL: '', iwAS: '', iwAM: '', iwAL: '', iwZulasten: '' });
+  S.iwWeiter();
+  pruefe(S.cl.iw.stufe === 3, 'ohne Variante kein Weiter');
+  setz({ iwVS: 'ein Buch online', iwKS: '40 €', iwAS: '1 Abend', iwVM: 'drei Bücher', iwKM: '120 €', iwAM: '3 Abende' });
+  S.iwSetzen('risiko', 'M:gering');
+  const vm = x.varianten.filter(v => v.groesse === 'M')[0];
+  pruefe(x.varianten.length === 2 && vm && vm.risiko === 'gering' && vm.kosten === '120 €', 'Varianten S und M mit Kosten und Risiko');
+  S.iwSetzen('gewaehlt', vm.id); S.iwSetzen('wollen', 8);
+  S.iwSetzen('zulasten', 'kb-haus');
+  pruefe(x.zulasten === 'kb-haus', 'iwSetzen kennt „zulasten“');
+  const c = S.iwCheck(x);
+  pruefe(c && c.v === vm && /Wollen 8\/10/.test(c.text) && typeof c.wahl === 'string', 'Vorab-Check aus Kurs auf den Favoriten');
+  S.iwWeiter();
+  pruefe(S.cl.iw.stufe === 4, 'weiter zu „Entscheiden“');
+  S.iwWeiter();
+  pruefe(S.cl.iw.stufe === 4 && !x.entscheidDatum, 'ohne Entscheidung bleibt es bei „Entscheiden“');
+  /* Später → Wiedervorlage */
+  S.iwSetzen('entscheidung', 'spaeter');
+  pruefe(/iwWiedervorlage/.test(inhalt()), 'Später: Feld für die Wiedervorlage');
+  setz({ iwWiedervorlage: S.tagePlus(S.isoDatum(), -1) });
+  S.iwWeiter();
+  pruefe(x.status === 'spaeter' && x.wiedervorlage === S.tagePlus(S.isoDatum(), -1) && S.cl.iw.ansicht === 'liste', 'Später: Status und Datum gespeichert, zurück zur Liste');
+  pruefe(S.iwGruppe(x) === 'reifen' && S.iwHinweise().indexOf(x) >= 0, 'fällige Wiedervorlage: Idee ist „wieder da“ und Hinweis unter Heute');
+  S.oeffne('heute');
+  pruefe(/Idee wieder da: Fotobuch/.test(inhalt()), 'Heute zeigt „💡 Idee wieder da“');
+  S.oeffne('ideen');
+  S.iwOeffnen(x.id);
+  pruefe(S.cl.iw.stufe === 4, 'wieder da → öffnet bei „Entscheiden“');
+  S.iwSetzen('entscheidung', 'go'); S.iwWeiter();
+  pruefe(x.status === 'aktiv' && x.stufe === 5 && S.cl.iw.stufe === 5 && S.iwHinweise().indexOf(x) < 0, 'Go: weiter zu „Planen“, Hinweis weg');
+  /* Planen */
+  setz({ iwMsText: '', iwMsDatum: '', iwSchrittText: '' });
+  S.iwWeiter();
+  pruefe(S.cl.iw.stufe === 5, 'ohne nächsten Schritt kein Weiter');
+  setz({ iwMsText: 'Bilder ausgewählt', iwMsDatum: '2026-11-15', iwSchrittText: 'Ordner „Fotobuch“ anlegen' });
+  S.iwLesen(); leer(['iwMsText', 'iwMsDatum', 'iwSchrittText']);
+  setz({ iwSchrittText: 'Anbieter heraussuchen' }); S.iwLesen(); leer(['iwSchrittText']);
+  pruefe(x.meilensteine.length === 1 && x.schritte.length === 2, 'Meilenstein und zwei Schritte eingetragen');
+  pruefe(/kleiner/.test(S.iwHinweisSchritt('Alles organisieren und planen')) && S.iwHinweisSchritt('Ordner anlegen') === '', 'Hinweis bei zu großem ersten Schritt');
+  S.iwWeiter();
+  pruefe(S.cl.iw.stufe === 6 && S.iwGruppe(x) === 'umsetzung', 'Umsetzen erreicht');
+  pruefe(/Steckbrief/.test(inhalt()) && /Ergebnis: Bis 20\.12\./.test(S.iwSteckbriefText(x)) && /Nächster Schritt: Ordner/.test(S.iwSteckbriefText(x)), 'Steckbrief mit Ergebnis und nächstem Schritt');
+  /* Kurs-Haken */
+  const v = S.krEinesVorschlaege(3).filter(y => y.idee === x.id)[0];
+  pruefe(v && v.text === 'Ordner „Fotobuch“ anlegen' && /Idee: Fotobuch/.test(v.quelle), 'nächster Schritt erscheint in der Kurs-Morgen-Runde');
+  S.krMorgenStarten(); S.krRundeSetzen('energie', 3); S.krRundeSchritt(1); S.krRundeSchritt(1);
+  S.krRundeSetzen('wahl', String(S.krEinesVorschlaege(3).findIndex(y => y.idee === x.id)));
+  S.document.getElementById('krAufgabe').checked = false; S.document.getElementById('krWennDann').value = '';
+  S.krRundeSchritt(1);
+  pruefe(S.krTag(false).eines && S.krTag(false).eines.idee === x.id, '„das Eine“ merkt sich die Idee');
+  S.krEinesErledigt();
+  pruefe(x.schritte[0].erledigt && S.iwNaechsterSchritt(x).text === 'Anbieter heraussuchen', 'in Kurs erledigt → Schritt in der Idee abgehakt');
+  S.cl.kr.runde = null; S.cl.kr.ansicht = 'heute';
+  S.oeffne('ideen'); S.iwOeffnen(x.id);
+  /* Projekt in der Workbench */
+  S.iwProjektAnlegen();
+  const pr = S.kpSeiteFinden(x.projekt);
+  pruefe(pr && pr.titel === 'Fotobuch für die Großeltern' && /^Ziel: Bis 20\.12\./.test(pr.text) && /\[\] Anbieter heraussuchen/.test(pr.text) && /\[\] Bilder ausgewählt \(bis /.test(pr.text) && !/Ordner/.test(pr.text),
+    'Projekt angelegt: Ziel, offene Schritte und Meilensteine als Aufgaben');
+  const anz = S.DB.projekte.length; S.iwProjektAnlegen();
+  pruefe(S.DB.projekte.length === anz, 'kein zweites Projekt');
+  pruefe(S.iwNaechsterSchritt(x).projekt && S.iwNaechsterSchritt(x).text === 'Anbieter heraussuchen', 'nächster Schritt kommt jetzt aus dem Projekt');
+  S.iwNaechsterErledigt();
+  pruefe(/\[x\] Anbieter heraussuchen/.test(pr.text) && S.iwNaechsterSchritt(x).text.indexOf('Bilder ausgewählt') === 0, 'Schritt erledigt → im Projekt abgehakt');
+  /* Wochen-Check */
+  pruefe(S.iwWocheFaellig(x) === (new Date().getDay() === 0), 'Wochen-Check nur sonntags fällig');
+  S.iwSetzen('woche', 'kurs');
+  pruefe(x.wochen.length === 1 && x.wochen[0].kw === S.krWochenId() && !S.iwWocheFaellig(x), 'Wochen-Check gespeichert');
+  S.iwSetzen('woche', 'kurs');
+  pruefe(x.wochen.length === 1, 'pro Woche nur ein Eintrag');
+  /* Zurück-Taste und Statistik */
+  pruefe(S.cl.iw.ansicht === 'stufe' && S.clZurueck() !== false && S.cl.iw.ansicht === 'liste', 'Zurück: von der Idee zur Liste');
+  pruefe(/In Umsetzung/.test(inhalt()) && /nächster Schritt: Bilder/.test(inhalt()), 'Liste: Gruppe „In Umsetzung“ mit nächstem Schritt');
+  S.iwSetzen && S.iwOeffnen(x.id); S.iwSetzen('woche', 'fertig');
+  pruefe(x.status === 'fertig' && S.iwGruppe(x) === 'fertig' && S.iwVorschlaege().length === 0, 'abgeschlossen: kein Vorschlag mehr in Kurs');
+  pruefe(S.iwStatZeile() === '1 · 0 · 1', 'Statistik: Ideen · in Umsetzung · abgeschlossen');
+  /* Verwerfen */
+  S.iwNeu(); setz({ iwTitel: 'Zweite Idee', iwWarum: '', iwBereich: '' }); S.iwWeiter();
+  const y = S.iwFinden(S.cl.iw.id);
+  y.stufe = 4; S.cl.iw.stufe = 4; S.iwSetzen('entscheidung', 'verwerfen'); S.iwWeiter();
+  pruefe(y.status === 'verworfen' && S.cl.iw.ansicht === 'liste' && !/Zweite Idee/.test(inhalt()), 'Verwerfen: aus der offenen Liste');
+  S.iwAlleUm();
+  pruefe(/Verworfen/.test(inhalt()) && /Zweite Idee/.test(inhalt()), '„Abgeschlossene“ zeigt auch Verworfenes');
+  pruefe(/\.iw-stufen button\.hier/.test(QUELLE) && /\.iw-var\{/.test(QUELLE), 'Gestaltung für die Ideenwerkstatt vorhanden');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    64. Kurs 2.0: der Tag (0.30)
    Grund: Kurs soll täglich führen — Morgen-Runde, das Eine, Plan B,
    Abend-Runde mit Vorschlag, Pfade, die nur bei getanem Schritt weiterrücken.
@@ -3433,7 +3560,7 @@ function kursTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  pruefe(/'kurs'\]/.test(QUELLE) && Array.isArray(S.DB.kurs), 'Bereich „kurs“ kommt aus der Workbench (6.3.4)');
+  pruefe(/'kurs'[\],]/.test(QUELLE) && Array.isArray(S.DB.kurs), 'Bereich „kurs“ kommt aus der Workbench (6.3.4)');
   S.oeffne('kurs');
   const b = S.krBereiche(false);
   pruefe(b.length === 7 && b[0].id === 'kb-gesundheit' && b.every(x => /^kb-/.test(x.id)), 'beim ersten Öffnen sieben Bereiche mit festen Kennungen (keine Doppelten auf zwei Geräten)');
@@ -4034,6 +4161,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { ideenTest(); } catch (e) { fail('Ideenwerkstatt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kurs2Test(); } catch (e) { fail('Kurs 2.0 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { naechsteFaelligTest(); } catch (e) { fail('1. Nächste warf: ' + e.message); }
   try { vlMarkenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

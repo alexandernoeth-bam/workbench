@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.30.0</title>
+<title>CLIE 0.31.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -546,6 +546,25 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .vl-entsperren{text-align:center}
 .vl-wisch{width:240px;height:46px;border:2px solid #2b3326;border-radius:23px;display:flex;align-items:center;padding:0 4px;margin:10px auto 0;touch-action:none}
 .vl-wisch i{width:36px;height:36px;border-radius:50%;background:#2b3326;color:#6a775f;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:20px}
+/* Ideenwerkstatt (seit 0.31) */
+.iw-idee{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:7px 0}
+.iw-idee small{display:block;font-size:16px;color:var(--px-mitte);margin-top:2px}
+.iw-idee .kr-kh b{font-weight:400;border:2px solid var(--px);padding:0 5px;font-size:15.5px;white-space:nowrap;height:fit-content}
+.iw-titel{font-size:19px;color:var(--px)}
+.iw-stufen button{flex:1;text-align:center;font-size:15.5px;border:2px solid var(--px);padding:1px 0}
+.iw-stufen button.an{background:var(--px);color:var(--lcd)}
+.iw-stufen button.hier{outline:3px solid var(--px);outline-offset:2px}
+.iw-stufen button:disabled{border-color:var(--px-zart);color:var(--px-zart)}
+.iw-var{border:2px solid var(--px);padding:6px 8px;margin:8px 0}
+.iw-var.an{box-shadow:3px 3px 0 var(--px);background:var(--lcd-hell)}
+.iw-var > b{font-size:18px}
+.iw-zeile{display:flex;gap:6px;margin-top:4px}
+.iw-zeile .eingabe{flex:1;min-width:0}
+.iw-datum{flex:0 0 150px!important}
+.iw-schr{display:flex;gap:8px;align-items:flex-start;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:18px}
+.iw-schr span{flex:1}
+.iw-steck{white-space:pre-wrap}
+.iw-entsch{grid-template-columns:1fr 1fr 1fr}
 /* Kurs (seit 0.28) */
 .kr-karte{display:block;width:100%;text-align:left;border:2px solid var(--px);background:var(--lcd-hell);padding:8px 10px;margin:8px 0}
 .kr-karte.jetzt{box-shadow:3px 3px 0 var(--px)}
@@ -668,7 +687,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.30.0';
+var APP_VERSION = '0.31.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -713,7 +732,10 @@ var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe
                   'vorlesen',
                   /* seit v6.3.4: App „Kurs“ im CLIE — Lebensbereiche,
                      Prinzipien, Entscheidungen, Wochen (Feld „typ“) */
-                  'kurs'];
+                  'kurs',
+                  /* seit v6.3.5: App „Ideenwerkstatt“ im CLIE — Ideen von
+                     der ersten Notiz bis zur Umsetzung */
+                  'ideen'];
 
 /* Aus der Workbench: nummerierte Zeilen */
 var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
@@ -758,7 +780,7 @@ var kalenderLaeuft = false;
 var kalenderUhr = null;
 
 /* ============================================================
-   Unterbau aus der Workbench 6.3.4 — wörtlich übernommen:
+   Unterbau aus der Workbench 6.3.5 — wörtlich übernommen:
    Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke,
    Kalender lesen, leere Datenbank und der Aktivitäten-Kern (kp…).
    ============================================================ */
@@ -1662,6 +1684,7 @@ function leereDatenbank() {
     lernstand:         [],
     vorlesen:          [],
     kurs:              [],
+    ideen:             [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -2903,6 +2926,7 @@ var CL_APPS = [
   { id: 'kalender', name: 'Kalender', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
   /* Seit 0.28 steht „Kurs“ an der Stelle von „Heute“ — Heute bleibt unten in der Leiste */
   { id: 'kurs', name: 'Kurs', stufe: '', was: '' },
+  { id: 'ideen', name: 'Ideenwerkstatt', rasterName: 'Ideen-\nwerkstatt', stufe: '', was: '' },
   { id: 'heute', name: 'Heute', stufe: '', was: '', raster: false },
   { id: 'aufgaben', name: 'Aufgaben', stufe: '',    was: 'Alle offenen Aufgaben in einer Liste. Oben rechts wählst du Alle, Beruf, Privat oder eine einzelne Liste. Abhaken wirkt in der Seite.' },
   { id: 'memo',     name: 'Memo',     stufe: '',    was: 'Alle Seiten: Projekte, Ziele, Listen und Notizen — lesen, schreiben, Details.' },
@@ -2962,6 +2986,8 @@ var CL_BILD = {
   /* Zwei Karteikarten, die vordere mit Zeilen (seit 0.23) */
   lernkartei: '<rect x="22" y="14" width="26" height="18" rx="2" ' + CL_STRICH + '/><rect x="14" y="26" width="28" height="22" rx="2" ' + CL_FUELL + '/>'
         + '<rect x="18" y="32" width="20" height="3" fill="#1C2116"/><rect x="18" y="39" width="14" height="3" fill="#1C2116"/>',
+  /* Glühbirne (seit 0.31) */
+  ideen: '<path d="M32 14c-8 0-13 6-13 12 0 5 3 8 5 10 1 1 2 3 2 5h12c0-2 1-4 2-5 2-2 5-5 5-10 0-6-5-12-13-12z" ' + CL_STRICH + '/><rect x="26" y="44" width="12" height="3" ' + CL_FUELL + '/><rect x="27" y="49" width="10" height="3" ' + CL_FUELL + '/>',
   /* Kompassnadel im Kreis (seit 0.28) */
   kurs: '<circle cx="32" cy="32" r="17" ' + CL_STRICH + '/><path d="M32 18l5 14h-10z" ' + CL_FUELL + '/><path d="M32 46l-5-14h10z" stroke="#C9D3B7" stroke-width="2" fill="none" stroke-linejoin="round"/>',
   /* Lautsprecher mit Schallbögen (seit 0.26) */
@@ -3229,7 +3255,10 @@ function heuteHtml() {
   var hinweise = clsAlle('lauf').map(function (g) {
     var st = clsStand(g);
     return '<button type="button" class="hz" onclick="oeffne(\'checklisten\');clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">☑ ' + esc(g.titel) + ' · ' + st.fertig + '/' + st.alle + '</span></button>';
-  }).concat(krTagesHinweis() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');' + (krTagesHinweis() === 'morgen' ? 'krMorgenStarten()' : 'krAbendStarten()') + '"><span class="tx">'
+  }).concat(iwHinweise().map(function (x) {
+    return '<button type="button" class="hz" onclick="oeffne(\'ideen\');iwOeffnen(\'' + esc(x.id) + '\')"><span class="tx">'
+      + (x.status === 'spaeter' ? '💡 Idee wieder da: ' : '💡 Wochen-Check: ') + esc(x.titel) + '</span></button>';
+  })).concat(krTagesHinweis() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');' + (krTagesHinweis() === 'morgen' ? 'krMorgenStarten()' : 'krAbendStarten()') + '"><span class="tx">'
     + (krTagesHinweis() === 'morgen' ? '☀ Kurs: Morgen-Runde' : '☾ Kurs: Abend-Runde') + '</span></button>'] : [])
     .concat(krRueckblickFaellig() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');krAnsicht(\'woche\');krFensterAuf(\'rueckblick\')"><span class="tx">◎ Kurs: Wochenrückblick</span></button>'] : [])
     .concat(lkAlleHeute() ? ['<button type="button" class="hz" onclick="oeffne(\'lernkartei\')"><span class="tx">▤ Lernkartei · ' + lkAlleHeute() + ' Karten fällig</span></button>'] : []).concat(saHinweise().map(function (x) {
@@ -3635,6 +3664,7 @@ function statistikHtml() {
     + clStatBlock('schach', 'Schach', [['gegen CLIE: gewonnen · verloren · remis', schBilanzLesen().g + ' · ' + schBilanzLesen().v + ' · ' + schBilanzLesen().r]])
     + clStatBlock('lernkartei', 'Lernkartei', [['Kästen · Karten · heute fällig', lkStatZeile()]])
     + clStatBlock('kurs', 'Kurs', [['Bereiche · Prinzipien · Entscheidungen', krStatZeile()]])
+    + clStatBlock('ideen', 'Ideenwerkstatt', [['Ideen · in Umsetzung · abgeschlossen', iwStatZeile()]])
     + clStatBlock('vorlesen', 'Vorlesen', [['Dokumente · fertig gehört', vlStatZeile()]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
@@ -3657,7 +3687,7 @@ function uebersichtHtml() {
   CL_APPS.filter(function (a) { return a.raster !== false; }).forEach(function (a) {
     h += '<button type="button" class="app" onclick="oeffne(\'' + a.id + '\')">'
        + '<span class="sym">' + clSymbol(a.id) + (a.id === 'heute' ? clHeuteZahlHtml() : '') + (a.id === 'checklisten' ? clsLaufZahlHtml() : '') + '</span>'
-       + esc(a.name) + '</button>';
+       + esc(a.rasterName || a.name).replace(/\n/g, '<br>') + '</button>';
   });
   /* Seit 0.7.1 keine Zahlen an den Symbolen — außer an „Heute“ (seit 0.9) und laufenden Checklisten (seit 0.27, zum Ausprobieren) */
   return h + '</div><button type="button" class="fassung" onclick="oeffne(\'statistik\')">CLIE v' + esc(APP_VERSION) + ' · <u>Statistik</u></button>';
@@ -3724,6 +3754,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'lernkartei') { el.innerHTML = lernkarteiHtml(); }
   else if (cl.app === 'vorlesen') { el.innerHTML = vorlesenHtml(); }
   else if (cl.app === 'kurs') { el.innerHTML = kursHtml(); }
+  else if (cl.app === 'ideen') { el.innerHTML = ideenHtml(); }
   else if (cl.app === 'drive') {
     /* Beim Suchen bleibt das Feld stehen — nur die Liste kommt neu */
     if (cl.drv.tab === 'suche' && el.innerHTML.indexOf('drvFeld') >= 0) { drvZeichnen(); return; }
@@ -3777,6 +3808,7 @@ function kopfZeichnen() {
       : (cl.app === 'lernkartei') ? '▼ ' + lkKopfText()
       : (cl.app === 'vorlesen') ? vlKopfText()
       : (cl.app === 'kurs') ? krKopfText()
+      : (cl.app === 'ideen') ? iwKopfText()
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
     kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl') ? ' an' : '');
   }
@@ -3892,7 +3924,8 @@ function fussZeichnen() {
         : (cl.app === 'schach') ? schachFussHtml()
         : (cl.app === 'lernkartei') ? lernkarteiFussHtml()
         : (cl.app === 'vorlesen') ? vorlesenFussHtml()
-        : (cl.app === 'kurs') ? kursFussHtml() : '';
+        : (cl.app === 'kurs') ? kursFussHtml()
+        : (cl.app === 'ideen') ? ideenFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
 }
@@ -3932,7 +3965,7 @@ function oeffne(id) {
 }
 
 function katUm() {
-  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs') { return; }
+  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'ideen') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
     : (cl.app === 'lernkartei') ? 'lkwahl'
@@ -14148,7 +14181,8 @@ function krEinesVorschlaege(energie) {
   ((w && w.wesentliche) || []).filter(function (x) { return !x.erledigt; }).forEach(function (x) {
     l.push({ text: x.text, bereich: x.bereich, quelle: 'Wesentliches der Woche' });
   });
-  return l;
+  /* Nächste Schritte aus der Ideenwerkstatt (seit 0.31) */
+  return l.concat(iwVorschlaege());
 }
 
 function krRundeLesen() {
@@ -14186,7 +14220,7 @@ function krPlanBVorschlag(r) {
 /* Gewähltes „Eines“ aus der Runde */
 function krEinesAusRunde(r) {
   var t = krTag(false);
-  if (r.wahl === 'gewaehlt' && t && t.eines) { return { text: t.eines.text, bereich: t.eines.bereich, quelle: t.eines.quelle }; }
+  if (r.wahl === 'gewaehlt' && t && t.eines) { return { text: t.eines.text, bereich: t.eines.bereich, quelle: t.eines.quelle, idee: t.eines.idee }; }
   if (r.wahl === '' || r.wahl === null || r.wahl === undefined) { return null; }
   if (r.wahl === 'eigen') { return r.eigen.trim() ? { text: r.eigen.trim().slice(0, 120), bereich: '', quelle: 'eigen' } : null; }
   var v = krEinesVorschlaege(r.energie)[Number(r.wahl)];
@@ -14205,7 +14239,7 @@ function krRundeSchritt(d) {
     var t = krTag(true);
     var neu = !t.eines || t.eines.text !== e.text;
     t.eines = { text: e.text, bereich: e.bereich || '', quelle: e.quelle || '', wennDann: String(r.wennDann || '').trim().slice(0, 200),
-                erledigt: neu ? false : !!t.eines.erledigt };
+                erledigt: neu ? false : !!t.eines.erledigt, idee: e.idee || (neu ? '' : t.eines.idee || '') };
     if (r.aufgabe && neu) { krAlsAufgabe(e.text); }
     r.wahl = 'gewaehlt';
     krSpeichern(t);
@@ -14271,6 +14305,7 @@ function krEinesErledigt() {
   var t = krTag(false);
   if (!t || !t.eines) { return; }
   t.eines.erledigt = !t.eines.erledigt;
+  if (t.eines.erledigt && t.eines.idee) { iwSchrittAbhaken(t.eines.idee, t.eines.text); }
   krSpeichern(t);
   if (t.eines.erledigt) { melde('Stark — eine Stimme für den, der du sein willst.', 'gut'); }
   krZeichnen();
@@ -14310,7 +14345,10 @@ function krAbendSpeichern() {
   var t = krTag(true);
   var vorher = t.abend && t.abend.ergebnis;
   t.abend = { ergebnis: r.ergebnis, grund: r.ergebnis === 'ja' ? '' : r.grund, notiz: String(r.notiz || '').trim().slice(0, 400), vorschlag: krAbendVorschlag(r), am: isoZeitJetzt() };
-  if (t.eines) { t.eines.erledigt = r.ergebnis === 'ja'; }
+  if (t.eines) {
+    if (r.ergebnis === 'ja' && !t.eines.erledigt && t.eines.idee) { iwSchrittAbhaken(t.eines.idee, t.eines.text); }
+    t.eines.erledigt = r.ergebnis === 'ja';
+  }
   /* Der Pfad rückt nur weiter, wenn der Schritt (ganz oder teilweise) getan ist — und nur einmal am Tag */
   var ap = krAktiverPfad();
   var pfadSchritt = ap && t.eines && /^Pfad /.test(t.eines.quelle || '');
@@ -14543,6 +14581,549 @@ function krZeichnen() {
 
 function krStatZeile() {
   return krBereiche(false).length + ' · ' + krPrinzipien().length + ' · ' + krEntscheidungen('').length;
+}
+
+/* ---------- Ideenwerkstatt (seit 0.31) ----------
+
+   Von der Idee zur Umsetzung — und dranbleiben. Eine Idee durchläuft sechs
+   Stufen: Einfangen, Klären, Ausloten, Entscheiden, Planen, Umsetzen. Jede
+   Stufe fragt das Nötige mit Beispielen und gibt einfache Hinweise. Am Ende
+   steht ein Steckbrief; ein Tipp legt ein Projekt in der Workbench an, und
+   der nächste Schritt erscheint in der Kurs-Morgen-Runde als Vorschlag.
+   Alles liegt in der workbench.json (Bereich „ideen“, Workbench 6.3.5). */
+
+var IW_STUFEN = [[1, 'Einfangen', 'Fang'], [2, 'Klären', 'Klären'], [3, 'Ausloten', 'Ausloten'], [4, 'Entscheiden', 'Entsch.'], [5, 'Planen', 'Planen'], [6, 'Umsetzen', 'Umsetz.']];
+var IW_RISIKO = [['gering', 'gering'], ['mittel', 'mittel'], ['hoch', 'hoch']];
+var IW_WOCHE = [['kurs', 'auf Kurs'], ['justieren', 'nachjustieren'], ['pause', 'pausieren'], ['fertig', 'abschließen']];
+
+cl.iw = { ansicht: 'liste', id: '', stufe: 1, fenster: '', alle: false, wahl: '' };
+
+function iwAlle() {
+  return (Array.isArray(DB.ideen) ? DB.ideen : []).filter(function (x) { return x && x.id; });
+}
+
+function iwFinden(id) {
+  return iwAlle().filter(function (x) { return x.id === id; })[0] || null;
+}
+
+function iwSpeichern(x) {
+  if (!Array.isArray(DB.ideen)) { DB.ideen = []; }
+  if (DB.ideen.indexOf(x) < 0) { DB.ideen.push(x); }
+  x.zuletzt = isoDatum();
+  x.geaendert = jetzt();
+  spaeterSichern();
+  return x;
+}
+
+function iwTageSeit(is) {
+  var a = saTagNr(is);
+  var b = saTagNr(isoDatum());
+  return (a === null || b === null) ? 0 : b - a;
+}
+
+/* Wo steht eine Idee? umsetzung · reifen · eingefangen · spaeter · fertig · verworfen */
+function iwGruppe(x) {
+  if (x.status === 'fertig' || x.status === 'verworfen') { return x.status; }
+  if (x.status === 'spaeter') { return (x.wiedervorlage && x.wiedervorlage <= isoDatum()) ? 'reifen' : 'spaeter'; }
+  if ((Number(x.stufe) || 1) >= 6) { return 'umsetzung'; }
+  return (Number(x.stufe) || 1) <= 1 ? 'eingefangen' : 'reifen';
+}
+
+/* Der nächste Schritt: aus dem Workbench-Projekt (wenn angelegt), sonst aus dem Plan */
+function iwNaechsterSchritt(x) {
+  if (x.projekt) {
+    var s = kpSeiteFinden(x.projekt);
+    if (s) {
+      var zeilen = String(s.text || '').split('\n');
+      var i;
+      for (i = 0; i < zeilen.length; i++) {
+        var a = kpAufgabe(zeilen[i]);
+        if (a && !a.erledigt && a.text) { return { text: kpPrio(a.text).text || a.text, nr: i, projekt: true }; }
+      }
+      return null;
+    }
+  }
+  var o = (x.schritte || []).filter(function (y) { return !y.erledigt; })[0];
+  return o ? { text: o.text, id: o.id, projekt: false } : null;
+}
+
+/* Für die Kurs-Morgen-Runde: nächste Schritte der Ideen in Umsetzung */
+function iwVorschlaege() {
+  return iwAlle().filter(function (x) { return iwGruppe(x) === 'umsetzung'; }).map(function (x) {
+    var n = iwNaechsterSchritt(x);
+    return n ? { text: n.text, bereich: x.bereich || '', quelle: 'Idee: ' + x.titel, idee: x.id } : null;
+  }).filter(function (v) { return !!v; });
+}
+
+function iwSchrittAbhaken(ideeId, text) {
+  var x = iwFinden(ideeId);
+  if (!x) { return false; }
+  var n = iwNaechsterSchritt(x);
+  if (!n || n.text !== text) { return false; }
+  if (n.projekt) {
+    var s = kpSeiteFinden(x.projekt);
+    if (!s || !kpSeiteKastenUmKern(s, n.nr)) { return false; }
+  } else {
+    (x.schritte || []).forEach(function (y) { if (y.id === n.id) { y.erledigt = true; } });
+  }
+  iwSpeichern(x);
+  return true;
+}
+
+/* ---- Hinweise: einfache Prüfungen, keine Vorschrift ---- */
+
+function iwHinweiseKlaeren(x) {
+  var h = [];
+  var e = String(x.ergebnis || '');
+  if (e && !/\d/.test(e)) { h.push('Dein Ergebnisbild hat kein Datum und keine Zahl. Zum Beispiel: „Bis 20.12. liegen drei gedruckte Bücher unterm Baum.“'); }
+  if (e && e.length < 30) { h.push('Noch knapp — wie sieht es genau aus, wenn es fertig ist? Was siehst, hörst, hältst du in der Hand?'); }
+  if (!String(x.nicht || '').trim()) { h.push('Was gehört ausdrücklich NICHT dazu? Grenzen schützen davor, dass die Idee ausufert.'); }
+  if (!String(x.erfolg || '').trim()) { h.push('Woran merkst du, dass es gelungen ist? Ein beobachtbares Zeichen hilft beim Abschließen.'); }
+  return h;
+}
+
+function iwHinweisSchritt(text) {
+  var t = String(text || '');
+  if (!t) { return ''; }
+  if (t.length > 60 || /\b(planen|organisieren|überlegen|kümmern|klären|erledigen|machen)\b/i.test(t)) {
+    return 'Mach den ersten Schritt kleiner und sichtbar — etwas, das in zwei Minuten erledigt ist (Ordner anlegen, eine Nummer heraussuchen, eine Mail beginnen).';
+  }
+  return '';
+}
+
+/* ---- Bedienen ---- */
+
+function iwNeu() {
+  krAnfangen();
+  cl.iw.id = '';
+  cl.iw.stufe = 1;
+  cl.iw.ansicht = 'stufe';
+  cl.iw.fenster = '';
+  iwZeichnen();
+}
+
+function iwOeffnen(id) {
+  var x = iwFinden(id);
+  if (!x) { return; }
+  cl.iw.id = id;
+  cl.iw.stufe = Math.max(1, Math.min(6, Number(x.stufe) || 1));
+  if (x.status === 'spaeter' && x.wiedervorlage && x.wiedervorlage <= isoDatum()) { cl.iw.stufe = 4; }
+  cl.iw.ansicht = 'stufe';
+  cl.iw.fenster = '';
+  iwZeichnen();
+}
+
+function iwStufeZeigen(n) {
+  var x = iwFinden(cl.iw.id);
+  if (!x && n > 1) { return; }
+  iwLesen();
+  if (x && n > (Number(x.stufe) || 1)) { return; }
+  cl.iw.stufe = n;
+  iwZeichnen();
+}
+
+function iwWert(id) {
+  var e = document.getElementById(id);
+  return e && typeof e.value === 'string' ? e.value : null;
+}
+
+/* Felder der gezeigten Stufe übernehmen (ohne Stufenwechsel) */
+function iwLesen() {
+  var x = iwFinden(cl.iw.id);
+  var s = cl.iw.stufe;
+  if (s === 1) {
+    var t = iwWert('iwTitel');
+    if (t === null) { return x; }
+    if (!x) {
+      if (!String(t).trim()) { return null; }
+      x = { id: 'iw-' + neueKennung(), titel: '', warum: '', stufe: 1, status: 'aktiv', angelegt: isoDatum(), varianten: [], meilensteine: [], schritte: [], wochen: [] };
+      cl.iw.id = x.id;
+    }
+    x.titel = String(t).trim().slice(0, 120) || x.titel;
+    x.warum = String(iwWert('iwWarum') || '').trim().slice(0, 400);
+    var b = iwWert('iwBereich');
+    if (b !== null) { x.bereich = b; }
+    iwSpeichern(x);
+    return x;
+  }
+  if (!x) { return null; }
+  if (s === 2) {
+    if (iwWert('iwErgebnis') === null) { return x; }
+    x.ergebnis = String(iwWert('iwErgebnis')).trim().slice(0, 400);
+    x.fuerWen = String(iwWert('iwFuerWen') || '').trim().slice(0, 200);
+    x.erfolg = String(iwWert('iwErfolg') || '').trim().slice(0, 300);
+    x.nicht = String(iwWert('iwNicht') || '').trim().slice(0, 300);
+  }
+  if (s === 3) {
+    ['S', 'M', 'L'].forEach(function (g) {
+      if (iwWert('iwV' + g) === null) { return; }
+      var v = (x.varianten || []).filter(function (y) { return y.groesse === g; })[0];
+      var name = String(iwWert('iwV' + g) || '').trim();
+      if (!v && !name) { return; }
+      if (!v) { v = { id: neueKennung(), groesse: g, risiko: 'mittel' }; x.varianten.push(v); }
+      v.name = name.slice(0, 120);
+      v.kosten = String(iwWert('iwK' + g) || '').trim().slice(0, 40);
+      v.aufwand = String(iwWert('iwA' + g) || '').trim().slice(0, 60);
+    });
+    var z = iwWert('iwZulasten');
+    if (z !== null) { x.zulasten = z; }
+  }
+  if (s === 5) {
+    var ms = iwWert('iwMsText');
+    var sc = iwWert('iwSchrittText');
+    if (ms !== null && String(ms).trim()) {
+      x.meilensteine.push({ id: neueKennung(), text: String(ms).trim().slice(0, 120), datum: String(iwWert('iwMsDatum') || ''), erledigt: false });
+      x.meilensteine.sort(function (a, b) { return String(a.datum || '9999').localeCompare(String(b.datum || '9999')); });
+    }
+    if (sc !== null && String(sc).trim()) {
+      x.schritte.push({ id: neueKennung(), text: String(sc).trim().slice(0, 120), erledigt: false });
+    }
+  }
+  iwSpeichern(x);
+  return x;
+}
+
+function iwWeiter() {
+  var x = iwLesen();
+  var s = cl.iw.stufe;
+  if (!x) { melde('Bitte die Idee in einem Satz eintragen.', 'warn'); return; }
+  if (s === 2 && !String(x.ergebnis || '').trim()) { melde('Wie sieht es aus, wenn es fertig ist?', 'warn'); return; }
+  if (s === 3 && !(x.varianten || []).some(function (v) { return v.name; })) { melde('Bitte mindestens eine Variante eintragen.', 'warn'); return; }
+  if (s === 4) { iwEntscheiden(); return; }
+  if (s === 5 && !(x.schritte || []).some(function (y) { return !y.erledigt; }) && !x.projekt) { melde('Bitte mindestens einen nächsten Schritt eintragen.', 'warn'); return; }
+  if (s >= 6) { iwZurListe(); return; }
+  x.stufe = Math.max(Number(x.stufe) || 1, s + 1);
+  iwSpeichern(x);
+  cl.iw.stufe = s + 1;
+  iwZeichnen();
+}
+
+function iwZurueck() {
+  iwLesen();
+  if (cl.iw.stufe > 1) { cl.iw.stufe--; iwZeichnen(); } else { iwZurListe(); }
+}
+
+function iwZurListe() {
+  iwLesen();
+  cl.iw.ansicht = 'liste';
+  cl.iw.fenster = '';
+  iwZeichnen();
+}
+
+function iwSetzen(feld, wert) {
+  var x = iwLesen();
+  if (!x) { return; }
+  if (feld === 'gewaehlt') { x.gewaehlt = wert; }
+  else if (feld === 'risiko') {
+    var t = String(wert).split(':');
+    (x.varianten || []).forEach(function (v) { if (v.groesse === t[0]) { v.risiko = t[1]; } });
+  } else if (feld === 'wollen') { x.wollen = Number(wert) || 0; }
+  else if (feld === 'entscheidung') { x.entscheidung = wert; }
+  else if (feld === 'zulasten') { x.zulasten = wert; }
+  else if (feld === 'woche') { iwWocheSetzen(x, wert); return; }
+  iwSpeichern(x);
+  iwZeichnen();
+}
+
+/* Vorab-Check aus Kurs auf die gewählte Variante */
+function iwCheck(x) {
+  var v = (x.varianten || []).filter(function (y) { return y.id === x.gewaehlt; })[0];
+  if (!v || !x.wollen) { return null; }
+  var e = krEmpfehlung({ regeln: {}, wollen: x.wollen, zulasten: x.zulasten || '', fokus: krFokus() });
+  var zl = krFinden(x.zulasten);
+  return { v: v, wahl: e.wahl, text: v.groesse + ' · ' + (v.name || '') + (v.aufwand ? ' · ' + v.aufwand : '') + (zl ? ' · zu Lasten von ' + zl.name + (krFokus().indexOf(zl.id) >= 0 ? ' (Fokus)' : '') : '')
+           + ' · Wollen ' + x.wollen + '/10', gruende: e.gruende };
+}
+
+function iwEntscheiden() {
+  var x = iwLesen();
+  if (!x) { return; }
+  if (!x.entscheidung) { melde('Bitte entscheiden: Go, Später oder Verwerfen.', 'warn'); return; }
+  x.entscheidDatum = isoDatum();
+  if (x.entscheidung === 'go') {
+    if (!x.gewaehlt && (x.varianten || []).length) { x.gewaehlt = x.varianten[0].id; }
+    x.status = 'aktiv';
+    x.stufe = Math.max(Number(x.stufe) || 1, 5);
+    cl.iw.stufe = 5;
+  } else if (x.entscheidung === 'spaeter') {
+    var w = String(iwWert('iwWiedervorlage') || '');
+    x.status = 'spaeter';
+    x.wiedervorlage = /^\d{4}-\d{2}-\d{2}$/.test(w) ? w : tagePlus(isoDatum(), 14);
+    melde('„' + x.titel + '“ reift — sie kommt am ' + kurzDatum(x.wiedervorlage) + ' wieder.', 'gut');
+    cl.iw.ansicht = 'liste';
+  } else {
+    x.status = 'verworfen';
+    melde('Verworfen — auch das ist eine Entscheidung.', null);
+    cl.iw.ansicht = 'liste';
+  }
+  iwSpeichern(x);
+  iwZeichnen();
+}
+
+function iwEintragWeg(art, id) {
+  var x = iwFinden(cl.iw.id);
+  if (!x) { return; }
+  iwLesen();
+  x[art] = (x[art] || []).filter(function (y) { return y.id !== id; });
+  iwSpeichern(x);
+  iwZeichnen();
+}
+
+function iwSchrittUm(id) {
+  var x = iwFinden(cl.iw.id);
+  if (!x) { return; }
+  (x.schritte || []).forEach(function (y) { if (y.id === id) { y.erledigt = !y.erledigt; } });
+  (x.meilensteine || []).forEach(function (y) { if (y.id === id) { y.erledigt = !y.erledigt; } });
+  iwSpeichern(x);
+  iwZeichnen();
+}
+
+/* Nächsten Schritt erledigen (im Projekt oder im Plan) */
+function iwNaechsterErledigt() {
+  var x = iwFinden(cl.iw.id);
+  var n = x ? iwNaechsterSchritt(x) : null;
+  if (!n) { return; }
+  iwSchrittAbhaken(x.id, n.text);
+  melde('Erledigt: ' + n.text, 'gut');
+  iwZeichnen();
+}
+
+/* Übergabe an die Workbench: ein Projekt mit Meilensteinen und Schritten als Aufgaben */
+function iwProjektAnlegen() {
+  var x = iwFinden(cl.iw.id);
+  if (!x || x.projekt) { return; }
+  var s = kpSeiteAnlegen('vorhaben', x.titel, 'privat', 'projekt');
+  if (!s) { melde('Das Projekt ließ sich nicht anlegen.', 'warn'); return; }
+  var zeilen = [];
+  if (x.ergebnis) { zeilen.push('Ziel: ' + x.ergebnis); }
+  (x.schritte || []).filter(function (y) { return !y.erledigt; }).forEach(function (y) { zeilen.push('[] ' + y.text); });
+  (x.meilensteine || []).filter(function (y) { return !y.erledigt; }).forEach(function (y) { zeilen.push('[] ' + y.text + (y.datum ? ' (bis ' + kurzDatum(y.datum) + ')' : '')); });
+  s.text = zeilen.join('\n');
+  s.geaendert = jetzt();
+  x.projekt = s.id;
+  iwSpeichern(x);
+  melde('Projekt „' + x.titel + '“ in der Workbench angelegt.', 'gut');
+  iwZeichnen();
+}
+
+function iwWocheSetzen(x, wert) {
+  if (!Array.isArray(x.wochen)) { x.wochen = []; }
+  var kw = krWochenId();
+  x.wochen = x.wochen.filter(function (w) { return w.kw !== kw; });
+  x.wochen.push({ kw: kw, status: wert, datum: isoDatum() });
+  if (wert === 'fertig') { x.status = 'fertig'; x.fertigAm = isoDatum(); melde('„' + x.titel + '“ abgeschlossen — Glückwunsch!', 'gut'); }
+  else if (wert === 'pause') { x.status = 'spaeter'; x.wiedervorlage = tagePlus(isoDatum(), 14); melde('Pausiert — kommt in zwei Wochen wieder.', null); }
+  else if (wert === 'justieren') { cl.iw.stufe = 5; }
+  iwSpeichern(x);
+  if (wert === 'fertig' || wert === 'pause') { cl.iw.ansicht = 'liste'; }
+  iwZeichnen();
+}
+
+function iwWocheFaellig(x) {
+  if (iwGruppe(x) !== 'umsetzung' || new Date().getDay() !== 0) { return false; }
+  var kw = krWochenId();
+  return !(x.wochen || []).some(function (w) { return w.kw === kw; });
+}
+
+function iwSteckbriefText(x) {
+  var v = (x.varianten || []).filter(function (y) { return y.id === x.gewaehlt; })[0];
+  var n = iwNaechsterSchritt(x);
+  return 'Idee: ' + x.titel + (x.warum ? '\nWarum jetzt: ' + x.warum : '')
+    + (x.ergebnis ? '\nErgebnis: ' + x.ergebnis : '') + (x.fuerWen ? '\nFür wen: ' + x.fuerWen : '') + (x.erfolg ? '\nErfolg: ' + x.erfolg : '')
+    + (x.nicht ? '\nNicht dazu: ' + x.nicht : '')
+    + ((x.varianten || []).length ? '\nVarianten: ' + x.varianten.map(function (y) { return y.groesse + ' ' + y.name + (y.kosten ? ' (' + y.kosten + ')' : ''); }).join(' · ') : '')
+    + (v ? '\nGewählt: ' + v.groesse + ' ' + v.name : '')
+    + ((x.meilensteine || []).length ? '\nMeilensteine: ' + x.meilensteine.map(function (m) { return (m.erledigt ? '✓ ' : '') + m.text + (m.datum ? ' (' + kurzDatum(m.datum) + ')' : ''); }).join(' · ') : '')
+    + (n ? '\nNächster Schritt: ' + n.text : '');
+}
+
+function iwVertiefen() {
+  var x = iwFinden(cl.iw.id);
+  if (!x) { return; }
+  krKopieren(iwSteckbriefText(x) + '\n\nHilf mir, diese Idee weiter zu konkretisieren: Was übersehe ich, was wäre ein besserer erster Schritt?');
+}
+
+/* Hinweise unter „Heute“: Wiedervorlagen und sonntags der Wochen-Check */
+function iwHinweise() {
+  return iwAlle().filter(function (x) {
+    return (x.status === 'spaeter' && x.wiedervorlage && x.wiedervorlage <= isoDatum()) || iwWocheFaellig(x);
+  });
+}
+
+/* ---- Zeichnen ---- */
+
+function iwListeHtml() {
+  var l = iwAlle();
+  var gruppen = [['umsetzung', 'In Umsetzung'], ['reifen', 'Reifen'], ['eingefangen', 'Eingefangen'], ['spaeter', 'Später']];
+  if (cl.iw.alle) { gruppen.push(['fertig', 'Abgeschlossen'], ['verworfen', 'Verworfen']); }
+  var h = '';
+  gruppen.forEach(function (g) {
+    var teil = l.filter(function (x) { return iwGruppe(x) === g[0]; }).sort(function (a, b) { return String(b.zuletzt || '').localeCompare(String(a.zuletzt || '')); });
+    if (!teil.length) { return; }
+    h += '<div class="abschnitt kr-ab"><span>' + g[1] + '</span><span class="leise">' + teil.length + '</span></div>' + teil.map(function (x) {
+      var st = IW_STUFEN[Math.max(0, Math.min(5, (Number(x.stufe) || 1) - 1))];
+      var n = g[0] === 'umsetzung' ? iwNaechsterSchritt(x) : null;
+      var marke = x.status === 'spaeter' ? (g[0] === 'reifen' ? 'wieder da' : 'Später') : (x.status === 'fertig' ? '✓' : (x.status === 'verworfen' ? '✗' : st[0] + ' ' + st[1]));
+      var unter = n ? 'nächster Schritt: ' + n.text + (x.projekt ? ' · Projekt in der Workbench' : '')
+        : (x.status === 'spaeter' ? (g[0] === 'reifen' ? 'zurück zum Entscheiden' : 'kommt am ' + kurzDatum(x.wiedervorlage) + ' wieder')
+          : 'zuletzt ' + (iwTageSeit(x.zuletzt) === 0 ? 'heute' : 'vor ' + iwTageSeit(x.zuletzt) + ' Tag' + (iwTageSeit(x.zuletzt) === 1 ? '' : 'en')));
+      return '<button type="button" class="iw-idee" onclick="iwOeffnen(\'' + esc(x.id) + '\')"><span class="kr-kh"><span class="iw-titel">' + esc(x.titel) + '</span><b>' + esc(marke) + '</b></span>'
+        + '<small>' + esc(unter) + '</small></button>';
+    }).join('');
+  });
+  if (!h) { h = '<p>Noch keine Idee.</p><p class="leise">„+ Idee“ — ein Satz genügt. Die Werkstatt führt dich dann Stufe für Stufe von der Idee bis zur Umsetzung.</p>'; }
+  return h;
+}
+
+function iwStufenHtml(x) {
+  var max = x ? Number(x.stufe) || 1 : 1;
+  return '<div class="kr-stufen iw-stufen">' + IW_STUFEN.map(function (s) {
+    return '<button type="button" class="' + (s[0] <= max ? 'an' : '') + (s[0] === cl.iw.stufe ? ' hier' : '') + '" onclick="iwStufeZeigen(' + s[0] + ')"' + (s[0] > max ? ' disabled' : '') + '>' + s[2] + '</button>';
+  }).join('') + '</div>';
+}
+
+function iwStufeHtml() {
+  var x = iwFinden(cl.iw.id);
+  var s = cl.iw.stufe;
+  var h = iwStufenHtml(x);
+  var feld = function (id, label, wert, platz, gross) {
+    return '<label for="' + id + '">' + label + '</label>' + (gross ? '<textarea id="' + id + '" class="eingabe kr-feld" placeholder="' + esc(platz || '') + '">' + esc(wert || '') + '</textarea>'
+      : '<input id="' + id + '" class="eingabe" type="text" autocomplete="off" value="' + esc(wert || '') + '" placeholder="' + esc(platz || '') + '">');
+  };
+  if (s === 1) {
+    return h + '<div class="kr-gross">Deine Idee in einem Satz</div>'
+      + feld('iwTitel', 'Idee:', x ? x.titel : '', 'z. B. Mit den Kindern ein Hochbeet bauen')
+      + feld('iwWarum', 'Warum gerade jetzt? (optional)', x ? x.warum : '', 'z. B. Im Frühjahr wollen wir eigenes Gemüse ernten', true)
+      + '<label for="iwBereich">Lebensbereich (aus Kurs):</label><select id="iwBereich" class="eingabe"><option value="">—</option>'
+      + krBereiche(false).map(function (b) { return '<option value="' + esc(b.id) + '"' + (x && x.bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + '<p class="leise">Einfangen dauert 30 Sekunden. Weiter geht es, wenn du Zeit hast — die Idee wartet im Speicher.</p>';
+  }
+  if (!x) { cl.iw.stufe = 1; return iwStufeHtml(); }
+  var kopf = '<div class="leise">' + esc(x.titel) + '</div>';
+  if (s === 2) {
+    var hw = iwHinweiseKlaeren(x);
+    return h + kopf + '<div class="kr-gross">Wie sieht es aus, wenn es <b>fertig</b> ist?</div>'
+      + feld('iwErgebnis', 'Ergebnisbild:', x.ergebnis, 'z. B. Bis 20.12. liegen drei gedruckte Fotobücher (je 40 Seiten) unterm Baum.', true)
+      + (hw.length ? hw.map(function (t) { return '<div class="kr-hinweis">' + esc(t) + '</div>'; }).join('') : '')
+      + feld('iwFuerWen', 'Für wen?', x.fuerWen, 'z. B. für die Großeltern')
+      + feld('iwErfolg', 'Woran merke ich Erfolg?', x.erfolg, 'z. B. Sie blättern es gemeinsam mit den Kindern durch.')
+      + feld('iwNicht', 'Was gehört ausdrücklich NICHT dazu?', x.nicht, 'z. B. kein Kalender, keine Fotos vor 2026');
+  }
+  if (s === 3) {
+    var c = iwCheck(x);
+    return h + kopf + '<div class="kr-gross">Drei Varianten — von klein bis groß</div>'
+      + ['S', 'M', 'L'].map(function (g) {
+        var v = (x.varianten || []).filter(function (y) { return y.groesse === g; })[0] || { risiko: 'mittel' };
+        return '<div class="iw-var' + (v.id && x.gewaehlt === v.id ? ' an' : '') + '"><b>' + g + '</b>'
+          + '<input id="iwV' + g + '" class="eingabe" type="text" autocomplete="off" value="' + esc(v.name || '') + '" placeholder="' + { S: 'klein: z. B. Sonnensegel', M: 'mittel: z. B. Bausatz selbst montiert', L: 'groß: z. B. Fachbetrieb' }[g] + '">'
+          + '<div class="iw-zeile"><input id="iwK' + g + '" class="eingabe" type="text" autocomplete="off" value="' + esc(v.kosten || '') + '" placeholder="Kosten">'
+          + '<input id="iwA' + g + '" class="eingabe" type="text" autocomplete="off" value="' + esc(v.aufwand || '') + '" placeholder="Aufwand"></div>'
+          + '<div class="kr-chips">' + IW_RISIKO.map(function (r) { return '<button type="button"' + (v.risiko === r[0] ? ' class="an"' : '') + ' onclick="iwSetzen(\'risiko\',\'' + g + ':' + r[0] + '\')">Risiko ' + r[1] + '</button>'; }).join('')
+          + (v.id ? '<button type="button"' + (x.gewaehlt === v.id ? ' class="an"' : '') + ' onclick="iwSetzen(\'gewaehlt\',\'' + esc(v.id) + '\')">★ Favorit</button>' : '') + '</div></div>';
+      }).join('')
+      + '<div class="kr-frage">Vorab-Check (aus Kurs) für den Favoriten</div>'
+      + '<label for="iwZulasten">Zu Lasten von welchem Bereich?</label><select id="iwZulasten" class="eingabe" onchange="iwSetzen(\'zulasten\',this.value)"><option value="">— keinem —</option>'
+      + krBereiche(false).map(function (b) { return '<option value="' + esc(b.id) + '"' + (x.zulasten === b.id ? ' selected' : '') + '>' + esc(b.name) + (krFokus().indexOf(b.id) >= 0 ? ' (Fokus)' : '') + '</option>'; }).join('') + '</select>'
+      + '<label>Wie sehr willst du es? (ehrlich)</label><div class="kr-zahlen">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+        return '<button type="button"' + (x.wollen === n ? ' class="an"' : '') + ' onclick="iwSetzen(\'wollen\',' + n + ')">' + n + '</button>';
+      }).join('') + '</div>'
+      + (c ? '<div class="kr-hinweis"><b>Vorab-Check:</b> ' + esc(c.text) + ' → Empfehlung: <u>' + esc(krWahlName(c.wahl)) + '</u>' + (c.gruende.length ? ' (' + esc(c.gruende.join(', ')) + ')' : '') + '</div>'
+        : '<p class="leise">Erst Varianten eintragen, einen ★ Favoriten wählen und das Wollen angeben.</p>');
+  }
+  if (s === 4) {
+    var c4 = iwCheck(x);
+    var e = x.entscheidung || '';
+    return h + kopf + '<div class="kr-gross">Entscheiden</div>'
+      + (c4 ? '<div class="kr-box">' + esc(c4.text) + '<br>Empfehlung aus dem Vorab-Check: <b>' + esc(krWahlName(c4.wahl)) + '</b></div>' : '')
+      + '<label>Welche Variante?</label>' + (x.varianten || []).filter(function (v) { return v.name; }).map(function (v) {
+        return '<button type="button" class="kr-var' + (x.gewaehlt === v.id ? ' an' : '') + '" onclick="iwSetzen(\'gewaehlt\',\'' + esc(v.id) + '\')"><b>' + esc(v.groesse + ' · ' + v.name) + '</b>'
+          + esc([v.kosten, v.aufwand, v.risiko ? 'Risiko ' + v.risiko : ''].filter(function (y) { return y; }).join(' · ')) + '</button>';
+      }).join('')
+      + '<div class="kr-ergebnis iw-entsch">' + [['go', '✓ Go'], ['spaeter', '◔ Später'], ['verwerfen', '✗ Verwerfen']].map(function (w) {
+        return '<button type="button"' + (e === w[0] ? ' class="an"' : '') + ' onclick="iwSetzen(\'entscheidung\',\'' + w[0] + '\')">' + w[1] + '</button>';
+      }).join('') + '</div>'
+      + (e === 'spaeter' ? '<label for="iwWiedervorlage">Wieder vorlegen am:</label><input id="iwWiedervorlage" class="eingabe" type="date" value="' + esc(x.wiedervorlage && x.wiedervorlage > isoDatum() ? x.wiedervorlage : tagePlus(isoDatum(), 14)) + '">' : '')
+      + '<p class="leise">„Später“ lässt die Idee reifen — sie kommt von selbst wieder. „Verwerfen“ ist auch eine gute Entscheidung: weniger, aber besser.</p>';
+  }
+  if (s === 5) {
+    var offen = (x.schritte || []).filter(function (y) { return !y.erledigt; });
+    var hinweis = offen.length ? iwHinweisSchritt(offen[0].text) : '';
+    return h + kopf + '<div class="kr-gross">Meilensteine &amp; die nächsten Schritte</div>'
+      + (x.meilensteine || []).map(function (m) {
+        return '<div class="iw-schr"><button type="button" class="kr-haken" onclick="iwSchrittUm(\'' + esc(m.id) + '\')">' + (m.erledigt ? '◆' : '◇') + '</button><span class="' + (m.erledigt ? 'kr-erledigt' : '') + '">'
+          + (m.datum ? esc(kurzDatum(m.datum)) + ' ' : '') + esc(m.text) + '</span><button type="button" class="kr-weg" onclick="iwEintragWeg(\'meilensteine\',\'' + esc(m.id) + '\')">✕</button></div>';
+      }).join('')
+      + '<div class="iw-zeile"><input id="iwMsText" class="eingabe" type="text" autocomplete="off" value="" placeholder="Meilenstein, z. B. Bilder ausgewählt"><input id="iwMsDatum" class="eingabe iw-datum" type="date" value=""></div>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="iwLesen();iwZeichnen()">+ Meilenstein</button></div>'
+      + '<label>Die nächsten Schritte (konkret, sichtbar — höchstens drei offen):</label>'
+      + (x.schritte || []).map(function (y, i) {
+        return '<div class="iw-schr"><button type="button" class="kr-haken" onclick="iwSchrittUm(\'' + esc(y.id) + '\')">' + (y.erledigt ? '☑' : '☐') + '</button><span class="' + (y.erledigt ? 'kr-erledigt' : '') + '">'
+          + esc(y.text) + '</span><button type="button" class="kr-weg" onclick="iwEintragWeg(\'schritte\',\'' + esc(y.id) + '\')">✕</button></div>';
+      }).join('')
+      + (offen.length < 3 ? '<input id="iwSchrittText" class="eingabe" type="text" autocomplete="off" value="" placeholder="' + (offen.length ? 'nächster Schritt' : 'erster Schritt — höchstens 2 Minuten') + '">'
+        + '<div class="knoepfe"><button type="button" class="knopf" onclick="iwLesen();iwZeichnen()">+ Schritt</button></div>' : '')
+      + (hinweis ? '<div class="kr-hinweis">' + esc(hinweis) + '</div>' : '<div class="kr-hinweis">Der erste Schritt dauert höchstens 2 Minuten — so fängt man wirklich an (Zwei-Minuten-Regel).</div>');
+  }
+  var n = iwNaechsterSchritt(x);
+  var kw = krWochenId();
+  var wo = (x.wochen || []).filter(function (w) { return w.kw === kw; })[0];
+  return h + '<div class="kr-karte"><span class="kr-kh"><b>Steckbrief</b><button type="button" class="knopf" onclick="iwVertiefen()">Mit Claude vertiefen ↗</button></span>'
+    + '<small class="iw-steck">' + esc(iwSteckbriefText(x)) + '</small></div>'
+    + '<div class="kr-karte jetzt"><span class="kr-kh"><b>▶ Nächster Schritt</b><span>' + (x.projekt ? 'aus dem Projekt' : 'aus dem Plan') + '</span></span>'
+    + (n ? '<div class="kr-eines">' + esc(n.text) + '</div><small>erscheint in Kurs als Vorschlag für „das Eine“</small>'
+      : '<small>Kein offener Schritt — unter „Planen“ den nächsten festlegen.</small>') + '</div>'
+    + (x.projekt ? '<p class="leise">✓ Projekt in der Workbench angelegt — Schritte dort abhaken oder hier.</p>'
+      : '<div class="knoepfe"><button type="button" class="knopf" onclick="iwProjektAnlegen()">Als Projekt in der Workbench anlegen</button></div>')
+    + '<div class="abschnitt kr-ab"><span>Wochen-Check</span><span class="leise">' + (wo ? 'diese Woche: ' + esc((IW_WOCHE.filter(function (w) { return w[0] === wo.status; })[0] || ['', ''])[1]) : 'sonntags') + '</span></div>'
+    + '<div class="kr-chips">' + IW_WOCHE.map(function (w) { return '<button type="button"' + (wo && wo.status === w[0] ? ' class="an"' : '') + ' onclick="iwSetzen(\'woche\',\'' + w[0] + '\')">' + w[1] + '</button>'; }).join('') + '</div>'
+    + ((x.meilensteine || []).length ? '<p class="leise">Meilensteine: ' + x.meilensteine.filter(function (m) { return m.erledigt; }).length + ' von ' + x.meilensteine.length + ' erreicht.</p>' : '');
+}
+
+function ideenHtml() {
+  return '<div class="kr-form">' + (cl.iw.ansicht === 'stufe' ? iwStufeHtml() : iwListeHtml()) + '</div>';
+}
+
+function ideenFussHtml() {
+  var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
+  if (cl.iw.ansicht === 'stufe') {
+    var s = cl.iw.stufe;
+    if (s === 6) {
+      var x = iwFinden(cl.iw.id);
+      return (x && iwNaechsterSchritt(x) ? k('✓ Schritt erledigt', 'iwNaechsterErledigt()', true) : '') + k('Planen', 'iwStufeZeigen(5)') + k('Fertig', 'iwZurListe()');
+    }
+    return k('◀', 'iwZurueck()') + k(s === 4 ? 'Entscheiden ▶' : (s === 5 ? 'Umsetzen ▶' : 'Weiter ▶'), 'iwWeiter()', true) + k('Speichern', 'iwZurListe()');
+  }
+  return k('+ Idee', 'iwNeu()', true) + k(cl.iw.alle ? 'Nur offene' : 'Abgeschlossene', 'iwAlleUm()');
+}
+
+function iwAlleUm() {
+  cl.iw.alle = !cl.iw.alle;
+  iwZeichnen();
+}
+
+function iwKopfText() {
+  if (cl.iw.ansicht === 'stufe') {
+    var x = iwFinden(cl.iw.id);
+    return x ? (x.titel.length > 18 ? x.titel.slice(0, 17) + '…' : x.titel) : 'Neue Idee';
+  }
+  return 'Ideen';
+}
+
+function iwEbeneHoch() {
+  if (cl.iw.ansicht === 'stufe') { iwZurListe(); return true; }
+  return false;
+}
+
+function iwZeichnen() {
+  if (cl.app !== 'ideen') { return; }
+  inhaltZeichnen();
+  fussZeichnen();
+  kopfZeichnen();
+}
+
+function iwStatZeile() {
+  var l = iwAlle();
+  return l.length + ' · ' + l.filter(function (x) { return iwGruppe(x) === 'umsetzung'; }).length + ' · ' + l.filter(function (x) { return x.status === 'fertig'; }).length;
 }
 
 /* ---------- Stones (seit 0.18) ----------
@@ -15386,6 +15967,7 @@ function clZurueck() {
   if (cl.vl.gesperrt) { return true; }
   if (cl.app === 'vorlesen' && vlEbeneHoch()) { return true; }
   if (cl.app === 'kurs' && krEbeneHoch()) { return true; }
+  if (cl.app === 'ideen' && iwEbeneHoch()) { return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'ordner' && cl.drv.stapel.length > 1) { drvHoch(); return true; }
   if (cl.app !== 'uebersicht') { oeffne('uebersicht'); return true; }
   return false;

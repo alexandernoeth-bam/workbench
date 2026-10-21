@@ -258,7 +258,9 @@ console.log('\n6. Datenmodell');
                     /* seit v6.3.3: Vorlesen im CLIE */
                     'vorlesen',
                     /* seit v6.3.4: Kurs im CLIE */
-                    'kurs'];
+                    'kurs',
+                    /* seit v6.3.5: Ideenwerkstatt im CLIE */
+                    'ideen'];
 
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
   pruefe(!!leer, 'leereDatenbank ist auslesbar');
@@ -13034,7 +13036,7 @@ console.log('\n202. Ausblenden im Tag');
 console.log('\n203. CLIE-Bereiche bleiben erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand',[\s\S]*?'vorlesen',[\s\S]*?'kurs'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
+  pruefe(/var SAMMLUNGEN = \[[\s\S]*?'sammlungen','datensaetze',[\s\S]*?'drivefavoriten',[\s\S]*?'lernkaesten','lernstand',[\s\S]*?'vorlesen',[\s\S]*?'kurs',[\s\S]*?'ideen'\];/.test(QUELLE), 'SAMMLUNGEN kennt sammlungen, datensaetze, drivefavoriten (6.3.1) und lernkaesten/lernstand (6.3.2)');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13231,7 +13233,7 @@ console.log('\n207. Vorlesen des CLIE bleibt erhalten');
 console.log('\n208. Kurs des CLIE bleibt erhalten');
 {
   const a = globalThis.__api || {};
-  pruefe(/'kurs'\];/.test(QUELLE), 'SAMMLUNGEN kennt kurs');
+  pruefe(/'kurs'[\],]/.test(QUELLE), 'SAMMLUNGEN kennt kurs');
   if (typeof a.zusammenfuehren !== 'function') {
     warn('Abgleich nicht auswertbar');
   } else {
@@ -13250,6 +13252,40 @@ console.log('\n208. Kurs des CLIE bleibt erhalten');
   if (typeof a.textZuBestand === 'function') {
     const b = a.textZuBestand(JSON.stringify({ kurs: [{ id: 'kb-arbeit', typ: 'bereich', geaendert: 1 }] }));
     pruefe(b && b.kurs && b.kurs.length === 1, 'Laden: der Bereich überlebt das Einlesen');
+  } else {
+    warn('Laden nicht auswertbar');
+  }
+}
+
+/* ============================================================
+   209. Ideenwerkstatt des CLIE bleibt erhalten (v6.3.5)
+   Grund: Ideen mit Steckbrief, Varianten, Plan und Wochen-Checks liegen in
+   der workbench.json. Ohne den Bereich gingen sie beim Speichern verloren.
+   Erkennt: Bereich fehlt, Ideen nicht je Kennung zusammengeführt,
+   Gelöschtes kehrt zurück, Bereich überlebt das Laden nicht.
+   ============================================================ */
+console.log('\n209. Ideenwerkstatt des CLIE bleibt erhalten');
+{
+  const a = globalThis.__api || {};
+  pruefe(/'ideen'\];/.test(QUELLE), 'SAMMLUNGEN kennt ideen');
+  if (typeof a.zusammenfuehren !== 'function') {
+    warn('Abgleich nicht auswertbar');
+  } else {
+    pruefe(Array.isArray(a.leereDatenbank().ideen), 'die leere Datenbank hat den Bereich');
+    const lokal = a.leereDatenbank(); const fremd = a.leereDatenbank();
+    lokal.ideen = [{ id: 'iw-1', titel: 'Hochbeet', stufe: 2, geaendert: 10 }];
+    fremd.ideen = [{ id: 'iw-1', titel: 'Hochbeet', stufe: 4, geaendert: 20 }, { id: 'iw-2', titel: 'Fotobuch', stufe: 1, geaendert: 5 }];
+    const m = a.zusammenfuehren(lokal, fremd); const db = m.db || m.ergebnis || m;
+    pruefe(db.ideen.length === 2 && db.ideen.filter(x => x.id === 'iw-1')[0].stufe === 4, 'je Idee zusammengeführt, die jüngere gewinnt');
+    const l2 = a.leereDatenbank(); const f2 = a.leereDatenbank();
+    f2.ideen = [{ id: 'iw-9', titel: 'Weg', geaendert: Date.now() - 60000 }];
+    l2.grabsteine = [{ s: 'ideen', id: 'iw-9', z: Date.now() }];
+    const m2 = a.zusammenfuehren(l2, f2); const db2 = m2.db || m2.ergebnis || m2;
+    pruefe(!(db2.ideen || []).some(x => x.id === 'iw-9'), 'gelöschte Idee (Grabstein) kehrt nicht zurück');
+  }
+  if (typeof a.textZuBestand === 'function') {
+    const b = a.textZuBestand(JSON.stringify({ ideen: [{ id: 'iw-1', titel: 'x', geaendert: 1 }] }));
+    pruefe(b && b.ideen && b.ideen.length === 1, 'Laden: der Bereich überlebt das Einlesen');
   } else {
     warn('Laden nicht auswertbar');
   }
