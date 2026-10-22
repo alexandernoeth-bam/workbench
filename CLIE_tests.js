@@ -1841,14 +1841,16 @@ function projekteTest() {
   S.DB.ziele.push({ id: 'z1', name: 'Fit bis Sommer', kontext: 'privat', status: 'laufend', zieltermin: '2027-06-30', flaeche: '', ordnung: 4, geaendert: 1 });
   S.oeffne('projekte');
   let h = inhalt();
-  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && /◇ Fit bis Sommer/.test(h),
-    'Liste „Laufend“: P1 zuerst, Ziele mit ◇ in derselben Liste, Ruhendes nicht');
-  pruefe(/Carport <small>1\/3<\/small>/.test(h) && /pjOeffnen\('p1','memo'\)" aria-label="Memo">✎/.test(h) && /pjOeffnen\('p2','memo'\)" aria-label="Memo"><\/button>/.test(h),
-    'Zeile: erledigt/gesamt, ✎ nur mit Text');
-  S.pjPrioUm('p1');
-  pruefe(S.DB.projekte[0].prio === 1, 'Tipp auf die Priorität: 1 (am Satz als „prio“)');
-  S.pjPrioUm('p1'); S.pjPrioUm('p1'); S.pjPrioUm('p1');
-  pruefe(!('prio' in S.DB.projekte[0]), '1 → 2 → 3 → keine: Feld wieder weg');
+  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && /Fit bis Sommer/.test(h),
+    'Liste „Laufend“: P1 zuerst, Ruhendes nicht');
+  /* Seit 0.43.2 schlicht: nur der Name, die Priorität nur wenn gesetzt */
+  pruefe(/<button type="button" class="pj-zeile" onclick="pjOeffnen\('p1','aufgaben'\)"><span class="pj-n">Carport<\/span><\/button>/.test(h)
+    && /<span class="pj-n">Heizung<\/span><span class="pj-p">P1<\/span>/.test(h) && !/◇|✎|<small>\d+\/\d+|·</.test(h.replace(/<p class="leise">[\s\S]*$/, '')),
+    'Zeile nur mit Namen — ohne Punkt, Zeichen, Aufgabenzahl und ✎; „P1“ nur wenn gesetzt');
+  S.pjOeffnen('p1', 'allgemein'); S.pjWahl('prio', '1');
+  pruefe(S.DB.projekte[0].prio === 1, 'Priorität im Reiter Allgemein (am Satz als „prio“)');
+  S.pjWahl('prio', '0');
+  pruefe(!('prio' in S.DB.projekte[0]), '„–“: Feld wieder weg');
   /* Reiter Aufgaben */
   S.pjOeffnen('p1', 'aufgaben');
   h = inhalt();
@@ -2611,7 +2613,7 @@ function memoRuhtTest() {
   pruefe(/Carport/.test(h) && /Marathon/.test(h) && !/Läuft|Altes Projekt/.test(h), 'Ruhend: ruhende Projekte und Ziele');
   S.pjZustandFilter('erledigt');
   h = inhalt();
-  pruefe(/Altes Projekt/.test(h) && !/Läuft|Carport/.test(h) && /pj-liste fertig/.test(h) && !/pjPrioUm/.test(h), 'Abgeschlossen: grau, ohne Priorität');
+  pruefe(/Altes Projekt/.test(h) && !/Läuft|Carport/.test(h) && /pj-liste fertig/.test(h) && !/pj-p/.test(h), 'Abgeschlossen: grau, ohne Priorität');
   S.pjZustandFilter('quatsch');
   pruefe(S.cl.pj.zustand === 'erledigt' && !/pjAbgeschlossene|class="pj-z"/.test(S.document.getElementById('fuss').innerHTML + h), 'Unbekanntes wird ignoriert; kein Knopf „Abgeschlossene“, kein L/R/A mehr');
   S.pjOeffnen('p2', 'allgemein'); S.pjZurListe();
