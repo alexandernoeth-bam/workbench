@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 24, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 25, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -413,10 +413,10 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","checklisten","sammlungen","einkauf","memo","vorlesen","rechner","coach","planung","lernen","spiele"]'
-    && CL.clApp('heute') && CL.clApp('heute').raster === false,
-    'Start 3×4 (seit 0.35): Kalender, Aufgaben, Checklisten / Sammlungen, Einkauf, Memo / Vorlesen, Rechner, Coach / Planung ▸, Lernen ▸, Spiele ▸');
-  pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","checklisten","sammlungen","projekte","memo","einkauf","vorlesen","rechner","planung","lernen","spiele"]'
+    && CL.clApp('heute') && CL.clApp('heute').raster === false && CL.clApp('coach').raster === false,
+    'Start 3×4 (seit 0.43): Kalender, Aufgaben, Checklisten / Sammlungen, Projekte, Notizen / Einkauf, Vorlesen, Rechner / Planung ▸, Lernen ▸, Spiele ▸');
+  pruefe(!/oeffne\('(ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Ziele, Listen oder Woche (Ziele stehen in Projekte)');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
   pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
@@ -1051,15 +1051,11 @@ function memoTest() {
   if (!CL) { return; }
   aufgabenDaten();
   CL.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[] Zahnbürste', checkliste: 'vorlage', ordnung: 70, geaendert: 1 });
-  CL.memoBereichSetzen('projekte');
   CL.oeffne('memo');
   let h = inhalt();
-  const bereich = b => { CL.memoBereichSetzen(b); return inhalt(); };
-  pruefe(/▼ Projekte/.test(h) && /Büro/.test(h) && !/Halbmarathon/.test(h) && !/Garten/.test(h) && !CL.MEMO_BEREICHE.some(x => x[0] === 'listen'),
-    'Bereich als Auswahl ▼ (seit 0.36): Projekte zeigt nur Projekte — ohne Listen (seit 0.6)');
-  pruefe(/Halbmarathon/.test(bereich('ziele')) && !/Packliste/.test(bereich('notizen')) && /Ruht/.test(bereich('ruhend')) && !/Büro/.test(bereich('ruhend')),
-    'Ziele, Notizen (ohne Checklisten) und Ruhendes je in eigenem Bereich');
-  CL.memoBereichSetzen('projekte');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Notizen' && !/Büro|Halbmarathon|Packliste/.test(h) && typeof CL.MEMO_BEREICHE === 'undefined',
+    'Notizen (seit 0.43): ohne Projekte, Ziele, Listen und Checklisten — keine Bereichsauswahl mehr');
+  /* Das Schreibfeld der Notizen dient auch den Projekten (Reiter „Memo“ → Schreiben) */
   CL.memoOeffnen('p1');
   h = inhalt();
   pruefe(/◎ Büro/.test(CL.document.getElementById('reiter').textContent), 'der Reiter zeigt die Seite');
@@ -1089,8 +1085,7 @@ function memoTest() {
   CL.memoSpeichern();
   const p1 = CL.DB.projekte[0];
   pruefe(p1.name === 'Büro neu' && p1.ende === '2027-03-31' && p1.status === 'ruht', 'Name, Ende und Zustand werden gespeichert');
-  pruefe(CL.cl.memo.id === '' && !/Büro neu/.test(inhalt()) && /Büro neu/.test((CL.memoBereichSetzen('ruhend'), inhalt())), 'eine ruhende Seite wandert in den Bereich „Ruhend“ (seit 0.12.2)');
-  CL.memoBereichSetzen('projekte');
+  pruefe(CL.cl.memo.id === '' && !/Büro neu/.test(inhalt()), 'eine ruhende Seite verlässt die Seite (zurück zur Liste)');
 
   CL.memoNeu();
   pruefe(!/memoWahl\('art','liste'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet keine Liste mehr an');
@@ -1109,7 +1104,7 @@ function memoTest() {
 
   CL.DB.projekte[1].flaeche = '[] Fenster messen';
   CL.memoZeile('p2', 0);
-  pruefe(CL.cl.app === 'memo' && CL.cl.memo.id === 'p2' && /class="aufg hervor"/.test(inhalt()), '„Im Memo zeigen“ öffnet die Seite an der Zeile');
+  pruefe(CL.cl.app === 'projekte' && CL.cl.pj.id === 'p2' && CL.cl.pj.reiter === 'aufgaben' && /class="aufg hervor" id="pjZ0"/.test(inhalt()), '„Im Projekt zeigen“ öffnet das Projekt (seit 0.43) an der Zeile');
   CL.memoZeile('t1', 0);
   pruefe(CL.cl.app === 'aufgaben' && CL.cl.auf.liste === 't1', '„Liste zeigen“ öffnet bei Listen die Aufgaben');
   CL.aufListeSetzen('');
@@ -1307,7 +1302,7 @@ function auszeichnungTest() {
   pruefe(!/<script>/.test(h) && /&lt;script&gt;/.test(h), 'HTML im Text wird nicht ausgeführt');
   pruefe(/class="tx umbruch"[^>]*>Wichtig anrufen<\/button>/.test(h), 'in Aufgabenzeilen ohne Sternchen — schlicht lesbar');
   CL.memoVerweis('p2');
-  pruefe(CL.cl.app === 'memo' && CL.cl.memo.id === 'p2', 'ein Tipp auf den Verweis öffnet die Seite');
+  pruefe(CL.cl.app === 'projekte' && CL.cl.pj.id === 'p2', 'ein Tipp auf den Verweis öffnet die Seite (Projekte seit 0.43 in Projekte)');
   CL.memoVerweis('t1');
   pruefe(CL.cl.app === 'aufgaben' && CL.cl.auf.liste === 't1', 'ein Verweis auf eine Liste öffnet sie in den Aufgaben');
   CL.aufListeSetzen('');
@@ -1822,6 +1817,99 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   79. Projekte wie „Projects“ am Palm (0.43)
+   Grund: Ein Projekt mit Angeboten, Rückmeldungen, Notizen, Meilensteinen
+   und Aufgaben war als eine lange Memo-Seite nicht mehr zu ordnen. Seit
+   0.43 eine eigene App: Liste mit Priorität, erledigt/gesamt, Zustand,
+   ✎ — und je Projekt drei Reiter Allgemein · Aufgaben · Memo. Daten der
+   Workbench (start, ende, meilensteine, flaeche); neu nur „prio“.
+   Erkennt: falsche Sortierung, Priorität nicht gespeichert, Beginn/Ende
+   im falschen Feld, Meilensteine nicht im Workbench-Format, Aufgaben im
+   Memo-Reiter, Schreiben führt nicht zurück ins Projekt, Ziele mit
+   Meilensteinen, Coach nicht im Ordner Planung, Symbol fehlt.
+   ============================================================ */
+function projekteTest() {
+  console.log('\n79. Projekte wie „Projects“ am Palm (0.43)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', start: '2026-09-01', ende: '2027-04-30', ordnung: 1,
+    meilensteine: [{ id: 'm1', titel: 'Vermessung', datum: '2026-09-12', erreicht: true }],
+    flaeche: '## Angebote\nHuber 14.200\n[] Huber nachfassen\n[x] Angebote anfragen\n[] Statik klären', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p2', name: 'Heizung', kontext: 'privat', status: 'laufend', flaeche: '[] Termin', ordnung: 2, prio: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p3', name: 'Keller', kontext: 'privat', status: 'ruht', flaeche: '', ordnung: 3, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Fit bis Sommer', kontext: 'privat', status: 'laufend', zieltermin: '2027-06-30', flaeche: '', ordnung: 4, geaendert: 1 });
+  S.oeffne('projekte');
+  let h = inhalt();
+  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && h.indexOf('Carport') < h.indexOf('Keller') && /◇ Fit bis Sommer/.test(h),
+    'Liste: P1 zuerst, Ruhendes unten, Ziele mit ◇ in derselben Liste');
+  pruefe(/Carport <small>1\/3<\/small>/.test(h) && /pjOeffnen\('p1','memo'\)" aria-label="Memo">✎/.test(h) && /pjOeffnen\('p2','memo'\)" aria-label="Memo"><\/button>/.test(h) && /<span class="pj-z">R<\/span>/.test(h),
+    'Zeile: erledigt/gesamt, ✎ nur mit Text, Zustand als Buchstabe');
+  S.pjPrioUm('p1');
+  pruefe(S.DB.projekte[0].prio === 1, 'Tipp auf die Priorität: 1 (am Satz als „prio“)');
+  S.pjPrioUm('p1'); S.pjPrioUm('p1'); S.pjPrioUm('p1');
+  pruefe(!('prio' in S.DB.projekte[0]), '1 → 2 → 3 → keine: Feld wieder weg');
+  /* Reiter Aufgaben */
+  S.pjOeffnen('p1', 'aufgaben');
+  h = inhalt();
+  pruefe(/class="pj-reiter">.*Allgemein.*class="an" onclick="pjReiter\('aufgaben'\)">Aufgaben.*Memo/.test(h), 'drei Reiter unter dem Titel, Aufgaben gewählt');
+  pruefe(h.indexOf('Huber nachfassen') < h.indexOf('Statik klären') && h.indexOf('Statik klären') < h.indexOf('Angebote anfragen') && !/Huber 14\.200/.test(h),
+    'Aufgaben: offene oben, erledigte darunter, kein Text');
+  S.memoHaken('p1', 2);
+  pruefe(/\[x\] Huber nachfassen/.test(S.DB.projekte[0].flaeche), 'abhaken im Reiter Aufgaben');
+  S.pjAufgabeNeu();
+  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster.seite === 'p1', '„Neu“: Aufgabe gleich im Projekt');
+  S.aufklappZu();
+  /* Reiter Memo */
+  S.pjReiter('memo');
+  h = inhalt();
+  pruefe(/Huber 14\.200/.test(h) && /memo-h2">Angebote/.test(h) && !/nachfassen|Statik/.test(h), 'Memo: Text und Überschriften, ohne Aufgaben');
+  S.pjSchreiben();
+  pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && /id="memoFeld"[^>]*>[^<]*Statik klären/.test(inhalt()), '„Schreiben“: ganzer Text im Schreibfeld');
+  S.memoSchreibenUm();
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1' && S.cl.pj.reiter === 'memo' && !S.cl.memo.ausProjekt, '„Fertig“ führt zurück in den Reiter Memo');
+  /* Reiter Allgemein */
+  S.pjReiter('allgemein');
+  h = inhalt();
+  pruefe(/id="pjBeginn"[^>]*value="2026-09-01"/.test(h) && /Ende:<input id="pjEnde"[^>]*value="2027-04-30"/.test(h) && /Vermessung/.test(h) && /Meilensteine <span>1\/1/.test(h),
+    'Allgemein: Beginn, Ende, Meilensteine aus den Workbench-Feldern');
+  S.document.getElementById('pjBeginn').value = '2026-10-01'; S.pjFeld('beginn');
+  S.document.getElementById('pjEnde').value = '2027-05-15'; S.pjFeld('ende');
+  S.document.getElementById('pjEnde').value = 'kaputt'; S.pjFeld('ende');
+  pruefe(S.DB.projekte[0].start === '2026-10-01' && S.DB.projekte[0].ende === '2027-05-15', 'Beginn → start, Ende → ende; Unlesbares wird nicht übernommen');
+  S.pjWahl('zustand', 'ruht'); S.pjWahl('kontext', 'beruflich'); S.pjWahl('prio', '2');
+  pruefe(S.DB.projekte[0].status === 'ruht' && S.DB.projekte[0].kontext === 'beruflich' && S.DB.projekte[0].prio === 2, 'Zustand, Kategorie, Priorität');
+  S.pjWahl('zustand', 'laeuft'); S.pjWahl('kontext', 'privat');
+  S.pjMsAuf('');
+  S.document.getElementById('pjMsTitel').value = 'Auftrag vergeben'; S.document.getElementById('pjMsDatum').value = '2026-11-15';
+  S.pjMsSpeichern();
+  const ms = S.DB.projekte[0].meilensteine;
+  pruefe(ms.length === 2 && ms[1].titel === 'Auftrag vergeben' && ms[1].datum === '2026-11-15' && ms[1].erreicht === false && !!ms[1].id, 'Meilenstein im Format der Workbench (id, titel, datum, erreicht)');
+  S.pjMsUm(ms[1].id);
+  pruefe(ms[1].erreicht === true && /Meilensteine <span>2\/2/.test(inhalt()), 'Tipp auf ◆: erreicht');
+  S.pjMsAuf(ms[1].id);
+  S.pjMsLoeschen();
+  pruefe(S.DB.projekte[0].meilensteine.length === 1, 'Meilenstein löschen');
+  /* Ziel */
+  S.pjOeffnen('z1', 'allgemein');
+  h = inhalt();
+  pruefe(/Zieltermin:<input id="pjEnde"[^>]*value="2027-06-30"/.test(h) && !/pjBeginn|Meilensteine/.test(h) && !/pjMsAuf/.test(S.document.getElementById('fuss').innerHTML), 'Ziel: Zieltermin, ohne Beginn und Meilensteine');
+  /* Zurück und Neu */
+  S.clZurueck();
+  pruefe(S.cl.app === 'projekte' && !S.cl.pj.id, 'Zurück: vom Projekt zur Liste');
+  S.pjNeu();
+  S.document.getElementById('pjNeuTitel').value = 'Terrassendach';
+  S.pjNeuSpeichern();
+  const neu = S.DB.projekte[S.DB.projekte.length - 1];
+  pruefe(neu.name === 'Terrassendach' && neu.start === S.isoDatum() && S.cl.pj.id === neu.id && S.cl.pj.reiter === 'allgemein', 'Neu: Beginn heute, öffnet Allgemein');
+  /* Start, Ordner, Symbol */
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('coach') >= 0 && S.clOrdnerVon('coach') === 'planung', 'Coach im Ordner Planung');
+  pruefe(/<rect x="15" y="18" width="16" height="6"/.test(S.clSymbol('projekte')), 'Symbol „Zeitplan“ (drei versetzte Balken)');
+  S.oeffne('uebersicht');
+  pruefe(/oeffne\('projekte'\)/.test(inhalt()) && />Notizen<\/button>/.test(inhalt()), 'Übersicht: Projekte und „Notizen“ statt Memo');
+}
+
+/* ============================================================
    78. Lesezeichen hinzufügen: Gruppen als Dropdown (0.42)
    Grund: Die Auswahl war eine Endlosliste über alle Gruppen — jetzt
    wie im Memo ein Knopf „▼ Gruppe“, darunter nur deren Einträge.
@@ -1996,7 +2084,7 @@ function lesezeichenTest() {
   const id = n => S.DB.pinnwand.filter(p => p.zielId === n)[0].id;
   S.lzOeffnen(id('l1')); pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'l1', 'Liste öffnet in Aufgaben');
   S.lzOeffnen(id('g:c1')); pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'c1', 'Checkliste öffnet in Checklisten');
-  S.lzOeffnen(id('p1')); pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'p1', 'Projekt öffnet im Memo');
+  S.lzOeffnen(id('p1')); pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1', 'Projekt öffnet in Projekte (seit 0.43)');
   S.lzOeffnen(id('s1')); pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === 's1', 'Sammlung öffnet');
   S.lzOeffnen(id('geburtstag')); pruefe(S.cl.app === 'kalender' && S.cl.kal.ansicht === 'jahr' && S.cl.ja.ansicht === 'liste' && S.cl.ja.filter === 'geburtstag', 'Jahresliste öffnet den Kalender bei „Geburtstag“');
   S.clKalAnsicht('tag');
@@ -2265,7 +2353,7 @@ function suchenTest() {
   let h = S.document.getElementById('suchErgebnis').innerHTML;
   pruefe(/class="su-gruppe"><span>Termine<\/span><span>3<\/span>/.test(h) && /\+0 weitere/.test(h) === false, 'Gruppe mit Anzahl');
   const gruppen = (h.match(/class="su-gruppe"><span>([^<]+)/g) || []).map(x => x.replace(/.*<span>/, ''));
-  pruefe(gruppen.join(',') === 'Termine,Aufgaben,Memo,Checklisten,Sammlungen,Routinen', 'Gruppen in fester Reihenfolge — ' + gruppen.join(','));
+  pruefe(gruppen.join(',') === 'Termine,Aufgaben,Projekte & Notizen,Checklisten,Sammlungen,Routinen', 'Gruppen in fester Reihenfolge — ' + gruppen.join(','));
   for (let i = 0; i < 3; i++) { S.DB.themen[0].text += '\n[] Carport Punkt ' + i; }
   S.suGetippt();
   h = S.document.getElementById('suchErgebnis').innerHTML;
@@ -2283,7 +2371,7 @@ function suchenTest() {
   pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === sa.id && S.cl.aufklapp === 'sa' && S.cl.sa.fenster.id === S.saSaetze(sa)[1].id, 'Sammlungs-Treffer öffnet den Eintrag');
   S.aufklappZu();
   S.suMemo('p1');
-  pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'p1', 'Memo-Treffer öffnet die Seite');
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1', 'Projekt-Treffer öffnet das Projekt (seit 0.43)');
   S.suAufgabe('l1', 0);
   pruefe(S.cl.app === 'aufgaben' && S.cl.aufklapp === 'aufgabe', 'Aufgaben-Treffer öffnet die Aufgabe');
   S.aufklappZu();
@@ -2512,14 +2600,14 @@ function memoRuhtTest() {
   S.DB.projekte.push({ id: 'p2', name: 'Carport', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.projekte.push({ id: 'p3', name: 'Altes Projekt', flaeche: '', status: 'abgeschlossen', geaendert: 1 });
-  S.memoBereichSetzen('projekte');
-  S.oeffne('memo');
-  pruefe(/Läuft/.test(inhalt()) && !/Carport/.test(inhalt()) && !/Altes Projekt/.test(inhalt()), 'Projekte: nur laufende');
-  S.memoBereichSetzen('ruhend');
-  pruefe(/Carport/.test(inhalt()) && /Marathon/.test(inhalt()) && !/Läuft/.test(inhalt()), 'ruhende Projekte und Ziele im Bereich „Ruhend“');
-  S.memoBereichSetzen('fertig');
-  pruefe(/Altes Projekt/.test(inhalt()) && /▼ Abgeschlossen <span>1/.test(inhalt()), 'Abgeschlossenes im eigenen Bereich (seit 0.36 statt eingeklappt)');
-  S.memoBereichSetzen('projekte');
+  /* Seit 0.43 in der App Projekte: Ruhende stehen (mit R) unter den laufenden, Abgeschlossene per Knopf */
+  S.oeffne('projekte');
+  let h = inhalt();
+  pruefe(/Läuft/.test(h) && /Carport/.test(h) && /Marathon/.test(h) && !/Altes Projekt/.test(h) && h.indexOf('Läuft') < h.indexOf('Carport'), 'Projekte: laufende vor ruhenden, ohne Abgeschlossene');
+  pruefe(/class="pj-zeile ruht"/.test(h) && /<span class="pj-z">R<\/span>/.test(h), 'ruhende Projekte und Ziele sichtbar als „R“');
+  S.pjAbgeschlosseneUm();
+  pruefe(/Altes Projekt/.test(inhalt()) && !/Läuft/.test(inhalt()) && /◂ Offene/.test(S.document.getElementById('fuss').innerHTML), 'Abgeschlossenes über den Knopf „Abgeschlossene“');
+  S.pjAbgeschlosseneUm();
   S.oeffne('uebersicht');
 }
 
@@ -2686,7 +2774,7 @@ function listeTextTest() {
   pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
   S.listeAlsText();
   S.oeffne('uebersicht'); S.oeffne('memo');
-  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Seiten|memo-zeile|memo-bereich/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
+  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Notizen|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
   S.oeffne('uebersicht');
 }
 
@@ -3616,38 +3704,32 @@ function jahrTest() {
 }
 
 /* ============================================================
-   73. Memo: Bereich als Auswahl (0.36)
-   Grund: Die Memo-Liste war eine endlose Liste (Projekte, Ziele, Ruhend,
-   Notizen, Abgeschlossen untereinander). Seit 0.36 wählt ein Knopf ▼ den
-   Bereich; gezeigt wird nur dieser. Die Wahl bleibt gemerkt.
-   Erkennt: wieder alle Bereiche untereinander, Auswahl ohne Zahlen,
-   Wahl nicht gemerkt, Seite im falschen Bereich.
+   73. Notizen wie das Memo Pad (0.43; vorher Bereichsauswahl 0.36)
+   Grund: Seit 0.43 stehen Projekte und Ziele in eigener App; Memo heißt
+   „Notizen“ und ist eine schlichte, nummerierte Liste der Notizen — die
+   Bereichsauswahl von 0.36 ist damit gestrichen.
+   Erkennt: Projekte/Ziele/Checklisten wieder in Notizen, Bereichsknopf
+   wieder da, Nummern fehlen, Filter Beruf/Privat wirkungslos.
    ============================================================ */
 function memoBereichTest() {
-  console.log('\n73. Memo: Bereich als Auswahl (0.36)');
+  console.log('\n73. Notizen wie das Memo Pad (0.43)');
   if (!CL) { return; }
   frisch();
   const S = CL;
   S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] Angebot', status: 'laufend', geaendert: 1 });
-  S.DB.projekte.push({ id: 'p2', name: 'Keller', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '', status: 'laufend', geaendert: 1 });
-  S.DB.gedanken.push({ id: 'n1', titel: 'Ideen Garten', text: 'x', ordnung: 1, geaendert: 1 });
-  S.memoBereichSetzen('projekte');
+  S.DB.gedanken.push({ id: 'n1', titel: 'Ideen Garten', text: 'x', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'n2', titel: 'Teamregeln', text: 'y', kontext: 'beruflich', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[] a', checkliste: 'vorlage', ordnung: 3, geaendert: 1 });
   S.oeffne('memo');
   let h = inhalt();
-  pruefe(/class="memo-bereich[^"]*" onclick="memoBereichAuf\(\)">▼ Projekte <span>1<\/span>/.test(h) && /Carport/.test(h) && !/Marathon|Keller|Ideen Garten/.test(h), 'oben ▼ Projekte · 1, darunter nur Projekte');
-  S.memoBereichAuf();
-  const a = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'memobereich' && ['Projekte', 'Ziele', 'Notizen', 'Ruhend', 'Abgeschlossen'].every(n => a.indexOf(n) >= 0) && /Ziele <span class="leise">1/.test(a), 'Auswahl mit allen Bereichen und Anzahl');
-  S.memoBereichSetzen('notizen');
-  pruefe(!S.cl.aufklapp && /Ideen Garten/.test(inhalt()) && !/Carport/.test(inhalt()) && S.__ablage['clie-memo-bereich'] === 'notizen' && S.memoBereichLaden() === 'notizen', 'Bereich gewählt und gemerkt');
-  S.memoBereichSetzen('fertig');
-  pruefe(/Keine Abgeschlossen\./.test(inhalt()), 'leerer Bereich: Hinweis');
-  S.memoBereichSetzen('quatsch');
-  pruefe(S.cl.memo.bereich === 'fertig', 'Unbekanntes wird ignoriert');
-  S.memoBereichSetzen('projekte');
+  pruefe(/<span class="mz nr">1\.<\/span><span class="tx">Ideen Garten/.test(h) && /<span class="mz nr">2\.<\/span><span class="tx">Teamregeln/.test(h), 'nummerierte Notizen wie am Palm');
+  pruefe(!/Carport|Marathon|Packliste/.test(h) && !/memo-bereich/.test(h) && !/function memoBereich/.test(SKRIPT), 'keine Projekte, Ziele, Checklisten — und keine Bereichsauswahl mehr');
+  S.memoNeu();
+  pruefe(/Neue Notiz/.test(S.document.getElementById('aufklapp').innerHTML) && !/◎ Projekt/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu legt nur Notizen an');
+  S.aufklappZu();
   S.katSetzen('beruflich');
-  pruefe(/▼ Projekte <span>\d+<\/span>/.test(inhalt()), 'Filter ▼ Beruf/Privat oben rechts gilt weiter');
+  pruefe(/Teamregeln/.test(inhalt()) && !/Ideen Garten/.test(inhalt()), 'Filter ▼ Beruf/Privat oben rechts gilt weiter');
   S.katSetzen('alle');
   S.oeffne('uebersicht');
 }
@@ -5194,6 +5276,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { projekteTest(); } catch (e) { fail('Projekte warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lzGruppenTest(); } catch (e) { fail('Lesezeichen-Gruppen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rollbarTest(); } catch (e) { fail('Bildlaufleiste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
