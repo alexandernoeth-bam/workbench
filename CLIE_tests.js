@@ -3355,7 +3355,7 @@ function jahrTest() {
   pruefe(S.jaArtenAusText('Brunch #Besuch und #Feiern').join() === 'besuche,feier' && S.jaTerminArten(S.cl.ja.termine[vor(60)][0]).join() === 'besuche', 'Arten aus #Kürzel im Titel oder in der Beschreibung (Einzahl = Mehrzahl)');
   /* Ansicht J */
   S.oeffne('kalender'); S.clKalAnsicht('jahr');
-  pruefe(S.cl.kal.ansicht === 'jahr' && /ja-raster/.test(inhalt()) && /Jahr \d{4}/.test(S.document.getElementById('reiter').textContent), 'Kalender: Ansicht „J“ zeigt das Jahresraster');
+  pruefe(S.cl.kal.ansicht === 'jahr' && /ja-raster/.test(inhalt()) && S.document.getElementById('reiter').textContent === 'Jahr', 'Kalender: Ansicht „J“ zeigt das Jahresraster');
   pruefe(/clKalAnsicht\('jahr'\)/.test(S.document.getElementById('fuss').innerHTML) && /jaAnsicht\('liste'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: J und „Als Liste“');
   const zellen = (inhalt().match(/onclick="jaTagOeffnen\('\d{4}-\d{2}-\d{2}'\)"/g) || []).length;
   const schalt = (j % 4 === 0 && (j % 100 !== 0 || j % 400 === 0)) ? 366 : 365;
@@ -3405,6 +3405,13 @@ function jahrTest() {
   pruefe(/Brunch bei Sabine/.test(f) && /jaZuordnen\('b1','besuche'\)/.test(f) && /clKalGehe/.test(f), 'Tag antippen: Termine mit Art-Auswahl, „Zum Tag“');
   S.jaFensterZu();
   /* Blättern und Kontext */
+  pruefe(!/ja-kopf|jaJahrUm\(-1\)/.test(inhalt()) && S.document.getElementById('katKnopf').textContent === '▼ ' + j && S.document.getElementById('reiter').textContent === 'Jahr', 'das Jahr steht nur oben (seit 0.38.1 kein zweiter Wähler)');
+  S.katUm();
+  const jw = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'jahrwahl' && new RegExp('jaJahrSetzen\\(' + (j - 1) + '\\)').test(jw) && /katSetzen\('privat'\)/.test(jw), 'oben rechts: Jahre und Beruf/Privat');
+  S.jaJahrSetzen(j - 1);
+  pruefe(S.cl.ja.jahr === j - 1 && !S.cl.aufklapp && S.document.getElementById('katKnopf').textContent === '▼ ' + (j - 1), 'Jahr gewählt');
+  S.cl.ja.jahr = j;
   S.clBlaettern(1);
   pruefe(S.cl.ja.jahr === j + 1, 'Wischen blättert das Jahr');
   S.cl.ja.jahr = j;

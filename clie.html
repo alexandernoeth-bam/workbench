@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.38.0</title>
+<title>CLIE 0.38.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -600,8 +600,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .ja-chips button.an{background:var(--px);color:var(--lcd)}
 .ja-chips i{display:inline-block;width:10px;height:10px}
 .ja-chips i.fer{background:repeating-linear-gradient(90deg,var(--lcd-hell) 0 2px,var(--px-zart) 2px 4px);border:1px solid var(--px-zart)}
-.ja-kopf{display:flex;align-items:center;gap:10px;margin:2px 0 6px;font-size:19px}
-.ja-kopf button{border:2px solid var(--px);padding:0 9px}
+.ja-hinweis{margin:0 0 4px}
 .ja-raster{display:grid;grid-template-columns:22px repeat(12,1fr);gap:1px}
 .ja-raster b{font-weight:400;font-size:15.5px;text-align:center;color:var(--px-mitte);line-height:1}
 .ja-raster i{display:block;height:13px;background:var(--lcd-hell)}
@@ -798,7 +797,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.38.0';
+var APP_VERSION = '0.38.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3971,10 +3970,11 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'ideen') ? iwKopfText()
       : (cl.app === 'coach') ? coKopfText()
+      : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (cl.filter !== 'alle' ? ' · ' + katName(cl.filter) : '')
       : (cl.app === 'sudoku') ? sdKopfText()
       : (cl.app === 'solitaer') ? soKopfText()
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
-    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl' || cl.aufklapp === 'sdwahl' || cl.aufklapp === 'sowahl' || cl.aufklapp === 'cotag') ? ' an' : '');
+    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl' || cl.aufklapp === 'sdwahl' || cl.aufklapp === 'sowahl' || cl.aufklapp === 'cotag' || cl.aufklapp === 'jahrwahl') ? ' an' : '');
   }
   uhrZeichnen();
 }
@@ -4032,6 +4032,8 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'covorab') {
     if (el.innerHTML.indexOf('coWeg') >= 0) { return; }
     el.innerHTML = coVorabHtml();
+  } else if (cl.aufklapp === 'jahrwahl') {
+    el.innerHTML = jaJahrWahlHtml();
   } else if (cl.aufklapp === 'lzneu') {
     el.innerHTML = lzNeuHtml();
   } else if (cl.aufklapp === 'jahr') {
@@ -4168,6 +4170,13 @@ function oeffne(id) {
 }
 
 function katUm() {
+  /* Im Jahr: oben rechts Jahr und Beruf/Privat (seit 0.38.1) */
+  if (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') {
+    cl.aufklapp = (cl.aufklapp === 'jahrwahl') ? '' : 'jahrwahl';
+    kopfZeichnen();
+    aufklappZeichnen();
+    return;
+  }
   if (cl.app === 'coach') {
     if (cl.co.ansicht === 'einst') { return; }
     cl.aufklapp = (cl.aufklapp === 'cotag') ? '' : 'cotag';
@@ -4290,7 +4299,7 @@ function clZeitText(z) { return String(z || '').replace(/^0(\d)/, '$1'); }
 /* Der Kopf des Kalenders: Tag, KW oder Monat */
 function clKalReiter() {
   var d = clKalDatum();
-  if (cl.kal.ansicht === 'jahr') { return 'Jahr ' + jaJahr(); }
+  if (cl.kal.ansicht === 'jahr') { return 'Jahr'; }
   if (cl.kal.ansicht === 'bloecke' && cl.kal.tage === 3) { return clWt(d) + '–' + clWt(tagePlus(d, 2)); }
   if (cl.kal.ansicht === 'woche' || cl.kal.ansicht === 'bloecke') { return 'KW ' + kalenderwoche(d); }
   if (cl.kal.ansicht === 'monat') { return KAL_MONATE[Number(d.slice(5, 7)) - 1] + ' ' + d.slice(0, 4); }
@@ -5319,9 +5328,9 @@ function jaChipsHtml() {
 function jaRasterHtml() {
   var j = jaJahr();
   var heute = isoDatum();
-  var h = '<div class="ja-kopf"><button type="button" onclick="jaJahrUm(-1)" aria-label="Jahr zurück">◀</button><b>' + j + '</b>'
-    + '<button type="button" onclick="jaJahrUm(1)" aria-label="Jahr vor">▶</button>'
-    + (cl.ja.laeuft ? '<span class="leise">lädt …</span>' : (!cl.ja.geladen[j] && tokenGueltig() ? '' : (!tokenGueltig() ? '<span class="leise">ohne Google nur Jahrestermine</span>' : ''))) + '</div>'
+  /* Das Jahr wählt man oben rechts (▼ 2026) oder per Wischen — seit 0.38.1 kein zweiter Wähler */
+  var hinweis = cl.ja.laeuft ? 'lädt Termine ' + j + ' …' : (!tokenGueltig() ? 'ohne Google nur Jahrestermine' : '');
+  var h = (hinweis ? '<p class="leise ja-hinweis">' + hinweis + '</p>' : '')
     + '<div class="ja-raster"><b></b>' + JA_MONATE.map(function (m) { return '<b>' + m + '</b>'; }).join('');
   var tag;
   for (tag = 1; tag <= 31; tag++) {
@@ -5452,6 +5461,26 @@ function jaAnsicht(v) {
     cl.ja.filter = jaArtenAlle().indexOf('geburtstag') >= 0 ? 'geburtstag' : JA_REIHE[0];
   }
   jaZeichnen();
+}
+
+/* Oben rechts: Beruf/Privat und das Jahr */
+function jaJahrWahlHtml() {
+  var heute = Number(isoDatum().slice(0, 4));
+  var h = '<div class="aufklapp" style="top:49px;right:6px;min-width:230px"><div class="schalter">' + CL_KATEGORIEN.map(function (k) {
+    return '<button type="button"' + (k[0] === cl.filter ? ' class="an"' : '') + ' onclick="katSetzen(\'' + k[0] + '\')">' + k[1] + '</button>';
+  }).join('') + '</div>';
+  var y;
+  for (y = heute + 1; y >= heute - 5; y--) {
+    h += '<button type="button"' + (y === jaJahr() ? ' class="an"' : '') + ' onclick="jaJahrSetzen(' + y + ')">' + y + '</button>';
+  }
+  return h + '</div>';
+}
+
+function jaJahrSetzen(y) {
+  cl.ja.jahr = Number(y) || jaJahr();
+  cl.aufklapp = '';
+  zeichne();
+  jaJahrHolen(cl.ja.jahr, false);
 }
 
 function jaJahrUm(d) {
