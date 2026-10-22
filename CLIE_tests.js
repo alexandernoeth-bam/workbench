@@ -1809,6 +1809,51 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   76. Arten im Termin-Fenster (0.40)
+   Grund: Beim Anlegen oder Ändern eines Google-Termins sollen die Arten
+   für den Jahreskalender (mehrere) direkt wählbar sein — als #Kürzel in
+   der Notiz, damit sie in Google, CLIE und Workbench gelten.
+   Erkennt: Knöpfe fehlen, Kürzel nicht geschrieben/entfernt, Mehrzahl-
+   Kürzel (#Besuch) nicht erkannt, Notiztext beschädigt, Kürzel landet
+   nicht in der Beschreibung des Termins.
+   ============================================================ */
+function terminArtenTest() {
+  console.log('\n76. Arten im Termin-Fenster (0.40)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.schreibKalender = [{ id: 'k', name: 'Privat', primary: true }];
+  S.oeffne('kalender');
+  S.cl.termin = { modus: 'neu', t: null, vorschlag: { titel: '', datum: S.isoDatum(), von: '10:00', bis: '11:00', ganztags: false, kalId: 'k', ort: '', notiz: '' } };
+  S.cl.aufklapp = 'termin'; S.aufklappNeu();
+  const f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Arten \(Jahreskalender\)/.test(f) && /terminArtUm\('besuche'\)/.test(f) && /terminArtUm\('geburtstag'\)/.test(f), 'Termin-Fenster: Arten als Knöpfe');
+  const notiz = S.document.getElementById('terminNotiz');
+  const titel = S.document.getElementById('terminTitel');
+  titel.value = 'Brunch bei Sabine'; notiz.value = 'Bitte Kuchen mitbringen';
+  S.terminArtUm('besuche');
+  pruefe(notiz.value === 'Bitte Kuchen mitbringen\n#Besuche', 'Besuche an: #Besuche in einer neuen Zeile');
+  S.terminArtUm('feier');
+  pruefe(notiz.value === 'Bitte Kuchen mitbringen\n#Besuche #Feier', 'zweite Art dazu: #Besuche #Feier');
+  pruefe(/class="an" onclick="terminArtUm\('besuche'\)"/.test(S.document.getElementById('terminArten').innerHTML) && /class="an" onclick="terminArtUm\('feier'\)"/.test(S.document.getElementById('terminArten').innerHTML), 'beide Knöpfe an');
+  S.terminArtUm('besuche');
+  pruefe(notiz.value === 'Bitte Kuchen mitbringen\n#Feier', 'Besuche aus: Kürzel heraus, Text bleibt');
+  notiz.value = 'alt #Besuch'; S.terminArtenNeu();
+  pruefe(/class="an" onclick="terminArtUm\('besuche'\)"/.test(S.document.getElementById('terminArten').innerHTML), '#Besuch (Einzahl) gilt als Besuche');
+  S.terminArtUm('besuche');
+  pruefe(notiz.value === 'alt', '… und lässt sich ebenso abschalten');
+  titel.value = 'Urlaub #Urlaub'; notiz.value = '';
+  S.terminArtUm('urlaub');
+  pruefe(notiz.value === '', 'steht die Art schon im Titel, wird sie nicht doppelt eingetragen');
+  /* Was an Google geht */
+  titel.value = 'Kino'; notiz.value = 'mit Petra'; S.terminArtUm('besuche');
+  const e = S.terminAusFenster();
+  pruefe(e.koerper.description === 'mit Petra\n#Besuche' && S.jaTerminArten({ titel: 'Kino', beschreibung: e.koerper.description }).join() === 'besuche', 'die Beschreibung des Termins trägt das Kürzel — der Jahreskalender erkennt es');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    75. Lesezeichen, Schreibleiste, Jahr in Graustufen (0.38)
    Grund: Die Pinnwand der Workbench war der Direktzugriff — in CLIE als
    „Lesezeichen“ (Liste, ohne Pins und Farben) unten in der Leiste statt
@@ -5029,6 +5074,7 @@ function lernkarteiTest() {
   try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
   try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
   try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
+  try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
   try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
@@ -5052,6 +5098,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { jahrTest(); } catch (e) { fail('Jahr warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoBereichTest(); } catch (e) { fail('Memo-Bereich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
