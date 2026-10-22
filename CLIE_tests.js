@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 25, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 26, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -1817,6 +1817,74 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   80. Ziele als eigene App im Ordner Planung (0.44)
+   Grund: Ziele sind keine Projekte — eine einfache eigene App mit Name,
+   Zieltermin, Zustand und freiem Text; Projekte zeigen nur Projekte.
+   Erkennt: Ziele wieder in Projekte, falsche Sortierung nach Termin,
+   Restzeit falsch, „erreicht“ nicht als abgeschlossen gespeichert,
+   Schreiben führt nicht zurück, Neu ohne Ziel-Kennzeichen, App fehlt im
+   Ordner Planung.
+   ============================================================ */
+function zieleTest() {
+  console.log('\n80. Ziele als eigene App im Ordner Planung (0.44)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', flaeche: '', ordnung: 1, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Haus auf Stand', kontext: 'privat', status: 'laufend', zieltermin: S.tagePlus(heute, 400), flaeche: '', ordnung: 1, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z2', name: 'Gewicht 73 kg', kontext: 'privat', status: 'laufend', zieltermin: S.tagePlus(heute, 30), flaeche: '## Warum\nKnie entlasten\n[] Waage kaufen', ordnung: 2, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z3', name: 'Italienisch A2', kontext: 'privat', status: 'laufend', zieltermin: '', flaeche: '', ordnung: 3, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z4', name: 'Alter Vorsatz', kontext: 'privat', status: 'abgeschlossen', zieltermin: '2025-01-01', flaeche: '', ordnung: 4, geaendert: 1 });
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('ziele') >= 0 && S.clApp('ziele').raster === false && /M20 17h22/.test(S.clSymbol('ziele')), 'Ziele im Ordner Planung, mit Fahne als Symbol');
+  pruefe(/2 laufen|3 laufen/.test(S.ordnerStandText('ziele')) && /nächstes in 30 Tage/.test(S.ordnerStandText('ziele')), 'Stand im Ordner: Anzahl und nächstes Ziel');
+  S.oeffne('projekte');
+  pruefe(!/Haus auf Stand|Gewicht/.test(inhalt()) && /Carport/.test(inhalt()), 'Projekte zeigt keine Ziele mehr');
+  S.pjNeu();
+  pruefe(!/◇ Ziel|pjNeuWahl\('typ'/.test(S.document.getElementById('aufklapp').innerHTML), 'Neues Projekt fragt nicht mehr nach der Art');
+  S.aufklappZu();
+  S.oeffne('ziele');
+  let h = inhalt();
+  pruefe(S.document.getElementById('reiter').textContent === 'Ziele' && /pjZustandFilter|ziZustandFilter\('laeuft'\)">Laufend/.test(h) && /ziZustandFilter\('erledigt'\)">Erreicht/.test(h), 'drei Schalter Laufend · Ruhend · Erreicht');
+  pruefe(h.indexOf('Gewicht') < h.indexOf('Haus auf Stand') && h.indexOf('Haus auf Stand') < h.indexOf('Italienisch') && !/Alter Vorsatz/.test(h), 'nächster Zieltermin zuerst, ohne Termin unten');
+  pruefe(/Gewicht 73 kg<\/span><span class="pj-p">30 Tage/.test(h) && /Haus auf Stand<\/span><span class="pj-p">13 Mon\./.test(h) && /Italienisch A2<\/span><span class="pj-p">—/.test(h), 'rechts die Restzeit: Tage, Monate oder —');
+  S.ziZustandFilter('erledigt');
+  pruefe(/Alter Vorsatz/.test(inhalt()) && !/Gewicht/.test(inhalt()), 'Erreicht: abgeschlossene Ziele');
+  S.ziOeffnen('z2');
+  h = inhalt();
+  pruefe(/noch 30 Tage/.test(h) && /memo-h1">Warum|memo-h2">Warum/.test(h) && /Waage kaufen/.test(h) && !/memo-kopf/.test(h), 'Ein Ziel: Zieltermin mit Restzeit, darunter der Text (mit Aufgaben)');
+  pruefe(/ziSchreiben\(\)/.test(S.document.getElementById('fuss').innerHTML) && /ziDetails\(\)/.test(S.document.getElementById('fuss').innerHTML), 'unten Fertig, Schreiben, Details…');
+  S.ziSchreiben();
+  pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && S.cl.memo.ausZiel === 'z2', '„Schreiben“ im Schreibfeld');
+  S.memoSchreibenUm();
+  pruefe(S.cl.app === 'ziele' && S.cl.zi.id === 'z2' && !S.cl.memo.ausZiel, '„Fertig“ führt zurück ins Ziel');
+  S.ziDetails();
+  S.document.getElementById('ziTitel').value = 'Gewicht 72 kg';
+  S.document.getElementById('ziTermin').value = '2027-06-30';
+  S.ziWahl('zustand', 'erledigt');
+  S.ziSpeichern();
+  const z2 = S.DB.ziele[1];
+  pruefe(z2.name === 'Gewicht 72 kg' && z2.zieltermin === '2027-06-30' && z2.status === 'abgeschlossen', 'Details: Name, Zieltermin; „erreicht“ = abgeschlossen in der Workbench');
+  S.ziZurListe();
+  pruefe(S.cl.zi.zustand === 'erledigt' && /Gewicht 72 kg/.test(inhalt()), 'zurück: Liste „Erreicht“');
+  S.ziNeu();
+  pruefe(/Neues Ziel/.test(S.document.getElementById('aufklapp').innerHTML) && !/ziWahl\('zustand'/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu: Name, Zieltermin, Kategorie');
+  S.document.getElementById('ziTitel').value = 'Halbmarathon';
+  S.document.getElementById('ziTermin').value = '2027-06-20';
+  S.ziSpeichern();
+  const neu = S.DB.ziele[S.DB.ziele.length - 1];
+  pruefe(neu.name === 'Halbmarathon' && neu.zieltermin === '2027-06-20' && neu.status === 'laufend' && S.cl.zi.id === neu.id, 'Neu legt ein Ziel in DB.ziele an und öffnet es');
+  S.clZurueck();
+  pruefe(S.cl.app === 'ziele' && !S.cl.zi.id, 'Zurück: vom Ziel zur Liste');
+  S.clZurueck();
+  pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === 'planung', 'noch einmal Zurück: in den Ordner Planung');
+  S.aufklappZu();
+  S.seiteOeffnen('z1');
+  pruefe(S.cl.app === 'ziele' && S.cl.zi.id === 'z1', 'Lesezeichen, Suche und Verweise öffnen Ziele in Ziele');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    79. Projekte wie „Projects“ am Palm (0.43)
    Grund: Ein Projekt mit Angeboten, Rückmeldungen, Notizen, Meilensteinen
    und Aufgaben war als eine lange Memo-Seite nicht mehr zu ordnen. Seit
@@ -1841,12 +1909,16 @@ function projekteTest() {
   S.DB.ziele.push({ id: 'z1', name: 'Fit bis Sommer', kontext: 'privat', status: 'laufend', zieltermin: '2027-06-30', flaeche: '', ordnung: 4, geaendert: 1 });
   S.oeffne('projekte');
   let h = inhalt();
-  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && /Fit bis Sommer/.test(h),
-    'Liste „Laufend“: P1 zuerst, Ruhendes nicht');
+  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && !/Fit bis Sommer/.test(h),
+    'Liste „Laufend“: P1 zuerst, Ruhendes nicht, Ziele nicht (seit 0.44 eigene App)');
   /* Seit 0.43.2 schlicht: nur der Name, die Priorität nur wenn gesetzt */
-  pruefe(/<button type="button" class="pj-zeile" onclick="pjOeffnen\('p1','aufgaben'\)"><span class="pj-n">Carport<\/span><\/button>/.test(h)
+  pruefe(/<button type="button" class="pj-zeile" onclick="pjOeffnen\('p1','allgemein'\)"><span class="pj-n">Carport<\/span><\/button>/.test(h)
     && /<span class="pj-n">Heizung<\/span><span class="pj-p">P1<\/span>/.test(h) && !/◇|✎|<small>\d+\/\d+|·</.test(h.replace(/<p class="leise">[\s\S]*$/, '')),
     'Zeile nur mit Namen — ohne Punkt, Zeichen, Aufgabenzahl und ✎; „P1“ nur wenn gesetzt');
+  pruefe(/pjOeffnen\('p2','allgemein'\)/.test(h) && !/'aufgaben'\)">/.test(h), 'Tipp auf ein Projekt öffnet „Allgemein“ (seit 0.44.1)');
+  S.seiteOeffnen('p2');
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.reiter === 'allgemein', 'auch Lesezeichen, Suche und Verweise landen bei „Allgemein“');
+  S.oeffne('projekte');
   S.pjOeffnen('p1', 'allgemein'); S.pjWahl('prio', '1');
   pruefe(S.DB.projekte[0].prio === 1, 'Priorität im Reiter Allgemein (am Satz als „prio“)');
   S.pjWahl('prio', '0');
@@ -1892,10 +1964,10 @@ function projekteTest() {
   S.pjMsAuf(ms[1].id);
   S.pjMsLoeschen();
   pruefe(S.DB.projekte[0].meilensteine.length === 1, 'Meilenstein löschen');
-  /* Ziel */
+  /* Ziel: seit 0.44 in der App Ziele */
   S.pjOeffnen('z1', 'allgemein');
-  h = inhalt();
-  pruefe(/Zieltermin:<input id="pjEnde"[^>]*value="2027-06-30"/.test(h) && !/pjBeginn|Meilensteine/.test(h) && !/pjMsAuf/.test(S.document.getElementById('fuss').innerHTML), 'Ziel: Zieltermin, ohne Beginn und Meilensteine');
+  pruefe(S.cl.app === 'ziele' && S.cl.zi.id === 'z1', 'ein Ziel öffnet in der App Ziele');
+  S.pjOeffnen('p1', 'allgemein');
   /* Zurück und Neu */
   S.clZurueck();
   pruefe(S.cl.app === 'projekte' && !S.cl.pj.id, 'Zurück: vom Projekt zur Liste');
@@ -2610,7 +2682,7 @@ function memoRuhtTest() {
   pruefe(/Läuft/.test(h) && !/Carport|Marathon|Altes Projekt/.test(h), 'Laufend: nur laufende');
   S.pjZustandFilter('ruht');
   h = inhalt();
-  pruefe(/Carport/.test(h) && /Marathon/.test(h) && !/Läuft|Altes Projekt/.test(h), 'Ruhend: ruhende Projekte und Ziele');
+  pruefe(/Carport/.test(h) && !/Marathon/.test(h) && !/Läuft|Altes Projekt/.test(h), 'Ruhend: ruhende Projekte (Ziele seit 0.44 in eigener App)');
   S.pjZustandFilter('erledigt');
   h = inhalt();
   pruefe(/Altes Projekt/.test(h) && !/Läuft|Carport/.test(h) && /pj-liste fertig/.test(h) && !/pj-p/.test(h), 'Abgeschlossen: grau, ohne Priorität');
@@ -5287,6 +5359,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { zieleTest(); } catch (e) { fail('Ziele warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { projekteTest(); } catch (e) { fail('Projekte warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lzGruppenTest(); } catch (e) { fail('Lesezeichen-Gruppen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rollbarTest(); } catch (e) { fail('Bildlaufleiste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

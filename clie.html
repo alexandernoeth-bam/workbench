@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.43.2</title>
+<title>CLIE 0.44.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -292,6 +292,10 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .pj-zeile{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);min-height:42px;padding:6px 0}
 .pj-liste.fertig .pj-zeile{color:var(--px-mitte)}
 .pj-filter{display:flex;margin:0 0 8px}
+/* Ziele (seit 0.44) */
+.zi-frist{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border:2px solid var(--px);padding:6px 8px;margin:4px 0 10px}
+.zi-frist b{font-size:21px;text-align:right;white-space:nowrap}
+.zi-text{border-top:2px solid var(--px);padding-top:6px}
 .pj-filter button{flex:1;border:2px solid var(--px);margin-left:-2px;padding:3px 0;font-size:17px}
 .pj-filter button:first-child{margin-left:0}
 .pj-filter button.an{background:var(--px);color:var(--lcd)}
@@ -856,7 +860,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.43.2';
+var APP_VERSION = '0.44.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3110,6 +3114,8 @@ var CL_APPS = [
   { id: 'spiele', name: 'Spiele', stufe: '', was: '', ordner: true },
   { id: 'kurs', name: 'Kurs', stufe: '', was: '', raster: false },
   { id: 'ideen', name: 'Ideenwerkstatt', rasterName: 'Ideen-\nwerkstatt', stufe: '', was: '', raster: false },
+  /* Seit 0.44 eigene, einfache App im Ordner Planung — vorher in Projekte */
+  { id: 'ziele', name: 'Ziele', stufe: '', was: '', raster: false },
   { id: 'heute', name: 'Heute', stufe: '', was: '', raster: false },
   { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.', raster: false },
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '', raster: false },
@@ -3172,6 +3178,8 @@ var CL_BILD = {
   planung: '<rect x="19" y="17" width="26" height="31" rx="2" ' + CL_STRICH + '/><rect x="26" y="14" width="12" height="6" rx="1.5" ' + CL_FUELL + '/>'
          + '<path d="M24 33l5 5 10-11" ' + CL_STRICH + '/>',
   lernen: '<path d="M32 22c-5-4-11-4-16-3v24c5-1 11-1 16 3 5-4 11-4 16-3V19c-5-1-11-1-16 3z" ' + CL_STRICH + '/><path d="M32 22v24" ' + CL_STRICH + '/>',
+  /* Fahne am Mast: ein Ziel in Sicht (seit 0.44) */
+  ziele: '<path d="M20 48V16" ' + CL_STRICH + '/><path d="M20 17h22l-5 6 5 6H20" ' + CL_FUELL + ' stroke="#C9D3B7" stroke-width="2" stroke-linejoin="round"/><path d="M13 48h22" ' + CL_STRICH + '/>',
   /* Zeitplan: drei versetzte Balken wie ein Gantt-Plan (seit 0.43) */
   projekte: '<rect x="15" y="18" width="16" height="6" ' + CL_FUELL + '/><rect x="23" y="29" width="18" height="6" ' + CL_FUELL + '/>'
           + '<rect x="33" y="40" width="16" height="6" ' + CL_FUELL + '/><path d="M15 50h34" stroke="#C9D3B7" stroke-width="2" stroke-linecap="round"/>',
@@ -3998,6 +4006,7 @@ function inhaltZeichnen() {
     if (document.activeElement && /^pj/.test(String(document.activeElement.id || '')) && el.innerHTML.indexOf('id="' + document.activeElement.id + '"') >= 0) { return; }
     el.innerHTML = projekteHtml();
   }
+  else if (cl.app === 'ziele') { el.innerHTML = zieleHtml(); }
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'statistik') { el.innerHTML = statistikHtml(); }
@@ -4111,6 +4120,9 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'pjneu') {
     if (el.innerHTML.indexOf('pjNeuTitel') >= 0) { return; }
     el.innerHTML = pjNeuHtml();
+  } else if (cl.aufklapp === 'zidet') {
+    if (el.innerHTML.indexOf('ziTitel') >= 0) { return; }
+    el.innerHTML = ziFensterHtml();
   } else if (cl.aufklapp === 'pjms') {
     if (el.innerHTML.indexOf('pjMsTitel') >= 0) { return; }
     el.innerHTML = pjMsHtml();
@@ -4181,6 +4193,7 @@ function fussZeichnen() {
         : (cl.app === 'aufgaben') ? aufFussHtml()
         : (cl.app === 'memo') ? memoFussHtml()
         : (cl.app === 'projekte') ? pjFussHtml()
+        : (cl.app === 'ziele') ? ziFussHtml()
         : (cl.app === 'checklisten') ? checklistenFussHtml()
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
@@ -4231,7 +4244,8 @@ function oeffne(id) {
   /* Gerade Abgehaktes verschwindet beim Verlassen der Aufgaben */
   cl.auf.frisch = {};
   cl.auf.wahl = '';
-  if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; cl.memo.ausProjekt = ''; }
+  if (id === 'memo' && cl.app !== 'memo') { cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; cl.memo.ausProjekt = ''; cl.memo.ausZiel = ''; }
+  if (id === 'ziele' && cl.app !== 'ziele') { cl.zi.id = ''; }
   if (id === 'projekte' && cl.app !== 'projekte') { cl.pj.id = ''; cl.pj.hervor = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; }
   if (id === 'sammlungen' && cl.app !== 'sammlungen') { cl.sa.id = ''; cl.sa.ansicht = 'tabelle'; }
@@ -5753,7 +5767,7 @@ var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
 cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null };
-cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '' };
+cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
    Ziele, alle Listen. Notizen (und damit Checklisten) nicht. */
@@ -6195,7 +6209,7 @@ function aufFensterHtml() {
     + '<div class="knoepfe"><button type="button" id="aufOk" class="knopf voll"' + (ok ? '' : ' disabled') + ' onclick="aufSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
     + (f.modus === 'details' ? '<div class="knoepfe"><button type="button" class="knopf" onclick="memoZeile(\'' + esc(f.quelle) + '\',' + f.nr + ')">'
-      + ({ liste: 'Liste zeigen', vorhaben: 'Im Projekt zeigen' }[(kpSeiteFinden(f.quelle) || {}).art] || 'In Notizen zeigen') + '</button>'
+      + ({ liste: 'Liste zeigen', vorhaben: 'Im Projekt zeigen', ziel: 'Im Ziel zeigen' }[((kpSeiteFinden(f.quelle) || {}).typ === 'ziel') ? 'ziel' : (kpSeiteFinden(f.quelle) || {}).art] || 'In Notizen zeigen') + '</button>'
       + '<button type="button" class="knopf" onclick="aufLoeschenFragen()">Löschen…</button></div>' : '')
     + (f.modus === 'neu' && !seite ? '<p class="leise">OK geht erst, wenn eine Liste gewählt ist.</p>' : '')
     + '</div></div>';
@@ -6616,13 +6630,13 @@ function memoListeHtml() {
 /* Eine Seite lesen: Überschriften, Text, Aufgaben zum Abhaken.
    Seit 0.43 mit „ohneAufgaben“: der Reiter „Memo“ eines Projekts zeigt nur
    den Text — die Aufgaben stehen dort im eigenen Reiter. */
-function memoSeiteHtml(s, ohneAufgaben) {
+function memoSeiteHtml(s, ohneAufgaben, ohneKopf) {
   var h = '';
-  if (s.art === 'vorhaben' && !ohneAufgaben) {
+  if (s.art === 'vorhaben' && !ohneAufgaben && !ohneKopf) {
     var zt = s.termin ? (s.typ === 'ziel' ? 'Zieltermin ' : 'Ende ') + clKurzDatum(s.termin) + s.termin.slice(0, 4) : '';
     h += '<div class="memo-kopf leise">' + (s.typ === 'ziel' ? 'Ziel' : 'Projekt') + (zt ? ' · ' + esc(zt) : '') + '</div>';
   }
-  if (cl.memo.schreiben && !ohneAufgaben) {
+  if (cl.memo.schreiben && !ohneAufgaben && !ohneKopf) {
     /* Seit 0.38 die volle Leiste: wie die Workbench, aber nur das Nötige */
     return h + '<div class="schreibleiste">' + MEMO_LEISTE.map(function (k) {
         return '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'' + k[0] + '\')" aria-label="' + k[2] + '">' + k[1] + '</button>';
@@ -6726,6 +6740,7 @@ function memoOeffnen(id) {
 function memoZurListe() {
   if (cl.memo.ausListe) { listeTextFertig(); return; }
   if (cl.memo.ausProjekt) { pjTextFertig(); return; }
+  if (cl.memo.ausZiel) { ziTextFertig(); return; }
   cl.memo.id = '';
   cl.memo.schreiben = false;
   cl.memo.hervor = '';
@@ -6741,6 +6756,7 @@ function memoZeile(seiteId, nr) {
   /* Listen stehen seit 0.6 nicht im Memo: dann die Liste in den Aufgaben */
   if (s.art === 'liste') { cl.app = 'aufgaben'; aufListeSetzen(s.id); return; }
   /* Projekte stehen seit 0.43 in der App Projekte */
+  if (s.art === 'vorhaben' && s.typ === 'ziel') { ziOeffnen(s.id); return; }
   if (s.art === 'vorhaben') { pjZeile(s.id, nr); return; }
   cl.app = 'memo';
   cl.memo.id = s.id;
@@ -6763,6 +6779,7 @@ function memoSchreibenUm() {
   if (cl.memo.schreiben && cl.memo.ausListe) { listeTextFertig(); return; }
   /* Aus dem Reiter „Memo“ eines Projekts: zurück ins Projekt (seit 0.43) */
   if (cl.memo.schreiben && cl.memo.ausProjekt) { pjTextFertig(); return; }
+  if (cl.memo.schreiben && cl.memo.ausZiel) { ziTextFertig(); return; }
   cl.memo.schreiben = !cl.memo.schreiben;
   zeichne();
   if (cl.memo.schreiben) {
@@ -6939,7 +6956,7 @@ function memoSpeichern() {
    flaeche); neu ist nur „prio“ (1–3) am Satz — die Workbench lässt das
    Feld unberührt. Ziele stehen mit ◇ in derselben Liste. */
 
-cl.pj = { id: '', reiter: 'aufgaben', zustand: 'laeuft', hervor: '', ms: null, neu: null };
+cl.pj = { id: '', reiter: 'allgemein', zustand: 'laeuft', hervor: '', ms: null, neu: null };
 
 var PJ_REITER = [['allgemein', 'Allgemein'], ['aufgaben', 'Aufgaben'], ['memo', 'Memo']];
 /* Seit 0.43.1 nur ein Zustand auf einmal — drei Schalter über der Liste */
@@ -6950,8 +6967,9 @@ function pjPrio(s) {
   return (p >= 1 && p <= 3) ? p : 0;
 }
 
+/* Seit 0.44 ohne Ziele — die haben ihre eigene App */
 function pjAlle() {
-  return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === 'vorhaben' && kpPasstFilter(s, cl.filter); }));
+  return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === 'vorhaben' && s.typ !== 'ziel' && kpPasstFilter(s, cl.filter); }));
 }
 
 /* Die Projekte des gewählten Zustands: nach Priorität —
@@ -6984,7 +7002,7 @@ function pjListeHtml() {
   var fertig = (cl.pj.zustand === 'erledigt');
   return h + '<div class="pj-liste' + (fertig ? ' fertig' : '') + '">' + l.map(function (s) {
     var p = fertig ? 0 : pjPrio(s);
-    return '<button type="button" class="pj-zeile" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'aufgaben\')">'
+    return '<button type="button" class="pj-zeile" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'allgemein\')">'
       + '<span class="pj-n">' + esc(s.titel) + '</span>' + (p ? '<span class="pj-p">P' + p + '</span>' : '') + '</button>';
   }).join('') + '</div>';
 }
@@ -6998,11 +7016,12 @@ function pjPrioSchreiben(s, p) {
 function pjOeffnen(id, reiter) {
   var s = kpSeiteFinden(id);
   if (!s || s.art !== 'vorhaben') { return; }
+  if (s.typ === 'ziel') { ziOeffnen(s.id); return; }
   if (cl.app !== 'projekte') { oeffne('projekte'); }
   cl.pj.id = s.id;
   /* Zurück zur Liste landet man beim Zustand dieses Projekts */
   cl.pj.zustand = s.zustand;
-  cl.pj.reiter = PJ_REITER.some(function (r) { return r[0] === reiter; }) ? reiter : 'aufgaben';
+  cl.pj.reiter = PJ_REITER.some(function (r) { return r[0] === reiter; }) ? reiter : 'allgemein';
   cl.pj.hervor = '';
   var el = document.getElementById('inhalt');
   if (el) { el.scrollTop = 0; }
@@ -7048,7 +7067,6 @@ function pjSeiteHtml(s) {
 
 function pjAllgemeinHtml(s) {
   var z = s.__satz;
-  var ziel = (s.typ === 'ziel');
   var reihe = function (feld, werte, an) {
     return '<div class="wahlreihe">' + werte.map(function (w) {
       return '<button type="button"' + (String(w[0]) === String(an) ? ' class="an"' : '') + ' onclick="pjWahl(\'' + feld + '\',\'' + w[0] + '\')">' + w[1] + '</button>';
@@ -7056,13 +7074,12 @@ function pjAllgemeinHtml(s) {
   };
   var h = '<label for="pjName">Name:</label><input id="pjName" class="eingabe" type="text" autocomplete="off" value="' + esc(s.titel) + '" onchange="pjFeld(\'name\')">'
     + '<div class="pj-daten">'
-    + (ziel ? '' : '<label for="pjBeginn">Beginn:<input id="pjBeginn" class="eingabe" type="date" value="' + esc(z.start || '') + '" onchange="pjFeld(\'beginn\')"></label>')
-    + '<label for="pjEnde">' + (ziel ? 'Zieltermin:' : 'Ende:') + '<input id="pjEnde" class="eingabe" type="date" value="' + esc(s.termin || '') + '" onchange="pjFeld(\'ende\')"></label>'
+    + '<label for="pjBeginn">Beginn:<input id="pjBeginn" class="eingabe" type="date" value="' + esc(z.start || '') + '" onchange="pjFeld(\'beginn\')"></label>'
+    + '<label for="pjEnde">Ende:<input id="pjEnde" class="eingabe" type="date" value="' + esc(s.termin || '') + '" onchange="pjFeld(\'ende\')"></label>'
     + '</div>'
     + '<label>Priorität:</label>' + reihe('prio', [[0, '–'], [1, '1'], [2, '2'], [3, '3']], pjPrio(s))
     + '<label>Zustand:</label>' + reihe('zustand', KP_ZUSTAENDE, s.zustand)
     + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], s.kontext);
-  if (ziel) { return h; }
   var ms = Array.isArray(z.meilensteine) ? z.meilensteine : [];
   var n = ms.filter(function (m) { return m && m.erreicht; }).length;
   h += '<div class="pj-gr">Meilensteine <span>' + n + '/' + ms.length + '</span></div>';
@@ -7129,7 +7146,7 @@ function pjMsUm(msId) {
 /* Meilenstein anlegen (ohne Kennung) oder ändern */
 function pjMsAuf(msId) {
   var s = cl.pj.id ? kpSeiteFinden(cl.pj.id) : null;
-  if (!s || s.typ === 'ziel') { return; }
+  if (!s) { return; }
   var m = msId ? pjMeilenstein(s, msId) : null;
   cl.pj.ms = { id: m ? m.id : '', titel: m ? (m.titel || '') : '', datum: m ? (m.datum || '') : '' };
   cl.aufklapp = 'pjms';
@@ -7254,7 +7271,7 @@ function pjTextFertig() {
 /* ---- Neu ---- */
 
 function pjNeu() {
-  cl.pj.neu = { typ: 'projekt', titel: '', kontext: (cl.filter === 'beruflich') ? 'beruflich' : 'privat' };
+  cl.pj.neu = { titel: '', kontext: (cl.filter === 'beruflich') ? 'beruflich' : 'privat' };
   cl.aufklapp = 'pjneu';
   aufklappNeu();
 }
@@ -7264,7 +7281,6 @@ function pjNeuWahl(feld, wert) {
   var t = document.getElementById('pjNeuTitel');
   if (!f) { return; }
   if (t && typeof t.value === 'string') { f.titel = t.value; }
-  if (feld === 'typ' && (wert === 'projekt' || wert === 'ziel')) { f.typ = wert; }
   if (feld === 'kontext' && (wert === 'beruflich' || wert === 'privat')) { f.kontext = wert; }
   aufklappNeu();
 }
@@ -7277,8 +7293,7 @@ function pjNeuHtml() {
       return '<button type="button"' + (w[0] === an ? ' class="an"' : '') + ' onclick="pjNeuWahl(\'' + feld + '\',\'' + w[0] + '\')">' + w[1] + '</button>';
     }).join('') + '</div>';
   };
-  return '<div class="fenster"><div class="titel">' + (f.typ === 'ziel' ? 'Neues Ziel' : 'Neues Projekt') + '</div><div class="rumpf">'
-    + '<label>Art:</label>' + reihe('typ', [['projekt', '◎ Projekt'], ['ziel', '◇ Ziel']], f.typ)
+  return '<div class="fenster"><div class="titel">Neues Projekt</div><div class="rumpf">'
     + '<label for="pjNeuTitel">Name:</label><input id="pjNeuTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
     + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pjNeuSpeichern()">OK</button>'
@@ -7292,10 +7307,10 @@ function pjNeuSpeichern() {
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   var titel = String(f.titel || '').trim();
   if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
-  var s = kpSeiteAnlegen('vorhaben', titel, f.kontext, f.typ === 'ziel' ? 'ziel' : '');
+  var s = kpSeiteAnlegen('vorhaben', titel, f.kontext, '');
   if (!s) { melde('Das ließ sich nicht anlegen.', 'warn'); return; }
   /* Am Palm hatte jedes Projekt einen Beginn — hier heute, änderbar */
-  if (s.typ !== 'ziel') { s.__satz.start = isoDatum(); }
+  s.__satz.start = isoDatum();
   cl.pj.neu = null;
   cl.pj.zustand = 'laeuft';
   spaeterSichern();
@@ -7311,19 +7326,248 @@ function pjFussHtml() {
   var h = '<button type="button" class="knopf voll" onclick="pjZurListe()">Fertig</button>';
   if (cl.pj.reiter === 'aufgaben') { h += '<button type="button" class="knopf" onclick="pjAufgabeNeu()">Neu</button>'; }
   if (cl.pj.reiter === 'memo') { h += '<button type="button" class="knopf" onclick="pjSchreiben()">Schreiben</button>'; }
-  if (cl.pj.reiter === 'allgemein' && s.typ !== 'ziel') { h += '<button type="button" class="knopf" onclick="pjMsAuf(\'\')">+ Meilenstein</button>'; }
+  if (cl.pj.reiter === 'allgemein') { h += '<button type="button" class="knopf" onclick="pjMsAuf(\'\')">+ Meilenstein</button>'; }
   return h;
 }
 
+/* ---------- Ziele (seit 0.44) ----------
+
+   Eine ganz einfache App im Ordner Planung: Name, Zieltermin, Zustand und
+   ein freier Text (Warum? Woran merke ich es? Wie?). Keine Reiter, keine
+   Meilensteine, keine Priorität. Daten wie in der Workbench (DB.ziele:
+   name, zieltermin, status, flaeche); „erreicht“ heißt dort abgeschlossen. */
+
+cl.zi = { id: '', zustand: 'laeuft', fenster: null };
+
+var ZI_FILTER = [['laeuft', 'Laufend'], ['ruht', 'Ruhend'], ['erledigt', 'Erreicht']];
+var ZI_ZUSTAENDE = [['laeuft', 'läuft'], ['ruht', 'ruht'], ['erledigt', 'erreicht']];
+
+function ziAlle() {
+  return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === 'vorhaben' && s.typ === 'ziel' && kpPasstFilter(s, cl.filter); }));
+}
+
+function ziTermin(s) {
+  var t = String((s && s.termin) || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : '';
+}
+
+/* Tage bis zum Zieltermin (negativ = vorbei); null ohne Termin */
+function ziTage(s) {
+  var t = ziTermin(s);
+  if (!t) { return null; }
+  var a = new Date(isoDatum() + 'T12:00:00');
+  var b = new Date(t + 'T12:00:00');
+  return Math.round((b - a) / 86400000);
+}
+
+/* Kurz für die Liste: „12 Tage“, „8 Mon.“, „vorbei“, „—“ */
+function ziRestKurz(s) {
+  var d = ziTage(s);
+  if (d === null) { return '—'; }
+  if (d < 0) { return 'vorbei'; }
+  if (d === 0) { return 'heute'; }
+  return (d <= 60) ? d + ' Tage' : Math.round(d / 30.44) + ' Mon.';
+}
+
+function ziRestLang(s) {
+  var d = ziTage(s);
+  if (d === null) { return 'ohne Termin'; }
+  if (d === 0) { return 'heute'; }
+  if (d < 0) { return 'seit ' + (-d) + (d === -1 ? ' Tag' : ' Tagen') + ' vorbei'; }
+  return 'noch ' + d + (d === 1 ? ' Tag' : ' Tage');
+}
+
+/* Laufend/Ruhend: nächster Termin zuerst, ohne Termin unten; Erreicht: zuletzt geänderte zuerst */
+function ziSichtbar() {
+  var z = cl.zi.zustand;
+  return ziAlle().filter(function (s) { return s.zustand === z; })
+    .map(function (s, i) { return { s: s, i: i }; }).sort(function (a, b) {
+      if (z === 'erledigt') { return ((Number(b.s.geaendert) || 0) - (Number(a.s.geaendert) || 0)) || (a.i - b.i); }
+      var ta = ziTermin(a.s) || '9999';
+      var tb = ziTermin(b.s) || '9999';
+      return (ta < tb ? -1 : (ta > tb ? 1 : 0)) || (a.i - b.i);
+    }).map(function (x) { return x.s; });
+}
+
+function ziStandText() {
+  var l = ziAlle().filter(function (s) { return s.zustand === 'laeuft'; });
+  if (!l.length) { return 'keine laufenden Ziele'; }
+  var naechstes = l.filter(function (s) { return ziTage(s) !== null && ziTage(s) >= 0; })
+    .sort(function (a, b) { return ziTage(a) - ziTage(b); })[0];
+  return l.length + (l.length === 1 ? ' läuft' : ' laufen') + (naechstes ? ' · nächstes in ' + ziRestKurz(naechstes) : '');
+}
+
+function zieleHtml() {
+  var s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
+  if (s && s.art === 'vorhaben' && s.typ === 'ziel') { return ziSeiteHtml(s); }
+  cl.zi.id = '';
+  var h = '<div class="pj-filter">' + ZI_FILTER.map(function (f) {
+    return '<button type="button"' + (cl.zi.zustand === f[0] ? ' class="an"' : '') + ' onclick="ziZustandFilter(\'' + f[0] + '\')">' + f[1] + '</button>';
+  }).join('') + '</div>';
+  var l = ziSichtbar();
+  if (!l.length) {
+    return h + '<p class="leise">' + { laeuft: 'Keine laufenden Ziele — „Neu“ tippen.', ruht: 'Nichts ruht.', erledigt: 'Noch nichts erreicht.' }[cl.zi.zustand] + '</p>';
+  }
+  var fertig = (cl.zi.zustand === 'erledigt');
+  return h + '<div class="pj-liste' + (fertig ? ' fertig' : '') + '">' + l.map(function (s) {
+    return '<button type="button" class="pj-zeile" onclick="ziOeffnen(\'' + esc(s.id) + '\')">'
+      + '<span class="pj-n">' + esc(s.titel) + '</span>' + (fertig ? '' : '<span class="pj-p">' + esc(ziRestKurz(s)) + '</span>') + '</button>';
+  }).join('') + '</div>';
+}
+
+function ziSeiteHtml(s) {
+  var t = ziTermin(s);
+  return '<div class="pj-titel">' + esc(s.titel) + '</div>'
+    + '<div class="zi-frist"><span>' + (t ? 'Zieltermin ' + esc(clKurzDatum(t) + t.slice(0, 4)) : 'Kein Zieltermin') + '</span>'
+    + '<b>' + esc(s.zustand === 'erledigt' ? 'erreicht' : ziRestLang(s)) + '</b></div>'
+    + '<div class="zi-text">' + memoSeiteHtml(s, false, true) + '</div>';
+}
+
+function ziZustandFilter(z) {
+  if (!ZI_FILTER.some(function (f) { return f[0] === z; })) { return; }
+  cl.zi.zustand = z;
+  zeichne();
+}
+
+function ziOeffnen(id) {
+  var s = kpSeiteFinden(id);
+  if (!s || s.art !== 'vorhaben' || s.typ !== 'ziel') { return; }
+  if (cl.app !== 'ziele') { oeffne('ziele'); }
+  cl.zi.id = s.id;
+  cl.zi.zustand = s.zustand;
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
+}
+
+function ziZurListe() {
+  var s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
+  if (s && s.zustand) { cl.zi.zustand = s.zustand; }
+  cl.zi.id = '';
+  zeichne();
+}
+
+/* Schreiben im Schreibfeld der Notizen, „Fertig“ führt zurück ins Ziel */
+function ziSchreiben() {
+  var s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
+  if (!s) { return; }
+  cl.aufklapp = '';
+  cl.app = 'memo';
+  cl.memo.id = s.id;
+  cl.memo.hervor = '';
+  cl.memo.ausListe = '';
+  cl.memo.ausProjekt = '';
+  cl.memo.ausZiel = s.id;
+  cl.memo.schreiben = true;
+  zeichne();
+  var f = document.getElementById('memoFeld');
+  if (f && f.focus) { f.focus(); }
+}
+
+function ziTextFertig() {
+  var id = cl.memo.ausZiel;
+  cl.memo.id = '';
+  cl.memo.schreiben = false;
+  cl.memo.hervor = '';
+  cl.memo.ausZiel = '';
+  cl.app = 'ziele';
+  cl.zi.id = id;
+  zeichne();
+}
+
+/* ---- Details und Neu: ein Fenster ---- */
+
+function ziDetails() {
+  var s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
+  if (!s) { return; }
+  cl.zi.fenster = { neu: false, titel: s.titel, termin: ziTermin(s), zustand: s.zustand, kontext: s.kontext === 'beruflich' ? 'beruflich' : 'privat' };
+  cl.aufklapp = 'zidet';
+  aufklappNeu();
+}
+
+function ziNeu() {
+  cl.zi.fenster = { neu: true, titel: '', termin: '', zustand: 'laeuft', kontext: (cl.filter === 'beruflich') ? 'beruflich' : 'privat' };
+  cl.aufklapp = 'zidet';
+  aufklappNeu();
+}
+
+function ziFensterLesen() {
+  var f = cl.zi.fenster;
+  if (!f) { return null; }
+  var t = document.getElementById('ziTitel');
+  var d = document.getElementById('ziTermin');
+  if (t && typeof t.value === 'string') { f.titel = t.value; }
+  if (d && typeof d.value === 'string') { f.termin = d.value; }
+  return f;
+}
+
+function ziWahl(feld, wert) {
+  var f = ziFensterLesen();
+  if (!f) { return; }
+  if (feld === 'zustand' && ZI_ZUSTAENDE.some(function (z) { return z[0] === wert; })) { f.zustand = wert; }
+  if (feld === 'kontext' && (wert === 'beruflich' || wert === 'privat')) { f.kontext = wert; }
+  aufklappNeu();
+}
+
+function ziFensterHtml() {
+  var f = cl.zi.fenster;
+  if (!f) { return ''; }
+  var reihe = function (feld, werte, an) {
+    return '<div class="wahlreihe">' + werte.map(function (w) {
+      return '<button type="button"' + (w[0] === an ? ' class="an"' : '') + ' onclick="ziWahl(\'' + feld + '\',\'' + w[0] + '\')">' + w[1] + '</button>';
+    }).join('') + '</div>';
+  };
+  return '<div class="fenster"><div class="titel">' + (f.neu ? 'Neues Ziel' : 'Details') + '</div><div class="rumpf">'
+    + '<label for="ziTitel">Name:</label><input id="ziTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
+    + '<label for="ziTermin">Zieltermin:</label><input id="ziTermin" class="eingabe" type="date" value="' + esc(f.termin) + '">'
+    + (f.neu ? '' : '<label>Zustand:</label>' + reihe('zustand', ZI_ZUSTAENDE, f.zustand))
+    + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="ziSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+}
+
+function ziSpeichern() {
+  var f = ziFensterLesen();
+  if (!f) { aufklappZu(); return; }
+  var titel = String(f.titel || '').trim();
+  if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  var termin = /^\d{4}-\d{2}-\d{2}$/.test(String(f.termin || '')) ? f.termin : '';
+  var s;
+  if (f.neu) {
+    s = kpSeiteAnlegen('vorhaben', titel, f.kontext, 'ziel');
+    if (!s) { melde('Das Ziel ließ sich nicht anlegen.', 'warn'); return; }
+  } else {
+    s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
+    if (!s) { aufklappZu(); return; }
+    s.titel = titel.slice(0, 200);
+    s.kontext = f.kontext;
+    if (ZI_ZUSTAENDE.some(function (z) { return z[0] === f.zustand; })) { s.zustand = f.zustand; }
+  }
+  s.termin = termin;
+  s.geaendert = jetzt();
+  cl.zi.fenster = null;
+  spaeterSichern();
+  aufklappZu();
+  ziOeffnen(s.id);
+}
+
+function ziFussHtml() {
+  if (!cl.zi.id) { return '<button type="button" class="knopf" onclick="ziNeu()">Neu</button>'; }
+  return '<button type="button" class="knopf voll" onclick="ziZurListe()">Fertig</button>'
+    + '<button type="button" class="knopf" onclick="ziSchreiben()">Schreiben</button>'
+    + '<button type="button" class="knopf" onclick="ziDetails()">Details…</button>';
+}
+
 /* Eine Seite dort öffnen, wo sie seit 0.43 hingehört: Listen in den
-   Aufgaben, Checklisten in Checklisten, Projekte und Ziele in Projekte,
-   Notizen in Notizen. */
+   Aufgaben, Checklisten in Checklisten, Projekte in Projekte, Ziele in
+   Ziele (seit 0.44), Notizen in Notizen. */
 function seiteOeffnen(id) {
   var s = kpSeiteFinden(id);
   if (!s) { return; }
   if (s.art === 'liste') { oeffne('aufgaben'); aufListeSetzen(s.id); return; }
   if (s.__satz && s.__satz.checkliste) { oeffne('checklisten'); clsOeffnen(s.id); return; }
-  if (s.art === 'vorhaben') { pjOeffnen(s.id, 'aufgaben'); return; }
+  /* Seit 0.44.1 landet jeder Sprung in ein Projekt bei „Allgemein“ */
+  if (s.art === 'vorhaben') { pjOeffnen(s.id, 'allgemein'); return; }
   oeffne('memo');
   memoOeffnen(s.id);
 }
@@ -17787,7 +18031,7 @@ var SP_PAUSE_MS = 60000;
 
 /* Ordner auf dem Start (seit 0.35, vorher nur „Spiele“) */
 var CL_ORDNER = {
-  planung: { name: 'Planung', apps: ['heute', 'routinen', 'ideen', 'coach'] },
+  planung: { name: 'Planung', apps: ['heute', 'routinen', 'ideen', 'coach', 'ziele'] },
   lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
   spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach'] }
 };
@@ -17825,6 +18069,7 @@ function ordnerStandText(id) {
     return n ? n + ' heute offen' : 'heute alles erledigt';
   }
   if (id === 'heute') { var hz = clHeuteZahl(); return hz ? hz + ' offen' : 'nichts mehr offen'; }
+  if (id === 'ziele') { return ziStandText(); }
   if (id === 'ideen') { return iwAlle().filter(function (x) { return iwGruppe(x) === 'umsetzung'; }).length + ' in Umsetzung'; }
   if (id === 'lernkartei') { var k = lkAlleHeute(); return k ? k + ' Karten fällig' : 'nichts fällig'; }
   return '';
@@ -19644,6 +19889,7 @@ function clZurueck() {
   if (cl.app === 'memo' && cl.memo.schreiben) { memoSchreibenUm(); return true; }
   if (cl.app === 'memo' && cl.memo.id) { memoZurListe(); return true; }
   if (cl.app === 'projekte' && cl.pj.id) { pjZurListe(); return true; }
+  if (cl.app === 'ziele' && cl.zi.id) { ziZurListe(); return true; }
   if (cl.app === 'checklisten' && cl.cls.schreiben) { clsSchreibenUm(); return true; }
   if (cl.app === 'checklisten' && cl.cls.id) { clsZurListe(); return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }
