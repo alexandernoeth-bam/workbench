@@ -485,8 +485,20 @@ function rechnerTest() {
   pruefe(CL.rtEingabeText() === 'sin(' && !R.zweit, 'die Taste unter 2nd heißt jetzt sin⁻¹ — Taste „sin“ liefert sin, 2nd geht wieder aus');
   CL.oeffne('rechner');
   CL.rtTaste('C'); CL.rtTaste('2nd');
-  pruefe(/rtTaste\('asin'\)">sin⁻¹/.test(inhalt()) && /rtTaste\('npr'\)/.test(inhalt()) && /rtTaste\('M\+'\)">M−/.test(inhalt()), '2nd zeigt sin⁻¹ … nPr und M−');
+  pruefe(/rtTaste\('asin'\)">sin⁻¹/.test(inhalt()) && /rtTaste\('kubik'\)">x³/.test(inhalt()) && /rtTaste\('M\+'\)">M−/.test(inhalt()), '2nd zeigt sin⁻¹ … x³ und M−');
   CL.rtTaste('2nd');
+  /* ⌫ und CE (seit 0.40.1) */
+  CL.rtTaste('C'); ['1', '2', '+', '3', '4', '5'].forEach(k => CL.rtTaste(k));
+  CL.rtTaste('zurueck');
+  pruefe(CL.rtEingabeText() === '12+34', '⌫ löscht das letzte Zeichen');
+  CL.rtTaste('CE');
+  pruefe(CL.rtEingabeText() === '12+', 'CE löscht die letzte Eingabe (die Zahl 34)');
+  CL.rtTaste('sqrt'); CL.rtTaste('CE');
+  pruefe(CL.rtEingabeText() === '12+', 'CE nach einer Funktion: den Baustein');
+  ['±', '7', ',', '5'].forEach(k => CL.rtTaste(k)); CL.rtTaste('CE');
+  pruefe(CL.rtEingabeText() === '12+', 'CE nimmt auch das Vorzeichen der Zahl mit');
+  CL.rtTaste('9'); CL.rtTaste('='); CL.rtTaste('CE');
+  pruefe(CL.rtEingabeText() === '' && R.ergebnis === null, 'CE nach „=“: alles leer');
   /* Speicher und Verlauf */
   R.speicher = 0;
   tippe('1 0'); CL.rtTaste('M+'); tippe('5'); CL.rtTaste('M+'); tippe('3'); CL.rtTaste('2nd'); CL.rtTaste('M+');
@@ -500,7 +512,8 @@ function rechnerTest() {
   pruefe(CL.alsText().replace(/"gespeichert": "[^"]*"/, '') === vorher, 'der Rechner schreibt nichts in die workbench.json');
   CL.oeffne('rechner');
   const h = inhalt();
-  pruefe(/rtTaste\('='\)/.test(h) && /rtTaste\('sin'\)/.test(h) && /rtTaste\('ncr'\)/.test(h) && (h.match(/class="taste[ "]/g) || []).length === 38, 'der Rechner zeigt 18 Funktions- und 20 Zahlentasten');
+  pruefe(/rtTaste\('='\)/.test(h) && /rtTaste\('sin'\)/.test(h) && /rtTaste\('ncr'\)/.test(h) && (h.match(/class="taste[ "]/g) || []).length === 43, 'der Rechner zeigt 18 Funktions- und 25 Zahlentasten');
+  pruefe(/rtTaste\('zurueck'\)">⌫/.test(h) && /rtTaste\('CE'\)">CE/.test(h) && /rtTaste\('C'\)">C/.test(h) && h.indexOf("rtTaste('zurueck')") > h.indexOf('rt-zahlen'), '⌫, CE und C groß im Zahlenblock (seit 0.40.1)');
   pruefe(CL.document.getElementById('katKnopf').textContent === 'DEG', 'oben rechts: DEG');
   CL.katUm();
   pruefe(!R.grad && CL.document.getElementById('katKnopf').textContent === 'RAD' && /"grad":false/.test(CL.__ablage['clie-rechner']), 'Tipp oben rechts: RAD, gemerkt');

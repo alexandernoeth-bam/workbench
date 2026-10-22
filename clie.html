@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.40.0</title>
+<title>CLIE 0.40.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -820,7 +820,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.40.0';
+var APP_VERSION = '0.40.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -18497,8 +18497,10 @@ var RT_TASTEN = {
 /* Funktionstasten: [normal, 2nd], je [Kennung, Aufschrift] */
 var RT_REIHE_1 = [[['sin', 'sin'], ['asin', 'sin⁻¹']], [['cos', 'cos'], ['acos', 'cos⁻¹']], [['tan', 'tan'], ['atan', 'tan⁻¹']],
                   [['log', 'log'], ['zehnhoch', '10ˣ']], [['ln', 'ln'], ['ehoch', 'eˣ']], [['sqrt', '√'], ['wurzeln', 'ˣ√']]];
-var RT_REIHE_2 = [[['quadrat', 'x²'], ['kehrwert', '1/x']], [['hoch', 'xʸ'], ['kubik', 'x³']], [['pi', 'π'], ['ans', 'Ans']],
-                  [['e', 'e'], ['ee', 'EE']], [['fak', 'n!'], ['prozent', '%']], [['ncr', 'nCr'], ['npr', 'nPr']]];
+var RT_REIHE_2 = [[['quadrat', 'x²'], ['kehrwert', '1/x']], [['hoch', 'xʸ'], ['kubik', 'x³']], [['pi', 'π'], ['pi', 'π']],
+                  [['e', 'e'], ['e', 'e']], [['fak', 'n!'], ['fak', 'n!']], [['ncr', 'nCr'], ['ncr', 'nCr']]];
+/* Seit 0.40.1 oben: Ans, EE, %, nPr — dafür stehen ←, CE, C und die Klammern groß im Zahlenblock */
+var RT_REIHE_0 = [['ans', 'Ans'], ['ee', 'EE'], ['prozent', '%'], ['npr', 'nPr']];
 
 var rt = { tokens: [], ergebnis: null, ans: 0, fertig: false, fehler: '', bruch: false, zweit: false, grad: true,
            speicher: 0, verlauf: [], verlaufAuf: false };
@@ -18750,8 +18752,20 @@ function rtTaste(t) {
   else if (t === 'winkel') { rt.grad = !rt.grad; rtMerken(); }
   else if (t === 'C') { rt.tokens = []; rt.ergebnis = null; rt.fertig = false; rt.fehler = ''; rt.bruch = false; }
   else if (t === 'zurueck') {
+    /* ⌫: das letzte Zeichen (ein Baustein wie „sin(“ auf einmal) */
     rt.fertig = false; rt.fehler = ''; rt.bruch = false;
     rt.tokens.pop();
+  } else if (t === 'CE') {
+    /* CE: die letzte Eingabe — die zuletzt getippte Zahl, sonst der letzte Baustein; nach „=“ alles */
+    if (rt.fertig) { rt.tokens = []; rt.ergebnis = null; }
+    else {
+      var zahlTeil = function (x) { return /^[0-9]$/.test(x) || x === ',' || x === 'ee'; };
+      if (rt.tokens.length && zahlTeil(rt.tokens[rt.tokens.length - 1])) {
+        while (rt.tokens.length && zahlTeil(rt.tokens[rt.tokens.length - 1])) { rt.tokens.pop(); }
+        if (rt.tokens[rt.tokens.length - 1] === 'neg') { rt.tokens.pop(); }
+      } else { rt.tokens.pop(); }
+    }
+    rt.fertig = false; rt.fehler = ''; rt.bruch = false;
   } else if (t === '=') { rtErgebnis(true); }
   else if (t === 'bruch') { if (rt.fertig && rt.ergebnis !== null) { rt.bruch = !rt.bruch; } else { rtErgebnis(true); rt.bruch = rt.fertig; } }
   else if (t === 'M+' || t === 'M-') {
@@ -18846,11 +18860,13 @@ function rechnerHtml() {
     };
     h += '<div class="rt-fn">'
        + rtTasteHtml('2nd', '2nd', 'fn' + (rt.zweit ? ' an' : '')) + rtTasteHtml('winkel', rt.grad ? 'DEG' : 'RAD', 'fn')
-       + rtTasteHtml('(', '(', 'fn') + rtTasteHtml(')', ')', 'fn') + rtTasteHtml('zurueck', '←', 'fn') + rtTasteHtml('C', 'C', 'fn')
+       + RT_REIHE_0.map(function (k) { return rtTasteHtml(k[0], k[1], 'fn'); }).join('')
        + reihe(RT_REIHE_1) + reihe(RT_REIHE_2) + '</div>'
        + '<div class="tasten rt-zahlen">'
-       + rtTasteHtml('7', '7') + rtTasteHtml('8', '8') + rtTasteHtml('9', '9') + rtTasteHtml('/', '÷', 'op') + rtTasteHtml('M+', rt.zweit ? 'M−' : 'M+', 'op')
-       + rtTasteHtml('4', '4') + rtTasteHtml('5', '5') + rtTasteHtml('6', '6') + rtTasteHtml('*', '×', 'op') + rtTasteHtml('MR', rt.zweit ? 'MC' : 'MR', 'op')
+       + rtTasteHtml('zurueck', '⌫', 'op') + rtTasteHtml('CE', 'CE', 'op') + rtTasteHtml('C', 'C', 'op')
+       + rtTasteHtml('M+', rt.zweit ? 'M−' : 'M+', 'op klein') + rtTasteHtml('MR', rt.zweit ? 'MC' : 'MR', 'op klein')
+       + rtTasteHtml('7', '7') + rtTasteHtml('8', '8') + rtTasteHtml('9', '9') + rtTasteHtml('/', '÷', 'op') + rtTasteHtml('(', '(', 'op')
+       + rtTasteHtml('4', '4') + rtTasteHtml('5', '5') + rtTasteHtml('6', '6') + rtTasteHtml('*', '×', 'op') + rtTasteHtml(')', ')', 'op')
        + rtTasteHtml('1', '1') + rtTasteHtml('2', '2') + rtTasteHtml('3', '3') + rtTasteHtml('-', '−', 'op') + rtTasteHtml('bruch', '→Bruch', 'op klein')
        + rtTasteHtml('0', '0') + rtTasteHtml(',', ',') + rtTasteHtml('±', '±') + rtTasteHtml('+', '+', 'op') + rtTasteHtml('=', '=', 'gl')
        + '</div>';
