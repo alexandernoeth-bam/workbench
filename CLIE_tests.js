@@ -992,12 +992,15 @@ function memoTest() {
   if (!CL) { return; }
   aufgabenDaten();
   CL.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[] Zahnbürste', checkliste: 'vorlage', ordnung: 70, geaendert: 1 });
+  CL.memoBereichSetzen('projekte');
   CL.oeffne('memo');
   let h = inhalt();
-  pruefe(/>Projekte</.test(h) && />Ziele</.test(h) && !/>Listen</.test(h) && />Notizen</.test(h) && !/Garten/.test(h),
-    'gruppiert: Projekte, Ziele, Notizen — seit 0.6 ohne Listen');
-  pruefe(/Büro/.test(h) && /Halbmarathon/.test(h) && !/Packliste/.test(h) && h.indexOf('>Ruhend<') >= 0 && h.indexOf('Ruht') > h.indexOf('>Ruhend<'),
-    'laufende Seiten oben, Ruhendes (seit 0.12.2) in eigener Gruppe, keine Checklisten');
+  const bereich = b => { CL.memoBereichSetzen(b); return inhalt(); };
+  pruefe(/▼ Projekte/.test(h) && /Büro/.test(h) && !/Halbmarathon/.test(h) && !/Garten/.test(h) && !CL.MEMO_BEREICHE.some(x => x[0] === 'listen'),
+    'Bereich als Auswahl ▼ (seit 0.36): Projekte zeigt nur Projekte — ohne Listen (seit 0.6)');
+  pruefe(/Halbmarathon/.test(bereich('ziele')) && !/Packliste/.test(bereich('notizen')) && /Ruht/.test(bereich('ruhend')) && !/Büro/.test(bereich('ruhend')),
+    'Ziele, Notizen (ohne Checklisten) und Ruhendes je in eigenem Bereich');
+  CL.memoBereichSetzen('projekte');
   CL.memoOeffnen('p1');
   h = inhalt();
   pruefe(/◎ Büro/.test(CL.document.getElementById('reiter').textContent), 'der Reiter zeigt die Seite');
@@ -1027,7 +1030,8 @@ function memoTest() {
   CL.memoSpeichern();
   const p1 = CL.DB.projekte[0];
   pruefe(p1.name === 'Büro neu' && p1.ende === '2027-03-31' && p1.status === 'ruht', 'Name, Ende und Zustand werden gespeichert');
-  pruefe(CL.cl.memo.id === '' && inhalt().indexOf('Büro neu') > inhalt().indexOf('>Ruhend<'), 'eine ruhende Seite wandert in die Gruppe „Ruhend“ (seit 0.12.2)');
+  pruefe(CL.cl.memo.id === '' && !/Büro neu/.test(inhalt()) && /Büro neu/.test((CL.memoBereichSetzen('ruhend'), inhalt())), 'eine ruhende Seite wandert in den Bereich „Ruhend“ (seit 0.12.2)');
+  CL.memoBereichSetzen('projekte');
 
   CL.memoNeu();
   pruefe(!/memoWahl\('art','liste'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet keine Liste mehr an');
@@ -2235,14 +2239,14 @@ function memoRuhtTest() {
   S.DB.projekte.push({ id: 'p2', name: 'Carport', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.projekte.push({ id: 'p3', name: 'Altes Projekt', flaeche: '', status: 'abgeschlossen', geaendert: 1 });
+  S.memoBereichSetzen('projekte');
   S.oeffne('memo');
-  let h = inhalt();
-  const ruhend = h.slice(h.indexOf('>Ruhend<'), h.indexOf('Abgeschlossen'));
-  pruefe(/Carport/.test(ruhend) && /Marathon/.test(ruhend) && !/Läuft/.test(ruhend), 'ruhende Projekte und Ziele in eigener Gruppe „Ruhend“');
-  pruefe(/› Abgeschlossen · 1/.test(h) && !/Altes Projekt/.test(h), 'Abgeschlossenes eingeklappt');
-  S.memoFertigUm();
-  pruefe(/▾ Abgeschlossen · 1/.test(inhalt()) && /Altes Projekt/.test(inhalt()), 'aufgeklappt sichtbar');
-  S.memoFertigUm();
+  pruefe(/Läuft/.test(inhalt()) && !/Carport/.test(inhalt()) && !/Altes Projekt/.test(inhalt()), 'Projekte: nur laufende');
+  S.memoBereichSetzen('ruhend');
+  pruefe(/Carport/.test(inhalt()) && /Marathon/.test(inhalt()) && !/Läuft/.test(inhalt()), 'ruhende Projekte und Ziele im Bereich „Ruhend“');
+  S.memoBereichSetzen('fertig');
+  pruefe(/Altes Projekt/.test(inhalt()) && /▼ Abgeschlossen <span>1/.test(inhalt()), 'Abgeschlossenes im eigenen Bereich (seit 0.36 statt eingeklappt)');
+  S.memoBereichSetzen('projekte');
   S.oeffne('uebersicht');
 }
 
@@ -2409,7 +2413,7 @@ function listeTextTest() {
   pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
   S.listeAlsText();
   S.oeffne('uebersicht'); S.oeffne('memo');
-  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Seiten|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
+  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Seiten|memo-zeile|memo-bereich/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
   S.oeffne('uebersicht');
 }
 
@@ -3229,6 +3233,43 @@ function schuleTest() {
   pruefe(S.cl.sch.ue.ich === 'b' && S.cl.sch.ue.idx === 1 && !S.cl.sch.ue.p.w, 'Schwarz üben: CLIE spielt den ersten Zug');
   S.cl.sch.ue = null; S.cl.sch.ev.id = ''; S.cl.sch.bereich = 'spielen';
   delete S.__ablage['clie-schach-schule'];
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   73. Memo: Bereich als Auswahl (0.36)
+   Grund: Die Memo-Liste war eine endlose Liste (Projekte, Ziele, Ruhend,
+   Notizen, Abgeschlossen untereinander). Seit 0.36 wählt ein Knopf ▼ den
+   Bereich; gezeigt wird nur dieser. Die Wahl bleibt gemerkt.
+   Erkennt: wieder alle Bereiche untereinander, Auswahl ohne Zahlen,
+   Wahl nicht gemerkt, Seite im falschen Bereich.
+   ============================================================ */
+function memoBereichTest() {
+  console.log('\n73. Memo: Bereich als Auswahl (0.36)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] Angebot', status: 'laufend', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p2', name: 'Keller', flaeche: '', status: 'ruht', geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '', status: 'laufend', geaendert: 1 });
+  S.DB.gedanken.push({ id: 'n1', titel: 'Ideen Garten', text: 'x', ordnung: 1, geaendert: 1 });
+  S.memoBereichSetzen('projekte');
+  S.oeffne('memo');
+  let h = inhalt();
+  pruefe(/class="memo-bereich[^"]*" onclick="memoBereichAuf\(\)">▼ Projekte <span>1<\/span>/.test(h) && /Carport/.test(h) && !/Marathon|Keller|Ideen Garten/.test(h), 'oben ▼ Projekte · 1, darunter nur Projekte');
+  S.memoBereichAuf();
+  const a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'memobereich' && ['Projekte', 'Ziele', 'Notizen', 'Ruhend', 'Abgeschlossen'].every(n => a.indexOf(n) >= 0) && /Ziele <span class="leise">1/.test(a), 'Auswahl mit allen Bereichen und Anzahl');
+  S.memoBereichSetzen('notizen');
+  pruefe(!S.cl.aufklapp && /Ideen Garten/.test(inhalt()) && !/Carport/.test(inhalt()) && S.__ablage['clie-memo-bereich'] === 'notizen' && S.memoBereichLaden() === 'notizen', 'Bereich gewählt und gemerkt');
+  S.memoBereichSetzen('fertig');
+  pruefe(/Keine Abgeschlossen\./.test(inhalt()), 'leerer Bereich: Hinweis');
+  S.memoBereichSetzen('quatsch');
+  pruefe(S.cl.memo.bereich === 'fertig', 'Unbekanntes wird ignoriert');
+  S.memoBereichSetzen('projekte');
+  S.katSetzen('beruflich');
+  pruefe(/▼ Projekte <span>\d+<\/span>/.test(inhalt()), 'Filter ▼ Beruf/Privat oben rechts gilt weiter');
+  S.katSetzen('alle');
   S.oeffne('uebersicht');
 }
 
@@ -4769,6 +4810,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { memoBereichTest(); } catch (e) { fail('Memo-Bereich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { startOrdnerTest(); } catch (e) { fail('Start mit Ordnern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coachQuellenTest(); } catch (e) { fail('Coach-Quellen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coachTest(); } catch (e) { fail('Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

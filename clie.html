@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.35.0</title>
+<title>CLIE 0.36.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -578,6 +578,13 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .co-sa span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .co-sa select{flex:0 0 120px}
 .co-sa input{flex:0 0 105px}
+/* Memo: Bereich als Auswahl (seit 0.36) */
+.memo-bereich{display:flex;justify-content:space-between;align-items:center;width:100%;border:2px solid var(--px);padding:4px 10px;margin:6px 0 8px;font-size:20px;text-align:left}
+.memo-bereich span{font-size:17px;color:var(--px-mitte)}
+.memo-bereich.an{background:var(--px);color:var(--lcd)}
+.memo-bereich.an span{color:var(--lcd)}
+.memo-bereich-auf{top:96px;left:6px;right:6px}
+.memo-bereich-auf button{display:flex;justify-content:space-between}
 /* Spiele (seit 0.32) */
 .sym .ord{position:absolute;right:-2px;bottom:2px;background:var(--lcd);border:2px solid var(--px);border-radius:9px;font-size:15.5px;line-height:1;padding:1px 4px}
 .sp-fenster{top:90px}
@@ -758,7 +765,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.35.0';
+var APP_VERSION = '0.36.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3982,6 +3989,8 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'covorab') {
     if (el.innerHTML.indexOf('coWeg') >= 0) { return; }
     el.innerHTML = coVorabHtml();
+  } else if (cl.aufklapp === 'memobereich') {
+    el.innerHTML = memoBereichHtml();
   } else if (cl.aufklapp === 'ordner') {
     el.innerHTML = ordnerHtml();
   } else if (cl.aufklapp === 'sdwahl') {
@@ -5028,7 +5037,7 @@ var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
 cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null };
-cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, fertigAuf: false, ausListe: '' };
+cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', bereich: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
    Ziele, alle Listen. Notizen (und damit Checklisten) nicht. */
@@ -5872,28 +5881,70 @@ function memoSeiten() {
   }));
 }
 
+/* Seit 0.36: Bereiche als Auswahl (▼) statt einer langen Liste */
+var MEMO_BEREICHE = [['projekte', 'Projekte'], ['ziele', 'Ziele'], ['notizen', 'Notizen'], ['ruhend', 'Ruhend'], ['fertig', 'Abgeschlossen']];
+var MEMO_BEREICH_KEY = 'clie-memo-bereich';
+
+function memoBereichLaden() {
+  var b = '';
+  try { b = window.localStorage.getItem(MEMO_BEREICH_KEY) || ''; } catch (e) { b = ''; }
+  return MEMO_BEREICHE.some(function (x) { return x[0] === b; }) ? b : 'projekte';
+}
+
+/* Die Seiten eines Bereichs (nach Filter ▼ Alle/Beruf/Privat) */
+function memoBereichSeiten(b) {
+  return memoSeiten().filter(function (s) {
+    if (b === 'notizen') { return s.art === 'notiz'; }
+    if (s.art !== 'vorhaben') { return false; }
+    if (b === 'ruhend') { return s.zustand === 'ruht'; }
+    if (b === 'fertig') { return s.zustand === 'erledigt'; }
+    return s.zustand === 'laeuft' && (b === 'ziele' ? s.typ === 'ziel' : s.typ !== 'ziel');
+  });
+}
+
+function memoBereichName(b) {
+  return (MEMO_BEREICHE.filter(function (x) { return x[0] === b; })[0] || ['', 'Projekte'])[1];
+}
+
 function memoListeHtml() {
-  var seiten = memoSeiten();
-  var gruppe = function (titel, l) {
-    if (!l.length) { return ''; }
-    return '<div class="gruppe">' + titel + '</div>' + l.map(function (s) {
-      var n = kpOffeneZahl(s);
-      return '<button type="button" class="memo-zeile" onclick="memoOeffnen(\'' + esc(s.id) + '\')"><span class="mz">' + clSeitenZeichen(s) + '</span>'
-        + '<span class="tx">' + esc(s.titel) + '</span><span class="q">' + (n ? n : '') + '</span></button>';
-    }).join('');
-  };
-  var laeuft = function (s) { return s.art === 'vorhaben' && s.zustand === 'laeuft'; };
-  var fertig = seiten.filter(function (s) { return s.art === 'vorhaben' && s.zustand === 'erledigt'; });
-  var h = gruppe('Projekte', seiten.filter(function (s) { return laeuft(s) && s.typ !== 'ziel'; }))
-        + gruppe('Ziele', seiten.filter(function (s) { return laeuft(s) && s.typ === 'ziel'; }))
-        + gruppe('Ruhend', seiten.filter(function (s) { return s.art === 'vorhaben' && s.zustand === 'ruht'; }))
-        + gruppe('Notizen', seiten.filter(function (s) { return s.art === 'notiz'; }));
-  /* Abgeschlossenes eingeklappt ganz unten */
-  if (fertig.length) {
-    h += '<button type="button" class="gruppe klapp" onclick="memoFertigUm()">' + (cl.memo.fertigAuf ? '▾' : '›') + ' Abgeschlossen · ' + fertig.length + '</button>';
-    if (cl.memo.fertigAuf) { h += gruppe('', fertig).replace('<div class="gruppe"></div>', ''); }
+  /* Erst beim ersten Zeichnen laden — die Bereiche stehen weiter unten im Code */
+  if (!cl.memo.bereich) { cl.memo.bereich = memoBereichLaden(); }
+  var b = cl.memo.bereich;
+  var l = memoBereichSeiten(b);
+  var h = '<button type="button" class="memo-bereich' + (cl.aufklapp === 'memobereich' ? ' an' : '') + '" onclick="memoBereichAuf()">▼ ' + esc(memoBereichName(b)) + ' <span>' + l.length + '</span></button>';
+  if (!l.length) { return h + '<p class="leise">Keine ' + esc(memoBereichName(b)) + '.</p>'; }
+  return h + l.map(function (s) {
+    var n = kpOffeneZahl(s);
+    return '<button type="button" class="memo-zeile" onclick="memoOeffnen(\'' + esc(s.id) + '\')"><span class="mz">' + clSeitenZeichen(s) + '</span>'
+      + '<span class="tx">' + esc(s.titel) + '</span><span class="q">' + (n ? n : '') + '</span></button>';
+  }).join('');
+}
+
+function memoBereichAuf() {
+  cl.aufklapp = (cl.aufklapp === 'memobereich') ? '' : 'memobereich';
+  aufklappZeichnen();
+  /* Die Auswahl hängt direkt unter dem Knopf — egal, wie hoch der Kopf gerade ist */
+  var knopf = document.querySelector('.memo-bereich');
+  var liste = document.querySelector('.memo-bereich-auf');
+  if (knopf && liste && typeof knopf.getBoundingClientRect === 'function' && typeof window.getComputedStyle === 'function') {
+    var oben = parseFloat(window.getComputedStyle(liste).top) || 0;
+    liste.style.top = (oben + knopf.getBoundingClientRect().bottom - liste.getBoundingClientRect().top + 2) + 'px';
   }
-  return h || '<p class="leise">Noch keine Seiten.</p>';
+}
+
+function memoBereichHtml() {
+  return '<div class="aufklapp memo-bereich-auf">' + MEMO_BEREICHE.map(function (x) {
+    return '<button type="button"' + (x[0] === cl.memo.bereich ? ' class="an"' : '') + ' onclick="memoBereichSetzen(\'' + x[0] + '\')">' + x[1]
+      + ' <span class="leise">' + memoBereichSeiten(x[0]).length + '</span></button>';
+  }).join('') + '</div>';
+}
+
+function memoBereichSetzen(b) {
+  if (!MEMO_BEREICHE.some(function (x) { return x[0] === b; })) { return; }
+  cl.memo.bereich = b;
+  try { window.localStorage.setItem(MEMO_BEREICH_KEY, b); } catch (e) { /* nur für jetzt */ }
+  cl.aufklapp = '';
+  zeichne();
 }
 
 /* Eine Seite lesen: Überschriften, Text, Aufgaben zum Abhaken */
@@ -5979,11 +6030,6 @@ function clPlanMarke(s, a) {
   if (a.erledigt || !a.text) { return ''; }
   var g = aufGeplant(s, a.text);
   return g ? '<span class="plan-marke">' + esc(clPlanText(g.datum, g.zeit)) + '</span>' : '';
-}
-
-function memoFertigUm() {
-  cl.memo.fertigAuf = !cl.memo.fertigAuf;
-  inhaltZeichnen();
 }
 
 function memoHtml() {
