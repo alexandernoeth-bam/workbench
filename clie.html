@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.38.1</title>
+<title>CLIE 0.38.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -601,14 +601,23 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .ja-chips i{display:inline-block;width:10px;height:10px}
 .ja-chips i.fer{background:repeating-linear-gradient(90deg,var(--lcd-hell) 0 2px,var(--px-zart) 2px 4px);border:1px solid var(--px-zart)}
 .ja-hinweis{margin:0 0 4px}
-.ja-raster{display:grid;grid-template-columns:22px repeat(12,1fr);gap:1px}
-.ja-raster b{font-weight:400;font-size:15.5px;text-align:center;color:var(--px-mitte);line-height:1}
-.ja-raster i{display:block;height:13px;background:var(--lcd-hell)}
+.ja-raster{display:grid;grid-template-columns:26px repeat(12,1fr);gap:1px}
+.ja-raster b{font-weight:400;font-size:15.5px;text-align:right;padding-right:3px;color:var(--px-mitte);line-height:1;display:flex;align-items:center;justify-content:flex-end}
+.ja-raster b:nth-child(-n+13){justify-content:center;padding-right:0}
+/* Das Raster füllt den Platz (seit 0.38.2): 32 Zeilen in der freien Höhe, mindestens 16 px */
+.ja-raster i{display:block;min-height:15px;background:var(--lcd-hell)}
+.ja{min-height:100%;display:flex;flex-direction:column}
+.ja .ja-raster{flex:1 1 auto;grid-template-rows:auto repeat(31,minmax(15px,1fr))}
 .ja-raster i.we{background:#aab597}
 .ja-raster i.fer{background-image:repeating-linear-gradient(90deg,transparent 0 2px,rgba(28,33,22,.35) 2px 3px)}
 .ja-raster i.fei{box-shadow:inset 0 0 0 1px var(--px)}
 .ja-raster i.heute{outline:2px solid var(--px);outline-offset:-1px}
-.ja-legende{font-size:15.5px;margin-top:6px}
+/* Art als Knopf ▼ (seit 0.38.2) */
+.ja-art{margin:2px 0 6px}
+.ja-art .ja-art-name{color:var(--px);font-size:19px}
+.memo-bereich.an .ja-art-name{color:var(--lcd)}
+.ja-art i{display:inline-block;width:12px;height:12px;margin:0 6px 0 2px;vertical-align:middle}
+.ja-punkt.fer,.ja-art i.fer{background:repeating-linear-gradient(90deg,var(--lcd-hell) 0 2px,var(--px-zart) 2px 4px);border:1px solid var(--px-zart)}
 .ja-zeile{display:flex;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:18px}
 .ja-zeile .d{flex:0 0 100px;color:var(--px-mitte);font-size:16px}
 .ja-zeile .t{flex:1;min-width:0}
@@ -797,7 +806,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.38.1';
+var APP_VERSION = '0.38.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4032,6 +4041,8 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'covorab') {
     if (el.innerHTML.indexOf('coWeg') >= 0) { return; }
     el.innerHTML = coVorabHtml();
+  } else if (cl.aufklapp === 'jahrart') {
+    el.innerHTML = jaArtWahlHtml();
   } else if (cl.aufklapp === 'jahrwahl') {
     el.innerHTML = jaJahrWahlHtml();
   } else if (cl.aufklapp === 'lzneu') {
@@ -5316,13 +5327,38 @@ function jaAbstand(datum, heute) {
 
 /* ---- Zeichnen ---- */
 
+/* Seit 0.38.2 ein Knopf ▼ statt einer Reihe von Arten — der Platz gehört dem Raster */
+function jaArtKnopfName(f) {
+  return !f ? 'Alle Arten' : (f === 'ferien' ? 'Ferien' : jaArtName(f));
+}
+
 function jaChipsHtml() {
   var f = cl.ja.filter;
-  return '<div class="ja-chips"><button type="button"' + (!f ? ' class="an"' : '') + ' onclick="jaFilter(\'\')">Alle</button>'
-    + jaArtenAlle().map(function (a) {
-      return '<button type="button"' + (f === a ? ' class="an"' : '') + ' onclick="jaFilter(\'' + esc(a) + '\')"><i style="background:' + esc(jaArtFarbe(a)) + '"></i>' + esc(jaArtName(a)) + '</button>';
-    }).join('')
-    + '<button type="button"' + (f === 'ferien' ? ' class="an"' : '') + ' onclick="jaFilter(\'ferien\')"><i class="fer"></i>Ferien</button></div>';
+  var zeichen = !f ? '' : (f === 'ferien' ? '<i class="fer"></i>' : '<i style="background:' + esc(jaArtFarbe(f)) + '"></i>');
+  return '<button type="button" class="memo-bereich ja-art' + (cl.aufklapp === 'jahrart' ? ' an' : '') + '" onclick="jaArtAuf()">'
+    + '<span class="ja-art-name">▼ ' + zeichen + esc(jaArtKnopfName(f)) + '</span></button>';
+}
+
+function jaArtAuf() {
+  cl.aufklapp = (cl.aufklapp === 'jahrart') ? '' : 'jahrart';
+  aufklappZeichnen();
+  /* Direkt unter dem Knopf, wie im Memo */
+  var knopf = document.querySelector('.ja-art');
+  var liste = document.querySelector('.ja-art-auf');
+  if (knopf && liste && typeof knopf.getBoundingClientRect === 'function' && typeof window.getComputedStyle === 'function') {
+    var oben = parseFloat(window.getComputedStyle(liste).top) || 0;
+    liste.style.top = (oben + knopf.getBoundingClientRect().bottom - liste.getBoundingClientRect().top + 2) + 'px';
+  }
+}
+
+function jaArtWahlHtml() {
+  var f = cl.ja.filter;
+  var knopf = function (wert, inhalt) {
+    return '<button type="button"' + (f === wert ? ' class="an"' : '') + ' onclick="jaFilter(\'' + esc(wert) + '\')">' + inhalt + '</button>';
+  };
+  return '<div class="aufklapp memo-bereich-auf ja-art-auf">' + knopf('', 'Alle Arten')
+    + jaArtenAlle().map(function (a) { return knopf(a, '<span><i class="ja-punkt" style="background:' + esc(jaArtFarbe(a)) + '"></i>' + esc(jaArtName(a)) + '</span>'); }).join('')
+    + knopf('ferien', '<span><i class="ja-punkt fer"></i>Ferien</span>') + '</div>';
 }
 
 function jaRasterHtml() {
@@ -5334,7 +5370,7 @@ function jaRasterHtml() {
     + '<div class="ja-raster"><b></b>' + JA_MONATE.map(function (m) { return '<b>' + m + '</b>'; }).join('');
   var tag;
   for (tag = 1; tag <= 31; tag++) {
-    h += '<b>' + (tag === 1 || tag % 5 === 0 ? tag : '') + '</b>';
+    h += '<b>' + tag + '</b>';
     var m;
     for (m = 1; m <= 12; m++) {
       var is = j + '-' + zwei(m) + '-' + zwei(tag);
@@ -5352,7 +5388,7 @@ function jaRasterHtml() {
       h += '<i class="' + kl.join(' ') + '"' + stil + ' onclick="jaTagOeffnen(\'' + is + '\')"></i>';
     }
   }
-  return h + '</div><p class="leise ja-legende">Wochenende dunkler · ★ Feiertag umrandet · Ferien schraffiert · Tag antippen zeigt, was dort ist.</p>';
+  return h + '</div>';
 }
 
 function jaListeHtml() {
@@ -5452,6 +5488,7 @@ function jaZeichnen() {
 function jaFilter(a) {
   cl.ja.filter = a || '';
   cl.ja.suche = '';
+  if (cl.aufklapp === 'jahrart') { cl.aufklapp = ''; }
   jaZeichnen();
 }
 

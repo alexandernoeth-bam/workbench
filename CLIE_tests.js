@@ -3406,6 +3406,15 @@ function jahrTest() {
   S.jaFensterZu();
   /* Blättern und Kontext */
   pruefe(!/ja-kopf|jaJahrUm\(-1\)/.test(inhalt()) && S.document.getElementById('katKnopf').textContent === '▼ ' + j && S.document.getElementById('reiter').textContent === 'Jahr', 'das Jahr steht nur oben (seit 0.38.1 kein zweiter Wähler)');
+  pruefe(!/class="ja-chips"/.test(inhalt()) && /onclick="jaArtAuf\(\)">.*▼ Alle Arten/.test(inhalt()), 'Arten als Knopf ▼ statt einer Reihe (seit 0.38.2)');
+  const zahlen = (inhalt().match(/<b>(\d{1,2})<\/b>/g) || []).map(x => Number(x.replace(/\D/g, '')));
+  pruefe(zahlen.length === 31 && zahlen.every((z, i) => z === i + 1), 'links alle Tage 1–31');
+  S.jaArtAuf();
+  const aw = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'jahrart' && /jaFilter\('besuche'\)/.test(aw) && /jaFilter\('ferien'\)/.test(aw) && /Alle Arten/.test(aw), 'Auswahl: alle Arten, Ferien');
+  S.jaFilter('besuche');
+  pruefe(!S.cl.aufklapp && /▼ <i style="background:#56604A"><\/i>Besuche/.test(inhalt()), 'gewählt: Knopf zeigt die Art mit ihrer Abstufung');
+  S.jaFilter('');
   S.katUm();
   const jw = S.document.getElementById('aufklapp').innerHTML;
   pruefe(S.cl.aufklapp === 'jahrwahl' && new RegExp('jaJahrSetzen\\(' + (j - 1) + '\\)').test(jw) && /katSetzen\('privat'\)/.test(jw), 'oben rechts: Jahre und Beruf/Privat');
