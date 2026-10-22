@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 26, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 27, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -1813,6 +1813,96 @@ function kennzahlTest() {
   S.saDetailsSpeichern();
   pruefe(!('gruppeName' in b) && !('kennzahl' in b), 'Gruppe wie die Vorlage und „wie die Vorlage“ speichern nichts Eigenes');
   S.cl.sa.id = ''; S.cl.aufklapp = '';
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   81. Invasion (0.45)
+   Grund: Ein Spiel nach dem Prinzip von Space Invaders: Formation rückt
+   seitlich und stufenweise vor, Bunker zerbröseln, Schiff folgt dem
+   Daumen und schießt von selbst; Loslassen und App-Wechsel halten an;
+   Spielstand und Bestenliste nur auf dem Gerät.
+   Erkennt: falsche Punkte je Reihe, Formation kehrt am Rand nicht um,
+   Tempo steigt nicht, Bunker unverwundbar, Treffer kostet kein Leben,
+   kein Spielende, kein neues Level, Pause ohne Spielstand, Spielstand
+   nicht wieder geladen, App-Wechsel läuft weiter.
+   ============================================================ */
+function invasionTest() {
+  console.log('\n81. Invasion (0.45)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  ['clie-invasion', 'clie-invasion-beste', 'clie-invasion-spiele'].forEach(k => S.localStorage.removeItem(k));
+  S.cl.iv.zustand = 'start'; S.cl.iv.geladen = false; S.cl.iv.level = 1; S.cl.iv.punkte = 0; S.cl.iv.leben = 3;
+  pruefe(S.CL_ORDNER.spiele.apps.indexOf('invasion') >= 0 && S.clApp('invasion').raster === false && /M24 16h4v4h-4z/.test(S.clSymbol('invasion')), 'Invasion im Ordner Spiele, Pixel-Gegner als Symbol');
+  S.oeffne('invasion');
+  let h = inhalt();
+  pruefe(/<canvas id="ivFeld"[^>]*ontouchstart="ivDaumenAuf\(event\)"[^>]*ontouchend="ivDaumenWeg\(event\)"/.test(h) && /Daumen aufs Feld legen/.test(h) && /Punkte 0/.test(h) && /♥♥♥/.test(h), 'Start: Feld für den Daumen, Hinweis, Punkte und drei Leben');
+  S.ivNeuesSpiel();
+  const iv = S.cl.iv;
+  pruefe(iv.zustand === 'laeuft' && iv.gegner.length === 40 && iv.bunker.length === 3 && iv.fy === 24 && S.document.getElementById('katKnopf').textContent === 'Level 1', 'Neues Spiel: 5 × 8 Gegner, 3 Bunker, Level 1');
+  /* Schießen: das Schiff unter die unterste Reihe, Spalte 0 */
+  iv.bomben = []; iv.bombUhr = -1e9; iv.ufoUhr = -1e9;
+  S.ivSchiffAuf(S.ivGegnerX(iv.gegner[32]) + 5);
+  let n = 0;
+  while (iv.punkte === 0 && n++ < 200) { iv.schritt = 0; S.ivTakt(16); }
+  pruefe(iv.punkte === 10 && !iv.gegner[32].lebt && iv.gegner.filter(g => !g.lebt).length === 1, 'der Schuss geht von selbst los: unterste Reihe 10 Punkte');
+  iv.gegner[32].lebt = true; iv.punkte = 0;
+  pruefe(S.IV_REIHE_PUNKTE.join() === '30,20,20,10,10', 'Punkte je Reihe: 30, 20, 20, 10, 10');
+  /* Formation */
+  const voll = S.ivSchrittMs();
+  iv.gegner.slice(0, 30).forEach(g => { g.lebt = false; });
+  pruefe(S.ivSchrittMs() < voll, 'weniger Gegner: schneller');
+  iv.gegner.forEach(g => { g.lebt = true; });
+  const fx = iv.fx; S.ivFormationSchritt();
+  pruefe(iv.fx === fx + 3 && iv.bild === 1, 'ein Schritt seitwärts, mit Gangbild');
+  iv.fx = 160 - 2 - 10 - 7 * 16; const fy = iv.fy; S.ivFormationSchritt();
+  pruefe(iv.fy === fy + 6 && iv.richtung === -1, 'am Rand: eine Stufe tiefer und umkehren');
+  /* Bunker */
+  const vorher = iv.bunker[0].reduce((a, z) => a + z.reduce((x, y) => x + y, 0), 0);
+  pruefe(S.ivBunkerTreffer(24 + 8, 170 + 4) && iv.bunker[0].reduce((a, z) => a + z.reduce((x, y) => x + y, 0), 0) < vorher, 'Treffer im Bunker: ein Loch');
+  /* Bombe trifft das Schiff */
+  iv.bomben = [{ x: iv.schiff, y: S.IV_SCHIFF_Y + 1 }]; iv.schuss = null;
+  S.ivBombenPruefen();
+  pruefe(iv.leben === 2 && iv.treffer > 0 && /♥♥♡/.test(S.ivStandZeile()), 'Bombe trifft: ein Leben weniger, das Schiff blinkt');
+  const fxStill = iv.fx; S.ivTakt(500);
+  pruefe(iv.fx === fxStill, 'nach einem Treffer kurz Ruhe');
+  iv.treffer = 0;
+  /* Bonusschiff */
+  iv.ufoUhr = 22000; iv.schritt = 0; S.ivTakt(1);
+  pruefe(!!iv.ufo, 'das Bonusschiff kommt von Zeit zu Zeit');
+  iv.ufo = null; iv.ufoUhr = -1e9;
+  /* Alle weg: nächstes Level */
+  iv.gegner.forEach(g => { g.lebt = false; }); iv.schritt = 0;
+  S.ivTakt(1);
+  pruefe(iv.level === 2 && S.ivLebende().length === 40 && iv.fy === 30, 'alle weg: Level 2, eine Stufe tiefer');
+  /* Loslassen hält an und merkt sich den Stand */
+  iv.punkte = 340; iv.gegner[5].lebt = false;
+  S.ivDaumenWeg({ touches: [] });
+  const st = JSON.parse(S.localStorage.getItem('clie-invasion') || 'null');
+  pruefe(iv.zustand === 'pause' && st && st.punkte === 340 && st.level === 2 && st.gegner[5] === 0, 'Loslassen: Pause, Spielstand auf dem Gerät');
+  pruefe(/Pause/.test(inhalt()) && /ivWeiter\(\)">Weiter/.test(S.document.getElementById('fuss').innerHTML), 'Pause-Fenster, unten „Weiter“');
+  /* Neu laden: das angefangene Spiel steht pausiert bereit */
+  iv.geladen = false; iv.zustand = 'start'; iv.punkte = 0; iv.level = 1;
+  S.ivLaden();
+  pruefe(iv.zustand === 'pause' && iv.punkte === 340 && iv.level === 2 && !iv.gegner[5].lebt, 'beim nächsten Öffnen: Spielstand wieder da');
+  pruefe(/pausiert · Level 2/.test(S.ordnerStandText('invasion')), 'im Ordner: „pausiert · Level 2“');
+  S.ivDaumenAuf({ touches: [] });
+  pruefe(iv.zustand === 'laeuft', 'Daumen wieder auf: weiter');
+  S.oeffne('uebersicht');
+  pruefe(iv.zustand === 'pause', 'App gewechselt: angehalten');
+  S.oeffne('invasion'); S.ivWeiter();
+  /* Formation unten: gelandet */
+  iv.fy = 200; S.ivFormationSchritt();
+  const beste = S.ivBeste();
+  pruefe(iv.zustand === 'vorbei' && beste.length === 1 && beste[0].p === 340 && beste[0].l === 2 && S.ivSpiele() === 1 && !S.localStorage.getItem('clie-invasion'), 'Gegner unten: Spielende, Bestenliste, Spielstand gelöscht');
+  pruefe(/Gelandet!/.test(inhalt()) && /class="neu"/.test(inhalt()) && /ivNeuesSpiel\(\)">Neues Spiel/.test(inhalt()), 'Fenster „Gelandet!“ mit markiertem Ergebnis');
+  /* Letztes Leben */
+  S.ivNeuesSpiel(); iv.leben = 1;
+  iv.bomben = [{ x: iv.schiff, y: S.IV_SCHIFF_Y + 2 }];
+  S.ivBombenPruefen();
+  pruefe(iv.zustand === 'vorbei' && S.ivSpiele() === 2, 'letztes Leben weg: Spielende');
+  pruefe(S.IV_TASTEN.ArrowLeft === 'links' && S.IV_TASTEN[' '] === 'start', 'am PC: Pfeile und Leertaste');
   S.oeffne('uebersicht');
 }
 
@@ -4213,8 +4303,8 @@ function spieleSudokuTest() {
   pruefe(S.CL_BILD.spiele && S.CL_BILD.sudoku && S.CL_BILD.solitaer, 'Symbole für Spiele, Sudoku und Solitär');
   S.oeffne('spiele');
   const fen = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 4,
-    'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones und Schach (seit 0.35)');
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && /ordnerWahl\('invasion'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 5,
+    'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones, Schach und Invasion (seit 0.35/0.45)');
   pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitär:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
   /* Erzeuger: eindeutig lösbar */
   const stufen = { leicht: 0, mittel: 0, schwer: 0 };
@@ -5359,6 +5449,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { invasionTest(); } catch (e) { fail('Invasion warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zieleTest(); } catch (e) { fail('Ziele warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { projekteTest(); } catch (e) { fail('Projekte warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lzGruppenTest(); } catch (e) { fail('Lesezeichen-Gruppen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

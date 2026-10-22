@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.44.1</title>
+<title>CLIE 0.45.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -401,6 +401,11 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sch-zk{padding:0 2px}
 .sch-analyse{margin:4px 0}
 /* Stones (seit 0.18) */
+/* Invasion (seit 0.45) */
+.iv-stand{display:flex;justify-content:space-between;font-size:17px;border-bottom:2px dotted var(--px-zart);padding:0 2px 3px;margin-bottom:4px}
+.iv-feld{display:block;margin:0 auto;height:min(calc(100vh - 280px),calc((min(100vw,480px) - 40px) * 1.375));aspect-ratio:160/220;max-width:100%;touch-action:none;image-rendering:pixelated;background:var(--lcd);border-bottom:0}
+.iv-feld.ruht{opacity:.45}
+.iv-fenster{top:120px}
 .sto-spiel{display:flex;gap:10px;justify-content:center;--z:min(calc((min(100vw,480px) - 150px) / 10),calc((100vh - 360px) / 18),30px)}
 .sto-feld{display:grid;grid-template-columns:repeat(10,var(--z));grid-template-rows:repeat(18,var(--z));gap:1px;border:2px solid var(--px);padding:2px;background:var(--lcd-hell);touch-action:none;flex:0 0 auto}
 .sto-feld i{display:block}
@@ -860,7 +865,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.44.1';
+var APP_VERSION = '0.45.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3122,6 +3127,8 @@ var CL_APPS = [
   { id: 'sudoku', name: 'Sudoku', stufe: '', was: '', raster: false },
   { id: 'solitaer', name: 'Solitär', stufe: '', was: '', raster: false },
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '', raster: false },
+  /* Seit 0.45: nach dem Prinzip von Space Invaders */
+  { id: 'invasion', name: 'Invasion', stufe: '', was: '', raster: false },
   { id: 'schach',   name: 'Schach',   stufe: '',    was: '', raster: false },
   { id: 'lernkartei', name: 'Lernkartei', stufe: '', was: '', raster: false },
   { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '', raster: false },
@@ -3180,6 +3187,8 @@ var CL_BILD = {
   lernen: '<path d="M32 22c-5-4-11-4-16-3v24c5-1 11-1 16 3 5-4 11-4 16-3V19c-5-1-11-1-16 3z" ' + CL_STRICH + '/><path d="M32 22v24" ' + CL_STRICH + '/>',
   /* Fahne am Mast: ein Ziel in Sicht (seit 0.44) */
   ziele: '<path d="M20 48V16" ' + CL_STRICH + '/><path d="M20 17h22l-5 6 5 6H20" ' + CL_FUELL + ' stroke="#C9D3B7" stroke-width="2" stroke-linejoin="round"/><path d="M13 48h22" ' + CL_STRICH + '/>',
+  /* Ein Pixel-Gegner (seit 0.45) */
+  invasion: '<path d="M24 16h4v4h-4zM36 16h4v4h-4zM28 20h8v4h-8zM24 24h16v4H24zM20 28h8v4h-8zM36 28h8v4h-8zM16 32h32v4H16zM16 36h4v4h-4zM24 36h16v4H24zM44 36h4v4h-4zM16 40h4v4h-4zM24 40h4v4h-4zM36 40h4v4h-4zM44 40h4v4h-4zM28 44h8v4h-8z" ' + CL_FUELL + '/>',
   /* Zeitplan: drei versetzte Balken wie ein Gantt-Plan (seit 0.43) */
   projekte: '<rect x="15" y="18" width="16" height="6" ' + CL_FUELL + '/><rect x="23" y="29" width="18" height="6" ' + CL_FUELL + '/>'
           + '<rect x="33" y="40" width="16" height="6" ' + CL_FUELL + '/><path d="M15 50h34" stroke="#C9D3B7" stroke-width="2" stroke-linecap="round"/>',
@@ -3880,6 +3889,8 @@ function statistikHtml() {
     + clStatBlock('solitaer', 'Solitär', [['Spiele · gewonnen · Bestzeit', soStatZeile()]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
+    + clStatBlock('invasion', 'Invasion', [
+      ['Bester · Spiele (dieses Gerät)', (ivBeste().length ? stoZahl(ivBeste()[0].p) : '—') + ' · ' + ivSpiele()]])
     + clStatBlock('abgleich', 'Datei', [
       [DATEINAME, kb + ' KB'],
       ['Letzter Abgleich', letzterAbgleich ? String(letzterAbgleich).slice(11, 16) : '—']]);
@@ -3965,6 +3976,13 @@ function inhaltZeichnen() {
   if (cl.app === 'abgleich') { el.innerHTML = abgleichHtml(); }
   else if (cl.app === 'rechner') { el.innerHTML = rechnerHtml(); }
   else if (cl.app === 'stones') { el.innerHTML = stonesHtml(); }
+  else if (cl.app === 'invasion') {
+    /* Im laufenden Spiel nur das Feld neu — das Canvas bleibt unter dem Daumen */
+    if (!cl.iv.voll && cl.iv.zustand === 'laeuft' && el.innerHTML.indexOf('ivFeld') >= 0) { ivZeichnen(); return; }
+    cl.iv.voll = false;
+    el.innerHTML = invasionHtml();
+    ivZeichnen();
+  }
   else if (cl.app === 'sudoku') { el.innerHTML = sudokuHtml(); }
   else if (cl.app === 'lesezeichen') { el.innerHTML = lesezeichenHtml(); }
   else if (cl.app === 'solitaer') { el.innerHTML = solitaerHtml(); }
@@ -4043,6 +4061,7 @@ function kopfZeichnen() {
     var liste = (cl.app === 'aufgaben') ? aufListe() : null;
     var saText = (cl.app === 'sammlungen') ? saKatText() : null;
     kat.textContent = (cl.app === 'stones') ? 'Level ' + cl.sto.level
+      : (cl.app === 'invasion') ? 'Level ' + cl.iv.level
       : (cl.app === 'drive') ? ''
       : (cl.app === 'schach') ? schKopfText()
       : (cl.app === 'lernkartei') ? '▼ ' + lkKopfText()
@@ -4200,6 +4219,7 @@ function fussZeichnen() {
         : (cl.app === 'heute') ? heuteFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
+        : (cl.app === 'invasion') ? invasionFussHtml()
         : (cl.app === 'drive') ? driveFussHtml()
         : (cl.app === 'schach') ? schachFussHtml()
         : (cl.app === 'lernkartei') ? lernkarteiFussHtml()
@@ -4241,6 +4261,7 @@ function oeffne(id) {
   if (CL_ORDNER[id]) { ordnerAuf(id); return; }
   /* Stones pausiert, sobald die App gewechselt wird */
   if (cl.app === 'stones' && id !== 'stones') { stoPause(); }
+  if (cl.app === 'invasion' && id !== 'invasion') { ivPause(); }
   /* Gerade Abgehaktes verschwindet beim Verlassen der Aufgaben */
   cl.auf.frisch = {};
   cl.auf.wahl = '';
@@ -4280,7 +4301,7 @@ function katUm() {
     aufklappZeichnen();
     return;
   }
-  if (cl.app === 'stones' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'ideen') { return; }
+  if (cl.app === 'stones' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'ideen') { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben') ? 'liste'
     : (cl.app === 'lernkartei') ? 'lkwahl'
@@ -18033,7 +18054,7 @@ var SP_PAUSE_MS = 60000;
 var CL_ORDNER = {
   planung: { name: 'Planung', apps: ['heute', 'routinen', 'ideen', 'coach', 'ziele'] },
   lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
-  spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach'] }
+  spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion'] }
 };
 
 cl.ordner = '';
@@ -18062,6 +18083,7 @@ function ordnerWahl(id) {
 /* Eine Zeile Stand je App im Ordner */
 function ordnerStandText(id) {
   if (id === 'sudoku' || id === 'solitaer' || id === 'stones') { return spStandText(id); }
+  if (id === 'invasion') { return ivStandText(); }
   if (id === 'schach') { return schBilanzLesen().g + ' gewonnen · ' + schBilanzLesen().v + ' verloren'; }
   if (id === 'routinen') {
     var heute = isoDatum();
@@ -18793,6 +18815,504 @@ function soStatZeile() {
   return b.spiele + ' · ' + b.siege + ' · ' + (b.beste ? spZeitText(b.beste) : '—');
 }
 
+/* ---------- Invasion (seit 0.45) ----------
+
+   Nach dem Prinzip von Space Invaders, in eigener Pixelgrafik: 5 Reihen
+   à 8 Gegner rücken seitlich vor und bei jedem Rand eine Stufe tiefer,
+   immer schneller, je weniger übrig sind. 3 Bunker zerbröseln, ab und zu
+   fliegt oben ein Bonusschiff. Das eigene Schiff folgt dem Daumen und
+   schießt von selbst — ein Schuss zugleich. Loslassen hält an, ebenso
+   der Wechsel der App. Spielstand und Bestenliste nur auf dem Gerät.
+   Das Feld rechnet in 160 × 220 Punkten; gezeichnet wird auf ein Canvas. */
+
+var IV_B = 160;
+var IV_H = 220;
+var IV_SCHIFF_Y = 200;
+var IV_BUNKER_Y = 170;
+var IV_BUNKER_X = [24, 72, 120];
+var IV_KEY = 'clie-invasion';
+var IV_BESTE_KEY = 'clie-invasion-beste';
+var IV_SPIELE_KEY = 'clie-invasion-spiele';
+/* Punkte je Reihe (oben 30, Mitte 20, unten 10) und Gegnerart je Reihe */
+var IV_REIHE_PUNKTE = [30, 20, 20, 10, 10];
+var IV_REIHE_ART = [0, 1, 1, 2, 2];
+/* Pixelbilder 8 × 8, je Art zwei Bilder für den Gang */
+var IV_BILDER = [
+  [['..#..#..', '...##...', '..####..', '.##..##.', '########', '#.####.#', '#.#..#.#', '...##...'],
+   ['..#..#..', '#..##..#', '#.####.#', '###..###', '########', '.######.', '.#....#.', '#......#']],
+  [['..####..', '.######.', '##.##.##', '########', '.#.##.#.', '#......#', '.#....#.', '..#..#..'],
+   ['..####..', '.######.', '##.##.##', '########', '..#..#..', '.#.##.#.', '#......#', '.#....#.']],
+  [['...##...', '..####..', '.######.', '##.##.##', '########', '..#..#..', '.#.##.#.', '#.#..#.#'],
+   ['...##...', '..####..', '.######.', '##.##.##', '########', '.#.##.#.', '#......#', '.#....#.']]
+];
+var IV_SCHIFF = ['....##....', '....##....', '.########.', '##########', '##########'];
+var IV_UFO = ['...####...', '.########.', '##.##.##.#', '##########', '..#....#..'];
+/* Bunker 16 × 10: oben abgeschrägt, unten ein Durchgang */
+var IV_BUNKER = ['...##########...', '..############..', '.##############.', '################', '################',
+                 '################', '################', '#####......#####', '####........####', '####........####'];
+
+cl.iv = { zustand: 'start', level: 1, punkte: 0, leben: 3, gegner: [], fx: 0, fy: 0, richtung: 1, bild: 0,
+          schritt: 0, bombUhr: 0, ufoUhr: 0, treffer: 0, schiff: 80, schuss: null, bomben: [], bunker: [], ufo: null,
+          uhr: null, zuletzt: 0, neu: -1, liste: false, standText: '', geladen: false, maus: false, voll: false };
+
+function ivBunkerNeu() {
+  return IV_BUNKER_X.map(function () { return IV_BUNKER.map(function (z) { return z.split('').map(function (c) { return c === '#' ? 1 : 0; }); }); });
+}
+
+/* Eine neue Welle: jedes Level eine Stufe tiefer (höchstens sechs) */
+function ivWelle() {
+  var g = [];
+  var r, c;
+  for (r = 0; r < 5; r++) { for (c = 0; c < 8; c++) { g.push({ r: r, c: c, lebt: true }); } }
+  cl.iv.gegner = g;
+  cl.iv.fx = 14;
+  cl.iv.fy = 24 + Math.min(5, cl.iv.level - 1) * 6;
+  cl.iv.richtung = 1;
+  cl.iv.schritt = 0;
+  cl.iv.bombUhr = 0;
+  cl.iv.ufoUhr = 0;
+  cl.iv.ufo = null;
+  cl.iv.schuss = null;
+  cl.iv.bomben = [];
+  cl.iv.bunker = ivBunkerNeu();
+}
+
+function ivGegnerX(g) { return cl.iv.fx + g.c * 16; }
+function ivGegnerY(g) { return cl.iv.fy + g.r * 13; }
+function ivLebende() { return cl.iv.gegner.filter(function (g) { return g.lebt; }); }
+
+/* Je weniger Gegner, desto schneller; höhere Level etwas schneller */
+function ivSchrittMs() {
+  return Math.round((60 + ivLebende().length * 14) * Math.max(0.6, 1 - (cl.iv.level - 1) * 0.06));
+}
+
+function ivNeuesSpiel() {
+  cl.iv.level = 1;
+  cl.iv.punkte = 0;
+  cl.iv.leben = 3;
+  cl.iv.treffer = 0;
+  cl.iv.schiff = IV_B / 2;
+  cl.iv.neu = -1;
+  cl.iv.liste = false;
+  ivWelle();
+  cl.iv.zustand = 'laeuft';
+  ivStarten();
+  ivAlles();
+}
+
+/* ---- Die Uhr: requestAnimationFrame, sonst 30 Bilder je Sekunde ---- */
+
+function ivStarten() {
+  cl.iv.zuletzt = Date.now();
+  if (cl.iv.uhr) { return; }
+  var weiter = function () {
+    cl.iv.uhr = null;
+    if (cl.iv.zustand !== 'laeuft' || cl.app !== 'invasion') { return; }
+    var jetztMs = Date.now();
+    ivTakt(Math.min(100, jetztMs - cl.iv.zuletzt));
+    cl.iv.zuletzt = jetztMs;
+    ivZeichnen();
+    if (cl.iv.zustand === 'laeuft') { cl.iv.uhr = ivNaechstes(weiter); }
+  };
+  cl.iv.uhr = ivNaechstes(weiter);
+}
+
+function ivNaechstes(f) {
+  if (typeof window.requestAnimationFrame === 'function') { return window.requestAnimationFrame(f) || true; }
+  return setTimeout(f, 33) || true;
+}
+
+/* Ein Zeitschritt des Spiels (ms) — ohne Zeichnen, damit er prüfbar bleibt */
+function ivTakt(ms) {
+  var s = cl.iv;
+  if (s.zustand !== 'laeuft') { return; }
+  var dt = ms / 1000;
+  if (s.treffer > 0) { s.treffer = Math.max(0, s.treffer - ms); return; }
+  /* Formation */
+  s.schritt += ms;
+  var takt = ivSchrittMs();
+  while (s.schritt >= takt && s.zustand === 'laeuft') {
+    s.schritt -= takt;
+    ivFormationSchritt();
+  }
+  /* Eigener Schuss: von selbst, einer zugleich */
+  if (!s.schuss) { s.schuss = { x: s.schiff, y: IV_SCHIFF_Y - 4 }; }
+  s.schuss.y -= 180 * dt;
+  ivSchussPruefen();
+  /* Bomben der Gegner */
+  s.bombUhr += ms;
+  if (s.bombUhr >= Math.max(350, 1100 - s.level * 80) && s.bomben.length < 3) { s.bombUhr = 0; ivBombeWerfen(); }
+  s.bomben.forEach(function (b) { b.y += 70 * dt; });
+  ivBombenPruefen();
+  /* Bonusschiff */
+  s.ufoUhr += ms;
+  if (!s.ufo && s.ufoUhr >= 22000) { s.ufoUhr = 0; s.ufo = { x: (s.level % 2) ? -12 : IV_B + 2, r: (s.level % 2) ? 1 : -1 }; }
+  if (s.ufo) {
+    s.ufo.x += s.ufo.r * 40 * dt;
+    if (s.ufo.x < -14 || s.ufo.x > IV_B + 4) { s.ufo = null; }
+  }
+  /* Alle weg: nächstes Level */
+  if (s.zustand === 'laeuft' && !ivLebende().length) {
+    s.level++;
+    ivWelle();
+  }
+}
+
+function ivFormationSchritt() {
+  var s = cl.iv;
+  var l = ivLebende();
+  if (!l.length) { return; }
+  var links = Math.min.apply(null, l.map(ivGegnerX));
+  var rechts = Math.max.apply(null, l.map(ivGegnerX)) + 10;
+  if ((s.richtung > 0 && rechts + 3 > IV_B - 2) || (s.richtung < 0 && links - 3 < 2)) {
+    s.fy += 6;
+    s.richtung = -s.richtung;
+  } else {
+    s.fx += 3 * s.richtung;
+  }
+  s.bild = 1 - s.bild;
+  /* Gegner fressen sich durch die Bunker */
+  l.forEach(function (g) { ivBunkerLoeschen(ivGegnerX(g), ivGegnerY(g), 10, 10); });
+  var unten = Math.max.apply(null, l.map(ivGegnerY)) + 10;
+  if (unten >= IV_SCHIFF_Y - 4) { ivVorbei(); }
+}
+
+/* Bunker-Pixel im Rechteck löschen; true, wenn etwas getroffen war */
+function ivBunkerLoeschen(x, y, b, h) {
+  var getroffen = false;
+  cl.iv.bunker.forEach(function (feld, k) {
+    var bx = IV_BUNKER_X[k];
+    var r, c;
+    for (r = Math.max(0, Math.floor(y - IV_BUNKER_Y)); r < Math.min(10, Math.ceil(y + h - IV_BUNKER_Y)); r++) {
+      for (c = Math.max(0, Math.floor(x - bx)); c < Math.min(16, Math.ceil(x + b - bx)); c++) {
+        if (feld[r][c]) { feld[r][c] = 0; getroffen = true; }
+      }
+    }
+  });
+  return getroffen;
+}
+
+/* Trifft ein Punkt (Schuss, Bombe) einen Bunker? Dann ein kleines Loch */
+function ivBunkerTreffer(x, y) {
+  var k;
+  for (k = 0; k < IV_BUNKER_X.length; k++) {
+    var c = Math.floor(x - IV_BUNKER_X[k]);
+    var r = Math.floor(y - IV_BUNKER_Y);
+    if (r >= 0 && r < 10 && c >= 0 && c < 16 && cl.iv.bunker[k] && cl.iv.bunker[k][r][c]) {
+      ivBunkerLoeschen(x - 1.5, y - 1.5, 3, 3);
+      return true;
+    }
+  }
+  return false;
+}
+
+function ivSchussPruefen() {
+  var s = cl.iv;
+  var p = s.schuss;
+  if (!p) { return; }
+  if (p.y < 0) { s.schuss = null; return; }
+  if (ivBunkerTreffer(p.x, p.y)) { s.schuss = null; return; }
+  if (s.ufo && p.y < 14 && p.x >= s.ufo.x && p.x <= s.ufo.x + 10) {
+    s.punkte += [50, 100, 150, 300][(s.punkte / 10) % 4];
+    s.ufo = null;
+    s.schuss = null;
+    return;
+  }
+  var g = ivLebende().filter(function (x) {
+    var gx = ivGegnerX(x);
+    var gy = ivGegnerY(x);
+    return p.x >= gx && p.x <= gx + 10 && p.y >= gy && p.y <= gy + 10;
+  })[0];
+  if (g) {
+    g.lebt = false;
+    s.punkte += IV_REIHE_PUNKTE[g.r];
+    s.schuss = null;
+  }
+}
+
+/* Es wirft der unterste Gegner einer Spalte — welcher Spalte, wechselt reihum */
+function ivBombeWerfen() {
+  var s = cl.iv;
+  var spalten = {};
+  ivLebende().forEach(function (g) { if (!spalten[g.c] || spalten[g.c].r < g.r) { spalten[g.c] = g; } });
+  var l = Object.keys(spalten).map(function (k) { return spalten[k]; });
+  if (!l.length) { return; }
+  /* Mal die Spalte über dem Schiff, mal eine andere */
+  var ueber = l.filter(function (g) { return Math.abs(ivGegnerX(g) + 5 - s.schiff) < 12; })[0];
+  var g = (ueber && Math.random() < 0.5) ? ueber : l[Math.floor(Math.random() * l.length)];
+  s.bomben.push({ x: ivGegnerX(g) + 5, y: ivGegnerY(g) + 10 });
+}
+
+function ivBombenPruefen() {
+  var s = cl.iv;
+  var getroffen = false;
+  s.bomben = s.bomben.filter(function (b) {
+    if (b.y > IV_H) { return false; }
+    if (ivBunkerTreffer(b.x, b.y)) { return false; }
+    if (s.schuss && Math.abs(s.schuss.x - b.x) < 2 && Math.abs(s.schuss.y - b.y) < 4) { s.schuss = null; return false; }
+    if (Math.abs(b.x - s.schiff) <= 6 && b.y >= IV_SCHIFF_Y && b.y <= IV_SCHIFF_Y + 7) { getroffen = true; return false; }
+    return true;
+  });
+  if (getroffen) {
+    s.leben--;
+    s.bomben = [];
+    s.schuss = null;
+    if (s.leben <= 0) { ivVorbei(); } else { s.treffer = 1000; }
+  }
+}
+
+/* ---- Steuerung ---- */
+
+/* Das Schiff steht dort, wo der Daumen ist (waagerecht) */
+function ivSchiffAuf(x) {
+  cl.iv.schiff = Math.max(6, Math.min(IV_B - 6, x));
+}
+
+function ivFingerX(e) {
+  var p = e && e.touches && e.touches[0] ? e.touches[0] : e;
+  var c = document.getElementById('ivFeld');
+  if (!p || !c || typeof c.getBoundingClientRect !== 'function') { return null; }
+  var r = c.getBoundingClientRect();
+  return r.width ? (p.clientX - r.left) / r.width * IV_B : null;
+}
+
+function ivDaumenAuf(e) {
+  if (e && e.preventDefault) { e.preventDefault(); }
+  if (cl.iv.zustand === 'vorbei' || cl.iv.liste) { return; }
+  var x = ivFingerX(e);
+  if (x !== null) { ivSchiffAuf(x); }
+  cl.iv.maus = true;
+  if (cl.iv.zustand === 'start') { ivNeuesSpiel(); return; }
+  if (cl.iv.zustand === 'pause') { ivWeiter(); }
+}
+
+function ivDaumenZieht(e) {
+  if (e && e.preventDefault) { e.preventDefault(); }
+  if (cl.iv.zustand !== 'laeuft') { return; }
+  if (e && !e.touches && !cl.iv.maus) { return; }
+  var x = ivFingerX(e);
+  if (x !== null) { ivSchiffAuf(x); }
+}
+
+function ivDaumenWeg(e) {
+  if (e && e.preventDefault) { e.preventDefault(); }
+  cl.iv.maus = false;
+  if (e && e.touches && e.touches.length) { return; }
+  ivPause();
+}
+
+/* Am PC: ◀ ▶ schieben, Leertaste hält an oder startet */
+function ivTaste(was) {
+  if (was === 'start') {
+    if (cl.iv.zustand === 'laeuft') { ivPause(); }
+    else if (cl.iv.zustand === 'pause') { ivWeiter(); }
+    else { ivNeuesSpiel(); }
+    return;
+  }
+  if (cl.iv.zustand !== 'laeuft') { return; }
+  ivSchiffAuf(cl.iv.schiff + (was === 'links' ? -6 : 6));
+}
+
+function ivPause() {
+  if (cl.iv.zustand !== 'laeuft') { return; }
+  cl.iv.zustand = 'pause';
+  ivSpeichern();
+  ivAlles();
+}
+
+function ivWeiter() {
+  if (cl.iv.zustand !== 'pause') { return; }
+  cl.iv.zustand = 'laeuft';
+  cl.iv.liste = false;
+  ivAlles();
+  ivStarten();
+}
+
+function ivVorbei() {
+  var s = cl.iv;
+  s.zustand = 'vorbei';
+  var l = ivBeste();
+  var neu = { p: s.punkte, l: s.level, d: isoDatum() };
+  l.push(neu);
+  l.sort(function (a, b) { return b.p - a.p; });
+  l = l.slice(0, 5);
+  s.neu = l.indexOf(neu);
+  try {
+    window.localStorage.setItem(IV_BESTE_KEY, JSON.stringify(l));
+    window.localStorage.setItem(IV_SPIELE_KEY, String(ivSpiele() + 1));
+    window.localStorage.removeItem(IV_KEY);
+  } catch (e) { /* nur für jetzt */ }
+  ivAlles();
+}
+
+/* ---- Auf dem Gerät: Spielstand, Bestenliste ---- */
+
+function ivSpeichern() {
+  var s = cl.iv;
+  var stand = { level: s.level, punkte: s.punkte, leben: s.leben, gegner: s.gegner.map(function (g) { return g.lebt ? 1 : 0; }),
+                fx: s.fx, fy: s.fy, richtung: s.richtung, schiff: s.schiff, bunker: s.bunker };
+  try { window.localStorage.setItem(IV_KEY, JSON.stringify(stand)); } catch (e) { /* nur für jetzt */ }
+}
+
+/* Beim ersten Öffnen: ein angefangenes Spiel steht pausiert bereit */
+function ivLaden() {
+  if (cl.iv.geladen) { return; }
+  cl.iv.geladen = true;
+  var t = null;
+  try { t = JSON.parse(window.localStorage.getItem(IV_KEY) || 'null'); } catch (e) { t = null; }
+  if (!t || !Array.isArray(t.gegner) || t.gegner.length !== 40 || !Array.isArray(t.bunker) || !(t.leben > 0)) { return; }
+  var s = cl.iv;
+  s.level = Number(t.level) || 1;
+  ivWelle();
+  s.punkte = Number(t.punkte) || 0;
+  s.leben = Number(t.leben);
+  s.gegner.forEach(function (g, i) { g.lebt = !!t.gegner[i]; });
+  s.fx = Number(t.fx) || 14;
+  s.fy = Number(t.fy) || 24;
+  s.richtung = (t.richtung === -1) ? -1 : 1;
+  s.schiff = Number(t.schiff) || IV_B / 2;
+  if (t.bunker.length === 3) { s.bunker = t.bunker; }
+  s.zustand = 'pause';
+}
+
+/* Bestenliste: [{ p: Punkte, l: Level, d: Datum }] */
+function ivBeste() {
+  var l = [];
+  try { l = JSON.parse(window.localStorage.getItem(IV_BESTE_KEY) || '[]'); } catch (e) { l = []; }
+  return Array.isArray(l) ? l.filter(function (x) { return x && typeof x.p === 'number'; }).slice(0, 5) : [];
+}
+
+function ivSpiele() {
+  var n = 0;
+  try { n = Number(window.localStorage.getItem(IV_SPIELE_KEY)) || 0; } catch (e) { n = 0; }
+  return n;
+}
+
+function ivListeZeigen() {
+  ivPause();
+  cl.iv.liste = true;
+  ivAlles();
+}
+
+function ivStandText() {
+  var b = ivBeste();
+  if (cl.iv.zustand === 'pause') { return 'pausiert · Level ' + cl.iv.level; }
+  if (!cl.iv.geladen) {
+    var t = null;
+    try { t = JSON.parse(window.localStorage.getItem(IV_KEY) || 'null'); } catch (e) { t = null; }
+    if (t && t.leben > 0) { return 'pausiert · Level ' + (Number(t.level) || 1); }
+  }
+  return b.length ? 'Bestwert ' + stoZahl(b[0].p) + ' · Level ' + b[0].l : 'neues Spiel';
+}
+
+/* ---- Zeichnen ---- */
+
+function invasionHtml() {
+  ivLaden();
+  return '<div class="iv-stand" id="ivStand">' + ivStandZeile() + '</div>'
+    + '<canvas id="ivFeld" class="iv-feld' + (cl.iv.zustand === 'laeuft' ? '' : ' ruht') + '" width="' + IV_B * 3 + '" height="' + IV_H * 3 + '"'
+    + ' ontouchstart="ivDaumenAuf(event)" ontouchmove="ivDaumenZieht(event)" ontouchend="ivDaumenWeg(event)" ontouchcancel="ivDaumenWeg(event)"'
+    + ' onmousedown="ivDaumenAuf(event)" onmousemove="ivDaumenZieht(event)" onmouseup="ivDaumenWeg(event)" onmouseleave="ivDaumenWeg(event)"></canvas>'
+    + ivFensterHtml();
+}
+
+function ivStandZeile() {
+  var b = ivBeste();
+  var herzen = '';
+  var i;
+  for (i = 0; i < 3; i++) { herzen += (i < cl.iv.leben) ? '♥' : '♡'; }
+  return '<span>Punkte ' + stoZahl(cl.iv.punkte) + '</span><span>' + herzen + '</span><span>Beste ' + (b.length ? stoZahl(b[0].p) : '—') + '</span>';
+}
+
+/* Fenster über dem Feld: Start, Pause, Spielende, Bestenliste */
+function ivFensterHtml() {
+  var z = cl.iv.zustand;
+  if (z === 'laeuft') { return ''; }
+  var b = ivBeste();
+  var liste = '<div class="sto-liste">' + (b.length ? b.map(function (x, i) {
+      return '<div' + (i === cl.iv.neu && z === 'vorbei' ? ' class="neu"' : '') + '><span>' + (i + 1) + '. '
+        + esc(x.d === isoDatum() ? 'heute' : clKurzDatum(x.d)) + '</span><span>Level ' + (Number(x.l) || 1) + '</span><span>' + stoZahl(x.p) + '</span></div>';
+    }).join('') : '<p class="leise">Noch keine Spiele.</p>') + '</div>';
+  var titel = (z === 'vorbei') ? 'Gelandet!' : (cl.iv.liste ? 'Bestenliste' : (z === 'pause' ? 'Pause' : 'Invasion'));
+  var h = '<div class="sto-fenster iv-fenster"><div class="titel">' + titel + '</div><div class="rumpf">';
+  if (z === 'vorbei') { h += '<p>' + stoZahl(cl.iv.punkte) + ' Punkte · Level ' + cl.iv.level + '</p>' + liste; }
+  else if (cl.iv.liste) { h += liste; }
+  else { h += '<p>Daumen aufs Feld legen' + (z === 'pause' ? ', dann geht es weiter.' : ' — los geht’s.') + '</p>'
+            + '<p class="leise">Das Schiff folgt dem Daumen und schießt von selbst. Loslassen hält an.</p>'; }
+  h += '<div class="knoepfe">'
+     + (z === 'vorbei' ? '<button type="button" class="knopf voll" onclick="ivNeuesSpiel()">Neues Spiel</button>' : '')
+     + (z !== 'vorbei' && !cl.iv.liste ? '<button type="button" class="knopf" onclick="ivListeZeigen()">Bestenliste</button>' : '')
+     + (cl.iv.liste ? '<button type="button" class="knopf" onclick="ivListeZu()">Zurück</button>' : '')
+     + '</div></div></div>';
+  return h;
+}
+
+function ivListeZu() {
+  cl.iv.liste = false;
+  ivAlles();
+}
+
+function invasionFussHtml() {
+  var z = cl.iv.zustand;
+  return (z === 'laeuft' ? '<button type="button" class="knopf" onclick="ivPause()">Pause</button>'
+          : (z === 'pause' ? '<button type="button" class="knopf voll" onclick="ivWeiter()">Weiter</button>' : ''))
+    + '<button type="button" class="knopf" onclick="ivNeuesSpiel()">Neu</button>';
+}
+
+function ivAlles() {
+  if (cl.app !== 'invasion') { return; }
+  cl.iv.voll = true;
+  inhaltZeichnen();
+  fussZeichnen();
+  kopfZeichnen();
+  ivZeichnen();
+}
+
+function ivSprite(ctx, bild, x, y, k, gross) {
+  var j, i;
+  for (j = 0; j < bild.length; j++) {
+    for (i = 0; i < bild[j].length; i++) {
+      if (bild[j].charAt(i) === '#') { ctx.fillRect(Math.round((x + i * gross) * k), Math.round((y + j * gross) * k), Math.ceil(gross * k), Math.ceil(gross * k)); }
+    }
+  }
+}
+
+/* Das Feld zeichnen — nur das Canvas, und die Standzeile, wenn sie sich ändert */
+function ivZeichnen() {
+  var c = document.getElementById('ivFeld');
+  if (!c || typeof c.getContext !== 'function' || cl.app !== 'invasion') { return; }
+  var ctx = c.getContext('2d');
+  if (!ctx) { return; }
+  var s = cl.iv;
+  var k = c.width / IV_B;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = '#1C2116';
+  if (s.ufo) { ivSprite(ctx, IV_UFO, s.ufo.x, 6, k, 1); }
+  ivLebende().forEach(function (g) { ivSprite(ctx, IV_BILDER[IV_REIHE_ART[g.r]][s.bild], ivGegnerX(g), ivGegnerY(g), k, 1.25); });
+  s.bunker.forEach(function (feld, n) {
+    var r, cc;
+    for (r = 0; r < 10; r++) { for (cc = 0; cc < 16; cc++) { if (feld[r][cc]) { ctx.fillRect((IV_BUNKER_X[n] + cc) * k, (IV_BUNKER_Y + r) * k, k, k); } } }
+  });
+  if (s.schuss) { ctx.fillRect((s.schuss.x - 0.5) * k, s.schuss.y * k, k, 4 * k); }
+  s.bomben.forEach(function (b) {
+    var w = (Math.floor(b.y / 2) % 2) ? 1 : -1;
+    ctx.fillRect((b.x - 0.5) * k, (b.y - 4) * k, k, k);
+    ctx.fillRect((b.x - 0.5 + w) * k, (b.y - 3) * k, k, 2 * k);
+    ctx.fillRect((b.x - 0.5) * k, (b.y - 1) * k, k, k);
+  });
+  /* Nach einem Treffer blinkt das Schiff */
+  if (!(s.treffer > 0 && Math.floor(s.treffer / 120) % 2)) { ivSprite(ctx, IV_SCHIFF, s.schiff - 6, IV_SCHIFF_Y, k, 1.2); }
+  ctx.fillRect(0, 214 * k, c.width, k);
+  var t = ivStandZeile();
+  if (t !== s.standText) {
+    s.standText = t;
+    var el = document.getElementById('ivStand');
+    if (el) { el.innerHTML = t; }
+  }
+  var kopf = document.getElementById('katKnopf');
+  if (kopf && kopf.textContent !== 'Level ' + s.level) { kopf.textContent = 'Level ' + s.level; }
+}
+
 /* ---------- Stones (seit 0.18) ----------
 
    Ein Fallblock-Spiel im LCD-Stil: Feld 10 × 18, sieben Steinformen,
@@ -19154,6 +19674,8 @@ function stoWischEnde(e) {
 
 /* Pfeiltasten am Rechner: ← → schieben, ↑ dreht, ↓ eine Zeile, Leertaste fallen */
 var STO_TASTEN = { ArrowLeft: 'links', ArrowRight: 'rechts', ArrowUp: 'drehen', ArrowDown: 'runter', ' ': 'fallen' };
+/* Invasion am PC (seit 0.45) */
+var IV_TASTEN = { ArrowLeft: 'links', ArrowRight: 'rechts', ' ': 'start' };
 
 /* ---------- Rechner (seit 0.39 wie ein Schulrechner) ----------
 
@@ -19866,6 +20388,7 @@ function tasteGlobal(e) {
     if (t) { e.preventDefault(); rtTaste(t); }
   }
   if (e && cl.app === 'stones' && !cl.aufklapp && STO_TASTEN[e.key]) { e.preventDefault(); stoTaste(STO_TASTEN[e.key]); }
+  if (e && cl.app === 'invasion' && !cl.aufklapp && IV_TASTEN[e.key]) { e.preventDefault(); ivTaste(IV_TASTEN[e.key]); }
 }
 
 /* ---------- Android-Taste Zurück (seit 0.7.2) ----------
