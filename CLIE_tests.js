@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 16 && CL.CL_APPS.length === 21, 'sechzehn Apps im Raster, „Heute“ nur in der Leiste, Sudoku/Solitär/Stones im Spiele-Fenster, Kurs unter dem Coach (seit 0.33)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 23, 'zwölf Felder im Raster (3×4), „Heute“ nur in der Leiste, der Rest in drei Ordnern (seit 0.35)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -413,13 +413,13 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","coach","ideen","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","spiele","schach","lernkartei","vorlesen","abgleich"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","checklisten","sammlungen","einkauf","memo","vorlesen","rechner","coach","planung","lernen","spiele"]'
     && CL.clApp('heute') && CL.clApp('heute').raster === false,
-    'genau sechzehn Apps im Raster: Kalender, Coach (statt Kurs, seit 0.33), Ideenwerkstatt (seit 0.31), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Spiele (seit 0.32 statt Stones), Schach, Lernkartei, Vorlesen, Abgleich');
+    'Start 3×4 (seit 0.35): Kalender, Aufgaben, Checklisten / Sammlungen, Einkauf, Memo / Vorlesen, Rechner, Coach / Planung ▸, Lernen ▸, Spiele ▸');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 16, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/16)');
+  pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -3233,6 +3233,189 @@ function schuleTest() {
 }
 
 /* ============================================================
+   72. Start mit Ordnern (0.35)
+   Grund: Zu viele Apps auf dem Start verwässerten CLIE. Seit 0.35 ein
+   3×4-Raster mit dem, was ständig gebraucht wird, dazu drei Ordner:
+   Planung (Routinen, Ideenwerkstatt), Lernen (Lernkartei, Drive),
+   Spiele (Sudoku, Solitär, Stones, Schach).
+   Erkennt: App in keinem Ordner und nicht im Raster (unerreichbar),
+   App doppelt, Ordner öffnet nicht, Zurück führt nicht in den Ordner.
+   ============================================================ */
+function startOrdnerTest() {
+  console.log('\n72. Start mit Ordnern (0.35)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  const imOrdner = [].concat(...Object.keys(S.CL_ORDNER).map(k => S.CL_ORDNER[k].apps));
+  const leiste = ['heute', 'abgleich', 'kurs'];
+  const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
+  pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
+  const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
+  pruefe(doppelt.length === 0, 'keine App doppelt (Raster und Ordner)');
+  pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).every(k => raster.indexOf(k) >= 0 && S.CL_BILD[k]), 'drei Ordner im Raster, mit eigenem Symbol');
+  S.oeffne('uebersicht');
+  pruefe((inhalt().match(/class="ord">▸/g) || []).length === 3, 'Ordner am ▸ erkennbar');
+  pruefe(/clsLaufZahlHtml|class="sym"/.test(inhalt()) && !/oeffne\('routinen'\)|oeffne\('drive'\)/.test(inhalt()), 'Routinen und Drive nicht mehr auf dem Start');
+  [['planung', ['routinen', 'ideen']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
+    S.oeffne(o);
+    const h = S.document.getElementById('aufklapp').innerHTML;
+    pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === o && apps.every(id => new RegExp("ordnerWahl\\('" + id + "'\\)").test(h)) && /Schließen/.test(h), 'Ordner ' + o + ': ' + apps.join(', '));
+    S.ordnerWahl(apps[0]);
+    pruefe(S.cl.app === apps[0] && !S.cl.aufklapp, apps[0] + ' öffnet aus dem Ordner');
+    S.clZurueck();
+    pruefe(S.cl.app === 'uebersicht' && S.cl.ordner === o && S.cl.aufklapp === 'ordner', 'Zurück aus ' + apps[0] + ': wieder im Ordner ' + o);
+    S.clZurueck();
+    pruefe(!S.cl.aufklapp, 'nochmal Zurück: Ordner zu');
+  });
+  S.oeffne('planung');
+  pruefe(/Routinen: /.test(S.document.getElementById('aufklapp').innerHTML) && /Ideenwerkstatt: \d+ in Umsetzung/.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
+  S.aufklappZu();
+  pruefe(/oeffne\('rechner'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Rechner, Vorlesen und Memo direkt auf dem Start');
+}
+
+/* ============================================================
+   71. Coach mit allen Quellen (0.34)
+   Grund: Der Coach soll auch Aufgaben-Listen, Kalender, Routinen,
+   Ideenwerkstatt und Sammlungen kennen — mit Rang, Obergrenze und
+   Schaltern je Quelle.
+   Erkennt: Vorschläge fehlen bei leerem Tag, Dauerschieber/Überfälliges
+   nicht erkannt, Antworten ohne Wirkung (einplanen, Routine abhaken,
+   Wert eintragen, Kündigungs-Aufgabe), Obergrenze/Rang verletzt,
+   abgeschaltete Quelle fragt trotzdem, Ruhe wird nicht eingehalten.
+   ============================================================ */
+function coachQuellenTest() {
+  console.log('\n71. Coach mit allen Quellen (0.34)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const gestern = S.tagePlus(heute, -1);
+  const morgen = S.tagePlus(heute, 1);
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
+  S.termineNachTag = {};
+  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12 });
+  /* Aufgaben: Vorschläge bei leerem Tag */
+  const s = S.kpSeiteAnlegen('liste', 'Büro', 'beruflich', '');
+  s.text = '[] P1 Angebot Müller\n[] P1 Heizung Termin\n[] P3 Ablage\n[] Steuer-Unterlagen';
+  const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
+  pruefe(mo && /noch nichts vorgenommen\. Aus deinen Listen mit P1: „Angebot Müller“, „Heizung Termin“/.test(mo.text) && mo.antworten.map(a => a[0]).join() === 'nehmen,nehmen,selbst,vornehmen' && mo.quelle === '☑ Aufgaben',
+    'leerer Tag: Vorschläge aus den Listen (P1), Quelle sichtbar');
+  S.coAntwort('morgen', 'nehmen', 1, '07:40');
+  pruefe(S.coTagDaten(heute).offen.some(z => /Heizung Termin/.test(z.a.text)), '„Heizung Termin“ antippen: für heute vorgenommen');
+  /* Dauerschieber: drei vergangene Tage liegen gelassen */
+  const st = 'Steuer-Unterlagen';
+  [3, 2, 1].forEach(n => { const tg = S.kpTagAnlegen(S.tagePlus(heute, -n)); tg.text = '[] ' + st; tg.eintraege = [{ id: 'e' + n, abschnitt: 'h', text: st, quelle: s.id, erledigt: false }]; });
+  S.aufPlanAnwenden(s, 3, heute, '');
+  pruefe(S.coSchiebeZahl(st, heute) === 3, 'Verschiebungen gezählt (liegen gelassene Tage)');
+  const ds = S.coFaellige('08:00', heute).filter(f => f.id === 'ds:' + st)[0];
+  pruefe(ds && /3-mal verschoben/.test(ds.text) && ds.antworten.map(a => a[0]).join() === 'klein,fest,streichen', 'Dauerschieber: „3-mal verschoben. Was tun?“');
+  S.coAntwort('ds:' + st, 'streichen', 2, '08:00');
+  pruefe(/\[-\] Steuer-Unterlagen/.test(s.text) && !S.coTagDaten(heute).offen.some(z => z.a.text === st), 'Streichen: als „nicht relevant“ markiert, aus dem Tag');
+  /* Überfälliges */
+  s.text += '\n[] Rechnung prüfen';
+  const tg2 = S.kpTagFinden(gestern); tg2.text += '\n[] Rechnung prüfen'; tg2.eintraege.push({ id: 'eR', abschnitt: 'h', text: 'Rechnung prüfen', quelle: s.id, erledigt: false });
+  const ue = S.coFaellige('08:00', heute).filter(f => f.id === 'ue:Rechnung prüfen')[0];
+  pruefe(ue && /war für .* geplant und ist noch offen/.test(ue.text), 'Überfälliges: gestern geplant, noch offen, nicht neu eingeplant');
+  S.coAntwort('ue:Rechnung prüfen', 'heute', 0, '08:00');
+  pruefe(S.coTagDaten(heute).offen.some(z => z.a.text === 'Rechnung prüfen') && !S.coUeberfaellig(heute).some(u => u.text === 'Rechnung prüfen'), '„Heute“: eingeplant, nicht mehr überfällig');
+  /* Kalender: voller Tag morgen, nach dem Termin */
+  S.termineNachTag[morgen] = [9, 11, 14].map((h, i) => ({ id: 'm' + i, titel: 'T' + i, rohTitel: 'T' + i, zeit: S.zwei(h) + ':00', bis: S.zwei(h + 2) + ':00', ganztags: false, kontext: '' }));
+  ['A', 'B'].forEach(x => { const nr = S.aufZeileAnhaengen(s, 'Morgen ' + x); S.aufPlanAnwenden(s, nr, morgen, ''); });
+  const kv = S.coFaellige('16:40', heute).filter(f => f.id === 'kv:' + morgen)[0];
+  pruefe(kv && /Morgen 6 Std\. Termine — für deine 2 Aufgaben/.test(kv.text) && !S.coFaellige('12:00', heute).some(f => /^kv:/.test(f.id)), 'Kalender: voller Tag morgen (ab Nachmittag)');
+  S.termineNachTag[heute] = [{ id: 'tr', titel: 'Team-Runde', rohTitel: 'Team-Runde', zeit: '10:00', bis: '11:00', ganztags: false, kontext: '' }];
+  pruefe(S.coFaellige('11:20', heute).some(f => f.id === 'tn:tr' && /„Team-Runde“ ist vorbei\. Ergibt sich daraus etwas zu tun\?/.test(f.text)) && !S.coFaellige('13:30', heute).some(f => f.id === 'tn:tr'),
+    'Kalender: nach dem Termin (bis zwei Stunden danach)');
+  S.coAntwort('tn:tr', 'ja', 0, '11:20');
+  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster && S.cl.auf.fenster.modus === 'neu', '„Ja → Aufgabe“ öffnet „Neue Aufgabe“');
+  S.aufklappZu();
+  /* Routinen */
+  const wt = S.ausIso(heute).getDay();
+  S.DB.aufgaben.push({ id: 'rj', titel: 'Joggen', wiederholung: { takt: 'woche', tage: [0, 1, 2, 3, 4, 5, 6], intervall: 1 }, ab: S.tagePlus(heute, -10), kontext: '', geaendert: 1 });
+  const rr = S.coFaellige('08:00', heute).filter(f => f.id === 'rr:rj')[0];
+  pruefe(rr && /jetzt 10-mal ausgelassen/.test(rr.text), 'Routine: Reihe ausgelassen erkannt');
+  pruefe(!S.coFaellige('12:00', heute).some(f => f.id === 'ro:rj') && S.coFaellige('20:40', heute).some(f => f.id === 'ro:rj' && /steht heute noch aus/.test(f.text)), 'Routine: abends „steht heute noch aus“');
+  S.coAntwort('ro:rj', 'ja', 0, '20:40');
+  const rj = S.DB.aufgaben.filter(a => a.id === 'rj')[0];
+  pruefe(S.istErledigtAn(rj, heute), '„Erledigt“: Routine für heute abgehakt');
+  S.coAntwort('rr:rj', 'pause', 2, '20:41');
+  pruefe(rj.pausiert === true, '„Pausieren“: Routine pausiert');
+  /* Ideenwerkstatt: Stillstand */
+  S.DB.ideen = [{ id: 'iw-x', titel: 'Fotobuch', stufe: 6, status: 'aktiv', zuletzt: S.tagePlus(heute, -12), schritte: [{ id: 's1', text: 'Bilder sichten', erledigt: false }], varianten: [], meilensteine: [], wochen: [] }];
+  const is = S.coFaellige('20:45', heute).filter(f => f.id === 'is:iw-x')[0];
+  pruefe(is && /Seit 12 Tagen nichts an „Fotobuch“/.test(is.text) && !S.coFaellige('12:00', heute).some(f => f.id === 'is:iw-x'), 'Idee steht still: abends nachgefragt');
+  S.coAntwort('is:iw-x', 'pause', 1, '20:45');
+  pruefe(S.iwFinden('iw-x').status === 'spaeter' && S.iwFinden('iw-x').wiedervorlage === S.tagePlus(heute, 14), '„Pausieren“: kommt in zwei Wochen wieder');
+  /* Sammlungen: regelmäßig, Eintrag in der Antwort, Trend, Frist */
+  S.DB.sammlungen = [{ id: 'sg', name: 'Gewicht', felder: [{ id: 'fd', name: 'Datum', typ: 'datum' }, { id: 'fk', name: 'kg', typ: 'zahl' }], rollen: {}, geaendert: 1 },
+    { id: 'sab', name: 'Abos', art: 'abos', felder: [{ id: 'an', name: 'Name', typ: 'text' }, { id: 'alz', name: 'Laufzeit', typ: 'datum' }, { id: 'afr', name: 'Frist', typ: 'zahl' }], rollen: { laufzeit: 'alz', frist: 'afr' }, geaendert: 1 }];
+  S.DB.datensaetze = [];
+  [20, 16, 12, 8, 4].forEach((n, i) => S.DB.datensaetze.push({ id: 'g' + n, sammlung: 'sg', werte: { fd: S.tagePlus(heute, -n), fk: 78 + i * 0.6 }, angelegt: 1, geaendert: 1 }));
+  const e = S.krFinden('kc-einstellungen') || { id: 'kc-einstellungen', typ: 'coach' };
+  e.sammlungen = { sg: { takt: 'taeglich', ab: '18:00' } }; S.krSpeichern(e);
+  pruefe(!S.coFaellige('17:00', heute).some(f => f.id === 'se:sg') && S.coFaellige('18:05', heute).some(f => f.id === 'se:sg' && f.eingabe === 'kg'), 'Sammlung täglich: ab 18:00 „heute noch nicht eingetragen“ mit Eingabefeld');
+  const tr = S.coFaellige('18:05', heute).filter(f => f.id === 'st:sg')[0];
+  pruefe(tr && /seit drei Wochen steigend \(78 → 80,4\)/.test(tr.text), 'Trend erkannt: steigend');
+  S.coAntwort('se:sg', 'eintragen', 0, '18:05', '80,4');
+  const neu = S.DB.datensaetze.filter(d => d.sammlung === 'sg' && d.werte.fd === heute)[0];
+  pruefe(neu && neu.werte.fk === 80.4 && !S.coFaellige('18:10', heute).some(f => f.id === 'se:sg'), '„Eintragen“: Wert mit heutigem Datum gespeichert, Frage erledigt');
+  pruefe(S.coTag(false, heute).coach.verlauf.some(f => f.id === 'se:sg' && /Eintragen: 80,4/.test(f.antwortText)), 'Antwort zeigt den Wert');
+  S.DB.datensaetze.push({ id: 'ab1', sammlung: 'sab', werte: { an: 'Netflix', alz: S.saMonatePlus(S.tagePlus(heute, 6), 1), afr: 1 }, angelegt: 1, geaendert: 1 });
+  const sf = S.coFaellige('09:00', heute).filter(f => f.id === 'sf:ab1')[0];
+  pruefe(sf && /„Netflix“ ist bis .* kündbar — noch \d+ Tage/.test(sf.text) && sf.rang === 1, 'Kündigungsfrist: Rang 1');
+  S.coAntwort('sf:ab1', 'kuendigen', 0, '09:00');
+  const coachL = S.kpSeitenAlle().filter(x => x.titel === 'Coach')[0];
+  pruefe(coachL && /Kündigen: Netflix/.test(coachL.text) && !S.coFaellige('09:05', heute).some(f => f.id === 'sf:ab1') && S.coRuhig('sf:ab1', heute), '„Kündigen“: Aufgabe für heute, Frage ruht bis zur Frist');
+  /* Obergrenze und Rang */
+  S.localStorage.removeItem('clie-coach-gesehen');
+  e.max = 4; S.krSpeichern(e);
+  const v = S.coVerlauf('20:50', heute);
+  const beantwortet = S.coTag(false, heute).coach.verlauf.length;
+  pruefe(v.length === Math.max(4, beantwortet), 'Obergrenze: höchstens ' + 4 + ' Fragen am Tag (' + v.length + ')');
+  e.max = 12; S.krSpeichern(e);
+  S.localStorage.removeItem('clie-coach-gesehen');
+  const alle = S.coFaellige('20:50', heute).filter(f => !S.coTag(false, heute).coach.verlauf.some(x => x.id === f.id));
+  e.max = beantwortet + 1; S.krSpeichern(e);
+  S.localStorage.removeItem('clie-coach-gesehen');
+  const eine = S.coVerlauf('20:50', heute).filter(f => !f.antwort);
+  const besterRang = Math.min.apply(null, alle.map(f => f.rang));
+  pruefe(eine.length === 1 && eine[0].rang === besterRang, 'bei knapper Grenze gewinnt der beste Rang');
+  S.termineNachTag[heute] = [{ id: 'spaet', titel: 'Elternabend', rohTitel: 'Elternabend', zeit: '21:15', bis: '22:00', ganztags: false, kontext: '' }];
+  e.max = 1; S.krSpeichern(e);
+  pruefe(S.coVerlauf('20:50', heute).some(f => f.id === 'tv:spaet' && !f.antwort), 'Termine (Rang 1) kommen auch über der Grenze');
+  S.termineNachTag[heute] = [];
+  e.max = 8; S.krSpeichern(e);
+  /* Schalter je Quelle */
+  e.quellen = { aufgaben: true, kalender: true, routinen: false, ideen: true, sammlungen: false }; S.krSpeichern(e);
+  rj.pausiert = false;
+  pruefe(!S.coFaellige('20:50', heute).some(f => /^(ro|rr|se|st|sf):/.test(f.id)), 'abgeschaltete Quellen (Routinen, Sammlungen) fragen nicht');
+  e.quellen = {}; S.krSpeichern(e);
+  /* Einstellungen */
+  S.oeffne('coach'); S.coEinstOeffnen();
+  pruefe(/coQ-routinen/.test(inhalt()) && /coS-sg/.test(inhalt()) && /coMax/.test(inhalt()) && /coFrist/.test(inhalt()), 'Einstellungen: Quellen, Sammlungen (Takt, ab), Obergrenze, Fristen');
+  ['morgen', 'mittag', 'nachmittag', 'abend'].forEach((z, i) => { S.document.getElementById('coZ-' + z).value = ['07:30', '12:30', '16:30', '20:30'][i]; });
+  S.document.getElementById('coVorlauf').value = '45'; S.document.getElementById('coKal').checked = false;
+  S.document.getElementById('coQ-ideen').checked = false; ['aufgaben', 'kalender', 'routinen', 'sammlungen'].forEach(q => { S.document.getElementById('coQ-' + q).checked = true; });
+  S.document.getElementById('coMax').value = '6'; S.document.getElementById('coFrist').value = '14';
+  S.document.getElementById('coS-sg').value = 'woechentlich'; S.document.getElementById('coSab-sg').value = '19:00';
+  S.document.getElementById('coS-sab').value = '';
+  S.coEinstSpeichern();
+  const e2 = S.coEinst();
+  pruefe(e2.quellen.ideen === false && e2.max === 6 && e2.frist === 14 && e2.sammlungen.sg.takt === 'woechentlich' && e2.sammlungen.sg.ab === '19:00' && !e2.sammlungen.sab, 'Einstellungen gespeichert');
+  pruefe(!S.coFaellige('19:30', heute).some(f => f.id === 'se:sg'), 'wöchentlich: Eintrag dieser Woche genügt');
+  /* Anzeige und Tippen */
+  S.oeffne('uebersicht');
+  pruefe(/co-q|Coach · \d/.test(inhalt()) || /co-zeile-still/.test(inhalt()), 'Übersicht zeigt die Quelle der Frage');
+  S.document.activeElement = { id: 'coIn0', value: '80' };
+  const vorher = inhalt(); S.document.getElementById('inhalt').innerHTML = vorher + '<!--tippt-->'; S.inhaltZeichnen();
+  pruefe(/<!--tippt-->/.test(inhalt()), 'beim Tippen einer Antwort wird nicht neu gezeichnet');
+  S.document.activeElement = null;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    69. Coach (0.33)
    Grund: Kurs war eine Doku-App mit Fragebogen am Morgen. Gewünscht ist
    ein Assistent, der von sich aus anspricht: „Du hast dir X vorgenommen —
@@ -3445,8 +3628,8 @@ function spieleSudokuTest() {
   pruefe(S.CL_BILD.spiele && S.CL_BILD.sudoku && S.CL_BILD.solitaer, 'Symbole für Spiele, Sudoku und Solitär');
   S.oeffne('spiele');
   const fen = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'spiele' && /spWahl\('sudoku'\)/.test(fen) && /spWahl\('solitaer'\)/.test(fen) && /spWahl\('stones'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 3,
-    'Spiele öffnet ein Fenster mit Sudoku, Solitär und Stones als App-Symbole');
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 4,
+    'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones und Schach (seit 0.35)');
   pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitär:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
   /* Erzeuger: eindeutig lösbar */
   const stufen = { leicht: 0, mittel: 0, schwer: 0 };
@@ -3461,7 +3644,7 @@ function spieleSudokuTest() {
   });
   pruefe(eindeutig && gueltig, 'jedes Rätsel hat genau eine Lösung, die Lösung ist gültig');
   pruefe(stufen.leicht > stufen.mittel && stufen.mittel > stufen.schwer && stufen.schwer >= 22, 'Stufen: leicht hat mehr Vorgaben als mittel, mittel mehr als schwer (' + stufen.leicht + '/' + stufen.mittel + '/' + stufen.schwer + ')');
-  S.spWahl('sudoku');
+  S.ordnerWahl('sudoku');
   pruefe(S.cl.app === 'sudoku' && !S.cl.aufklapp && S.cl.sd.spiel && S.cl.sd.spiel.stufe === 'mittel' && /sd-gitter/.test(inhalt()) && (inhalt().match(/onclick="sdFeld\(/g) || []).length === 81,
     'Sudoku startet mit einem mittleren Rätsel, 81 Felder');
   const s = S.cl.sd.spiel;
@@ -3518,7 +3701,7 @@ function spieleSudokuTest() {
   pruefe(z.zeitMs === 60000 && S.spZeitText(75) === '1:15' && S.spZeitText(3725) === '1:02:05', 'Spielzeit: Pausen höchstens eine Minute, Anzeige m:ss');
   /* Zurück */
   S.clZurueck();
-  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'spiele', 'Zurück aus dem Spiel: ins Spiele-Fenster');
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele', 'Zurück aus dem Spiel: in den Ordner Spiele');
   S.clZurueck();
   pruefe(!S.cl.aufklapp, 'nochmal Zurück: Fenster zu');
   pruefe(/Sudoku/.test(S.statistikHtml()) && /Solitär/.test(S.statistikHtml()), 'Statistik zeigt Sudoku und Solitär');
@@ -3593,7 +3776,7 @@ function solitaerTest() {
   S.cl.so.spiel = null;
   pruefe(S.soSpiel().ziehen === 3 && S.soSpiel().stapel.length === 24, 'angefangenes Spiel wird wieder geladen');
   S.clZurueck();
-  pruefe(S.cl.aufklapp === 'spiele', 'Zurück: ins Spiele-Fenster');
+  pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele', 'Zurück: in den Ordner Spiele');
   S.aufklappZu();
   pruefe(/\.so-k\.zu\{/.test(QUELLE) && /\.sd-gitter\{/.test(QUELLE), 'Gestaltung für Sudoku und Solitär vorhanden');
 }
@@ -3670,7 +3853,8 @@ function ideenTest() {
   const S = CL;
   const setz = (o) => Object.keys(o).forEach(k => { S.document.getElementById(k).value = o[k]; });
   const leer = (l) => l.forEach(k => { S.document.getElementById(k).value = ''; });
-  pruefe(S.clApp('ideen') && /Ideen-<br>werkstatt/.test((S.oeffne('uebersicht'), inhalt())) && S.CL_BILD.ideen, 'App „Ideenwerkstatt“ im Raster (zweizeilig) mit eigenem Symbol');
+  pruefe(S.clApp('ideen') && /Ideen-<br>werkstatt/.test((S.oeffne('planung'), S.document.getElementById('aufklapp').innerHTML)) && S.CL_BILD.ideen, 'App „Ideenwerkstatt“ im Ordner Planung (zweizeilig) mit eigenem Symbol');
+  S.aufklappZu();
   pruefe(Array.isArray(S.DB.ideen) && /'ideen'[\],]/.test(QUELLE), 'Bereich „ideen“ kommt aus der Workbench (6.3.5)');
   S.oeffne('ideen');
   pruefe(/Noch keine Idee/.test(inhalt()) && /iwNeu\(\)/.test(S.document.getElementById('fuss').innerHTML), 'leere Liste mit „+ Idee“');
@@ -3718,7 +3902,7 @@ function ideenTest() {
   pruefe(x.status === 'spaeter' && x.wiedervorlage === S.tagePlus(S.isoDatum(), -1) && S.cl.iw.ansicht === 'liste', 'Später: Status und Datum gespeichert, zurück zur Liste');
   pruefe(S.iwGruppe(x) === 'reifen' && S.iwHinweise().indexOf(x) >= 0, 'fällige Wiedervorlage: Idee ist „wieder da“ und Hinweis unter Heute');
   S.oeffne('heute');
-  pruefe(/Idee wieder da: Fotobuch/.test(inhalt()), 'Heute zeigt „💡 Idee wieder da“');
+  pruefe(!/Idee wieder da: Fotobuch/.test(inhalt()) && S.coFaellige('09:00', S.isoDatum()).some(f => f.id === 'iw:' + x.id), 'seit 0.34 fragt der Coach „Idee ist wieder da“ (nicht mehr unter Heute)');
   S.oeffne('ideen');
   S.iwOeffnen(x.id);
   pruefe(S.cl.iw.stufe === 4, 'wieder da → öffnet bei „Entscheiden“');
@@ -4585,6 +4769,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { startOrdnerTest(); } catch (e) { fail('Start mit Ordnern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { coachQuellenTest(); } catch (e) { fail('Coach-Quellen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coachTest(); } catch (e) { fail('Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await coachVorabTest(); } catch (e) { fail('Coach vorab warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spieleSudokuTest(); } catch (e) { fail('Sudoku warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
