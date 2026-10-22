@@ -1841,10 +1841,10 @@ function projekteTest() {
   S.DB.ziele.push({ id: 'z1', name: 'Fit bis Sommer', kontext: 'privat', status: 'laufend', zieltermin: '2027-06-30', flaeche: '', ordnung: 4, geaendert: 1 });
   S.oeffne('projekte');
   let h = inhalt();
-  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && h.indexOf('Carport') < h.indexOf('Keller') && /◇ Fit bis Sommer/.test(h),
-    'Liste: P1 zuerst, Ruhendes unten, Ziele mit ◇ in derselben Liste');
-  pruefe(/Carport <small>1\/3<\/small>/.test(h) && /pjOeffnen\('p1','memo'\)" aria-label="Memo">✎/.test(h) && /pjOeffnen\('p2','memo'\)" aria-label="Memo"><\/button>/.test(h) && /<span class="pj-z">R<\/span>/.test(h),
-    'Zeile: erledigt/gesamt, ✎ nur mit Text, Zustand als Buchstabe');
+  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && /◇ Fit bis Sommer/.test(h),
+    'Liste „Laufend“: P1 zuerst, Ziele mit ◇ in derselben Liste, Ruhendes nicht');
+  pruefe(/Carport <small>1\/3<\/small>/.test(h) && /pjOeffnen\('p1','memo'\)" aria-label="Memo">✎/.test(h) && /pjOeffnen\('p2','memo'\)" aria-label="Memo"><\/button>/.test(h),
+    'Zeile: erledigt/gesamt, ✎ nur mit Text');
   S.pjPrioUm('p1');
   pruefe(S.DB.projekte[0].prio === 1, 'Tipp auf die Priorität: 1 (am Satz als „prio“)');
   S.pjPrioUm('p1'); S.pjPrioUm('p1'); S.pjPrioUm('p1');
@@ -2585,14 +2585,14 @@ function memoZweiTest() {
 }
 
 /* ============================================================
-   39. Ruhende Projekte im Memo (0.12.2)
+   39. Projekte nach Zustand (0.12.2; seit 0.43.1 drei Schalter in Projekte)
    Grund: Die Memo-Liste blendete alles aus, was nicht läuft — ruhende
    Projekte und Ziele waren nicht zu sehen.
    Erkennt: wieder ausgeblendete ruhende Seiten, Abgeschlossenes, das
    offen statt eingeklappt steht.
    ============================================================ */
 function memoRuhtTest() {
-  console.log('\n39. Ruhende Projekte im Memo (0.12.2)');
+  console.log('\n39. Projekte nach Zustand (0.12.2, seit 0.43.1 drei Schalter)');
   if (!CL) { return; }
   frisch();
   const S = CL;
@@ -2600,14 +2600,23 @@ function memoRuhtTest() {
   S.DB.projekte.push({ id: 'p2', name: 'Carport', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '', status: 'ruht', geaendert: 1 });
   S.DB.projekte.push({ id: 'p3', name: 'Altes Projekt', flaeche: '', status: 'abgeschlossen', geaendert: 1 });
-  /* Seit 0.43 in der App Projekte: Ruhende stehen (mit R) unter den laufenden, Abgeschlossene per Knopf */
+  /* Seit 0.43.1 in der App Projekte: drei Schalter Laufend · Ruhend · Abgeschlossen, je nur ein Zustand */
   S.oeffne('projekte');
   let h = inhalt();
-  pruefe(/Läuft/.test(h) && /Carport/.test(h) && /Marathon/.test(h) && !/Altes Projekt/.test(h) && h.indexOf('Läuft') < h.indexOf('Carport'), 'Projekte: laufende vor ruhenden, ohne Abgeschlossene');
-  pruefe(/class="pj-zeile ruht"/.test(h) && /<span class="pj-z">R<\/span>/.test(h), 'ruhende Projekte und Ziele sichtbar als „R“');
-  S.pjAbgeschlosseneUm();
-  pruefe(/Altes Projekt/.test(inhalt()) && !/Läuft/.test(inhalt()) && /◂ Offene/.test(S.document.getElementById('fuss').innerHTML), 'Abgeschlossenes über den Knopf „Abgeschlossene“');
-  S.pjAbgeschlosseneUm();
+  pruefe(/class="pj-filter"><button type="button" class="an" onclick="pjZustandFilter\('laeuft'\)">Laufend<\/button><button type="button" onclick="pjZustandFilter\('ruht'\)">Ruhend<\/button><button type="button" onclick="pjZustandFilter\('erledigt'\)">Abgeschlossen<\/button><\/div>/.test(h),
+    'drei Schalter über der Liste, ohne Anzahl; Laufend ist gewählt');
+  pruefe(/Läuft/.test(h) && !/Carport|Marathon|Altes Projekt/.test(h), 'Laufend: nur laufende');
+  S.pjZustandFilter('ruht');
+  h = inhalt();
+  pruefe(/Carport/.test(h) && /Marathon/.test(h) && !/Läuft|Altes Projekt/.test(h), 'Ruhend: ruhende Projekte und Ziele');
+  S.pjZustandFilter('erledigt');
+  h = inhalt();
+  pruefe(/Altes Projekt/.test(h) && !/Läuft|Carport/.test(h) && /pj-liste fertig/.test(h) && !/pjPrioUm/.test(h), 'Abgeschlossen: grau, ohne Priorität');
+  S.pjZustandFilter('quatsch');
+  pruefe(S.cl.pj.zustand === 'erledigt' && !/pjAbgeschlossene|class="pj-z"/.test(S.document.getElementById('fuss').innerHTML + h), 'Unbekanntes wird ignoriert; kein Knopf „Abgeschlossene“, kein L/R/A mehr');
+  S.pjOeffnen('p2', 'allgemein'); S.pjZurListe();
+  pruefe(S.cl.pj.zustand === 'ruht', 'zurück aus einem ruhenden Projekt: Liste „Ruhend“');
+  S.pjZustandFilter('laeuft');
   S.oeffne('uebersicht');
 }
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.43.0</title>
+<title>CLIE 0.43.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -290,11 +290,14 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .memo-zeile .mz.nr{color:var(--px-mitte);text-align:right;flex:0 0 30px}
 /* Projekte (seit 0.43) — wie „Projects“ am Palm */
 .pj-zeile{display:flex;align-items:center;gap:8px;border-bottom:2px dotted var(--px-zart);min-height:40px}
-.pj-zeile.ruht{color:var(--px-mitte)}
+.pj-liste.fertig .pj-zeile{color:var(--px-mitte)}
+.pj-filter{display:flex;margin:0 0 8px}
+.pj-filter button{flex:1;border:2px solid var(--px);margin-left:-2px;padding:3px 0;font-size:17px}
+.pj-filter button:first-child{margin-left:0}
+.pj-filter button.an{background:var(--px);color:var(--lcd)}
 .pj-p{flex:0 0 24px;text-align:center;font-weight:600;padding:6px 0}
 .pj-n{flex:1;min-width:0;text-align:left;padding:6px 0;overflow-wrap:anywhere}
 .pj-n small{font-size:16px;color:var(--px-mitte);white-space:nowrap}
-.pj-z{flex:0 0 18px;text-align:center;color:var(--px-mitte)}
 .pj-m{flex:0 0 26px;min-height:32px;text-align:center}
 .pj-titel{font-weight:600;font-size:21px;margin:2px 0 6px}
 .pj-reiter{display:flex;margin-bottom:8px}
@@ -855,7 +858,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.43.0';
+var APP_VERSION = '0.43.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6938,10 +6941,11 @@ function memoSpeichern() {
    flaeche); neu ist nur „prio“ (1–3) am Satz — die Workbench lässt das
    Feld unberührt. Ziele stehen mit ◇ in derselben Liste. */
 
-cl.pj = { id: '', reiter: 'aufgaben', abgeschlossen: false, hervor: '', ms: null, neu: null };
+cl.pj = { id: '', reiter: 'aufgaben', zustand: 'laeuft', hervor: '', ms: null, neu: null };
 
 var PJ_REITER = [['allgemein', 'Allgemein'], ['aufgaben', 'Aufgaben'], ['memo', 'Memo']];
-var PJ_ZUSTAND_KURZ = { laeuft: 'L', ruht: 'R', erledigt: 'A' };
+/* Seit 0.43.1 nur ein Zustand auf einmal — drei Schalter über der Liste */
+var PJ_FILTER = [['laeuft', 'Laufend'], ['ruht', 'Ruhend'], ['erledigt', 'Abgeschlossen']];
 
 function pjPrio(s) {
   var p = (s && s.__satz) ? Number(s.__satz.prio) : 0;
@@ -6952,17 +6956,15 @@ function pjAlle() {
   return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === 'vorhaben' && kpPasstFilter(s, cl.filter); }));
 }
 
-/* Offene (laufend vor ruhend, dann nach Priorität) oder Abgeschlossene */
+/* Die Projekte des gewählten Zustands: nach Priorität —
+   abgeschlossene ohne Priorität, zuletzt geänderte zuerst */
 function pjSichtbar() {
-  return pjAlle().filter(function (s) {
-    return cl.pj.abgeschlossen ? s.zustand === 'erledigt' : s.zustand !== 'erledigt';
-  }).map(function (s, i) { return { s: s, i: i }; }).sort(function (a, b) {
-    var ra = (a.s.zustand === 'ruht') ? 1 : 0;
-    var rb = (b.s.zustand === 'ruht') ? 1 : 0;
-    var pa = pjPrio(a.s) || 4;
-    var pb = pjPrio(b.s) || 4;
-    return (ra - rb) || (pa - pb) || (a.i - b.i);
-  }).map(function (x) { return x.s; });
+  var z = cl.pj.zustand;
+  return pjAlle().filter(function (s) { return s.zustand === z; })
+    .map(function (s, i) { return { s: s, i: i }; }).sort(function (a, b) {
+      if (z === 'erledigt') { return ((Number(b.s.geaendert) || 0) - (Number(a.s.geaendert) || 0)) || (a.i - b.i); }
+      return ((pjPrio(a.s) || 4) - (pjPrio(b.s) || 4)) || (a.i - b.i);
+    }).map(function (x) { return x.s; });
 }
 
 function pjStand(s) {
@@ -6987,21 +6989,24 @@ function projekteHtml() {
 }
 
 function pjListeHtml() {
+  var h = '<div class="pj-filter">' + PJ_FILTER.map(function (f) {
+    return '<button type="button"' + (cl.pj.zustand === f[0] ? ' class="an"' : '') + ' onclick="pjZustandFilter(\'' + f[0] + '\')">' + f[1] + '</button>';
+  }).join('') + '</div>';
   var l = pjSichtbar();
   if (!l.length) {
-    return '<p class="leise">' + (cl.pj.abgeschlossen ? 'Keine abgeschlossenen Projekte.' : 'Noch keine Projekte — „Neu“ tippen.') + '</p>';
+    return h + '<p class="leise">' + { laeuft: 'Keine laufenden Projekte — „Neu“ tippen.', ruht: 'Nichts ruht.', erledigt: 'Noch nichts abgeschlossen.' }[cl.pj.zustand] + '</p>';
   }
-  return '<div class="pj-liste">' + l.map(function (s) {
+  var fertig = (cl.pj.zustand === 'erledigt');
+  return h + '<div class="pj-liste' + (fertig ? ' fertig' : '') + '">' + l.map(function (s) {
     var st = pjStand(s);
     var p = pjPrio(s);
-    return '<div class="pj-zeile' + (s.zustand === 'ruht' ? ' ruht' : '') + '">'
-      + '<button type="button" class="pj-p" onclick="pjPrioUm(\'' + esc(s.id) + '\')" aria-label="Priorität">' + (p || '·') + '</button>'
+    return '<div class="pj-zeile">'
+      + (fertig ? '<span class="pj-p"></span>' : '<button type="button" class="pj-p" onclick="pjPrioUm(\'' + esc(s.id) + '\')" aria-label="Priorität">' + (p || '·') + '</button>')
       + '<button type="button" class="pj-n" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'aufgaben\')">' + (s.typ === 'ziel' ? '◇ ' : '') + esc(s.titel)
       + ' <small>' + st.fertig + '/' + st.alle + '</small></button>'
-      + '<span class="pj-z">' + (PJ_ZUSTAND_KURZ[s.zustand] || '') + '</span>'
       + '<button type="button" class="pj-m" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'memo\')" aria-label="Memo">' + (pjHatText(s) ? '✎' : '') + '</button>'
       + '</div>';
-  }).join('') + '</div><p class="leise">L läuft · R ruht · A abgeschlossen</p>';
+  }).join('') + '</div>';
 }
 
 /* Priorität in der Liste: 1 → 2 → 3 → keine → 1 */
@@ -7023,6 +7028,8 @@ function pjOeffnen(id, reiter) {
   if (!s || s.art !== 'vorhaben') { return; }
   if (cl.app !== 'projekte') { oeffne('projekte'); }
   cl.pj.id = s.id;
+  /* Zurück zur Liste landet man beim Zustand dieses Projekts */
+  cl.pj.zustand = s.zustand;
   cl.pj.reiter = PJ_REITER.some(function (r) { return r[0] === reiter; }) ? reiter : 'aufgaben';
   cl.pj.hervor = '';
   var el = document.getElementById('inhalt');
@@ -7040,13 +7047,18 @@ function pjReiter(r) {
 }
 
 function pjZurListe() {
+  var s = cl.pj.id ? kpSeiteFinden(cl.pj.id) : null;
+  if (s && s.zustand) { cl.pj.zustand = s.zustand; }
   cl.pj.id = '';
   cl.pj.hervor = '';
   zeichne();
 }
 
-function pjAbgeschlosseneUm() {
-  cl.pj.abgeschlossen = !cl.pj.abgeschlossen;
+function pjZustandFilter(z) {
+  if (!PJ_FILTER.some(function (f) { return f[0] === z; })) { return; }
+  cl.pj.zustand = z;
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
   zeichne();
 }
 
@@ -7313,7 +7325,7 @@ function pjNeuSpeichern() {
   /* Am Palm hatte jedes Projekt einen Beginn — hier heute, änderbar */
   if (s.typ !== 'ziel') { s.__satz.start = isoDatum(); }
   cl.pj.neu = null;
-  cl.pj.abgeschlossen = false;
+  cl.pj.zustand = 'laeuft';
   spaeterSichern();
   aufklappZu();
   pjOeffnen(s.id, 'allgemein');
@@ -7322,8 +7334,7 @@ function pjNeuSpeichern() {
 function pjFussHtml() {
   var s = cl.pj.id ? kpSeiteFinden(cl.pj.id) : null;
   if (!s) {
-    return '<button type="button" class="knopf" onclick="pjNeu()">Neu</button>'
-      + '<button type="button" class="knopf" onclick="pjAbgeschlosseneUm()">' + (cl.pj.abgeschlossen ? '◂ Offene' : 'Abgeschlossene') + '</button>';
+    return '<button type="button" class="knopf" onclick="pjNeu()">Neu</button>';
   }
   var h = '<button type="button" class="knopf voll" onclick="pjZurListe()">Fertig</button>';
   if (cl.pj.reiter === 'aufgaben') { h += '<button type="button" class="knopf" onclick="pjAufgabeNeu()">Neu</button>'; }
