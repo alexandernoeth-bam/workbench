@@ -4110,6 +4110,8 @@ function solitaerTest() {
     'Austeilen: 7 Spalten (1–7 Karten, oberste offen), 24 im Stapel');
   pruefe(new Set(s.stapel.concat(...s.spalten).map(k => k.f + k.w)).size === 52, '52 verschiedene Karten');
   pruefe(S.soBilanz().spiele === 1 && S.document.getElementById('katKnopf').textContent === '▼ 1 Karte', 'Bilanz zählt das Spiel; Kopf „▼ 1 Karte“');
+  const bild = [11, 12, 13].map(w => S.soName({ f: 'H', w: w }));
+  pruefe(bild.join() === 'Bu♥,Da♥,Kö♥' && bild.every(n => !/^[0-9B]♥$/.test(n)), 'Bildkarten Bu/Da/Kö — nicht mit Zahlen zu verwechseln (B sah aus wie 8, seit 0.41.1)');
   /* Regeln */
   const K = (f, w, o) => ({ f: f, w: w, o: o !== false });
   pruefe(S.soAufSpalteOk(K('H', 8), [K('P', 9)]) && !S.soAufSpalteOk(K('K', 8), [K('H', 9)]) && !S.soAufSpalteOk(K('H', 7), [K('P', 9)]), 'Spalte: abwechselnd Farbe, eins kleiner');
