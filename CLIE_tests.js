@@ -1822,6 +1822,47 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   77. Bildlaufleiste wie am Palm (0.41)
+   Grund: Lange Seiten sollen rechts eine sichtbare Leiste haben (▲,
+   Schieber, ▼) — Android zeigt nur kurz eine dünne. Rollen mit dem
+   Finger und seitliches Wischen bleiben.
+   Erkennt: Leiste bei kurzen Seiten, keine Leiste bei langen, Schieber
+   an falscher Stelle, ▲/▼ blättern nicht, Inhalt nicht eingerückt.
+   ============================================================ */
+function rollbarTest() {
+  console.log('\n77. Bildlaufleiste wie am Palm (0.41)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const el = S.document.getElementById('inhalt');
+  const rb = S.document.getElementById('rollbar');
+  const bahn = S.document.getElementById('rbBahn');
+  const sch = S.document.getElementById('rbSchieber');
+  pruefe(/<div class="rollbar" id="rollbar"[^>]*><button[^>]*onclick="rbSeite\(-1\)"[^>]*>▲<\/button><div class="rb-bahn" id="rbBahn"[^>]*><i id="rbSchieber"[^>]*><\/i><\/div><button[^>]*onclick="rbSeite\(1\)"[^>]*>▼<\/button><\/div>/.test(QUELLE), 'Leiste in der Hülle: ▲, Bahn mit Schieber, ▼');
+  el.scrollHeight = 500; el.clientHeight = 600; el.scrollTop = 0; el.offsetTop = 110;
+  S.rbAktualisieren();
+  pruefe(!rb.classList.contains('auf') && !el.classList.contains('mitbar'), 'kurze Seite: keine Leiste');
+  el.scrollHeight = 2400; bahn.clientHeight = 544;
+  S.rbAktualisieren();
+  pruefe(rb.classList.contains('auf') && el.classList.contains('mitbar') && rb.style.top === '110px' && rb.style.height === '600px', 'lange Seite: Leiste neben dem Inhalt, Inhalt rückt ein');
+  pruefe(sch.style.height === '136px' && sch.style.top === '0px', 'Schieber oben, Größe ~ sichtbarer Anteil (600 von 2400)');
+  S.rbSeite(1);
+  pruefe(el.scrollTop === 560 && sch.style.top === Math.round((544 - 136) * 560 / 1800) + 'px', '▼ blättert eine Seite (abzüglich einer Zeile Überlappung)');
+  S.rbSeite(-1); S.rbSeite(-1);
+  pruefe(el.scrollTop === 0, '▲ blättert zurück, nicht über den Anfang');
+  el.scrollTop = 1800; S.rbAktualisieren();
+  pruefe(sch.style.top === (544 - 136) + 'px', 'am Ende: Schieber unten');
+  /* Ziehen */
+  el.scrollTop = 0; sch.offsetHeight = 136;
+  S.rbZiehenStart({ clientY: 200, preventDefault() {}, stopPropagation() {} });
+  S.rbZiehen({ clientY: 302 });
+  S.rbZiehenEnde();
+  pruefe(Math.round(el.scrollTop) === Math.round(102 * 1800 / 408) && S.rbZieht === null, 'Schieber ziehen rollt mit');
+  pruefe(/\.inhalt\.mitbar\{padding-right:26px/.test(QUELLE) && /wischAnfang|ontouchstart/.test(SKRIPT), 'Inhalt eingerückt; Wischen bleibt unberührt');
+  el.scrollHeight = 0; el.clientHeight = 0; S.rbAktualisieren();
+}
+
+/* ============================================================
    76. Arten im Termin-Fenster (0.40)
    Grund: Beim Anlegen oder Ändern eines Google-Termins sollen die Arten
    für den Jahreskalender (mehrere) direkt wählbar sein — als #Kürzel in
@@ -5087,6 +5128,7 @@ function lernkarteiTest() {
   try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
   try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
   try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
+  try { rollbarTest(); } catch (e) { fail('Bildlaufleiste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
@@ -5111,6 +5153,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { rollbarTest(); } catch (e) { fail('Bildlaufleiste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { jahrTest(); } catch (e) { fail('Jahr warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

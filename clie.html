@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.40.1</title>
+<title>CLIE 0.41.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -46,6 +46,15 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .neu-wort{border:2px solid var(--px);border-radius:12px;padding:0 8px}
 
 .inhalt{flex:1;min-height:0;overflow:auto;padding:6px 10px 14px;position:relative}
+/* Bildlaufleiste wie am Palm (seit 0.41): eigene Leiste statt der dünnen von Android */
+.inhalt.mitbar{padding-right:26px;scrollbar-width:none}
+.inhalt.mitbar::-webkit-scrollbar{display:none}
+.rollbar{position:absolute;right:2px;width:18px;display:none;flex-direction:column;z-index:5}
+.rollbar.auf{display:flex}
+.rollbar button{flex:0 0 26px;font-size:15.5px;line-height:1;color:var(--px);padding:0}
+.rollbar button:active{background:var(--px);color:var(--lcd)}
+.rb-bahn{flex:1;position:relative;border-left:2px dotted var(--px-mitte);margin:0 0 0 8px}
+.rb-bahn i{position:absolute;left:-6px;width:10px;background:var(--px);touch-action:none;cursor:grab}
 
 /* Silkscreen: die festen Tasten unten (seit 0.8 wieder da — die Android-
    Taste ◀ geht zusätzlich zurück, der Reiter öffnet ebenfalls das Menü) */
@@ -796,6 +805,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
     <span class="neu-wort">Laden</span>
   </button>
   <main class="inhalt" id="inhalt"></main>
+  <div class="rollbar" id="rollbar" aria-hidden="true"><button type="button" onclick="rbSeite(-1)" tabindex="-1">▲</button><div class="rb-bahn" id="rbBahn" onclick="rbBahnTipp(event)"><i id="rbSchieber" onpointerdown="rbZiehenStart(event)"></i></div><button type="button" onclick="rbSeite(1)" tabindex="-1">▼</button></div>
   <div class="fuss" id="fuss"></div>
   <nav class="silk" aria-label="Tasten">
     <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Übersicht</button>
@@ -820,7 +830,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.40.1';
+var APP_VERSION = '0.41.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -19234,7 +19244,105 @@ function minutenTakt() {
   coKalenderPlanen(false);
 }
 
+/* ---------- Bildlaufleiste wie am Palm (seit 0.41) ----------
+   Rechts am Inhalt: ▲, Schieber, ▼ — nur wenn die Seite länger ist als
+   der Bildschirm. ▲/▼ blättern eine Seite, der Schieber lässt sich
+   ziehen. Rollen mit dem Finger bleibt, wie es ist. */
+
+var rbZieht = null;
+var rbPlan = false;
+
+function rbAktualisieren() {
+  rbPlan = false;
+  var el = document.getElementById('inhalt');
+  var rb = document.getElementById('rollbar');
+  var bahn = document.getElementById('rbBahn');
+  var sch = document.getElementById('rbSchieber');
+  if (!el || !rb || !bahn || !sch) { return; }
+  var hoch = Number(el.scrollHeight) || 0;
+  var sicht = Number(el.clientHeight) || 0;
+  var zuviel = sicht > 0 && hoch > sicht + 4;
+  if (!zuviel) {
+    rb.classList.remove('auf');
+    el.classList.remove('mitbar');
+    return;
+  }
+  rb.classList.add('auf');
+  el.classList.add('mitbar');
+  rb.style.top = (Number(el.offsetTop) || 0) + 'px';
+  rb.style.height = sicht + 'px';
+  var bahnH = Number(bahn.clientHeight) || Math.max(0, sicht - 56);
+  var schH = Math.max(28, Math.round(bahnH * sicht / hoch));
+  var weg = Math.max(1, hoch - sicht);
+  var oben = Math.round((bahnH - schH) * Math.min(1, Math.max(0, (Number(el.scrollTop) || 0) / weg)));
+  sch.style.height = schH + 'px';
+  sch.style.top = oben + 'px';
+}
+
+/* Höchstens einmal je Bild neu rechnen */
+function rbBald() {
+  if (rbPlan) { return; }
+  rbPlan = true;
+  if (typeof window.requestAnimationFrame === 'function') { window.requestAnimationFrame(rbAktualisieren); }
+  else { window.setTimeout(rbAktualisieren, 16); }
+}
+
+function rbSeite(d) {
+  var el = document.getElementById('inhalt');
+  if (!el) { return; }
+  el.scrollTop = Math.max(0, (Number(el.scrollTop) || 0) + d * Math.max(40, (Number(el.clientHeight) || 0) - 40));
+  rbAktualisieren();
+}
+
+/* Tipp in die Bahn: eine Seite in diese Richtung */
+function rbBahnTipp(ev) {
+  var sch = document.getElementById('rbSchieber');
+  if (!ev || !sch || ev.target === sch || typeof sch.getBoundingClientRect !== 'function') { return; }
+  var r = sch.getBoundingClientRect();
+  rbSeite(ev.clientY < r.top ? -1 : 1);
+}
+
+function rbZiehenStart(ev) {
+  var el = document.getElementById('inhalt');
+  if (!ev || !el) { return; }
+  if (ev.preventDefault) { ev.preventDefault(); }
+  if (ev.stopPropagation) { ev.stopPropagation(); }
+  rbZieht = { y: ev.clientY, oben: Number(el.scrollTop) || 0 };
+}
+
+function rbZiehen(ev) {
+  if (!rbZieht || !ev) { return; }
+  var el = document.getElementById('inhalt');
+  var bahn = document.getElementById('rbBahn');
+  var sch = document.getElementById('rbSchieber');
+  if (!el || !bahn || !sch) { return; }
+  var frei = Math.max(1, (Number(bahn.clientHeight) || 1) - (Number(sch.offsetHeight) || 0));
+  var weg = Math.max(0, (Number(el.scrollHeight) || 0) - (Number(el.clientHeight) || 0));
+  el.scrollTop = rbZieht.oben + (ev.clientY - rbZieht.y) * weg / frei;
+  rbAktualisieren();
+}
+
+function rbZiehenEnde() {
+  rbZieht = null;
+}
+
+function rbAnbinden() {
+  var el = document.getElementById('inhalt');
+  if (!el) { return; }
+  el.addEventListener('scroll', rbBald);
+  window.addEventListener('resize', rbBald);
+  window.addEventListener('pointermove', rbZiehen);
+  window.addEventListener('pointerup', rbZiehenEnde);
+  window.addEventListener('pointercancel', rbZiehenEnde);
+  /* Jede Änderung am Inhalt (Neuzeichnen, Aufklappen) prüft die Länge neu */
+  if (typeof window.MutationObserver === 'function') {
+    new window.MutationObserver(rbBald).observe(el, { childList: true, subtree: true, characterData: true });
+  }
+  rbBald();
+}
+
 function start() {
+  rbAnbinden();
   clFilterLaden();
   clWocheTageLaden();
   aufListeLaden();
