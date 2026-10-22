@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.41.1</title>
+<title>CLIE 0.42.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -615,6 +615,8 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .memo-bereich span{font-size:17px;color:var(--px-mitte)}
 .memo-bereich.an{background:var(--px);color:var(--lcd)}
 .memo-bereich.an span{color:var(--lcd)}
+.lz-gruppen{border:2px solid var(--px);border-top:0;margin:-8px 0 8px;padding:0 6px}
+.fenster .lz-gruppen .wahl.an{font-weight:600}
 .memo-bereich-auf{top:96px;left:6px;right:6px}
 .memo-bereich-auf button{display:flex;justify-content:space-between}
 /* Jahr (seit 0.37) */
@@ -830,7 +832,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.41.1';
+var APP_VERSION = '0.42.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -17319,26 +17321,65 @@ function lzUm(art, zielId) {
   aufklappNeu();
 }
 
+cl.lzGruppe = '';
+cl.lzGruppeOffen = false;
+
 function lzNeuAuf() {
   cl.aufklapp = 'lzneu';
+  cl.lzGruppeOffen = false;
+  aufklappNeu();
+}
+
+/* Seit 0.42.0: Gruppen als Dropdown-Knopf (wie die Memo-Bereiche) statt Endlosliste.
+   Liefert [[schluessel, name, [[art, id, zeichen, titel], …]], …] */
+function lzNeuGruppen() {
+  var seiten = memoSeiten().filter(function (s) { return s.zustand !== 'erledigt'; });
+  var memo = function (pruef, art) {
+    return seiten.filter(pruef).map(function (s) { return [art, s.id, clSeitenZeichen(s), s.titel]; });
+  };
+  return [
+    ['projekte', 'Projekte', memo(function (s) { return s.art === 'vorhaben' && s.typ !== 'ziel'; }, 'projekt')],
+    ['ziele', 'Ziele', memo(function (s) { return s.art === 'vorhaben' && s.typ === 'ziel'; }, 'ziel')],
+    ['notizen', 'Notizen', memo(function (s) { return s.art !== 'vorhaben'; }, 'flaeche')],
+    ['listen', 'Listen', aufWaehlbar(true).filter(function (s) { return s.art === 'liste'; }).map(function (s) { return ['liste', s.id, '≡', s.titel]; })],
+    ['checklisten', 'Checklisten', clsAlle('vorlage').concat(clsAlle('lauf')).map(function (g) { return ['flaeche', g.id, '☑', g.titel]; })],
+    ['sammlungen', 'Sammlungen', saAlle(false).map(function (s) { return ['sammlung', s.id, '▤', s.name]; })],
+    ['jahr', 'Jahr (als Liste)', jaArtenAlle().map(function (a) { return ['jahrliste', a, '▦', jaArtName(a)]; })]
+  ].filter(function (g) { return g[2].length; });
+}
+
+function lzGruppeUm() {
+  cl.lzGruppeOffen = !cl.lzGruppeOffen;
+  aufklappNeu();
+}
+
+function lzGruppeSetzen(k) {
+  cl.lzGruppe = k;
+  cl.lzGruppeOffen = false;
   aufklappNeu();
 }
 
 function lzNeuHtml() {
-  var zeile = function (art, id, zeichen, titel) {
-    var da = !!lzHat(art, id);
-    return '<button type="button" class="wahl" onclick="lzUm(\'' + art + '\',\'' + esc(id) + '\')">' + (da ? '☑ ' : '☐ ') + esc(zeichen) + ' ' + esc(titel) + '</button>';
-  };
-  var gruppe = function (t, l) { return l.length ? '<div class="gruppe">' + t + '</div>' + l.join('') : ''; };
-  var seiten = memoSeiten().filter(function (s) { return s.zustand !== 'erledigt'; });
-  var artVon = function (s) { return s.art === 'vorhaben' ? (s.typ === 'ziel' ? 'ziel' : 'projekt') : 'flaeche'; };
-  return '<div class="fenster"><div class="titel">Lesezeichen hinzufügen</div><div class="rumpf">'
-    + gruppe('Memo', seiten.map(function (s) { return zeile(artVon(s), s.id, clSeitenZeichen(s), s.titel); }))
-    + gruppe('Listen', aufWaehlbar(true).filter(function (s) { return s.art === 'liste'; }).map(function (s) { return zeile('liste', s.id, '≡', s.titel); }))
-    + gruppe('Checklisten', clsAlle('vorlage').concat(clsAlle('lauf')).map(function (g) { return zeile('flaeche', g.id, '☑', g.titel); }))
-    + gruppe('Sammlungen', saAlle(false).map(function (s) { return zeile('sammlung', s.id, '▤', s.name); }))
-    + gruppe('Jahr (als Liste)', jaArtenAlle().map(function (a) { return zeile('jahrliste', a, '▦', jaArtName(a)); }))
-    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufklappZu()">Fertig</button></div></div></div>';
+  var gruppen = lzNeuGruppen();
+  var kopf = '<div class="fenster"><div class="titel">Lesezeichen hinzufügen</div><div class="rumpf">';
+  var fuss = '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufklappZu()">Fertig</button></div></div></div>';
+  if (!gruppen.length) { return kopf + '<p class="leise">Nichts zum Hinzufügen.</p>' + fuss; }
+  var g = gruppen.filter(function (x) { return x[0] === cl.lzGruppe; })[0] || gruppen[0];
+  cl.lzGruppe = g[0];
+  var gesetzt = function (x) { return x[2].filter(function (e) { return !!lzHat(e[0], e[1]); }).length; };
+  var h = '<button type="button" class="memo-bereich lz-gruppe' + (cl.lzGruppeOffen ? ' an' : '') + '" onclick="lzGruppeUm()">▼ ' + esc(g[1]) + ' <span>' + g[2].length + '</span></button>';
+  if (cl.lzGruppeOffen) {
+    h += '<div class="lz-gruppen">' + gruppen.map(function (x) {
+      var n = gesetzt(x);
+      return '<button type="button" class="wahl' + (x[0] === g[0] ? ' an' : '') + '" onclick="lzGruppeSetzen(\'' + x[0] + '\')">' + esc(x[1])
+        + ' <span class="leise">' + x[2].length + (n ? ' · ' + n + ' ☆' : '') + '</span></button>';
+    }).join('') + '</div>';
+  } else {
+    h += g[2].map(function (e) {
+      return '<button type="button" class="wahl" onclick="lzUm(\'' + e[0] + '\',\'' + esc(e[1]) + '\')">' + (lzHat(e[0], e[1]) ? '☑ ' : '☐ ') + esc(e[2]) + ' ' + esc(e[3]) + '</button>';
+    }).join('');
+  }
+  return kopf + h + fuss;
 }
 
 function lzStatZeile() {

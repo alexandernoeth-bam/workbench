@@ -1822,6 +1822,45 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   78. Lesezeichen hinzufügen: Gruppen als Dropdown (0.42)
+   Grund: Die Auswahl war eine Endlosliste über alle Gruppen — jetzt
+   wie im Memo ein Knopf „▼ Gruppe“, darunter nur deren Einträge.
+   Erkennt: wieder alle Gruppen untereinander, leere Gruppen wählbar,
+   Wahl wirkt nicht, Häkchen fehlen, Endlosliste bei offenem Dropdown.
+   ============================================================ */
+function lzGruppenTest() {
+  console.log('\n78. Lesezeichen hinzufügen: Gruppen als Dropdown (0.42)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '', status: 'laufend', kontext: 'privat', geaendert: 1 });
+  S.DB.themen.push({ id: 'l1', name: 'Haus', kontext: 'privat', text: '[] x', geaendert: 1 });
+  S.DB.sammlungen = [{ id: 's1', name: 'Abos', felder: [], rollen: {}, geaendert: 1 }];
+  S.DB.pinnwand = [];
+  S.oeffne('lesezeichen'); S.lzNeuAuf();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/onclick="lzGruppeUm\(\)">▼ Projekte/.test(f) && /☐ ◎ Carport/.test(f) && !/Haus|Abos/.test(f), 'ein Dropdown-Knopf, darunter nur die Einträge der ersten Gruppe');
+  pruefe(!/class="gruppe"/.test(f), 'keine Endlosliste mit Zwischenüberschriften mehr');
+  S.lzGruppeUm();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  const namen = S.lzNeuGruppen().map(g => g[1]);
+  pruefe(/lzGruppeSetzen\('listen'\)/.test(f) && /lzGruppeSetzen\('sammlungen'\)/.test(f) && !/Carport/.test(f), 'offen: Gruppenwahl statt Einträge');
+  pruefe(namen.indexOf('Ziele') < 0 && S.lzNeuGruppen().every(g => g[2].length > 0), 'leere Gruppen (hier Ziele) erscheinen nicht');
+  S.lzGruppeSetzen('listen');
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/▼ Listen/.test(f) && /☐ ≡ Haus/.test(f) && !/Carport/.test(f) && !S.cl.lzGruppeOffen, 'Wahl „Listen“ zeigt die Listen');
+  S.lzUm('liste', 'l1');
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/☑ ≡ Haus/.test(f) && /▼ Listen/.test(f), 'Antippen hakt an, Gruppe bleibt gewählt');
+  S.lzGruppeUm();
+  pruefe(/Listen <span class="leise">1 · 1 ☆/.test(S.document.getElementById('aufklapp').innerHTML), 'Gruppenwahl zeigt, wie viele schon Lesezeichen sind');
+  S.lzGruppeSetzen('gibtsnicht');
+  pruefe(/▼ Projekte/.test(S.document.getElementById('aufklapp').innerHTML), 'unbekannte Gruppe fällt auf die erste zurück');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    77. Bildlaufleiste wie am Palm (0.41)
    Grund: Lange Seiten sollen rechts eine sichtbare Leiste haben (▲,
    Schieber, ▼) — Android zeigt nur kurz eine dünne. Rollen mit dem
@@ -1941,7 +1980,7 @@ function lesezeichenTest() {
   /* Hinzufügen */
   S.lzBearbeitenUm(); S.lzNeuAuf();
   const f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(['Memo', 'Listen', 'Checklisten', 'Sammlungen', 'Jahr (als Liste)'].every(g => f.indexOf('>' + g + '<') >= 0) && /☑ ◎ Carport/.test(f), 'Hinzufügen: Memo, Listen, Checklisten, Sammlungen, Jahr — Vorhandenes angehakt');
+  pruefe(/▼ Projekte/.test(f) && /☑ ◎ Carport/.test(f), 'Hinzufügen: erste Gruppe (Projekte) — Vorhandenes angehakt (Gruppen-Dropdown: Kategorie 78)');
   S.lzUm('liste', 'l1'); S.lzUm('flaeche', 'c1'); S.lzUm('sammlung', 's1'); S.lzUm('jahrliste', 'geburtstag');
   S.aufklappZu(); S.lzBearbeitenUm();
   h = inhalt();
@@ -5155,6 +5194,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { lzGruppenTest(); } catch (e) { fail('Lesezeichen-Gruppen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rollbarTest(); } catch (e) { fail('Bildlaufleiste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
