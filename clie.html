@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.38.2</title>
+<title>CLIE 0.39.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -137,6 +137,20 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .taste.gl{background:var(--px);color:var(--lcd)}
 .taste.klein{height:44px;font-size:20px}
 .rt-verlauf{border:2px dotted var(--px-mitte);padding:6px 8px;font-size:19px;min-height:200px}
+/* Schulrechner (seit 0.39) */
+.rt-anzeige{text-align:left}
+.rt-status{display:flex;justify-content:space-between;font-size:15.5px;color:var(--px-mitte)}
+.rt-eingabe{font:19px/1.3 ui-monospace,Menlo,Consolas,monospace;min-height:25px;word-break:break-all}
+.rt-cursor{display:inline-block;width:2px;height:19px;background:var(--px);vertical-align:text-bottom;margin-left:1px}
+.rt-anzeige .zahl-gross{text-align:right;font-size:38px}
+.rt-anzeige .zahl-gross small{font-size:18px;font-weight:400}
+.rt-fehler{font-size:20px}
+.rt-fn{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:7px}
+.taste.fn{height:38px;font-size:17px;border-radius:6px;padding:0}
+.taste.fn.an{background:var(--px);color:var(--lcd)}
+.rt-zahlen{grid-template-columns:repeat(5,1fr);gap:6px}
+.rt-zahlen .taste{height:52px;font-size:25px}
+.rt-zahlen .taste.klein{font-size:16px}
 .rt-verlauf div{padding:3px 0;border-bottom:2px dotted var(--px-zart);text-align:right}
 
 /* Untere Knopfzeile einer App (Neu, Gehe zu, T/W/M) */
@@ -806,7 +820,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.38.2';
+var APP_VERSION = '0.39.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3979,6 +3993,7 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'ideen') ? iwKopfText()
       : (cl.app === 'coach') ? coKopfText()
+      : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (cl.filter !== 'alle' ? ' · ' + katName(cl.filter) : '')
       : (cl.app === 'sudoku') ? sdKopfText()
       : (cl.app === 'solitaer') ? soKopfText()
@@ -4181,6 +4196,8 @@ function oeffne(id) {
 }
 
 function katUm() {
+  /* Am Rechner schaltet oben rechts Grad/Bogenmaß (seit 0.39) */
+  if (cl.app === 'rechner') { rtTaste('winkel'); return; }
   /* Im Jahr: oben rechts Jahr und Beruf/Privat (seit 0.38.1) */
   if (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') {
     cl.aufklapp = (cl.aufklapp === 'jahrwahl') ? '' : 'jahrwahl';
@@ -18417,107 +18434,341 @@ function stoWischEnde(e) {
 /* Pfeiltasten am Rechner: ← → schieben, ↑ dreht, ↓ eine Zeile, Leertaste fallen */
 var STO_TASTEN = { ArrowLeft: 'links', ArrowRight: 'rechts', ArrowUp: 'drehen', ArrowDown: 'runter', ' ': 'fallen' };
 
-/* ---------- Rechner ----------
+/* ---------- Rechner (seit 0.39 wie ein Schulrechner) ----------
 
-   Wie der Rechner des Palm: Grundrechenarten, Prozent, Vorzeichen,
-   Speicher. Gerechnet wird mit Zahlen, gezeigt mit Komma. Speicher
-   und Verlauf bleiben auf dem Gerät (nicht in der workbench.json). */
+   Formel-Eingabe wie TI-30X oder fx-991: Punkt vor Strich, Klammern,
+   Funktionen (sin, cos, tan und ihre Umkehrungen, log, ln, Wurzeln,
+   Potenzen, n!, nCr, nPr), π, e, Ans, EE. 2nd schaltet die
+   Funktionstasten um; DEG/RAD bleibt gemerkt. →Bruch zeigt exakte
+   Ergebnisse als Bruch. Speicher und Verlauf bleiben auf dem Gerät. */
 
 var RT_KEY = 'clie-rechner';
 var RT_STELLEN = 12;
 var RT_VERLAUF_MAX = 20;
-var RT_ZEICHEN = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+/* Was die Taste in die Eingabe schreibt */
+var RT_ANZEIGE = {
+  '+': '+', '-': '−', '*': '×', '/': '÷', 'hoch': '^', 'neg': '−', '(': '(', ')': ')', ',': ',', 'ee': 'E',
+  'sin': 'sin(', 'cos': 'cos(', 'tan': 'tan(', 'asin': 'sin⁻¹(', 'acos': 'cos⁻¹(', 'atan': 'tan⁻¹(',
+  'log': 'log(', 'ln': 'ln(', 'sqrt': '√(', 'zehnhoch': '10^(', 'ehoch': 'e^(', 'wurzeln': 'ˣ√',
+  'quadrat': '²', 'kubik': '³', 'kehrwert': '⁻¹', 'fak': '!', 'prozent': '%', 'ncr': ' nCr ', 'npr': ' nPr ',
+  'pi': 'π', 'e': 'e', 'ans': 'Ans'
+};
+var RT_FUNKTIONEN = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'log', 'ln', 'sqrt', 'zehnhoch', 'ehoch'];
+/* Tastatur am PC */
 var RT_TASTEN = {
   '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
-  ',': ',', '.': ',', '+': '+', '-': '-', '*': '*', '/': '/', '%': '%',
-  'Enter': '=', '=': '=', 'Backspace': 'zurueck', 'Delete': 'CE'
+  ',': ',', '.': ',', '+': '+', '-': '-', '*': '*', '/': '/', '^': 'hoch', '(': '(', ')': ')', '!': 'fak', '%': 'prozent',
+  'Enter': '=', '=': '=', 'Backspace': 'zurueck', 'Delete': 'C', 'Escape': ''
 };
-var rt = { anzeige: '0', links: null, op: '', neu: true, fehler: false, zeile: '', speicher: 0, verlauf: [], verlaufAuf: false };
+/* Funktionstasten: [normal, 2nd], je [Kennung, Aufschrift] */
+var RT_REIHE_1 = [[['sin', 'sin'], ['asin', 'sin⁻¹']], [['cos', 'cos'], ['acos', 'cos⁻¹']], [['tan', 'tan'], ['atan', 'tan⁻¹']],
+                  [['log', 'log'], ['zehnhoch', '10ˣ']], [['ln', 'ln'], ['ehoch', 'eˣ']], [['sqrt', '√'], ['wurzeln', 'ˣ√']]];
+var RT_REIHE_2 = [[['quadrat', 'x²'], ['kehrwert', '1/x']], [['hoch', 'xʸ'], ['kubik', 'x³']], [['pi', 'π'], ['ans', 'Ans']],
+                  [['e', 'e'], ['ee', 'EE']], [['fak', 'n!'], ['prozent', '%']], [['ncr', 'nCr'], ['npr', 'nPr']]];
+
+var rt = { tokens: [], ergebnis: null, ans: 0, fertig: false, fehler: '', bruch: false, zweit: false, grad: true,
+           speicher: 0, verlauf: [], verlaufAuf: false };
 
 function rtLaden() {
   var roh = null;
   try { roh = JSON.parse(window.localStorage.getItem(RT_KEY) || 'null'); } catch (e) { roh = null; }
   if (roh && typeof roh.speicher === 'number' && isFinite(roh.speicher)) { rt.speicher = roh.speicher; }
   if (roh && Array.isArray(roh.verlauf)) { rt.verlauf = roh.verlauf.filter(function (v) { return typeof v === 'string'; }).slice(0, RT_VERLAUF_MAX); }
+  if (roh && typeof roh.grad === 'boolean') { rt.grad = roh.grad; }
+  if (roh && typeof roh.ans === 'number' && isFinite(roh.ans)) { rt.ans = roh.ans; }
 }
 
 function rtMerken() {
-  try { window.localStorage.setItem(RT_KEY, JSON.stringify({ speicher: rt.speicher, verlauf: rt.verlauf })); } catch (e) { /* nur für jetzt */ }
+  try { window.localStorage.setItem(RT_KEY, JSON.stringify({ speicher: rt.speicher, verlauf: rt.verlauf, grad: rt.grad, ans: rt.ans })); } catch (e) { /* nur für jetzt */ }
 }
 
-function rtZahl() {
-  return Number(String(rt.anzeige).replace(',', '.'));
-}
-
-/* Zahl → Anzeige: höchstens 12 Stellen, Komma, ohne Rundungsreste. */
-function rtText(n) {
+/* Zahl → Text: höchstens 12 Stellen, Komma; große ganze Zahlen mit Tausenderpunkten */
+function rtText(n, ohnePunkte) {
   if (!isFinite(n)) { return 'Fehler'; }
+  if (Math.abs(n) < 1e-12) { n = 0; }
   var t = String(Number(n.toPrecision(RT_STELLEN)));
-  if (/e/.test(t)) { t = n.toExponential(6); }
-  return t.replace('.', ',');
+  if (/e/.test(t)) {
+    var m = n.toExponential(8).split('e');
+    return String(Number(m[0])).replace('.', ',') + 'E' + Number(m[1]);
+  }
+  var teile = t.split('.');
+  if (!ohnePunkte && Math.abs(n) >= 10000) {
+    /* Tausenderpunkte von rechts */
+    var vz = teile[0].charAt(0) === '-' ? '-' : '';
+    var z = teile[0].replace('-', '');
+    var mit = '';
+    while (z.length > 3) { mit = '.' + z.slice(-3) + mit; z = z.slice(0, -3); }
+    teile[0] = vz + z + mit;
+  }
+  return teile.join(',');
 }
 
-function rtRechnen(a, op, b) {
-  if (op === '+') { return a + b; }
-  if (op === '-') { return a - b; }
-  if (op === '*') { return a * b; }
-  if (op === '/') { return b === 0 ? NaN : a / b; }
-  return b;
+function rtEingabeText() {
+  return rt.tokens.map(function (t) { return RT_ANZEIGE[t] !== undefined ? RT_ANZEIGE[t] : t; }).join('');
 }
+
+/* ---- Rechnen: rekursiver Abstieg über die Tasten ---- */
+
+function rtFehler(text) {
+  var f = new Error(text);
+  f.rechner = true;
+  return f;
+}
+
+function rtAuswerten(tokens) {
+  var i = 0;
+  var grad = rt.grad;
+  var rund = function (x) { return Math.abs(x) < 1e-12 ? 0 : Number(x.toPrecision(15)); };
+  var winkelRein = function (x) { return grad ? x * Math.PI / 180 : x; };
+  var winkelRaus = function (x) { return grad ? x * 180 / Math.PI : x; };
+  var istZiffer = function (t) { return /^[0-9]$/.test(t) || t === ','; };
+  var beginntWert = function (t) { return t !== undefined && (istZiffer(t) || t === 'pi' || t === 'e' || t === 'ans' || t === '(' || RT_FUNKTIONEN.indexOf(t) >= 0); };
+  var ganz = function (x, was) {
+    if (Math.abs(x - Math.round(x)) > 1e-9 || x < 0) { throw rtFehler(was + ' nur für ganze Zahlen ab 0'); }
+    return Math.round(x);
+  };
+  var fakultaet = function (n) {
+    n = ganz(n, 'n!');
+    if (n > 170) { throw rtFehler('Zahl zu groß'); }
+    var f = 1;
+    var k;
+    for (k = 2; k <= n; k++) { f *= k; }
+    return f;
+  };
+  var ncr = function (n, r) {
+    n = ganz(n, 'nCr'); r = ganz(r, 'nCr');
+    if (r > n) { throw rtFehler('nCr: r größer als n'); }
+    var v = 1;
+    var k;
+    for (k = 1; k <= Math.min(r, n - r); k++) { v = v * (n - k + 1) / k; }
+    return Math.round(v);
+  };
+  var npr = function (n, r) {
+    n = ganz(n, 'nPr'); r = ganz(r, 'nPr');
+    if (r > n) { throw rtFehler('nPr: r größer als n'); }
+    var v = 1;
+    var k;
+    for (k = 0; k < r; k++) { v *= (n - k); }
+    return v;
+  };
+  var zahl = function () {
+    var s = '';
+    while (i < tokens.length && istZiffer(tokens[i])) { s += tokens[i] === ',' ? '.' : tokens[i]; i++; }
+    if (tokens[i] === 'ee') {
+      i++;
+      var ex = '';
+      if (tokens[i] === 'neg' || tokens[i] === '-') { ex = '-'; i++; }
+      while (i < tokens.length && /^[0-9]$/.test(tokens[i])) { ex += tokens[i]; i++; }
+      if (!/\d/.test(ex)) { throw rtFehler('Exponent fehlt'); }
+      s = (s || '1') + 'e' + ex;
+    }
+    if ((s.match(/\./g) || []).length > 1 || s === '.') { throw rtFehler('Zahl falsch'); }
+    return Number(s);
+  };
+  var ausdruck;
+  var funktion = function (f, x) {
+    if (f === 'sin') { return Math.sin(winkelRein(x)); }
+    if (f === 'cos') { return Math.cos(winkelRein(x)); }
+    if (f === 'tan') {
+      if (grad && Math.abs(((x % 180) + 180) % 180 - 90) < 1e-9) { throw rtFehler('tan nicht definiert'); }
+      return Math.tan(winkelRein(x));
+    }
+    if (f === 'asin' || f === 'acos') {
+      if (x < -1 || x > 1) { throw rtFehler('Wert außerhalb von −1 … 1'); }
+      return winkelRaus(f === 'asin' ? Math.asin(x) : Math.acos(x));
+    }
+    if (f === 'atan') { return winkelRaus(Math.atan(x)); }
+    if (f === 'log' || f === 'ln') {
+      if (x <= 0) { throw rtFehler('Logarithmus nur für Zahlen über 0'); }
+      return f === 'log' ? Math.log(x) / Math.LN10 : Math.log(x);
+    }
+    if (f === 'sqrt') {
+      if (x < 0) { throw rtFehler('Wurzel aus negativer Zahl'); }
+      return Math.sqrt(x);
+    }
+    if (f === 'zehnhoch') { return Math.pow(10, x); }
+    return Math.exp(x);
+  };
+  var grund = function () {
+    var t = tokens[i];
+    if (t === undefined) { throw rtFehler('Eingabe unvollständig'); }
+    if (istZiffer(t) || t === 'ee') { return zahl(); }
+    if (t === 'pi') { i++; return Math.PI; }
+    if (t === 'e') { i++; return Math.E; }
+    if (t === 'ans') { i++; return rt.ans; }
+    if (t === '(' || RT_FUNKTIONEN.indexOf(t) >= 0) {
+      i++;
+      var x = ausdruck();
+      /* Fehlende Klammern am Ende schließt der Rechner selbst */
+      if (tokens[i] === ')') { i++; } else if (i < tokens.length) { throw rtFehler('Klammer fehlt'); }
+      return t === '(' ? x : funktion(t, x);
+    }
+    if (t === ')') { throw rtFehler('Klammer zu viel'); }
+    throw rtFehler('Eingabe unvollständig');
+  };
+  var nach = function () {
+    var x = grund();
+    while (i < tokens.length) {
+      var t = tokens[i];
+      if (t === 'quadrat') { x = x * x; } else if (t === 'kubik') { x = x * x * x; }
+      else if (t === 'kehrwert') { if (x === 0) { throw rtFehler('Division durch 0'); } x = 1 / x; }
+      else if (t === 'fak') { x = fakultaet(x); } else if (t === 'prozent') { x = x / 100; }
+      else { break; }
+      i++;
+    }
+    return x;
+  };
+  var vorzeichen;
+  var potenz = function () {
+    var b = nach();
+    if (tokens[i] === 'hoch') {
+      i++;
+      var ex = vorzeichen();
+      var p = Math.pow(b, ex);
+      if (isNaN(p)) { throw rtFehler('Potenz nicht definiert'); }
+      return p;
+    }
+    return b;
+  };
+  vorzeichen = function () {
+    if (tokens[i] === 'neg' || tokens[i] === '-') { i++; return -vorzeichen(); }
+    if (tokens[i] === '+') { i++; return vorzeichen(); }
+    return potenz();
+  };
+  var kombi = function () {
+    var x = vorzeichen();
+    while (tokens[i] === 'ncr' || tokens[i] === 'npr' || tokens[i] === 'wurzeln') {
+      var op = tokens[i];
+      i++;
+      var y = vorzeichen();
+      if (op === 'ncr') { x = ncr(x, y); }
+      else if (op === 'npr') { x = npr(x, y); }
+      else {
+        if (x === 0) { throw rtFehler('0-te Wurzel'); }
+        if (y < 0 && Math.abs(x % 2) === 1) { x = -Math.pow(-y, 1 / x); }
+        else if (y < 0) { throw rtFehler('Wurzel aus negativer Zahl'); }
+        else { x = Math.pow(y, 1 / x); }
+      }
+    }
+    return x;
+  };
+  var produkt = function () {
+    var x = kombi();
+    while (i < tokens.length) {
+      var t = tokens[i];
+      if (t === '*' || t === '/') {
+        i++;
+        var y = kombi();
+        if (t === '/' && y === 0) { throw rtFehler('Division durch 0'); }
+        x = (t === '*') ? x * y : x / y;
+      } else if (beginntWert(t)) {
+        /* 2π, 3(4+1), 2sin(30): ohne ×-Zeichen multipliziert */
+        x = x * kombi();
+      } else { break; }
+    }
+    return x;
+  };
+  ausdruck = function () {
+    var x = produkt();
+    while (tokens[i] === '+' || tokens[i] === '-') {
+      var t = tokens[i];
+      i++;
+      var y = produkt();
+      x = (t === '+') ? x + y : x - y;
+    }
+    return x;
+  };
+  if (!tokens.length) { return 0; }
+  var erg = ausdruck();
+  if (i < tokens.length) { throw rtFehler(tokens[i] === ')' ? 'Klammer zu viel' : 'Eingabe falsch'); }
+  if (!isFinite(erg)) { throw rtFehler('Zahl zu groß'); }
+  return rund(erg);
+}
+
+/* Als Bruch, wenn es einer ist (Nenner bis 10 000) */
+function rtBruch(x) {
+  if (!isFinite(x) || Math.abs(x - Math.round(x)) < 1e-12) { return ''; }
+  var neg = x < 0;
+  var a = Math.abs(x);
+  var h0 = 0, h1 = 1, k0 = 1, k1 = 0;
+  var b = a;
+  var n;
+  for (n = 0; n < 40; n++) {
+    var g = Math.floor(b);
+    var h2 = g * h1 + h0;
+    var k2 = g * k1 + k0;
+    if (k2 > 10000) { break; }
+    h0 = h1; h1 = h2; k0 = k1; k1 = k2;
+    if (Math.abs(a - h1 / k1) < 1e-10) { return (neg ? '−' : '') + h1 + '/' + k1; }
+    if (b - g < 1e-12) { break; }
+    b = 1 / (b - g);
+  }
+  return '';
+}
+
+/* ---- Bedienen ---- */
 
 function rtTaste(t) {
-  if (rt.fehler && t !== 'C') { return; }
-  if (/^[0-9]$/.test(t)) {
-    if (rt.neu) { rt.anzeige = t; rt.neu = false; }
-    else if (rt.anzeige.replace(/[-,]/g, '').length < RT_STELLEN) { rt.anzeige = (rt.anzeige === '0') ? t : rt.anzeige + t; }
-  } else if (t === ',') {
-    if (rt.neu) { rt.anzeige = '0,'; rt.neu = false; }
-    else if (rt.anzeige.indexOf(',') < 0) { rt.anzeige += ','; }
-  } else if (t === 'zurueck') {
-    if (!rt.neu) { rt.anzeige = rt.anzeige.length > 1 ? rt.anzeige.slice(0, -1) : '0'; if (rt.anzeige === '-') { rt.anzeige = '0'; } }
-  } else if (t === '±') {
-    if (rt.anzeige !== '0') { rt.anzeige = (rt.anzeige.charAt(0) === '-') ? rt.anzeige.slice(1) : '-' + rt.anzeige; }
-  } else if (t === '+' || t === '-' || t === '*' || t === '/') {
-    if (rt.op && !rt.neu) { rtErgebnis(false); if (rt.fehler) { rtZeichnen(); return; } }
-    rt.links = rtZahl();
-    rt.op = t;
-    rt.zeile = rtText(rt.links) + ' ' + RT_ZEICHEN[t];
-    rt.neu = true;
-  } else if (t === '%') {
-    /* Wie am Taschenrechner: 200 + 10 % = 220, 200 × 10 % = 20 */
-    var b = rtZahl();
-    var wert = (rt.op === '+' || rt.op === '-') && rt.links !== null ? rt.links * b / 100 : b / 100;
-    rt.anzeige = rtText(wert);
-    rt.neu = false;
-  } else if (t === '=') {
-    rtErgebnis(true);
-  } else if (t === 'C') {
-    rt.anzeige = '0'; rt.links = null; rt.op = ''; rt.neu = true; rt.fehler = false; rt.zeile = '';
-  } else if (t === 'CE') {
-    rt.anzeige = '0'; rt.neu = true;
-  } else if (t === 'MC') { rt.speicher = 0; rtMerken();
-  } else if (t === 'MR') { rt.anzeige = rtText(rt.speicher); rt.neu = true;
-  } else if (t === 'M+') { rt.speicher = Number((rt.speicher + rtZahl()).toPrecision(RT_STELLEN)); rt.neu = true; rtMerken();
-  } else if (t === 'M-') { rt.speicher = Number((rt.speicher - rtZahl()).toPrecision(RT_STELLEN)); rt.neu = true; rtMerken();
-  }
+  if (!t) { return; }
+  var zweit = rt.zweit;
+  if (t !== '2nd') { rt.zweit = false; }
+  if (t === '2nd') { rt.zweit = !zweit; }
+  else if (t === 'winkel') { rt.grad = !rt.grad; rtMerken(); }
+  else if (t === 'C') { rt.tokens = []; rt.ergebnis = null; rt.fertig = false; rt.fehler = ''; rt.bruch = false; }
+  else if (t === 'zurueck') {
+    rt.fertig = false; rt.fehler = ''; rt.bruch = false;
+    rt.tokens.pop();
+  } else if (t === '=') { rtErgebnis(true); }
+  else if (t === 'bruch') { if (rt.fertig && rt.ergebnis !== null) { rt.bruch = !rt.bruch; } else { rtErgebnis(true); rt.bruch = rt.fertig; } }
+  else if (t === 'M+' || t === 'M-') {
+    if (zweit && t === 'M+') { t = 'M-'; }
+    if (!rt.fertig) { rtErgebnis(true); }
+    if (rt.fertig && rt.ergebnis !== null) {
+      rt.speicher = Number((rt.speicher + (t === 'M+' ? rt.ergebnis : -rt.ergebnis)).toPrecision(RT_STELLEN));
+      rtMerken();
+    }
+  } else if (t === 'MR' || t === 'MC') {
+    if (zweit || t === 'MC') { rt.speicher = 0; rtMerken(); }
+    else { rtEinfuegen(rtText(rt.speicher, true).replace('-', '−'), true); }
+  } else if (t === '±') { rtEinfuegen('neg'); }
+  else if (RT_ANZEIGE[t] !== undefined || /^[0-9]$/.test(t)) { rtEinfuegen(t); }
   rtZeichnen();
 }
 
+/* Nach einem Ergebnis: Rechenzeichen rechnen mit Ans weiter, alles andere beginnt neu */
+function rtEinfuegen(t, alsZahl) {
+  var weiter = ['+', '-', '*', '/', 'hoch', 'quadrat', 'kubik', 'kehrwert', 'fak', 'prozent', 'ncr', 'npr', 'wurzeln'];
+  if (rt.fertig) {
+    rt.tokens = (weiter.indexOf(t) >= 0) ? ['ans'] : [];
+    rt.fertig = false;
+    rt.bruch = false;
+  }
+  rt.fehler = '';
+  if (alsZahl) {
+    /* Speicherwert als Ziffernfolge */
+    String(t).split('').forEach(function (c) { rt.tokens.push(c === '−' ? 'neg' : (c === '.' ? ',' : c)); });
+    return;
+  }
+  rt.tokens.push(t);
+}
+
 function rtErgebnis(merken) {
-  if (!rt.op) { return; }
-  var b = rtZahl();
-  var erg = rtRechnen(rt.links, rt.op, b);
-  var rechnung = rtText(rt.links) + ' ' + RT_ZEICHEN[rt.op] + ' ' + rtText(b) + ' =';
-  rt.zeile = rechnung;
-  rt.op = '';
-  rt.links = null;
-  rt.neu = true;
-  if (!isFinite(erg)) { rt.anzeige = 'Fehler'; rt.fehler = true; return; }
-  rt.anzeige = rtText(erg);
-  if (merken) {
-    rt.verlauf.unshift(rechnung + ' ' + rt.anzeige);
-    rt.verlauf = rt.verlauf.slice(0, RT_VERLAUF_MAX);
-    rtMerken();
+  if (!rt.tokens.length) { return; }
+  try {
+    var erg = rtAuswerten(rt.tokens);
+    rt.ergebnis = erg;
+    rt.ans = erg;
+    rt.fehler = '';
+    rt.fertig = true;
+    if (merken) {
+      rt.verlauf.unshift(rtEingabeText() + ' = ' + rtText(erg));
+      rt.verlauf = rt.verlauf.slice(0, RT_VERLAUF_MAX);
+      rtMerken();
+    }
+  } catch (f) {
+    rt.fehler = (f && f.rechner) ? f.message : 'Eingabe falsch';
+    rt.ergebnis = null;
+    rt.fertig = false;
   }
 }
 
@@ -18527,7 +18778,7 @@ function rtVerlaufUm() {
 }
 
 function rtKopieren() {
-  var text = rt.anzeige;
+  var text = rt.ergebnis !== null && rt.fertig ? rtText(rt.ergebnis, true) : rtEingabeText();
   if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
     navigator.clipboard.writeText(text).then(function () { melde('Kopiert: ' + text, 'gut'); },
       function () { melde('Kopieren nicht möglich.', 'warn'); });
@@ -18540,22 +18791,34 @@ function rtTasteHtml(t, aufschrift, klasse) {
   return '<button type="button" class="taste' + (klasse ? ' ' + klasse : '') + '" onclick="rtTaste(\'' + t + '\')">' + aufschrift + '</button>';
 }
 
+function rtErgebnisText() {
+  if (rt.fehler) { return '<span class="rt-fehler">' + esc(rt.fehler) + '</span>'; }
+  if (!rt.fertig || rt.ergebnis === null) { return '&nbsp;'; }
+  var br = rt.bruch ? rtBruch(rt.ergebnis) : '';
+  return br ? esc(br) + ' <small>≈ ' + esc(rtText(Number(rt.ergebnis.toPrecision(6)))) + '</small>' : esc(rtText(rt.ergebnis));
+}
+
 function rechnerHtml() {
-  var h = '<div class="anzeige"><div class="verlauf-zeile">' + esc(rt.zeile || ' ') + '</div>'
-        + '<span class="m-marke">' + (rt.speicher ? 'M' : '') + '</span>'
-        + '<div class="zahl-gross" id="rtAnzeige">' + esc(rt.anzeige) + '</div></div>';
+  var h = '<div class="anzeige rt-anzeige"><div class="rt-status"><span>' + (rt.grad ? 'DEG' : 'RAD') + (rt.zweit ? ' · 2nd' : '') + '</span><span>' + (rt.speicher ? 'M' : '') + '</span></div>'
+        + '<div class="rt-eingabe">' + (esc(rtEingabeText()) || '&nbsp;') + '<i class="rt-cursor"></i></div>'
+        + '<div class="zahl-gross" id="rtAnzeige">' + rtErgebnisText() + '</div></div>';
   if (rt.verlaufAuf) {
     h += '<div class="rt-verlauf">' + (rt.verlauf.length
       ? rt.verlauf.map(function (v) { return '<div>' + esc(v) + '</div>'; }).join('')
       : '<div class="leise">Noch keine Rechnungen.</div>') + '</div>';
   } else {
-    h += '<div class="tasten">'
-       + rtTasteHtml('MC', 'MC', 'klein') + rtTasteHtml('MR', 'MR', 'klein') + rtTasteHtml('M-', 'M−', 'klein') + rtTasteHtml('M+', 'M+', 'klein')
-       + rtTasteHtml('C', 'C', 'op') + rtTasteHtml('CE', 'CE', 'op') + rtTasteHtml('%', '%', 'op') + rtTasteHtml('/', '÷', 'op')
-       + rtTasteHtml('7', '7') + rtTasteHtml('8', '8') + rtTasteHtml('9', '9') + rtTasteHtml('*', '×', 'op')
-       + rtTasteHtml('4', '4') + rtTasteHtml('5', '5') + rtTasteHtml('6', '6') + rtTasteHtml('-', '−', 'op')
-       + rtTasteHtml('1', '1') + rtTasteHtml('2', '2') + rtTasteHtml('3', '3') + rtTasteHtml('+', '+', 'op')
-       + rtTasteHtml('±', '±') + rtTasteHtml('0', '0') + rtTasteHtml(',', ',') + rtTasteHtml('=', '=', 'gl')
+    var reihe = function (l) {
+      return l.map(function (x) { var k = x[rt.zweit ? 1 : 0]; return rtTasteHtml(k[0], k[1], 'fn'); }).join('');
+    };
+    h += '<div class="rt-fn">'
+       + rtTasteHtml('2nd', '2nd', 'fn' + (rt.zweit ? ' an' : '')) + rtTasteHtml('winkel', rt.grad ? 'DEG' : 'RAD', 'fn')
+       + rtTasteHtml('(', '(', 'fn') + rtTasteHtml(')', ')', 'fn') + rtTasteHtml('zurueck', '←', 'fn') + rtTasteHtml('C', 'C', 'fn')
+       + reihe(RT_REIHE_1) + reihe(RT_REIHE_2) + '</div>'
+       + '<div class="tasten rt-zahlen">'
+       + rtTasteHtml('7', '7') + rtTasteHtml('8', '8') + rtTasteHtml('9', '9') + rtTasteHtml('/', '÷', 'op') + rtTasteHtml('M+', rt.zweit ? 'M−' : 'M+', 'op')
+       + rtTasteHtml('4', '4') + rtTasteHtml('5', '5') + rtTasteHtml('6', '6') + rtTasteHtml('*', '×', 'op') + rtTasteHtml('MR', rt.zweit ? 'MC' : 'MR', 'op')
+       + rtTasteHtml('1', '1') + rtTasteHtml('2', '2') + rtTasteHtml('3', '3') + rtTasteHtml('-', '−', 'op') + rtTasteHtml('bruch', '→Bruch', 'op klein')
+       + rtTasteHtml('0', '0') + rtTasteHtml(',', ',') + rtTasteHtml('±', '±') + rtTasteHtml('+', '+', 'op') + rtTasteHtml('=', '=', 'gl')
        + '</div>';
   }
   h += '<div class="knoepfe"><button type="button" class="knopf' + (rt.verlaufAuf ? ' voll' : '') + '" onclick="rtVerlaufUm()">'
@@ -18565,7 +18828,7 @@ function rechnerHtml() {
 }
 
 function rtZeichnen() {
-  if (cl.app === 'rechner') { inhaltZeichnen(); }
+  if (cl.app === 'rechner') { inhaltZeichnen(); kopfZeichnen(); }
 }
 
 /* ---------- Stand und Rückmeldungen ---------- */
@@ -18861,7 +19124,7 @@ function swAnmelden() {
 function tasteGlobal(e) {
   if (e && e.key === 'Escape') { clZurueck(); return; }
   /* Am Rechner mit Tastatur: Ziffern, Rechenzeichen, Enter, Rücktaste */
-  if (e && cl.app === 'rechner' && !cl.aufklapp && !e.ctrlKey && !e.metaKey && !e.altKey) {
+  if (e && cl.app === 'rechner' && !cl.aufklapp && !e.ctrlKey && !e.metaKey && !e.altKey && e.key !== 'Escape') {
     var t = RT_TASTEN[e.key];
     if (t) { e.preventDefault(); rtTaste(t); }
   }

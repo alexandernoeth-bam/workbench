@@ -434,39 +434,85 @@ function palmTest() {
    Rundungsreste und die deutsche Schreibweise.
    ============================================================ */
 function rechnerTest() {
-  console.log('\n12. Rechner');
+  console.log('\n12. Rechner (seit 0.39 wie ein Schulrechner)');
   if (!CL) { return; }
   frisch();
-  const tippe = (folge) => { CL.rtTaste('C'); folge.split(' ').forEach(t => CL.rtTaste(t)); return CL.rt.anzeige; };
-  pruefe(tippe('2 4 9 , 9 0 * 3 =') === '749,7', '249,90 × 3 = 749,7 — mit Komma');
-  pruefe(tippe('0 , 1 + 0 , 2 =') === '0,3', '0,1 + 0,2 = 0,3 — ohne Rundungsrest');
-  pruefe(tippe('7 / 0 =') === 'Fehler' && CL.rt.fehler, 'durch null ergibt „Fehler“');
+  const R = CL.rt;
+  R.grad = true; R.zweit = false; R.ans = 0;
+  const tippe = (folge) => { CL.rtTaste('C'); folge.split(' ').forEach(t => CL.rtTaste(t)); CL.rtTaste('='); return R.fehler ? R.fehler : CL.rtText(R.ergebnis); };
+  pruefe(tippe('2 4 9 , 9 0 * 3') === '749,7', '249,90 × 3 = 749,7 — mit Komma');
+  pruefe(tippe('0 , 1 + 0 , 2') === '0,3', '0,1 + 0,2 = 0,3 — ohne Rundungsrest');
+  pruefe(tippe('2 + 3 * 4') === '14', 'Punkt vor Strich: 2 + 3 × 4 = 14');
+  pruefe(tippe('( 2 + 3 ) * 4') === '20', 'Klammern: (2 + 3) × 4 = 20');
+  pruefe(tippe('2 * sin 3 0 ) + sqrt 1 6 ) - 3 quadrat') === '-4', '2·sin(30)+√(16)−3² = −4 (Grad)');
+  pruefe(tippe('neg 3 quadrat') === '-9' && tippe('( neg 3 ) quadrat') === '9', '−3² = −9, (−3)² = 9');
+  pruefe(tippe('2 hoch 1 0') === '1024' && tippe('2 hoch neg 1') === '0,5', 'Potenzen: 2^10 = 1024, 2^−1 = 0,5');
+  pruefe(tippe('cos 6 0') === '0,5' && tippe('tan 4 5') === '1' && tippe('sin 1 8 0') === '0', 'cos 60 = 0,5, tan 45 = 1, sin 180 = 0 (kein Rundungsrest)');
+  pruefe(tippe('asin 0 , 5') === '30' && tippe('atan 1') === '45', 'Umkehrfunktionen in Grad');
+  pruefe(tippe('tan 9 0') === 'tan nicht definiert', 'tan 90 ist nicht definiert');
+  pruefe(tippe('asin 2') === 'Wert außerhalb von −1 … 1', 'sin⁻¹(2): Fehler in Worten');
+  CL.rtTaste('winkel');
+  pruefe(!R.grad && tippe('sin pi / 2') === '1' && tippe('cos pi') === '-1', 'RAD: sin(π/2) = 1, cos π = −1');
+  CL.rtTaste('winkel');
+  pruefe(tippe('log 1 0 0 0') === '3' && tippe('ln e') === '1' && tippe('zehnhoch 2') === '100' && tippe('ehoch 0') === '1', 'log, ln, 10ˣ, eˣ');
+  pruefe(tippe('log 0') === 'Logarithmus nur für Zahlen über 0' && tippe('sqrt neg 4') === 'Wurzel aus negativer Zahl', 'log 0 und √−4: Fehler in Worten');
+  pruefe(tippe('3 wurzeln 2 7') === '3' && tippe('3 wurzeln neg 8') === '-2', 'n-te Wurzel: ³√27 = 3, ³√−8 = −2');
+  pruefe(tippe('5 fak') === '120' && tippe('4 9 ncr 6') === '13.983.816' && tippe('5 npr 2') === '20', 'n!, nCr (Lotto: 13.983.816), nPr');
+  pruefe(tippe('2 , 5 fak') === 'n! nur für ganze Zahlen ab 0' && tippe('3 ncr 5') === 'nCr: r größer als n', 'n! und nCr prüfen ihre Zahlen');
+  pruefe(tippe('7 / 0') === 'Division durch 0' && tippe('( 2 + 3') === '5' && tippe('2 + 3 )') === 'Klammer zu viel', 'Division durch 0; fehlende Klammer am Ende ergänzt; Klammer zu viel');
+  pruefe(tippe('2 pi') === CL.rtText(2 * Math.PI) && tippe('3 ( 4 + 1 )') === '15', 'ohne ×: 2π, 3(4+1)');
+  pruefe(tippe('6 , 0 2 ee 2 3') === '6,02E23' && tippe('1 ee neg 3') === '0,001', 'EE: 6,02E23, 1E−3');
+  pruefe(tippe('2 0 0 * 1 0 prozent') === '20' && tippe('4 kehrwert') === '0,25' && tippe('2 kubik') === '8', '%, 1/x, x³');
+  /* Ans */
+  tippe('1 0');
+  CL.rtTaste('*'); CL.rtTaste('3'); CL.rtTaste('=');
+  pruefe(CL.rtEingabeText() === 'Ans×3' && CL.rtText(R.ergebnis) === '30', 'nach einem Ergebnis rechnet × mit Ans weiter');
   CL.rtTaste('5');
-  pruefe(CL.rt.anzeige === 'Fehler', 'nach einem Fehler hilft nur C');
-  pruefe(tippe('2 + 3 * 4 =') === '20', 'der Reihe nach gerechnet wie am Palm: 2 + 3 × 4 = 20');
-  pruefe(tippe('2 0 0 + 1 0 % =') === '220', '200 + 10 % = 220');
-  pruefe(tippe('2 0 0 * 1 0 % =') === '20', '200 × 10 % = 20');
-  pruefe(tippe('5 ± - 3 =') === '-8', 'Vorzeichen: −5 − 3 = −8');
-  pruefe(tippe('1 2 3 zurueck') === '12', 'die Rücktaste löscht die letzte Ziffer');
-  CL.rtTaste('C'); CL.rtTaste('MC');
-  tippe('1 0 M+'); tippe('5 M+'); tippe('3 M-');
-  pruefe(CL.rt.speicher === 12 && /"speicher":12/.test(CL.__ablage['clie-rechner'] || ''), 'Speicher M+ / M− rechnet und bleibt auf dem Gerät');
-  tippe('MR');
-  pruefe(CL.rt.anzeige === '12', 'MR holt den Speicher');
-  pruefe(CL.rt.verlauf.indexOf('-5 − 3 = -8') >= 0, 'Rechnungen landen im Verlauf („-5 − 3 = -8“)');
-  pruefe(CL.rt.verlauf.length <= 20, 'der Verlauf hat höchstens 20 Einträge');
+  pruefe(CL.rtEingabeText() === '5', 'eine Ziffer beginnt neu');
+  /* Bruch */
+  tippe('1 / 3 + 1 / 4');
+  CL.rtTaste('bruch');
+  pruefe(R.bruch && /7\/12/.test(CL.rtErgebnisText()) && /≈ 0,583333</.test(CL.rtErgebnisText()), '→Bruch: 1/3 + 1/4 = 7/12');
+  pruefe(CL.rtBruch(Math.PI) === '' && CL.rtBruch(-0.75) === '−3/4' && CL.rtBruch(2) === '', 'π ist kein Bruch, −0,75 = −3/4');
+  /* ←, 2nd */
+  CL.rtTaste('C'); CL.rtTaste('sin'); CL.rtTaste('3');
+  pruefe(CL.rtEingabeText() === 'sin(3', 'Eingabe sichtbar: sin(3');
+  CL.rtTaste('zurueck'); CL.rtTaste('zurueck');
+  pruefe(CL.rtEingabeText() === '', '← löscht ganze Bausteine (sin( auf einmal)');
+  CL.rtTaste('2nd');
+  pruefe(R.zweit, '2nd an');
+  CL.rtTaste('sin');
+  pruefe(CL.rtEingabeText() === 'sin(' && !R.zweit, 'die Taste unter 2nd heißt jetzt sin⁻¹ — Taste „sin“ liefert sin, 2nd geht wieder aus');
+  CL.oeffne('rechner');
+  CL.rtTaste('C'); CL.rtTaste('2nd');
+  pruefe(/rtTaste\('asin'\)">sin⁻¹/.test(inhalt()) && /rtTaste\('npr'\)/.test(inhalt()) && /rtTaste\('M\+'\)">M−/.test(inhalt()), '2nd zeigt sin⁻¹ … nPr und M−');
+  CL.rtTaste('2nd');
+  /* Speicher und Verlauf */
+  R.speicher = 0;
+  tippe('1 0'); CL.rtTaste('M+'); tippe('5'); CL.rtTaste('M+'); tippe('3'); CL.rtTaste('2nd'); CL.rtTaste('M+');
+  pruefe(R.speicher === 12 && /"speicher":12/.test(CL.__ablage['clie-rechner'] || ''), 'Speicher M+ / M− rechnet und bleibt auf dem Gerät');
+  CL.rtTaste('C'); CL.rtTaste('MR'); CL.rtTaste('=');
+  pruefe(CL.rtText(R.ergebnis) === '12', 'MR holt den Speicher');
+  pruefe(R.verlauf.some(v => /^4 9 nCr 6 = 13\.983\.816$|^49 nCr 6 = 13\.983\.816$/.test(v)), 'Rechnungen landen im Verlauf („49 nCr 6 = 13.983.816“)');
+  pruefe(R.verlauf.length <= 20, 'der Verlauf hat höchstens 20 Einträge');
   const vorher = CL.alsText().replace(/"gespeichert": "[^"]*"/, '');
-  tippe('9 + 1 =');
+  tippe('9 + 1');
   pruefe(CL.alsText().replace(/"gespeichert": "[^"]*"/, '') === vorher, 'der Rechner schreibt nichts in die workbench.json');
   CL.oeffne('rechner');
   const h = inhalt();
-  pruefe(/rtTaste\('='\)/.test(h) && /rtTaste\('M\+'\)/.test(h) && (h.match(/class="taste[ "]/g) || []).length === 24, 'der Rechner zeigt 24 Tasten');
+  pruefe(/rtTaste\('='\)/.test(h) && /rtTaste\('sin'\)/.test(h) && /rtTaste\('ncr'\)/.test(h) && (h.match(/class="taste[ "]/g) || []).length === 38, 'der Rechner zeigt 18 Funktions- und 20 Zahlentasten');
+  pruefe(CL.document.getElementById('katKnopf').textContent === 'DEG', 'oben rechts: DEG');
+  CL.katUm();
+  pruefe(!R.grad && CL.document.getElementById('katKnopf').textContent === 'RAD' && /"grad":false/.test(CL.__ablage['clie-rechner']), 'Tipp oben rechts: RAD, gemerkt');
+  CL.katUm();
   CL.rtVerlaufUm();
-  pruefe(/rt-verlauf/.test(inhalt()) && /9 \+ 1 = 10/.test(inhalt()), '„Verlauf…“ zeigt die letzten Rechnungen');
+  pruefe(/rt-verlauf/.test(inhalt()) && /9\+1 = 10/.test(inhalt()), '„Verlauf…“ zeigt die letzten Rechnungen');
   CL.rtVerlaufUm();
   let gedrueckt = false;
+  CL.rtTaste('C');
   CL.tasteGlobal({ key: '7', preventDefault() { gedrueckt = true; } });
-  pruefe(gedrueckt && /7$/.test(CL.rt.anzeige), 'am PC tippt die Tastatur mit');
+  CL.tasteGlobal({ key: '^', preventDefault() {} }); CL.tasteGlobal({ key: '2', preventDefault() {} }); CL.tasteGlobal({ key: 'Enter', preventDefault() {} });
+  pruefe(gedrueckt && CL.rtText(R.ergebnis) === '49', 'am PC tippt die Tastatur mit (7^2 Enter = 49)');
   CL.oeffne('uebersicht');
 }
 
