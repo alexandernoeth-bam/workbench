@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 23, 'zwölf Felder im Raster (3×4), „Heute“ nur in der Leiste, der Rest in drei Ordnern (seit 0.35)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 24, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -1763,6 +1763,95 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   75. Lesezeichen, Schreibleiste, Jahr in Graustufen (0.38)
+   Grund: Die Pinnwand der Workbench war der Direktzugriff — in CLIE als
+   „Lesezeichen“ (Liste, ohne Pins und Farben) unten in der Leiste statt
+   „Heute“. Die Schreibleiste im Memo bekam alles, was die Workbench
+   konnte (aber nicht mehr). Der Jahreskalender ohne Farben.
+   Erkennt: Lesezeichen ohne Ziel sichtbar, Workbench-Zettel (g:) nicht
+   erkannt, Reihenfolge/Entfernen wirkungslos, Grabstein fehlt,
+   Schreibleiste setzt falsche Zeichen, Farben im Jahr.
+   ============================================================ */
+function lesezeichenTest() {
+  console.log('\n75. Lesezeichen, Schreibleiste, Jahr in Graustufen (0.38)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.cl.lz.bearbeiten = false;
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] a\n[] b\n[] c', status: 'laufend', kontext: 'privat', geaendert: 1 });
+  S.DB.gedanken.push({ id: 'n1', titel: 'WLAN, Zugänge', text: 'x', ordnung: 1, kontext: 'privat', geaendert: 1 });
+  S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub packen', text: '[x] a\n[] b', checkliste: 'lauf', ordnung: 2, kontext: 'privat', geaendert: 1 });
+  S.DB.themen.push({ id: 'l1', name: 'Haus', kontext: 'beruflich', text: '[] x', geaendert: 1 });
+  S.DB.sammlungen = [{ id: 's1', name: 'Abos', felder: [], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [{ id: 'd1', sammlung: 's1', werte: {}, angelegt: 1, geaendert: 1 }];
+  /* Bestand der Workbench-Pinnwand: Notiz mit g:-Kennung, Projekt, eine unbekannte Aufgabe */
+  S.DB.pinnwand = [{ id: 'w1', art: 'flaeche', zielId: 'g:n1', farbe: 'gelb', ordnung: 20, geaendert: 1 },
+                   { id: 'w2', art: 'projekt', zielId: 'p1', farbe: 'blau', ordnung: 10, geaendert: 1 },
+                   { id: 'w3', art: 'aufgabe', zielId: 'xx', farbe: 'gelb', ordnung: 5, geaendert: 1 }];
+  S.oeffne('lesezeichen');
+  let h = inhalt();
+  pruefe(/Carport/.test(h) && /WLAN, Zugänge/.test(h) && h.indexOf('Carport') < h.indexOf('WLAN') && !/xx/.test(h), 'Workbench-Zettel erscheinen als Lesezeichen (Reihenfolge übernommen, Unbekanntes still weg)');
+  pruefe(/3 offen/.test(h) && !/farbe|zettel|z-nadel/i.test(h), 'schlichte Liste mit Stand, ohne Pins und Farben');
+  pruefe(S.document.getElementById('reiter').textContent === 'Lesezeichen' && /lzBearbeitenUm/.test(S.document.getElementById('fuss').innerHTML), 'App „Lesezeichen“ mit „Bearbeiten“');
+  /* Hinzufügen */
+  S.lzBearbeitenUm(); S.lzNeuAuf();
+  const f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(['Memo', 'Listen', 'Checklisten', 'Sammlungen', 'Jahr (als Liste)'].every(g => f.indexOf('>' + g + '<') >= 0) && /☑ ◎ Carport/.test(f), 'Hinzufügen: Memo, Listen, Checklisten, Sammlungen, Jahr — Vorhandenes angehakt');
+  S.lzUm('liste', 'l1'); S.lzUm('flaeche', 'c1'); S.lzUm('sammlung', 's1'); S.lzUm('jahrliste', 'geburtstag');
+  S.aufklappZu(); S.lzBearbeitenUm();
+  h = inhalt();
+  pruefe(/Haus/.test(h) && /Urlaub packen/.test(h) && /1\/2/.test(h) && /Abos/.test(h) && /Geburtstag/.test(h) && /Jahr ▸ Liste/.test(h), 'Liste, Checkliste (1/2), Sammlung und Jahresliste als Lesezeichen');
+  pruefe(S.DB.pinnwand.filter(p => p.art === 'flaeche' && p.zielId === 'g:c1').length === 1, 'Checkliste wie in der Workbench als „flaeche“ mit g:-Kennung');
+  S.lzUm('liste', 'l1'); S.lzUm('liste', 'l1');
+  pruefe(S.DB.pinnwand.filter(p => p.art === 'liste').length === 1, 'zweimal tippen: entfernen und wieder hinzufügen');
+  /* Filter Beruf/Privat */
+  S.katSetzen('privat');
+  pruefe(!/Haus/.test(inhalt()) && /Carport/.test(inhalt()), 'Filter ▼: Privat zeigt keine beruflichen Lesezeichen');
+  S.katSetzen('alle');
+  /* Öffnen */
+  const id = n => S.DB.pinnwand.filter(p => p.zielId === n)[0].id;
+  S.lzOeffnen(id('l1')); pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'l1', 'Liste öffnet in Aufgaben');
+  S.lzOeffnen(id('g:c1')); pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'c1', 'Checkliste öffnet in Checklisten');
+  S.lzOeffnen(id('p1')); pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'p1', 'Projekt öffnet im Memo');
+  S.lzOeffnen(id('s1')); pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === 's1', 'Sammlung öffnet');
+  S.lzOeffnen(id('geburtstag')); pruefe(S.cl.app === 'kalender' && S.cl.kal.ansicht === 'jahr' && S.cl.ja.ansicht === 'liste' && S.cl.ja.filter === 'geburtstag', 'Jahresliste öffnet den Kalender bei „Geburtstag“');
+  S.clKalAnsicht('tag');
+  /* Bearbeiten: schieben, entfernen */
+  S.oeffne('lesezeichen'); S.lzBearbeitenUm();
+  const erste = S.lzSichtbar()[0].id; const zweite = S.lzSichtbar()[1].id;
+  S.lzSchieben(erste, 1);
+  pruefe(S.lzSichtbar()[0].id === zweite && S.lzSichtbar()[1].id === erste, '▼ verschiebt nach unten');
+  S.lzWeg(erste);
+  pruefe(!S.DB.pinnwand.some(p => p.id === erste) && (S.DB.grabsteine || []).some(g => g.s === 'pinnwand' && g.id === erste), '✕ entfernt (mit Grabstein)');
+  S.lzBearbeitenUm();
+  /* Schreibleiste */
+  S.oeffne('memo'); S.memoOeffnen('n1'); S.memoSchreibenUm();
+  const leiste = inhalt();
+  pruefe(S.MEMO_LEISTE.length === 13 && S.MEMO_LEISTE.every(k => leiste.indexOf("memoZeichen('" + k[0] + "')") >= 0), 'Schreibleiste mit 13 Knöpfen');
+  const feld = S.document.getElementById('memoFeld');
+  const satz = (text, a, e) => { feld.value = text; feld.selectionStart = a; feld.selectionEnd = e === undefined ? a : e; };
+  satz('Zeile', 2); S.memoZeichen('nicht'); pruefe(feld.value === '[-] Zeile', '[–]: nicht relevant');
+  S.memoZeichen('kasten'); pruefe(feld.value === '[] Zeile', '[ ] macht aus [-] eine Aufgabe');
+  satz('Zeile', 0); S.memoZeichen('zahl'); pruefe(feld.value === '1. Zeile', '1.: Nummerierung');
+  satz('- Punkt', 3); S.memoZeichen('ein'); pruefe(feld.value === '  - Punkt', '→ rückt ein');
+  S.memoZeichen('aus'); pruefe(feld.value === '- Punkt', '← rückt aus');
+  satz('ein Wort hier', 4, 8); S.memoZeichen('fett'); pruefe(feld.value === 'ein **Wort** hier', 'F: fett um die Auswahl');
+  satz('ein Wort hier', 4, 8); S.memoZeichen('unter'); pruefe(feld.value === 'ein __Wort__ hier', 'U: unterstrichen');
+  satz('ein Wort hier', 4, 8); S.memoZeichen('durch'); pruefe(feld.value === 'ein ~~Wort~~ hier', 'S: durchgestrichen');
+  satz('Angebot', 0, 7); S.memoZeichen('link'); pruefe(feld.value === '[Angebot](https://)', 'Link: [Text](https://)');
+  satz('oben', 4); S.memoZeichen('trenner'); pruefe(feld.value === 'oben\n---', 'Trenner');
+  satz('oben', 4); S.memoZeichen('tabelle'); pruefe(/^oben\n\| Spalte 1 \| Spalte 2 \|\n\|---\|---\|\n\|  \|  \|$/.test(feld.value), 'Tabelle als Vorlage');
+  pruefe(S.DB.gedanken.filter(g => g.id === 'n1')[0].text === feld.value, 'das Getippte landet in der Seite');
+  satz('x', 1); let verhindert = false; S.memoTaste({ key: 'Tab', shiftKey: false, preventDefault() { verhindert = true; } });
+  pruefe(verhindert && feld.value === '  x', 'Tab rückt ein (am PC)');
+  pruefe(/\.geraet\.schreibbreit\{max-width:900px\}/.test(QUELLE) && /classList\.add\('schreibbreit'\)/.test(QUELLE), 'am PC beim Schreiben breiter');
+  S.memoSchreibenUm();
+  /* Jahr ohne Farben */
+  pruefe(Object.keys(S.JA_ARTEN).every(k => ['#1C2116', '#56604A', '#8E9A7C'].indexOf(S.JA_ARTEN[k].f) >= 0) && S.jaArtFarbe('training') === '#56604A', 'Jahr: nur drei Graustufen, keine Farben');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    31. Jahrestermine, Feiertage und Ferien der Workbench (0.8.2)
    Grund: CLIE zeigte nur Google-Termine; im Jahreskalender der
    Workbench stehen dazu eigene Jahrestermine, Feiertage und Ferien.
@@ -1880,8 +1969,8 @@ function heuteTest() {
   S.katSetzen('alle');
   S.oeffne('uebersicht');
   pruefe(!/class="app" onclick="oeffne\('heute'\)"/.test(inhalt()) && S.clHeuteZahl() === 5, 'Heute nicht im Raster (seit 0.28) — die Zahl steht unten in der Leiste');
-  pruefe(/onclick="oeffne\('heute'\)"><b>◉<\/b>Heute<span id="heuteZahl"/.test(QUELLE) && !/<nav class="silk"[^]*?menueUm\(\)[^]*?<\/nav>/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE),
-    'Leiste unten: Heute statt Menü, Suchen bleibt');
+  pruefe(/onclick="oeffne\('lesezeichen'\)"><b>☆<\/b>Lesezeichen/.test(QUELLE) && !/<nav class="silk"[^]*?menueUm\(\)[^]*?<\/nav>/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE) && S.CL_ORDNER.planung.apps.indexOf('heute') >= 0,
+    'Leiste unten: Lesezeichen statt Heute (seit 0.38), Heute im Ordner Planung, Suchen bleibt');
   pruefe(/onclick="aufNeuAm\(isoDatum\(\),\\?'\\?'\)">Neu/.test(SKRIPT) || /aufNeuAm\(isoDatum\(\)/.test(SKRIPT), 'unten: Neu für heute');
   S.clUhrzeit = altUhr;
   S.zeichne();
@@ -2398,7 +2487,7 @@ function listeTextTest() {
   pruefe(/onclick="listeAlsText\(\)">„Haus“ als Text bearbeiten …/.test(S.document.getElementById('aufklapp').innerHTML), 'im Reiter-Menü: „Haus“ als Text bearbeiten …');
   S.listeAlsText();
   pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && S.cl.aufklapp === ''
-    && inhalt().indexOf('<textarea id="memoFeld" class="memo-feld" spellcheck="true" oninput="memoTextGetippt()">' + S.esc(S.DB.themen[0].text) + '</textarea>') >= 0,
+    && inhalt().indexOf('<textarea id="memoFeld" class="memo-feld" spellcheck="true" oninput="memoTextGetippt()" onkeydown="memoTaste(event)">' + S.esc(S.DB.themen[0].text) + '</textarea>') >= 0,
     'Schreibfeld zeigt die ganze Listenseite');
   const feld = S.document.getElementById('memoFeld');
   feld.value = '[] Fenster warten – Magnat anrufen\n    › Auftrag ausfüllen\n    › Wartung einplanen\n[] Lampe tauschen';
@@ -2433,7 +2522,7 @@ function laufZeichenTest() {
   S.oeffne('aufgaben'); S.aufListeSetzen('lh');
   S.listeAlsText();
   const h = inhalt();
-  pruefe(/memoZeichen\('kasten'\)/.test(h) && /memoZeichen\('h'\)/.test(h) && /memoZeichen\('punkt'\)" aria-label="Aufzählung">•<\/button><\/div>/.test(h), 'Schreibleiste: [ ] H • — und nichts danach');
+  pruefe(/memoZeichen\('kasten'\)/.test(h) && /memoZeichen\('h'\)/.test(h) && /memoZeichen\('tabelle'\)" aria-label="Tabelle">⊞<\/button><\/div>/.test(h), 'Schreibleiste: [ ] … ⊞ — und nichts danach (seit 0.38 die volle Leiste)');
   pruefe(!/memoZeichen\('lauf'\)/.test(h) && !/'lauf'|▶ '/.test(funktionText(SKRIPT, 'memoZeichen')), 'kein ▶-Knopf, keine ▶-Sonderbehandlung');
   S.memoSchreibenUm();
   S.oeffne('uebersicht');
@@ -3237,6 +3326,96 @@ function schuleTest() {
 }
 
 /* ============================================================
+   74. Jahreskalender und Listen nach Art (0.37)
+   Grund: Das Jahresraster mit Arten und Ferien war das Highlight der
+   Workbench. Use Cases: alle Geburtstage als Liste, alle Treffen mit
+   einer Freundin rückwärts.
+   Erkennt: Arten aus #Kürzel/Zuordnung nicht erkannt, Raster ohne Farbe,
+   jährliche Termine im falschen Jahr, Liste falsch sortiert, Suche
+   wirkungslos, Jahrestermin nicht gespeichert/gelöscht, Zuordnung ohne
+   Grabstein beim Aufheben.
+   ============================================================ */
+function jahrTest() {
+  console.log('\n74. Jahreskalender und Listen nach Art (0.37)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const j = Number(heute.slice(0, 4));
+  S.cl.ja = Object.assign(S.cl.ja, { jahr: 0, filter: '', ansicht: 'raster', suche: '', tag: '', jt: null, termine: {}, geladen: {}, ab: 0 });
+  S.termineNachTag = {};
+  const vor = n => S.tagePlus(heute, -n);
+  S.DB.jahrestermine = [
+    { id: 'g1', titel: 'Moni', von: '1974-' + S.tagePlus(heute, 10).slice(5), jaehrlich: true, art: 'geburtstag', kontext: 'privat', jahrgang: '1974', geaendert: 1 },
+    { id: 'g2', titel: 'Papa *1948', von: '2020-' + S.tagePlus(heute, 3).slice(5), jaehrlich: true, art: 'geburtstag', kontext: 'privat', geaendert: 1 },
+    { id: 'u1', titel: 'Ostsee', von: S.tagePlus(heute, 20), bis: S.tagePlus(heute, 27), art: 'urlaub', kontext: 'privat', geaendert: 1 }];
+  S.cl.ja.termine[vor(18)] = [{ id: 'b1', titel: 'Brunch bei Sabine #Besuch', rohTitel: 'Brunch bei Sabine #Besuch', zeit: '10:00', ganztags: false, kontext: 'privat', kalId: 'k' }];
+  S.cl.ja.termine[vor(120)] = [{ id: 'b2', titel: 'Grillen mit Sabine und Tom', rohTitel: 'Grillen mit Sabine und Tom', zeit: '18:00', ganztags: false, kontext: 'privat', kalId: 'k' }];
+  S.cl.ja.termine[vor(60)] = [{ id: 'b3', titel: 'Kino', rohTitel: 'Kino', beschreibung: 'mit Petra #besuche', zeit: '20:00', ganztags: false, kontext: 'privat', kalId: 'k' }];
+  pruefe(S.jaArtenAusText('Brunch #Besuch und #Feiern').join() === 'besuche,feier' && S.jaTerminArten(S.cl.ja.termine[vor(60)][0]).join() === 'besuche', 'Arten aus #Kürzel im Titel oder in der Beschreibung (Einzahl = Mehrzahl)');
+  /* Ansicht J */
+  S.oeffne('kalender'); S.clKalAnsicht('jahr');
+  pruefe(S.cl.kal.ansicht === 'jahr' && /ja-raster/.test(inhalt()) && /Jahr \d{4}/.test(S.document.getElementById('reiter').textContent), 'Kalender: Ansicht „J“ zeigt das Jahresraster');
+  pruefe(/clKalAnsicht\('jahr'\)/.test(S.document.getElementById('fuss').innerHTML) && /jaAnsicht\('liste'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: J und „Als Liste“');
+  const zellen = (inhalt().match(/onclick="jaTagOeffnen\('\d{4}-\d{2}-\d{2}'\)"/g) || []).length;
+  const schalt = (j % 4 === 0 && (j % 100 !== 0 || j % 400 === 0)) ? 366 : 365;
+  pruefe(zellen === schalt, 'jeder Tag des Jahres genau einmal (' + zellen + ')');
+  const tagG = S.tagePlus(heute, 10);
+  pruefe(S.jaAn(tagG).some(x => x.id === 'g1') && new RegExp('class="art[^"]*" style="background:#8E9A7C" onclick="jaTagOeffnen\\(\'' + tagG + '\'\\)"').test(inhalt().replace(/class="([^"]*)"/g, (m, c) => 'class="' + c.split(' ').filter(k => k === 'art').join(' ') + '"')),
+    'jährlicher Geburtstag im aktuellen Jahr, in seiner Abstufung (seit 0.38 ohne Farben)');
+  S.jaFilter('urlaub');
+  pruefe(!S.jaAn(tagG).filter(S.jaPasst).length && S.jaAn(S.tagePlus(heute, 22)).filter(S.jaPasst).length === 1, 'Filter nach Art');
+  /* Liste Geburtstage */
+  S.jaFilter('geburtstag'); S.jaAnsicht('liste');
+  let h = inhalt();
+  pruefe(h.indexOf('Papa') < h.indexOf('Moni') && /Moni \(\d+\)/.test(h) && /Papa \*1948 \(\d+\)/.test(h) && /in 3 T\./.test(h), 'Geburtstage: nach dem nächsten Datum, mit Alter (Jahrgang oder Jahreszahl im Titel)');
+  const alterMoni = Number(S.tagePlus(heute, 10).slice(0, 4)) - 1974;
+  pruefe(new RegExp('Moni \\(' + alterMoni + '\\)').test(h), 'Alter stimmt (' + alterMoni + ')');
+  /* Liste Besuche rückwärts mit Suche */
+  S.jaFilter('besuche'); S.jaAnsicht('liste');
+  h = inhalt();
+  pruefe(/Brunch bei Sabine/.test(h) && /Kino/.test(h) && !/Grillen/.test(h) && h.indexOf('Brunch') < h.indexOf('Kino'), 'Besuche: neueste oben, nur mit Art');
+  S.jaZuordnen('b2', 'besuche');
+  pruefe(S.DB.kalenderzuordnung.b2.art === 'besuche' && /Grillen mit Sabine/.test(inhalt()), 'Art zuordnen: Grillen zählt jetzt zu Besuche');
+  S.document.getElementById('jaSuche').value = 'sabine'; S.jaSucheGetippt();
+  h = S.document.getElementById('jaTreffer').innerHTML;
+  pruefe(/Brunch/.test(h) && /Grillen/.test(h) && !/Kino/.test(h), 'Suche „sabine“: wann wir Sabine getroffen haben');
+  pruefe(/vor 18 T\./.test(h) && /vor \d Mon\./.test(h), 'Abstand: „vor 18 T.“, „vor 4 Mon.“');
+  S.jaZuordnen('b2', 'besuche');
+  pruefe(!S.DB.kalenderzuordnung.b2 && (S.DB.grabsteine || []).some(g => g.s === 'kalenderzuordnung' && g.id === 'b2'), 'dieselbe Art nochmals: Zuordnung aufgehoben, mit Grabstein');
+  S.cl.ja.suche = '';
+  /* Jahrestermin anlegen, ändern, löschen */
+  S.jaJtNeu(heute);
+  pruefe(S.cl.aufklapp === 'jahr' && /jaTitel/.test(S.document.getElementById('aufklapp').innerHTML) && S.cl.ja.jt.art === 'besuche', 'Neuer Jahrestermin: Fenster, Art vom Filter');
+  S.document.getElementById('jaTitel').value = 'Anna'; S.document.getElementById('jaVon').value = '2014-03-03'; S.document.getElementById('jaBis').value = '';
+  S.document.getElementById('jaJaehrlich').checked = true; S.document.getElementById('jaJahrgang').value = '2014';
+  S.jaJtSetzen('art', 'geburtstag');
+  S.jaJtSpeichern();
+  const anna = S.DB.jahrestermine.filter(e => e.titel === 'Anna')[0];
+  pruefe(anna && anna.jaehrlich && anna.art === 'geburtstag' && anna.jahrgang === '2014' && anna.bis === '2014-03-03' && !S.cl.aufklapp, 'gespeichert: jährlich, Art, Jahrgang');
+  S.jaJtOeffnen(anna.id);
+  S.document.getElementById('jaTitel').value = ''; S.jaJtSpeichern();
+  pruefe(S.cl.aufklapp === 'jahr' && anna.titel === 'Anna', 'ohne Bezeichnung kein Speichern');
+  S.jaJtLoeschen();
+  pruefe(!S.DB.jahrestermine.some(e => e.id === anna.id) && (S.DB.grabsteine || []).some(g => g.s === 'jahrestermine' && g.id === anna.id), 'Löschen mit Grabstein');
+  /* Tag antippen */
+  S.jaAnsicht('raster'); S.jaFilter('');
+  S.jaTagOeffnen(vor(18));
+  const f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Brunch bei Sabine/.test(f) && /jaZuordnen\('b1','besuche'\)/.test(f) && /clKalGehe/.test(f), 'Tag antippen: Termine mit Art-Auswahl, „Zum Tag“');
+  S.jaFensterZu();
+  /* Blättern und Kontext */
+  S.clBlaettern(1);
+  pruefe(S.cl.ja.jahr === j + 1, 'Wischen blättert das Jahr');
+  S.cl.ja.jahr = j;
+  S.katSetzen('beruflich');
+  pruefe(!S.jaAn(tagG).some(x => x.id === 'g1'), 'Filter Beruf/Privat gilt auch im Jahr');
+  S.katSetzen('alle');
+  S.clKalAnsicht('tag');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    73. Memo: Bereich als Auswahl (0.36)
    Grund: Die Memo-Liste war eine endlose Liste (Projekte, Ziele, Ruhend,
    Notizen, Abgeschlossen untereinander). Seit 0.36 wählt ein Knopf ▼ den
@@ -3289,7 +3468,7 @@ function startOrdnerTest() {
   const S = CL;
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
   const imOrdner = [].concat(...Object.keys(S.CL_ORDNER).map(k => S.CL_ORDNER[k].apps));
-  const leiste = ['heute', 'abgleich', 'kurs'];
+  const leiste = ['lesezeichen', 'abgleich', 'kurs'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -4788,6 +4967,7 @@ function lernkarteiTest() {
   try { zurueckTest(); } catch (e) { fail('Zurück warf: ' + e.message); }
   try { formelTest(); } catch (e) { fail('Formeln warf: ' + e.message); }
   try { kennzahlTest(); } catch (e) { fail('Kennzahl warf: ' + e.message); }
+  try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
   try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
   try { trainingTest(); } catch (e) { fail('Training warf: ' + e.message); }
@@ -4810,6 +4990,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { jahrTest(); } catch (e) { fail('Jahr warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoBereichTest(); } catch (e) { fail('Memo-Bereich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { startOrdnerTest(); } catch (e) { fail('Start mit Ordnern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coachQuellenTest(); } catch (e) { fail('Coach-Quellen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
