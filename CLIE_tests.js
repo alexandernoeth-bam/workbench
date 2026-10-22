@@ -286,7 +286,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 16 && CL.CL_APPS.length === 20, 'sechzehn Apps im Raster, „Heute“ nur in der Leiste, Sudoku/Solitär/Stones im Spiele-Fenster (seit 0.32)');
+  pruefe((h.match(/class="app"/g) || []).length === 16 && CL.CL_APPS.length === 21, 'sechzehn Apps im Raster, „Heute“ nur in der Leiste, Sudoku/Solitär/Stones im Spiele-Fenster, Kurs unter dem Coach (seit 0.33)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -413,9 +413,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","kurs","ideen","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","spiele","schach","lernkartei","vorlesen","abgleich"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","coach","ideen","aufgaben","memo","checklisten","sammlungen","routinen","einkauf","rechner","drive","spiele","schach","lernkartei","vorlesen","abgleich"]'
     && CL.clApp('heute') && CL.clApp('heute').raster === false,
-    'genau sechzehn Apps im Raster: Kalender, Kurs (statt Heute, seit 0.28), Ideenwerkstatt (seit 0.31), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Spiele (seit 0.32 statt Stones), Schach, Lernkartei, Vorlesen, Abgleich');
+    'genau sechzehn Apps im Raster: Kalender, Coach (statt Kurs, seit 0.33), Ideenwerkstatt (seit 0.31), Aufgaben, Memo, Checklisten, Sammlungen, Routinen, Einkauf, Rechner, Drive, Spiele (seit 0.32 statt Stones), Schach, Lernkartei, Vorlesen, Abgleich');
   pruefe(!/oeffne\('(projekte|ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Projekte, Ziele, Listen oder Woche');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -3233,6 +3233,200 @@ function schuleTest() {
 }
 
 /* ============================================================
+   69. Coach (0.33)
+   Grund: Kurs war eine Doku-App mit Fragebogen am Morgen. Gewünscht ist
+   ein Assistent, der von sich aus anspricht: „Du hast dir X vorgenommen —
+   wie steht es?“, Termine vorbereiten lässt, an Vorsätze erinnert und
+   abends Bilanz zieht. Antworten wirken (verschieben, aus dem Tag nehmen,
+   Vorbereitungs-Aufgabe anlegen).
+   Erkennt: Fragen zur falschen Zeit, Erledigtes wird weiter abgefragt,
+   Antworten ohne Wirkung, bloßes Anzeigen schreibt in die workbench.json,
+   Coach-Termine erscheinen in CLIE, Energie-Frage taucht wieder auf.
+   ============================================================ */
+function coachTest() {
+  console.log('\n69. Coach (0.33)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const morgen = S.tagePlus(heute, 1);
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
+  const s = S.kpSeiteAnlegen('liste', 'Haus', 'privat', '');
+  ['Steuer-Unterlagen sortieren', 'P1 Angebot Müller', 'Keller aufräumen', 'Fahrrad flicken'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
+  S.termineNachTag = {}; S.termineNachTag[heute] = [{ id: 'tr1', titel: 'Team-Runde', rohTitel: 'Team-Runde', zeit: '10:00', bis: '11:00', ganztags: false, kontext: '' },
+    { id: 'tc1', titel: 'Coach: Halbzeit', rohTitel: 'Coach: Halbzeit', zeit: '12:30', bis: '12:35', ganztags: false, kontext: '' }];
+  pruefe(S.clApp('coach') && S.CL_BILD.coach && S.clApp('kurs').raster === false, 'App „Coach“ im Raster, Kurs liegt darunter');
+  pruefe(S.clTermineAm(heute).zeit.length === 1 && S.coTagDaten(heute).termine.length === 1, 'Coach-Termine („Coach: …“) sind in CLIE ausgeblendet');
+  /* Morgen */
+  const m = S.coFaellige('07:45', heute);
+  const mo = m.filter(f => f.id === 'morgen')[0];
+  pruefe(mo && /Vorgenommen für heute/.test(mo.text) && /Angebot Müller/.test(mo.text) && /Team-Runde|Termine: 1/.test(mo.text) && /Womit fängst du an\?/.test(mo.text), 'morgens: was vorgenommen ist, die Termine, „Womit fängst du an?“');
+  pruefe(mo.antworten[0][1] === 'Angebot Müller' && mo.antworten.some(a => a[0] === 'vornehmen'), 'Antworten: die Aufgaben (P1 zuerst) und „+ Vornehmen“');
+  pruefe(!m.some(f => /Energie/.test(f.text)) && !S.coFaellige('07:00', heute).some(f => f.id === 'morgen'), 'keine Energie-Frage; vor 7:30 noch still');
+  /* Termin vorbereiten */
+  const tv = S.coFaellige('09:20', heute).filter(f => /^tv:/.test(f.id))[0];
+  pruefe(tv && /In 40 Min\.: „Team-Runde“/.test(tv.text) && !S.coFaellige('09:00', heute).some(f => /^tv:/.test(f.id)), 'Termin: 45 Min. vorher „Ist alles vorbereitet?“');
+  const vorher = S.alsText().replace(/"gespeichert": "[^"]*"/, '');
+  const v1 = S.coVerlauf('09:20', heute);
+  pruefe(S.alsText().replace(/"gespeichert": "[^"]*"/, '') === vorher && v1.length >= 2, 'Anzeigen allein schreibt nichts in die workbench.json');
+  S.coAntwort(tv.id, 'nein', 1, '09:20');
+  const coachListe = S.kpSeitenAlle().filter(x => x.titel === 'Coach')[0];
+  pruefe(coachListe && /Vorbereiten: Team-Runde/.test(coachListe.text) && S.coTagDaten(heute).offen.some(z => /Vorbereiten: Team-Runde/.test(z.a.text)), '„Noch nicht“: Aufgabe „Vorbereiten: Team-Runde“ für heute');
+  pruefe(S.coTag(false, heute).coach.verlauf.filter(f => f.id === tv.id && f.antwort === 'nein').length === 1, 'die Antwort ist im Tag gespeichert');
+  pruefe(!S.coVerlauf('09:25', heute).some(f => f.id === tv.id && !f.antwort), 'beantwortet: wird nicht erneut gefragt');
+  /* Mittag */
+  const steuerNr = S.clTagZeilen(heute).filter(z => z.a && /Angebot/.test(z.a.text))[0].nr;
+  S.clTagZeileUm(heute, steuerNr);
+  const mi = S.coFaellige('12:40', heute).filter(f => f.id === 'mittag')[0];
+  pruefe(mi && /Halbzeit: „Angebot Müller“ ✓/.test(mi.text) && /schaffst du das heute noch\?/.test(mi.text) && mi.antworten.map(a => a[0]).join() === 'ja,morgen,lass', 'Halbzeit: Erledigtes ✓, nächstes Offenes mit Ja / Morgen / Lass ich');
+  const offen1 = mi.bezug.text;
+  S.coAntwort('mittag', 'morgen', 1, '12:40');
+  pruefe(!S.coTagDaten(heute).offen.some(z => z.a.text === offen1) && S.clTagZeilen(morgen).some(z => z.a && z.a.text === offen1), '„Morgen“: Aufgabe auf morgen verschoben');
+  /* Nachmittag: je offene Aufgabe, Erledigtes fällt heraus */
+  const nm = S.coFaellige('16:40', heute).filter(f => /^nm:/.test(f.id));
+  pruefe(nm.length >= 2 && nm.length <= 3 && !nm.some(f => /Angebot/.test(f.id)), 'Nachmittag: nur noch Offenes, höchstens drei');
+  const kel = nm.filter(f => /Keller/.test(f.id))[0];
+  S.coAntwort(kel.id, 'lass', 2, '16:40');
+  const kz = S.kpZeileSuchen(s, 'Keller aufräumen');
+  pruefe(!S.coTagDaten(heute).offen.some(z => /Keller/.test(z.a.text)) && kz && !kz.erledigt, '„Lass ich“: aus dem Tag genommen, bleibt in der Liste');
+  /* Vorsätze */
+  S.krSpeichern({ id: 'kp-t1', typ: 'prinzip', rang: 1, text: 'Kein Handy', konkret: 'ins Regal legen', zeit: '21:00', zeitArt: 'ab' });
+  S.krSpeichern({ id: 'kp-t2', typ: 'prinzip', rang: 2, text: '20 Min. spazieren', zeit: '18:00', zeitArt: 'bis' });
+  pruefe(!S.coFaellige('20:30', heute).some(f => f.id === 'vs:kp-t1') && S.coFaellige('20:46', heute).some(f => f.id === 'vs:kp-t1' && /Ab 21:00 gilt dein Vorsatz: „Kein Handy“ — ins Regal legen/.test(f.text)), 'Vorsatz „ab“: eine Viertelstunde vorher');
+  const sp = S.coFaellige('17:10', heute).filter(f => f.id === 'vs:kp-t2')[0];
+  pruefe(sp && /Bis 18:00 wolltest du/.test(sp.text) && sp.antworten.length === 3 && !S.coFaellige('16:50', heute).some(f => f.id === 'vs:kp-t2'), 'Vorsatz „bis“: eine Stunde vorher „Schon geschafft?“');
+  /* Abend */
+  const ab = S.coFaellige('20:35', heute).filter(f => f.id === 'abend')[0];
+  pruefe(ab && /Heute erledigt: 1 von/.test(ab.text) && ab.antworten[0][0] === 'alle-morgen', 'Abend: Bilanz und „Alles auf morgen“');
+  S.coAntwort('abend', 'alle-morgen', 0, '20:35');
+  pruefe(S.coTagDaten(heute).offen.length === 0 && S.clTagZeilen(morgen).filter(z => z.a && !z.a.erledigt).length >= 3, 'Alles Offene steht morgen an');
+  pruefe(S.coFaellige('20:40', heute).filter(f => f.id === 'abend')[0].antworten[0][0] === 'ok', 'danach: „Alles erledigt“');
+  /* Übersicht, App, Tag-Auswahl, Zurück */
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.oeffne('uebersicht');
+  pruefe(/co-oben|co-zeile-still/.test(inhalt()) && /oeffne\('coach'\)/.test(inhalt()), 'Übersicht: oben spricht der Coach');
+  S.oeffne('coach');
+  pruefe(/co-verlauf/.test(inhalt()) && /Team-Runde/.test(inhalt()) && /co-msg ich/.test(inhalt()), 'Coach-App: Tagesverlauf mit Fragen und Antworten');
+  pruefe(/aufNeuAm\(isoDatum\(\)/.test(S.document.getElementById('fuss').innerHTML) && /coMehr\('prinzipien'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: + Vornehmen, Vorsätze, Mehr…');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'cotag' && /Gestern/.test(S.document.getElementById('aufklapp').innerHTML), '▾: die letzten Tage');
+  S.coTagWahl(S.tagePlus(heute, -1));
+  pruefe(S.cl.co.tag && /still/.test(inhalt()), 'gestern ohne Coach: „still“');
+  S.clZurueck();
+  pruefe(S.cl.co.tag === '' && S.cl.app === 'coach', 'Zurück: wieder heute');
+  S.coMehrAuf();
+  pruefe(/coMehr\('bilanz'\)/.test(S.document.getElementById('aufklapp').innerHTML) && /coMehr\('woche'\)/.test(S.document.getElementById('aufklapp').innerHTML) && /coEinstOeffnen/.test(S.document.getElementById('aufklapp').innerHTML), 'Mehr: Einstellungen, Fokus & Bereiche, Woche & Rückblick, Pfade');
+  S.coMehr('bilanz');
+  pruefe(S.cl.app === 'kurs' && S.cl.kr.ansicht === 'bilanz', 'Mehr → Kurs-Bilanz');
+  S.clZurueck();
+  pruefe(S.cl.app === 'coach', 'aus Kurs zurück zum Coach');
+  /* Einstellungen */
+  S.coEinstOeffnen();
+  pruefe(/coZ-mittag/.test(inhalt()) && /coKal/.test(inhalt()), 'Einstellungen: Zeiten, Vorlauf, Kalender');
+  S.document.getElementById('coZ-morgen').value = '07:30'; S.document.getElementById('coZ-mittag').value = '13:00';
+  S.document.getElementById('coZ-nachmittag').value = '16:30'; S.document.getElementById('coZ-abend').value = '21:00';
+  S.document.getElementById('coVorlauf').value = '30'; S.document.getElementById('coKal').checked = false;
+  S.coEinstSpeichern();
+  const e = S.coEinst();
+  pruefe(e.mittag === '13:00' && e.abend === '21:00' && e.vorlauf === 30 && e.kalender === false && S.cl.co.ansicht === 'verlauf', 'Einstellungen gespeichert (synchronisiert über „kurs“)');
+  pruefe(!S.coFaellige('12:40', heute).some(f => f.id === 'mittag'), 'Mittag jetzt erst ab 13:00');
+  /* Vorsatz mit Uhrzeit im Prinzip-Fenster */
+  S.oeffne('kurs'); S.krAnsicht('prinzipien'); S.krPrinzipOeffnen('kp-t1');
+  pruefe(/krPZeit/.test(inhalt()) && /krPArt/.test(inhalt()), 'Prinzip/Vorsatz: Uhrzeit „ab“ / „bis“');
+  S.document.getElementById('krPText').value = 'Kein Handy'; S.document.getElementById('krPKonkret').value = '';
+  S.document.getElementById('krPArt').value = 'bis'; S.document.getElementById('krPZeit').value = '22:15';
+  S.krPrinzipSpeichern();
+  pruefe(S.krFinden('kp-t1').zeit === '22:15' && S.krFinden('kp-t1').zeitArt === 'bis', 'Uhrzeit am Vorsatz gespeichert');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   70. Coach: Vorab hinterfragen und Kalender-Erinnerungen (0.33)
+   Grund: Neues soll vorab hinterfragt werden („Was fällt dafür weg?“);
+   der Coach soll sich über den Kalender aufs Handy melden.
+   Erkennt: Nachfrage bei Kleinkram, keine Nachfrage bei P1 oder vollem
+   Tag, „Lass ich“ löscht nicht, „Bis Sonntag“ ohne Wiedervorlage,
+   doppelte Kalender-Termine, Erinnerungen ohne Aufräumen.
+   ============================================================ */
+async function coachVorabTest() {
+  console.log('\n70. Coach: Vorab hinterfragen und Kalender-Erinnerungen (0.33)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const s = S.kpSeiteAnlegen('liste', 'Verein', 'privat', '');
+  S.termineNachTag = {};
+  pruefe(!S.coVorabNoetig('Batterien kaufen', '') && S.coVorabNoetig('P1 Vereinsfest mitorganisieren', '') && S.coVorabNoetig('P2 Steuer', ''), 'Nachfrage bei Prio 1/2, nicht bei Kleinkram');
+  ['A', 'B', 'C'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
+  pruefe(S.coVorabNoetig('Noch etwas', heute) && !S.coVorabNoetig('Noch etwas', S.tagePlus(heute, 3)), 'Nachfrage, wenn der Tag schon drei offene Aufgaben hat');
+  /* Neue Aufgabe über das Fenster */
+  S.oeffne('aufgaben'); S.aufNeuAm(heute, '');
+  S.cl.auf.fenster.seite = s.id; S.cl.auf.fenster.text = 'P1 Vereinsfest mitorganisieren';
+  S.document.getElementById('aufText').value = 'P1 Vereinsfest mitorganisieren';
+  S.aufSpeichern();
+  pruefe(S.cl.aufklapp === 'covorab' && /Was fällt dafür weg\?/.test(S.document.getElementById('aufklapp').innerHTML) && /Vereinsfest/.test(S.document.getElementById('aufklapp').innerHTML), 'neue P1-Aufgabe: „Coach fragt nach“');
+  S.document.getElementById('coWeg').value = 'Dienstag-Training';
+  S.coVorabEntscheiden('spaeter');
+  const o = S.krAlle('coachoffen')[0];
+  const so = S.coSonntag(heute);
+  pruefe(o && o.text === 'Vereinsfest mitorganisieren' && o.faellig === so && S.ausIso(so).getDay() === 0 && so > heute && o.weg === 'Dienstag-Training', '„Bis Sonntag überlegen“: Wiedervorlage am Sonntag, „fällt weg“ gemerkt');
+  pruefe(!S.coTagDaten(heute).offen.some(z => /Vereinsfest/.test(z.a.text)) && /Vereinsfest/.test(s.text), 'bis dahin nicht für heute geplant, bleibt in der Liste');
+  pruefe(S.krEntscheidungen('').some(x => x.quelle === 'coach' && /Dienstag-Training/.test(x.antwort)), 'Entscheidung im Buch (Kurs)');
+  const oe = S.coFaellige('10:00', so).filter(f => f.id === 'oe:' + o.id)[0];
+  pruefe(oe && /Du wolltest entscheiden: „Vereinsfest mitorganisieren“ \(dafür fiele weg: Dienstag-Training\)/.test(oe.text) && !S.coFaellige('10:00', heute).some(f => f.id === 'oe:' + o.id), 'am Sonntag fragt der Coach nach');
+  S.cl.co.tag = ''; S.localStorage.removeItem('clie-coach-gesehen');
+  S.coOffenEntscheiden(o.id, false);
+  pruefe(!/Vereinsfest/.test(s.text) && S.krFinden(o.id).erledigt === 'nein', '„Lass ich“: Aufgabe gestrichen');
+  /* Lass ich sofort */
+  S.coVorabAuf({ art: 'aufgabe', text: 'P2 Grillabend', seite: s.id, datum: '' });
+  S.aufZeileAnhaengen(s, 'P2 Grillabend');
+  S.document.getElementById('coWeg').value = '';
+  S.coVorabEntscheiden('lass');
+  pruefe(!/Grillabend/.test(s.text) && !S.cl.aufklapp, 'sofort „Lass ich“: gelöscht, Fenster zu');
+  /* Kalender-Erinnerungen */
+  const abrufe = [];
+  let nr = 0;
+  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
+  S.schreibKalender = [{ id: 'haupt', name: 'Privat', primary: true }, { id: 'coachkal', name: 'Coach', primary: false }];
+  S.fetch = function (adresse, opt) {
+    abrufe.push((opt && opt.method || 'GET') + ' ' + adresse + ' ' + ((opt && opt.body) || ''));
+    nr++;
+    return Promise.resolve({ ok: true, status: 200, json() { return Promise.resolve({ id: 'ev' + nr }); }, text() { return Promise.resolve(''); } });
+  };
+  S.cl.co.kalZuletzt = 0; S.cl.co.kalLaeuft = false;
+  await S.coKalenderPlanen(true, '08:00', heute);
+  const posts = abrufe.filter(a => /^POST /.test(a));
+  pruefe(posts.length >= 3 && posts.every(a => /calendars\/coachkal\/events/.test(a)) && posts.every(a => /"summary":"Coach: /.test(a)) && posts.some(a => /Halbzeit/.test(a)),
+    'Erinnerungen als „Coach: …“-Termine im Kalender „Coach“ (' + posts.length + ')');
+  pruefe(posts.every(a => /"overrides":\[\{"method":"popup","minutes":0\}\]/.test(a)) && posts.every(a => /#coach/.test(a)), 'mit Benachrichtigung zur Zeit und Link zurück zum Coach');
+  const kal = S.coTag(false, heute).coach.kal;
+  pruefe(Object.keys(kal).length === posts.length && kal.mittag && kal.mittag.id, 'Termin-Kennungen im Tag gemerkt');
+  abrufe.length = 0;
+  await S.coKalenderPlanen(true, '08:00', heute);
+  pruefe(abrufe.filter(a => /^(POST|PATCH|DELETE) /.test(a)).length === 0, 'unverändert: kein zweiter Termin');
+  /* Alles erledigt: Mittag/Nachmittag fallen weg, Abend-Text ändert sich */
+  S.clTagZeilen(heute).forEach(z => { if (z.a && !z.a.erledigt) { S.clTagZeileUm(heute, z.nr); } });
+  abrufe.length = 0;
+  await S.coKalenderPlanen(true, '08:00', heute);
+  pruefe(abrufe.filter(a => /^DELETE /.test(a)).length === 2 && abrufe.some(a => /^PATCH .*Tagesrückblick/.test(a)) && !S.coTag(false, heute).coach.kal.mittag, 'nicht mehr nötig: gelöscht; geänderter Text: angepasst');
+  /* Ohne Kalender „Coach“: Hauptkalender */
+  S.schreibKalender = [{ id: 'haupt', name: 'Privat', primary: true }];
+  let ziel = await S.coKalenderZiel();
+  pruefe(ziel === 'haupt', 'ohne Kalender „Coach“: im Hauptkalender');
+  /* Termin ab einer Stunde */
+  pruefe(/dauer >= 60/.test(QUELLE) && /coVorabAuf\(\{ art: 'termin'/.test(QUELLE), 'neuer Termin ab einer Stunde: der Coach fragt nach');
+  S.coVorabAuf({ art: 'termin', text: 'Vereinssitzung', dauer: '2 Std.', kalId: 'haupt', terminId: 'evX', datum: heute });
+  abrufe.length = 0;
+  S.coVorabEntscheiden('lass');
+  await new Promise(r => setImmediate(r));
+  pruefe(abrufe.some(a => /^DELETE .*calendars\/haupt\/events\/evX/.test(a)), 'Termin „Lass ich“: im Kalender gelöscht');
+  S.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
+  S.zugriffToken = null; S.tokenAblauf = 0;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    67. Spiele-Fenster und Sudoku (0.32)
    Grund: Neue App „Spiele“: ein Fenster mit Sudoku, Solitär und Stones.
    Sudoku mit drei Stufen, eindeutig lösbar, Notizen, Rückgängig, Tipp,
@@ -3650,12 +3844,13 @@ function kurs2Test() {
   pruefe(k.length === 7 && k[6].e === 'ja' && k[6].heute, 'Kette: heute ✓');
   pruefe(/class="an heute">✓/.test(inhalt()), 'Kette auf „Heute im Kurs“');
   /* Hinweise unter Heute */
-  pruefe(/krTagesHinweis\(\) \? \['<button type="button" class="hz"/.test(QUELLE) && typeof S.krTagesHinweis() === 'string', 'Hinweise Morgen/Abend unter „Heute“');
+  pruefe(!/krTagesHinweis\(\) \?/.test(QUELLE) && !/Morgen-Runde/.test((S.oeffne('heute'), inhalt())), 'seit 0.33 keine Morgen-/Abend-Runde mehr unter „Heute“ — der Coach fragt selbst');
+  S.oeffne('kurs');
   /* Zurück */
   S.krMorgenStarten(); S.krRundeSchritt(1); S.krRundeSchritt(1);
   S.clZurueck(); pruefe(S.cl.kr.runde.schritt === 2, 'Zurück in der Morgen-Runde: ein Schritt');
-  S.clZurueck(); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'heute', 'dann zu „Heute im Kurs“');
-  S.krAnsicht('prinzipien'); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz', 'Prinzipien → zurück zur Bilanz');
+  S.clZurueck(); S.clZurueck(); pruefe(S.cl.app === 'coach', 'dann zum Coach (seit 0.33)');
+  S.oeffne('kurs'); S.krAnsicht('prinzipien'); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz', 'Prinzipien → zurück zur Bilanz');
   S.oeffne('uebersicht');
 }
 
@@ -3853,7 +4048,8 @@ function kursTest() {
   /* Zurück */
   S.krCheckNeu(); S.document.getElementById('krWas').value = 'x'; S.krCheckSchritt(1);
   S.clZurueck(); pruefe(S.cl.kr.check.schritt === 1, 'Zurück im Check: ein Schritt zurück');
-  S.clZurueck(); pruefe(S.cl.kr.ansicht === 'heute' && !S.cl.kr.check, 'dann zu „Heute im Kurs“ (seit 0.30)');
+  S.clZurueck(); pruefe(S.cl.app === 'coach' && !S.cl.kr.check, 'dann zum Coach (seit 0.33)');
+  S.oeffne('kurs');
   S.oeffne('uebersicht');
 }
 
@@ -4389,6 +4585,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { coachTest(); } catch (e) { fail('Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { await coachVorabTest(); } catch (e) { fail('Coach vorab warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spieleSudokuTest(); } catch (e) { fail('Sudoku warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { solitaerTest(); } catch (e) { fail('Solitär warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { eingabeTest(); } catch (e) { fail('Getipptes/Liste löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
