@@ -1831,7 +1831,12 @@ function saSymbolTest() {
   frisch();
   const S = CL;
   const ik = S.SA_IKONEN || [];
-  pruefe(ik.length === 64 && new Set(ik.map(i => i[0])).size === 64, '64 Symbole mit eindeutigem Schlüssel');
+  pruefe(ik.length === 128 && new Set(ik.map(i => i[0])).size === 128, '128 Symbole mit eindeutigem Schlüssel');
+  /* gespeicherte Schlüssel müssen gültig bleiben — Symbole nie umbenennen oder entfernen (0.48.1) */
+  const ALTE = ['waage','herz','laufen','rad','schwimmen','apfel','wasser','schlaf','zahn','medizin','hantel','puls','euro','sparschwein','karte','geldbeutel','rechnung','prozent','tresor','wachstum','haus','werkzeug','schluessel','lampe','blitz','flamme','pflanze','baum','sonne','auto','tanken','muell','buch','musik','film','kamera','spiel','schach','koffer','flugzeug','berg','ball','kochen','kaffee','tasche','uhr','kalender','brief','telefon','laptop','ordner','stift','haken','stern','flagge','schild','person','gruppe','kind','katze','hund','geschenk','kuchen','glas'];
+  const fehlen = ALTE.filter(k => !S.saIkone(k));
+  pruefe(fehlen.length === 0 && ik.slice(0, 64).map(i => i[0]).join() === ALTE.join(), 'die 64 Symbole aus 0.48.0 sind unverändert vorn' + (fehlen.length ? ' — fehlen: ' + fehlen.join(', ') : ''));
+  pruefe(S.saIkone('wolke') && S.saIkone('kompass') && /<rect/.test(S.saIkoneSvg('kompass')), 'neue Symbole (Wolke … Kompass) werden gezeichnet');
   pruefe(ik.every(i => i[2].length === 12 && i[2].every(r => /^[#.]{12}$/.test(r)) && i[2].join('').indexOf('#') >= 0), 'jedes Bild 12 × 12 und nicht leer');
   S.DB.sammlungen = [{ id: 'sa1', name: 'Gewicht', art: 'frei', felder: [{ id: 'f1', name: 'kg', typ: 'zahl' }], rollen: {}, geaendert: 1 }];
   S.DB.datensaetze = [];
@@ -1843,7 +1848,7 @@ function saSymbolTest() {
   pruefe(/saSymbolWahl\(\)/.test(S.saFensterHtml()), 'Details zeigen die Zeile „Symbol“');
   S.document.getElementById('saName').value = 'Körpergewicht';
   S.saSymbolWahl();
-  pruefe(S.cl.sa.fenster.modus === 'symbol' && (S.saFensterHtml().match(/saSymbolTipp\(/g) || []).length === 64, 'Raster mit 64 Symbolen');
+  pruefe(S.cl.sa.fenster.modus === 'symbol' && (S.saFensterHtml().match(/saSymbolTipp\(/g) || []).length === 128, 'Raster mit 128 Symbolen');
   S.saSymbolTipp('waage');
   pruefe(/Gewählt: <b>Waage/.test(S.saFensterHtml()), 'Tipp zeigt den Namen des Symbols');
   S.saSymbolZurueck(true, false);
