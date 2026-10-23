@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.48.2</title>
+<title>CLIE 0.48.3</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -915,7 +915,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.48.2';
+var APP_VERSION = '0.48.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -8097,7 +8097,7 @@ function clsKontext(k) {
 }
 
 function clsFensterSchritt(modus) {
-  if (['neu', 'kopie', 'memo', 'loeschen', 'details'].indexOf(modus) < 0 || !cl.cls.fenster) { return; }
+  if (['neu', 'kopie', 'memo', 'liste', 'loeschen', 'details'].indexOf(modus) < 0 || !cl.cls.fenster) { return; }
   clsFensterLesen();
   cl.cls.fenster.modus = modus;
   aufklappNeu();
@@ -8114,8 +8114,9 @@ function clsFensterHtml() {
       + '<button type="button" class="wahl" onclick="clsAnlegen(\'leer\',\'\')">Leere Vorlage</button>'
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'kopie\')">Kopie einer Vorlage …</button>'
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'memo\')">Aus einem Memo übernehmen …</button>'
+      + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'liste\')">Aus einer Aufgabenliste übernehmen …</button>'
       + '<button type="button" class="wahl" onclick="clsAnlegen(\'einmalig\',\'\')">Einmalige Checkliste (ohne Vorlage)</button>'
-      + '<p class="leise">„Aus einem Memo“ übernimmt die Punkte und Überschriften einer Seite als neue Vorlage — das Memo bleibt, wie es ist.</p>'
+      + '<p class="leise">„Aus einem Memo“ bzw. „Aus einer Aufgabenliste“ übernimmt alle Punkte (offen, erledigt, nicht relevant) und Überschriften als neue Vorlage — die Quelle bleibt, wie sie ist.</p>'
       + abbrechen;
   }
   if (f.modus === 'kopie') {
@@ -8129,6 +8130,13 @@ function clsFensterHtml() {
     return kopf('Aus einem Memo') + (s.length ? s.map(function (x) {
       return '<button type="button" class="wahl" onclick="clsAnlegen(\'memo\',\'' + esc(x.id) + '\')">' + clSeitenZeichen(x) + ' ' + esc(x.titel) + '</button>';
     }).join('') : '<p class="leise">Kein Memo mit Punkten.</p>') + abbrechen;
+  }
+  /* Aus einer Aufgabenliste (seit 0.48.3) */
+  if (f.modus === 'liste') {
+    var li = clsListenQuellen();
+    return kopf('Aus einer Aufgabenliste') + (li.length ? li.map(function (x) {
+      return '<button type="button" class="wahl" onclick="clsAnlegen(\'liste\',\'' + esc(x.id) + '\')">≡ ' + esc(x.titel) + '</button>';
+    }).join('') : '<p class="leise">Keine Liste mit Punkten.</p>') + abbrechen;
   }
   if (f.modus === 'plan' && g) {
     return kopf('Punkt einplanen') + '<p>' + esc(f.alt) + '</p>'
@@ -8182,7 +8190,23 @@ function clsFensterHtml() {
   return h + '<button type="button" class="knopf" onclick="clsFensterSchritt(\'loeschen\')">Löschen…</button></div></div></div>';
 }
 
-/* Neu: leer, als Kopie, aus einem Memo oder einmalig */
+/* Aufgabenlisten mit mindestens einem Punkt — passend zu Beruf/Privat (seit 0.48.3) */
+function clsListenQuellen() {
+  return kpSeiten('liste').filter(function (x) {
+    return kpPasstFilter(x, cl.filter) && String(x.text || '').split('\n').some(function (z) { return kpAufgabe(z); });
+  });
+}
+
+/* Alle Punkte einer Liste — offen, erledigt, nicht relevant — als leere Punkte; Überschriften bleiben, „P1 “ fällt weg */
+function clsAusListe(text) {
+  return String(text || '').split('\n').map(function (z) {
+    var m = z.match(KP_KASTEN);
+    if (m) { return m[1] + '[] ' + kpPrio(kpSchluessel(m[3])).text; }
+    return /^\s*#{1,3}\s/.test(z) ? z : null;
+  }).filter(function (z) { return z !== null; }).join('\n');
+}
+
+/* Neu: leer, als Kopie, aus einem Memo, aus einer Liste oder einmalig */
 function clsAnlegen(wie, quelleId) {
   var g = null;
   if (wie === 'leer') { g = clsNeuerSatz('vorlage', 'Neue Vorlage', '[] ', ''); }
@@ -8197,6 +8221,10 @@ function clsAnlegen(wie, quelleId) {
       var text = String(s.text || '').split('\n').filter(function (z) { return kpAufgabe(z) || /^\s*#{1,3}\s/.test(z); }).join('\n');
       g = clsNeuerSatz('vorlage', s.titel, clsLeeren(text), s.kontext);
     }
+  }
+  else if (wie === 'liste') {
+    var li = kpSeiteFinden(quelleId);
+    if (li && li.art === 'liste') { g = clsNeuerSatz('vorlage', li.titel, clsAusListe(li.text), li.kontext); }
   }
   if (!g) { melde('Das ließ sich nicht anlegen.', 'warn'); return; }
   spaeterSichern();

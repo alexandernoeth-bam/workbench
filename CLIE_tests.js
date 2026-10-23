@@ -1817,6 +1817,42 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   92. Neue Checkliste aus einer Aufgabenliste (0.48.3)
+   Grund: Bei „Neu“ ließ sich eine Vorlage nur leer, als Kopie oder aus
+   einem Memo anlegen. Seit 0.48.3 auch aus einer Aufgabenliste — mit
+   allen Punkten, egal ob offen, erledigt oder nicht relevant.
+   Erkennt: erledigte oder nicht relevante Punkte fehlen, Haken werden
+   mitkopiert, „P1“ landet im Text, die Liste selbst wird verändert,
+   Listen ohne Punkte oder vom anderen Bereich stehen zur Wahl.
+   ============================================================ */
+function clsAusListeTest() {
+  console.log('\n92. Neue Checkliste aus einer Aufgabenliste (0.48.3)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const quelle = '## Vorbereitung\n[] P1 Server prüfen\n[x] Zugang holen\n[-] Altes Protokoll\nFließtext\n  [] Unterpunkt';
+  S.DB.themen = [{ id: 't1', name: 'Auslieferung', text: quelle, kontext: 'beruflich', geaendert: 1 },
+                 { id: 't2', name: 'Leer', text: 'nur Text', kontext: 'beruflich', geaendert: 1 },
+                 { id: 't3', name: 'Garten', text: '[] Rasen', kontext: 'privat', geaendert: 1 }];
+  S.katSetzen('beruflich');
+  S.oeffne('checklisten');
+  S.clsNeu();
+  pruefe(/clsFensterSchritt\('liste'\)/.test(S.clsFensterHtml()), 'Neu bietet „Aus einer Aufgabenliste …“');
+  S.clsFensterSchritt('liste');
+  const h = S.clsFensterHtml();
+  pruefe(/Auslieferung/.test(h) && !/>≡ Leer</.test(h) && !/Garten/.test(h), 'zur Wahl: Listen mit Punkten, passend zu Beruf/Privat');
+  const vorher = S.DB.gedanken.length;
+  S.clsAnlegen('liste', 't1');
+  const v = S.DB.gedanken[S.DB.gedanken.length - 1];
+  pruefe(S.DB.gedanken.length === vorher + 1 && v.checkliste === 'vorlage' && v.titel === 'Auslieferung' && v.kontext === 'beruflich', 'neue Vorlage mit Namen und Bereich der Liste');
+  pruefe(v.text === '## Vorbereitung\n[] Server prüfen\n[] Zugang holen\n[] Altes Protokoll\n  [] Unterpunkt', 'alle Punkte (offen, erledigt, nicht relevant) leer übernommen, ohne „P1“ und Fließtext');
+  pruefe(S.DB.themen[0].text === quelle, 'die Aufgabenliste bleibt unverändert');
+  S.katSetzen('alle');
+  S.cl.cls.id = ''; S.cl.cls.schreiben = false; S.cl.cls.fenster = null; S.cl.aufklapp = '';
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    91. Checklisten kompakt, Name zweizeilig, Fassung bei Fokus (0.48.2)
    Grund: Die Übersicht brauchte je Eintrag zwei bis drei Zeilen; der
    Startknopf in der Liste ist überflüssig (gestartet wird in der Vorlage).
@@ -5875,6 +5911,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { clsAusListeTest(); } catch (e) { fail('Checkliste aus Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsKompaktTest(); } catch (e) { fail('Checklisten kompakt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saSymbolTest(); } catch (e) { fail('Sammlung-Symbole warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { appSymbolTest(); } catch (e) { fail('App-Symbol warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
