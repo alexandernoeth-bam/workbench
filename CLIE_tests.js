@@ -2034,6 +2034,33 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   107. Training: Sportart nicht doppelt (0.58.1)
+   Grund: Die Spalte „Einheit“ bekam die Sportart vorangestellt
+   („Laufen · Lauf locker“) — auch wenn „Sport“ selbst als Spalte steht.
+   Doppelt und verschenkter Platz.
+   Erkennt: Präfix trotz Sport-Spalte; Präfix fehlt, wenn Sport keine
+   Spalte ist.
+   ============================================================ */
+function trainingSportDoppeltTest() {
+  console.log('\n107. Training: Sportart nicht doppelt (0.58.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const s = S.saAusVorlage(S.SA_VORLAGEN.training, 'Training', false, []);
+  const r = s.rollen || {};
+  const w = {}; w[r.sport || 'sport'] = 'Lauf'; w[r.einheit || 'einheit'] = 'Lauf locker';
+  const d = { id: 'tr1', sammlung: s.id, werte: w, angelegt: 1, geaendert: 1 };
+  S.DB.datensaetze.push(d);
+  const ein = S.saFeld(s, r.einheit || 'einheit');
+  const sport = S.saFeld(s, r.sport || 'sport');
+  sport.spalte = false;
+  pruefe(S.saZelle(s, ein, d) === 'Lauf · Lauf locker', 'Sport keine Spalte: Einheit mit Sportart davor — ' + S.saZelle(s, ein, d));
+  sport.spalte = true;
+  pruefe(S.saZelle(s, ein, d) === 'Lauf locker', 'Sport als Spalte: Einheit ohne Sportart — ' + S.saZelle(s, ein, d));
+  pruefe(/<td class="">Lauf<\/td>/.test(S.saTabelleHtml(s)) && !/Lauf · Lauf locker/.test(S.saTabelleHtml(s)), 'Tabelle: Sportart nur einmal');
+}
+
+/* ============================================================
    106. Sammlung: Spaltenbreiten Auto und von Hand (0.58.0)
    Grund: Feste Anteile — „Ergebnis“ bekam viel Platz für ein ✓, die
    Einheit wurde nach wenigen Zeichen abgeschnitten.
@@ -6744,6 +6771,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { trainingSportDoppeltTest(); } catch (e) { fail('Training Sport doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenBreitenTest(); } catch (e) { fail('Spaltenbreiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungSucheTest(); } catch (e) { fail('Sammlung-Suche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { morgengrussTest(); } catch (e) { fail('Morgengruß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
