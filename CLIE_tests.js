@@ -1817,6 +1817,87 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   86. Diagramme in Sammlungen (0.47)
+   Grund: Sammlungen sollen einfache Diagramme zeigen: Linie (Verlauf,
+   optional Ziellinie), Balken je Zeit, Balken je Gruppe, Torte — bis zu
+   drei je Sammlung, umschaltbar „Tabelle | Diagramm“, Zeitraum ◀ ▶,
+   dazu eine Mini-Kurve in Kopfwert-Kacheln.
+   Erkennt: krumme Achsenwerte, falsche Summen/Ø je Monat oder Gruppe,
+   Zeitraum wirkungslos, Torte ohne Anteile, Einrichten speichert falsch,
+   mehr als drei Diagramme, Umschalter ohne Diagramme sichtbar.
+   ============================================================ */
+function diagrammeTest() {
+  console.log('\n86. Diagramme in Sammlungen (0.47)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  pruefe(JSON.stringify(S.saDiaSkala(0, 6290, 3)) === JSON.stringify({ lo: 0, hi: 7500, schritt: 2500 }) && S.saDiaZahl(2500, 2500) === '2,5k' && S.saDiaZahl(77.5, 2.5) === '77,5' && S.saDiaZahl(0, 2500) === '0',
+    'Achsen mit runden Schritten (2.500 statt 2.097) und passender Genauigkeit');
+  S.DB.sammlungen = [{ id: 'sg', name: 'Gewicht', felder: [{ id: 'fd', name: 'Datum', typ: 'datum' }, { id: 'fk', name: 'kg', typ: 'zahl' }, { id: 'fn', name: 'Notiz', typ: 'text' }],
+    werte: [{ id: 'wz', name: 'Ziel', typ: 'zahl', wert: 73 }], kopfwerte: [{ art: 'letzter', feld: 'fk' }, { art: 'wert', wert: 'wz' }], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [];
+  [[-100, 85], [-20, 80], [-10, 79], [-3, 78.5], [0, 78]].forEach((x, i) => S.DB.datensaetze.push({ id: 'g' + i, sammlung: 'sg', werte: { fd: S.tagePlus(heute, x[0]), fk: x[1], fn: i % 2 ? 'A' : 'B' }, angelegt: 1, geaendert: 1 }));
+  const sg = S.DB.sammlungen[0];
+  S.oeffne('sammlungen'); S.saOeffnen('sg');
+  pruefe(!/class="sa-dia-um"/.test(inhalt()), 'ohne Diagramm kein Umschalter');
+  pruefe(/<small>kg<\/small><b>78<\/b><svg class="sa-mini"/.test(inhalt()) && !/Ziel<\/small><b>73<\/b><svg/.test(inhalt()), 'Mini-Kurve (30 Tage) in der Kachel „letzter Wert“, nicht beim festen Wert');
+  S.menueUm();
+  pruefe(/menueWahl\('saDiagramme'\)">Diagramme…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü der Sammlung: „Diagramme…“');
+  S.menueWahl('saDiagramme');
+  pruefe(S.cl.sa.ansicht === 'diagramme' && S.document.getElementById('reiter').textContent === 'Diagramme' && /saDiaNeu\(\)">\+ Diagramm/.test(S.document.getElementById('fuss').innerHTML), 'Einrichten: Liste mit „+ Diagramm“');
+  /* Linie mit Ziel anlegen */
+  S.saDiaNeu();
+  let a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/saDiaArt\('torte'\)">Torte/.test(a) && /id="saDiaZiel"/.test(a) && !/id="saDiaGruppe"/.test(a), 'Fenster: vier Arten; bei Linie die Ziellinie, keine Gruppe');
+  S.document.getElementById('saDiaFeld').value = 'fk'; S.document.getElementById('saDiaWie').value = 'eintrag'; S.document.getElementById('saDiaZiel').value = 'wz'; S.document.getElementById('saDiaName').value = '';
+  S.saDiaSpeichern();
+  pruefe(JSON.stringify(sg.diagramme) === JSON.stringify([{ art: 'linie', wie: 'eintrag', feld: 'fk', ziel: 'wz' }]), 'Linie gespeichert (an der Sammlung, Feld „diagramme“)');
+  /* Torte: Art wechseln, Werte bleiben */
+  S.saDiaNeu();
+  S.document.getElementById('saDiaFeld').value = 'fk';
+  S.saDiaArt('torte');
+  a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/id="saDiaGruppe"/.test(a) && !/value="schnitt"/.test(a) && !/id="saDiaZiel"/.test(a), 'Torte: Gruppe wählbar, kein Ø, keine Ziellinie');
+  S.document.getElementById('saDiaGruppe').value = 'fn'; S.document.getElementById('saDiaWie').value = 'anzahl';
+  S.saDiaSpeichern();
+  S.saDiaNeu();
+  S.saDiaArt('zeit');
+  S.document.getElementById('saDiaFeld').value = 'fk'; S.document.getElementById('saDiaWie').value = 'summe'; S.document.getElementById('saDiaTakt').value = 'monat';
+  S.saDiaSpeichern();
+  pruefe(sg.diagramme.length === 3 && sg.diagramme[1].art === 'torte' && sg.diagramme[1].gruppe === 'fn' && !sg.diagramme[1].feld && sg.diagramme[2].takt === 'monat', 'Torte (Anzahl je Notiz) und Balken je Monat gespeichert');
+  S.saDiaNeu();
+  pruefe(S.cl.aufklapp !== 'sa' && /disabled>\+ Diagramm/.test(S.document.getElementById('fuss').innerHTML), 'höchstens drei Diagramme');
+  /* Anzeige */
+  S.saAnsicht('tabelle');
+  pruefe(/class="sa-dia-um"><button type="button" class="an" onclick="saAnsicht\('tabelle'\)">Tabelle/.test(inhalt()), 'mit Diagrammen: Umschalter „Tabelle | Diagramm“');
+  S.saAnsicht('diagramm');
+  let h = inhalt();
+  pruefe((h.match(/class="sa-dia"/g) || []).length === 3 && /<span>kg<\/span><small>▼ −2<\/small>/.test(h) && />Ziel 73<\/text>/.test(h), 'Diagramm-Ansicht: drei Diagramme, Linie mit Veränderung und Ziellinie');
+  pruefe(/Anteile Einträge je Notiz/.test(h) && /<pattern id="saSchr1"/.test(h) && /50 %<\/text>/.test(h), 'Torte mit Schraffur und Anteilen');
+  pruefe(/saDiaPunkt\('/.test(h) && /saDiaZrUm\(1\)/.test(S.document.getElementById('fuss').innerHTML) && />3 M</.test(S.document.getElementById('fuss').innerHTML), 'Punkte antippbar, Zeitraum unten (Standard 3 M)');
+  pruefe(S.saDiaLinieDaten(sg, sg.diagramme[0]).length === 4, '3 Monate: der Eintrag von vor 100 Tagen fällt heraus');
+  S.saDiaZrUm(1); S.saDiaZrUm(1);
+  pruefe(S.saDiaZr(sg) === '' && S.saDiaLinieDaten(sg, sg.diagramme[0]).length === 5, '▶ ▶: „alles“ — alle fünf Einträge');
+  S.saDiaZrUm(1);
+  pruefe(S.saDiaZr(sg) === '30', 'danach wieder 1 Monat');
+  const mon = S.saDiaZeitDaten(sg, { art: 'zeit', feld: 'fk', wie: 'summe', takt: 'monat' });
+  pruefe(mon.length >= 1 && mon[mon.length - 1].k === heute.slice(0, 8) + '01' && mon.every(m => typeof m.v === 'number'), 'Balken je Monat: Monate bis heute, leere mit 0');
+  const gr = S.saDiaGruppenDaten(sg, { art: 'gruppe', feld: 'fk', gruppe: 'fn', wie: 'summe' }, 8);
+  pruefe(gr.length === 2 && gr[0].v >= gr[1].v, 'Balken je Gruppe: absteigend');
+  const viele = S.saDiaGruppenDaten(sg, { art: 'torte', gruppe: 'fd', wie: 'anzahl' }, 3);
+  pruefe(viele.length === 3 && viele[2].name === 'Übrige', 'mehr Gruppen als Platz: der Rest als „Übrige“');
+  S.saDiaPunkt('23.10.2026: 78');
+  pruefe(/23\.10\.2026: 78/.test(S.document.getElementById('toastText').textContent), 'Tipp auf einen Punkt: Datum und Wert');
+  /* Löschen */
+  S.saAnsicht('diagramme');
+  S.saDiaOeffnen(0); S.saDiaLoeschen(); S.saDiaOeffnen(0); S.saDiaLoeschen(); S.saDiaOeffnen(0); S.saDiaLoeschen();
+  pruefe(!('diagramme' in sg), 'alle gelöscht: Feld wieder weg');
+  S.saZurListe();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    85. Kopfwert „letzter Wert“ heißt wie das Feld (0.46.3)
    Grund: Kopfwerte zeigten „letzter Wert Taille“ — abgeschnitten zu
    „letzter Wert Ta…“, das Wichtige fehlte. Seit 0.46.3 steht nur der
@@ -5613,6 +5694,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { diagrammeTest(); } catch (e) { fail('Diagramme warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kopfwertNameTest(); } catch (e) { fail('Kopfwert-Name warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { blattTest(); } catch (e) { fail('Blättern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { menueInfoTest(); } catch (e) { fail('Menü/Info warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

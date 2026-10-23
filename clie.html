@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.46.3</title>
+<title>CLIE 0.47.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -514,6 +514,18 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-infohinweis{border-left:3px solid var(--px);padding:2px 8px;margin:0 0 8px;font-size:16.5px}
 .sa-infotext p{margin:0 0 8px}
 .sa-infofeld{min-height:150px;resize:vertical}
+/* Diagramme in Sammlungen (seit 0.47) */
+.sa-dia-um{display:flex;border:2px solid var(--px);width:max-content;margin:0 0 6px}
+.sa-dia-um button{padding:1px 10px;font-size:17px}
+.sa-dia-um button.an{background:var(--px);color:var(--lcd)}
+.sa-dia{margin:4px 0 12px}
+.sa-dia-kopf{display:flex;justify-content:space-between;align-items:baseline;font-weight:600;border-bottom:2px solid var(--px);margin-bottom:4px}
+.sa-dia-kopf small{font-weight:400;font-size:15.5px;color:var(--px-mitte)}
+.sa-dia-svg{display:block;width:100%;height:auto;font-family:inherit}
+.sa-dia-tipp{cursor:pointer}
+.sa-mini{display:block;width:100%;height:14px;margin-top:1px}
+.sa-dia-zr{display:inline-flex;align-items:center;gap:6px}
+.sa-dia-zr button{font-size:16px;padding:0 2px}
 .sa-kw.sa-kw3 div{padding:2px 4px}
 .sa-kw.sa-kw3 b{font-size:20px}
 .sa-tab.sa-vier th:first-child,.sa-tab.sa-vier td:first-child{width:34%}
@@ -888,7 +900,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.46.3';
+var APP_VERSION = '0.47.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4209,6 +4221,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saFilter\')">Filter…</button>'
           + '<button type="button" onclick="menueWahl(\'saWerte\')">Feste Werte…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopf\')">Kopfwerte…</button>'
+          + '<button type="button" onclick="menueWahl(\'saDiagramme\')">Diagramme…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
       + (cl.app === 'schach' ? '<div class="trenn"></div>'
@@ -4375,6 +4388,7 @@ function menueWahl(was) {
   if (was === 'saFilter') { saAnsicht('filter'); return; }
   if (was === 'saWerte') { saAnsicht('werte'); return; }
   if (was === 'saKopf') { saAnsicht('kopf'); return; }
+  if (was === 'saDiagramme') { saAnsicht('diagramme'); return; }
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   if (was === 'stoNeu') { stoNeuesSpiel(); return; }
@@ -9035,12 +9049,20 @@ function saKopfwertName(s, k) {
   return art + (k.art !== 'anzahl' && f ? ' ' + f.name : '') + (k.zeitraum ? ' · ' + zr : '');
 }
 
+/* Kopfwerte und (seit 0.46) das „i“ für den eigenen Hinweis */
+function saKopfBereichHtml(s) {
+  var kw = saKopfwerteHtml(s);
+  if (!saInfoText(s)) { return kw; }
+  return '<div class="sa-kopfzeile">' + (kw || '<div class="sa-kw-leer"></div>')
+    + '<button type="button" class="sa-info" onclick="saInfoZeigen()" aria-label="Info zur Sammlung">i</button></div>';
+}
+
 function saKopfwerteHtml(s) {
   var l = (s.kopfwerte || []).slice(0, SA_KOPF_MAX);
   if (!l.length) { return ''; }
   /* Ab fünf Kacheln drei nebeneinander — der Kopf bleibt flach */
   return '<div class="sa-kw' + (l.length > 4 ? ' sa-kw3' : '') + '">' + l.map(function (k) {
-    return '<div><small>' + esc(saKopfwertName(s, k)) + '</small><b>' + esc(saKopfwertText(s, k)) + '</b></div>';
+    return '<div><small>' + esc(saKopfwertName(s, k)) + '</small><b>' + esc(saKopfwertText(s, k)) + '</b>' + saDiaMiniHtml(s, k) + '</div>';
   }).join('') + '</div>';
 }
 
@@ -9172,13 +9194,7 @@ function saTabelleHtml(s) {
   var klasse = 'sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '');
   /* Seit 0.14: Überschrift und Kopfwerte stehen fest, nur die Einträge scrollen.
      Zwei Tabellen mit gleichen Spaltenbreiten — so bleibt alles bündig. */
-  /* Seit 0.46: ein eigener Hinweis je Sammlung — „i“ neben den Kopfwerten */
-  var kw = saKopfwerteHtml(s);
-  if (saInfoText(s)) {
-    kw = '<div class="sa-kopfzeile">' + (kw || '<div class="sa-kw-leer"></div>')
-       + '<button type="button" class="sa-info" onclick="saInfoZeigen()" aria-label="Info zur Sammlung">i</button></div>';
-  }
-  var h = '<div class="sa-fest">' + kw
+  var h = '<div class="sa-fest">' + saKopfBereichHtml(s) + saDiaUmschalterHtml(s)
     + '<table class="' + klasse + ' sa-kopf"><tr>' + sp.map(function (f) {
         return '<th class="' + (saRechts(f) ? 'r' : '') + '">' + esc(f.name) + '</th>';
       }).join('') + '</tr></table></div>'
@@ -9359,6 +9375,8 @@ function saSammlungHtml(s) {
   if (cl.sa.ansicht === 'filter') { return saFilterListeHtml(s); }
   if (cl.sa.ansicht === 'werte') { return saWerteHtml(s); }
   if (cl.sa.ansicht === 'kopf') { return saKopfListeHtml(s); }
+  if (cl.sa.ansicht === 'diagramme') { return saDiaListeHtml(s); }
+  if (cl.sa.ansicht === 'diagramm') { return saDiagrammAnsichtHtml(s); }
   var l = saGefiltert(s);
   var h = saTabelleHtml(s);
   if ((s.werte || []).length) {
@@ -9446,6 +9464,17 @@ function sammlungenFussHtml() {
     return '<button type="button" class="knopf voll" onclick="saAnsicht(\'tabelle\')">Fertig</button>'
       + '<button type="button" class="knopf" onclick="saKopfOeffnen(-1)"' + ((s.kopfwerte || []).length >= SA_KOPF_MAX ? ' disabled' : '') + '>+ Kopfwert</button>';
   }
+  if (cl.sa.ansicht === 'diagramme') {
+    return '<button type="button" class="knopf voll" onclick="saAnsicht(\'tabelle\')">Fertig</button>'
+      + '<button type="button" class="knopf" onclick="saDiaNeu()"' + (saDiagramme(s).length >= SA_DIA_MAX ? ' disabled' : '') + '>+ Diagramm</button>';
+  }
+  if (cl.sa.ansicht === 'diagramm') {
+    return '<button type="button" class="knopf" onclick="saZurListe()">Fertig</button>'
+      + '<button type="button" class="knopf" onclick="saEintrag(\'\')">Neu</button>'
+      + '<span class="knopf sa-dia-zr"><button type="button" onclick="saDiaZrUm(-1)" aria-label="kürzer">◀</button>'
+      + esc((SA_DIA_ZR.filter(function (x) { return x[0] === saDiaZr(s); })[0] || ['', ''])[1])
+      + '<button type="button" onclick="saDiaZrUm(1)" aria-label="länger">▶</button></span>';
+  }
   return '<button type="button" class="knopf" onclick="saZurListe()">Fertig</button>'
     + '<button type="button" class="knopf" onclick="saEintrag(\'\')">Neu</button>'
     + (s.gruppe && saFeld(s, s.gruppe) ? '<button type="button" class="knopf' + (s.gruppenAn ? ' voll' : '') + '" onclick="saGruppenUm()">Gruppen</button>' : '')
@@ -9459,6 +9488,7 @@ function saReiter() {
   if (cl.sa.ansicht === 'filter') { return 'Filter'; }
   if (cl.sa.ansicht === 'werte') { return 'Feste Werte'; }
   if (cl.sa.ansicht === 'kopf') { return 'Kopfwerte'; }
+  if (cl.sa.ansicht === 'diagramme') { return 'Diagramme'; }
   return s.name;
 }
 
@@ -9512,7 +9542,7 @@ function saZurListe() {
 }
 
 function saAnsicht(a) {
-  if (['tabelle', 'felder', 'filter', 'werte', 'kopf'].indexOf(a) < 0) { return; }
+  if (['tabelle', 'felder', 'filter', 'werte', 'kopf', 'diagramm', 'diagramme'].indexOf(a) < 0) { return; }
   cl.sa.ansicht = a;
   cl.aufklapp = '';
   zeichne();
@@ -9568,6 +9598,490 @@ function saFeldSchieben(i, r) {
 /* ---- Fenster ----
    Ein Fenster für alles: neue Sammlung, Eintrag, Feld, Filter,
    Kopieren, Details. Eingaben werden erst beim Speichern gelesen. */
+
+/* ---------- Diagramme in Sammlungen (seit 0.47) ----------
+
+   Bis zu drei Diagramme je Sammlung, gezeichnet als SVG in Pixeln und
+   Graustufen: Linie (Verlauf eines Zahlenfelds, optional mit Ziellinie
+   aus einem festen Wert), Balken je Zeit (Summe/Ø/Anzahl je Woche oder
+   Monat), Balken je Gruppe und Torte (je Wert eines Text-/Auswahlfelds).
+   Gespeichert an der Sammlung als „diagramme“ — die Workbench reicht
+   Sammlungen unverändert durch. Der Zeitraum gilt je Sammlung und nur
+   auf diesem Gerät für diese Sitzung. */
+
+var SA_DIA_MAX = 3;
+var SA_DIA_ARTEN = [['linie', 'Linie'], ['zeit', 'Balken je Zeit'], ['gruppe', 'Balken je Gruppe'], ['torte', 'Torte']];
+var SA_DIA_ZR = [['30', '1 M'], ['90', '3 M'], ['365', 'Jahr'], ['', 'alles']];
+var SA_DIA_WIE = {
+  linie: [['eintrag', 'jeder Eintrag'], ['woche', 'Ø je Woche'], ['monat', 'Ø je Monat']],
+  zeit: [['summe', 'Summe'], ['schnitt', 'Ø'], ['anzahl', 'Anzahl der Einträge']],
+  gruppe: [['summe', 'Summe'], ['schnitt', 'Ø'], ['anzahl', 'Anzahl der Einträge']],
+  torte: [['summe', 'Summe'], ['anzahl', 'Anzahl der Einträge']]
+};
+var SA_DIA_TAKT = [['woche', 'je Woche'], ['monat', 'je Monat']];
+var SA_DIA_PX = '#1C2116';
+var SA_DIA_MI = '#56604A';
+var SA_DIA_ZA = '#8E9A7C';
+var SA_DIA_HELL = '#C9D3B7';
+
+cl.sa.dzr = {};
+
+function saDiagramme(s) {
+  return Array.isArray(s && s.diagramme) ? s.diagramme.slice(0, SA_DIA_MAX) : [];
+}
+
+function saDiaZahlFelder(s) {
+  return (s.felder || []).filter(function (f) { return f.typ === 'zahl' || f.typ === 'betrag' || f.typ === 'formel'; });
+}
+
+function saDiaGruppenFelder(s) {
+  return (s.felder || []).filter(function (f) { return ['zahl', 'betrag', 'formel', 'datum', 'link'].indexOf(f.typ) < 0; });
+}
+
+function saDiaZr(s) {
+  var z = cl.sa.dzr[s.id];
+  return SA_DIA_ZR.some(function (x) { return x[0] === z; }) ? z : '90';
+}
+
+function saDiaZrUm(r) {
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s) { return; }
+  var i = SA_DIA_ZR.map(function (x) { return x[0]; }).indexOf(saDiaZr(s));
+  cl.sa.dzr[s.id] = SA_DIA_ZR[(i + r + SA_DIA_ZR.length) % SA_DIA_ZR.length][0];
+  zeichne();
+}
+
+/* Beginn des Zeitraums ('' = alles) */
+function saDiaVon(s) {
+  var zr = saDiaZr(s);
+  return zr ? tagePlus(isoDatum(), -(Number(zr) - 1)) : '';
+}
+
+/* Einträge im Zeitraum, nach Datum aufsteigend */
+function saDiaEintraege(s) {
+  var von = saDiaVon(s);
+  return saSaetze(s).map(function (d) { return { d: d, t: saEintragDatum(s, d) }; })
+    .filter(function (x) { return !von || x.t >= von; })
+    .sort(function (a, b) { return a.t < b.t ? -1 : (a.t > b.t ? 1 : 0); });
+}
+
+function saDiaName(s, g) {
+  if (g.name) { return g.name; }
+  var f = saFeld(s, g.feld);
+  var gf = saFeld(s, g.gruppe);
+  var was = (g.wie === 'anzahl') ? 'Einträge' : ((g.wie === 'schnitt' ? 'Ø ' : '') + (f ? f.name : '?'));
+  if (g.art === 'linie') { return (f ? f.name : '?') + (g.wie === 'woche' ? ' · Ø je Woche' : (g.wie === 'monat' ? ' · Ø je Monat' : '')); }
+  if (g.art === 'zeit') { return was + (g.takt === 'woche' ? ' je Woche' : ' je Monat'); }
+  if (g.art === 'torte') { return 'Anteile ' + was + ' je ' + (gf ? gf.name : '?'); }
+  return was + ' je ' + (gf ? gf.name : '?');
+}
+
+/* Werte zusammenfassen */
+function saDiaRechnen(wie, werte) {
+  var z = werte.filter(function (v) { return v !== null && isFinite(v); });
+  if (wie === 'anzahl') { return werte.length; }
+  if (!z.length) { return null; }
+  var sum = z.reduce(function (a, b) { return a + b; }, 0);
+  return (wie === 'schnitt') ? sum / z.length : sum;
+}
+
+/* Runde Achsenschritte: 1, 2, 5 × 10^n — damit stehen 2.000 statt 2.097 an der Achse */
+function saDiaSkala(min, max, teile) {
+  var roh = Math.max((max - min) / teile, 1e-9);
+  var zehn = Math.pow(10, Math.floor(Math.log(roh) / Math.LN10));
+  var schritt = [1, 2, 2.5, 5, 10].map(function (x) { return x * zehn; }).filter(function (x) { return x >= roh; })[0] || 10 * zehn;
+  var lo = Math.floor(min / schritt + 1e-9) * schritt;
+  var hi = Math.ceil(max / schritt - 1e-9) * schritt;
+  if (hi <= lo) { hi = lo + schritt; }
+  return { lo: lo, hi: hi, schritt: schritt };
+}
+
+/* Achsenbeschriftung nach Schrittweite: ab 1.000 in „k“, sonst so genau wie nötig */
+function saDiaZahl(v, schritt) {
+  if (Math.abs(v) < schritt / 1000) { return '0'; }
+  if (schritt >= 1000) { return saZahlKurz(Math.round(v / 100) / 10) + 'k'; }
+  var genau = (Math.abs(schritt - Math.round(schritt)) < 1e-9) ? 0 : (Math.abs(schritt * 10 - Math.round(schritt * 10)) < 1e-9 ? 1 : 2);
+  return saZahlText(v, genau);
+}
+
+function saDiaText(x, y, t, opt) {
+  return '<text x="' + Math.round(x) + '" y="' + Math.round(y) + '" font-size="' + ((opt && opt.gross) || 10) + '"' + (opt && opt.anker ? ' text-anchor="' + opt.anker + '"' : '')
+    + ' fill="' + ((opt && opt.farbe) || SA_DIA_MI) + '">' + esc(t) + '</text>';
+}
+
+function saDiaKurz(d) {
+  return Number(d.slice(8, 10)) + '.' + Number(d.slice(5, 7)) + '.';
+}
+
+/* ---- Linie ---- */
+
+function saDiaLinieDaten(s, g) {
+  var f = saFeld(s, g.feld);
+  if (!f) { return []; }
+  var p = saDiaEintraege(s).map(function (x) { return { t: x.t, v: saFeldZahl(s, x.d, f, 0) }; })
+    .filter(function (x) { return x.v !== null && isFinite(x.v); });
+  if (g.wie !== 'woche' && g.wie !== 'monat') { return p; }
+  var eimer = {};
+  var reihe = [];
+  p.forEach(function (x) {
+    var k = (g.wie === 'woche') ? montagVon(x.t) : x.t.slice(0, 8) + '01';
+    if (!eimer[k]) { eimer[k] = []; reihe.push(k); }
+    eimer[k].push(x.v);
+  });
+  return reihe.map(function (k) { return { t: k, v: saDiaRechnen('schnitt', eimer[k]) }; });
+}
+
+function saDiaLinieSvg(s, g) {
+  var p = saDiaLinieDaten(s, g);
+  if (p.length < 1) { return ''; }
+  var B = 300, H = 170, L = 34, R = 6, O = 8, U = 18;
+  var ziel = null;
+  var zw = (s.werte || []).filter(function (w) { return w.id === g.ziel && w.typ !== 'datum'; })[0];
+  if (zw) { ziel = saZahlLesen(zw.wert); }
+  var werte = p.map(function (x) { return x.v; }).concat(ziel !== null ? [ziel] : []);
+  var min = Math.min.apply(null, werte);
+  var max = Math.max.apply(null, werte);
+  if (max === min) { max += 1; min -= 1; }
+  var sk = saDiaSkala(min, max, 4);
+  min = sk.lo; max = sk.hi;
+  var von = saDiaVon(s) || p[0].t;
+  var bis = (p[p.length - 1].t > isoDatum()) ? p[p.length - 1].t : isoDatum();
+  var t0 = saTagNr(von);
+  var t1 = Math.max(saTagNr(bis), t0 + 1);
+  var X = function (t) { return L + (B - L - R) * (saTagNr(t) - t0) / (t1 - t0); };
+  var Y = function (v) { return O + (H - O - U) * (max - v) / (max - min); };
+  var h = '';
+  var i;
+  var gv;
+  for (gv = min; gv <= max + sk.schritt / 2; gv += sk.schritt) {
+    var gy = Math.round(Y(gv));
+    h += '<rect x="' + L + '" y="' + gy + '" width="' + (B - L - R) + '" height="1" fill="' + SA_DIA_ZA + '"/>' + saDiaText(L - 4, gy + 4, saDiaZahl(gv, sk.schritt), { anker: 'end' });
+  }
+  if (ziel !== null) {
+    var zy = Math.round(Y(ziel));
+    for (i = L; i < B - R; i += 6) { h += '<rect x="' + i + '" y="' + (zy - 1) + '" width="3" height="2" fill="' + SA_DIA_MI + '"/>'; }
+    h += saDiaText(B - R, zy - 4, (zw.name || 'Ziel') + ' ' + saZahlKurz(ziel), { anker: 'end' });
+  }
+  var mitte = tagePlus(von, Math.round((saTagNr(bis) - t0) / 2));
+  h += saDiaText(L, H - 4, saDiaKurz(von)) + saDiaText((L + B - R) / 2, H - 4, saDiaKurz(mitte), { anker: 'middle' }) + saDiaText(B - R, H - 4, saDiaKurz(bis), { anker: 'end' });
+  if (p.length > 1) {
+    h += '<path d="' + p.map(function (x, k) { return (k ? 'L' : 'M') + Math.round(X(x.t)) + ' ' + Math.round(Y(x.v)); }).join('') + '" stroke="' + SA_DIA_PX + '" stroke-width="2" fill="none"/>';
+  }
+  p.forEach(function (x) {
+    var px = Math.round(X(x.t));
+    var py = Math.round(Y(x.v));
+    h += '<rect x="' + (px - 2) + '" y="' + (py - 2) + '" width="4" height="4" fill="' + SA_DIA_PX + '"/>'
+       + '<rect class="sa-dia-tipp" x="' + (px - 8) + '" y="' + (py - 8) + '" width="16" height="16" fill="transparent" onclick="saDiaPunkt(\'' + esc(saDatumText(x.t) + ': ' + saZahlKurz(Math.round(x.v * 100) / 100)) + '\')"/>';
+  });
+  return '<svg class="sa-dia-svg" viewBox="0 0 ' + B + ' ' + H + '" shape-rendering="crispEdges">' + h + '</svg>';
+}
+
+function saDiaPunkt(text) {
+  melde(String(text), null);
+}
+
+/* ---- Balken je Zeit ---- */
+
+function saDiaZeitDaten(s, g) {
+  var f = saFeld(s, g.feld);
+  if (!f && g.wie !== 'anzahl') { return []; }
+  var l = saDiaEintraege(s);
+  var woche = (g.takt === 'woche');
+  var schluessel = function (t) { return woche ? montagVon(t) : t.slice(0, 8) + '01'; };
+  var start = saDiaVon(s) || (l.length ? l[0].t : isoDatum());
+  var k = schluessel(start);
+  var ende = schluessel(isoDatum());
+  if (l.length && schluessel(l[l.length - 1].t) > ende) { ende = schluessel(l[l.length - 1].t); }
+  var eimer = [];
+  var n = 0;
+  while (k <= ende && n < 200) {
+    eimer.push({ k: k, werte: [] });
+    k = woche ? tagePlus(k, 7) : (Number(k.slice(5, 7)) === 12 ? (Number(k.slice(0, 4)) + 1) + '-01-01' : k.slice(0, 5) + zwei(Number(k.slice(5, 7)) + 1) + '-01');
+    n++;
+  }
+  /* Höchstens 24 Balken — die jüngsten */
+  eimer = eimer.slice(-24);
+  var nachK = {};
+  eimer.forEach(function (e) { nachK[e.k] = e; });
+  l.forEach(function (x) {
+    var e = nachK[schluessel(x.t)];
+    if (e) { e.werte.push(f ? saFeldZahl(s, x.d, f, 0) : 1); }
+  });
+  return eimer.map(function (e) {
+    var v = saDiaRechnen(g.wie, e.werte);
+    return { k: e.k, name: woche ? 'KW ' + kalenderwoche(e.k) : KAL_MONATE[Number(e.k.slice(5, 7)) - 1].slice(0, 3), v: (v === null ? 0 : v) };
+  });
+}
+
+function saDiaSaeulenSvg(daten) {
+  if (!daten.length) { return ''; }
+  var B = 300, H = 150, L = 34, R = 6, O = 14, U = 18;
+  var max = Math.max.apply(null, daten.map(function (x) { return x.v; }).concat([0]));
+  var min = Math.min.apply(null, daten.map(function (x) { return x.v; }).concat([0]));
+  if (max === min) { max = min + 1; }
+  var sk = saDiaSkala(min, max, 3);
+  min = sk.lo; max = sk.hi;
+  var Y = function (v) { return O + (H - O - U) * (max - v) / (max - min); };
+  var h = '';
+  var gv;
+  for (gv = min; gv <= max + sk.schritt / 2; gv += sk.schritt) {
+    var gy = Math.round(Y(gv));
+    h += '<rect x="' + L + '" y="' + gy + '" width="' + (B - L - R) + '" height="1" fill="' + SA_DIA_ZA + '"/>' + saDiaText(L - 4, gy + 4, saDiaZahl(gv, sk.schritt), { anker: 'end' });
+  }
+  var bw = (B - L - R) / daten.length;
+  var jede = Math.ceil(daten.length / 6);
+  daten.forEach(function (x, k) {
+    var y0 = Math.round(Y(0));
+    var y1 = Math.round(Y(x.v));
+    var bx = Math.round(L + k * bw + bw * 0.15);
+    var w = Math.max(2, Math.round(bw * 0.7));
+    h += '<rect x="' + bx + '" y="' + Math.min(y0, y1) + '" width="' + w + '" height="' + Math.max(1, Math.abs(y0 - y1)) + '" fill="' + (k === daten.length - 1 ? SA_DIA_PX : SA_DIA_MI) + '"/>';
+    if (k % jede === 0 || k === daten.length - 1) { h += saDiaText(bx + w / 2, H - 4, x.name, { anker: 'middle' }); }
+    if (daten.length <= 8 && x.v) { h += saDiaText(bx + w / 2, Math.min(y0, y1) - 3, saZahlKurz(Math.round(x.v * 10) / 10), { anker: 'middle', farbe: SA_DIA_PX }); }
+  });
+  return '<svg class="sa-dia-svg" viewBox="0 0 ' + B + ' ' + H + '" shape-rendering="crispEdges">' + h + '</svg>';
+}
+
+/* ---- Je Gruppe: Balken und Torte ---- */
+
+function saDiaGruppenDaten(s, g, hoechstens) {
+  var f = saFeld(s, g.feld);
+  var gf = saFeld(s, g.gruppe);
+  if (!gf || (!f && g.wie !== 'anzahl')) { return []; }
+  var nach = {};
+  var reihe = [];
+  saDiaEintraege(s).forEach(function (x) {
+    var roh = (x.d.werte || {})[gf.id];
+    var name = String(saWertText(gf, roh) || '').trim() || '—';
+    if (!nach[name]) { nach[name] = []; reihe.push(name); }
+    nach[name].push(f ? saFeldZahl(s, x.d, f, 0) : 1);
+  });
+  var l = reihe.map(function (n) { var v = saDiaRechnen(g.wie, nach[n]); return { name: n, v: (v === null ? 0 : v) }; })
+    .sort(function (a, b) { return b.v - a.v; });
+  if (l.length > hoechstens) {
+    var rest = l.slice(hoechstens - 1);
+    l = l.slice(0, hoechstens - 1);
+    if (g.wie !== 'schnitt') { l.push({ name: 'Übrige', v: rest.reduce(function (a, b) { return a + b.v; }, 0) }); }
+  }
+  return l;
+}
+
+function saDiaBalkenSvg(daten) {
+  if (!daten.length) { return ''; }
+  var B = 300, Z = 24, LB = 92;
+  var max = Math.max.apply(null, daten.map(function (x) { return Math.abs(x.v); }).concat([1]));
+  var h = '';
+  daten.forEach(function (x, k) {
+    var y = 4 + k * Z;
+    var w = Math.max(1, Math.round((B - LB - 60) * Math.abs(x.v) / max));
+    var name = x.name.length > 11 ? x.name.slice(0, 10) + '…' : x.name;
+    h += saDiaText(0, y + 13, name, { gross: 12, farbe: SA_DIA_PX })
+       + '<rect x="' + LB + '" y="' + (y + 2) + '" width="' + w + '" height="14" fill="' + (k ? SA_DIA_MI : SA_DIA_PX) + '"/>'
+       + saDiaText(LB + w + 4, y + 13, saZahlKurz(Math.round(x.v * 10) / 10), { gross: 11, farbe: SA_DIA_PX });
+  });
+  return '<svg class="sa-dia-svg" viewBox="0 0 ' + B + ' ' + (daten.length * Z + 6) + '" shape-rendering="crispEdges">' + h + '</svg>';
+}
+
+/* Torte: fünf Teile in Graustufen und Schraffur; daneben die Legende mit Anteil */
+function saDiaTorteSvg(daten, nr) {
+  var l = daten.filter(function (x) { return x.v > 0; });
+  var summe = l.reduce(function (a, b) { return a + b.v; }, 0);
+  if (!l.length || !summe) { return ''; }
+  var muster = 'saSchr' + nr;
+  var farben = [SA_DIA_PX, SA_DIA_MI, SA_DIA_ZA, 'url(#' + muster + ')', SA_DIA_HELL];
+  var cx = 62, cy = 62, r = 56;
+  var h = '<defs><pattern id="' + muster + '" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+        + '<rect width="5" height="5" fill="' + SA_DIA_HELL + '"/><rect width="2" height="5" fill="' + SA_DIA_PX + '"/></pattern></defs>';
+  var winkel = -Math.PI / 2;
+  l.forEach(function (x, k) {
+    var teil = x.v / summe;
+    var fill = farben[k % farben.length];
+    if (teil >= 0.9999) {
+      h += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + fill + '" stroke="' + SA_DIA_PX + '" stroke-width="2"/>';
+    } else {
+      var w2 = winkel + teil * 2 * Math.PI;
+      var p = function (w) { return (cx + r * Math.cos(w)).toFixed(1) + ' ' + (cy + r * Math.sin(w)).toFixed(1); };
+      h += '<path d="M' + cx + ' ' + cy + 'L' + p(winkel) + 'A' + r + ' ' + r + ' 0 ' + (teil > 0.5 ? 1 : 0) + ' 1 ' + p(w2) + 'Z" fill="' + fill + '" stroke="' + SA_DIA_PX + '" stroke-width="1.5"/>';
+      winkel = w2;
+    }
+    var ly = 10 + k * 22;
+    var name = x.name.length > 12 ? x.name.slice(0, 11) + '…' : x.name;
+    h += '<rect x="140" y="' + ly + '" width="14" height="14" fill="' + fill + '" stroke="' + SA_DIA_PX + '" stroke-width="1.5"/>'
+       + saDiaText(160, ly + 12, name, { gross: 12, farbe: SA_DIA_PX })
+       + saDiaText(298, ly + 12, Math.round(teil * 100) + ' %', { gross: 12, anker: 'end', farbe: SA_DIA_PX });
+  });
+  return '<svg class="sa-dia-svg" viewBox="0 0 300 ' + Math.max(128, 14 + l.length * 22) + '">' + h + '</svg>';
+}
+
+/* Ein Diagramm mit Überschrift */
+function saDiaHtml(s, g, nr) {
+  var svg = '';
+  var neben = '';
+  if (g.art === 'linie') {
+    var p = saDiaLinieDaten(s, g);
+    svg = saDiaLinieSvg(s, g);
+    if (p.length > 1) {
+      var dv = p[p.length - 1].v - p[0].v;
+      neben = (dv > 0 ? '▲ +' : (dv < 0 ? '▼ −' : '► ')) + saZahlKurz(Math.abs(Math.round(dv * 10) / 10));
+    }
+  } else if (g.art === 'zeit') {
+    svg = saDiaSaeulenSvg(saDiaZeitDaten(s, g));
+  } else if (g.art === 'gruppe') {
+    svg = saDiaBalkenSvg(saDiaGruppenDaten(s, g, 8));
+  } else if (g.art === 'torte') {
+    svg = saDiaTorteSvg(saDiaGruppenDaten(s, g, 5), nr);
+  }
+  return '<div class="sa-dia"><div class="sa-dia-kopf"><span>' + esc(saDiaName(s, g)) + '</span><small>' + esc(neben) + '</small></div>'
+    + (svg || '<p class="leise">Im Zeitraum keine Werte.</p>') + '</div>';
+}
+
+/* Umschalter über der Tabelle bzw. den Diagrammen */
+function saDiaUmschalterHtml(s) {
+  if (!saDiagramme(s).length) { return ''; }
+  var an = (cl.sa.ansicht === 'diagramm');
+  return '<div class="sa-dia-um"><button type="button"' + (an ? '' : ' class="an"') + ' onclick="saAnsicht(\'tabelle\')">Tabelle</button>'
+    + '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="saAnsicht(\'diagramm\')">Diagramm</button></div>';
+}
+
+function saDiagrammAnsichtHtml(s) {
+  return saKopfBereichHtml(s) + saDiaUmschalterHtml(s)
+    + saDiagramme(s).map(function (g, i) { return saDiaHtml(s, g, i); }).join('');
+}
+
+/* Mini-Kurve der letzten 30 Tage in einer Kopfwert-Kachel („letzter Wert“ eines Zahlenfelds) */
+function saDiaMiniHtml(s, k) {
+  if (k.art !== 'letzter') { return ''; }
+  var f = saFeld(s, k.feld);
+  if (!f || saDiaZahlFelder(s).indexOf(f) < 0) { return ''; }
+  var von = tagePlus(isoDatum(), -29);
+  var p = saSaetze(s).map(function (d) { return { t: saEintragDatum(s, d), v: saFeldZahl(s, d, f, 0) }; })
+    .filter(function (x) { return x.t >= von && x.v !== null && isFinite(x.v); })
+    .sort(function (a, b) { return a.t < b.t ? -1 : (a.t > b.t ? 1 : 0); });
+  if (p.length < 2) { return ''; }
+  var min = Math.min.apply(null, p.map(function (x) { return x.v; }));
+  var max = Math.max.apply(null, p.map(function (x) { return x.v; }));
+  if (max === min) { max += 1; min -= 1; }
+  var t0 = saTagNr(von);
+  return '<svg class="sa-mini" viewBox="0 0 60 14" preserveAspectRatio="none"><path d="' + p.map(function (x, i) {
+    return (i ? 'L' : 'M') + (60 * (saTagNr(x.t) - t0) / 29).toFixed(1) + ' ' + (1.5 + 11 * (max - x.v) / (max - min)).toFixed(1);
+  }).join('') + '" stroke="' + SA_DIA_PX + '" stroke-width="1.5" fill="none" vector-effect="non-scaling-stroke"/></svg>';
+}
+
+/* ---- Einrichten ---- */
+
+function saDiaListeHtml(s) {
+  var l = saDiagramme(s);
+  var h = '<p class="leise">Bis zu ' + SA_DIA_MAX + ' Diagramme. Antippen zum Ändern. Angezeigt werden sie über „Tabelle | Diagramm“.</p>';
+  l.forEach(function (g, i) {
+    h += '<div class="sa-feldzeile"><button type="button" class="tx" onclick="saDiaOeffnen(' + i + ')">' + esc(saDiaName(s, g))
+       + '<small>' + esc((SA_DIA_ARTEN.filter(function (a) { return a[0] === g.art; })[0] || ['', ''])[1]) + '</small></button></div>';
+  });
+  if (!l.length) { h += '<p class="leise">Noch kein Diagramm — „+ Diagramm“ tippen.</p>'; }
+  return h;
+}
+
+function saDiaOeffnen(nr) {
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s) { return; }
+  var g = (nr >= 0) ? saDiagramme(s)[nr] : null;
+  var zf = saDiaZahlFelder(s)[0];
+  var gf = saDiaGruppenFelder(s)[0];
+  var v = g || { art: 'linie', feld: zf ? zf.id : '', gruppe: gf ? gf.id : '', wie: 'eintrag', takt: 'monat', ziel: '', name: '' };
+  saFensterAuf({ modus: 'diagramm', nr: g ? nr : -1, art: v.art, feld: v.feld || '', gruppe: v.gruppe || '', wie: v.wie || '', takt: v.takt || 'monat', ziel: v.ziel || '', name: v.name || '' });
+}
+
+function saDiaNeu() {
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s || saDiagramme(s).length >= SA_DIA_MAX) { return; }
+  saDiaOeffnen(-1);
+}
+
+/* Getipptes und Gewähltes ins Fenster-Objekt, bevor neu gezeichnet wird */
+function saDiaFensterLesen() {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'diagramm') { return null; }
+  var name = document.getElementById('saDiaName');
+  if (name && typeof name.value === 'string') { f.name = name.value; }
+  [['feld', 'saDiaFeld'], ['gruppe', 'saDiaGruppe'], ['wie', 'saDiaWie'], ['takt', 'saDiaTakt'], ['ziel', 'saDiaZiel']].forEach(function (x) {
+    var el = document.getElementById(x[1]);
+    if (el && typeof el.value === 'string') { f[x[0]] = el.value; }
+  });
+  return f;
+}
+
+function saDiaArt(art) {
+  var f = saDiaFensterLesen();
+  if (!f || !SA_DIA_ARTEN.some(function (a) { return a[0] === art; })) { return; }
+  f.art = art;
+  if (!SA_DIA_WIE[art].some(function (w) { return w[0] === f.wie; })) { f.wie = SA_DIA_WIE[art][0][0]; }
+  aufklappNeu();
+}
+
+function saDiaFensterHtml(s, f, kopf, abbrechen) {
+  var wahl = function (id, an, liste) {
+    return '<select id="' + id + '" class="eingabe">' + liste.map(function (x) {
+      return '<option value="' + esc(x[0]) + '"' + (x[0] === an ? ' selected' : '') + '>' + esc(x[1]) + '</option>';
+    }).join('') + '</select>';
+  };
+  var wieListe = SA_DIA_WIE[f.art] || SA_DIA_WIE.linie;
+  var wie = wieListe.some(function (w) { return w[0] === f.wie; }) ? f.wie : wieListe[0][0];
+  var h = kopf(f.nr >= 0 ? 'Diagramm' : 'Neues Diagramm')
+    + '<label>Art:</label><div class="wahlreihe">' + SA_DIA_ARTEN.map(function (a) {
+        return '<button type="button"' + (a[0] === f.art ? ' class="an"' : '') + ' onclick="saDiaArt(\'' + a[0] + '\')">' + a[1] + '</button>';
+      }).join('') + '</div>'
+    + '<label for="saDiaWie">' + (f.art === 'linie' ? 'Punkte:' : 'Wert:') + '</label>' + wahl('saDiaWie', wie, wieListe)
+    + '<label for="saDiaFeld">Feld (Zahl):</label>' + wahl('saDiaFeld', f.feld, saDiaZahlFelder(s).map(function (x) { return [x.id, x.name]; }));
+  if (f.art === 'zeit') { h += '<label for="saDiaTakt">Zusammenfassen:</label>' + wahl('saDiaTakt', f.takt, SA_DIA_TAKT); }
+  if (f.art === 'gruppe' || f.art === 'torte') {
+    h += '<label for="saDiaGruppe">Je Wert von Feld:</label>' + wahl('saDiaGruppe', f.gruppe, saDiaGruppenFelder(s).map(function (x) { return [x.id, x.name]; }));
+  }
+  if (f.art === 'linie') {
+    h += '<label for="saDiaZiel">Ziellinie (fester Wert, optional):</label>'
+       + wahl('saDiaZiel', f.ziel, [['', '— keine —']].concat((s.werte || []).filter(function (w) { return w.typ !== 'datum'; }).map(function (w) { return [w.id, w.name]; })));
+  }
+  h += '<label for="saDiaName">Überschrift (leer = automatisch):</label><input id="saDiaName" class="eingabe" type="text" autocomplete="off" value="' + esc(f.name || '') + '">';
+  return h + saKnoepfe('<button type="button" class="knopf voll" onclick="saDiaSpeichern()">OK</button>' + abbrechen
+    + (f.nr >= 0 ? '<button type="button" class="knopf" onclick="saDiaLoeschen()">Löschen</button>' : ''));
+}
+
+function saDiaSpeichern() {
+  var f = saDiaFensterLesen();
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || !s) { aufklappZu(); return; }
+  var wieListe = SA_DIA_WIE[f.art];
+  if (!wieListe) { melde('Bitte eine Art wählen.', 'warn'); return; }
+  var wie = wieListe.some(function (w) { return w[0] === f.wie; }) ? f.wie : wieListe[0][0];
+  var zahl = saFeld(s, f.feld);
+  if (wie !== 'anzahl' && (!zahl || saDiaZahlFelder(s).indexOf(zahl) < 0)) { melde('Bitte ein Zahlenfeld wählen.', 'warn'); return; }
+  var g = { art: f.art, wie: wie };
+  if (zahl && wie !== 'anzahl') { g.feld = zahl.id; }
+  if (f.art === 'zeit') { g.takt = (f.takt === 'woche') ? 'woche' : 'monat'; }
+  if (f.art === 'gruppe' || f.art === 'torte') {
+    var gf = saFeld(s, f.gruppe);
+    if (!gf || saDiaGruppenFelder(s).indexOf(gf) < 0) { melde('Bitte ein Feld zum Gruppieren wählen.', 'warn'); return; }
+    g.gruppe = gf.id;
+  }
+  if (f.art === 'linie' && (s.werte || []).some(function (w) { return w.id === f.ziel; })) { g.ziel = f.ziel; }
+  var name = String(f.name || '').trim().slice(0, 40);
+  if (name) { g.name = name; }
+  if (!Array.isArray(s.diagramme)) { s.diagramme = []; }
+  if (f.nr >= 0 && s.diagramme[f.nr]) { s.diagramme[f.nr] = g; }
+  else if (s.diagramme.length < SA_DIA_MAX) { s.diagramme.push(g); }
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
+}
+
+function saDiaLoeschen() {
+  var f = cl.sa.fenster;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || !s || !Array.isArray(s.diagramme)) { aufklappZu(); return; }
+  s.diagramme.splice(f.nr, 1);
+  if (!s.diagramme.length) { delete s.diagramme; }
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
+}
 
 /* ---- Info je Sammlung (seit 0.46): freier Text am Satz der Sammlung, Feld „info“ ---- */
 
@@ -9865,6 +10379,8 @@ function saFensterHtml() {
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saWertSpeichern()">OK</button>' + abbrechen
         + (fw ? '<button type="button" class="knopf" onclick="saWertLoeschen()">Löschen</button>' : ''));
   }
+
+  if (f.modus === 'diagramm') { return saDiaFensterHtml(s, f, kopf, abbrechen); }
 
   if (f.modus === 'kopf') {
     var kw = (f.nr >= 0 && s.kopfwerte) ? s.kopfwerte[f.nr] : null;
