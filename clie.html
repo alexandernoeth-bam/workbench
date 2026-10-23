@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.47.4</title>
+<title>CLIE 0.48.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -487,6 +487,16 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-zeile .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .sa-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
 .sa-sym{width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:#3B4433;color:var(--lcd-hell);display:flex;align-items:center;justify-content:center;font-size:18px}
+/* Pixel-Symbole der Sammlungen (seit 0.48) */
+.sa-sym .sa-ikone{width:22px;height:22px}
+.sa-ikone-text{width:18px;height:18px;vertical-align:-3px}
+.eingabe.sa-symwahl{display:flex;align-items:center;gap:10px;text-align:left;padding:4px}
+.sa-symwahl .sa-sym{width:30px;height:30px;flex:0 0 30px}
+.sa-symwahl-pf{margin-left:auto}
+.sa-raster{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin:2px 0 4px}
+.sa-raster button{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:50%;background:#3B4433;color:var(--lcd-hell);border:2px solid transparent}
+.sa-raster button.an{outline:3px solid var(--px);outline-offset:1px;background:var(--px)}
+.sa-raster .sa-ikone{width:62%;height:62%}
 .sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap;text-align:right;line-height:1.15}
 /* Kennzahl 2 klein darunter (seit 0.11.1) */
 .sa-kz small{display:block;font-size:16px}
@@ -899,7 +909,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.47.4';
+var APP_VERSION = '0.48.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3692,7 +3702,7 @@ function suTreffer(q) {
   (DB.sammlungen || []).forEach(function (sa) {
     if (!sa || sa.vorlage) { return; }
     if (suFinde(sa.name, q)) {
-      aus.push({ gruppe: 'sammlungen', titel: esc(SA_ZEICHEN[sa.art] || '≡') + ' ' + suMarkiert(sa.name, q, false),
+      aus.push({ gruppe: 'sammlungen', titel: (saIkone(sa.symbol) ? saIkoneSvg(sa.symbol, 'sa-ikone-text') : esc(SA_ZEICHEN[sa.art] || '≡')) + ' ' + suMarkiert(sa.name, q, false),
         unter: esc('Sammlung · ' + saSaetze(sa).length + (saSaetze(sa).length === 1 ? ' Eintrag' : ' Einträge')), aufruf: 'suSammlung(\'' + esc(sa.id) + '\',\'\')', rang: [0, 0] });
     }
     saSaetze(sa).forEach(function (d) {
@@ -4220,7 +4230,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saKopf\')">Kopfwerte…</button>'
           + '<button type="button" onclick="menueWahl(\'saDiagramme\')">Diagramme…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
-          + '<button type="button" onclick="menueWahl(\'saDetails\')">Umbenennen / Löschen…</button>' : '')
+          + '<button type="button" onclick="menueWahl(\'saDetails\')">Details…</button>' : '')
       + (cl.app === 'schach' ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'schNeu\')">Neue Partie…</button>'
           + '<button type="button" onclick="menueWahl(\'schSpeichern\')">Partie speichern…</button>'
@@ -9133,7 +9143,7 @@ function saListeHtml() {
     if (!l.length) { return; }
     h += '<div class="gruppe">' + esc(g) + '</div>';
     l.forEach(function (s) {
-      h += '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + (SA_ZEICHEN[s.art] || '≡') + '</span>'
+      h += '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
          + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
          + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>';
     });
@@ -9586,6 +9596,140 @@ function saFeldSchieben(i, r) {
 /* ---- Fenster ----
    Ein Fenster für alles: neue Sammlung, Eintrag, Feld, Filter,
    Kopieren, Details. Eingaben werden erst beim Speichern gelesen. */
+
+/* ---- Symbole für Sammlungen (seit 0.48) ----
+   64 Pixel-Symbole, je 12 × 12 — '#' = Pixel. [Schlüssel, Name, Bild].
+   Gewählt in „Details…“, gespeichert an der Sammlung als „symbol“. */
+var SA_IKONEN = [
+/* Gesundheit */
+['waage','Waage',['............','.##########.','#..........#','#...####...#','#..#....#..#','#.#...#..#.#','#.#..#...#.#','#..........#','#..........#','#..........#','.##########.','............']],
+['herz','Herz',['............','.###....###.','#####..#####','############','############','############','.##########.','..########..','...######...','....####....','.....##.....','............']],
+['laufen','Laufen',['.......##...','.......##...','.....####...','....#.###...','...#..###.#.','.....#####..','.....##.....','....##.##...','...##...##..','..##.....#..','.##......##.','............']],
+['rad','Fahrrad',['............','........##..','.....#...#..','....###.#...','...#.#.###..','.###..#.###.','#...##.#...#','#..#.#.#.#.#','#.#..#.#..##','#...#...#..#','.###.....###','............']],
+['schwimmen','Schwimmen',['............','........##..','........##..','....######..','...#.....#..','..#.......#.','............','.##..##..##.','#..##..##..#','............','.##..##..##.','#..##..##..#']],
+['apfel','Apfel',['......#.....','.....#..##..','.....###....','..###.####..','.##########.','############','############','############','.##########.','.##########.','..###..###..','............']],
+['wasser','Wasser',['.....#......','.....#......','....###.....','....###.....','...#####....','..#######...','..##.####...','.##..#####..','.##..#####..','.#########..','..#######...','...#####....']],
+['schlaf','Schlaf',['....####....','..####......','.####.......','.###........','####........','####........','####........','####......#.','.####....##.','.#########..','..#######...','....###.....']],
+['zahn','Zahn',['............','.###....###.','############','############','############','.##########.','.##########.','.####..####.','.###....###.','.###....###.','..##....##..','............']],
+['medizin','Medizin',['............','....####....','....#..#....','....#..#....','.####..####.','.#........#.','.#........#.','.####..####.','....#..#....','....#..#....','....####....','............']],
+['hantel','Hantel',['............','............','.##......##.','.##......##.','###......###','############','############','###......###','.##......##.','.##......##.','............','............']],
+['puls','Puls',['............','............','......#.....','.....#.#....','.....#.#....','#....#..#...','.#..#...#..#','..##....#.#.','.........#..','............','............','............']],
+/* Geld */
+['euro','Euro',['............','....######..','...#......#.','..#.........','#######.....','..#.........','#######.....','..#.........','...#......#.','....######..','............','............']],
+['sparschwein','Sparen',['.....##.....','............','..########..','.#........#.','##...#....##','#..........#','#..........#','.#........#.','..########..','..#..#.#..#.','..#..#.#..#.','............']],
+['karte','Karte',['............','############','#..........#','############','############','#..........#','#.###......#','#..........#','#.##.###...#','############','............','............']],
+['geldbeutel','Geldbeutel',['............','...#######..','..#......#..','############','#..........#','#.......####','#.......#..#','#.......####','#..........#','############','............','............']],
+['rechnung','Rechnung',['.##########.','.#........#.','.#.######.#.','.#........#.','.#.####...#.','.#........#.','.#.#####..#.','.#........#.','.#.....##.#.','.#........#.','.#.#.#.#.##.','..#.#.#.#...']],
+['prozent','Prozent',['............','.##......#..','#..#....#...','#..#...#....','.##...#.....','.....#......','....#..##...','...#..#..#..','..#...#..#..','.#.....##...','............','............']],
+['tresor','Tresor',['############','#..........#','#.########.#','#.#......#.#','#.#..##..#.#','#.#.#..#.###','#.#.#..#.#.#','#.#..##..###','#.#......#.#','#.########.#','#..........#','############']],
+['wachstum','Wachstum',['............','.......#####','..........##','.........#.#','........#..#','.......#....','..#...#.....','.#.#.#......','#...#.......','............','############','............']],
+/* Haus und Garten */
+['haus','Haus',['.....##.....','....####....','...######...','..########..','.##########.','############','.##########.','.###....###.','.###.##.###.','.###.##.###.','.###....###.','.##########.']],
+['werkzeug','Werkzeug',['.##.........','#..#........','#..#........','.####.......','....##......','.....##.....','......##....','.......####.','........#..#','........#..#','.........##.','............']],
+['schluessel','Schlüssel',['............','.####.......','#....#......','#.##.#......','#.##.#######','#....#.#.#.#','.####..#.#..','...........#','............','............','............','............']],
+['lampe','Licht',['....####....','...#....#...','..#......#..','..#......#..','..#......#..','...#....#...','....#..#....','....####....','....####....','....####....','.....##.....','............']],
+['blitz','Strom',['......####..','.....####...','....####....','...####.....','..########..','.....####...','....####....','...###......','..##........','.#..........','............','............']],
+['flamme','Heizung',['.....#......','.....##.....','....###.....','....####.#..','...#####.##.','..#########.','..####.####.','.####...###.','.###.....##.','.###.....##.','..###...##..','...######...']],
+['pflanze','Pflanze',['......##....','.##..####...','####.####...','.####.##....','..#####.....','....##......','...######...','..########..','..#......#..','...#....#...','...######...','............']],
+['baum','Baum',['.....##.....','....####....','...######...','..########..','.##########.','..########..','.##########.','############','.....##.....','.....##.....','....####....','............']],
+['sonne','Sonne',['.....##.....','.#...##...#.','..#......#..','....####....','...######...','##.######.##','##.######.##','...######...','....####....','..#......#..','.#...##...#.','.....##.....']],
+['auto','Auto',['............','............','...######...','..#..#...#..','.#...#....#.','############','#..........#','############','.##......##.','#..#....#..#','.##......##.','............']],
+['tanken','Tanken',['............','.#######....','.#.....#.#..','.#.....#..#.','.#######..#.','.#######..#.','.#######.##.','.#######.#..','.#######.#..','.#######.#..','.#######....','###########.']],
+['muell','Müll',['....####....','############','............','.##########.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','..########..','............']],
+/* Freizeit */
+['buch','Buch',['............','.####..####.','#....##....#','#.##.##.##.#','#....##....#','#.##.##.##.#','#....##....#','#.##.##.##.#','#....##....#','.####..####.','.....##.....','............']],
+['musik','Musik',['.....######.','.....#....#.','.....######.','.....#....#.','.....#....#.','.....#....#.','.....#....#.','..####..####','.#####.#####','.#####.#####','..###...###.','............']],
+['film','Film',['############','#.#......#.#','############','#.#......#.#','#.#......#.#','#.#......#.#','#.#......#.#','############','#.#......#.#','############','............','............']],
+['kamera','Kamera',['............','....####....','############','#..........#','#...####...#','#..#....#..#','#..#....#..#','#...####...#','#..........#','############','............','............']],
+['spiel','Spiel',['............','............','.##########.','#..........#','#.#......#.#','###.....#.##','#.#...#....#','#.......#..#','#..........#','.###....###.','............','............']],
+['schach','Schach',['....#..#....','....####....','...######...','..##.#####..','.###.######.','.#######.##.','..#...####..','.....#####..','....######..','...#######..','..#########.','............']],
+['koffer','Reise',['....####....','....#..#....','############','#...#..#...#','#...#..#...#','#...#..#...#','#...#..#...#','#...#..#...#','#...#..#...#','############','.#........#.','............']],
+['flugzeug','Flug',['.....##.....','.....##.....','.....##.....','....####....','..########..','############','.....##.....','.....##.....','....####....','...######...','............','............']],
+['berg','Berg',['............','............','......#.....','.....###....','....#####...','...#######..','..#.#######.','.#...#######','#.....######','#......#####','############','............']],
+['ball','Ball',['....####....','..##....##..','.#...##...#.','.#..####..#.','#..######..#','#...####...#','#....##....#','#.##....##.#','.###....###.','.#........#.','..##....##..','....####....']],
+['kochen','Kochen',['............','...#..#..#..','..#..#..#...','............','############','.#........#.','.#........#.','.#........#.','.#........#.','..########..','............','............']],
+['kaffee','Kaffee',['...#..#.....','..#..#......','...#..#.....','............','#########...','#.......###.','#.......#..#','#.......###.','.#.....#....','..#####.....','############','............']],
+/* Arbeit und Ordnung */
+['tasche','Arbeit',['............','....####....','...#....#...','############','#..........#','#....##....#','############','#..........#','#..........#','#..........#','############','............']],
+['uhr','Uhr',['....####....','..##....##..','.#....#...#.','.#....#...#.','#.....#....#','#.....####.#','#..........#','.#........#.','.#........#.','..##....##..','....####....','............']],
+['kalender','Kalender',['..#.....#...','############','#..........#','############','#.#.#.#.#..#','#..........#','#.#.#.#.#..#','#..........#','#.#.#.###..#','#.....###..#','############','............']],
+['brief','Brief',['............','############','##........##','#.#......#.#','#..#....#..#','#...#..#...#','#....##....#','#..........#','#..........#','############','............','............']],
+['telefon','Telefon',['............','.###........','####........','###.........','###.........','.##.........','..##........','...###...###','....########','.....#######','.......####.','............']],
+['laptop','Computer',['............','.##########.','.#........#.','.#........#.','.#........#.','.#........#.','.##########.','............','############','#..........#','############','............']],
+['ordner','Ordner',['............','####........','#...#.......','#....######.','#..........#','#..........#','#..........#','#..........#','#..........#','############','............','............']],
+['stift','Stift',['.........##.','........#..#','.......#..##','......#..#..','.....#..#...','....#..#....','...#..#.....','..#..#......','.#..#.......','.###........','.##.........','............']],
+['haken','Erledigt',['............','............','..........##','.........###','........###.','##.....###..','###...###...','.###.###....','..#####.....','...###......','............','............']],
+['stern','Stern',['.....##.....','.....##.....','....####....','############','.##########.','..########..','...######...','...######...','..###..###..','..##....##..','.#........#.','............']],
+['flagge','Ziel',['.#..........','.#########..','.#.##..##...','.#########..','.#.##..##...','.#########..','.#..........','.#..........','.#..........','.#..........','####........','............']],
+['schild','Wichtig',['.....##.....','....#..#....','....#..#....','...#.##.#...','...#.##.#...','..#..##..#..','..#..##..#..','.#........#.','.#...##...#.','#.........##','############','............']],
+/* Menschen und Tiere */
+['person','Person',['....####....','...######...','...######...','...######...','....####....','............','..########..','.##########.','############','############','############','............']],
+['gruppe','Familie',['..##....##..','.####..####.','.####..####.','..##....##..','............','.####..####.','######.#####','######.#####','######.#####','............','............','............']],
+['kind','Kind',['....####....','....####....','.....##.....','..########..','.#..####..#.','#...####...#','....####....','....#..#....','...##..##...','...#....#...','..##....##..','............']],
+['katze','Katze',['.#......#...','.##....##...','.########...','.#.##.#.#...','.########...','..######....','..#######..#','..########.#','..########.#','..#######.#.','..#.#..#.#..','............']],
+['hund','Hund',['............','##..........','#####.......','#.####......','#####.......','.#####......','..#########.','..##########','..#########.','..#......#..','..#......#..','.##.....##..']],
+['geschenk','Geschenk',['...##..##...','..#..##..#..','...##..##...','############','#....##....#','############','.#...##...#.','.#...##...#.','.#...##...#.','.#...##...#.','.##########.','............']],
+['kuchen','Feier',['..#..#..#...','..#..#..#...','.##.##.##...','############','#..........#','############','#.#.#.#.#.##','############','#..........#','############','............','............']],
+['glas','Wein',['.##########.','.#........#.','.#........#.','.##########.','..########..','...######...','....####....','.....##.....','.....##.....','.....##.....','...######...','............']]
+];
+
+function saIkone(k) {
+  return SA_IKONEN.filter(function (x) { return x[0] === k; })[0] || null;
+}
+
+/* Das Pixelbild als SVG in Schriftfarbe — passt in die runde Scheibe der Liste wie in Textzeilen */
+function saIkoneSvg(k, klasse) {
+  var x = saIkone(k);
+  if (!x) { return ''; }
+  var h = '';
+  x[2].forEach(function (r, j) {
+    var i;
+    for (i = 0; i < 12; i++) { if (r.charAt(i) === '#') { h += '<rect x="' + i + '" y="' + j + '" width="1" height="1"/>'; } }
+  });
+  return '<svg class="' + (klasse || 'sa-ikone') + '" viewBox="0 0 12 12" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true">' + h + '</svg>';
+}
+
+/* Inhalt der runden Scheibe: das gewählte Symbol oder das Zeichen der Vorlage */
+function saSymbolHtml(s) {
+  return (s && saIkone(s.symbol)) ? saIkoneSvg(s.symbol) : esc(SA_ZEICHEN[s && s.art] || '≡');
+}
+
+/* In „Details…“: das Raster mit allen Symbolen */
+function saSymbolWahl() {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'details') { return; }
+  saDetailsLesen(f);
+  f.wahl = f.symbol || '';
+  f.modus = 'symbol';
+  aufklappNeu();
+}
+
+function saSymbolTipp(k) {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'symbol' || (k && !saIkone(k))) { return; }
+  f.wahl = k;
+  aufklappNeu();
+}
+
+/* OK (übernehmen), „Wie Vorlage“ (leer) oder Abbrechen — zurück in die Details */
+function saSymbolZurueck(uebernehmen, leeren) {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'symbol') { return; }
+  if (leeren) { f.symbol = ''; } else if (uebernehmen) { f.symbol = f.wahl || ''; }
+  f.modus = 'details';
+  aufklappNeu();
+}
+
+function saSymbolFensterHtml(f, kopf) {
+  var x = saIkone(f.wahl);
+  return kopf('Symbol wählen') + '<div class="sa-raster">' + SA_IKONEN.map(function (i) {
+      return '<button type="button"' + (i[0] === f.wahl ? ' class="an"' : '') + ' onclick="saSymbolTipp(\'' + i[0] + '\')" aria-label="' + esc(i[1]) + '">' + saIkoneSvg(i[0]) + '</button>';
+    }).join('') + '</div>'
+    + '<p class="leise">Gewählt: <b>' + esc(x ? x[1] : 'wie die Vorlage') + '</b></p>'
+    + saKnoepfe('<button type="button" class="knopf voll" onclick="saSymbolZurueck(true,false)">OK</button>'
+      + '<button type="button" class="knopf" onclick="saSymbolZurueck(false,true)">Wie Vorlage</button>'
+      + '<button type="button" class="knopf" onclick="saSymbolZurueck(false,false)">Abbrechen</button>');
+}
 
 /* ---------- Diagramme in Sammlungen (seit 0.47) ----------
 
@@ -10135,7 +10279,7 @@ function saDetailsOeffnen() {
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
   if (!s) { return; }
   var kz = s.kennzahl || {};
-  saFensterAuf({ modus: 'details', name: s.name, kontext: s.kontext || 'privat', gruppe: s.gruppeName || '',
+  saFensterAuf({ modus: 'details', name: s.name, kontext: s.kontext || 'privat', gruppe: s.gruppeName || '', symbol: saIkone(s.symbol) ? s.symbol : '',
                  kzArt: kz.art || '', kzFeld: kz.feld || ((s.felder || [])[0] || {}).id || '', kzWert: kz.wert || ((s.werte || [])[0] || {}).id || '',
                  kz2Art: (s.kennzahl2 || {}).art || '', kz2Feld: (s.kennzahl2 || {}).feld || ((s.felder || [])[0] || {}).id || '',
                  kz2Wert: (s.kennzahl2 || {}).wert || ((s.werte || [])[0] || {}).id || '' });
@@ -10414,6 +10558,8 @@ function saFensterHtml() {
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saKopieren()">Speichern</button>' + abbrechen);
   }
 
+  if (f.modus === 'symbol') { return saSymbolFensterHtml(f, kopf); }
+
   if (f.modus === 'details') {
     var feldWahl = function (id, an, liste) {
       return '<select id="' + id + '" class="eingabe">' + liste.map(function (x) {
@@ -10423,7 +10569,11 @@ function saFensterHtml() {
     var kzArten = [['', 'wie die Vorlage (' + saKennzahlStandard(s) + ')'], ['anzahl', 'Anzahl der Einträge'], ['letzter', 'letzter Wert eines Felds'],
                    ['summe', 'Summe eines Felds'], ['schnitt', 'Ø eines Felds'], ['min', 'Min eines Felds'], ['max', 'Max eines Felds']];
     if ((s.werte || []).length) { kzArten.push(['wert', 'ein fester Wert']); }
+    var ik = saIkone(f.symbol);
     return kopf('Sammlung') + '<label for="saName">Name:</label><input id="saName" class="eingabe" type="text" autocomplete="off" value="' + esc(f.name) + '">'
+      /* Symbol (seit 0.48) */
+      + '<label>Symbol:</label><button type="button" class="eingabe sa-symwahl" onclick="saSymbolWahl()"><span class="sa-sym">' + (ik ? saIkoneSvg(f.symbol) : esc(SA_ZEICHEN[s.art] || '≡')) + '</span>'
+      + '<span>' + esc(ik ? ik[1] : 'wie die Vorlage') + '</span><span class="sa-symwahl-pf">▶</span></button>'
       + '<label>Kategorie:</label><div class="wahlreihe">'
       + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
           return '<button type="button"' + (f.kontext === k[0] ? ' class="an"' : '') + ' onclick="saKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
@@ -10807,6 +10957,7 @@ function saDetailsSpeichern() {
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { s.kontext = f.kontext; }
   var gruppe = String(f.gruppe || '').trim().slice(0, 40);
   if (gruppe && gruppe !== saGruppeStandard(s)) { s.gruppeName = gruppe; } else { delete s.gruppeName; }
+  if (saIkone(f.symbol)) { s.symbol = f.symbol; } else { delete s.symbol; }
   var kz1 = saKennzahlWahl(f.kzArt, f.kzFeld, f.kzWert);
   var kz2 = saKennzahlWahl(f.kz2Art, f.kz2Feld, f.kz2Wert);
   if (kz1) { s.kennzahl = kz1; } else { delete s.kennzahl; }
@@ -18485,7 +18636,7 @@ function lzZiel(p) {
   if (p.art === 'sammlung') {
     var sa = saFinden(p.zielId);
     if (!sa || sa.vorlage) { return aus; }
-    return { lebt: true, titel: sa.name, zeichen: '▤', stand: String(saSaetze(sa).length), kontext: sa.kontext || '' };
+    return { lebt: true, titel: sa.name, zeichen: '▤', symbol: saIkone(sa.symbol) ? saIkoneSvg(sa.symbol, 'sa-ikone-text') : '', stand: String(saSaetze(sa).length), kontext: sa.kontext || '' };
   }
   if (p.art === 'jahrliste') {
     return { lebt: true, titel: jaArtName(p.zielId), zeichen: '▦', stand: 'Jahr ▸ Liste', kontext: '' };
@@ -18526,12 +18677,12 @@ function lesezeichenHtml() {
   return l.map(function (p, i) {
     var z = lzZiel(p);
     if (cl.lz.bearbeiten) {
-      return '<div class="lz-zeile"><span class="s">' + esc(z.zeichen) + '</span><span class="t">' + esc(z.titel) + '</span>'
+      return '<div class="lz-zeile"><span class="s">' + (z.symbol || esc(z.zeichen)) + '</span><span class="t">' + esc(z.titel) + '</span>'
         + '<button type="button" onclick="lzSchieben(\'' + esc(p.id) + '\',-1)"' + (i === 0 ? ' disabled' : '') + ' aria-label="nach oben">▲</button>'
         + '<button type="button" onclick="lzSchieben(\'' + esc(p.id) + '\',1)"' + (i === l.length - 1 ? ' disabled' : '') + ' aria-label="nach unten">▼</button>'
         + '<button type="button" onclick="lzWeg(\'' + esc(p.id) + '\')" aria-label="entfernen">✕</button></div>';
     }
-    return '<button type="button" class="lz-zeile" onclick="lzOeffnen(\'' + esc(p.id) + '\')"><span class="s">' + esc(z.zeichen) + '</span><span class="t">' + esc(z.titel) + '</span><span class="q">' + esc(z.stand) + '</span></button>';
+    return '<button type="button" class="lz-zeile" onclick="lzOeffnen(\'' + esc(p.id) + '\')"><span class="s">' + (z.symbol || esc(z.zeichen)) + '</span><span class="t">' + esc(z.titel) + '</span><span class="q">' + esc(z.stand) + '</span></button>';
   }).join('');
 }
 

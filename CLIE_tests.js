@@ -1817,6 +1817,53 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   90. Symbole für Sammlungen (0.48.0)
+   Grund: Sammlungen bekamen nur ein Zeichen je Vorlage (≡, €, ↻ …) —
+   viele sahen gleich aus. Seit 0.48 gibt es 64 runde Pixel-Symbole,
+   gewählt in „Details…“ und gespeichert als „symbol“ an der Sammlung.
+   Erkennt: kaputte Symbol-Bilder, doppelte Schlüssel, Wahl geht verloren,
+   „Wie Vorlage“ entfernt nicht, Symbol fehlt in Liste/Suche/Lesezeichen,
+   unbekannter Schlüssel bricht die Anzeige.
+   ============================================================ */
+function saSymbolTest() {
+  console.log('\n90. Symbole für Sammlungen (0.48.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const ik = S.SA_IKONEN || [];
+  pruefe(ik.length === 64 && new Set(ik.map(i => i[0])).size === 64, '64 Symbole mit eindeutigem Schlüssel');
+  pruefe(ik.every(i => i[2].length === 12 && i[2].every(r => /^[#.]{12}$/.test(r)) && i[2].join('').indexOf('#') >= 0), 'jedes Bild 12 × 12 und nicht leer');
+  S.DB.sammlungen = [{ id: 'sa1', name: 'Gewicht', art: 'frei', felder: [{ id: 'f1', name: 'kg', typ: 'zahl' }], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [];
+  const s = S.DB.sammlungen[0];
+  pruefe(S.saSymbolHtml(s) === '≡' && S.saSymbolHtml({ art: 'frei', symbol: 'gibtsnicht' }) === '≡', 'ohne (oder mit unbekanntem) Symbol: Zeichen der Vorlage');
+  S.oeffne('sammlungen'); S.saOeffnen('sa1');
+  S.saDetailsOeffnen();
+  pruefe(/Details…/.test(S.saFensterHtml() + SKRIPT) && SKRIPT.indexOf('Umbenennen / Löschen…') < 0, 'Menüpunkt heißt „Details…“');
+  pruefe(/saSymbolWahl\(\)/.test(S.saFensterHtml()), 'Details zeigen die Zeile „Symbol“');
+  S.document.getElementById('saName').value = 'Körpergewicht';
+  S.saSymbolWahl();
+  pruefe(S.cl.sa.fenster.modus === 'symbol' && (S.saFensterHtml().match(/saSymbolTipp\(/g) || []).length === 64, 'Raster mit 64 Symbolen');
+  S.saSymbolTipp('waage');
+  pruefe(/Gewählt: <b>Waage/.test(S.saFensterHtml()), 'Tipp zeigt den Namen des Symbols');
+  S.saSymbolZurueck(true, false);
+  pruefe(S.cl.sa.fenster.modus === 'details' && S.cl.sa.fenster.name === 'Körpergewicht', 'OK: zurück in Details, getippter Name bleibt');
+  S.saDetailsSpeichern();
+  pruefe(s.symbol === 'waage' && s.name === 'Körpergewicht', 'Speichern legt „symbol“ an der Sammlung ab');
+  S.saZurListe();
+  pruefe(/sa-sym"><svg class="sa-ikone"/.test(inhalt('inhalt') + inhalt('app')) || /<svg class="sa-ikone"/.test(S.saListeHtml ? S.saListeHtml() : ''), 'Liste zeigt das Pixel-Symbol');
+  const t = S.suTreffer('Körper').filter(x => x.gruppe === 'sammlungen')[0];
+  pruefe(t && /<svg class="sa-ikone-text"/.test(t.titel), 'Suche zeigt das Symbol');
+  const z = S.lzZiel({ art: 'sammlung', zielId: 'sa1' });
+  pruefe(z && /<svg class="sa-ikone-text"/.test(z.symbol), 'Lesezeichen zeigt das Symbol');
+  S.saOeffnen('sa1'); S.saDetailsOeffnen(); S.saSymbolWahl();
+  S.saSymbolZurueck(false, true); S.saDetailsSpeichern();
+  pruefe(!('symbol' in s) && S.saSymbolHtml(s) === '≡', '„Wie Vorlage“ entfernt das Symbol wieder');
+  S.saZurListe();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    89. Neues App-Symbol: kleiner Organizer (0.47.3)
    Grund: Das alte Symbol (Schriftzug „CLIE“ auf Grün) wurde auf dem
    Pixel rund ausgeschnitten und war kaum lesbar. Neu: ein Palm-
@@ -5784,6 +5831,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { saSymbolTest(); } catch (e) { fail('Sammlung-Symbole warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { appSymbolTest(); } catch (e) { fail('App-Symbol warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { diaZeitraumTest(); } catch (e) { fail('Diagramm-Zeitraum warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenSortTest(); } catch (e) { fail('Spalten-Sortieren warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
