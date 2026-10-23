@@ -1962,6 +1962,81 @@ function ckKorbTest() {
 }
 
 /* ============================================================
+   96. Sammlung aus einer Notiz-Tabelle (0.49.1)
+   Grund: Manche Notizen sind eigentlich Sammlungen — ihre Daten stehen
+   als Markdown-Tabelle darin. Seit 0.49.1 lassen sie sich als neue
+   Sammlung anlegen oder an eine bestehende anhängen.
+   Erkennt: Tabellen werden nicht gefunden (ohne Randstriche, \|, mehrere
+   Tabellen), Feldart falsch erkannt, Zahlen/Daten falsch umgewandelt,
+   Probleme verschwiegen, Doppelte beim zweiten Anhängen, Notiz verändert.
+   ============================================================ */
+function saImportTest() {
+  console.log('\n96. Sammlung aus einer Notiz-Tabelle (0.49.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.katSetzen('alle');
+  const wein = '# Weinkeller\nText davor\n\n| Wein | Jahrgang | Preis | Lage | getrunken | Web |\n|---|---:|---|:---:|---|---|\n'
+    + '| **Riesling GG** | 2019 | 24,90 € | Mosel | x | [Shop](https://wein.de/a) |\n| Spätburgunder \\| alt | 2015 | ca. 20 | Ahr |  | https://wein.de/b |\n|  |  |  |  |  |  |\n'
+    + '| Silvaner | 2021 | 1.234,50 € | Franken | nein | https://wein.de/c |\n\nText danach';
+  const gew = 'Datum | Gewicht | Notiz\n--- | --- | ---\n21.10.2026 | 84,6 | nach Urlaub\n22.10.26 | 84,1 |\n\n| A | B |\n|---|---|\n| 1 | 2 |';
+  S.DB.gedanken.push({ id: 'nw', titel: 'Weinkeller', text: wein, kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'ng', titel: 'Gewicht 2026', text: gew, kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'nx', titel: 'Ohne Tabelle', text: 'nur | ein Strich', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  const tw = S.saMdTabellen(wein);
+  pruefe(tw.length === 1 && tw[0].kopf.join(',') === 'Wein,Jahrgang,Preis,Lage,getrunken,Web' && tw[0].zeilen.length === 3, 'Tabelle gefunden: Kopf, Zeilen — leere Zeile übersprungen');
+  pruefe(tw[0].zeilen[1][0] === 'Spätburgunder | alt', '\\| bleibt ein Strich im Text');
+  pruefe(S.saMdTabellen(gew).length === 2 && S.saMdTabellen(gew)[0].zeilen.length === 2, 'ohne Randstriche und zwei Tabellen in einer Notiz');
+  pruefe(['text', 'zahl', 'betrag', 'text', 'janein', 'link'].join() === tw[0].kopf.map((k, i) => S.saImpTyp(k, tw[0].zeilen.map(z => z[i]))).join(), 'Feldart erkannt: Text, Zahl, Betrag, Text, Ja/Nein, Link');
+  pruefe(S.saImpWert('datum', '22.10.26') === '2026-10-22' && S.saImpWert('betrag', '1.234,50 €') === 1234.5 && S.saImpWert('zahl', 'ca. 20') === null && S.saImpWert('link', '[Shop](https://wein.de/a)') === 'https://wein.de/a',
+    'Umwandlung: Datum, Betrag mit Tausenderpunkt, Unpassendes wird null, Link aus [Text](Link)');
+  /* Neue Sammlung */
+  S.oeffne('sammlungen');
+  S.saNeu();
+  pruefe(/saImpStart\('neu'\)/.test(S.saFensterHtml()), 'Neu bietet „Aus einer Notiz-Tabelle …“');
+  S.saImpStart('neu');
+  let h = S.saFensterHtml();
+  pruefe(/Weinkeller/.test(h) && /Tabelle 2: A · B — 1 Zeilen/.test(h) && !/Ohne Tabelle/.test(h), 'Wahl: nur Notizen mit Tabellen, mehrere Tabellen einzeln');
+  S.saImpWahl('nw', 0);
+  h = S.saFensterHtml();
+  pruefe(/Neu aus „Weinkeller“/.test(h) && /<option value="betrag" selected>/.test(h) && /3 Zeilen/.test(h) && /1 Wert in „Preis“ ist kein Betrag \(z\. B\. „ca\. 20“\)/.test(h), 'Vorschau: Feldart je Spalte, Probleme gezählt');
+  /* Die Testumgebung übernimmt Werte nicht aus dem HTML — wie gewählt setzen */
+  S.cl.sa.fenster.typen.forEach((ty, i) => { S.document.getElementById('saImp_' + i).value = ty; });
+  S.document.getElementById('saImpName').value = 'Weinkeller';
+  pruefe(!/<td class="(k|b)"/.test(h) && /<td class="ik">/.test(h), 'eigene Klassen in der Spaltentabelle — „k“ ist das Kästchen (Klassenkollision)');
+  S.document.getElementById('saImp_3').value = '';
+  S.saImpGeaendert();
+  S.saImpAnlegen();
+  const s = S.DB.sammlungen[S.DB.sammlungen.length - 1];
+  const sae = S.saSaetze(s);
+  pruefe(s.name === 'Weinkeller' && s.felder.length === 5 && !s.felder.some(f => f.name === 'Lage') && s.felder.filter(f => f.spalte).length === 3, 'neue Sammlung: Felder aus den Spalten, „Lage“ ausgelassen, drei als Spalte');
+  const fid = n => s.felder.filter(f => f.name === n)[0].id;
+  pruefe(sae.length === 3 && sae[0].werte[fid('Wein')] === 'Riesling GG' && sae[0].werte[fid('Preis')] === 24.9 && sae[0].werte[fid('getrunken')] === true && !(fid('Preis') in sae[1].werte) && sae[2].werte[fid('Preis')] === 1234.5,
+    'Einträge mit umgewandelten Werten, Unpassendes leer');
+  pruefe(S.DB.gedanken.filter(g => g.id === 'nw')[0].text === wein, 'die Notiz bleibt unverändert');
+  /* Anhängen */
+  S.DB.sammlungen.push({ id: 'sg', name: 'Gewicht', art: 'frei', kontext: 'privat', felder: [{ id: 'fd', name: 'Datum', typ: 'datum', spalte: true }, { id: 'fk', name: 'kg', typ: 'zahl', spalte: true }], rollen: {}, geaendert: 1 });
+  S.DB.datensaetze.push({ id: 'd0', sammlung: 'sg', werte: { fd: '2026-10-21', fk: 84.6 }, geaendert: 1 });
+  S.saOeffnen('sg');
+  S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
+  pruefe(/menueWahl\('saImport'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'im ≡ Menü: „Aus Notiz-Tabelle anhängen…“');
+  S.menueWahl('saImport');
+  S.saImpWahl('ng', 0);
+  h = S.saFensterHtml();
+  pruefe(/<option value="fd" selected>Datum/.test(h) && !/<option value="fk" selected>/.test(h), 'Zuordnung über den Namen (Datum), Unbekanntes leer');
+  S.document.getElementById('saImp_0').value = 'fd';
+  S.document.getElementById('saImp_1').value = 'fk';
+  S.document.getElementById('saImp_2').value = '';
+  S.saImpGeaendert();
+  h = S.saFensterHtml();
+  pruefe(/2 Zeilen: 1 neu, 1 schon vorhanden/.test(h) && /1 anhängen/.test(h), 'Gleiche Zeilen werden erkannt und gezählt');
+  S.saImpAnhaengen();
+  pruefe(S.saSaetze(S.saFinden('sg')).length === 2 && S.saSaetze(S.saFinden('sg')).some(d => d.werte.fd === '2026-10-22' && d.werte.fk === 84.1), 'nur die neue Zeile angehängt');
+  S.saZurListe();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    95. Prioritäten 1–5, ⚑ Frist, ◷ Dauer, ★ in Aufgaben (0.49)
    Grund: P1 war nur ein Alarmsignal. Seit 0.49 fünf Stufen (3 = Vorgabe
    ohne Kürzel), die Frist von außen ist eine eigene Marke statt P1, die
@@ -6122,6 +6197,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { saImportTest(); } catch (e) { fail('Tabellen-Import warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckPrioTest(); } catch (e) { fail('Prioritäten 1–5 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckKorbTest(); } catch (e) { fail('Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckZustandTest(); } catch (e) { fail('Checklisten-Zustand warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

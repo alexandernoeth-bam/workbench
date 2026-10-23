@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.49.0</title>
+<title>CLIE 0.49.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -512,6 +512,13 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-raster button{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:50%;background:#3B4433;color:var(--lcd-hell);border:2px solid transparent}
 .sa-raster button.an{outline:3px solid var(--px);outline-offset:1px;background:var(--px)}
 .sa-raster .sa-ikone{width:62%;height:62%}
+/* Import aus Notiz-Tabellen (seit 0.49.1) */
+.sa-imp{border-collapse:collapse;width:100%;margin:2px 0 4px;table-layout:fixed}
+.sa-imp td{border-bottom:2px dotted var(--px-zart);padding:2px 2px;vertical-align:middle;font-size:16px}
+.sa-imp td.ik{width:32%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sa-imp td.ib{width:24%;color:var(--px-mitte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15.5px}
+.sa-imp select.eingabe{margin:1px 0;padding:2px;font-size:16px}
+.sa-imp-info{border:2px solid var(--px);padding:4px 6px;margin:6px 0;font-size:16px}
 .sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap;text-align:right;line-height:1.15}
 /* Kennzahl 2 klein darunter (seit 0.11.1) */
 .sa-kz small{display:block;font-size:16px}
@@ -924,7 +931,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.49.0';
+var APP_VERSION = '0.49.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4244,6 +4251,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'saWerte\')">Feste Werte…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopf\')">Kopfwerte…</button>'
           + '<button type="button" onclick="menueWahl(\'saDiagramme\')">Diagramme…</button>'
+          + '<button type="button" onclick="menueWahl(\'saImport\')">Aus Notiz-Tabelle anhängen…</button>'
           + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Details…</button>' : '')
       + (cl.app === 'schach' ? '<div class="trenn"></div>'
@@ -4412,6 +4420,7 @@ function menueWahl(was) {
   if (was === 'saKopf') { saAnsicht('kopf'); return; }
   if (was === 'saDiagramme') { saAnsicht('diagramme'); return; }
   if (was === 'saKopieren') { saKopierenOeffnen(); return; }
+  if (was === 'saImport') { saImpStart('anh'); return; }
   if (was === 'saDetails') { saDetailsOeffnen(); return; }
   if (was === 'stoNeu') { stoNeuesSpiel(); return; }
   if (was === 'vlPdf') { aufklappZeichnen(); vlDateiWaehlen(); return; }
@@ -10250,6 +10259,311 @@ function saSymbolFensterHtml(f, kopf) {
       + '<button type="button" class="knopf" onclick="saSymbolZurueck(false,false)">Abbrechen</button>');
 }
 
+/* ---------- Sammlung aus einer Notiz-Tabelle (seit 0.49.1) ----------
+   Liest Markdown-Tabellen aus Notizen und legt daraus eine neue Sammlung
+   an oder hängt die Zeilen an die geöffnete an. Die Notiz bleibt, wie sie
+   ist. Feldarten werden erkannt; was nicht passt, bleibt leer und wird
+   vorher gezählt. */
+
+var SA_IMP_TYPEN = [['text', 'Text'], ['zahl', 'Zahl'], ['betrag', 'Betrag'], ['datum', 'Datum'], ['janein', 'Ja/Nein'], ['link', 'Link'], ['', '– nicht übernehmen –']];
+var SA_IMP_TRENN = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
+/* Zellen einer Tabellenzeile — \| bleibt ein Strich im Text */
+function saMdZellen(zeile) {
+  var t = String(zeile).trim().replace(/\\\|/g, '\u0001');
+  if (t.charAt(0) === '|') { t = t.slice(1); }
+  if (t.charAt(t.length - 1) === '|') { t = t.slice(0, -1); }
+  return t.split('|').map(function (z) { return z.replace(/\u0001/g, '|').trim(); });
+}
+
+/* Alle Tabellen eines Texts: Kopfzeile, Trennzeile, dann Zeilen mit „|“ */
+function saMdTabellen(text) {
+  var z = String(text || '').split('\n');
+  var aus = [];
+  var i = 0;
+  while (i < z.length - 1) {
+    if (z[i].indexOf('|') >= 0 && SA_IMP_TRENN.test(z[i + 1]) && z[i + 1].indexOf('-') >= 0) {
+      var kopf = saMdZellen(z[i]);
+      var zeilen = [];
+      i += 2;
+      while (i < z.length && z[i].indexOf('|') >= 0 && z[i].trim()) {
+        var c = saMdZellen(z[i]);
+        while (c.length < kopf.length) { c.push(''); }
+        if (c.some(function (x) { return x; })) { zeilen.push(c.slice(0, kopf.length)); }
+        i++;
+      }
+      aus.push({ kopf: kopf.map(function (k, n) { return saMdSauber(k) || ('Spalte ' + (n + 1)); }), zeilen: zeilen });
+      continue;
+    }
+    i++;
+  }
+  return aus;
+}
+
+/* Auszeichnungen weg: **fett**, *kursiv*, `Code`, [Text](Link) → Text */
+function saMdSauber(t) {
+  return String(t || '').replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '$1').replace(/(\*\*|__|`)/g, '').replace(/(^|\s)[*_]([^*_]+)[*_](?=\s|$)/g, '$1$2').trim();
+}
+
+function saMdLink(t) {
+  var m = String(t || '').match(/\]\((https?:\/\/[^)\s]+)\)/) || String(t || '').match(/(https?:\/\/\S+)/);
+  return m ? m[1] : '';
+}
+
+function saMdDatum(t) {
+  var x = saMdSauber(t);
+  var m = x.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) { return x; }
+  m = x.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+  if (!m) { return ''; }
+  var j = m[3].length === 2 ? '20' + m[3] : m[3];
+  var d = j + '-' + zwei(Number(m[2])) + '-' + zwei(Number(m[1]));
+  return (Number(m[2]) >= 1 && Number(m[2]) <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= 31) ? d : '';
+}
+
+function saMdJa(t) { return /^(x|✓|✔|ja|j|yes|true)$/i.test(saMdSauber(t)); }
+function saMdNein(t) { return /^(nein|n|no|false|-|–)$/i.test(saMdSauber(t)); }
+
+/* Ein Wert in die Feldart — null, wenn er nicht passt */
+function saImpWert(typ, roh) {
+  var t = saMdSauber(roh);
+  if (!t) { return null; }
+  if (typ === 'zahl' || typ === 'betrag') { return saZahlLesen(t.replace(/EUR|€/gi, '')); }
+  if (typ === 'bewertung') { var b = saZahlLesen(t); return (b >= 1 && b <= 5) ? Math.round(b) : null; }
+  if (typ === 'datum') { return saMdDatum(t) || null; }
+  if (typ === 'janein') { return saMdJa(t) ? true : (saMdNein(t) ? false : null); }
+  if (typ === 'link') { return saMdLink(roh) || null; }
+  return t.slice(0, 500);
+}
+
+/* Feldart einer Spalte erraten — an den gefüllten Werten; Datum, Link und
+   Zahl schon, wenn drei von fünf passen (der Rest wird als Problem gezählt) */
+function saImpTyp(kopf, werte) {
+  var w = werte.filter(function (x) { return saMdSauber(x); });
+  if (!w.length) { return 'text'; }
+  var alle = function (f) { return w.every(f); };
+  var meist = function (f) { return w.filter(f).length >= Math.max(1, Math.ceil(w.length * 0.6)); };
+  if (meist(function (x) { return !!saMdDatum(x); })) { return 'datum'; }
+  if (alle(function (x) { return saMdJa(x) || saMdNein(x); }) && w.some(saMdJa)) { return 'janein'; }
+  if (meist(function (x) { return !!saMdLink(x); })) { return 'link'; }
+  if (meist(function (x) { return saImpWert('zahl', x) !== null; })) {
+    return (w.some(function (x) { return /€|EUR/i.test(x); }) || /preis|betrag|kosten|summe|€/i.test(kopf)) ? 'betrag' : 'zahl';
+  }
+  return 'text';
+}
+
+/* Notizen mit Tabellen — jede Tabelle einzeln */
+function saImpQuellen() {
+  var aus = [];
+  kpSeitenAlle().forEach(function (s) {
+    if (s.art !== 'notiz' || (s.__satz && s.__satz.checkliste) || !kpPasstFilter(s, cl.filter)) { return; }
+    var t = saMdTabellen(s.text);
+    t.forEach(function (tab, n) { if (tab.zeilen.length) { aus.push({ id: s.id, nr: n, titel: s.titel, anzahl: t.length, tab: tab, kontext: s.kontext }); } });
+  });
+  return aus;
+}
+
+function saImpTabelle(f) {
+  return saImpQuellen().filter(function (q) { return q.id === f.quelle && q.nr === f.tab; })[0] || null;
+}
+
+function saImpStart(ziel) {
+  if (ziel === 'anh' && !(cl.sa.id && saFinden(cl.sa.id))) { return; }
+  saFensterAuf({ modus: 'imp-wahl', ziel: ziel === 'anh' ? 'anh' : 'neu', quelle: '', tab: 0, name: '', typen: [], zuord: [], ohneDoppelte: true });
+}
+
+/* Tabelle gewählt: Vorschläge für Feldart (neu) bzw. Zuordnung (anhängen) */
+function saImpWahl(id, nr) {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'imp-wahl') { return; }
+  f.quelle = id;
+  f.tab = Number(nr) || 0;
+  var q = saImpTabelle(f);
+  if (!q) { return; }
+  var s = saFinden(cl.sa.id);
+  f.name = q.titel;
+  f.typen = q.tab.kopf.map(function (k, i) { return saImpTyp(k, q.tab.zeilen.map(function (z) { return z[i]; })); });
+  f.zuord = q.tab.kopf.map(function (k) {
+    var fe = s && f.ziel === 'anh' ? (s.felder || []).filter(function (x) { return x.typ !== 'formel' && String(x.name).trim().toLowerCase() === String(k).trim().toLowerCase(); })[0] : null;
+    return fe ? fe.id : '';
+  });
+  f.modus = f.ziel === 'anh' ? 'imp-anh' : 'imp-neu';
+  aufklappNeu();
+}
+
+function saImpLesen(f) {
+  var q = saImpTabelle(f);
+  if (!q) { return null; }
+  var n = document.getElementById('saImpName');
+  if (n && typeof n.value === 'string') { f.name = n.value; }
+  q.tab.kopf.forEach(function (k, i) {
+    var el = document.getElementById('saImp_' + i);
+    if (el && typeof el.value === 'string') { if (f.modus === 'imp-neu') { f.typen[i] = el.value; } else { f.zuord[i] = el.value; } }
+  });
+  return q;
+}
+
+function saImpZurueck() {
+  var f = cl.sa.fenster;
+  if (!f) { return; }
+  f.modus = 'imp-wahl';
+  aufklappNeu();
+}
+
+function saImpDoppelteUm() {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'imp-anh') { return; }
+  saImpLesen(f);
+  f.ohneDoppelte = !f.ohneDoppelte;
+  aufklappNeu();
+}
+
+function saImpGeaendert() {
+  var f = cl.sa.fenster;
+  if (!f) { return; }
+  saImpLesen(f);
+  aufklappNeu();
+}
+
+/* Die Zeilen als Werte — dazu, was nicht passte (je Spalte die Zahl und ein Beispiel) */
+function saImpWerte(q, ziele) {
+  var probleme = {};
+  var saetze = q.tab.zeilen.map(function (z) {
+    var w = {};
+    ziele.forEach(function (zi, i) {
+      if (!zi) { return; }
+      var v = saImpWert(zi.typ, z[i]);
+      if (v === null || v === false) {
+        if (v === null && saMdSauber(z[i])) { var p = probleme[i] || (probleme[i] = { n: 0, bsp: saMdSauber(z[i]) }); p.n++; }
+        return;
+      }
+      w[zi.id] = v;
+    });
+    return w;
+  }).filter(function (w) { return Object.keys(w).length; });
+  return { saetze: saetze, probleme: probleme };
+}
+
+function saImpProblemHtml(q, ziele, probleme) {
+  return Object.keys(probleme).map(function (i) {
+    var p = probleme[i];
+    var art = (SA_TYPEN.filter(function (t) { return t[0] === ziele[i].typ; })[0] || ['', ''])[1];
+    return p.n + (p.n === 1 ? ' Wert' : ' Werte') + ' in „' + esc(q.tab.kopf[i]) + '“ ' + (p.n === 1 ? 'ist' : 'sind') + ' kein' + (ziele[i].typ === 'zahl' ? 'e' : '') + ' ' + esc(art) + ' (z. B. „' + esc(p.bsp) + '“) und bleib' + (p.n === 1 ? 't' : 'en') + ' leer.';
+  }).join('<br>');
+}
+
+/* Neue Sammlung: Ziel je Spalte = neues Feld */
+function saImpNeuZiele(q, f) {
+  return q.tab.kopf.map(function (k, i) { return f.typen[i] ? { id: 'f' + i, typ: f.typen[i], name: k } : null; });
+}
+
+function saImpDoppelt(s, w) {
+  var key = function (x) { return JSON.stringify(Object.keys(w).sort().map(function (k) { return [k, x[k] === undefined ? null : x[k]]; })); };
+  var k = key(w);
+  return saSaetze(s).some(function (d) { return key(d.werte || {}) === k; });
+}
+
+function saImpAnhZiele(q, f, s) {
+  return q.tab.kopf.map(function (k, i) { var fe = f.zuord[i] ? saFeld(s, f.zuord[i]) : null; return fe ? { id: fe.id, typ: fe.typ, name: fe.name } : null; });
+}
+
+function saImpFensterHtml(f, kopf) {
+  var abbrechen = '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>';
+  if (f.modus === 'imp-wahl') {
+    var l = saImpQuellen();
+    return kopf('Notiz-Tabelle wählen') + (l.length ? l.map(function (q) {
+        return '<button type="button" class="wahl" onclick="saImpWahl(\'' + esc(q.id) + '\',' + q.nr + ')">✎ ' + esc(q.titel)
+          + '<small class="herkunft">' + (q.anzahl > 1 ? 'Tabelle ' + (q.nr + 1) + ': ' : '') + esc(q.tab.kopf.join(' · ')) + ' — ' + q.tab.zeilen.length + ' Zeilen</small></button>';
+      }).join('') : '<p class="leise">Keine Notiz mit einer Tabelle.</p>')
+      + '<p class="leise">Die Notiz bleibt, wie sie ist.</p>'
+      + saKnoepfe((f.ziel === 'neu' ? '<button type="button" class="knopf" onclick="saNeu()">Zurück</button>' : '') + abbrechen);
+  }
+  var q = saImpTabelle(f);
+  if (!q) { return kopf('Notiz-Tabelle') + '<p class="leise">Die Tabelle gibt es nicht mehr.</p>' + saKnoepfe(abbrechen); }
+  var bsp = function (i) { var b = q.tab.zeilen.filter(function (z) { return saMdSauber(z[i]); })[0]; return b ? saMdSauber(b[i]) : ''; };
+  var zeile = function (i, auswahl) {
+    return '<tr><td class="ik">' + esc(q.tab.kopf[i]) + '</td><td>' + auswahl + '</td><td class="ib">' + esc(bsp(i)) + '</td></tr>';
+  };
+  if (f.modus === 'imp-neu') {
+    var zn = saImpNeuZiele(q, f);
+    var en = saImpWerte(q, zn);
+    var ph = saImpProblemHtml(q, zn, en.probleme);
+    return kopf('Neu aus „' + q.titel + '“')
+      + '<label for="saImpName">Name:</label><input id="saImpName" class="eingabe" type="text" autocomplete="off" value="' + esc(f.name) + '">'
+      + '<label>Spalten → Felder:</label><table class="sa-imp">' + q.tab.kopf.map(function (k, i) {
+          return zeile(i, '<select id="saImp_' + i + '" class="eingabe" onchange="saImpGeaendert()">' + SA_IMP_TYPEN.map(function (t) {
+            return '<option value="' + t[0] + '"' + (f.typen[i] === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';
+          }).join('') + '</select>');
+        }).join('') + '</table>'
+      + '<div class="sa-imp-info">' + en.saetze.length + ' Zeilen' + (ph ? ' · ' + ph : '') + '</div>'
+      + saKnoepfe('<button type="button" class="knopf voll" onclick="saImpAnlegen()"' + (en.saetze.length ? '' : ' disabled') + '>Anlegen</button>'
+        + '<button type="button" class="knopf" onclick="saImpZurueck()">Zurück</button>' + abbrechen);
+  }
+  var s = saFinden(cl.sa.id);
+  if (!s) { return ''; }
+  var za = saImpAnhZiele(q, f, s);
+  var ea = saImpWerte(q, za);
+  var neu = ea.saetze.filter(function (w) { return !f.ohneDoppelte || !saImpDoppelt(s, w); }).length;
+  var pa = saImpProblemHtml(q, za, ea.probleme);
+  var felder = (s.felder || []).filter(function (x) { return x.typ !== 'formel'; });
+  return kopf('Anhängen aus „' + q.titel + '“')
+    + '<label>Spalten → Felder von „' + esc(s.name) + '“:</label><table class="sa-imp">' + q.tab.kopf.map(function (k, i) {
+        return zeile(i, '<select id="saImp_' + i + '" class="eingabe" onchange="saImpGeaendert()"><option value="">– nicht übernehmen –</option>'
+          + felder.map(function (fe) { return '<option value="' + esc(fe.id) + '"' + (f.zuord[i] === fe.id ? ' selected' : '') + '>' + esc(fe.name) + '</option>'; }).join('') + '</select>');
+      }).join('') + '</table>'
+    + '<div class="wahlreihe"><button type="button"' + (f.ohneDoppelte ? ' class="an"' : '') + ' onclick="saImpDoppelteUm()">' + (f.ohneDoppelte ? '■' : '▢') + ' Gleiche Zeilen überspringen</button></div>'
+    + '<div class="sa-imp-info">' + ea.saetze.length + ' Zeilen' + (f.ohneDoppelte && neu < ea.saetze.length ? ': ' + neu + ' neu, ' + (ea.saetze.length - neu) + ' schon vorhanden (übersprungen)' : '') + (pa ? ' · ' + pa : '') + '</div>'
+    + saKnoepfe('<button type="button" class="knopf voll" onclick="saImpAnhaengen()"' + (neu ? '' : ' disabled') + '>' + neu + ' anhängen</button>'
+      + '<button type="button" class="knopf" onclick="saImpZurueck()">Zurück</button>' + abbrechen);
+}
+
+function saImpAnlegen() {
+  var f = cl.sa.fenster;
+  if (!f || f.modus !== 'imp-neu') { return; }
+  var q = saImpLesen(f);
+  if (!q) { aufklappZu(); return; }
+  var name = String(f.name || '').trim();
+  if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  var ziele = saImpNeuZiele(q, f);
+  var felder = [];
+  var ids = {};
+  ziele.forEach(function (z, i) {
+    if (!z) { return; }
+    var id = 'f' + neueKennung();
+    ids[z.id] = id;
+    felder.push({ id: id, name: String(q.tab.kopf[i]).replace(/[\[\]]/g, '').slice(0, 60) || ('Spalte ' + (i + 1)), typ: z.typ, spalte: felder.length < 3 });
+  });
+  if (!felder.length) { melde('Bitte mindestens eine Spalte übernehmen.', 'warn'); return; }
+  var saetze = saImpWerte(q, ziele).saetze.map(function (w) {
+    var x = {};
+    Object.keys(w).forEach(function (k) { x[ids[k]] = w[k]; });
+    return x;
+  });
+  var s = saAusVorlage({ name: name, art: 'frei', felder: felder, rollen: {}, gruppe: '', gruppenAn: false, filter: [],
+                         kontext: q.kontext === 'beruflich' ? 'beruflich' : 'privat' }, name, false, saetze);
+  spaeterSichern();
+  cl.aufklapp = '';
+  cl.sa.fenster = null;
+  melde('„' + s.name + '“ mit ' + saetze.length + ' Einträgen angelegt.', 'gut');
+  saOeffnen(s.id);
+}
+
+function saImpAnhaengen() {
+  var f = cl.sa.fenster;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!f || f.modus !== 'imp-anh' || !s) { aufklappZu(); return; }
+  var q = saImpLesen(f);
+  if (!q) { aufklappZu(); return; }
+  var l = saImpWerte(q, saImpAnhZiele(q, f, s)).saetze.filter(function (w) { return !f.ohneDoppelte || !saImpDoppelt(s, w); });
+  if (!l.length) { melde('Nichts zum Anhängen.', 'warn'); return; }
+  if (!Array.isArray(DB.datensaetze)) { DB.datensaetze = []; }
+  l.forEach(function (w) { DB.datensaetze.push({ id: neueKennung(), sammlung: s.id, werte: w, angelegt: jetzt(), geaendert: jetzt() }); });
+  saGeaendert(s);
+  spaeterSichern();
+  aufklappZu();
+  melde(l.length + (l.length === 1 ? ' Eintrag' : ' Einträge') + ' angehängt.', 'gut');
+}
+
 /* ---------- Diagramme in Sammlungen (seit 0.47) ----------
 
    Bis zu drei Diagramme je Sammlung, gezeichnet als SVG in Pixeln und
@@ -10887,9 +11201,13 @@ function saFensterHtml() {
            + '<button type="button" class="knopf" onclick="saVorlageVerwalten(\'' + esc(v.id) + '\')" aria-label="Vorlage bearbeiten">✎</button></div>';
       });
     }
+    /* Seit 0.49.1: aus einer Markdown-Tabelle in einer Notiz */
+    h += '<button type="button" class="wahl" onclick="saImpStart(\'neu\')">▦ Aus einer Notiz-Tabelle …</button>';
     h += '<label for="saName">Name:</label><input id="saName" class="eingabe" type="text" autocomplete="off" value="' + esc(f.name || '') + '">';
     return h + saKnoepfe('<button type="button" class="knopf voll" onclick="saAnlegen()"' + (f.quelle ? '' : ' disabled') + '>Anlegen</button>' + abbrechen);
   }
+
+  if (f.modus === 'imp-wahl' || f.modus === 'imp-neu' || f.modus === 'imp-anh') { return saImpFensterHtml(f, kopf); }
 
   if (f.modus === 'vorlage') {
     var v = saFinden(f.id);
