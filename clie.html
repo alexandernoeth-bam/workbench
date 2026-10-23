@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.54.0</title>
+<title>CLIE 0.55.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -939,7 +939,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.54.0';
+var APP_VERSION = '0.55.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -18165,7 +18165,10 @@ function coFaellige(nun, is) {
       if (vor.length || muss.length) {
         text = 'Guten Morgen. ' + coVorsatzZitat(/wichtig/i) + 'Frei heute: etwa ' + coDauerText(frei) + '.'
           + (muss.length ? ' Muss ⚑: ' + muss.slice(0, 3).map(function (x) { return '„' + kpPrio(x.text).text + '“ (' + (x.frist <= is ? 'heute' : 'morgen') + ')'; }).join(', ') + '.' : '')
-          + (vor.length ? ' Will — nach deinen Prioritäten: ' + vor.map(function (x) { return '„' + kpPrio(x.text).text + '“ (' + x.p + (x.stern ? ' ★' : '') + ' · ' + coDauerText(x.dauer) + ')'; }).join(', ') + '. Was nimmst du?' : '');
+          + (vor.length ? ' Will — nach deinen Prioritäten: ' + vor.map(function (x) { return '„' + kpPrio(x.text).text + '“ (' + x.p + (x.stern ? ' ★' : '') + ' · ' + coDauerText(x.dauer) + ')'; }).join(', ') + '.'
+            /* Seit 0.55: zuerst ein Stein ins Mauerwerk */
+            + (vor[0].p <= 2 ? ' Dein Stein fürs Mauerwerk heute: „' + kpPrio(vor[0].text).text + '“.' : ' Heute ist kein Substanz-Punkt frei — welcher Stein fehlt?')
+            + ' Was nimmst du?' : '');
         ant = vor.map(function (x) { return ['nehmen', kpPrio(x.text).text]; }).concat(vor.length > 1 ? [['alle', 'Alle vornehmen']] : []).concat([['selbst', 'Selbst wählen']]);
       } else {
         text = 'Guten Morgen. Für heute ist noch nichts vorgenommen. Was ist heute das Wichtigste?';
@@ -18559,6 +18562,27 @@ function coSammlungFragen(nun, is, e) {
   return l;
 }
 
+/* ---------- Substanz, Verbindlichkeit, Routine (seit 0.55) ----------
+   Nach Alexanders „Einordnung substanzieller Aufgaben“:
+   Substanz setzt einen Stein ins Mauerwerk (P1: bleibendes Ergebnis und
+   Hebel, P2: eins von beiden), Verbindlichkeit begleicht eine Schuld oder
+   hält ein Wort (⚑ Frist), Routine wischt den Staub ab (App Routinen),
+   alles andere ist Organisation (P3–P5). Der „Nachher-Test“ fragt bei
+   Substanz, die nach Organisation klingt: Was liegt danach auf dem Tisch? */
+
+var CO_ORGA_KLANG = /(^|[^A-Za-zÄÖÜäöüß])(anschauen|ansehen|angucken|durchsehen|besprechen|abstimmen|kümmern|recherchieren|informieren|nachfragen|nachhaken|weiterleiten|termin\s+(aus|ab)?machen|termin\s+vereinbaren|ordner\s+anlegen|anlegen|einstellen|organisieren|raussuchen|heraussuchen|durchklicken|schauen|checken|überlegen|beschäftigen|thema)(?![A-Za-zÄÖÜäöüß])/i;
+
+/* Klingt der Punkt nach Organisation statt nach einem Ergebnis? */
+function coOrgaKlang(text) {
+  return CO_ORGA_KLANG.test(kpPrio(String(text || '')).text);
+}
+
+/* Aus den Prüffragen die Priorität: zweimal Ja → 1, einmal → 2, sonst 3 */
+function coSubstanzStufe(ergebnis, hebel) {
+  var n = (ergebnis ? 1 : 0) + (hebel ? 1 : 0);
+  return n === 2 ? 1 : (n === 1 ? 2 : 3);
+}
+
 /* ---------- Coach und Korb (seit 0.52) ----------
    Der Korb soll leer werden: Der Coach fragt nach Punkten, die zu lange
    darin liegen (ohne Termin und ohne ⚑ — sonst gilt die Schieber-Regel),
@@ -18761,18 +18785,50 @@ function coPrioFragen(nun, is, e) {
         [['loeschen', 'Löschen'], ['behalten', 'Behalten']], { p5: { seite: s.id, text: a.text } }, '☑ Aufgaben · P5', 5));
     });
   });
+  /* Nachher-Test (seit 0.55): Substanz, die nach Organisation klingt — höchstens zwei am Tag */
+  var nt = 0;
+  aufQuellen().forEach(function (s) {
+    if (aufIstCheckliste(s) && ckArt(s) !== 'aufgaben') { return; }
+    var stern = !!(s.__satz && s.__satz.stern && ckZustand(s) === 'lauf');
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt || nt >= 2) { return; }
+      if (!(kpPrio(a.text).p === 1 || kpPrio(a.text).p === 2 || stern) || !coOrgaKlang(a.text) || coRuhig('nt:' + a.text, is)) { return; }
+      nt++;
+      var q = coQ('nt:' + a.text, '„' + kpPrio(a.text).text + '“ klingt nach Organisation. Was liegt danach greifbar auf dem Tisch?',
+        [['umformulieren', 'Umformulieren'], ['orga', 'Ist Organisation → P3'], ['passt', 'Passt so']], { nachher: { seite: s.id, text: a.text } }, '☑ Aufgaben · Nachher-Test', 4);
+      q.eingabe = 'Ergebnis, z. B. „… abgeschlossen & Favorit gewählt“';
+      q.eingabeText = true;
+      l.push(q);
+    });
+  });
+  /* ★-Check (seit 0.55): eine Woche nur Organisation erledigt? */
+  if (nun >= e.abend) {
+    var mo = montagVon(is);
+    kpSeitenAlle().filter(function (x) { return ckSeite(x.id) && x.__satz.stern && ckZustand(x) === 'lauf' && kpPasstFilter(x, cl.filter); }).forEach(function (x) {
+      var key = 'sb:' + x.id + ':' + mo;
+      if (coRuhig(key, is)) { return; }
+      var w = coWochenBilanz(is, x.id);
+      if (w.orga >= 2 && !w.substanz) {
+        l.push(coQ(key, 'Diese Woche in „' + x.titel + '“: ' + w.orga + '× Organisation, kein Baustein. Bewegt es sich, oder wird es nur verwaltet? Welcher Baustein fehlt?',
+          [['baustein', 'Baustein anlegen'], ['passt', 'Passt so']], { bewegt: x.id }, '◎ Woche · ★', 3));
+      }
+    });
+  }
   /* Sonntag: ★ Wesentlich für die neue Woche */
   if (nun >= e.abend && ausIso(is).getDay() === 0 && !coRuhig('sw', is)) {
-    l.push(coQ('sw:' + is, 'Neue Woche: Welche Checklisten sind wesentlich? Bis zu drei bekommen ★. Dazu die Bilanz der Woche.',
+    l.push(coQ('sw:' + is, 'Neue Woche: Welche Checklisten sind wesentlich? Bis zu drei bekommen ★. Dazu die Bilanz: Substanz, Verbindlichkeit, Routine, Organisation.',
       [['jetzt', 'Wählen'], ['spaeter', 'Später']], { wesentlich: true }, '◎ Woche · ★', 2));
   }
   return l;
 }
 
-/* Bilanz der Woche: erledigte, eingeplante Punkte — mit ⚑ (fremd) oder P1/P2 (eigen) */
-function coWochenBilanz(is) {
+/* Bilanz der Woche (seit 0.55 in Alexanders Kategorien): erledigte, eingeplante Punkte —
+   ⚑ = Verbindlichkeit, P1/P2 = Substanz, sonst Organisation; dazu abgehakte Routinen.
+   Mit „nur“: nur Punkte dieser einen Seite (für den ★-Check), ohne Routinen. */
+function coWochenBilanz(is, nur) {
   var mo = montagVon(is);
-  var b = { fremd: 0, eigen: 0, sonst: 0 };
+  var b = { substanz: 0, verbindlichkeit: 0, routine: 0, orga: 0 };
   (DB.tage || []).forEach(function (t) {
     if (!t || t.datum < mo || t.datum > is) { return; }
     String(t.text || '').split('\n').forEach(function (z) {
@@ -18780,9 +18836,16 @@ function coWochenBilanz(is) {
       if (!a || !a.text || !a.erledigt || a.nichtRelevant) { return; }
       var en = kpWocheEintrag(t, a.text);
       var s = en ? kpSeiteFinden(en.quelle) : null;
-      if (s && ckZusatz(s, a.text).frist) { b.fremd++; } else if (clPrioEff(a.text) <= 2) { b.eigen++; } else { b.sonst++; }
+      if (nur && (!s || s.id !== nur)) { return; }
+      if (s && ckZusatz(s, a.text).frist) { b.verbindlichkeit++; } else if (clPrioEff(a.text) <= 2) { b.substanz++; } else { b.orga++; }
     });
   });
+  if (!nur) {
+    (DB.aufgaben || []).forEach(function (r) {
+      if (!r || !r.wiederholung || !Array.isArray(r.erledigtTage)) { return; }
+      b.routine += r.erledigtTage.filter(function (d) { return d >= mo && d <= is; }).length;
+    });
+  }
   return b;
 }
 
@@ -18813,6 +18876,7 @@ function coKorbHtml() {
       + (alle.length ? '<p class="leise">Was noch im Korb liegt, hat einen Termin oder wartet auf „Später“.</p>' : '') + '</div>';
   } else {
     var k = ckKorb(false);
+    if (cl.co.pruef && cl.co.pruef.text !== p.text) { cl.co.pruef = null; }
     var pe = clPrioEff(p.text);
     var fokus = krFokus().map(function (id) { var b = krFinden(id); return b ? b.name : ''; }).filter(function (x) { return x; });
     h += '<div class="co-korbkarte"><div class="co-korbtext">' + esc(p.kern) + '</div>'
@@ -18826,10 +18890,13 @@ function coKorbHtml() {
       + '<label for="coKorbFrist">⚑ Erwartet das jemand bis zu einem Datum?</label><div class="zeitpaar">'
       + '<input id="coKorbFrist" class="eingabe" type="date" value="' + esc(ckZusatz(k, p.text).frist || '') + '">'
       + '<button type="button" class="knopf" onclick="coKorbFrist()">Setzen</button></div>'
+      /* Prüffragen für Substanz (seit 0.55) */
+      + coKorbFrageHtml('ergebnis', 'Bleibt danach ein Ergebnis (Konzept, Entscheidung, Baustein)?')
+      + coKorbFrageHtml('hebel', 'Macht es Künftiges leichter oder erst möglich?')
       + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (n) {
           return '<button type="button"' + (pe === n ? ' class="an"' : '') + ' onclick="coKorbPrio(' + n + ')">' + n + '</button>';
         }).join('') + '</div>'
-      + '<p class="leise">1 richtungsweisend · 2 zahlt auf ' + (fokus.length ? 'deinen Fokus (' + esc(fokus.join(', ')) + ')' : 'einen Fokus-Bereich') + ' oder ein Ziel ein · 3 normal · 4 kann · 5 irgendwann</p></div>';
+      + '<p class="leise">1–2 Substanz (setzt einen Stein ins Mauerwerk' + (fokus.length ? '; Fokus: ' + esc(fokus.join(', ')) : '') + ') · 3–5 Organisation · ⚑ Verbindlichkeit</p></div>';
   }
   if ((cl.co.korbLog || []).length) {
     h += '<div class="gruppe">Schon entschieden</div>' + cl.co.korbLog.map(function (x) {
@@ -18837,6 +18904,29 @@ function coKorbHtml() {
     }).join('');
   }
   return h;
+}
+
+/* Ja/Nein zu einer Prüffrage — sind beide beantwortet, steht die Priorität */
+function coKorbFrageHtml(was, text) {
+  var a = (cl.co.pruef || {})[was];
+  return '<label>' + esc(text) + '</label><div class="wahlreihe">'
+    + '<button type="button"' + (a === true ? ' class="an"' : '') + ' onclick="coKorbPruef(\'' + was + '\',true)">Ja</button>'
+    + '<button type="button"' + (a === false ? ' class="an"' : '') + ' onclick="coKorbPruef(\'' + was + '\',false)">Nein</button></div>';
+}
+
+function coKorbPruef(was, ja) {
+  var p = coKorbJetzt()[0];
+  if (!p || (was !== 'ergebnis' && was !== 'hebel')) { return; }
+  if (!cl.co.pruef || cl.co.pruef.text !== p.text) { cl.co.pruef = { text: p.text }; }
+  cl.co.pruef[was] = !!ja;
+  if (typeof cl.co.pruef.ergebnis === 'boolean' && typeof cl.co.pruef.hebel === 'boolean') {
+    var stufe = coSubstanzStufe(cl.co.pruef.ergebnis, cl.co.pruef.hebel);
+    cl.co.pruef = null;
+    coKorbPrio(stufe);
+    melde(stufe <= 2 ? 'Substanz — P' + stufe + '.' : 'Organisation — P3.', 'gut');
+    return;
+  }
+  zeichne();
 }
 
 function coKorbFrist() {
@@ -18906,13 +18996,13 @@ function coSternUm(id) {
 function coWesentlichHtml() {
   var is = isoDatum();
   var b = coWochenBilanz(is);
-  var max = Math.max(1, b.fremd, b.eigen, b.sonst);
+  var max = Math.max(1, b.substanz, b.verbindlichkeit, b.routine, b.orga);
   var balken = function (n) { return '<span class="balken co-bil"><i style="width:' + Math.round(n * 100 / max) + '%"></i></span>'; };
   var korb = ckKorbPunkte().length;
-  var h = '<div class="co-korbkarte"><b>Diese Woche erledigt (eingeplant)</b>'
-    + '<div class="co-bilzeile"><span>⚑ fremd</span>' + balken(b.fremd) + '<b>' + b.fremd + '</b></div>'
-    + '<div class="co-bilzeile"><span>eigen P1/P2</span>' + balken(b.eigen) + '<b>' + b.eigen + '</b></div>'
-    + '<div class="co-bilzeile"><span>übrige</span>' + balken(b.sonst) + '<b>' + b.sonst + '</b></div></div>'
+  var zeile = function (name, n) { return '<div class="co-bilzeile"><span>' + name + '</span>' + balken(n) + '<b>' + n + '</b></div>'; };
+  var h = '<div class="co-korbkarte"><b>Diese Woche erledigt</b>'
+    + zeile('Substanz', b.substanz) + zeile('⚑ Verbindl.', b.verbindlichkeit) + zeile('Routine', b.routine) + zeile('Organisation', b.orga)
+    + '<p class="leise">Substanz setzt einen Stein ins Mauerwerk · Verbindlichkeit hält ein Wort · Routine wischt den Staub ab.</p></div>'
     + '<div class="gruppe">★ Wesentlich · ' + (cl.co.sterne || []).length + ' von 3</div>';
   var l = ckAlle().filter(function (x) { return ckZustand(x) === 'lauf' && !ckIstKorb(x); });
   h += l.length ? l.map(function (x) {
@@ -19069,6 +19159,27 @@ function coQuelleAntwort(f, code, is) {
     return 'Bleibt — der Coach fragt in 30 Tagen wieder.';
   }
   if (b.wesentlich) { return code === 'jetzt' ? 'wesentlich' : ''; }
+  if (b.nachher) {
+    var sn = kpSeiteFinden(b.nachher.seite);
+    if (code === 'passt') { coRuheSetzen(f.id, tagePlus(is, 60)); return ''; }
+    if (code === 'orga') {
+      coUeberall(b.nachher.text).forEach(function (x) { kpPrioSetzenKern(x.s, x.z.nr, 0); });
+      spaeterSichern();
+      return 'Als Organisation eingeordnet — P3.';
+    }
+    var neu = String(f.wert || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    var zn = sn ? kpZeileSuchen(sn, b.nachher.text, false) : null;
+    if (!neu || !zn) { return ''; }
+    var mitP = kpPrioText(neu, kpPrio(b.nachher.text).p);
+    aufTextAendern(sn, zn.nr, b.nachher.text, mitP);
+    spaeterSichern();
+    f.antwortZusatz = neu;
+    return 'Umformuliert: „' + neu + '“.';
+  }
+  if (b.bewegt) {
+    if (code !== 'baustein') { coRuheSetzen(f.id, tagePlus(is, 7)); return ''; }
+    return 'baustein';
+  }
   if (b.frist) {
     if (code === 'kuendigen') { krAlsAufgabe('Kündigen: ' + b.name + ' (bis ' + clKurzDatum(b.bis) + ')', 'Coach', ''); }
     coRuheSetzen('sf:' + b.frist, tagePlus(b.bis, 1));
@@ -19104,6 +19215,7 @@ function coWeiter(was, f, is) {
   /* Seit 0.52/0.53 */
   if (was === 'korbaufraeumen') { coKorbAufraeumen(); return; }
   if (was === 'wesentlich') { coWesentlichAuf(); return; }
+  if (was === 'baustein') { oeffne('checklisten'); clsOeffnen(b.bewegt); aufNeu(); if (cl.auf.fenster) { cl.auf.fenster.prio = 1; cl.auf.fenster.prioGesetzt = true; aufklappNeu(); } return; }
   if (was === 'aufprio') { aufAnsicht('prio'); oeffne('aufgaben'); return; }
   if (was === 'korbdetails' || was === 'korbwahl') {
     var kb = ckKorb(false);
@@ -19178,7 +19290,7 @@ function coAntwort(id, code, nr, nun, wert) {
   f.wert = wert || '';
   var qn = coQuelleAntwort(f, code, is);
   var weiter = '';
-  if (['wahl', 'kalender', 'aufgabe', 'routine', 'idee', 'sammlung', 'sammlung-neu', 'korbaufraeumen', 'wesentlich', 'aufprio', 'korbdetails', 'korbwahl', 'aufdetails'].indexOf(qn) >= 0) { weiter = qn; qn = ''; }
+  if (['wahl', 'kalender', 'aufgabe', 'routine', 'idee', 'sammlung', 'sammlung-neu', 'korbaufraeumen', 'wesentlich', 'aufprio', 'korbdetails', 'korbwahl', 'aufdetails', 'baustein'].indexOf(qn) >= 0) { weiter = qn; qn = ''; }
   if (qn) { notiz = qn; }
   if (code === 'morgen' && f.bezug && f.bezug.text) { coSchiebenZaehlen(f.bezug.text); }
   if (id === 'morgen' && code === 'zuerst') { notiz = 'Los geht’s mit „' + label + '“.'; }
@@ -19463,7 +19575,7 @@ function coEinstSpeichern() {
 function coKnoepfeHtml(f) {
   var k = cl.co.ids.indexOf(f.id);
   if (k < 0) { k = cl.co.ids.length; cl.co.ids.push(f.id); }
-  return (f.eingabe ? '<input id="coIn' + k + '" class="eingabe co-in" type="text" inputmode="decimal" autocomplete="off" placeholder="' + esc(f.eingabe) + '">' : '')
+  return (f.eingabe ? '<input id="coIn' + k + '" class="eingabe co-in" type="text" inputmode="' + (f.eingabeText ? 'text' : 'decimal') + '" autocomplete="off" placeholder="' + esc(f.eingabe) + '">' : '')
     + '<div class="co-ant">' + (f.antworten || []).map(function (a, i) {
     return '<button type="button" onclick="coAntwortNr(' + k + ',' + i + ')">' + esc(a[1]) + '</button>';
   }).join('') + '</div>';
@@ -19477,6 +19589,7 @@ function coAntwortNr(k, i) {
   var ein = document.getElementById('coIn' + k);
   var wert = (ein && typeof ein.value === 'string') ? ein.value : '';
   if (f.eingabe && a[0] === 'eintragen' && saZahlLesen(wert) === null) { melde('Bitte ' + f.eingabe + ' eintragen.', 'warn'); return; }
+  if (a[0] === 'umformulieren' && !String(wert).trim()) { melde('Bitte eintragen, was danach auf dem Tisch liegt.', 'warn'); return; }
   if (document.activeElement && typeof document.activeElement.blur === 'function') { document.activeElement.blur(); }
   cl.co.tag = '';
   coAntwort(f.id, a[0], i, '', wert);

@@ -2032,6 +2032,65 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   102. Substanz, Verbindlichkeit, Routine im Coach (0.55)
+   Grund: Alexanders „Einordnung substanzieller Aufgaben“ — Substanz
+   (bleibendes Ergebnis, Hebel) = P1/P2, Verbindlichkeit = ⚑, Routine =
+   Routinen, Rest = Organisation. Der Coach fragt beim Einsortieren mit den
+   Prüffragen, macht den Nachher-Test, legt morgens einen Stein vor und
+   fragt bei ★-Checklisten, ob sie sich bewegen oder nur verwaltet werden.
+   Erkennt: Prüffragen ergeben falsche Stufe, Nachher-Test fehlt oder fragt
+   bei P3, Umformulieren ändert den Text nicht (oder verliert P), Bilanz
+   ohne Routinen, ★-Check fehlt.
+   ============================================================ */
+function coSubstanzTest() {
+  console.log('\n102. Substanz, Verbindlichkeit, Routine im Coach (0.55)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf'; S.termineNachTag = {};
+  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, morgen: '07:30', abend: '20:30' });
+  pruefe(S.coSubstanzStufe(true, true) === 1 && S.coSubstanzStufe(true, false) === 2 && S.coSubstanzStufe(false, true) === 2 && S.coSubstanzStufe(false, false) === 3, 'Prüffragen: zweimal Ja → P1, einmal → P2, keinmal → P3');
+  pruefe(S.coOrgaKlang('P1 Carport Angebote anschauen') && S.coOrgaKlang('Testdaten-Thema mit Team besprechen') && !S.coOrgaKlang('Carport: Angebotsvergleich abgeschlossen & Favorit gewählt') && !S.coOrgaKlang('Fachbuchkapitel durcharbeiten'),
+    'Nachher-Test erkennt Organisatorisches an typischen Verben');
+  /* Korb aufräumen mit Prüffragen */
+  S.DB.themen = [{ id: 'cl-korb', name: 'Korb', kontext: '', korb: true, ordnung: 0, geaendert: 1, text: '[] Fundamentplan zeichnen' },
+    { id: 'tc', name: 'Carport', kontext: 'privat', stern: true, ordnung: 1, geaendert: 1, text: '[] P1 Carport Angebote anschauen\n[] Ordner anlegen' }];
+  S.coKorbAufraeumen();
+  pruefe(/coKorbPruef\('ergebnis',true\)/.test(inhalt()) && /coKorbPruef\('hebel',false\)/.test(inhalt()) && /1–2 Substanz/.test(inhalt()), 'Aufräumen: zwei Prüffragen, Hinweis „1–2 Substanz“');
+  S.coKorbPruef('ergebnis', true);
+  pruefe(/\[\] Fundamentplan zeichnen/.test(S.DB.themen[0].text), 'nach der ersten Antwort noch nichts geändert');
+  S.coKorbPruef('hebel', true);
+  pruefe(/\[\] P1 Fundamentplan zeichnen/.test(S.DB.themen[0].text) && /Substanz — P1/.test(S.document.getElementById('toastText').textContent), 'beide Ja: P1 (Substanz)');
+  S.coKorbFertig();
+  /* Nachher-Test */
+  const l = S.coFaellige('09:00', heute);
+  const nt = l.filter(f => /^nt:/.test(f.id));
+  pruefe(nt.length === 2 && nt[0].id === 'nt:P1 Carport Angebote anschauen' && nt[0].eingabe && nt[0].eingabeText && nt.some(f => f.id === 'nt:Ordner anlegen'),
+    'Nachher-Test: P1 und Punkte aus ★-Checklisten, die nach Organisation klingen — mit Textfeld');
+  S.coAntwort('nt:P1 Carport Angebote anschauen', 'umformulieren', 0, '09:00', 'Carport: Angebotsvergleich abgeschlossen & Favorit gewählt');
+  pruefe(/\[\] P1 Carport: Angebotsvergleich abgeschlossen & Favorit gewählt/.test(S.DB.themen[1].text) && !/anschauen/.test(S.DB.themen[1].text), 'Umformulieren: neuer Text, P1 bleibt');
+  S.coAntwort('nt:Ordner anlegen', 'orga', 1, '09:00');
+  pruefe(/\[\] Ordner anlegen/.test(S.DB.themen[1].text), '„Ist Organisation“: P3');
+  /* Morgen: der Stein */
+  S.DB.themen[1].text += '\n[] P2 Fundamentplan freigeben';
+  const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
+  pruefe(mo && /Dein Stein fürs Mauerwerk heute: „/.test(mo.text), 'Morgen: zuerst ein Stein fürs Mauerwerk');
+  /* Bilanz mit Routinen, ★-Check */
+  S.DB.aufgaben.push({ id: 'r1', titel: 'Tabletten', wiederholung: { art: 'taeglich' }, erledigtTage: [heute], geaendert: 1 });
+  S.kpTagAnlegen(heute);
+  const tg = S.kpTagFinden(heute);
+  tg.text = '[x] Termin ausmachen\n[x] Ordner anlegen';
+  tg.eintraege = [{ id: 'e1', abschnitt: 'h', text: 'Termin ausmachen', quelle: 'tc', erledigt: true }, { id: 'e2', abschnitt: 'h', text: 'Ordner anlegen', quelle: 'tc', erledigt: true }];
+  const b = S.coWochenBilanz(heute);
+  pruefe(b.routine === 1 && b.orga === 2 && b.substanz === 0, 'Bilanz: Routinen aus der App Routinen, Organisation gezählt');
+  const sb = S.coFaellige('21:00', heute).filter(f => /^sb:tc:/.test(f.id))[0];
+  pruefe(sb && /2× Organisation, kein Baustein/.test(sb.text) && sb.antworten[0][0] === 'baustein', '★-Check: nur Organisation erledigt → „Bewegt es sich, oder wird es nur verwaltet?“');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    101. Vorlesen: Initialen, Abkürzungen, Suche in PDFs (0.54)
    Grund: PDFs mit abgesetzten Initialen lasen „W enn“ statt „Wenn“, und
    „z. B.“ wurde buchstabiert. Außerdem soll die Suche auf Wunsch auch den
@@ -2192,11 +2251,11 @@ function coPrioTest() {
   tg.text = '[x] Zahlen an Controlling\n[x] P1 ZEO-Auftrag\n[x] Rasen';
   tg.eintraege = [{ id: 'e1', abschnitt: 'h', text: 'Zahlen an Controlling', quelle: 'ta', erledigt: true }, { id: 'e2', abschnitt: 'h', text: 'P1 ZEO-Auftrag', quelle: 'tb', erledigt: true }, { id: 'e3', abschnitt: 'h', text: 'Rasen', quelle: 'ta', erledigt: true }];
   const b = S.coWochenBilanz(heute);
-  pruefe(b.fremd === 1 && b.eigen === 1 && b.sonst === 1, 'Bilanz der Woche: ⚑ fremd 1, eigen 1, übrige 1');
+  pruefe(b.verbindlichkeit === 1 && b.substanz === 1 && b.orga === 1, 'Bilanz der Woche (seit 0.55): Verbindlichkeit 1, Substanz 1, Organisation 1');
   S.DB.themen.push({ id: 'tc', name: 'Carport', text: '[] a', kontext: 'privat', ordnung: 3, geaendert: 1 }, { id: 'td', name: 'Garten', text: '[] b', kontext: 'privat', ordnung: 4, geaendert: 1 },
                    { id: 'te', name: 'Keller', text: '[] c', kontext: 'privat', ordnung: 5, geaendert: 1 });
   S.coWesentlichAuf();
-  pruefe(S.cl.co.ansicht === 'wesentlich' && S.cl.co.sterne.join() === 'tb' && /⚑ fremd/.test(inhalt()) && /1 von 3/.test(inhalt()), '★-Wahl: vorbelegt mit dem bisherigen ★, Bilanz oben');
+  pruefe(S.cl.co.ansicht === 'wesentlich' && S.cl.co.sterne.join() === 'tb' && /Substanz/.test(inhalt()) && /Verbindl/.test(inhalt()) && /1 von 3/.test(inhalt()), '★-Wahl: vorbelegt mit dem bisherigen ★, Bilanz oben');
   S.coSternUm('tc'); S.coSternUm('td'); S.coSternUm('te');
   pruefe(S.cl.co.sterne.length === 3 && /Höchstens drei/.test(S.document.getElementById('toastText').textContent), 'höchstens drei');
   S.coSternUm('tb'); S.coSternUm('te');
@@ -6454,6 +6513,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { coSubstanzTest(); } catch (e) { fail('Substanz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlAusspracheTest(); } catch (e) { fail('Vorlesen-Aussprache warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsAusNotizTest(); } catch (e) { fail('Checkliste aus Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoLoeschenTest(); } catch (e) { fail('Notiz löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
