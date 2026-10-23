@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.55.0</title>
+<title>CLIE 0.56.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -527,6 +527,14 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .co-bilzeile{display:flex;align-items:center;gap:8px;font-size:16.5px;margin-top:4px}
 .co-bilzeile span:first-child{flex:0 0 7.5em}
 .co-bilzeile .balken.co-bil{flex:1 1 auto;width:auto}
+/* Kampagne (seit 0.56) */
+.kk-regel{display:flex;flex-direction:column;border-bottom:2px dotted var(--px-zart);padding:4px 0;font-size:17px}
+.kk-regel small{color:var(--px-mitte);font-size:15.5px}
+.kk-phase{border-bottom:2px dotted var(--px-zart);padding:4px 0;font-size:16.5px}
+.kk-phase.an{background:var(--lcd-hell)}
+.kk-phase small{display:block;color:var(--px-mitte);font-size:15.5px}
+.kk-check{border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:17px}
+.kk-feld{min-height:6.5em;font-size:16px}
 .sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap;text-align:right;line-height:1.15}
 /* Kennzahl 2 klein darunter (seit 0.11.1) */
 .sa-kz small{display:block;font-size:16px}
@@ -939,7 +947,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.55.0';
+var APP_VERSION = '0.56.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -17486,6 +17494,9 @@ function krEntscheidungLoeschen() {
 
 function krFensterZu() {
   cl.kr.fenster = '';
+  /* Kampagne (seit 0.56): Entwurf verwerfen */
+  cl.kr.kkEntwurf = null;
+  if (cl.kr.nr === 'neu') { cl.kr.nr = ''; }
   krZeichnen();
 }
 
@@ -17504,6 +17515,14 @@ function krFensterHtml() {
       + '</select><input id="krPZeit" class="eingabe" type="time" value="' + esc(p ? p.zeit || '' : '') + '"></div>'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="krPrinzipSpeichern()">OK</button>' + abbr
       + (p ? '<button type="button" class="knopf" onclick="krPrinzipLoeschen()">Löschen</button>' : '') + '</div>' + zu;
+  }
+  if (f === 'kampagne') { return krKampagneFensterHtml(kopf, zu, abbr); }
+  if (f === 'kkNotiz') {
+    var nz = memoNotizen().filter(function (x) { return kkRegelnAusNotiz(x.text).length; });
+    return kopf('Regeln aus einer Notiz') + (nz.length ? nz.map(function (x) {
+      return '<button type="button" class="wahl" onclick="krKampagneNotiz(\'' + esc(x.id) + '\')">✎ ' + esc(x.titel) + ' <small>(' + kkRegelnAusNotiz(x.text).length + ' Regeln)</small></button>';
+    }).join('') : '<p class="leise">Keine Notiz mit nummerierten Regeln („1. …:“).</p>')
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="krFensterAuf(\'kampagne\')">Zurück</button></div>' + zu;
   }
   if (f === 'vorschlaege') {
     var da = krPrinzipien().map(function (x) { return x.text; });
@@ -17975,7 +17994,8 @@ function kursHtml() {
   var v = cl.kr.ansicht;
   var h = v === 'bereich' ? krBereichHtml() : v === 'prinzipien' ? krPrinzipienHtml() : v === 'check' ? krCheckHtml()
     : v === 'woche' ? krWocheHtml() : v === 'buch' ? krBuchHtml() : v === 'bilanz' ? krBilanzHtml()
-    : v === 'morgen' ? krMorgenHtml() : v === 'abend' ? krAbendHtml() : v === 'pfade' ? krPfadeHtml() : krHeuteHtml();
+    : v === 'morgen' ? krMorgenHtml() : v === 'abend' ? krAbendHtml() : v === 'pfade' ? krPfadeHtml()
+    : v === 'kampagne' ? krKampagneHtml() : v === 'regelcheck' ? krRegelCheckHtml() : krHeuteHtml();
   return '<div class="kr-form kr-app">' + h + '</div>' + krFensterHtml();
 }
 
@@ -18004,6 +18024,12 @@ function kursFussHtml() {
   }
   if (v === 'abend') { return k('Speichern', 'krAbendSpeichern()', true) + k('Abbrechen', 'krEbeneHoch()'); }
   if (v === 'pfade') { return k('Fertig', 'krEbeneHoch()'); }
+  /* Kampagne (seit 0.56) */
+  if (v === 'kampagne') {
+    return kkAktiv(true) ? (kkAktiv(false) ? k('Regel-Check', 'krRegelCheckAuf()', true) : '') + k('Bearbeiten…', 'krFensterAuf(\'kampagne\')') + k('Fertig', 'krEbeneHoch()')
+      : k('+ Kampagne', 'krFensterAuf(\'kampagne\')', true) + k('Fertig', 'krEbeneHoch()');
+  }
+  if (v === 'regelcheck') { return k('Speichern', 'krRegelCheckSpeichern()', true) + k('Abbrechen', 'krAnsicht(\'kampagne\')'); }
   /* Heute im Kurs (seit 0.30) */
   return k('Vorab-Check', 'krCheckNeu()', true) + k('Woche', 'krAnsicht(\'woche\')') + k('Bilanz', 'krAnsicht(\'bilanz\')') + k('Pfade', 'krAnsicht(\'pfade\')');
 }
@@ -18024,7 +18050,7 @@ function krKopfText() {
   if (v === 'woche') { return 'KW ' + kalenderwoche(montagVon(isoDatum())); }
   if (v === 'morgen') { return 'Morgen ' + ((cl.kr.runde && cl.kr.runde.schritt) || 1) + '/5'; }
   if (v === 'heute') { return kurzDatum(isoDatum()); }
-  return { bereich: 'Bereich', prinzipien: 'Prinzipien', check: 'Vorab-Check', buch: 'Entscheidungen', bilanz: 'Bilanz', abend: 'Abend', pfade: 'Pfade' }[v] || '';
+  return { bereich: 'Bereich', prinzipien: 'Prinzipien', check: 'Vorab-Check', buch: 'Entscheidungen', bilanz: 'Bilanz', abend: 'Abend', pfade: 'Pfade', kampagne: 'Kampagne', regelcheck: 'Regel-Check' }[v] || '';
 }
 
 /* Zurück: Fenster zu, dann zur Bilanz — der Vorab-Check geht schrittweise zurück */
@@ -18034,6 +18060,7 @@ function krEbeneHoch() {
   if (cl.kr.ansicht === 'morgen' && cl.kr.runde && cl.kr.runde.schritt > 1) { krRundeSchritt(-1); return true; }
   /* Unter der Bilanz liegen Bereich, Prinzipien und Buch — von dort eine Ebene zurück zur Bilanz */
   if (['bereich', 'prinzipien', 'buch'].indexOf(cl.kr.ansicht) >= 0) { cl.kr.ansicht = 'bilanz'; krZeichnen(); return true; }
+  if (cl.kr.ansicht === 'regelcheck') { cl.kr.rc = null; krAnsicht('kampagne'); return true; }
   /* Seit 0.33: Kurs liegt unter dem Coach — von oben zurück zum Coach */
   cl.kr.check = null;
   cl.kr.runde = null;
@@ -18051,10 +18078,337 @@ function krZeichnen() {
   kopfZeichnen();
   var el = document.getElementById('inhalt');
   if (el && cl.kr.fenster) { el.scrollTop = 0; }
+  /* Kampagne: Getipptes nach dem Neuzeichnen wieder einsetzen (seit 0.56) */
+  if (cl.kr.fenster === 'kampagne') {
+    var e = cl.kr.kkEntwurf;
+    var setz = function (id, v) { var x = document.getElementById(id); if (x && v !== undefined && v !== null) { x.value = v; } };
+    if (e) { setz('kkName', e.name); setz('kkStart', e.start); setz('kkEnde', e.ende); setz('kkPhasen', e.phasen.map(kkPhaseText).join('\n')); setz('kkRegeln', e.regeln.map(kkRegelText).join('\n')); setz('kkRichtung', e.richtung); }
+    if (cl.kr.kkRegeln) { setz('kkRegeln', cl.kr.kkRegeln); cl.kr.kkRegeln = ''; }
+  }
 }
 
 function krStatZeile() {
   return krBereiche(false).length + ' · ' + krPrinzipien().length + ' · ' + krEntscheidungen('').length;
+}
+
+/* ---------- Kampagne (seit 0.56) ----------
+   Ein Vorhaben mit Anfang und Ende (z. B. 12 Wochen), Phasen mit Fokus und
+   Meilenstein (Zielwert in einem Feld einer Sammlung, gemessen am
+   7-Tage-Schnitt) und Regeln (Do's und Don'ts, Don'ts auf Wunsch mit
+   Ausnahme-Kontingent je Woche). Abends der Regel-Check: je Regel ✓, ✗
+   oder Ausnahme. Gespeichert in „kurs“ (typ „kampagne“), synchronisiert. */
+
+var KK_RICHTUNGEN = [['runter', 'soll sinken'], ['hoch', 'soll steigen']];
+
+function kkAlle() {
+  return krAlle('kampagne').sort(function (a, b) { return String(b.start || '').localeCompare(String(a.start || '')); });
+}
+
+/* Die laufende Kampagne — oder (zum Bearbeiten) die jüngste */
+function kkAktiv(auchVorbei) {
+  var heute = isoDatum();
+  var l = kkAlle();
+  var lauf = l.filter(function (k) { return k.start <= heute && heute <= k.ende; })[0];
+  return lauf || (auchVorbei ? l[0] || null : null);
+}
+
+function kkWoche(k, is) {
+  var t = ckTage(k.start, is || isoDatum());
+  return { nr: Math.floor(t / 7) + 1, von: Math.max(1, Math.ceil((ckTage(k.start, k.ende) + 1) / 7)) };
+}
+
+function kkPhase(k, is) {
+  var d = is || isoDatum();
+  return (k.phasen || []).filter(function (p) { return p.von <= d && d <= p.bis; })[0] || null;
+}
+
+/* Schnitt eines Felds über die letzten n Tage bis „bis“ (Einträge nach ihrem Datum) */
+function coSchnitt(s, feldId, bis, n) {
+  if (!s || !feldId) { return null; }
+  var von = tagePlus(bis, -((n || 7) - 1));
+  var w = saSaetze(s).filter(function (d) { var t = saEintragDatum(s, d); return t >= von && t <= bis; })
+    .map(function (d) { return Number((d.werte || {})[feldId]); }).filter(function (x) { return isFinite(x) && x !== 0; });
+  if (!w.length) { return null; }
+  return w.reduce(function (a, b) { return a + b; }, 0) / w.length;
+}
+
+/* Der nächste Meilenstein, der noch nicht erreicht ist */
+function kkMeilenstein(k, schnitt) {
+  var runter = k.richtung !== 'hoch';
+  return (k.phasen || []).filter(function (p) { return isFinite(Number(p.ziel)) && p.ziel !== null && p.ziel !== ''; })
+    .filter(function (p) { return schnitt === null || (runter ? schnitt > Number(p.ziel) : schnitt < Number(p.ziel)); })[0] || null;
+}
+
+/* Zeile „Phase | Ziel | Fokus“ lesen: „28.09.2026 – 25.10.2026 | 102,9 erste Bastion | Fundament legen“ */
+function kkPhaseLesen(zeile, nr) {
+  var t = String(zeile || '').split('|').map(function (x) { return x.trim(); });
+  var daten = String(t[0] || '').match(/(\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2})|\d{4}-\d{2}-\d{2})/g) || [];
+  var von = saMdDatum(daten[0] || '');
+  var bis = saMdDatum(daten[1] || '');
+  if (!von || !bis || bis < von) { return null; }
+  var z = String(t[1] || '').match(/^([<>≤≥]?\s*\d[\d.,]*)\s*(.*)$/);
+  var ziel = z ? saZahlLesen(z[1].replace(/[<>≤≥\s]/g, '')) : null;
+  return { name: 'Phase ' + nr, von: von, bis: bis, ziel: ziel, zielName: z ? z[2].trim().slice(0, 60) : '', fokus: String(t[2] || '').slice(0, 160) };
+}
+
+function kkPhaseText(p) {
+  return clKurzDatum(p.von) + p.von.slice(0, 4) + ' – ' + clKurzDatum(p.bis) + p.bis.slice(0, 4)
+    + ' | ' + (p.ziel !== null && p.ziel !== undefined ? coZahl(p.ziel) + (p.zielName ? ' ' + p.zielName : '') : '') + ' | ' + (p.fokus || '');
+}
+
+/* Regel-Zeile: „✗ Alkohol 0,0 (max 1/Woche)“ = Don't mit Kontingent, sonst Do */
+function kkRegelLesen(zeile) {
+  var t = String(zeile || '').trim();
+  if (!t) { return null; }
+  var dont = /^(✗|x\s|nicht:|don'?t:|-\s*nicht)/i.test(t);
+  t = t.replace(/^(✗|✓|x\s|nicht:|don'?t:|do:)\s*/i, '');
+  var m = t.match(/\(\s*max\.?\s*(\d+)\s*\/\s*woche\s*\)/i);
+  t = t.replace(/\(\s*max\.?\s*\d+\s*\/\s*woche\s*\)/i, '').trim();
+  return t ? { text: t.slice(0, 80), art: dont ? 'dont' : 'do', kontingent: m ? Number(m[1]) : 0 } : null;
+}
+
+function kkRegelText(r) {
+  return (r.art === 'dont' ? '✗ ' : '✓ ') + r.text + (r.kontingent ? ' (max ' + r.kontingent + '/Woche)' : '');
+}
+
+/* Regeln aus einer Notiz: nummerierte Überschriften „1. Alkohol-Regel:“ — unter „Don't“ verboten, sonst Do */
+function kkRegelnAusNotiz(text) {
+  var art = 'do';
+  var aus = [];
+  String(text || '').split('\n').forEach(function (z) {
+    if (/don'?t|verbot/i.test(z) && !/^\s*\d+\./.test(z)) { art = 'dont'; return; }
+    if (/\bdo'?s\b|standard|gebot/i.test(z) && !/^\s*\d+\./.test(z)) { art = 'do'; return; }
+    var m = z.match(/^\s*#*\s*\d{1,2}\.\s+(.+?):?\s*$/);
+    if (m && m[1].length <= 80) { aus.push({ text: m[1].replace(/:$/, ''), art: art, kontingent: 0 }); }
+  });
+  return aus;
+}
+
+/* Ausnahmen einer Regel in der Woche von „is“ */
+function kkAusnahmen(k, regelId, is) {
+  var mo = montagVon(is);
+  var so = tagePlus(mo, 6);
+  return Object.keys(k.tage || {}).filter(function (d) { return d >= mo && d <= so && (k.tage[d] || {})[regelId] === 'aus'; }).length;
+}
+
+/* Serie: gehaltene Tage am Stück bis gestern (heute zählt, wenn schon gecheckt) */
+function kkSerie(k, regelId) {
+  var n = 0;
+  var d = isoDatum();
+  if (!((k.tage || {})[d] || {})[regelId]) { d = tagePlus(d, -1); }
+  while (d >= k.start) {
+    var w = ((k.tage || {})[d] || {})[regelId];
+    if (w !== 'ok' && w !== 'aus') { break; }
+    n++;
+    d = tagePlus(d, -1);
+  }
+  return n;
+}
+
+/* Quote der Woche: gehalten (✓ oder erlaubte Ausnahme) von allen Angaben */
+function kkWochenQuote(k, is) {
+  var mo = montagVon(is);
+  var ja = 0, alle = 0;
+  Object.keys(k.tage || {}).forEach(function (d) {
+    if (d < mo || d > is) { return; }
+    Object.keys(k.tage[d]).forEach(function (r) { alle++; if (k.tage[d][r] !== 'nein') { ja++; } });
+  });
+  return alle ? Math.round(ja * 100 / alle) : null;
+}
+
+function kkKopfText(k, is) {
+  var w = kkWoche(k, is);
+  var ph = kkPhase(k, is);
+  var s = k.sammlung ? saFinden(k.sammlung) : null;
+  var sn = coSchnitt(s, k.feld, is, 7);
+  var ms = kkMeilenstein(k, sn);
+  var fe = s ? saFeld(s, k.feld) : null;
+  return '„' + k.name + '“: Woche ' + Math.min(w.nr, w.von) + ' von ' + w.von + (ph ? ' · ' + ph.name + (ph.fokus ? ' (' + ph.fokus + ')' : '') : '') + '.'
+    + (sn !== null ? ' 7-Tage-Schnitt ' + (fe ? fe.name + ' ' : '') + coZahl(Math.round(sn * 10) / 10) + (ms ? ' — noch ' + coZahl(Math.round(Math.abs(sn - ms.ziel) * 10) / 10) + ' bis ' + (ms.zielName ? '„' + ms.zielName + '“' : 'zum Meilenstein') + ' (' + coZahl(ms.ziel) + ').' : ' — alle Meilensteine erreicht.') : '');
+}
+
+/* ---- Ansichten in Kurs ---- */
+
+function krKampagneHtml() {
+  var k = kkAktiv(true);
+  if (!k) {
+    return '<div class="abschnitt kr-ab"><span>Kampagne</span></div><p class="leise">Noch keine. Eine Kampagne hat Anfang und Ende, Phasen mit Meilensteinen und Regeln, die du abends abhakst — „+ Kampagne“.</p>';
+  }
+  var is = isoDatum();
+  var h = '<div class="abschnitt kr-ab"><span>' + esc(k.name) + '</span><span class="leise">' + esc(clKurzDatum(k.start) + ' – ' + clKurzDatum(k.ende)) + '</span></div>'
+    + '<p>' + esc(kkKopfText(k, is)) + '</p>';
+  var q = kkWochenQuote(k, is);
+  h += '<div class="abschnitt kr-ab"><span>Regeln</span><span class="leise">' + (q === null ? 'diese Woche noch nichts' : 'diese Woche ' + q + ' % gehalten') + '</span></div>';
+  h += (k.regeln || []).map(function (r) {
+    var aus = r.kontingent ? ' · Ausnahmen ' + kkAusnahmen(k, r.id, is) + '/' + r.kontingent : '';
+    return '<div class="kk-regel"><span>' + esc(kkRegelText(r).replace(/ \(max \d+\/Woche\)$/, '')) + '</span><small>Serie ' + kkSerie(k, r.id) + ' Tage' + esc(aus) + '</small></div>';
+  }).join('') || '<p class="leise">Noch keine Regeln — „Bearbeiten…“.</p>';
+  h += '<div class="abschnitt kr-ab"><span>Phasen</span></div>' + (k.phasen || []).map(function (p) {
+    var jetzt = p.von <= is && is <= p.bis;
+    return '<div class="kk-phase' + (jetzt ? ' an' : '') + '"><b>' + esc(p.name) + '</b> ' + esc(clKurzDatum(p.von) + '–' + clKurzDatum(p.bis))
+      + (p.ziel !== null && p.ziel !== undefined ? ' · Ziel ' + esc(coZahl(p.ziel) + (p.zielName ? ' ' + p.zielName : '')) : '')
+      + (p.fokus ? '<small>' + esc(p.fokus) + '</small>' : '') + '</div>';
+  }).join('');
+  return h;
+}
+
+function krRegelCheckHtml() {
+  var k = kkAktiv(false);
+  if (!k) { return '<p class="leise">Keine laufende Kampagne.</p>'; }
+  var is = isoDatum();
+  var rc = cl.kr.rc || {};
+  return '<div class="abschnitt kr-ab"><span>Regel-Check · ' + esc(clWt(is) + ' ' + clKurzDatum(is)) + '</span></div>'
+    + (k.regeln || []).map(function (r) {
+      var w = rc[r.id] || '';
+      var rest = r.kontingent ? r.kontingent - kkAusnahmen(k, r.id, is) + (((k.tage || {})[is] || {})[r.id] === 'aus' ? 1 : 0) : 0;
+      return '<div class="kk-check"><span>' + esc(kkRegelText(r).replace(/ \(max \d+\/Woche\)$/, '')) + '</span><div class="wahlreihe">'
+        + '<button type="button"' + (w === 'ok' ? ' class="an"' : '') + ' onclick="krRegelSetzen(\'' + esc(r.id) + '\',\'ok\')">✓ gehalten</button>'
+        + '<button type="button"' + (w === 'nein' ? ' class="an"' : '') + ' onclick="krRegelSetzen(\'' + esc(r.id) + '\',\'nein\')">✗</button>'
+        + (r.kontingent ? '<button type="button"' + (w === 'aus' ? ' class="an"' : '') + (rest > 0 || w === 'aus' ? '' : ' disabled') + ' onclick="krRegelSetzen(\'' + esc(r.id) + '\',\'aus\')">Ausnahme (' + Math.max(0, rest) + ')</button>' : '')
+        + '</div></div>';
+    }).join('') + '<p class="leise">Ausnahme = vorher bewusst festgelegt; die Zahl zeigt, wie viele diese Woche noch erlaubt sind.</p>';
+}
+
+function krRegelCheckAuf() {
+  var k = kkAktiv(false);
+  if (!k) { melde('Keine laufende Kampagne.', 'warn'); return; }
+  cl.kr.rc = JSON.parse(JSON.stringify(((k.tage || {})[isoDatum()]) || {}));
+  if (cl.app !== 'kurs') { oeffne('kurs'); }
+  krAnsicht('regelcheck');
+}
+
+function krRegelSetzen(id, w) {
+  if (['ok', 'nein', 'aus'].indexOf(w) < 0) { return; }
+  if (!cl.kr.rc) { cl.kr.rc = {}; }
+  cl.kr.rc[id] = w;
+  krZeichnen();
+}
+
+function krRegelCheckSpeichern() {
+  var k = kkAktiv(false);
+  if (!k) { krAnsicht('kampagne'); return; }
+  var is = isoDatum();
+  var rc = cl.kr.rc || {};
+  var ueber = (k.regeln || []).filter(function (r) { return rc[r.id] === 'aus' && r.kontingent && kkAusnahmen(k, r.id, is) - (((k.tage || {})[is] || {})[r.id] === 'aus' ? 1 : 0) >= r.kontingent; })[0];
+  if (ueber) { melde('„' + ueber.text + '“: diese Woche ist keine Ausnahme mehr frei.', 'warn'); return; }
+  if (!k.tage || typeof k.tage !== 'object') { k.tage = {}; }
+  var gueltig = {};
+  (k.regeln || []).forEach(function (r) { if (rc[r.id]) { gueltig[r.id] = rc[r.id]; } });
+  k.tage[is] = gueltig;
+  krSpeichern(k);
+  var n = Object.keys(gueltig).filter(function (x) { return gueltig[x] !== 'nein'; }).length;
+  melde('Regel-Check: ' + n + ' von ' + (k.regeln || []).length + ' gehalten.', 'gut');
+  cl.kr.rc = null;
+  krAnsicht('kampagne');
+}
+
+/* Fenster „Kampagne“: alles als Text — Phasen und Regeln je eine Zeile */
+function krKampagneFensterHtml(kopf, zu, abbr) {
+  var k = kkAktiv(true);
+  var neu = !k || cl.kr.nr === 'neu';
+  var x = cl.kr.kkEntwurf || (neu ? { name: '', start: isoDatum(), ende: tagePlus(isoDatum(), 83), sammlung: '', feld: '', richtung: 'runter', phasen: [], regeln: [] } : k);
+  var sams = saAlleEchten();
+  var s = x.sammlung ? saFinden(x.sammlung) : null;
+  return kopf(neu ? 'Neue Kampagne' : 'Kampagne')
+    + '<label for="kkName">Name:</label><input id="kkName" class="eingabe" type="text" autocomplete="off" value="' + esc(x.name) + '">'
+    + '<div class="zeitpaar"><input id="kkStart" class="eingabe" type="date" value="' + esc(x.start) + '" aria-label="Start"><input id="kkEnde" class="eingabe" type="date" value="' + esc(x.ende) + '" aria-label="Ende"></div>'
+    + '<label for="kkSammlung">Gemessen in (7-Tage-Schnitt):</label><select id="kkSammlung" class="eingabe" onchange="krKampagneFeldNeu()"><option value="">– nichts –</option>'
+    + sams.map(function (y) { return '<option value="' + esc(y.id) + '"' + (x.sammlung === y.id ? ' selected' : '') + '>' + esc(y.name) + '</option>'; }).join('') + '</select>'
+    + '<div class="zeitpaar"><select id="kkFeld" class="eingabe">' + (s ? (s.felder || []).filter(function (f) { return f.typ === 'zahl' || f.typ === 'betrag' || f.typ === 'formel'; }).map(function (f) {
+        return '<option value="' + esc(f.id) + '"' + (x.feld === f.id ? ' selected' : '') + '>' + esc(f.name) + '</option>'; }).join('') : '<option value="">–</option>') + '</select>'
+    + '<select id="kkRichtung" class="eingabe">' + KK_RICHTUNGEN.map(function (r) { return '<option value="' + r[0] + '"' + (x.richtung === r[0] ? ' selected' : '') + '>' + r[1] + '</option>'; }).join('') + '</select></div>'
+    + '<label for="kkPhasen">Phasen — je Zeile „von – bis | Ziel Name | Fokus“:</label><textarea id="kkPhasen" class="eingabe kk-feld" spellcheck="false">'
+    + esc((x.phasen || []).map(kkPhaseText).join('\n')) + '</textarea>'
+    + '<label for="kkRegeln">Regeln — je Zeile; „✗ “ davor = Don\'t, „(max 1/Woche)“ = Ausnahmen:</label><textarea id="kkRegeln" class="eingabe kk-feld" spellcheck="true">'
+    + esc((x.regeln || []).map(kkRegelText).join('\n')) + '</textarea>'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="krKampagneSpeichern()">OK</button>' + abbr
+    + '<button type="button" class="knopf" onclick="krFensterAuf(\'kkNotiz\')">Regeln aus Notiz …</button></div>'
+    + (!neu ? '<div class="knoepfe"><button type="button" class="knopf" onclick="krKampagneNeu()">Neue Kampagne</button><button type="button" class="knopf" onclick="krKampagneLoeschen()">Löschen</button></div>' : '') + zu;
+}
+
+function krKampagneFeldNeu() {
+  /* Getipptes behalten: Felder lesen, Fenster neu */
+  var k = krKampagneLesen();
+  cl.kr.kkEntwurf = k;
+  krZeichnen();
+}
+
+function krKampagneNeu() { cl.kr.nr = 'neu'; cl.kr.kkEntwurf = null; krZeichnen(); }
+
+function krKampagneLesen() {
+  var w = function (id) { var e = document.getElementById(id); return e && typeof e.value === 'string' ? e.value : ''; };
+  var phasen = [];
+  w('kkPhasen').split('\n').forEach(function (z) { var p = kkPhaseLesen(z, phasen.length + 1); if (p) { phasen.push(p); } });
+  var regeln = w('kkRegeln').split('\n').map(kkRegelLesen).filter(function (r) { return r; });
+  return { name: w('kkName').trim(), start: w('kkStart'), ende: w('kkEnde'), sammlung: w('kkSammlung'), feld: w('kkFeld'), richtung: w('kkRichtung') === 'hoch' ? 'hoch' : 'runter', phasen: phasen, regeln: regeln };
+}
+
+function krKampagneSpeichern() {
+  var e = krKampagneLesen();
+  if (!e.name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.start) || !/^\d{4}-\d{2}-\d{2}$/.test(e.ende) || e.ende < e.start) { melde('Bitte Start und Ende wählen (Ende nach dem Start).', 'warn'); return; }
+  var k = (cl.kr.nr === 'neu') ? null : kkAktiv(true);
+  if (!k) { k = { id: 'kk-' + neueKennung(), typ: 'kampagne', tage: {} }; }
+  /* Regeln behalten ihre Kennung, wenn der Text gleich bleibt — sonst gingen Serien verloren */
+  var alt = k.regeln || [];
+  e.regeln.forEach(function (r) {
+    var g = alt.filter(function (a) { return a.text === r.text; })[0];
+    r.id = g ? g.id : 'kr-' + neueKennung();
+  });
+  ['name', 'start', 'ende', 'sammlung', 'feld', 'richtung', 'phasen', 'regeln'].forEach(function (f) { k[f] = e[f]; });
+  krSpeichern(k);
+  cl.kr.nr = '';
+  cl.kr.kkEntwurf = null;
+  cl.kr.fenster = '';
+  krAnsicht('kampagne');
+}
+
+function krKampagneLoeschen() {
+  var k = kkAktiv(true);
+  if (k) { krLoeschen(k.id); }
+  cl.kr.fenster = '';
+  krAnsicht('kampagne');
+}
+
+function krKampagneNotiz(id) {
+  var s = kpSeiteFinden(id);
+  var l = s ? kkRegelnAusNotiz(s.text) : [];
+  if (!l.length) { melde('In der Notiz stehen keine nummerierten Regeln.', 'warn'); return; }
+  cl.kr.kkRegeln = l.map(kkRegelText).join('\n');
+  cl.kr.fenster = 'kampagne';
+  krZeichnen();
+  var el = document.getElementById('kkRegeln');
+  if (el) { el.value = cl.kr.kkRegeln; }
+  melde(l.length + ' Regeln übernommen — prüfen und „OK“.', 'gut');
+}
+
+/* ---- Coach: Kampagne, Regel-Check, Pre-Commitment (seit 0.56) ---- */
+
+var CO_PRECOMMIT = /(restaurant|essen gehen|abendessen|mittagessen|dinner|brunch|halle|arena|stadion|feier|fest\b|geburtstag|party|grill|weihnachtsfeier|stammtisch|bar\b|kneipe|wirtshaus|biergarten)/i;
+
+function coKampagneFragen(nun, is, e) {
+  var l = [];
+  var k = kkAktiv(false);
+  if (k && nun >= e.morgen && nun < '11:00') {
+    l.push(coQ('kk:' + is, kkKopfText(k, is), [['ok', 'Los geht’s'], ['ansehen', 'Kampagne ansehen']], { kampagne: k.id }, '◎ Kampagne', 2));
+  }
+  if (k && nun >= e.abend && !((k.tage || {})[is]) && (k.regeln || []).length) {
+    l.push(coQ('rc:' + is, 'Regel-Check für heute: ' + (k.regeln || []).length + ' Regeln — wie lief der Tag?', [['jetzt', 'Abhaken'], ['spaeter', 'Später']], { regelcheck: k.id }, '◎ Kampagne', 2));
+  }
+  /* Pre-Commitment: morgen ein Termin mit Essen oder Trinken */
+  if (nun >= e.nachmittag) {
+    var morgen = tagePlus(is, 1);
+    var t = clTermineAm(morgen);
+    (t.zeit || []).concat(t.ganztags || []).forEach(function (x) {
+      if (!x || !x.id || coIstCoachTermin(x) || !CO_PRECOMMIT.test(String(x.titel || '') + ' ' + String(x.ort || '')) || krFinden('kpc-' + x.id) || coRuhig('pc:' + x.id, is)) { return; }
+      var q = coQ('pc:' + x.id, 'Morgen „' + x.titel + '“' + (x.zeit ? ' (' + clZeitText(x.zeit) + ')' : '') + '. Was isst und trinkst du dort? Jetzt festlegen.',
+        [['festlegen', 'Festlegen'], ['ausnahme', 'Geplante Ausnahme'], ['lass', 'Nicht nötig']], { precommit: { id: x.id, titel: x.titel, datum: morgen } }, '▦ Kalender · Vorab entscheiden', 2);
+      q.eingabe = 'z. B. Salat, Wasser, kein Nachtisch';
+      q.eingabeText = true;
+      l.push(q);
+    });
+  }
+  return l;
 }
 
 /* ---------- Coach (seit 0.33) ----------
@@ -18196,7 +18550,8 @@ function coFaellige(nun, is) {
   d.termine.forEach(function (x) {
     var bis = clMinuten(x.zeit) - clMinuten(nun);
     if (bis <= 0 || bis > e.vorlauf) { return; }
-    l.push(coQ('tv:' + x.id, 'In ' + bis + ' Min.: „' + x.titel + '“ (' + clZeitText(x.zeit) + '). Ist alles vorbereitet?',
+    var pc = krFinden('kpc-' + x.id);
+    l.push(coQ('tv:' + x.id, 'In ' + bis + ' Min.: „' + x.titel + '“ (' + clZeitText(x.zeit) + ').' + (pc ? ' Festgelegt: „' + pc.text + '“.' : '') + ' Ist alles vorbereitet?',
       [['ja', 'Ja'], ['nein', 'Noch nicht']], { termin: x.titel }, '▦ Kalender', 1));
   });
   /* Mittag: Halbzeit */
@@ -18256,6 +18611,7 @@ function coFaellige(nun, is) {
   if (e.quellen.sammlungen) { l = l.concat(coSammlungFragen(nun, is, e)); }
   if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)); }
   if (e.quellen.aufgaben) { l = l.concat(coPrioFragen(nun, is, e)); }
+  l = l.concat(coKampagneFragen(nun, is, e));
   return l;
 }
 
@@ -19002,7 +19358,8 @@ function coWesentlichHtml() {
   var zeile = function (name, n) { return '<div class="co-bilzeile"><span>' + name + '</span>' + balken(n) + '<b>' + n + '</b></div>'; };
   var h = '<div class="co-korbkarte"><b>Diese Woche erledigt</b>'
     + zeile('Substanz', b.substanz) + zeile('⚑ Verbindl.', b.verbindlichkeit) + zeile('Routine', b.routine) + zeile('Organisation', b.orga)
-    + '<p class="leise">Substanz setzt einen Stein ins Mauerwerk · Verbindlichkeit hält ein Wort · Routine wischt den Staub ab.</p></div>'
+    + '<p class="leise">Substanz setzt einen Stein ins Mauerwerk · Verbindlichkeit hält ein Wort · Routine wischt den Staub ab.</p>'
+    + (kkAktiv(false) && kkWochenQuote(kkAktiv(false), is) !== null ? '<p>Kampagne „' + esc(kkAktiv(false).name) + '“: Regeln diese Woche ' + kkWochenQuote(kkAktiv(false), is) + ' % gehalten.</p>' : '') + '</div>'
     + '<div class="gruppe">★ Wesentlich · ' + (cl.co.sterne || []).length + ' von 3</div>';
   var l = ckAlle().filter(function (x) { return ckZustand(x) === 'lauf' && !ckIstKorb(x); });
   h += l.length ? l.map(function (x) {
@@ -19111,7 +19468,11 @@ function coQuelleAntwort(f, code, is) {
     saGeaendert(s2);
     spaeterSichern();
     f.antwortZusatz = coZahl(n);
-    return b.feldName + ' ' + coZahl(n) + ' eingetragen.';
+    /* Seit 0.56: der 7-Tage-Schnitt statt nur des Tageswerts */
+    var sn = coSchnitt(s2, b.feld, is, 7);
+    var sv = coSchnitt(s2, b.feld, tagePlus(is, -7), 7);
+    return b.feldName + ' ' + coZahl(n) + ' eingetragen.' + (sn !== null ? ' 7-Tage-Schnitt ' + coZahl(Math.round(sn * 10) / 10)
+      + (sv !== null ? ' (' + (sn - sv >= 0 ? '+' : '−') + coZahl(Math.round(Math.abs(sn - sv) * 10) / 10) + ' zur Vorwoche)' : '') + '.' : '');
   }
   /* Korb (seit 0.52) */
   if (b.korb) {
@@ -19159,6 +19520,17 @@ function coQuelleAntwort(f, code, is) {
     return 'Bleibt — der Coach fragt in 30 Tagen wieder.';
   }
   if (b.wesentlich) { return code === 'jetzt' ? 'wesentlich' : ''; }
+  /* Kampagne (seit 0.56) */
+  if (b.kampagne) { return code === 'ansehen' ? 'kampagne' : ''; }
+  if (b.regelcheck) { return code === 'jetzt' ? 'regelcheck' : ''; }
+  if (b.precommit) {
+    if (code === 'lass') { coRuheSetzen(f.id, tagePlus(is, 3)); return ''; }
+    var was = code === 'ausnahme' ? 'Geplante Ausnahme' + (String(f.wert || '').trim() ? ': ' + String(f.wert).trim() : '') : String(f.wert || '').trim();
+    if (!was) { return ''; }
+    krSpeichern({ id: 'kpc-' + b.precommit.id, typ: 'precommit', termin: b.precommit.id, titel: b.precommit.titel, datum: b.precommit.datum, text: was.slice(0, 160) });
+    f.antwortZusatz = was;
+    return 'Festgelegt — der Coach erinnert dich vor dem Termin daran.';
+  }
   if (b.nachher) {
     var sn = kpSeiteFinden(b.nachher.seite);
     if (code === 'passt') { coRuheSetzen(f.id, tagePlus(is, 60)); return ''; }
@@ -19215,6 +19587,8 @@ function coWeiter(was, f, is) {
   /* Seit 0.52/0.53 */
   if (was === 'korbaufraeumen') { coKorbAufraeumen(); return; }
   if (was === 'wesentlich') { coWesentlichAuf(); return; }
+  if (was === 'kampagne') { coMehr('kampagne'); return; }
+  if (was === 'regelcheck') { krRegelCheckAuf(); return; }
   if (was === 'baustein') { oeffne('checklisten'); clsOeffnen(b.bewegt); aufNeu(); if (cl.auf.fenster) { cl.auf.fenster.prio = 1; cl.auf.fenster.prioGesetzt = true; aufklappNeu(); } return; }
   if (was === 'aufprio') { aufAnsicht('prio'); oeffne('aufgaben'); return; }
   if (was === 'korbdetails' || was === 'korbwahl') {
@@ -19290,7 +19664,7 @@ function coAntwort(id, code, nr, nun, wert) {
   f.wert = wert || '';
   var qn = coQuelleAntwort(f, code, is);
   var weiter = '';
-  if (['wahl', 'kalender', 'aufgabe', 'routine', 'idee', 'sammlung', 'sammlung-neu', 'korbaufraeumen', 'wesentlich', 'aufprio', 'korbdetails', 'korbwahl', 'aufdetails', 'baustein'].indexOf(qn) >= 0) { weiter = qn; qn = ''; }
+  if (['wahl', 'kalender', 'aufgabe', 'routine', 'idee', 'sammlung', 'sammlung-neu', 'korbaufraeumen', 'wesentlich', 'aufprio', 'korbdetails', 'korbwahl', 'aufdetails', 'baustein', 'kampagne', 'regelcheck'].indexOf(qn) >= 0) { weiter = qn; qn = ''; }
   if (qn) { notiz = qn; }
   if (code === 'morgen' && f.bezug && f.bezug.text) { coSchiebenZaehlen(f.bezug.text); }
   if (id === 'morgen' && code === 'zuerst') { notiz = 'Los geht’s mit „' + label + '“.'; }
@@ -19590,6 +19964,7 @@ function coAntwortNr(k, i) {
   var wert = (ein && typeof ein.value === 'string') ? ein.value : '';
   if (f.eingabe && a[0] === 'eintragen' && saZahlLesen(wert) === null) { melde('Bitte ' + f.eingabe + ' eintragen.', 'warn'); return; }
   if (a[0] === 'umformulieren' && !String(wert).trim()) { melde('Bitte eintragen, was danach auf dem Tisch liegt.', 'warn'); return; }
+  if (a[0] === 'festlegen' && !String(wert).trim()) { melde('Bitte eintragen, was du isst und trinkst.', 'warn'); return; }
   if (document.activeElement && typeof document.activeElement.blur === 'function') { document.activeElement.blur(); }
   cl.co.tag = '';
   coAntwort(f.id, a[0], i, '', wert);
@@ -19678,6 +20053,7 @@ function coMehrHtml() {
     + '<button type="button" onclick="coKalenderPlanen(true)">Erinnerungen jetzt eintragen</button><div class="trenn"></div>'
     + '<button type="button" onclick="coKorbAufraeumen()">Korb aufräumen</button>'
     + '<button type="button" onclick="coWesentlichAuf()">★ Wesentlich wählen</button>'
+    + '<button type="button" onclick="coMehr(\'kampagne\')">Kampagne</button>'
     + '<button type="button" onclick="coMehr(\'bilanz\')">Fokus &amp; Lebensbereiche</button>'
     + '<button type="button" onclick="coMehr(\'woche\')">Woche &amp; Rückblick</button>'
     + '<button type="button" onclick="coMehr(\'check\')">Vorab-Check…</button>'

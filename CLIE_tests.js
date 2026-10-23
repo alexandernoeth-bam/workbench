@@ -2032,6 +2032,91 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   103. Kampagne, Regel-Check, Pre-Commitment, 7-Tage-Schnitt (0.56)
+   Grund: Alexanders 12-Wochen-Kampagne — Phasen mit Meilensteinen am
+   7-Tage-Schnitt, Do's und Don'ts (mit Ausnahme-Kontingent) und der
+   Abend-Check. Dazu: vor Terminen mit Essen vorher festlegen, und nach dem
+   Eintragen des Gewichts den 7-Tage-Schnitt nennen.
+   Erkennt: Phasen/Regeln falsch gelesen, Regeln aus der Notiz fehlen,
+   Meilenstein am Tageswert statt am Schnitt, Kontingent überschritten,
+   Serie/Quote falsch, Pre-Commitment fehlt oder wird nicht erinnert.
+   ============================================================ */
+function kampagneTest() {
+  console.log('\n103. Kampagne, Regel-Check, Pre-Commitment, 7-Tage-Schnitt (0.56)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const vor = n => S.tagePlus(heute, -n);
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf'; S.termineNachTag = {};
+  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, morgen: '07:30', nachmittag: '16:30', abend: '20:30' });
+  const ph = S.kkPhaseLesen('28.09.2026 – 25.10.2026 | 102,9 erste Bastion | Fundament legen', 1);
+  pruefe(ph && ph.von === '2026-09-28' && ph.bis === '2026-10-25' && ph.ziel === 102.9 && ph.zielName === 'erste Bastion' && ph.fokus === 'Fundament legen', 'Phase lesen: von – bis | Ziel Name | Fokus');
+  const r = S.kkRegelLesen('✗ Alkohol 0,0 (max 1/Woche)');
+  pruefe(r && r.art === 'dont' && r.kontingent === 1 && r.text === 'Alkohol 0,0' && S.kkRegelText(r) === '✗ Alkohol 0,0 (max 1/Woche)', 'Regel lesen: Don\'t mit Ausnahme-Kontingent — und zurück als Text');
+  const notiz = 'I. Die 6 unumstößlichen Don\'ts (Messbare Verbote)\n1. Alkohol-Regel:\n▪ 0,0\n2. Keine flüssigen Kalorien:\nII. Die 6 unumstößlichen Do\'s (Tägliche Standards)\n1. Proteinanker bei jeder Hauptmahlzeit setzen\n2. Hydrations-Pflicht: 2,5 bis 3 Liter täglich';
+  const ausN = S.kkRegelnAusNotiz(notiz);
+  pruefe(ausN.length === 4 && ausN[0].art === 'dont' && ausN[0].text === 'Alkohol-Regel' && ausN[2].art === 'do' && ausN[3].text === 'Hydrations-Pflicht: 2,5 bis 3 Liter täglich', 'Regeln aus der Notiz: Don\'ts und Do\'s nach Abschnitt');
+  /* Sammlung Gewicht: 7 Tage um 102,0, Vorwoche um 102,5 */
+  S.DB.sammlungen.push({ id: 'sg', name: 'Gewicht', art: 'frei', kontext: 'privat', felder: [{ id: 'fd', name: 'Datum', typ: 'datum' }, { id: 'fk', name: 'kg', typ: 'zahl' }], rollen: {}, geaendert: 1 });
+  [0, 1, 2, 3, 4, 5, 6].forEach(n => S.DB.datensaetze.push({ id: 'a' + n, sammlung: 'sg', werte: { fd: vor(n), fk: 102 }, geaendert: 1 }));
+  [7, 8, 9].forEach(n => S.DB.datensaetze.push({ id: 'b' + n, sammlung: 'sg', werte: { fd: vor(n), fk: 102.5 }, geaendert: 1 }));
+  pruefe(Math.abs(S.coSchnitt(S.saFinden('sg'), 'fk', heute, 7) - 102) < 0.001, '7-Tage-Schnitt');
+  /* Kampagne über das Fenster anlegen */
+  S.oeffne('kurs'); S.krAnsicht('kampagne');
+  S.krFensterAuf('kampagne');
+  const set = (id, v) => { S.document.getElementById(id).value = v; };
+  set('kkName', 'Abnehmen'); set('kkStart', vor(30)); set('kkEnde', S.tagePlus(heute, 53)); set('kkSammlung', 'sg'); set('kkFeld', 'fk'); set('kkRichtung', 'runter');
+  set('kkPhasen', S.clKurzDatum(vor(30)) + vor(30).slice(0, 4) + ' – ' + S.clKurzDatum(vor(1)) + vor(1).slice(0, 4) + ' | 102,9 erste Bastion | Fundament\n'
+    + S.clKurzDatum(heute) + heute.slice(0, 4) + ' – ' + S.clKurzDatum(S.tagePlus(heute, 53)) + S.tagePlus(heute, 53).slice(0, 4) + ' | 101,5 Halbzeit-Bastion | Ausdauer');
+  set('kkRegeln', '✗ Alkohol 0,0 (max 1/Woche)\nProteinanker');
+  S.krKampagneSpeichern();
+  const k = S.kkAktiv(false);
+  pruefe(k && k.name === 'Abnehmen' && k.phasen.length === 2 && k.regeln.length === 2 && k.regeln[0].kontingent === 1 && k.regeln[0].id, 'Kampagne gespeichert: Phasen und Regeln mit Kennung');
+  const kopf = S.kkKopfText(k, heute);
+  pruefe(/Woche 5 von 12/.test(kopf) && /Phase 2 \(Ausdauer\)/.test(kopf) && /7-Tage-Schnitt kg 102 — noch 0,5 bis „Halbzeit-Bastion“ \(101,5\)/.test(kopf), 'Kopf: Woche, Phase mit Fokus, Schnitt und nächster Meilenstein (erste Bastion schon erreicht)');
+  /* Coach: morgens Kampagne, abends Regel-Check */
+  pruefe(S.coFaellige('07:40', heute).some(f => f.id === 'kk:' + heute), 'morgens: Kampagne im Coach');
+  pruefe(S.coFaellige('21:00', heute).some(f => f.id === 'rc:' + heute), 'abends: Regel-Check');
+  S.krRegelCheckAuf();
+  pruefe(S.cl.kr.ansicht === 'regelcheck' && /Ausnahme \(1\)/.test(inhalt()), 'Regel-Check: ✓ / ✗ / Ausnahme (1 frei)');
+  S.krRegelSetzen(k.regeln[0].id, 'aus'); S.krRegelSetzen(k.regeln[1].id, 'ok');
+  S.krRegelCheckSpeichern();
+  pruefe(k.tage[heute][k.regeln[0].id] === 'aus' && S.kkAusnahmen(k, k.regeln[0].id, heute) === 1, 'gespeichert, Ausnahme gezählt');
+  pruefe(!S.coFaellige('21:05', heute).some(f => f.id === 'rc:' + heute), 'nach dem Check fragt der Coach nicht mehr');
+  k.tage[vor(1)] = {}; k.tage[vor(1)][k.regeln[0].id] = 'ok';
+  if (S.montagVon(vor(1)) === S.montagVon(heute)) {
+    k.tage[vor(1)][k.regeln[0].id] = 'aus';
+    S.cl.kr.rc = {}; S.cl.kr.rc[k.regeln[0].id] = 'aus';
+    S.cl.kr.ansicht = 'regelcheck';
+    S.krRegelCheckSpeichern();
+    pruefe(/keine Ausnahme mehr frei/.test(S.document.getElementById('toastText').textContent), 'zweite Ausnahme in derselben Woche wird abgelehnt');
+    k.tage[vor(1)][k.regeln[0].id] = 'ok';
+  }
+  pruefe(S.kkSerie(k, k.regeln[1].id) === 1 && S.kkSerie(k, k.regeln[0].id) === 2, 'Serie: gehaltene Tage am Stück (Ausnahme zählt als gehalten)');
+  /* Pre-Commitment */
+  const morgen = S.tagePlus(heute, 1);
+  S.termineNachTag[morgen] = [{ id: 't9', zeit: '19:00', bis: '22:00', titel: 'Abendessen Restaurant Krone', kontext: 'privat' }];
+  const pc = S.coFaellige('17:00', heute).filter(f => f.id === 'pc:t9')[0];
+  pruefe(pc && /Was isst und trinkst du dort\?/.test(pc.text) && pc.eingabeText, 'am Vortag: Termin mit Essen → jetzt festlegen');
+  S.coAntwort('pc:t9', 'festlegen', 0, '17:00', 'Salat, Wasser');
+  pruefe(S.krFinden('kpc-t9') && S.krFinden('kpc-t9').text === 'Salat, Wasser', 'Festgelegtes gespeichert');
+  S.termineNachTag[heute] = [{ id: 't9', zeit: '19:00', bis: '22:00', titel: 'Abendessen Restaurant Krone', kontext: 'privat' }];
+  const tv = S.coFaellige('18:30', heute).filter(f => f.id === 'tv:t9')[0];
+  pruefe(tv && /Festgelegt: „Salat, Wasser“/.test(tv.text), 'vor dem Termin erinnert der Coach daran');
+  /* Gewicht eintragen: 7-Tage-Schnitt in der Antwort */
+  S.cl.co.tag = '';
+  S.krFinden('kc-einstellungen').sammlungen = { sg: { takt: 'taeglich', ab: '07:00' } };
+  S.DB.datensaetze = S.DB.datensaetze.filter(d => d.id !== 'a0');
+  const se = S.coFaellige('08:00', heute).filter(f => f.id === 'se:sg')[0];
+  pruefe(!!se, 'Coach fragt nach dem Gewicht');
+  S.coAntwort('se:sg', 'eintragen', 0, '08:00', '101,3');
+  pruefe(/7-Tage-Schnitt 101,9 \(−0,6 zur Vorwoche\)/.test(S.document.getElementById('toastText').textContent), 'Antwort mit 7-Tage-Schnitt und Vergleich zur Vorwoche — ' + S.document.getElementById('toastText').textContent);
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    102. Substanz, Verbindlichkeit, Routine im Coach (0.55)
    Grund: Alexanders „Einordnung substanzieller Aufgaben“ — Substanz
    (bleibendes Ergebnis, Hebel) = P1/P2, Verbindlichkeit = ⚑, Routine =
@@ -6513,6 +6598,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { kampagneTest(); } catch (e) { fail('Kampagne warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coSubstanzTest(); } catch (e) { fail('Substanz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlAusspracheTest(); } catch (e) { fail('Vorlesen-Aussprache warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsAusNotizTest(); } catch (e) { fail('Checkliste aus Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
