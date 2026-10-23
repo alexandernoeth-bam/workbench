@@ -119,7 +119,7 @@ console.log('\n1. Aufbau der Datei');
   const version = (SKRIPT.match(/var APP_VERSION = '([\d.]+)';/) || [])[1];
   const titel = (QUELLE.match(/<title>CLIE ([\d.]+)<\/title>/) || [])[1];
   pruefe(version && version === titel, 'Version steht gleich im Titel und in APP_VERSION (' + version + ')');
-  pruefe(/class="fassung" onclick="oeffne\(\\'statistik\\'\)">CLIE v' \+ esc\(APP_VERSION\)/.test(SKRIPT), 'die Übersicht zeigt die Version im Hauptfenster (seit 0.7.1 mit Weg zur Statistik)');
+  pruefe(/<div class="fassung">CLIE v' \+ esc\(APP_VERSION\)/.test(SKRIPT) && /oeffne\(\\'statistik\\'\)"><u>Statistik<\/u>/.test(SKRIPT), 'die Übersicht zeigt die Version im Hauptfenster (seit 0.7.1 mit Weg zur Statistik)');
   pruefe(/document\.title = 'CLIE ' \+ APP_VERSION/.test(SKRIPT), 'der Fenstertitel trägt die Version');
   pruefe(!/@media/.test(QUELLE), 'keine @media-Regeln');
   const fns = [...SKRIPT.matchAll(/\nfunction (\w+)\s*\(/g)].map(m => m[1]);
@@ -1612,7 +1612,7 @@ async function neustartTest() {
   let h = inhalt();
   /* Seit 0.9 darf an „Heute“ eine Zahl stehen — je nach Uhrzeit; sonst nirgends */
   const ohneHeute = h.replace(/oeffne\('heute'\)"><span class="sym">[\s\S]*?<\/button>/, '');
-  pruefe(!/class="zahl"/.test(ohneHeute) && /onclick="oeffne\('statistik'\)">CLIE v[\d.]+ · <u>Statistik<\/u>/.test(h), 'Übersicht ohne Zahlen (außer an „Heute“), die Versionszeile führt zur Statistik');
+  pruefe(!/class="zahl"/.test(ohneHeute) && /<div class="fassung">CLIE v[\d.]+ · <button type="button" onclick="oeffne\('abgleich'\)"><u>(abgeglichen \d\d:\d\d|nicht abgeglichen)<\/u><\/button> · <button type="button" onclick="oeffne\('statistik'\)"><u>Statistik<\/u>/.test(h), 'Übersicht ohne Zahlen (außer an „Heute“), die Versionszeile führt zu Abgleich (seit 0.46) und Statistik');
   CL.cl.aufklapp = 'menue'; CL.aufklappZeichnen();
   pruefe(/menueWahl\('statistik'\)">Statistik/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: Statistik');
   CL.cl.aufklapp = '';
@@ -1640,9 +1640,9 @@ function zurueckTest() {
   console.log('\n28. Android-Taste Zurück (0.7.2, Leiste seit 0.8 wieder da)');
   if (!CL) { return; }
   frisch();
-  pruefe(/<nav class="silk"/.test(QUELLE) && /onclick="oeffne\('uebersicht'\)"><b>⌂<\/b>Übersicht/.test(QUELLE) && /onclick="oeffne\('abgleich'\)"><b>⇅<\/b>Abgleich/.test(QUELLE),
-    'seit 0.8 ist die Tastenleiste unten wieder da (Übersicht, Menü, Suchen, Abgleich)');
-  pruefe(/id="reiter" onclick="menueUm\(\)"/.test(QUELLE) && /\.reiter::after\{content:" ▾"/.test(QUELLE), 'der Reiter öffnet das Menü und trägt ein ▾');
+  pruefe(/<nav class="silk"/.test(QUELLE) && /onclick="oeffne\('uebersicht'\)"><b>⌂<\/b>Übersicht/.test(QUELLE) && /onclick="menueUm\(\)" id="menueTaste"><b>≡<\/b>Menü/.test(QUELLE) && !/<b>⇅<\/b>Abgleich/.test(QUELLE),
+    'Tastenleiste unten (seit 0.8); seit 0.46 rechts ≡ Menü statt Abgleich');
+  pruefe(/<span class="reiter" id="reiter">/.test(QUELLE) && !/id="reiter" onclick/.test(QUELLE) && !/\.reiter::after/.test(QUELLE), 'seit 0.46 ist der Reiter nur der Titel — ohne ▾ und ohne Menü');
   pruefe(/addEventListener\('popstate', zurueckGedrueckt\)/.test(SKRIPT), 'die Android-Taste Zurück wird abgefangen');
   let gepusht = 0, zurueck = 0;
   CL.window.history = { pushState() { gepusht++; }, back() { zurueck++; } };
@@ -1813,6 +1813,62 @@ function kennzahlTest() {
   S.saDetailsSpeichern();
   pruefe(!('gruppeName' in b) && !('kennzahl' in b), 'Gruppe wie die Vorlage und „wie die Vorlage“ speichern nichts Eigenes');
   S.cl.sa.id = ''; S.cl.aufklapp = '';
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   83. Menü-Taste unten, Titel nur Text, Info je Sammlung (0.46)
+   Grund: Der Titel oben mit ▾ war zugleich das Menü — er wechselt je
+   nach Seite („So–Di“, „Gewicht“) und weckte falsche Erwartungen. Jetzt
+   ist er nur Titel; das Menü sitzt wie am Palm als Taste ≡ unten rechts
+   (statt Abgleich). Dazu ein eigener Hinweis je Sammlung („i“), dessen
+   erster Absatz beim Eintragen oben steht.
+   Erkennt: Titel wieder anklickbar, Menü-Taste fehlt, Menü ohne
+   Abgleich/Fassung oben, Info nicht gespeichert oder nicht angezeigt,
+   „i“ ohne Info, Hinweis fehlt beim Eintragen.
+   ============================================================ */
+function menueInfoTest() {
+  console.log('\n83. Menü-Taste unten, Titel nur Text, Info je Sammlung (0.46)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(/<span class="reiter" id="reiter">/.test(QUELLE) && /onclick="menueUm\(\)" id="menueTaste"><b>≡<\/b>Menü<\/button>\s*<\/nav>/.test(QUELLE), 'oben nur der Titel, unten rechts die Taste ≡ Menü');
+  S.oeffne('kalender');
+  S.menueUm();
+  const m = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/class="aufklapp menue-unten"/.test(m) && m.indexOf('Abgleich…') < m.indexOf('Auf neue Fassung prüfen') && m.indexOf('Auf neue Fassung prüfen') < m.indexOf('Termine holen') && m.indexOf('Termine holen') < m.indexOf('Statistik'),
+    'Menü über der Leiste: Abgleich…, Auf neue Fassung prüfen, Termine holen … Statistik, Info');
+  S.menueWahl('abgleich');
+  pruefe(S.cl.app === 'abgleich' && !S.cl.aufklapp, '„Abgleich…“ öffnet die App Abgleich');
+  S.oeffne('uebersicht');
+  /* Info je Sammlung */
+  S.DB.sammlungen = [{ id: 'sg', name: 'Gewicht', felder: [{ id: 'fd', name: 'Datum', typ: 'datum', spalte: true }, { id: 'fk', name: 'kg', typ: 'zahl', spalte: true }], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [];
+  S.oeffne('sammlungen'); S.saOeffnen('sg');
+  pruefe(!/class="sa-info"/.test(inhalt()), 'ohne Hinweis kein „i“');
+  S.menueUm();
+  pruefe(/menueWahl\('saInfo'\)">Info…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü der Sammlung: „Info…“');
+  S.menueWahl('saInfo');
+  pruefe(S.cl.aufklapp === 'sa' && /id="saInfoFeld"/.test(S.document.getElementById('aufklapp').innerHTML), '„Info…“ öffnet das Textfeld');
+  S.document.getElementById('saInfoFeld').value = 'Immer morgens wiegen: nüchtern, nackt.\nNach dem Klo.\n\nGleiche Waage, gleicher Platz.';
+  S.saInfoSpeichern();
+  const sg = S.DB.sammlungen[0];
+  pruefe(/^Immer morgens/.test(sg.info) && sg.geaendert > 1 && !S.cl.aufklapp, 'Hinweis gespeichert (Feld „info“ der Sammlung, geht in die workbench.json)');
+  pruefe(/class="sa-info" onclick="saInfoZeigen\(\)"/.test(inhalt()), 'mit Hinweis: „i“ neben den Kopfwerten');
+  S.saInfoZeigen();
+  let a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Info · Gewicht/.test(a) && /<p>Immer morgens wiegen: nüchtern, nackt\.<br>Nach dem Klo\.<\/p><p>Gleiche Waage/.test(a) && /saInfoBearbeiten\(\)">Bearbeiten/.test(a), '„i“ zeigt den Hinweis mit Absätzen, dazu „Bearbeiten“');
+  S.aufklappZu();
+  S.saEintrag('');
+  a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/class="sa-infohinweis">ⓘ Immer morgens wiegen: nüchtern, nackt\.<br>Nach dem Klo\.<\/div>/.test(a) && !/Gleiche Waage/.test(a), 'Neuer Eintrag: der erste Absatz steht oben');
+  S.aufklappZu();
+  S.saInfoBearbeiten();
+  S.document.getElementById('saInfoFeld').value = '   ';
+  S.saInfoSpeichern();
+  pruefe(!('info' in S.DB.sammlungen[0]) && !/class="sa-info"/.test(inhalt()), 'Text geleert: Hinweis und „i“ wieder weg');
+  pruefe((QUELLE.match(/\.sa-hinweis\{/g) || []).length === 1, 'eigene Klasse für den Info-Hinweis — die Abo-Warnung „sa-hinweis“ bleibt unberührt');
+  S.saZurListe();
   S.oeffne('uebersicht');
 }
 
@@ -2453,7 +2509,7 @@ function heuteTest() {
   S.katSetzen('alle');
   S.oeffne('uebersicht');
   pruefe(!/class="app" onclick="oeffne\('heute'\)"/.test(inhalt()) && S.clHeuteZahl() === 5, 'Heute nicht im Raster (seit 0.28) — die Zahl steht unten in der Leiste');
-  pruefe(/onclick="oeffne\('lesezeichen'\)"><b>☆<\/b>Lesezeichen/.test(QUELLE) && !/<nav class="silk"[^]*?menueUm\(\)[^]*?<\/nav>/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE) && S.CL_ORDNER.planung.apps.indexOf('heute') >= 0,
+  pruefe(/onclick="oeffne\('lesezeichen'\)"><b>☆<\/b>Lesezeichen/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE) && S.CL_ORDNER.planung.apps.indexOf('heute') >= 0,
     'Leiste unten: Lesezeichen statt Heute (seit 0.38), Heute im Ordner Planung, Suchen bleibt');
   pruefe(/onclick="aufNeuAm\(isoDatum\(\),\\?'\\?'\)">Neu/.test(SKRIPT) || /aufNeuAm\(isoDatum\(\)/.test(SKRIPT), 'unten: Neu für heute');
   S.clUhrzeit = altUhr;
@@ -5497,6 +5553,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { menueInfoTest(); } catch (e) { fail('Menü/Info warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { klammerWechselTest(); } catch (e) { fail('Klammer-Wechsel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { invasionTest(); } catch (e) { fail('Invasion warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zieleTest(); } catch (e) { fail('Ziele warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
