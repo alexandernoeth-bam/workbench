@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.46.1</title>
+<title>CLIE 0.46.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -205,6 +205,15 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .notiz{padding:3px 0;border-bottom:2px dotted var(--px-zart)}
 .erl-knopf{margin:10px 0 0;font-size:17.5px;color:var(--px-mitte);text-decoration:underline}
 .wochenkopf{font-size:19px;color:var(--px-mitte);margin:2px 0 4px}
+/* Blättern mit Pfeilen in Woche, Blöcken, Monat (seit 0.46.2) */
+.blatt{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--px);padding:2px 0 5px;margin-bottom:4px;font-size:19px}
+.blatt span{color:var(--px-mitte)}
+.blatt-pfeil{min-width:40px;height:32px;text-align:center;font-size:19px}
+.blatt-zeile{display:flex;align-items:center;gap:6px;margin:2px 0 6px}
+.blatt-zeile .tagwahl{margin:0}
+.blatt-pfeile{margin-left:auto;display:flex}
+.blatt-pfeile .blatt-pfeil{min-width:30px}
+.blatt-zeile .tagwahl button{white-space:nowrap;padding:1px 8px}
 .wtag{display:flex;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:4px 0}
 .wtag b{flex:0 0 72px;font-weight:600}
 .wtag.heute b{background:var(--px);color:var(--lcd);padding:0 4px}
@@ -879,7 +888,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.46.1';
+var APP_VERSION = '0.46.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4715,7 +4724,7 @@ function clWochenleisteHtml(is) {
 
 function kalWocheHtml(is) {
   var montag = montagVon(is);
-  var h = '<div class="wochenkopf">' + clKurzDatum(montag) + ' – ' + clKurzDatum(tagePlus(montag, 6)) + '</div>';
+  var h = clBlattHtml(clKurzDatum(montag) + ' – ' + clKurzDatum(tagePlus(montag, 6)));
   var i;
   for (i = 0; i < 7; i++) {
     var d = tagePlus(montag, i);
@@ -4747,7 +4756,7 @@ function kalMonatHtml(is) {
   var erster = is.slice(0, 8) + '01';
   var start = montagVon(erster);
   var monat = is.slice(0, 7);
-  var h = '<div class="monat">' + ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(function (t) { return '<div class="mk">' + t + '</div>'; }).join('');
+  var h = clBlattHtml(KAL_MONATE[Number(is.slice(5, 7)) - 1] + ' ' + is.slice(0, 4)) + '<div class="monat">' + ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(function (t) { return '<div class="mk">' + t + '</div>'; }).join('');
   var i;
   for (i = 0; i < 42; i++) {
     var d = tagePlus(start, i);
@@ -4838,9 +4847,10 @@ function kalBloeckeHtml(is) {
   var jetzt = clMinuten(clUhrzeit());
   var jetztLinie = (tage.indexOf(isoDatum()) >= 0 && jetzt >= von && jetzt <= bis)
     ? '<span class="wb-jetzt" style="top:' + Math.round((jetzt - von) * proMin) + 'px"></span>' : '';
-  var h = '<div class="tagwahl">' + [[3, '3 Tage'], [5, 'Arbeitswoche'], [7, 'Woche']].map(function (x) {
+  /* Seit 0.46.2 rechts daneben ◀ ▶ — am PC lässt sich nicht wischen */
+  var h = '<div class="blatt-zeile"><div class="tagwahl">' + [[3, '3 Tage'], [5, 'Arbeitswoche'], [7, 'Woche']].map(function (x) {
     return '<button type="button"' + (cl.kal.tage === x[0] ? ' class="an"' : '') + ' onclick="clWocheTageSetzen(' + x[0] + ')">' + x[1] + '</button>';
-  }).join('') + '</div>';
+  }).join('') + '</div><span class="blatt-pfeile">' + clPfeilHtml(-1) + clPfeilHtml(1) + '</span></div>';
   h += '<div class="wb' + (tage.length === 3 ? ' breit' : '') + '" style="grid-template-columns:36px repeat(' + tage.length + ',1fr)"><div class="kz"></div>';
   tage.forEach(function (d) {
     h += '<button type="button" class="kz' + (d === isoDatum() ? ' heute' : '') + '" onclick="clKalGehe(\'' + d + '\',\'tag\')">'
@@ -4918,6 +4928,15 @@ function clKalGehe(is, ansicht) {
   zeichne();
   /* Außerhalb des geholten Fensters: neu holen */
   if (tokenGueltig() && (!kalVon || is < kalVon || is > kalBis)) { clTermineHolen(false); }
+}
+
+/* Pfeile zum Blättern (seit 0.46.2) — am PC gibt es kein Wischen */
+function clPfeilHtml(richtung) {
+  return '<button type="button" class="blatt-pfeil" onclick="clBlaettern(' + richtung + ')" aria-label="' + (richtung < 0 ? 'zurück' : 'vor') + '">' + (richtung < 0 ? '◀' : '▶') + '</button>';
+}
+
+function clBlattHtml(text) {
+  return '<div class="blatt">' + clPfeilHtml(-1) + '<span>' + esc(text) + '</span>' + clPfeilHtml(1) + '</div>';
 }
 
 function clBlaettern(richtung) {

@@ -1817,6 +1817,39 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   84. Blättern mit Pfeilen in Woche, Blöcken, Monat (0.46.2)
+   Grund: Am PC (Maus) lässt sich nicht wischen — in Woche, Blöcken und
+   Monat gab es keinen Weg vor und zurück. Jetzt ◀ ▶: in Woche und Monat
+   in einer Zeile über dem Inhalt, in Blöcken rechts neben der Tagwahl.
+   Erkennt: fehlende Pfeile, Pfeile blättern falsch weit, Blöcke-Zeile
+   ohne Pfeile.
+   ============================================================ */
+function blattTest() {
+  console.log('\n84. Blättern mit Pfeilen in Woche, Blöcken, Monat (0.46.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const pfeile = h => /onclick="clBlaettern\(-1\)" aria-label="zurück">◀/.test(h) && /onclick="clBlaettern\(1\)" aria-label="vor">▶/.test(h);
+  S.oeffne('kalender');
+  S.clKalGehe('2026-10-21', 'woche');
+  let h = inhalt();
+  pruefe(pfeile(h) && /class="blatt">.*<span>19\.10\. – 25\.10\.<\/span>/.test(h), 'Woche: ◀ 19.10. – 25.10. ▶');
+  S.clBlaettern(1);
+  pruefe(S.clKalDatum() === '2026-10-28' && /26\.10\. – 01\.11\.|26\.10\. – 1\.11\./.test(inhalt()), '▶ blättert eine Woche weiter');
+  S.clKalGehe('2026-10-21', 'monat');
+  h = inhalt();
+  pruefe(pfeile(h) && /<span>Oktober 2026<\/span>/.test(h), 'Monat: ◀ Oktober 2026 ▶');
+  S.clBlaettern(-1);
+  pruefe(S.clKalDatum().slice(0, 7) === '2026-09' && /<span>September 2026<\/span>/.test(inhalt()), '◀ blättert einen Monat zurück');
+  S.clKalGehe('2026-10-21', 'bloecke');
+  h = inhalt();
+  pruefe(/class="blatt-zeile"><div class="tagwahl">[\s\S]*<\/div><span class="blatt-pfeile">/.test(h) && pfeile(h), 'Blöcke: ◀ ▶ rechts neben der Tagwahl');
+  S.clKalAnsicht('tag');
+  S.clKalGehe(S.isoDatum(), 'tag');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    83. Menü-Taste unten, Titel nur Text, Info je Sammlung (0.46)
    Grund: Der Titel oben mit ▾ war zugleich das Menü — er wechselt je
    nach Seite („So–Di“, „Gewicht“) und weckte falsche Erwartungen. Jetzt
@@ -5556,6 +5589,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { blattTest(); } catch (e) { fail('Blättern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { menueInfoTest(); } catch (e) { fail('Menü/Info warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { klammerWechselTest(); } catch (e) { fail('Klammer-Wechsel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { invasionTest(); } catch (e) { fail('Invasion warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
