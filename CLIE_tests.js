@@ -1817,6 +1817,38 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   88. Diagramm-Zeitraum wird gemerkt (0.47.2)
+   Grund: Diagramme starteten immer bei „3 M“ — wer „1 M“ will, musste
+   jedes Mal umschalten. Seit 0.47.2 merkt sich das Gerät den Zeitraum
+   je Sammlung (localStorage, nicht in der workbench.json).
+   Erkennt: Zeitraum nach Neustart wieder 3 M, Zeitraum gilt für alle
+   Sammlungen statt je Sammlung, kaputter Speicher bricht die Anzeige.
+   ============================================================ */
+function diaZeitraumTest() {
+  console.log('\n88. Diagramm-Zeitraum wird gemerkt (0.47.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.localStorage.removeItem('clie-sa-zeitraum');
+  S.cl.sa.dzr = null;
+  S.DB.sammlungen = [{ id: 'sa1', name: 'Gewicht', felder: [{ id: 'f1', name: 'kg', typ: 'zahl' }], diagramme: [{ art: 'linie', feld: 'f1', wie: 'eintrag' }], rollen: {}, geaendert: 1 },
+    { id: 'sa2', name: 'Budget', felder: [{ id: 'f2', name: 'Betrag', typ: 'betrag' }], diagramme: [{ art: 'zeit', feld: 'f2', wie: 'summe', takt: 'monat' }], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [];
+  S.oeffne('sammlungen'); S.saOeffnen('sa1'); S.saAnsicht('diagramm');
+  pruefe(S.saDiaZr(S.DB.sammlungen[0]) === '90', 'ohne Gemerktes: 3 M');
+  S.saDiaZrUm(-1);
+  pruefe(S.saDiaZr(S.DB.sammlungen[0]) === '30' && JSON.parse(S.localStorage.getItem('clie-sa-zeitraum')).sa1 === '30', '◀ auf 1 M — auf dem Gerät gemerkt');
+  S.cl.sa.dzr = null;   /* wie nach einem Neustart */
+  pruefe(S.saDiaZr(S.DB.sammlungen[0]) === '30' && S.saDiaZr(S.DB.sammlungen[1]) === '90', 'nach Neustart: Gewicht bleibt 1 M, Budget hat eigenen Zeitraum');
+  pruefe(!('dzr' in S.DB.sammlungen[0]) && !/clie-sa-zeitraum/.test(JSON.stringify(S.DB)), 'nicht in der workbench.json');
+  S.localStorage.setItem('clie-sa-zeitraum', 'kaputt'); S.cl.sa.dzr = null;
+  pruefe(S.saDiaZr(S.DB.sammlungen[0]) === '90', 'kaputter Speicher: wieder 3 M, kein Fehler');
+  S.localStorage.removeItem('clie-sa-zeitraum'); S.cl.sa.dzr = null;
+  S.saZurListe();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    87. Sortieren über die Spaltenköpfe (0.47.1)
    Grund: „Sortieren“ unten war ein eigener Knopf mit Auswahlliste — es
    gehört an die Werte. Ein Tipp auf die Überschrift sortiert, ein
@@ -5727,6 +5759,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { diaZeitraumTest(); } catch (e) { fail('Diagramm-Zeitraum warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenSortTest(); } catch (e) { fail('Spalten-Sortieren warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { diagrammeTest(); } catch (e) { fail('Diagramme warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kopfwertNameTest(); } catch (e) { fail('Kopfwert-Name warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
