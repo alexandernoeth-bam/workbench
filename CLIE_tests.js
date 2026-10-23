@@ -2034,6 +2034,78 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   108. Aus einem Sammlungseintrag eine Aufgabe oder einen Termin (0.59.0)
+   Grund: Vieles in Sammlungen ist eine Erinnerung (Abo kündigen,
+   Trainingseinheit) — sie soll ohne Abtippen in den Korb oder Kalender.
+   Erkennt: Knopf fehlt / erscheint bei „Neu“, Vorbelegung falsch (Text,
+   Frist aus „kündbar bis“, Datum in der Vergangenheit), Getipptes geht
+   verloren, Aufgabe landet nicht im Korb, Termin ohne Titel/Dauer.
+   ============================================================ */
+function sammlungPlanenTest() {
+  console.log('\n108. Aus einem Sammlungseintrag eine Aufgabe oder einen Termin (0.59.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const ab = S.saAusVorlage(S.SA_VORLAGEN.abos, 'Abos', false, []);
+  const r = ab.rollen;
+  const w = { betrag: '13,99' }; w[ab.felder[0].id] = 'Netflix'; w[r.takt] = 'monatlich'; w[r.laufzeit] = S.tagePlus(heute, 40); w[r.frist] = '0'; w[r.status] = 'aktiv';
+  S.DB.datensaetze.push({ id: 'ab1', sammlung: ab.id, werte: w, angelegt: 1, geaendert: 1 });
+  S.oeffne('sammlungen'); S.saOeffnen(ab.id);
+  S.saFensterAuf({ modus: 'eintrag', id: null });
+  pruefe(!/saPlanen\(\)/.test(S.saFensterHtml()), 'bei „Neu“ noch kein „→ Aufgabe oder Termin…“');
+  S.saEintrag('ab1');
+  pruefe(/saPlanen\(\)">→ Aufgabe oder Termin…/.test(S.saFensterHtml()), 'im gespeicherten Eintrag: „→ Aufgabe oder Termin…“');
+  const v = S.saPlanVorschlag(ab, S.saSatzFinden('ab1'));
+  pruefe(v.text === 'Netflix kündigen' && v.frist === S.tagePlus(heute, 40) && v.aus === 'Netflix', 'Abo: „Netflix kündigen“, ⚑ Frist = kündbar bis — ' + JSON.stringify(v));
+  /* Training: Einheit, Datum, Dauer aus Plan Min */
+  const tr = S.saAusVorlage(S.SA_VORLAGEN.training, 'Training', false, []);
+  const tw = {}; tw[tr.rollen.datum] = S.tagePlus(heute, 3); tw[tr.rollen.sport] = 'Lauf'; tw[tr.rollen.einheit] = 'Intervalle'; tw[tr.rollen.pmin] = 45;
+  S.DB.datensaetze.push({ id: 'tr1', sammlung: tr.id, werte: tw, angelegt: 1, geaendert: 1 });
+  const vt = S.saPlanVorschlag(tr, S.saSatzFinden('tr1'));
+  pruefe(vt.text === 'Lauf · Intervalle' && vt.datum === S.tagePlus(heute, 3) && vt.terminMin === 45, 'Training: „Lauf · Intervalle“, Datum der Einheit, 45 Min — ' + JSON.stringify(vt));
+  S.saFinden(tr.id) && (S.saSatzFinden('tr1').werte[tr.rollen.datum] = S.tagePlus(heute, -2));
+  pruefe(S.saPlanVorschlag(tr, S.saSatzFinden('tr1')).datum === '', 'Datum in der Vergangenheit wird nicht vorgeschlagen');
+  /* Öffnen: Getipptes wird gesichert, dann das Fenster „Neu“ mit Termin | Aufgabe */
+  /* Im Test gibt es kein echtes Formular: Felder wie im Browser füllen */
+  const fuellen = (s, d) => s.felder.forEach(f => { const el = S.document.getElementById('saF_' + f.id); el.value = d.werte[f.id] === undefined ? '' : String(d.werte[f.id]); });
+  S.saEintrag('ab1');
+  fuellen(ab, S.saSatzFinden('ab1'));
+  S.document.getElementById('saF_' + ab.felder[0].id).value = 'Netflix Premium';
+  S.saPlanen();
+  pruefe(S.saSatzFinden('ab1').werte[ab.felder[0].id] === 'Netflix Premium', 'Getipptes im Eintrag wird vorher gesichert');
+  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster && S.cl.auf.fenster.text === 'Netflix Premium kündigen' && S.cl.auf.fenster.ausKalender, 'Fenster „Neu“ mit Termin | Aufgabe, vorbelegt');
+  const fh = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Aus „Netflix Premium“/.test(fh) && /terminStatt\(\)/.test(fh), 'Titel „Aus „…““ und Wahl „Termin“');
+  pruefe(fh.includes('id="aufFrist" class="eingabe" type="date" value="' + S.tagePlus(heute, 40) + '"') && /id="aufDatum"[^>]*value=""/.test(fh), 'Abo: Frist vorbelegt, kein Tag');
+  S.document.getElementById('aufText').value = S.cl.auf.fenster.text;
+  S.document.getElementById('aufDatum').value = '';
+  S.document.getElementById('aufFrist').value = S.cl.auf.fenster.frist;
+  S.aufSpeichern();
+  const korb = S.ckKorb(false);
+  pruefe(korb && /\[\] Netflix Premium kündigen/.test(korb.text) && S.ckZusatz(korb, 'Netflix Premium kündigen').frist === S.tagePlus(heute, 40), 'ohne Wahl: in den Korb, mit ⚑ Frist');
+  pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === ab.id, 'danach bleibt man in der Sammlung');
+  /* Termin: Titel und Dauer übernehmen */
+  S.aufklappZu();
+  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
+  S.fetch = function () { return Promise.resolve({ ok: true, status: 200, json() { return Promise.resolve({ items: [] }); } }); };
+  S.saSatzFinden('tr1').werte[tr.rollen.datum] = S.tagePlus(heute, 3);
+  S.saOeffnen(tr.id); S.saEintrag('tr1');
+  fuellen(tr, S.saSatzFinden('tr1'));
+  S.saPlanen();
+  pruefe(S.document.getElementById('aufklapp').innerHTML.includes('value="' + S.tagePlus(heute, 3) + '"'), 'Training: Tag der Einheit vorbelegt');
+  S.document.getElementById('aufText').value = 'Lauf · Intervalle';
+  S.document.getElementById('aufDatum').value = S.tagePlus(heute, 3);
+  S.terminStatt();
+  const tv = S.cl.termin && S.cl.termin.vorschlag;
+  pruefe(tv && tv.titel === 'Lauf · Intervalle' && tv.datum === S.tagePlus(heute, 3), 'Termin: Titel und Datum aus dem Eintrag');
+  pruefe(tv && S.clMinuten(tv.bis) - S.clMinuten(tv.von) === 45, 'Termin: „bis“ aus Plan Min (45) — ' + (tv ? tv.von + '–' + tv.bis : ''));
+  S.aufklappZu();
+  S.zugriffToken = null; S.tokenAblauf = 0;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    107. Training: Sportart nicht doppelt (0.58.1)
    Grund: Die Spalte „Einheit“ bekam die Sportart vorangestellt
    („Laufen · Lauf locker“) — auch wenn „Sport“ selbst als Spalte steht.
@@ -6771,6 +6843,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { sammlungPlanenTest(); } catch (e) { fail('Sammlung planen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { trainingSportDoppeltTest(); } catch (e) { fail('Training Sport doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenBreitenTest(); } catch (e) { fail('Spaltenbreiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungSucheTest(); } catch (e) { fail('Sammlung-Suche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

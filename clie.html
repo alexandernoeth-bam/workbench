@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.58.1</title>
+<title>CLIE 0.59.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -539,6 +539,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 /* Kennzahl 2 klein darunter (seit 0.11.1) */
 .sa-kz small{display:block;font-size:16px}
 .sa-hinweis{display:block;width:100%;text-align:left;border:2px dashed var(--px);padding:3px 7px;margin:8px 0;font-size:18px}
+.sa-plan{display:block;width:100%;margin:12px 0 0;padding:5px 8px;border:2px dashed var(--px);border-radius:6px;background:transparent;font:inherit;font-size:17px;color:inherit;text-align:left}
 .sa-suche{display:flex;align-items:center;gap:4px;border:2px solid var(--px);border-radius:4px;padding:0 4px;margin:0 0 6px}
 .sa-suche span{font-size:18px}
 .sa-suche input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:18px;padding:4px 2px;color:inherit;outline:none}
@@ -951,7 +952,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.58.1';
+var APP_VERSION = '0.59.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6455,7 +6456,7 @@ function aufFensterHtml() {
     + '<div class="zeitpaar"><button type="button" class="knopf' + (f.mitZeit ? ' voll' : '') + '" onclick="aufUhrzeitUm()">Uhrzeit</button>'
     + (f.mitZeit ? '<input id="aufZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '" aria-label="Uhrzeit">'
                  + '<button type="button" class="knopf" onclick="aufUhrzeitUm()" aria-label="ohne Uhrzeit">✕</button>' : '') + '</div>';
-  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? (f.ausKalender ? 'Neu' : 'Neue Aufgabe') : 'Aufgabe') + '</div><div class="rumpf">'
+  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? (f.aus ? 'Aus „' + esc(f.aus) + '“' : (f.ausKalender ? 'Neu' : 'Neue Aufgabe')) : 'Aufgabe') + '</div><div class="rumpf">'
     + (f.ausKalender ? '<div class="wahlreihe"><button type="button" onclick="terminStatt()">Termin</button><button type="button" class="an">Aufgabe</button></div>' : '')
     + '<label for="aufText">Aufgabe:</label><input id="aufText" class="eingabe" type="text" autocomplete="off" value="' + esc(f.text) + '"'
     + ' oninput="aufTextGetippt()">'
@@ -6489,6 +6490,15 @@ function terminStatt() {
   var z = (f && f.mitZeit && f.zeit) ? f.zeit : '';
   cl.auf.fenster = null;
   terminNeu(d, z);
+  /* Getippter Text wird zum Titel; aus einer Sammlung auch die Dauer (seit 0.59.0) */
+  var v = cl.termin && cl.termin.modus === 'neu' ? cl.termin.vorschlag : null;
+  if (!v || !f) { return; }
+  v.titel = kpPrio(String(f.text || '').trim()).text;
+  if (f.terminMin > 0 && /^\d{2}:\d{2}$/.test(String(v.von || ''))) {
+    var ende = Math.min(clMinuten(v.von) + Math.round(f.terminMin), 24 * 60 - 1);
+    v.bis = zwei(Math.floor(ende / 60)) + ':' + zwei(ende % 60);
+  }
+  clTerminFensterNeu();
 }
 
 /* OK wird erst bedienbar, wenn Text und Liste da sind */
@@ -11591,6 +11601,7 @@ function saFensterHtml() {
       if (kb) { e += reihe('→ kündbar bis', saDatumText(kb)); }
       if (mo !== null) { e += reihe('→ pro Monat', saZahlText(mo, 2) + ' €'); }
     }
+    if (d) { e += '<button type="button" class="sa-plan" onclick="saPlanen()">→ Aufgabe oder Termin…</button>'; }
     return e + saKnoepfe('<button type="button" class="knopf voll" onclick="saEintragSpeichern()">Fertig</button>' + abbrechen
       + (d ? '<button type="button" class="knopf" onclick="saEintragKopieren()">Kopieren</button>'
            + '<button type="button" class="knopf" onclick="saFensterSchritt(\'loeschen\')">Löschen…</button>' : ''));
@@ -11852,6 +11863,54 @@ function saEintragSpeichern() {
   }
   spaeterSichern();
   aufklappZu();
+}
+
+/* ---- Aus einem Eintrag eine Aufgabe oder einen Termin (seit 0.59.0) ----
+   Öffnet das bekannte Fenster „Neu“ (Aufgabe | Termin), vorbelegt aus dem
+   Eintrag. Ohne Wahl landet die Aufgabe im Korb. */
+function saPlanVorschlag(s, d) {
+  var w = d.werte || {};
+  var r = s.rollen || {};
+  var heute = isoDatum();
+  var erster = function (typ) {
+    var f = (s.felder || []).filter(function (x) { return x.typ === typ && String(w[x.id] || '').trim(); })[0];
+    return f ? String(w[f.id]).trim() : '';
+  };
+  var v = { aus: '', text: '', datum: '', frist: '', terminMin: 0 };
+  v.aus = erster('text') || erster('auswahl') || s.name;
+  v.text = v.aus;
+  if (s.art === 'training') {
+    var sport = saWert(s, d, 'sport');
+    var ein = saWert(s, d, 'einheit');
+    if (ein) { v.aus = String(ein); v.text = (sport ? sport + ' · ' : '') + ein; }
+    var pm = saZahlLesen(saWert(s, d, 'pmin'));
+    if (pm > 0) { v.terminMin = pm; }
+  }
+  if (s.art === 'abos') {
+    v.text = v.aus + ' kündigen';
+    var kb = saAboKuendbar(s, d);
+    if (kb && kb >= heute) { v.frist = kb; }
+  }
+  /* Bei Abos kein Tag — dort zählt die Frist (Laufzeit ist kein Termin) */
+  var dat = (s.art === 'abos') ? '' : (r.datum && saFeld(s, r.datum) ? String(w[r.datum] || '') : erster('datum'));
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dat) && dat >= heute) { v.datum = dat; }
+  v.text = v.text.slice(0, 200);
+  return v;
+}
+
+function saPlanen() {
+  var f = cl.sa.fenster;
+  var id = f && f.id;
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s || !id || !saSatzFinden(id)) { return; }
+  /* Erst das Getippte sichern — sonst ginge es verloren */
+  saEintragSpeichern();
+  if (cl.aufklapp) { return; }
+  var v = saPlanVorschlag(s, saSatzFinden(id));
+  cl.auf.fenster = { modus: 'neu', seite: '', nr: -1, text: v.text, datum: v.datum, zeit: '', mitZeit: false,
+                     ausKalender: true, aus: v.aus, frist: v.frist, terminMin: v.terminMin };
+  cl.aufklapp = 'aufgabe';
+  aufklappNeu();
 }
 
 function saEintragKopieren() {
