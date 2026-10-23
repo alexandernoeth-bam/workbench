@@ -12,7 +12,7 @@
 
 'use strict';
 
-var VORRAT = 'clie-vorrat-1';
+var VORRAT = 'clie-vorrat-2';   /* 2: neues App-Symbol (CLIE 0.47.3) */
 var PRAEFIX = 'clie-';
 var GRUNDLAGE = [
   './clie.html',

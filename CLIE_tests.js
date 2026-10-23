@@ -373,7 +373,7 @@ function swTest() {
     try { m = JSON.parse(fs.readFileSync(MANIFEST_PFAD, 'utf8')); ok('das Manifest ist gültiges JSON'); } catch (e) { fail('Manifest: ' + e.message); }
     if (m) {
       pruefe(m.start_url === './clie.html' && m.scope === './clie' && m.name === 'CLIE', 'Manifest: Name, Start und Bereich');
-      pruefe((m.icons || []).every(i => fs.existsSync(path.join(ORDNER, i.src))), 'alle Symbole des Manifests liegen bei');
+      pruefe((m.icons || []).every(i => fs.existsSync(path.join(ORDNER, i.src.replace(/\?.*$/, '')))), 'alle Symbole des Manifests liegen bei (ohne ?v=…)');
     }
   }
 }
@@ -1814,6 +1814,31 @@ function kennzahlTest() {
   pruefe(!('gruppeName' in b) && !('kennzahl' in b), 'Gruppe wie die Vorlage und „wie die Vorlage“ speichern nichts Eigenes');
   S.cl.sa.id = ''; S.cl.aufklapp = '';
   S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   89. Neues App-Symbol: kleiner Organizer (0.47.3)
+   Grund: Das alte Symbol (Schriftzug „CLIE“ auf Grün) wurde auf dem
+   Pixel rund ausgeschnitten und war kaum lesbar. Neu: ein Palm-
+   Organizer — als „any“ (abgerundet) und „maskable“ (randlos, Gerät in
+   der sicheren Zone). Damit Android das neue Bild holt, tragen die
+   Adressen ?v=…, und der Vorrat des Service Workers ist neu.
+   Erkennt: falsche Bildgrößen, maskierbares Symbol fehlt, Manifest und
+   Seite verweisen auf unterschiedliche Fassungen, alter Vorrat bleibt.
+   ============================================================ */
+function appSymbolTest() {
+  console.log('\n89. Neues App-Symbol: kleiner Organizer (0.47.3)');
+  if (!fs.existsSync(MANIFEST_PFAD)) { warn('clie.webmanifest fehlt'); return; }
+  const m = JSON.parse(fs.readFileSync(MANIFEST_PFAD, 'utf8'));
+  const groesse = f => { const b = fs.readFileSync(path.join(ORDNER, f)); return b.readUInt32BE(16) + 'x' + b.readUInt32BE(20); };
+  const icons = m.icons || [];
+  pruefe(icons.length === 3 && icons.every(i => /\?v=\d+$/.test(i.src)), 'drei Symbole, jedes mit ?v=… (neues Bild wird geholt)');
+  pruefe(icons.every(i => groesse(i.src.replace(/\?.*$/, '')) === i.sizes), 'Bildgrößen stimmen mit dem Manifest: ' + icons.map(i => i.sizes).join(', '));
+  pruefe(icons.some(i => i.purpose === 'maskable'), 'eine randlose „maskable“-Fassung für Android');
+  const v = (icons[0].src.match(/\?v=(\d+)/) || [])[1];
+  pruefe(QUELLE.indexOf('href="./clie-192.png?v=' + v + '"') >= 0, 'die Seite verweist auf dieselbe Fassung des Symbols (v=' + v + ')');
+  const sw = fs.existsSync(path.join(ORDNER, 'sw-clie.js')) ? fs.readFileSync(path.join(ORDNER, 'sw-clie.js'), 'utf8') : '';
+  pruefe(/var VORRAT = 'clie-vorrat-([2-9]|\d\d+)'/.test(sw), 'neuer Vorrat im Service Worker (alter wird aufgeräumt)');
 }
 
 /* ============================================================
@@ -5759,6 +5784,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { appSymbolTest(); } catch (e) { fail('App-Symbol warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { diaZeitraumTest(); } catch (e) { fail('Diagramm-Zeitraum warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenSortTest(); } catch (e) { fail('Spalten-Sortieren warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { diagrammeTest(); } catch (e) { fail('Diagramme warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
