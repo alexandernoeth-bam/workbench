@@ -1162,9 +1162,9 @@ function checklistenTest() {
 
   /* Neu: aus einem Memo, als Kopie, leer */
   CL.clsNeu();
-  pruefe(/Aus einem Memo/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet: leer, Kopie, aus Memo, einmalig');
+  pruefe(/Aus einer Notiz übernehmen/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet: leer, Kopie, aus Notiz, einmalig');
   CL.clsFensterSchritt('memo');
-  pruefe(/clsAnlegen\('memo','p1'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Memos mit Punkten stehen zur Wahl');
+  pruefe(!/clsAnlegen\('memo','p1'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'zur Wahl stehen seit 0.53.4 nur Notizen, keine Projekte');
   CL.clsAnlegen('memo', 'p1');
   const ausMemo = CL.DB.gedanken[CL.DB.gedanken.length - 1];
   pruefe(ausMemo.checkliste === 'vorlage' && ausMemo.titel === 'Umbau' && ausMemo.text === '## Statik\n[] Pläne\n[] Angebot', 'aus dem Memo: nur Punkte und Überschriften, leer');
@@ -2028,6 +2028,40 @@ function coKorbTest() {
   /* Quelle abschaltbar */
   S.krFinden('kc-einstellungen').quellen = { korb: false };
   pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Korb“ ausgeschaltet: keine Korb-Fragen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   100. Checkliste aus einer Notiz (0.53.3, nur Notizen und „- [ ]“ 0.53.4)
+   Grund: „Aus einem Memo“ hieß noch nach dem alten App-Namen und fand nur
+   Notizen mit Kästchen — Notizen mit Aufzählungen („- Punkt“) fehlten.
+   Erkennt: alter Name, Aufzählungen nicht übernommen, Fließtext landet in
+   der Checkliste, „Einmalig“ fehlt, die Notiz wird verändert.
+   ============================================================ */
+function clsAusNotizTest() {
+  console.log('\n100. Checkliste aus einer Notiz (0.53.3)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.katSetzen('alle');
+  const text = '# Packen\nText dazu\n- Koffer\n* Ladekabel\n• Pass\n1. Tickets\n  - Bahn\n[x] Brille\nEnde';
+  S.DB.gedanken.push({ id: 'na', titel: 'Urlaub', text: text, kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'nb', titel: 'Nur Text', text: 'Gedanken ohne Liste', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.DB.projekte.push({ id: 'pz', name: 'Projekt', flaeche: '[] Aufgabe', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  pruefe(S.clsAusNotiz(text) === '# Packen\n[] Koffer\n[] Ladekabel\n[] Pass\n[] Tickets\n  [] Bahn\n[] Brille', 'Aufzählungen (-, *, •, 1.) und Kästchen werden leere Punkte, Überschriften bleiben, Text fällt weg');
+  S.oeffne('checklisten'); S.clsNeu();
+  pruefe(/Aus einer Notiz übernehmen/.test(S.clsFensterHtml()) && !/Memo/.test(S.clsFensterHtml()), 'heißt „Aus einer Notiz übernehmen …“');
+  S.clsFensterSchritt('memo');
+  const h = S.clsFensterHtml();
+  pruefe(/clsAnlegen\('memo','na'\)/.test(h) && !/'nb'/.test(h) && /clsAlsWahl\('lauf'\)/.test(h), 'Notiz mit Aufzählung steht zur Wahl, reiner Text nicht; „Vorlage | Einmalig“');
+  pruefe(S.clsAusNotiz('- [ ] Brot\n* [x] Milch\n1. [ ] Eier') === '[] Brot\n[] Milch\n[] Eier', 'Markdown-Aufgaben „- [ ] …“ werden Punkte (0.53.4)');
+  pruefe(!/clsAnlegen\('memo','pz'\)/.test(h), 'nur Notizen — keine Projekte (0.53.4)');
+  S.clsAlsWahl('lauf');
+  S.clsAnlegen('memo', 'na');
+  const g = S.DB.gedanken[S.DB.gedanken.length - 1];
+  pruefe(g.checkliste === 'lauf' && g.art === 'aufgaben' && g.titel === 'Urlaub' && /\[\] Tickets/.test(g.text), 'Einmalig: laufende Checkliste (Art Aufgaben) mit allen Punkten');
+  pruefe(S.DB.gedanken.filter(x => x.id === 'na')[0].text === text, 'die Notiz bleibt unverändert');
+  S.clsZurListe();
   S.oeffne('uebersicht');
 }
 
@@ -6380,6 +6414,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { clsAusNotizTest(); } catch (e) { fail('Checkliste aus Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoLoeschenTest(); } catch (e) { fail('Notiz löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coPrioTest(); } catch (e) { fail('Coach-Prioritäten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coKorbTest(); } catch (e) { fail('Coach-Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

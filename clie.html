@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.53.2</title>
+<title>CLIE 0.53.4</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -939,7 +939,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.53.2';
+var APP_VERSION = '0.53.4';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -8593,10 +8593,10 @@ function clsFensterHtml() {
     return kopf('Neue Checkliste')
       + '<button type="button" class="wahl" onclick="clsAnlegen(\'leer\',\'\')">Leere Vorlage</button>'
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'kopie\')">Kopie einer Vorlage …</button>'
-      + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'memo\')">Aus einem Memo übernehmen …</button>'
+      + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'memo\')">Aus einer Notiz übernehmen …</button>'
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'liste\')">Aus einer Aufgabenliste übernehmen …</button>'
       + '<button type="button" class="wahl" onclick="clsAnlegen(\'einmalig\',\'\')">Neue Checkliste (ohne Vorlage)</button>'
-      + '<p class="leise">„Aus einem Memo“ bzw. „Aus einer Aufgabenliste“ übernimmt alle Punkte (offen, erledigt, nicht relevant) und Überschriften — aus einer Liste wahlweise als Vorlage oder einmalige Checkliste. Die Quelle bleibt, wie sie ist.</p>'
+      + '<p class="leise">„Aus einer Notiz“ bzw. „Aus einer Aufgabenliste“ übernimmt alle Punkte (Kästchen und Aufzählungen „-“, „•“, „1.“) und Überschriften — wahlweise als Vorlage oder einmalige Checkliste. Die Quelle bleibt, wie sie ist.</p>'
       + abbrechen;
   }
   if (f.modus === 'kopie') {
@@ -8606,20 +8606,18 @@ function clsFensterHtml() {
     }).join('') : '<p class="leise">Noch keine Vorlage.</p>') + abbrechen;
   }
   if (f.modus === 'memo') {
-    var s = memoSeiten().filter(function (x) { return /\[[ xX-]?\]/.test(String(x.text || '')); });
-    return kopf('Aus einem Memo') + (s.length ? s.map(function (x) {
+    /* Seit 0.53.3: auch Notizen mit Aufzählungen, und wahlweise einmalig */
+    /* Seit 0.53.4 nur Notizen (Projekte haben eigene Aufgaben) */
+    var s = memoNotizen().filter(function (x) { return clsAusNotiz(x.text).indexOf('[] ') >= 0; });
+    return kopf('Aus einer Notiz') + clsAlsReihe(f) + (s.length ? s.map(function (x) {
       return '<button type="button" class="wahl" onclick="clsAnlegen(\'memo\',\'' + esc(x.id) + '\')">' + clSeitenZeichen(x) + ' ' + esc(x.titel) + '</button>';
-    }).join('') : '<p class="leise">Kein Memo mit Punkten.</p>') + abbrechen;
+    }).join('') : '<p class="leise">Keine Notiz mit Punkten oder Aufzählungen.</p>') + abbrechen;
   }
   /* Aus einer Aufgabenliste (seit 0.48.3) */
   if (f.modus === 'liste') {
     var li = clsListenQuellen();
     /* als Vorlage oder gleich als einmalige Checkliste (seit 0.48.4) */
-    return kopf('Aus einer Aufgabenliste')
-      + '<label>Anlegen als:</label><div class="wahlreihe">'
-      + [['vorlage', 'Vorlage'], ['lauf', 'Einmalig']].map(function (k) {
-          return '<button type="button"' + ((f.als || 'vorlage') === k[0] ? ' class="an"' : '') + ' onclick="clsAlsWahl(\'' + k[0] + '\')">' + k[1] + '</button>';
-        }).join('') + '</div>'
+    return kopf('Aus einer Aufgabenliste') + clsAlsReihe(f)
       + (li.length ? li.map(function (x) {
       return '<button type="button" class="wahl" onclick="clsAnlegen(\'liste\',\'' + esc(x.id) + '\')">≡ ' + esc(x.titel) + '</button>';
     }).join('') : '<p class="leise">Keine Liste mit Punkten.</p>') + abbrechen;
@@ -8703,9 +8701,31 @@ function clsFensterHtml() {
 }
 
 
+/* „Anlegen als: Vorlage | Einmalig“ — aus Liste (0.48.4) und Notiz (0.53.3) */
+function clsAlsReihe(f) {
+  return '<label>Anlegen als:</label><div class="wahlreihe">'
+    + [['vorlage', 'Vorlage'], ['lauf', 'Einmalig']].map(function (k) {
+        return '<button type="button"' + ((f.als || 'vorlage') === k[0] ? ' class="an"' : '') + ' onclick="clsAlsWahl(\'' + k[0] + '\')">' + k[1] + '</button>';
+      }).join('') + '</div>';
+}
+
+/* Punkte einer Notiz: Kästchen und Aufzählungen (-, *, •, 1.) werden leere Punkte,
+   Überschriften bleiben, übriger Text fällt weg */
+function clsAusNotiz(text) {
+  return String(text || '').split('\n').map(function (z) {
+    /* Markdown-Aufgaben „- [ ] …“ / „* [x] …“ (seit 0.53.4) wie Kästchen */
+    z = String(z).replace(/^(\s*)(?:[-*•]|\d{1,3}[.)])\s+(\[[ xX-]?\])/, '$1$2');
+    var m = z.match(KP_KASTEN);
+    if (m) { return m[1] + '[] ' + kpPrio(kpSchluessel(m[3])).text; }
+    if (/^\s*#{1,3}\s/.test(z)) { return z; }
+    var b = z.match(/^(\s*)(?:[-*•]|\d{1,3}[.)])\s+(\S.*)$/);
+    return b ? b[1] + '[] ' + b[2].trim() : null;
+  }).filter(function (z) { return z !== null; }).join('\n');
+}
+
 function clsAlsWahl(als) {
   var f = cl.cls.fenster;
-  if (!f || f.modus !== 'liste' || (als !== 'vorlage' && als !== 'lauf')) { return; }
+  if (!f || (f.modus !== 'liste' && f.modus !== 'memo') || (als !== 'vorlage' && als !== 'lauf')) { return; }
   f.als = als;
   aufklappNeu();
 }
@@ -8737,9 +8757,10 @@ function clsAnlegen(wie, quelleId) {
   } else if (wie === 'memo') {
     var s = kpSeiteFinden(quelleId);
     if (s) {
-      /* Nur Punkte und Überschriften — der übrige Text bleibt im Memo */
-      var text = String(s.text || '').split('\n').filter(function (z) { return kpAufgabe(z) || /^\s*#{1,3}\s/.test(z); }).join('\n');
-      g = clsNeuerSatz('vorlage', s.titel, clsLeeren(text), s.kontext);
+      /* Nur Punkte (auch Aufzählungen) und Überschriften — der übrige Text bleibt in der Notiz */
+      var alsM = (cl.cls.fenster && cl.cls.fenster.als === 'lauf') ? 'lauf' : 'vorlage';
+      g = clsNeuerSatz(alsM, s.titel, clsAusNotiz(s.text), s.kontext);
+      if (alsM === 'lauf') { g.art = 'aufgaben'; }
     }
   }
   else if (wie === 'liste') {
@@ -15284,7 +15305,7 @@ function lkFensterHtml() {
   if (f === 'neu') {
     return kopf('Neu') + '<button type="button" class="wahl" onclick="lkFensterAuf(\'kasten\')">Neuer Kasten …</button>'
       + '<button type="button" class="wahl" onclick="lkFensterAuf(\'einfuegen\')">Karten als Text einfügen …</button>'
-      + '<button type="button" class="wahl" onclick="lkFensterAuf(\'memo\')">Aus einem Memo übernehmen …</button>'
+      + '<button type="button" class="wahl" onclick="lkFensterAuf(\'memo\')">Aus einer Notiz übernehmen …</button>'
       + '<button type="button" class="wahl" onclick="lkPaketWaehlen()">Kartenpaket laden …</button>'
       + '<div class="knoepfe"><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
   }
@@ -15301,7 +15322,7 @@ function lkFensterHtml() {
   }
   if (f === 'memo') {
     var seiten = kpNachRang(kpSeitenAlle()).filter(function (s) { return /^\s*#{1,3}\s/m.test(String(s.text || '')); });
-    return kopf('Aus einem Memo') + (seiten.length ? seiten.map(function (s) {
+    return kopf('Aus einer Notiz') + (seiten.length ? seiten.map(function (s) {
         return '<button type="button" class="wahl" onclick="lkMemoUebernehmen(\'' + esc(s.id) + '\')">' + clSeitenZeichen(s) + ' ' + esc(s.titel) + '</button>';
       }).join('') : '<p class="leise">Kein Memo mit Überschriften gefunden.</p>')
       + '<p class="leise">Jede Überschrift wird eine Karte, der Text darunter ihre Rückseite.</p>'
@@ -16452,7 +16473,7 @@ function vlFensterHtml() {
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="vlDriveErlauben()">Erlauben</button><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
   }
   if (f === 'text') {
-    return kopf('+ Text') + '<button type="button" class="wahl" onclick="vlFensterAuf(\'memo\')">Aus einem Memo …</button>'
+    return kopf('+ Text') + '<button type="button" class="wahl" onclick="vlFensterAuf(\'memo\')">Aus einer Notiz …</button>'
       + '<button type="button" class="wahl" onclick="vlFensterAuf(\'einfuegen\')">Text einfügen …</button>'
       + '<div class="knoepfe"><button type="button" class="knopf" onclick="vlFensterZu()">Abbrechen</button></div>' + zu;
   }
