@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.48.1</title>
+<title>CLIE 0.48.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -355,6 +355,12 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .cls-zeile .tx{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis}
 .cls-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
 .cls-zeile.erl .tx{color:var(--px-mitte)}
+/* kompakte Liste (seit 0.48.2) */
+.cls-zeile.lauf,.cls-zeile.vorl{min-height:0;padding:6px 0}
+.cls-zeile.lauf .tx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
+.cls-zeile.vorl .tx{white-space:nowrap}
+.cls-zeile .balken{width:36px;flex:0 0 36px;height:10px}
+.cls-name{resize:none;line-height:1.3;overflow:hidden}
 .balken{display:inline-block;width:64px;height:12px;border:2px solid var(--px);position:relative;flex:0 0 64px;vertical-align:middle}
 .balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
 .cls-zahl{font-size:18px;white-space:nowrap;margin-left:6px}
@@ -909,7 +915,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.48.1';
+var APP_VERSION = '0.48.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -7747,15 +7753,14 @@ function checklistenListeHtml() {
   var fertig = clsAlle('fertig');
   var h = '<div class="gruppe">Laufend</div>';
   h += laufend.length ? laufend.map(function (g) {
-    return '<button type="button" class="cls-zeile" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel)
-      + '<small>seit ' + esc(clKurzDatum(g.gestartet || isoDatum())) + '</small></span>' + clsBalkenHtml(clsStand(g)) + '</button>';
+    /* kompakt (seit 0.48.2): Titel höchstens zwei Zeilen, kurzer Balken mit x/y */
+    return '<button type="button" class="cls-zeile lauf" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel)
+      + '</span>' + clsBalkenHtml(clsStand(g)) + '</button>';
   }).join('') : '<p class="leise">Keine laufende Checkliste.</p>';
   h += '<div class="gruppe">Vorlagen</div>';
   h += vorlagen.length ? vorlagen.map(function (g) {
-    var st = clsStand(g);
-    return '<div class="cls-zeile"><button type="button" class="tx" onclick="clsOeffnen(\'' + esc(g.id) + '\')">' + esc(g.titel)
-      + '<small>' + st.alle + ' Punkte' + (g.benutzt ? ' · ' + g.benutzt + '× benutzt' : '') + '</small></button>'
-      + '<button type="button" class="knopf" onclick="clsStarten(\'' + esc(g.id) + '\')">Starten</button></div>';
+    /* kompakt (seit 0.48.2): eine Zeile, gestartet wird in der geöffneten Vorlage */
+    return '<button type="button" class="cls-zeile vorl" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel) + '</span></button>';
   }).join('') : '<p class="leise">Noch keine Vorlage — „Neu“ tippen.</p>';
   if (fertig.length) {
     h += '<button type="button" class="gruppe klapp" onclick="clsFertigUm()">' + (cl.cls.fertigAuf ? '▾' : '›') + ' Erledigt · ' + fertig.length + '</button>';
@@ -8048,10 +8053,27 @@ function clsDetails() {
   aufklappNeu();
 }
 
+/* Name im Fenster: mindestens zwei Zeilen, wächst mit — Enter bricht nicht um (seit 0.48.2) */
+function clsNameFeldHtml(titel) {
+  var zeilen = Math.max(2, Math.ceil(String(titel || '').length / 28));
+  return '<textarea id="clsTitel" class="eingabe cls-name" rows="' + zeilen + '" autocomplete="off" spellcheck="true"'
+    + ' onkeydown="clsNameTaste(event)" oninput="clsNameHoehe(this)">' + esc(titel) + '</textarea>';
+}
+
+function clsNameTaste(e) {
+  if (e && e.key === 'Enter' && e.preventDefault) { e.preventDefault(); }
+}
+
+function clsNameHoehe(el) {
+  if (!el || !el.style) { return; }
+  el.style.height = 'auto';
+  if (el.scrollHeight) { el.style.height = el.scrollHeight + 'px'; }
+}
+
 function clsFensterLesen() {
   var f = cl.cls.fenster;
   var t = document.getElementById('clsTitel');
-  if (f && t && typeof t.value === 'string') { f.titel = t.value; }
+  if (f && t && typeof t.value === 'string') { f.titel = t.value.replace(/\s*\n\s*/g, ' '); }
   var d = document.getElementById('clsDatum');
   var z = document.getElementById('clsZeit');
   var st = document.getElementById('clsStichtag');
@@ -8126,7 +8148,7 @@ function clsFensterHtml() {
     var alle = clsStand(v).alle;
     var plan = clsPlanVorschau(v.text, f.stichtag);
     return kopf('„' + esc(v.titel) + '“ starten')
-      + '<label for="clsTitel">Name:</label><input id="clsTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
+      + '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
       + '<label for="clsStichtag">Stichtag:</label><input id="clsStichtag" class="eingabe" type="date" value="' + esc(f.stichtag) + '" onchange="clsStartVorschau()">'
       + '<label>Wird eingeplant (' + plan.length + ' von ' + alle + '):</label><div class="cls-vorschau">'
       + plan.map(function (p) { return '<div><b>' + esc(clPlanText(p.datum, p.zeit)) + '</b>' + esc(p.text) + '</div>'; }).join('') + '</div>'
@@ -8142,7 +8164,7 @@ function clsFensterHtml() {
   }
   if (!g) { return ''; }
   var h = kopf(g.checkliste === 'vorlage' ? 'Vorlage' : 'Checkliste')
-    + '<label for="clsTitel">Name:</label><input id="clsTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
+    + '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
     + '<label>Kategorie:</label><div class="wahlreihe">'
     + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
         return '<button type="button"' + (f.kontext === k[0] ? ' class="an"' : '') + ' onclick="clsKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
@@ -21202,6 +21224,15 @@ function neuLaden() {
   });
 }
 
+/* Am PC bleibt das Fenster beim Wechsel zu anderen Programmen „sichtbar“ —
+   deshalb auch beim Zurückholen (Fokus) fragen, höchstens einmal je Minute (seit 0.48.2) */
+var versionZuletztMs = 0;
+function versionBeiFokus() {
+  if (document.hidden || Date.now() - versionZuletztMs < 60000) { return; }
+  versionZuletztMs = Date.now();
+  versionPruefen(false);
+}
+
 function versionTaktStarten() {
   if (versionUhr) { window.clearInterval(versionUhr); }
   versionUhr = window.setInterval(function () {
@@ -21421,6 +21452,7 @@ function start() {
   document.addEventListener('click', klickErneuern, true);
   window.addEventListener('focus', standZeichnen);
   window.addEventListener('focus', erneuerungPruefen);
+  window.addEventListener('focus', versionBeiFokus);
   window.setInterval(minutenTakt, 30000);
   window.setInterval(spTakt, 1000);
   /* Aus einer Coach-Erinnerung im Kalender: gleich zum Coach (seit 0.33) */

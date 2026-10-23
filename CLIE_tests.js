@@ -1131,7 +1131,7 @@ function checklistenTest() {
   CL.DB.projekte.push({ id: 'p1', name: 'Umbau', flaeche: '## Statik\n[x] Pläne\nText\n[] Angebot', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
   CL.oeffne('checklisten');
   let h = inhalt();
-  pruefe(/>Laufend</.test(h) && />Vorlagen</.test(h) && /Packliste Urlaub/.test(h) && /3 Punkte · 2× benutzt/.test(h), 'Übersicht: Laufend und Vorlagen mit Punkten und Nutzung');
+  pruefe(/>Laufend</.test(h) && />Vorlagen</.test(h) && /Packliste Urlaub/.test(h) && !/clsStarten\(/.test(h), 'Übersicht: Laufend und Vorlagen — ohne Startknopf (0.48.2)');
   CL.katSetzen('beruflich');
   pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'Beruf / Privat filtert');
   CL.katSetzen('alle');
@@ -1813,6 +1813,45 @@ function kennzahlTest() {
   S.saDetailsSpeichern();
   pruefe(!('gruppeName' in b) && !('kennzahl' in b), 'Gruppe wie die Vorlage und „wie die Vorlage“ speichern nichts Eigenes');
   S.cl.sa.id = ''; S.cl.aufklapp = '';
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   91. Checklisten kompakt, Name zweizeilig, Fassung bei Fokus (0.48.2)
+   Grund: Die Übersicht brauchte je Eintrag zwei bis drei Zeilen; der
+   Startknopf in der Liste ist überflüssig (gestartet wird in der Vorlage).
+   Lange Namen ließen sich im einzeiligen Feld nicht pflegen. Am PC kam
+   die Meldung „Neue Fassung“ erst nach einem Klick, weil das Fenster beim
+   Wechsel zu anderen Programmen sichtbar bleibt.
+   Erkennt: Startknopf oder Zusatzzeilen wieder in der Liste, Name wieder
+   einzeilig, Zeilenumbruch landet im Namen, keine Prüfung beim Fokus.
+   ============================================================ */
+function clsKompaktTest() {
+  console.log('\n91. Checklisten kompakt, Name zweizeilig, Fassung bei Fokus (0.48.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.gedanken.push({ id: 'v9', titel: 'Durchführung des DFÜ-Abruftest für eine Auslieferung', text: '[] A\n[] B', kontext: 'beruflich', checkliste: 'vorlage', benutzt: 3, ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'l9', titel: 'Durchführung des DFÜ-Abruftest 29.10.2026', text: '[x] A\n[] B', kontext: 'beruflich', checkliste: 'lauf', gestartet: S.isoDatum(), ordnung: 2, geaendert: 1 });
+  S.oeffne('checklisten');
+  const h = S.checklistenListeHtml();
+  pruefe(!/clsStarten\(/.test(h) && !/Starten</.test(h), 'kein Startknopf in der Übersicht');
+  pruefe(!/× benutzt|Punkte<|<small>seit /.test(h), 'keine Zusatzzeilen (seit … / Punkte · benutzt)');
+  pruefe(/class="cls-zeile vorl"/.test(h) && /class="cls-zeile lauf"[^>]*>.*1\/2/.test(h), 'Vorlage einzeilig, Laufend mit kurzem Balken und 1/2');
+  pruefe(/\.cls-zeile\.vorl \.tx\{white-space:nowrap\}/.test(QUELLE) && /\.cls-zeile\.lauf \.tx\{[^}]*line-clamp:2/.test(QUELLE), 'CSS: Vorlagen eine Zeile, Laufende höchstens zwei');
+  S.clsOeffnen('v9');
+  pruefe(/clsStarten\(/.test(S.checklistenFussHtml()), 'gestartet wird in der geöffneten Vorlage');
+  const feld = S.clsNameFeldHtml('Durchführung des DFÜ-Abruftest für eine Auslieferung');
+  pruefe(/<textarea id="clsTitel"/.test(feld) && Number((feld.match(/rows="(\d+)"/) || [])[1]) >= 2, 'Name ist mindestens zweizeilig');
+  S.cl.cls.fenster = { modus: 'details', titel: '' };
+  S.document.getElementById('clsTitel').value = 'Zeile eins\n  Zeile zwei';
+  S.clsFensterLesen();
+  pruefe(S.cl.cls.fenster.titel === 'Zeile eins Zeile zwei', 'Zeilenumbruch wird zum Leerzeichen');
+  pruefe(/addEventListener\('focus', versionBeiFokus\)/.test(SKRIPT), 'neue Fassung wird auch beim Zurückholen des Fensters geprüft');
+  S.versionZuletztMs = Date.now();
+  S.versionBeiFokus();
+  pruefe(Date.now() - S.versionZuletztMs < 1000, 'höchstens einmal je Minute');
+  S.cl.cls.fenster = null; S.cl.cls.id = '';
   S.oeffne('uebersicht');
 }
 
@@ -5836,6 +5875,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { clsKompaktTest(); } catch (e) { fail('Checklisten kompakt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saSymbolTest(); } catch (e) { fail('Sammlung-Symbole warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { appSymbolTest(); } catch (e) { fail('App-Symbol warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { diaZeitraumTest(); } catch (e) { fail('Diagramm-Zeitraum warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
