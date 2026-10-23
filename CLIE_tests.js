@@ -1817,6 +1817,30 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   85. Kopfwert „letzter Wert“ heißt wie das Feld (0.46.3)
+   Grund: Kopfwerte zeigten „letzter Wert Taille“ — abgeschnitten zu
+   „letzter Wert Ta…“, das Wichtige fehlte. Seit 0.46.3 steht nur der
+   Feldname. Alte Verweise „Sammlung: letzter Wert Feld“ gelten weiter.
+   Erkennt: Vorsatz wieder da, andere Arten (Summe, Ø) ohne Vorsatz,
+   alte Verweise rechnen nicht mehr.
+   ============================================================ */
+function kopfwertNameTest() {
+  console.log('\n85. Kopfwert „letzter Wert“ heißt wie das Feld (0.46.3)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const k = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Körpermaße', false, []);
+  k.felder = [{ id: 'kd', name: 'Datum', typ: 'datum' }, { id: 'kt', name: 'Taille', typ: 'zahl' }];
+  k.kopfwerte = [{ art: 'letzter', feld: 'kt' }, { art: 'schnitt', feld: 'kt' }, { art: 'letzter', feld: 'kt', name: 'Bauch' }];
+  S.DB.datensaetze.push({ id: 'x1', sammlung: k.id, werte: { kd: '2026-10-01', kt: 106 }, angelegt: 1, geaendert: 1 });
+  S.DB.datensaetze.push({ id: 'x2', sammlung: k.id, werte: { kd: '2026-10-20', kt: 104 }, angelegt: 2, geaendert: 2 });
+  pruefe(S.saKopfwertName(k, k.kopfwerte[0]) === 'Taille', '„letzter Wert“ heißt nur wie das Feld: „Taille“');
+  pruefe(S.saKopfwertName(k, k.kopfwerte[1]) === 'Ø Taille' && S.saKopfwertName(k, k.kopfwerte[2]) === 'Bauch', 'Ø behält den Vorsatz, ein eigener Name bleibt');
+  pruefe(!/letzter Wert/.test(S.saKopfwerteHtml(k)) && /<small>Taille<\/small><b>104<\/b>/.test(S.saKopfwerteHtml(k)), 'Kachel: „Taille 104“');
+  pruefe(S.saFremdZahl('Körpermaße: Taille', '', 0) === 104 && S.saFremdZahl('Körpermaße: letzter Wert Taille', '', 0) === 104, 'Verweise: neuer Name und alter Name „letzter Wert Taille“ gelten');
+}
+
+/* ============================================================
    84. Blättern mit Pfeilen in Woche, Blöcken, Monat (0.46.2)
    Grund: Am PC (Maus) lässt sich nicht wischen — in Woche, Blöcken und
    Monat gab es keinen Weg vor und zurück. Jetzt ◀ ▶: in Woche und Monat
@@ -5589,6 +5613,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { kopfwertNameTest(); } catch (e) { fail('Kopfwert-Name warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { blattTest(); } catch (e) { fail('Blättern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { menueInfoTest(); } catch (e) { fail('Menü/Info warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { klammerWechselTest(); } catch (e) { fail('Klammer-Wechsel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
