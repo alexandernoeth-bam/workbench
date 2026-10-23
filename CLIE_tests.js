@@ -1847,7 +1847,18 @@ function klammerWechselTest() {
     'echte Überschneidung (13:05 in 13–14) bleibt daneben in der zweiten Spalte');
   pruefe(/class="kl"><i class="wechsel"><\/i><i class=""><\/i>/.test(zeile('14:00')) && /class="kl"><i class="wechsel"><\/i><i class=""><\/i>/.test(zeile('15:45')) && /class="kl"><i class="unten"><\/i>/.test(zeile('16:00')),
     'Kette 13–14 → 14–15:45 → 15:45–16: jeweils Wechsel in derselben Spalte');
-  pruefe(/\.kl i\.wechsel::before\{[^}]*border-bottom/.test(QUELLE) && /\.kl i\.wechsel::after\{[^}]*border-top/.test(QUELLE), 'Wechsel gezeichnet: oben schließen, unten öffnen');
+  /* Seit 0.45.2: zwei enden zugleich, und dann beginnt ein neuer */
+  CL.termineNachTag[tag] = [
+    { id: 'g', zeit: '11:00', bis: '12:00', titel: 'Gruppenmeeting', kontext: 'beruflich', kalId: 'k' },
+    { id: 'h', zeit: '11:30', bis: '12:00', titel: 'UJQS', kontext: 'beruflich', kalId: 'k' },
+    { id: 'i', zeit: '12:00', bis: '12:45', titel: 'Mittagessen', kontext: 'beruflich', kalId: 'k' }];
+  CL.clKalGehe(tag, 'tag');
+  const reihen2 = inhalt().split('<div class="std').slice(1);
+  const zeile2 = (zeit) => reihen2.filter(r => r.indexOf('class="z">' + zeit + '<') >= 0)[0] || '';
+  pruefe(/class="kl"><i class="mitte"><\/i><i class="oben"><\/i>/.test(zeile2('11:30')) && /class="kl"><i class="wechsel"><\/i><i class="schluss"><\/i>/.test(zeile2('12:00')) && /class="kl"><i class="unten"><\/i><i class=""><\/i>/.test(zeile2('12:45')),
+    'zwei enden um 12:00, Mittagessen beginnt: Wechsel links, die innere Klammer schließt auf derselben Höhe (seit 0.45.2)');
+  pruefe(/\.kl i\.wechsel::before,\.kl i\.schluss::before\{[^}]*border-bottom/.test(QUELLE), '„schluss“ schließt wie der Wechsel in der Mitte der Zeile');
+  pruefe(/\.kl i\.wechsel::before\{[^}]*border-bottom/.test(QUELLE) || /\.kl i\.wechsel::before,/.test(QUELLE) && /\.kl i\.wechsel::after\{[^}]*border-top/.test(QUELLE), 'Wechsel gezeichnet: oben schließen, unten öffnen');
   delete CL.termineNachTag[tag];
   CL.clKalGehe(CL.isoDatum(), 'tag');
   CL.oeffne('uebersicht');
