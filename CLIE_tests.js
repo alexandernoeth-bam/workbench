@@ -2106,12 +2106,12 @@ function projekteTest() {
   pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && !/Fit bis Sommer/.test(h),
     'Liste „Laufend“: P1 zuerst, Ruhendes nicht, Ziele nicht (seit 0.44 eigene App)');
   /* Seit 0.43.2 schlicht: nur der Name, die Priorität nur wenn gesetzt */
-  pruefe(/<button type="button" class="pj-zeile" onclick="pjOeffnen\('p1','allgemein'\)"><span class="pj-n">Carport<\/span><\/button>/.test(h)
+  pruefe(/<button type="button" class="pj-zeile" onclick="pjOeffnen\('p1','inhalt'\)"><span class="pj-n">Carport<\/span><\/button>/.test(h)
     && /<span class="pj-n">Heizung<\/span><span class="pj-p">P1<\/span>/.test(h) && !/◇|✎|<small>\d+\/\d+|·</.test(h.replace(/<p class="leise">[\s\S]*$/, '')),
     'Zeile nur mit Namen — ohne Punkt, Zeichen, Aufgabenzahl und ✎; „P1“ nur wenn gesetzt');
-  pruefe(/pjOeffnen\('p2','allgemein'\)/.test(h) && !/'aufgaben'\)">/.test(h), 'Tipp auf ein Projekt öffnet „Allgemein“ (seit 0.44.1)');
+  pruefe(/pjOeffnen\('p2','inhalt'\)/.test(h) && !/'aufgaben'\)">/.test(h), 'Tipp auf ein Projekt öffnet „Inhalt“ (seit 0.46.1)');
   S.seiteOeffnen('p2');
-  pruefe(S.cl.app === 'projekte' && S.cl.pj.reiter === 'allgemein', 'auch Lesezeichen, Suche und Verweise landen bei „Allgemein“');
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.reiter === 'inhalt', 'auch Lesezeichen, Suche und Verweise landen bei „Inhalt“');
   S.oeffne('projekte');
   S.pjOeffnen('p1', 'allgemein'); S.pjWahl('prio', '1');
   pruefe(S.DB.projekte[0].prio === 1, 'Priorität im Reiter Allgemein (am Satz als „prio“)');
@@ -2120,7 +2120,8 @@ function projekteTest() {
   /* Reiter Aufgaben */
   S.pjOeffnen('p1', 'aufgaben');
   h = inhalt();
-  pruefe(/class="pj-reiter">.*Allgemein.*class="an" onclick="pjReiter\('aufgaben'\)">Aufgaben.*Memo/.test(h), 'drei Reiter unter dem Titel, Aufgaben gewählt');
+  pruefe(/class="pj-reiter"><button type="button" onclick="pjReiter\('inhalt'\)">Inhalt<\/button><button type="button" onclick="pjReiter\('meilensteine'\)">Meilensteine<\/button><button type="button" class="an" onclick="pjReiter\('aufgaben'\)">Aufgaben<\/button><button type="button" onclick="pjReiter\('allgemein'\)">Allgemein<\/button><\/div>/.test(h),
+    'vier Reiter (seit 0.46.1): Inhalt · Meilensteine · Aufgaben · Allgemein — Aufgaben gewählt');
   pruefe(h.indexOf('Huber nachfassen') < h.indexOf('Statik klären') && h.indexOf('Statik klären') < h.indexOf('Angebote anfragen') && !/Huber 14\.200/.test(h),
     'Aufgaben: offene oben, erledigte darunter, kein Text');
   S.memoHaken('p1', 2);
@@ -2129,18 +2130,18 @@ function projekteTest() {
   pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster.seite === 'p1', '„Neu“: Aufgabe gleich im Projekt');
   S.aufklappZu();
   /* Reiter Memo */
-  S.pjReiter('memo');
+  S.pjReiter('inhalt');
   h = inhalt();
-  pruefe(/Huber 14\.200/.test(h) && /memo-h2">Angebote/.test(h) && !/nachfassen|Statik/.test(h), 'Memo: Text und Überschriften, ohne Aufgaben');
+  pruefe(/Huber 14\.200/.test(h) && /memo-h2">Angebote/.test(h) && !/nachfassen|Statik/.test(h) && /pjSchreiben\(\)">Schreiben/.test(S.document.getElementById('fuss').innerHTML), 'Inhalt: Text und Überschriften, ohne Aufgaben; unten „Schreiben“');
   S.pjSchreiben();
   pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && /id="memoFeld"[^>]*>[^<]*Statik klären/.test(inhalt()), '„Schreiben“: ganzer Text im Schreibfeld');
   S.memoSchreibenUm();
-  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1' && S.cl.pj.reiter === 'memo' && !S.cl.memo.ausProjekt, '„Fertig“ führt zurück in den Reiter Memo');
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1' && S.cl.pj.reiter === 'inhalt' && !S.cl.memo.ausProjekt, '„Fertig“ führt zurück in den Reiter Inhalt');
   /* Reiter Allgemein */
   S.pjReiter('allgemein');
   h = inhalt();
-  pruefe(/id="pjBeginn"[^>]*value="2026-09-01"/.test(h) && /Ende:<input id="pjEnde"[^>]*value="2027-04-30"/.test(h) && /Vermessung/.test(h) && /Meilensteine <span>1\/1/.test(h),
-    'Allgemein: Beginn, Ende, Meilensteine aus den Workbench-Feldern');
+  pruefe(/id="pjBeginn"[^>]*value="2026-09-01"/.test(h) && /Ende:<input id="pjEnde"[^>]*value="2027-04-30"/.test(h) && !/Vermessung|Meilensteine <span>/.test(h) && !/pjMsAuf/.test(S.document.getElementById('fuss').innerHTML),
+    'Allgemein: Beginn und Ende aus den Workbench-Feldern — Meilensteine seit 0.46.1 im eigenen Reiter');
   S.document.getElementById('pjBeginn').value = '2026-10-01'; S.pjFeld('beginn');
   S.document.getElementById('pjEnde').value = '2027-05-15'; S.pjFeld('ende');
   S.document.getElementById('pjEnde').value = 'kaputt'; S.pjFeld('ende');
@@ -2148,6 +2149,8 @@ function projekteTest() {
   S.pjWahl('zustand', 'ruht'); S.pjWahl('kontext', 'beruflich'); S.pjWahl('prio', '2');
   pruefe(S.DB.projekte[0].status === 'ruht' && S.DB.projekte[0].kontext === 'beruflich' && S.DB.projekte[0].prio === 2, 'Zustand, Kategorie, Priorität');
   S.pjWahl('zustand', 'laeuft'); S.pjWahl('kontext', 'privat');
+  S.pjReiter('meilensteine');
+  pruefe(/Vermessung/.test(inhalt()) && /Meilensteine <span>1\/1/.test(inhalt()) && /pjMsAuf\(''\)">\+ Meilenstein/.test(S.document.getElementById('fuss').innerHTML), 'Reiter Meilensteine: Liste und „+ Meilenstein“');
   S.pjMsAuf('');
   S.document.getElementById('pjMsTitel').value = 'Auftrag vergeben'; S.document.getElementById('pjMsDatum').value = '2026-11-15';
   S.pjMsSpeichern();

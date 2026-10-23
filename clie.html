@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.46.0</title>
+<title>CLIE 0.46.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png" sizes="192x192" type="image/png">
@@ -309,7 +309,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .pj-p{flex:0 0 auto;font-size:16px;color:var(--px-mitte)}
 .pj-titel{font-weight:600;font-size:21px;margin:2px 0 6px}
 .pj-reiter{display:flex;margin-bottom:8px}
-.pj-reiter button{flex:1;border:2px solid var(--px);margin-left:-2px;padding:3px 0;font-size:18px}
+.pj-reiter button{flex:1 1 auto;border:2px solid var(--px);margin-left:-2px;padding:3px 4px;font-size:16px;white-space:nowrap}
 .pj-reiter button:first-child{margin-left:0}
 .pj-reiter button.an{background:var(--px);color:var(--lcd)}
 .pj-daten{display:flex;gap:10px}
@@ -879,7 +879,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.46.0';
+var APP_VERSION = '0.46.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -7018,9 +7018,10 @@ function memoSpeichern() {
    flaeche); neu ist nur „prio“ (1–3) am Satz — die Workbench lässt das
    Feld unberührt. Ziele stehen mit ◇ in derselben Liste. */
 
-cl.pj = { id: '', reiter: 'allgemein', zustand: 'laeuft', hervor: '', ms: null, neu: null };
+cl.pj = { id: '', reiter: 'inhalt', zustand: 'laeuft', hervor: '', ms: null, neu: null };
 
-var PJ_REITER = [['allgemein', 'Allgemein'], ['aufgaben', 'Aufgaben'], ['memo', 'Memo']];
+/* Seit 0.46.1: Inhalt · Meilensteine · Aufgaben · Allgemein — ein Projekt öffnet bei „Inhalt“ */
+var PJ_REITER = [['inhalt', 'Inhalt'], ['meilensteine', 'Meilensteine'], ['aufgaben', 'Aufgaben'], ['allgemein', 'Allgemein']];
 /* Seit 0.43.1 nur ein Zustand auf einmal — drei Schalter über der Liste */
 var PJ_FILTER = [['laeuft', 'Laufend'], ['ruht', 'Ruhend'], ['erledigt', 'Abgeschlossen']];
 
@@ -7064,7 +7065,7 @@ function pjListeHtml() {
   var fertig = (cl.pj.zustand === 'erledigt');
   return h + '<div class="pj-liste' + (fertig ? ' fertig' : '') + '">' + l.map(function (s) {
     var p = fertig ? 0 : pjPrio(s);
-    return '<button type="button" class="pj-zeile" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'allgemein\')">'
+    return '<button type="button" class="pj-zeile" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'inhalt\')">'
       + '<span class="pj-n">' + esc(s.titel) + '</span>' + (p ? '<span class="pj-p">P' + p + '</span>' : '') + '</button>';
   }).join('') + '</div>';
 }
@@ -7083,7 +7084,7 @@ function pjOeffnen(id, reiter) {
   cl.pj.id = s.id;
   /* Zurück zur Liste landet man beim Zustand dieses Projekts */
   cl.pj.zustand = s.zustand;
-  cl.pj.reiter = PJ_REITER.some(function (r) { return r[0] === reiter; }) ? reiter : 'allgemein';
+  cl.pj.reiter = PJ_REITER.some(function (r) { return r[0] === reiter; }) ? reiter : 'inhalt';
   cl.pj.hervor = '';
   var el = document.getElementById('inhalt');
   if (el) { el.scrollTop = 0; }
@@ -7121,11 +7122,12 @@ function pjSeiteHtml(s) {
         return '<button type="button"' + (cl.pj.reiter === r[0] ? ' class="an"' : '') + ' onclick="pjReiter(\'' + r[0] + '\')">' + r[1] + '</button>';
       }).join('') + '</div>';
   if (cl.pj.reiter === 'allgemein') { return h + pjAllgemeinHtml(s); }
-  if (cl.pj.reiter === 'memo') { return h + memoSeiteHtml(s, true); }
+  if (cl.pj.reiter === 'meilensteine') { return h + pjMeilensteineHtml(s); }
+  if (cl.pj.reiter === 'inhalt') { return h + memoSeiteHtml(s, true); }
   return h + pjAufgabenHtml(s);
 }
 
-/* ---- Reiter „Allgemein“: Eckdaten und Meilensteine ---- */
+/* ---- Reiter „Allgemein“: Eckdaten ---- */
 
 function pjAllgemeinHtml(s) {
   var z = s.__satz;
@@ -7142,9 +7144,15 @@ function pjAllgemeinHtml(s) {
     + '<label>Priorität:</label>' + reihe('prio', [[0, '–'], [1, '1'], [2, '2'], [3, '3']], pjPrio(s))
     + '<label>Zustand:</label>' + reihe('zustand', KP_ZUSTAENDE, s.zustand)
     + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], s.kontext);
-  var ms = Array.isArray(z.meilensteine) ? z.meilensteine : [];
+  return h;
+}
+
+/* ---- Reiter „Meilensteine“ (seit 0.46.1 eigener Reiter) ---- */
+
+function pjMeilensteineHtml(s) {
+  var ms = Array.isArray(s.__satz.meilensteine) ? s.__satz.meilensteine : [];
   var n = ms.filter(function (m) { return m && m.erreicht; }).length;
-  h += '<div class="pj-gr">Meilensteine <span>' + n + '/' + ms.length + '</span></div>';
+  var h = '<div class="pj-gr">Meilensteine <span>' + n + '/' + ms.length + '</span></div>';
   if (!ms.length) { return h + '<p class="leise">Noch keine — „+ Meilenstein“ tippen.</p>'; }
   return h + ms.map(function (m) {
     if (!m) { return ''; }
@@ -7300,7 +7308,7 @@ function pjZeile(id, nr) {
   if (z && z.scrollIntoView) { z.scrollIntoView({ block: 'center' }); }
 }
 
-/* ---- Reiter „Memo“: geschrieben wird im Schreibfeld der Notizen ---- */
+/* ---- Reiter „Inhalt“: geschrieben wird im Schreibfeld der Notizen ---- */
 
 function pjSchreiben() {
   var s = cl.pj.id ? kpSeiteFinden(cl.pj.id) : null;
@@ -7325,7 +7333,7 @@ function pjTextFertig() {
   cl.memo.ausProjekt = '';
   cl.app = 'projekte';
   cl.pj.id = id;
-  cl.pj.reiter = 'memo';
+  cl.pj.reiter = 'inhalt';
   cl.pj.hervor = '';
   zeichne();
 }
@@ -7387,8 +7395,8 @@ function pjFussHtml() {
   }
   var h = '<button type="button" class="knopf voll" onclick="pjZurListe()">Fertig</button>';
   if (cl.pj.reiter === 'aufgaben') { h += '<button type="button" class="knopf" onclick="pjAufgabeNeu()">Neu</button>'; }
-  if (cl.pj.reiter === 'memo') { h += '<button type="button" class="knopf" onclick="pjSchreiben()">Schreiben</button>'; }
-  if (cl.pj.reiter === 'allgemein') { h += '<button type="button" class="knopf" onclick="pjMsAuf(\'\')">+ Meilenstein</button>'; }
+  if (cl.pj.reiter === 'inhalt') { h += '<button type="button" class="knopf" onclick="pjSchreiben()">Schreiben</button>'; }
+  if (cl.pj.reiter === 'meilensteine') { h += '<button type="button" class="knopf" onclick="pjMsAuf(\'\')">+ Meilenstein</button>'; }
   return h;
 }
 
@@ -7628,8 +7636,8 @@ function seiteOeffnen(id) {
   if (!s) { return; }
   if (s.art === 'liste') { oeffne('aufgaben'); aufListeSetzen(s.id); return; }
   if (s.__satz && s.__satz.checkliste) { oeffne('checklisten'); clsOeffnen(s.id); return; }
-  /* Seit 0.44.1 landet jeder Sprung in ein Projekt bei „Allgemein“ */
-  if (s.art === 'vorhaben') { pjOeffnen(s.id, 'allgemein'); return; }
+  /* Jeder Sprung in ein Projekt landet bei „Inhalt“ (seit 0.46.1; 0.44.1: Allgemein) */
+  if (s.art === 'vorhaben') { pjOeffnen(s.id, 'inhalt'); return; }
   oeffne('memo');
   memoOeffnen(s.id);
 }
