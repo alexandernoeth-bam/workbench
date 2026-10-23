@@ -1817,7 +1817,7 @@ function kennzahlTest() {
 }
 
 /* ============================================================
-   92. Neue Checkliste aus einer Aufgabenliste (0.48.3)
+   92. Neue Checkliste aus einer Aufgabenliste (0.48.3, einmalig 0.48.4)
    Grund: Bei „Neu“ ließ sich eine Vorlage nur leer, als Kopie oder aus
    einem Memo anlegen. Seit 0.48.3 auch aus einer Aufgabenliste — mit
    allen Punkten, egal ob offen, erledigt oder nicht relevant.
@@ -1847,6 +1847,14 @@ function clsAusListeTest() {
   pruefe(S.DB.gedanken.length === vorher + 1 && v.checkliste === 'vorlage' && v.titel === 'Auslieferung' && v.kontext === 'beruflich', 'neue Vorlage mit Namen und Bereich der Liste');
   pruefe(v.text === '## Vorbereitung\n[] Server prüfen\n[] Zugang holen\n[] Altes Protokoll\n  [] Unterpunkt', 'alle Punkte (offen, erledigt, nicht relevant) leer übernommen, ohne „P1“ und Fließtext');
   pruefe(S.DB.themen[0].text === quelle, 'die Aufgabenliste bleibt unverändert');
+  /* 0.48.4: wahlweise gleich als einmalige Checkliste */
+  S.cl.cls.id = ''; S.clsNeu(); S.clsFensterSchritt('liste');
+  pruefe(/clsAlsWahl\('lauf'\)/.test(S.clsFensterHtml()) && /class="an" onclick="clsAlsWahl\('vorlage'\)"/.test(S.clsFensterHtml()), 'Umschalter Vorlage / Einmalig — Vorlage vorgewählt');
+  S.clsAlsWahl('lauf');
+  S.clsAnlegen('liste', 't1');
+  const e = S.DB.gedanken[S.DB.gedanken.length - 1];
+  pruefe(e.checkliste === 'lauf' && e.gestartet === S.isoDatum() && e.titel === 'Auslieferung' && !('benutzt' in e) && /\[\] Zugang holen/.test(e.text), 'Einmalig: laufende Checkliste mit leeren Punkten, ab heute');
+  pruefe(S.DB.gedanken.filter(x => x.checkliste === 'vorlage' && x.titel === 'Auslieferung').length === 1, 'dabei entsteht keine weitere Vorlage');
   S.katSetzen('alle');
   S.cl.cls.id = ''; S.cl.cls.schreiben = false; S.cl.cls.fenster = null; S.cl.aufklapp = '';
   S.oeffne('uebersicht');
