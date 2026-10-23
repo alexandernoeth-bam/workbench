@@ -1138,7 +1138,7 @@ function checklistenTest() {
   CL.localStorage.setItem('clie-cls-klapp', JSON.stringify({ vorl: true }));
   CL.oeffne('checklisten');
   let h = inhalt();
-  pruefe(/>Laufend</.test(h) && /Vorlagen · 2/.test(h) && /Packliste Urlaub/.test(h) && !/clsStarten\(/.test(h), 'Übersicht: Laufend und Vorlagen (aufgeklappt) — ohne Startknopf (0.48.2)');
+  pruefe(/class="cls-korb"/.test(h) && /Vorlagen · 2/.test(h) && /Packliste Urlaub/.test(h) && !/clsStarten\(/.test(h), 'Übersicht: Laufend und Vorlagen (aufgeklappt) — ohne Startknopf (0.48.2)');
   CL.katSetzen('beruflich');
   pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'Beruf / Privat filtert');
   CL.katSetzen('alle');
@@ -1848,9 +1848,17 @@ function ckZustandTest() {
   S.DB.gedanken.push({ id: 'ga', titel: 'Jahresgespräche', text: '[] Termine\n[] Bögen', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', bereich: 'kb-arbeit', gestartet: heute, ordnung: 5, geaendert: 1 });
   S.oeffne('checklisten');
   let h = inhalt();
-  pruefe(/class="cls-korb"/.test(h) && h.indexOf('cls-korb') < h.indexOf('>Laufend<'), 'oben der Korb, darunter „Laufend“');
-  pruefe(/cls-bereich">Haus &amp; Projekte</.test(h) && /cls-bereich">Arbeit</.test(h) && h.indexOf('>Arbeit<') < h.indexOf('>Haus &amp; Projekte<'),
-    'Laufend nach Lebensbereich aus Kurs gruppiert (Reihenfolge wie in Kurs)');
+  pruefe(/class="cls-korb"/.test(h) && h.indexOf('cls-korb') < h.indexOf('class="cls-zeile lauf"') && !/cls-bereich/.test(h) && !/class="balken"/.test(h),
+    'oben der Korb, darunter eine schlichte Liste — ohne Bereichs-Überschriften und Balken (0.53.2)');
+  pruefe(/Haus<\/span><span class="cls-zahl">1\/2</.test(h), 'rechts nur x/y');
+  /* Bereich oben rechts wie die Kategorien am Palm (0.53.2) */
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'clswahl' && /clsBereichSetzen\('kb-arbeit'\)/.test(S.document.getElementById('aufklapp').innerHTML), '▼ oben rechts: Alle, Beruf, Privat und die Lebensbereiche');
+  S.clsBereichSetzen('kb-arbeit');
+  pruefe(/Jahresgespräche/.test(inhalt()) && !/>Haus</.test(inhalt()) && /▼ Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-cls-bereich') === 'kb-arbeit',
+    'Bereich gewählt: nur dessen Checklisten, oben „▼ Arbeit“, gemerkt');
+  S.clsKatSetzen('alle');
+  pruefe(S.cl.cls.bereich === '' && /Dachrinne|>Haus</.test(inhalt()), '„Alle“ hebt den Bereich auf');
   pruefe(/Ruhend · 1/.test(h) && /Abgeschlossen · 1/.test(h) && !/Maier/.test(h) && !/>Carport Angebote</.test(h), 'Ruhend und Abgeschlossen eingeklappt mit Zahl');
   S.clsKlappUm('ruht');
   pruefe(/Carport Angebote/.test(inhalt()) && JSON.parse(S.localStorage.getItem('clie-cls-klapp')).ruht === true, 'aufklappen zeigt sie, auf dem Gerät gemerkt');
@@ -2329,7 +2337,7 @@ function clsKompaktTest() {
   pruefe(!/clsStarten\(/.test(h) && !/Starten</.test(h), 'kein Startknopf in der Übersicht');
   pruefe(!/× benutzt|Punkte<|<small>seit /.test(h), 'keine Zusatzzeilen (seit … / Punkte · benutzt)');
   pruefe(/class="cls-zeile vorl"/.test(h) && /class="cls-zeile lauf"[^>]*>.*1\/2/.test(h), 'Vorlage einzeilig, Laufend mit kurzem Balken und 1/2');
-  pruefe(/\.cls-zeile\.vorl \.tx\{white-space:nowrap\}/.test(QUELLE) && /\.cls-zeile\.lauf \.tx\{[^}]*line-clamp:2/.test(QUELLE), 'CSS: Vorlagen eine Zeile, Laufende höchstens zwei');
+  pruefe(/\.cls-zeile\.vorl \.tx\{white-space:nowrap\}/.test(QUELLE) && /\.cls-zeile\.lauf \.tx,\.cls-zeile\.erl \.tx\{white-space:nowrap\}/.test(QUELLE), 'CSS: alle Zeilen einzeilig (seit 0.53.2)');
   S.clsOeffnen('v9');
   pruefe(/clsStarten\(/.test(S.checklistenFussHtml()), 'gestartet wird in der geöffneten Vorlage');
   const feld = S.clsNameFeldHtml('Durchführung des DFÜ-Abruftest für eine Auslieferung');

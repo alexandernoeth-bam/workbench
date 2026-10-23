@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.53.1</title>
+<title>CLIE 0.53.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -361,7 +361,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .cls-zeile.erl .tx{color:var(--px-mitte)}
 /* kompakte Liste (seit 0.48.2) */
 .cls-zeile.lauf,.cls-zeile.vorl{min-height:0;padding:6px 0}
-.cls-zeile.lauf .tx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal}
+.cls-zeile.lauf .tx,.cls-zeile.erl .tx{white-space:nowrap}
 .cls-zeile.vorl .tx{white-space:nowrap}
 .cls-zeile .balken{width:36px;flex:0 0 36px;height:10px}
 .cls-name{resize:none;line-height:1.3;overflow:hidden}
@@ -939,7 +939,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.53.1';
+var APP_VERSION = '0.53.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4150,8 +4150,9 @@ function kopfZeichnen() {
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (cl.filter !== 'alle' ? ' · ' + katName(cl.filter) : '')
       : (cl.app === 'sudoku') ? sdKopfText()
       : (cl.app === 'solitaer') ? soKopfText()
+      : (cl.app === 'checklisten' && cl.cls.bereich) ? '▼ ' + ckBereichName(cl.cls.bereich)
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
-    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl' || cl.aufklapp === 'sdwahl' || cl.aufklapp === 'sowahl' || cl.aufklapp === 'cotag' || cl.aufklapp === 'jahrwahl') ? ' an' : '');
+    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl' || cl.aufklapp === 'sdwahl' || cl.aufklapp === 'sowahl' || cl.aufklapp === 'clswahl' || cl.aufklapp === 'cotag' || cl.aufklapp === 'jahrwahl') ? ' an' : '');
   }
   uhrZeichnen();
 }
@@ -4179,6 +4180,8 @@ function aufklappZeichnen() {
     el.innerHTML = einkaufDialogHtml();
   } else if (cl.aufklapp === 'liste') {
     el.innerHTML = listeAufklappHtml();
+  } else if (cl.aufklapp === 'clswahl') {
+    el.innerHTML = clsWahlHtml();
   } else if (cl.aufklapp === 'liste-neu') {
     if (el.innerHTML.indexOf('listeTitel') >= 0) { return; }
     el.innerHTML = neueListeHtml();
@@ -4386,6 +4389,7 @@ function katUm() {
     : (cl.app === 'lernkartei') ? 'lkwahl'
     : (cl.app === 'sudoku') ? 'sdwahl'
     : (cl.app === 'solitaer') ? 'sowahl'
+    : (cl.app === 'checklisten') ? 'clswahl'
     : (cl.app === 'sammlungen' && saKatText() !== null) ? 'safilter' : 'kat';
   cl.aufklapp = (cl.aufklapp === wohin) ? '' : wohin;
   kopfZeichnen();
@@ -5938,6 +5942,7 @@ function aufAnsichtLaden() {
 function aufListeLaden() {
   var l = '';
   var b = '';
+  try { cl.cls.bereich = window.localStorage.getItem(CK_BEREICH_KEY) || ''; } catch (e) { cl.cls.bereich = ''; }
   try { l = window.localStorage.getItem(AUF_LISTE_KEY) || ''; b = window.localStorage.getItem(AUF_BEREICH_KEY) || ''; } catch (e) { l = ''; }
   cl.auf.liste = l;
   cl.auf.bereich = b;
@@ -7847,7 +7852,7 @@ function seiteOeffnen(id) {
    Der Text folgt derselben Schreibweise wie überall: [] Punkt, ## Überschrift.
    So gehen Checklisten ohne Umbau der Workbench durch den Abgleich. */
 
-cl.cls = { id: '', schreiben: false, fenster: null };
+cl.cls = { id: '', schreiben: false, fenster: null, bereich: '' };
 
 function clsAlle(art) {
   return kpNachRang((DB.gedanken || []).filter(function (g) {
@@ -7909,6 +7914,8 @@ function clsBalkenHtml(st) {
 
 var CK_KORB_ID = 'cl-korb';
 var CK_KLAPP_KEY = 'clie-cls-klapp';
+/* Seit 0.53.2: Bereich wie die Kategorien am Palm — oben rechts gewählt */
+var CK_BEREICH_KEY = 'clie-cls-bereich';
 var CK_DAUER = [[15, '15 Min'], [30, '30 Min'], [60, '1 Std'], [120, '2 Std'], [240, '½ Tag']];
 var CK_ZUSTAENDE = [['lauf', 'Laufend'], ['ruht', 'Ruhend'], ['fertig', 'Abgeschl.']];
 
@@ -8115,13 +8122,45 @@ function clsKorbOeffnen() {
 }
 
 /* Eine Zeile der Übersicht: ★, Titel (zwei Zeilen), „geweckt“, kurzer Balken */
+/* Seit 0.53.2 ruhig wie die To-Do-Liste am Palm: eine Zeile, rechts nur x/y */
 function ckZeileHtml(s) {
   var x = s.__satz;
   var z = ckZustand(s);
+  var st = clsStand(s);
   return '<button type="button" class="cls-zeile ' + (z === 'fertig' ? 'erl' : 'lauf') + '" onclick="clsOeffnen(\'' + esc(s.id) + '\')"><span class="tx">'
     + (x.stern && z === 'lauf' ? '★ ' : '') + esc(s.titel) + '</span>'
     + (x.geweckt === isoDatum() && z === 'lauf' ? '<span class="cls-geweckt">geweckt</span>' : '')
-    + clsBalkenHtml(clsStand(s)) + '</button>';
+    + '<span class="cls-zahl">' + (st.alle ? st.fertig + '/' + st.alle : '–') + '</span></button>';
+}
+
+/* Passt zur Wahl oben rechts: kein Bereich gewählt oder dieser */
+function ckImBereich(s) {
+  return !cl.cls.bereich || (s.__satz && s.__satz.bereich === cl.cls.bereich);
+}
+
+function clsBereichSetzen(id) {
+  cl.cls.bereich = ckBereichName(id) ? id : '';
+  try { window.localStorage.setItem(CK_BEREICH_KEY, cl.cls.bereich); } catch (e) { /* nur für jetzt */ }
+  cl.aufklapp = '';
+  zeichne();
+}
+
+/* Beruf/Privat/Alle heben den Bereich auf — eine Wahl auf einmal, wie am Palm */
+function clsKatSetzen(f) {
+  cl.cls.bereich = '';
+  try { window.localStorage.setItem(CK_BEREICH_KEY, ''); } catch (e) { /* nur für jetzt */ }
+  katSetzen(f);
+}
+
+function clsWahlHtml() {
+  return '<div class="aufklapp" style="top:49px;right:6px">'
+    + CL_KATEGORIEN.map(function (k) {
+        return '<button type="button"' + (!cl.cls.bereich && k[0] === cl.filter ? ' class="an"' : '') + ' onclick="clsKatSetzen(\'' + k[0] + '\')">' + k[1] + '</button>';
+      }).join('')
+    + '<div class="trenn"></div><div class="zw">Bereich</div>'
+    + ckBereiche().map(function (b) {
+        return '<button type="button"' + (cl.cls.bereich === b.id ? ' class="an"' : '') + ' onclick="clsBereichSetzen(\'' + esc(b.id) + '\')">' + esc(b.name) + '</button>';
+      }).join('') + '</div>';
 }
 
 function checklistenListeHtml() {
@@ -8132,21 +8171,18 @@ function checklistenListeHtml() {
   /* Oben der Korb (seit 0.49) — die eine Liste ohne Ende */
   var h = '<button type="button" class="cls-korb" onclick="clsKorbOeffnen()"><span><b>Korb</b></span><span class="cls-zahl">'
     + (korb ? kpOffeneZahl(korb) : 0) + ' offen ›</span></button>';
+  /* Seit 0.53.2 eine schlichte Liste; der Bereich wird oben rechts gewählt */
+  alle = alle.filter(ckImBereich);
   var laufend = alle.filter(function (s) { return ckZustand(s) === 'lauf' && !ckIstKorb(s); });
-  h += '<div class="gruppe">Laufend</div>';
-  if (!laufend.length) { h += '<p class="leise">Keine laufende Checkliste.</p>'; }
-  /* nach Lebensbereich gruppiert (Kurs), ohne Bereich am Ende */
-  ckBereiche().concat([{ id: '', name: 'Ohne Bereich' }]).forEach(function (b) {
-    var l = laufend.filter(function (s) { return (s.__satz.bereich || '') === b.id || (!b.id && !ckBereichName(s.__satz.bereich)); });
-    if (!l.length) { return; }
-    h += '<div class="cls-bereich">' + esc(b.name) + '</div>' + l.map(ckZeileHtml).join('');
-  });
+  h += laufend.length ? laufend.map(ckZeileHtml).join('')
+    : '<p class="leise">' + (cl.cls.bereich ? 'Keine laufende Checkliste in „' + esc(ckBereichName(cl.cls.bereich)) + '“.' : 'Keine laufende Checkliste.') + '</p>';
   var gruppe = function (w, name, l, zeile) {
     if (!l.length) { return ''; }
     return '<button type="button" class="gruppe klapp" onclick="clsKlappUm(\'' + w + '\')">' + (klapp[w] ? '▾' : '›') + ' ' + name + ' · ' + l.length + '</button>'
       + (klapp[w] ? l.map(zeile).join('') : '');
   };
   h += gruppe('ruht', 'Ruhend', alle.filter(function (s) { return ckZustand(s) === 'ruht'; }), ckZeileHtml);
+  vorlagen = vorlagen.filter(function (g) { return !cl.cls.bereich || g.bereich === cl.cls.bereich; });
   h += gruppe('vorl', 'Vorlagen', vorlagen, function (g) {
     /* kompakt (seit 0.48.2): eine Zeile, gestartet wird in der geöffneten Vorlage */
     return '<button type="button" class="cls-zeile vorl" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel) + '</span></button>';
