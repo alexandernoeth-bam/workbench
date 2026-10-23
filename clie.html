@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.53.4</title>
+<title>CLIE 0.54.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -939,7 +939,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.53.4';
+var APP_VERSION = '0.54.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3581,14 +3581,51 @@ function clHeuteErlUm() {
 
 var SU_ZULETZT_KEY = 'clie-suche-zuletzt';
 var SU_GRUPPEN = [['termine', 'Termine'], ['jahr', 'Jahrestermine'], ['aufgaben', 'Aufgaben'], ['memo', 'Projekte & Notizen'],
-                  ['checklisten', 'Checklisten'], ['sammlungen', 'Sammlungen'], ['routinen', 'Routinen']];
+                  ['checklisten', 'Checklisten'], ['sammlungen', 'Sammlungen'], ['routinen', 'Routinen'], ['vorlesen', 'Vorlesen (PDFs)']];
+/* Seit 0.54: auf Wunsch auch im Text der PDFs aus Vorlesen (liegt je Gerät in IndexedDB) */
+var SU_PDF_KEY = 'clie-suche-pdf';
+var SU_PDF_JE_DOK = 5;
 var SU_JE_GRUPPE = 3;
 
-cl.su = { text: '', erl: false, auf: {}, zuletzt: [] };
+cl.su = { text: '', erl: false, auf: {}, zuletzt: [], pdf: false, vl: null, vlLaedt: false };
 
 function suLaden() {
   try { cl.su.zuletzt = JSON.parse(window.localStorage.getItem(SU_ZULETZT_KEY) || '[]') || []; } catch (e) { cl.su.zuletzt = []; }
   if (!Array.isArray(cl.su.zuletzt)) { cl.su.zuletzt = []; }
+  try { cl.su.pdf = window.localStorage.getItem(SU_PDF_KEY) === 'an'; } catch (e) { cl.su.pdf = false; }
+}
+
+/* Die Texte der PDFs dieses Geräts einmal in den Speicher holen */
+function suVlLaden() {
+  if (cl.su.vl || cl.su.vlLaedt || !idbDa()) { return Promise.resolve(cl.su.vl); }
+  cl.su.vlLaedt = true;
+  var lokal = vlLokal();
+  var docs = vlDokumente().filter(function (d) { return d.art !== 'memo' && lokal[d.id]; });
+  var aus = {};
+  return Promise.all(docs.map(function (d) {
+    return idbLesen('vl-text-' + d.id).then(function (t) {
+      if (t && Array.isArray(t.saetze)) { aus[d.id] = { titel: d.titel, saetze: t.saetze, seite: t.seite || [] }; }
+    }).catch(function () { return null; });
+  })).then(function () {
+    cl.su.vl = aus;
+    cl.su.vlLaedt = false;
+    if (cl.app === 'suchen') { suErgebnisZeichnen(); }
+    return aus;
+  });
+}
+
+function suPdfUm() {
+  cl.su.pdf = !cl.su.pdf;
+  try { window.localStorage.setItem(SU_PDF_KEY, cl.su.pdf ? 'an' : 'aus'); } catch (e) { /* nur für jetzt */ }
+  cl.su.vl = null;
+  if (cl.su.pdf) { suVlLaden(); }
+  suErgebnisZeichnen();
+  fussZeichnen();
+}
+
+function suVorlesen(id, i) {
+  oeffne('vorlesen');
+  vlOeffnen(id).then(function (t) { if (t) { vlGehe(Number(i) || 0); } });
 }
 
 function suMerken(t) {
@@ -3752,6 +3789,20 @@ function suTreffer(q) {
     });
   });
 
+  /* PDFs aus Vorlesen (seit 0.54): je Dokument die ersten Treffer, mit Seite */
+  if (cl.su.pdf && cl.su.vl) {
+    Object.keys(cl.su.vl).forEach(function (id) {
+      var d = cl.su.vl[id];
+      var n = 0;
+      d.saetze.forEach(function (satz, i) {
+        if (n >= SU_PDF_JE_DOK || !suFinde(satz, q)) { return; }
+        n++;
+        aus.push({ gruppe: 'vorlesen', titel: suMarkiert(satz, q, true), unter: esc(d.titel + (d.seite[i] ? ' · S. ' + d.seite[i] : '')),
+          aufruf: 'suVorlesen(\'' + esc(id) + '\',' + i + ')', rang: [0, suNorm(d.titel), i] });
+      });
+    });
+  }
+
   /* Routinen: alphabetisch */
   (DB.aufgaben || []).forEach(function (a) {
     if (!a || !a.wiederholung || !suFinde(a.titel, q)) { return; }
@@ -3781,11 +3832,13 @@ function suErgebnisHtml() {
         return '<button type="button" class="su-chip" onclick="suZuletzt(' + i + ')">' + esc(w) + '</button>';
       }).join('') + '</div>';
     }
-    return h + '<p class="leise">Durchsucht Termine, Jahrestermine, Aufgaben, Memos, Checklisten, Sammlungen und Routinen — ab 2 Buchstaben. Groß/klein und ä/ae sind egal.</p>';
+    return h + '<p class="leise">Durchsucht Termine, Jahrestermine, Aufgaben, Notizen, Checklisten, Sammlungen und Routinen — mit „auch in PDFs“ auch die PDFs aus Vorlesen. Ab 2 Buchstaben. Groß/klein und ä/ae sind egal.</p>';
   }
+  if (cl.su.pdf && !cl.su.vl) { suVlLaden(); }
   var alle = suTreffer(q);
-  if (!alle.length) { return '<p class="leise">Nichts gefunden' + (cl.su.erl ? '' : ' — vielleicht bei „auch Erledigtes“') + '.</p>'; }
-  var h2 = '';
+  var laedt = cl.su.pdf && !cl.su.vl ? '<p class="leise">PDFs werden durchsucht …</p>' : '';
+  if (!alle.length) { return laedt + '<p class="leise">Nichts gefunden' + (cl.su.erl ? '' : ' — vielleicht bei „auch Erledigtes“') + '.</p>'; }
+  var h2 = laedt;
   SU_GRUPPEN.forEach(function (g) {
     var l = alle.filter(function (x) { return x.gruppe === g[0]; });
     if (!l.length) { return; }
@@ -3808,7 +3861,8 @@ function suchenHtml() {
 }
 
 function suchenFussHtml() {
-  return '<button type="button" class="knopf' + (cl.su.erl ? ' voll' : '') + '" onclick="suErlUm()">' + (cl.su.erl ? '☒' : '☐') + ' auch Erledigtes</button>';
+  return '<button type="button" class="knopf' + (cl.su.erl ? ' voll' : '') + '" onclick="suErlUm()">' + (cl.su.erl ? '☒' : '☐') + ' auch Erledigtes</button>'
+    + '<button type="button" class="knopf' + (cl.su.pdf ? ' voll' : '') + '" onclick="suPdfUm()">' + (cl.su.pdf ? '☒' : '☐') + ' auch in PDFs</button>';
 }
 
 /* Beim Tippen nur die Ergebnisse neu zeichnen — das Feld behält den Fokus */
@@ -15621,9 +15675,38 @@ function vlAufbereiten(seiten) {
   absaetze = zusammen;
   var aus = { saetze: [], seite: [], absatz: [] };
   absaetze.forEach(function (a, ai) {
-    vlSaetze(a.text).forEach(function (s) { aus.saetze.push(s); aus.seite.push(a.seite); aus.absatz.push(ai); });
+    vlSaetze(vlInitialen(a.text)).forEach(function (s) { aus.saetze.push(s); aus.seite.push(a.seite); aus.absatz.push(ai); });
   });
   return aus;
+}
+
+/* Abgesetzte Initialen zusammenfügen: „W enn“ → „Wenn“, „Ü ber“ → „Über“ (seit 0.54) —
+   am Absatz- und Satzanfang, wo Initialen stehen. „A“ und „O“ bleiben (A bis Z, O Gott). */
+function vlInitialen(text) {
+  return String(text || '').replace(/(^|[.!?…]["“”»]?\s+|[„"»(]\s?)([B-NP-ZÄÖÜ]) ([a-zäöüß]{2,})/g, '$1$2$3');
+}
+
+/* Abkürzungen fürs Vorlesen ausschreiben (seit 0.54) — nur beim Sprechen, der Text bleibt */
+var VL_AUSSPRACHE = [
+  ['i\\.\\s?d\\.\\s?R\\.', 'in der Regel'], ['[zZ]\\.\\s?B\\.?(?=[\\s,;:]|$)', '#zum Beispiel'], ['[dD]\\.\\s?h\\.', '#das heißt'],
+  ['[uU]\\.\\s?a\\.', '#unter anderem'], ['[uU]\\.\\s?U\\.', '#unter Umständen'], ['o\\.\\s?Ä\\.', 'oder Ähnliches'], ['[zZ]\\.\\s?T\\.', '#zum Teil'],
+  ['s\\.\\s?o\\.', 'siehe oben'], ['s\\.\\s?u\\.', 'siehe unten'], ['v\\.\\s?Chr\\.', 'vor Christus'], ['n\\.\\s?Chr\\.', 'nach Christus'],
+  ['usw\\.', 'und so weiter'], ['bzw\\.', 'beziehungsweise'], ['ca\\.', 'circa'], ['[gG]gf\\.', '#gegebenenfalls'], ['evtl\\.', 'eventuell'],
+  ['[vV]gl\\.', '#vergleiche'], ['inkl\\.', 'inklusive'], ['bspw\\.', 'beispielsweise'], ['etc\\.', 'et cetera'], ['insb\\.', 'insbesondere'],
+  ['zzgl\\.', 'zuzüglich'], ['Dr\\.', 'Doktor'], ['Prof\\.', 'Professor'], ['Abb\\.', 'Abbildung'], ['Tab\\.', 'Tabelle'], ['Kap\\.', 'Kapitel'],
+  ['Nr\\.', 'Nummer'], ['S\\.(?=\\s?\\d)', 'Seite'], ['Mio\\.', 'Millionen'], ['Mrd\\.', 'Milliarden'], ['Jh\\.', 'Jahrhundert']];
+
+function vlAussprache(text) {
+  var t = String(text || '');
+  VL_AUSSPRACHE.forEach(function (a) {
+    t = t.replace(new RegExp('(^|[^A-Za-zÄÖÜäöüß])' + a[0], 'g'), function (g, vor) {
+      var ersatz = a[1].charAt(0) === '#' ? a[1].slice(1) : a[1];
+      /* Großgeschriebene Abkürzung („Z. B.“ am Satzanfang) → großer Anfang */
+      var gross = a[1].charAt(0) === '#' && /^[A-ZÄÖÜ]/.test(g.slice(vor.length));
+      return vor + (gross ? ersatz.charAt(0).toUpperCase() + ersatz.slice(1) : ersatz);
+    });
+  });
+  return t;
 }
 
 /* Text in Sätze teilen — Abkürzungen, Ordnungszahlen und Aufzählungen bleiben heil */
@@ -16086,7 +16169,8 @@ function vlStimme() {
 /* Für die Stimme: WÖRTER IN GROSSBUCHSTABEN normal schreiben (sonst buchstabiert sie),
    zerlegte Initialen („E S IST“) zusammenfügen. Echte Abkürzungen bleiben. (seit 0.27) */
 function vlSprechText(text) {
-  var t = String(text || '');
+  /* Seit 0.54 auch für schon eingelesene Dokumente: Initialen zusammen */
+  var t = vlInitialen(String(text || ''));
   var buchst = t.replace(/[^A-Za-zÄÖÜäöüß]/g, '');
   var gross = t.replace(/[^A-ZÄÖÜ]/g, '').length;
   var meistGross = buchst.length >= 6 && gross / buchst.length > 0.6;
@@ -16096,12 +16180,14 @@ function vlSprechText(text) {
   }
   t = t.replace(/(^|[\s„"»(])([B-DF-HJ-NP-TV-ZÄÖÜ]) (?=[A-ZÄÖÜ]{4,})/g, '$1$2');
   var grossWoerter = (t.match(/\b[A-ZÄÖÜ]{3,}\b/g) || []).length;
-  return t.replace(/[A-ZÄÖÜ][A-ZÄÖÜß]+/g, function (w, pos) {
+  var aus = t.replace(/[A-ZÄÖÜ][A-ZÄÖÜß]+/g, function (w, pos) {
     var ganz = !/[A-Za-zÄÖÜäöüß]/.test(t.charAt(pos - 1) || ' ') && !/[a-zäöüß]/.test(t.charAt(pos + w.length) || ' ');
     if (!ganz) { return w; }
     if (w.length >= 6 || (w.length >= 3 && grossWoerter >= 2) || meistGross) { return w.charAt(0) + w.slice(1).toLowerCase(); }
     return w;
   });
+  /* Abkürzungen ausgesprochen (seit 0.54) */
+  return vlAussprache(aus);
 }
 
 function vlSprechen(text, fertig) {

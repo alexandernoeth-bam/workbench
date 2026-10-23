@@ -2032,6 +2032,46 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   101. Vorlesen: Initialen, Abkürzungen, Suche in PDFs (0.54)
+   Grund: PDFs mit abgesetzten Initialen lasen „W enn“ statt „Wenn“, und
+   „z. B.“ wurde buchstabiert. Außerdem soll die Suche auf Wunsch auch den
+   Text der PDFs durchsuchen.
+   Erkennt: Initialen nicht zusammengefügt (oder echte Wörter wie „A“
+   verschluckt), Abkürzungen nicht ausgesprochen oder im angezeigten Text
+   verändert, PDF-Treffer fehlen, Schalter wird nicht gemerkt.
+   ============================================================ */
+function vlAusspracheTest() {
+  console.log('\n101. Vorlesen: Initialen, Abkürzungen, Suche in PDFs (0.54)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(S.vlInitialen('W enn es regnet. D ann gehen wir. „Ü ber alles“') === 'Wenn es regnet. Dann gehen wir. „Über alles“', '„W enn“ → „Wenn“ am Absatz- und Satzanfang, auch „Ü ber“');
+  pruefe(S.vlInitialen('A bis Z und O je') === 'A bis Z und O je' && S.vlInitialen('Herr K sagte') === 'Herr K sagte', '„A“, „O“ und Buchstaben mitten im Satz bleiben');
+  pruefe(S.vlAussprache('Obst, z. B. Äpfel, d.h. gesund, usw.') === 'Obst, zum Beispiel Äpfel, das heißt gesund, und so weiter', 'z. B., d.h., usw. werden ausgesprochen');
+  pruefe(S.vlAussprache('Z. B. hier, siehe S. 12 und Abb. 3, ca. 5 Mio. Euro, o. Ä.') === 'Zum Beispiel hier, siehe Seite 12 und Abbildung 3, circa 5 Millionen Euro, oder Ähnliches', 'Satzanfang groß, Seite nur vor Zahl, Abb., ca., Mio., o. Ä.');
+  pruefe(S.vlAussprache('Das S.-Bahn-Netz') === 'Das S.-Bahn-Netz' && S.vlAussprache('Kaffee usw') === 'Kaffee usw', 'ohne passenden Punkt/Zahl bleibt alles');
+  pruefe(/zum Beispiel/.test(S.vlSprechText('Etwa z.B. so.')) && /^Wenn/.test(S.vlSprechText('W enn das so ist.')), 'beim Sprechen greift beides — auch für schon eingelesene Dokumente');
+  const auf = S.vlAufbereiten([{ zeilen: [{ t: 'W enn man z. B. liest, klappt es.', y: 700, h: 10 }] }]);
+  pruefe(auf.saetze[0] === 'Wenn man z. B. liest, klappt es.', 'beim Einlesen: Initiale zusammen, Abkürzung bleibt im Text');
+  /* Suche in PDFs */
+  S.localStorage.removeItem('clie-suche-pdf');
+  S.suLaden();
+  S.oeffne('suchen');
+  pruefe(/suPdfUm\(\)">☐ auch in PDFs/.test(S.suchenFussHtml()), 'unten: „auch in PDFs“');
+  S.cl.su.text = 'Photovoltaik';
+  pruefe(!S.suTreffer('Photovoltaik').some(x => x.gruppe === 'vorlesen'), 'aus: keine PDF-Treffer');
+  S.suPdfUm();
+  pruefe(S.cl.su.pdf && S.localStorage.getItem('clie-suche-pdf') === 'an', 'an — auf dem Gerät gemerkt');
+  S.cl.su.vl = { d1: { titel: 'Energiebuch', saetze: ['Einleitung.', 'Die Photovoltaik wandelt Licht um.', 'Mehr zur Photovoltaik.'], seite: [1, 12, 13] } };
+  const tr = S.suTreffer('Photovoltaik').filter(x => x.gruppe === 'vorlesen');
+  pruefe(tr.length === 2 && /<mark>Photovoltaik<\/mark>/.test(tr[0].titel) && /Energiebuch · S\. 12/.test(tr[0].unter) && /suVorlesen\('d1',1\)/.test(tr[0].aufruf), 'Treffer im PDF: Satz markiert, Dokument und Seite, Sprung an den Satz');
+  pruefe(/Vorlesen \(PDFs\)/.test(S.suErgebnisHtml()), 'eigene Gruppe „Vorlesen (PDFs)“');
+  S.suPdfUm();
+  S.cl.su.text = '';
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    100. Checkliste aus einer Notiz (0.53.3, nur Notizen und „- [ ]“ 0.53.4)
    Grund: „Aus einem Memo“ hieß noch nach dem alten App-Namen und fand nur
    Notizen mit Kästchen — Notizen mit Aufzählungen („- Punkt“) fehlten.
@@ -6414,6 +6454,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { vlAusspracheTest(); } catch (e) { fail('Vorlesen-Aussprache warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsAusNotizTest(); } catch (e) { fail('Checkliste aus Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoLoeschenTest(); } catch (e) { fail('Notiz löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coPrioTest(); } catch (e) { fail('Coach-Prioritäten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
