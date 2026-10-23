@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.49.1</title>
+<title>CLIE 0.53.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -519,6 +519,14 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-imp td.ib{width:24%;color:var(--px-mitte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15.5px}
 .sa-imp select.eingabe{margin:1px 0;padding:2px;font-size:16px}
 .sa-imp-info{border:2px solid var(--px);padding:4px 6px;margin:6px 0;font-size:16px}
+/* Coach: Korb aufräumen, ★ Wesentlich (seit 0.52/0.53) */
+.co-korbkopf{margin:6px 0 4px}
+.co-korbkarte{border:2px solid var(--px);border-radius:6px;padding:8px 10px;margin:6px 0 8px;font-size:17px}
+.co-korbtext{font-size:20px;line-height:1.3}
+.co-korblog{display:flex;justify-content:space-between;gap:8px;border-bottom:2px dotted var(--px-zart);padding:3px 0;font-size:16.5px}
+.co-bilzeile{display:flex;align-items:center;gap:8px;font-size:16.5px;margin-top:4px}
+.co-bilzeile span:first-child{flex:0 0 7.5em}
+.co-bilzeile .balken.co-bil{flex:1 1 auto;width:auto}
 .sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap;text-align:right;line-height:1.15}
 /* Kennzahl 2 klein darunter (seit 0.11.1) */
 .sa-kz small{display:block;font-size:16px}
@@ -931,7 +939,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.49.1';
+var APP_VERSION = '0.53.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6550,7 +6558,7 @@ function aufSpeichern() {
   spaeterSichern();
   aufklappZu();
   /* Größeres hinterfragt der Coach gleich (seit 0.33) */
-  if (f.modus === 'neu' && coVorabNoetig(text, datum)) { coVorabAuf({ art: 'aufgabe', text: text, seite: seite.id, datum: datum }); }
+  if (f.modus === 'neu' && (coVorabNoetig(text, datum) || f.frist)) { coVorabAuf({ art: 'aufgabe', text: text, seite: seite.id, datum: datum, frist: f.frist || '' }); }
 }
 
 function aufLoeschen() {
@@ -7908,7 +7916,7 @@ function ckZustandSetzen(s, z) {
     x.checkliste = (z === 'fertig') ? 'fertig' : 'lauf';
     if (z === 'fertig') { x.abgeschlossen = isoDatum(); } else { delete x.abgeschlossen; }
   }
-  if (z === 'ruht') { x.ruht = true; } else { delete x.ruht; }
+  if (z === 'ruht') { x.ruht = true; x.ruhtSeit = isoDatum(); } else { delete x.ruht; delete x.ruhtSeit; }
   if (z !== 'lauf') { delete x.stern; }
   delete x.geweckt;
   x.geaendert = jetzt();
@@ -7977,6 +7985,7 @@ function ckWecken() {
   var namen = [];
   kpSeitenAlle().forEach(function (s) {
     if (!ckSeite(s.id) || ckZustand(s) !== 'ruht') { return; }
+    if (!s.__satz.ruhtSeit) { s.__satz.ruhtSeit = heute; s.__satz.geaendert = jetzt(); spaeterSichern(); }
     var faellig = String(s.text || '').split('\n').some(function (z) {
       var a = kpAufgabe(z);
       if (!a || !a.text || a.erledigt) { return false; }
@@ -7986,15 +7995,60 @@ function ckWecken() {
     });
     if (!faellig) { return; }
     delete s.__satz.ruht;
+    delete s.__satz.ruhtSeit;
     s.__satz.geweckt = heute;
     s.__satz.geaendert = jetzt();
     namen.push(s.titel);
   });
+  if (ckStempeln(heute)) { spaeterSichern(); }
   if (namen.length) {
     spaeterSichern();
     melde('Aufgewacht: ' + namen.map(function (n) { return '„' + n + '“'; }).join(', ') + ' — ein Punkt ist fällig.', 'gut');
   }
   return namen.length;
+}
+
+/* Seit wann ein Punkt im Korb liegt und seit wann etwas auf P5 steht —
+   beim ersten Sehen gestempelt (für den Coach, seit 0.52/0.53) */
+function ckStempeln(heute) {
+  var geaendert = false;
+  var stempel = function (satz, feld, kerne) {
+    var alt = (satz[feld] && typeof satz[feld] === 'object') ? satz[feld] : {};
+    var neu = {};
+    kerne.forEach(function (k) { neu[k] = alt[k] || heute; });
+    if (JSON.stringify(neu) !== JSON.stringify(alt)) {
+      if (Object.keys(neu).length) { satz[feld] = neu; } else { delete satz[feld]; }
+      satz.geaendert = jetzt();
+      geaendert = true;
+    }
+  };
+  kpSeitenAlle().forEach(function (s) {
+    if (!s.__satz || (s.art === 'notiz' && !s.__satz.checkliste)) { return; }
+    var offen = String(s.text || '').split('\n').map(kpAufgabe).filter(function (a) { return a && a.text && !a.erledigt; });
+    if (ckIstKorb(s)) { stempel(s.__satz, 'korbSeit', offen.map(function (a) { return kpPrio(a.text).text; })); }
+    stempel(s.__satz, 'p5Seit', offen.filter(function (a) { return kpPrio(a.text).p === 5; }).map(function (a) { return kpPrio(a.text).text; }));
+  });
+  return geaendert;
+}
+
+/* Ganze Tage zwischen zwei Daten */
+function ckTage(von, bis) {
+  var a = saTagNr(von);
+  var b = saTagNr(bis);
+  return (a === null || b === null) ? 0 : b - a;
+}
+
+/* Einen Punkt ganz entfernen: aus Tag und Woche, aus der Seite, mit Zusatz */
+function ckPunktLoeschen(s, text) {
+  var z = s ? kpZeileSuchen(s, text, false) : null;
+  if (!z) { return false; }
+  kpEintraegeFinden(s.id, text).forEach(function (x) { kpAusplanenKern(x.woche.id, x.eintrag.id); });
+  var zeilen = String(s.text || '').split('\n');
+  zeilen.splice(z.nr, 1);
+  s.text = zeilen.join('\n');
+  s.geaendert = jetzt();
+  ckZusatzSetzen(s, text, '', '');
+  return true;
 }
 
 /* ★ Wesentlich: höchstens drei laufende zugleich (wie die Wesentlichen in Kurs) */
@@ -17844,7 +17898,7 @@ cl.co = { tag: '', ansicht: 'verlauf', vorab: null, kalZuletzt: 0, kalLaeuft: fa
 
 function coEinst() {
   var e = krFinden('kc-einstellungen');
-  var aus = { kalender: true, vorlauf: 45, max: 8, frist: 10, quellen: {}, sammlungen: {} };
+  var aus = { kalender: true, vorlauf: 45, max: 8, frist: 10, quellen: {}, sammlungen: {}, korbGrenze: 7, korbTag: 0 };
   CO_ZEITEN.forEach(function (z) { aus[z[0]] = z[2]; });
   CO_QUELLEN.forEach(function (q) { aus.quellen[q[0]] = true; });
   if (e) {
@@ -17854,6 +17908,8 @@ function coEinst() {
     if (e.sammlungen && typeof e.sammlungen === 'object') { aus.sammlungen = e.sammlungen; }
     CO_ZEITEN.forEach(function (z) { if (/^\d{2}:\d{2}$/.test(String(e[z[0]] || ''))) { aus[z[0]] = e[z[0]]; } });
     if (typeof e.kalender === 'boolean') { aus.kalender = e.kalender; }
+    if (CO_KORB_GRENZE.indexOf(Number(e.korbGrenze)) >= 0) { aus.korbGrenze = Number(e.korbGrenze); }
+    if (CO_WOCHENTAGE.some(function (w) { return w[0] === Number(e.korbTag); }) && e.korbTag !== '' && e.korbTag !== null && e.korbTag !== undefined) { aus.korbTag = Number(e.korbTag); }
     if (CO_VORLAUF.indexOf(Number(e.vorlauf)) >= 0) { aus.vorlauf = Number(e.vorlauf); }
   }
   return aus;
@@ -17922,14 +17978,16 @@ function coFaellige(nun, is) {
       text = 'Guten Morgen. Vorgenommen für heute: ' + coNamen(d.offen, 4) + '.';
       ant = d.offen.slice(0, 3).map(function (z) { return ['zuerst', kpPrio(z.a.text).text]; });
     } else {
-      /* Nichts vorgenommen: Vorschläge aus den Listen (P1, sonst P2) */
-      var vor = e.quellen.aufgaben ? coUngeplant(1) : [];
-      if (!vor.length && e.quellen.aufgaben) { vor = coUngeplant(2); }
-      vor = vor.slice(0, 3);
-      if (vor.length) {
-        text = 'Guten Morgen. Für heute ist noch nichts vorgenommen. Aus deinen Listen mit ' + (kpPrio(vor[0].text).p === 1 ? 'P1' : 'P2') + ': '
-          + vor.map(function (x) { return '„' + kpPrio(x.text).text + '“'; }).join(', ') + '. Was nimmst du?';
-        ant = vor.map(function (x) { return ['nehmen', kpPrio(x.text).text]; }).concat([['selbst', 'Selbst wählen']]);
+      /* Nichts vorgenommen (seit 0.53 „Muss und Will“): Fristen getrennt, dann die
+         Warteschlange nach Priorität — so viel, wie in die freie Zeit passt */
+      var frei = coFreiMinuten(is, nun);
+      var vor = e.quellen.aufgaben ? coWarteschlange(is, frei, 3) : [];
+      var muss = e.quellen.aufgaben ? coMuss(is) : [];
+      if (vor.length || muss.length) {
+        text = 'Guten Morgen. ' + coVorsatzZitat(/wichtig/i) + 'Frei heute: etwa ' + coDauerText(frei) + '.'
+          + (muss.length ? ' Muss ⚑: ' + muss.slice(0, 3).map(function (x) { return '„' + kpPrio(x.text).text + '“ (' + (x.frist <= is ? 'heute' : 'morgen') + ')'; }).join(', ') + '.' : '')
+          + (vor.length ? ' Will — nach deinen Prioritäten: ' + vor.map(function (x) { return '„' + kpPrio(x.text).text + '“ (' + x.p + (x.stern ? ' ★' : '') + ' · ' + coDauerText(x.dauer) + ')'; }).join(', ') + '. Was nimmst du?' : '');
+        ant = vor.map(function (x) { return ['nehmen', kpPrio(x.text).text]; }).concat(vor.length > 1 ? [['alle', 'Alle vornehmen']] : []).concat([['selbst', 'Selbst wählen']]);
       } else {
         text = 'Guten Morgen. Für heute ist noch nichts vorgenommen. Was ist heute das Wichtigste?';
         ant = [['nichts', 'Heute nichts Besonderes']];
@@ -17945,6 +18003,11 @@ function coFaellige(nun, is) {
     if (d.offen.length) { text += ' Womit fängst du an?'; }
     ant.push(['vornehmen', '+ Vornehmen']);
     if (!d.offen.length && vor && vor.length) { bezugM = { vorschlaege: vor }; }
+    if (d.offen.length && e.quellen.aufgaben) {
+      /* ⚑ fällig, aber nicht vorgenommen */
+      var mussOffen = coMuss(is).filter(function (x) { return !d.offen.some(function (z) { return z.a.text === x.text; }); });
+      if (mussOffen.length) { text += ' Nicht vergessen ⚑: ' + mussOffen.slice(0, 3).map(function (x) { return '„' + kpPrio(x.text).text + '“'; }).join(', ') + '.'; }
+    }
     l.push(coQ('morgen', text, ant, bezugM, '☑ Aufgaben', 2));
   }
   /* Termine vorbereiten */
@@ -18009,6 +18072,8 @@ function coFaellige(nun, is) {
   if (e.quellen.routinen) { l = l.concat(coRoutinenFragen(nun, is, e)); }
   if (e.quellen.ideen) { l = l.concat(coIdeenFragen(nun, is, e)); }
   if (e.quellen.sammlungen) { l = l.concat(coSammlungFragen(nun, is, e)); }
+  if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)); }
+  if (e.quellen.aufgaben) { l = l.concat(coPrioFragen(nun, is, e)); }
   return l;
 }
 
@@ -18065,7 +18130,13 @@ function coNaechsteZeit(nun) {
    Höchstens e.max Fragen am Tag; das Wichtigere gewinnt. */
 
 var CO_QUELLEN = [['aufgaben', '☑ Aufgaben (Vorschläge, Dauerschieber, Überfälliges)'], ['kalender', '▦ Kalender (voller Tag, nach Terminen)'],
-                  ['routinen', '↻ Routinen (fällig, ausgelassen)'], ['ideen', '💡 Ideenwerkstatt (Stillstand, Wiedervorlage)'], ['sammlungen', '▤ Sammlungen (Einträge, Fristen, Trends)']];
+                  ['routinen', '↻ Routinen (fällig, ausgelassen)'], ['ideen', '💡 Ideenwerkstatt (Stillstand, Wiedervorlage)'], ['sammlungen', '▤ Sammlungen (Einträge, Fristen, Trends)'],
+                  /* Seit 0.52: Korb und Checklisten */
+                  ['korb', '▢ Korb und Checklisten (zu lange, zu voll, gleiches Thema, Ruhendes)']];
+var CO_KORB_GRENZE = [5, 7, 10, 15];
+var CO_WOCHENTAGE = [[1, 'Montag'], [2, 'Dienstag'], [3, 'Mittwoch'], [4, 'Donnerstag'], [5, 'Freitag'], [6, 'Samstag'], [0, 'Sonntag']];
+var CO_FUELLWOERTER = ['aber', 'alle', 'auch', 'beim', 'bitte', 'dann', 'dass', 'dem', 'den', 'der', 'des', 'die', 'diese', 'dieser', 'dieses', 'eine', 'einem',
+                       'einen', 'einer', 'eines', 'für', 'fuer', 'mit', 'nach', 'noch', 'oder', 'sich', 'über', 'und', 'unter', 'vom', 'von', 'vor', 'wegen', 'wenn', 'zum', 'zur'];
 var CO_MAX = [4, 6, 8, 10, 12];
 var CO_FRIST = [3, 7, 10, 14, 30];
 var CO_TAKTE = [['', 'nicht'], ['taeglich', 'täglich'], ['woechentlich', 'wöchentlich']];
@@ -18166,8 +18237,10 @@ function coAufgabenFragen(nun, is, e, d) {
     d.offen.forEach(function (z) {
       var n = coSchiebeZahl(z.a.text, is);
       if (n >= 3 && !coRuhig('ds:' + z.a.text, is)) {
-        l.push(coQ('ds:' + z.a.text, '„' + kpPrio(z.a.text).text + '“ hast du jetzt ' + n + '-mal verschoben. Was tun?',
-          [['klein', 'Kleiner machen'], ['fest', 'Fest einplanen'], ['streichen', 'Streichen']], { text: z.a.text, schieber: true }, '☑ Aufgaben · Dauerschieber', 2));
+        /* Seit 0.53: Passt die Priorität noch? */
+        var pz = clPrioEff(z.a.text);
+        l.push(coQ('ds:' + z.a.text, '„' + kpPrio(z.a.text).text + '“ hast du jetzt ' + n + '-mal verschoben.' + (pz <= 3 ? ' Ist das wirklich eine ' + pz + '?' : '') + ' Was tun?',
+          [['klein', 'Kleiner machen'], ['fest', 'Fest einplanen']].concat(pz < 4 ? [['p4', 'Auf P4 (kann)']] : []).concat([['streichen', 'Streichen']]), { text: z.a.text, schieber: true }, '☑ Aufgaben · Dauerschieber', 2));
       }
     });
     /* Überfälliges (höchstens drei) */
@@ -18307,6 +18380,386 @@ function coSammlungFragen(nun, is, e) {
   return l;
 }
 
+/* ---------- Coach und Korb (seit 0.52) ----------
+   Der Korb soll leer werden: Der Coach fragt nach Punkten, die zu lange
+   darin liegen (ohne Termin und ohne ⚑ — sonst gilt die Schieber-Regel),
+   bietet „Aufräumen“ an, wenn er zu voll ist oder am gewählten Wochentag,
+   schlägt bei gleichem Thema eine Checkliste vor und fragt nach
+   Checklisten, die seit 30 Tagen ruhen. */
+
+function ckKorbPunkte() {
+  var k = ckKorb(false);
+  if (!k) { return []; }
+  var seit = (k.__satz.korbSeit && typeof k.__satz.korbSeit === 'object') ? k.__satz.korbSeit : {};
+  var aus = [];
+  String(k.text || '').split('\n').forEach(function (z, nr) {
+    var a = kpAufgabe(z);
+    if (!a || !a.text || a.erledigt) { return; }
+    var kern = kpPrio(a.text).text;
+    var g = aufGeplant(k, a.text);
+    aus.push({ nr: nr, text: a.text, kern: kern, seit: seit[kern] || isoDatum(), datum: g ? g.datum : '', frist: ckZusatz(k, a.text).frist || '' });
+  });
+  return aus;
+}
+
+/* Wörter, die in mindestens drei Korb-Punkten vorkommen */
+function coKorbThemen(punkte) {
+  var zaehl = {};
+  punkte.forEach(function (p) {
+    var gesehen = {};
+    String(p.kern).split(/[^A-Za-zÄÖÜäöüß0-9-]+/).forEach(function (w) {
+      var k = w.toLowerCase();
+      if (k.length < 4 || CO_FUELLWOERTER.indexOf(k) >= 0 || /^\d+$/.test(k) || gesehen[k]) { return; }
+      gesehen[k] = true;
+      if (!zaehl[k]) { zaehl[k] = { wort: w.charAt(0).toUpperCase() + w.slice(1), texte: [] }; }
+      zaehl[k].texte.push(p.text);
+    });
+  });
+  return Object.keys(zaehl).map(function (k) { return zaehl[k]; }).filter(function (x) { return x.texte.length >= 3; })
+    .sort(function (a, b) { return b.texte.length - a.texte.length; });
+}
+
+function coKorbFragen(nun, is, e) {
+  var l = [];
+  var punkte = ckKorbPunkte();
+  var offen = punkte.length;
+  if (nun >= e.morgen) {
+    /* Zu lange im Korb — nur ohne Termin und ohne Frist */
+    punkte.filter(function (p) { return !p.datum && !p.frist && ckTage(p.seit, is) >= e.frist && !coRuhig('ka:' + p.text, is); })
+      .sort(function (a, b) { return a.seit < b.seit ? -1 : 1; }).slice(0, 2).forEach(function (p) {
+        var t = ckTage(p.seit, is);
+        l.push(coQ('ka:' + p.text, '„' + p.kern + '“ liegt seit ' + t + ' Tagen im Korb.',
+          [['heute', 'Heute'], ['einplanen', 'Einplanen …'], ['checkliste', 'In Checkliste …'], ['loeschen', 'Löschen']], { korb: p.text }, '▢ Korb · zu lange', 3));
+      });
+  }
+  /* Zu voll */
+  if (nun >= e.mittag && offen >= e.korbGrenze && !coRuhig('kv', is)) {
+    l.push(coQ('kv:' + is, 'Der Korb hat ' + offen + ' Punkte. 10 Minuten aufräumen?', [['jetzt', 'Aufräumen'], ['spaeter', 'Später']], { korbVoll: true }, '▢ Korb · zu voll', 3));
+  }
+  /* Wöchentlich leeren */
+  if (nun >= e.abend && ausIso(is).getDay() === e.korbTag) {
+    l.push(offen ? coQ('kw:' + is, 'Korb leeren? ' + offen + (offen === 1 ? ' Punkt liegt' : ' Punkte liegen') + ' darin.', [['jetzt', 'Aufräumen'], ['spaeter', 'Später']], { korbVoll: true }, '▢ Korb · wöchentlich', 3)
+                 : coQ('kw:' + is, 'Korb ist leer ✓', [['ok', 'Danke']], null, '▢ Korb · wöchentlich', 5));
+  }
+  /* Gleiches Thema → eigene Checkliste */
+  if (nun >= e.morgen) {
+    var th = coKorbThemen(punkte).filter(function (x) { return !coRuhig('kt:' + x.wort.toLowerCase(), is); })[0];
+    if (th) {
+      l.push(coQ('kt:' + th.wort.toLowerCase(), th.texte.length + ' Punkte im Korb betreffen „' + th.wort + '“: ' + th.texte.slice(0, 3).map(function (t) { return kpPrio(t).text; }).join(' · ')
+        + '. Checkliste „' + th.wort + '“ anlegen und die Punkte hineinlegen?', [['anlegen', 'Anlegen'], ['nein', 'Nein']], { thema: th.wort, texte: th.texte }, '▢ Korb · Thema', 3));
+    }
+  }
+  /* Seit 30 Tagen ruhend — höchstens eine am Tag */
+  var ruhig = kpSeitenAlle().filter(function (x) {
+    return ckSeite(x.id) && ckZustand(x) === 'ruht' && kpPasstFilter(x, cl.filter) && x.__satz.ruhtSeit && ckTage(x.__satz.ruhtSeit, is) >= 30 && !coRuhig('cr:' + x.id, is);
+  })[0];
+  if (ruhig && nun >= e.morgen) {
+    l.push(coQ('cr:' + ruhig.id, '„' + ruhig.titel + '“ ruht seit ' + ckTage(ruhig.__satz.ruhtSeit, is) + ' Tagen. Abschließen, wecken oder weiter ruhen lassen?',
+      [['abschliessen', 'Abschließen'], ['wecken', 'Wecken'], ['weiter', 'Weiter ruhen']], { ruhend: ruhig.id }, '▢ Checklisten · ruhend', 4));
+  }
+  return l;
+}
+
+/* ---------- Coach und Prioritäten (seit 0.53) ----------
+   Dringlichkeit macht das System: ⚑ Frist naht, Schieben, zu viele P1 für
+   die freie Zeit. Am Morgen „Muss und Will“: Fristen getrennt vom Eigenen,
+   das Eigene aus der Warteschlange (P1 mit ★ zuerst, dann P1, P2, P3) so
+   weit, wie es in die freie Zeit passt. Sonntags: ★ Wesentlich wählen und
+   die Bilanz „⚑ fremd / eigen“. */
+
+function coDauerText(m) {
+  if (m < 60) { return m + ' Min'; }
+  var h = Math.round(m / 30) / 2;
+  return String(h).replace('.', ',') + ' Std';
+}
+
+/* Freie Minuten eines Tages zwischen Morgen und Abend (Coach-Zeiten), ab „ab“,
+   ohne Termine und ohne schon Vorgenommenes */
+function coFreiMinuten(is, ab) {
+  var e = coEinst();
+  var von = Math.max(clMinuten(e.morgen), clMinuten(ab || e.morgen));
+  var spanne = clMinuten(e.abend) - von;
+  var termine = coTerminMinuten(is);
+  var vor = coTagDaten(is).offen.length * 30;
+  return Math.max(0, spanne - termine - vor);
+}
+
+/* Offene, noch nirgends eingeplante Punkte nach Priorität (★ zuerst) */
+function coWarteschlange(is, frei, max) {
+  var l = [];
+  aufQuellen().forEach(function (s) {
+    if (s.art === 'notiz' && !s.__satz.checkliste) { return; }
+    if (aufIstCheckliste(s) && ckArt(s) !== 'aufgaben') { return; }
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt || clPrioEff(a.text) > 3) { return; }
+      if (kpEintraegeFinden(s.id, a.text).length) { return; }
+      var zu = ckZusatz(s, a.text);
+      /* ⚑ heute oder morgen fällig ist „Muss“ — steht dort, nicht hier */
+      if (zu.frist && zu.frist <= tagePlus(is, 1)) { return; }
+      l.push({ seite: s.id, text: a.text, liste: s.titel, p: clPrioEff(a.text), stern: !!(s.__satz.stern && ckZustand(s) === 'lauf'),
+               dauer: Number(zu.dauer) || 30, frist: zu.frist || '' });
+    });
+  });
+  l.sort(function (a, b) { return (a.p - b.p) || ((a.stern ? 0 : 1) - (b.stern ? 0 : 1)) || ((a.frist || '9999') < (b.frist || '9999') ? -1 : ((a.frist || '9999') > (b.frist || '9999') ? 1 : 0)); });
+  var aus = [];
+  var summe = 0;
+  l.forEach(function (x) {
+    if (aus.length >= (max || 3)) { return; }
+    if (aus.length && summe + x.dauer > frei) { return; }
+    if (!aus.length && frei <= 0) { return; }
+    aus.push(x);
+    summe += x.dauer;
+  });
+  return aus;
+}
+
+/* ⚑ Fristen heute und morgen, noch offen */
+function coMuss(is) {
+  var bis = tagePlus(is, 1);
+  var aus = [];
+  aufQuellen().forEach(function (s) {
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt) { return; }
+      var fr = ckZusatz(s, a.text).frist;
+      if (fr && fr <= bis) { aus.push({ seite: s.id, text: a.text, frist: fr }); }
+    });
+  });
+  return aus.sort(function (a, b) { return a.frist < b.frist ? -1 : 1; });
+}
+
+/* Ein Vorsatz passend zum Moment — nur aus deinen eigenen */
+function coVorsatzZitat(muster) {
+  var p = krPrinzipien().filter(function (x) { return muster.test(String(x.text || '')); })[0];
+  return p ? '„' + p.text + '“ ' : '';
+}
+
+function coPrioFragen(nun, is, e) {
+  var l = [];
+  if (nun < e.morgen) { return l; }
+  /* ⚑ Frist naht: in 1–3 Tagen fällig, nirgends eingeplant */
+  var bis = tagePlus(is, 3);
+  var n = 0;
+  aufQuellen().forEach(function (s) {
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt || n >= 3) { return; }
+      var fr = ckZusatz(s, a.text).frist;
+      if (!fr || fr <= is || fr > bis || kpEintraegeFinden(s.id, a.text).length || coRuhig('fn:' + a.text, is)) { return; }
+      n++;
+      l.push(coQ('fn:' + a.text, '„' + kpPrio(a.text).text + '“ ist am ' + clWt(fr) + ' ' + clKurzDatum(fr) + ' fällig (⚑) und noch nicht eingeplant. Wann machst du das?',
+        [['heute', 'Heute'], ['morgen', 'Morgen'], ['waehlen', 'Tag wählen …']], { fristNaht: { seite: s.id, text: a.text } }, '☑ Aufgaben · ⚑ Frist', 1));
+    });
+  });
+  /* Zu viele P1 für die freie Zeit bis morgen */
+  if (nun < '11:00' && !coRuhig('pg', is)) {
+    var p1 = 0;
+    aufQuellen().forEach(function (s) {
+      if (aufIstCheckliste(s) && ckArt(s) !== 'aufgaben') { return; }
+      String(s.text || '').split('\n').forEach(function (z) {
+        var a = kpAufgabe(z);
+        if (a && a.text && !a.erledigt && kpPrio(a.text).p === 1) { p1 += Number(ckZusatz(s, a.text).dauer) || 30; }
+      });
+    });
+    var frei = coFreiMinuten(is, nun) + coFreiMinuten(tagePlus(is, 1), e.morgen);
+    if (p1 > frei && p1 > 0) {
+      l.push(coQ('pg:' + is, 'P1 für ' + coDauerText(p1) + ', frei bis morgen Abend ' + coDauerText(frei) + '. Was davon ist wirklich richtungsweisend?',
+        [['ansehen', 'P1 ansehen'], ['passt', 'Passt so']], { pGrenze: true }, '☑ Aufgaben · P1', 3));
+    }
+  }
+  /* P5 seit über 30 Tagen: löschen? (höchstens zwei) */
+  var m = 0;
+  aufQuellen().forEach(function (s) {
+    var seit = (s.__satz && s.__satz.p5Seit) || {};
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt || kpPrio(a.text).p !== 5 || m >= 2) { return; }
+      var k = kpPrio(a.text).text;
+      if (!seit[k] || ckTage(seit[k], is) < 30 || coRuhig('p5:' + a.text, is)) { return; }
+      m++;
+      l.push(coQ('p5:' + a.text, '„' + k + '“ steht seit ' + ckTage(seit[k], is) + ' Tagen auf P5 (irgendwann). Löschen?',
+        [['loeschen', 'Löschen'], ['behalten', 'Behalten']], { p5: { seite: s.id, text: a.text } }, '☑ Aufgaben · P5', 5));
+    });
+  });
+  /* Sonntag: ★ Wesentlich für die neue Woche */
+  if (nun >= e.abend && ausIso(is).getDay() === 0 && !coRuhig('sw', is)) {
+    l.push(coQ('sw:' + is, 'Neue Woche: Welche Checklisten sind wesentlich? Bis zu drei bekommen ★. Dazu die Bilanz der Woche.',
+      [['jetzt', 'Wählen'], ['spaeter', 'Später']], { wesentlich: true }, '◎ Woche · ★', 2));
+  }
+  return l;
+}
+
+/* Bilanz der Woche: erledigte, eingeplante Punkte — mit ⚑ (fremd) oder P1/P2 (eigen) */
+function coWochenBilanz(is) {
+  var mo = montagVon(is);
+  var b = { fremd: 0, eigen: 0, sonst: 0 };
+  (DB.tage || []).forEach(function (t) {
+    if (!t || t.datum < mo || t.datum > is) { return; }
+    String(t.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || !a.erledigt || a.nichtRelevant) { return; }
+      var en = kpWocheEintrag(t, a.text);
+      var s = en ? kpSeiteFinden(en.quelle) : null;
+      if (s && ckZusatz(s, a.text).frist) { b.fremd++; } else if (clPrioEff(a.text) <= 2) { b.eigen++; } else { b.sonst++; }
+    });
+  });
+  return b;
+}
+
+/* ---- Ansichten des Coachs: Korb aufräumen, ★ Wesentlich ---- */
+
+function coKorbAufraeumen() {
+  cl.aufklapp = '';
+  cl.co.ansicht = 'korb';
+  cl.co.korbSpaeter = [];
+  cl.co.korbLog = [];
+  if (cl.app !== 'coach') { oeffne('coach'); } else { zeichne(); }
+}
+
+/* Der Punkt, der dran ist: ohne Termin, nicht auf „Später“ gelegt */
+function coKorbJetzt() {
+  var sp = cl.co.korbSpaeter || [];
+  /* das Älteste zuerst */
+  return ckKorbPunkte().filter(function (p) { return !p.datum && sp.indexOf(p.text) < 0; }).sort(function (a, b) { return a.seit < b.seit ? -1 : (a.seit > b.seit ? 1 : a.nr - b.nr); });
+}
+
+function coKorbHtml() {
+  var l = coKorbJetzt();
+  var alle = ckKorbPunkte();
+  var p = l[0];
+  var h = '<div class="leise co-korbkopf">Korb aufräumen' + (p ? ' · noch ' + l.length + ' von ' + alle.length : '') + '</div>';
+  if (!p) {
+    h += '<div class="co-korbkarte"><b>' + (alle.length ? 'Alles entschieden ✓' : 'Korb ist leer ✓') + '</b>'
+      + (alle.length ? '<p class="leise">Was noch im Korb liegt, hat einen Termin oder wartet auf „Später“.</p>' : '') + '</div>';
+  } else {
+    var k = ckKorb(false);
+    var pe = clPrioEff(p.text);
+    var fokus = krFokus().map(function (id) { var b = krFinden(id); return b ? b.name : ''; }).filter(function (x) { return x; });
+    h += '<div class="co-korbkarte"><div class="co-korbtext">' + esc(p.kern) + '</div>'
+      + '<p class="leise">seit ' + ckTage(p.seit, isoDatum()) + ' Tagen im Korb</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="coKorbTun(\'heute\')">Heute</button>'
+      + '<button type="button" class="knopf" onclick="coKorbTun(\'einplanen\')">Einplanen …</button>'
+      + '<button type="button" class="knopf" onclick="coKorbTun(\'checkliste\')">In Checkliste …</button>'
+      + '<button type="button" class="knopf" onclick="coKorbTun(\'loeschen\')">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="coKorbTun(\'spaeter\')">Später</button></div>'
+      /* Einsortieren (seit 0.53): Frist von außen, dann die eigene Priorität */
+      + '<label for="coKorbFrist">⚑ Erwartet das jemand bis zu einem Datum?</label><div class="zeitpaar">'
+      + '<input id="coKorbFrist" class="eingabe" type="date" value="' + esc(ckZusatz(k, p.text).frist || '') + '">'
+      + '<button type="button" class="knopf" onclick="coKorbFrist()">Setzen</button></div>'
+      + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (n) {
+          return '<button type="button"' + (pe === n ? ' class="an"' : '') + ' onclick="coKorbPrio(' + n + ')">' + n + '</button>';
+        }).join('') + '</div>'
+      + '<p class="leise">1 richtungsweisend · 2 zahlt auf ' + (fokus.length ? 'deinen Fokus (' + esc(fokus.join(', ')) + ')' : 'einen Fokus-Bereich') + ' oder ein Ziel ein · 3 normal · 4 kann · 5 irgendwann</p></div>';
+  }
+  if ((cl.co.korbLog || []).length) {
+    h += '<div class="gruppe">Schon entschieden</div>' + cl.co.korbLog.map(function (x) {
+      return '<div class="co-korblog"><span>' + esc(x.text) + '</span><span class="leise">→ ' + esc(x.was) + '</span></div>';
+    }).join('');
+  }
+  return h;
+}
+
+function coKorbFrist() {
+  var p = coKorbJetzt()[0];
+  var k = ckKorb(false);
+  var el = document.getElementById('coKorbFrist');
+  if (!p || !k || !el) { return; }
+  var v = String(el.value || '');
+  if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) { melde('Bitte ein gültiges Datum wählen.', 'warn'); return; }
+  var zu = ckZusatz(k, p.text);
+  ckZusatzSetzen(k, p.text, v, zu.dauer || '');
+  spaeterSichern();
+  melde(v ? '⚑ Frist ' + clKurzDatum(v) + ' gesetzt.' : 'Frist entfernt.', 'gut');
+  zeichne();
+}
+
+function coKorbPrio(n) {
+  var p = coKorbJetzt()[0];
+  var k = ckKorb(false);
+  var z = (p && k) ? kpZeileSuchen(k, p.text, false) : null;
+  if (!z || n < 1 || n > 5) { return; }
+  kpPrioSetzenKern(k, z.nr, n === 3 ? 0 : n);
+  spaeterSichern();
+  zeichne();
+}
+
+function coKorbTun(was) {
+  var p = coKorbJetzt()[0];
+  var k = ckKorb(false);
+  var z = (p && k) ? kpZeileSuchen(k, p.text, false) : null;
+  if (!z) { return; }
+  var log = function (w) { cl.co.korbLog = (cl.co.korbLog || []).concat([{ text: p.kern, was: w }]); };
+  if (was === 'heute') { aufPlanAnwenden(k, z.nr, isoDatum(), ''); spaeterSichern(); log('heute'); zeichne(); return; }
+  if (was === 'loeschen') { ckPunktLoeschen(k, p.text); spaeterSichern(); log('gelöscht'); zeichne(); return; }
+  if (was === 'spaeter') { cl.co.korbSpaeter = (cl.co.korbSpaeter || []).concat([p.text]); log('später'); zeichne(); return; }
+  if (was === 'einplanen' || was === 'checkliste') {
+    log(was === 'einplanen' ? 'Details' : 'in Checkliste …');
+    cl.co.korbSpaeter = (cl.co.korbSpaeter || []).concat([p.text]);
+    aufDetails(k.id, z.nr);
+    if (was === 'checkliste') { listenwahlOeffnen('aufgabe'); }
+  }
+}
+
+function coKorbFertig() {
+  cl.co.ansicht = 'verlauf';
+  cl.co.korbSpaeter = [];
+  cl.co.korbLog = [];
+  zeichne();
+}
+
+/* ★ Wesentlich wählen — Sonntag oder jederzeit */
+function coWesentlichAuf() {
+  cl.aufklapp = '';
+  cl.co.ansicht = 'wesentlich';
+  cl.co.sterne = kpSeitenAlle().filter(function (x) { return ckSeite(x.id) && x.__satz.stern && ckZustand(x) === 'lauf'; }).map(function (x) { return x.id; });
+  if (cl.app !== 'coach') { oeffne('coach'); } else { zeichne(); }
+}
+
+function coSternUm(id) {
+  var l = cl.co.sterne || [];
+  if (l.indexOf(id) >= 0) { cl.co.sterne = l.filter(function (x) { return x !== id; }); }
+  else if (l.length >= 3) { melde('Höchstens drei — erst einen abwählen.', 'warn'); return; }
+  else { cl.co.sterne = l.concat([id]); }
+  inhaltZeichnen();
+}
+
+function coWesentlichHtml() {
+  var is = isoDatum();
+  var b = coWochenBilanz(is);
+  var max = Math.max(1, b.fremd, b.eigen, b.sonst);
+  var balken = function (n) { return '<span class="balken co-bil"><i style="width:' + Math.round(n * 100 / max) + '%"></i></span>'; };
+  var korb = ckKorbPunkte().length;
+  var h = '<div class="co-korbkarte"><b>Diese Woche erledigt (eingeplant)</b>'
+    + '<div class="co-bilzeile"><span>⚑ fremd</span>' + balken(b.fremd) + '<b>' + b.fremd + '</b></div>'
+    + '<div class="co-bilzeile"><span>eigen P1/P2</span>' + balken(b.eigen) + '<b>' + b.eigen + '</b></div>'
+    + '<div class="co-bilzeile"><span>übrige</span>' + balken(b.sonst) + '<b>' + b.sonst + '</b></div></div>'
+    + '<div class="gruppe">★ Wesentlich · ' + (cl.co.sterne || []).length + ' von 3</div>';
+  var l = ckAlle().filter(function (x) { return ckZustand(x) === 'lauf' && !ckIstKorb(x); });
+  h += l.length ? l.map(function (x) {
+    var an = (cl.co.sterne || []).indexOf(x.id) >= 0;
+    return '<div class="aufg">' + clKastenHtml(an, 'coSternUm(\'' + esc(x.id) + '\')') + '<span class="tx">' + (an ? '★ ' : '') + esc(x.titel) + '</span></div>';
+  }).join('') : '<p class="leise">Keine laufende Checkliste.</p>';
+  if (korb) { h += '<div class="knoepfe"><span class="leise">Korb: ' + korb + ' Punkte</span><button type="button" class="knopf" onclick="coKorbAufraeumen()">Aufräumen</button></div>'; }
+  return h;
+}
+
+function coWesentlichFertig() {
+  var l = cl.co.sterne || [];
+  kpSeitenAlle().forEach(function (x) {
+    if (!ckSeite(x.id)) { return; }
+    var soll = l.indexOf(x.id) >= 0 && ckZustand(x) === 'lauf';
+    if (!!x.__satz.stern !== soll) {
+      if (soll) { x.__satz.stern = true; } else { delete x.__satz.stern; }
+      x.__satz.geaendert = jetzt();
+    }
+  });
+  spaeterSichern();
+  cl.co.ansicht = 'verlauf';
+  melde(l.length ? '★ Wesentlich: ' + l.length + (l.length === 1 ? ' Checkliste' : ' Checklisten') + '.' : 'Keine ★ diese Woche.', 'gut');
+  zeichne();
+}
+
 /* Antworten auf die Quellen-Fragen; gibt die Notiz zurück (oder null, wenn nicht zuständig) */
 function coQuelleAntwort(f, code, is) {
   var b = f.bezug || {};
@@ -18323,7 +18776,17 @@ function coQuelleAntwort(f, code, is) {
     return '';
   }
   if (b.vorschlaege && code === 'selbst') { return 'wahl'; }
+  if (b.vorschlaege && code === 'alle') {
+    var n0 = b.vorschlaege.filter(function (v0) { return plane(v0, is); }).length;
+    return n0 + (n0 === 1 ? ' Punkt ist' : ' Punkte sind') + ' für heute vorgenommen.';
+  }
   if (b.schieber) {
+    if (code === 'p4') {
+      coUeberall(b.text).forEach(function (x) { kpPrioSetzenKern(x.s, x.z.nr, 4); });
+      coRuheSetzen('ds:' + b.text, tagePlus(is, 7));
+      spaeterSichern();
+      return 'Auf P4 (kann) gesetzt.';
+    }
     if (code === 'streichen') {
       coVerschieben(is, b.text, '');
       coUeberall(b.text).forEach(function (x) { kpKastenSetzen(x.s, x.z.nr, false, true); });
@@ -18381,6 +18844,52 @@ function coQuelleAntwort(f, code, is) {
     f.antwortZusatz = coZahl(n);
     return b.feldName + ' ' + coZahl(n) + ' eingetragen.';
   }
+  /* Korb (seit 0.52) */
+  if (b.korb) {
+    var kb = ckKorb(false);
+    var zk = kb ? kpZeileSuchen(kb, b.korb, false) : null;
+    if (!zk) { return ''; }
+    if (code === 'heute') { aufPlanAnwenden(kb, zk.nr, is, ''); spaeterSichern(); return 'Für heute eingeplant.'; }
+    if (code === 'loeschen') { ckPunktLoeschen(kb, b.korb); spaeterSichern(); return 'Aus dem Korb gelöscht.'; }
+    return code === 'checkliste' ? 'korbwahl' : 'korbdetails';
+  }
+  if (b.korbVoll) { return code === 'jetzt' ? 'korbaufraeumen' : ''; }
+  if (b.thema) {
+    if (code !== 'anlegen') { coRuheSetzen(f.id, tagePlus(is, 30)); return ''; }
+    var kt = ckKorb(false);
+    var neu = kpSeiteAnlegen('liste', b.thema, 'privat', '');
+    if (!kt || !neu) { return ''; }
+    var zahl = 0;
+    b.texte.forEach(function (t) {
+      var zt = kpZeileSuchen(kt, t, false);
+      if (zt && !zt.erledigt) { aufVerschieben(kt, zt.nr, neu); zahl++; }
+    });
+    spaeterSichern();
+    return 'Checkliste „' + b.thema + '“ angelegt — ' + zahl + ' Punkte hineingelegt.';
+  }
+  if (b.ruhend) {
+    var sr = ckSeite(b.ruhend);
+    if (!sr) { return ''; }
+    if (code === 'abschliessen') { ckZustandSetzen(sr, 'fertig'); spaeterSichern(); return 'Abgeschlossen.'; }
+    if (code === 'wecken') { ckZustandSetzen(sr, 'lauf'); spaeterSichern(); return '„' + sr.titel + '“ läuft wieder.'; }
+    sr.__satz.ruhtSeit = is;
+    sr.__satz.geaendert = jetzt();
+    spaeterSichern();
+    return 'Ruht weiter — der Coach fragt in 30 Tagen wieder.';
+  }
+  /* Prioritäten (seit 0.53) */
+  if (b.fristNaht) {
+    if (code === 'waehlen') { return 'aufdetails'; }
+    plane(b.fristNaht, code === 'morgen' ? morgen : is);
+    return code === 'morgen' ? 'Für morgen eingeplant.' : 'Für heute eingeplant.';
+  }
+  if (b.pGrenze) { if (code !== 'ansehen') { coRuheSetzen('pg', tagePlus(is, 3)); } return code === 'ansehen' ? 'aufprio' : ''; }
+  if (b.p5) {
+    if (code === 'loeschen') { ckPunktLoeschen(kpSeiteFinden(b.p5.seite), b.p5.text); spaeterSichern(); return 'Gelöscht — weniger, aber besser.'; }
+    coRuheSetzen(f.id, tagePlus(is, 30));
+    return 'Bleibt — der Coach fragt in 30 Tagen wieder.';
+  }
+  if (b.wesentlich) { return code === 'jetzt' ? 'wesentlich' : ''; }
   if (b.frist) {
     if (code === 'kuendigen') { krAlsAufgabe('Kündigen: ' + b.name + ' (bis ' + clKurzDatum(b.bis) + ')', 'Coach', ''); }
     coRuheSetzen('sf:' + b.frist, tagePlus(b.bis, 1));
@@ -18413,6 +18922,24 @@ function coWeiter(was, f, is) {
   if (was === 'aufgabe') { aufNeuAm(is, ''); return; }
   if (was === 'routine') { oeffne('routinen'); rtDetails(b.routine); return; }
   if (was === 'idee') { oeffne('ideen'); iwOeffnen(b.idee); return; }
+  /* Seit 0.52/0.53 */
+  if (was === 'korbaufraeumen') { coKorbAufraeumen(); return; }
+  if (was === 'wesentlich') { coWesentlichAuf(); return; }
+  if (was === 'aufprio') { aufAnsicht('prio'); oeffne('aufgaben'); return; }
+  if (was === 'korbdetails' || was === 'korbwahl') {
+    var kb = ckKorb(false);
+    var zk = kb ? kpZeileSuchen(kb, b.korb, false) : null;
+    if (!zk) { return; }
+    aufDetails(kb.id, zk.nr);
+    if (was === 'korbwahl') { listenwahlOeffnen('aufgabe'); }
+    return;
+  }
+  if (was === 'aufdetails') {
+    var sd = kpSeiteFinden(b.fristNaht.seite);
+    var zd = sd ? kpZeileSuchen(sd, b.fristNaht.text, false) : null;
+    if (zd) { aufDetails(sd.id, zd.nr); }
+    return;
+  }
   if (was === 'sammlung' || was === 'sammlung-neu') { oeffne('sammlungen'); saOeffnen(b.sammlung); if (was === 'sammlung-neu') { saEintrag(''); } return; }
 }
 
@@ -18472,7 +18999,7 @@ function coAntwort(id, code, nr, nun, wert) {
   f.wert = wert || '';
   var qn = coQuelleAntwort(f, code, is);
   var weiter = '';
-  if (qn === 'wahl' || qn === 'kalender' || qn === 'aufgabe' || qn === 'routine' || qn === 'idee' || qn === 'sammlung' || qn === 'sammlung-neu') { weiter = qn; qn = ''; }
+  if (['wahl', 'kalender', 'aufgabe', 'routine', 'idee', 'sammlung', 'sammlung-neu', 'korbaufraeumen', 'wesentlich', 'aufprio', 'korbdetails', 'korbwahl', 'aufdetails'].indexOf(qn) >= 0) { weiter = qn; qn = ''; }
   if (qn) { notiz = qn; }
   if (code === 'morgen' && f.bezug && f.bezug.text) { coSchiebenZaehlen(f.bezug.text); }
   if (id === 'morgen' && code === 'zuerst') { notiz = 'Los geht’s mit „' + label + '“.'; }
@@ -18549,6 +19076,8 @@ function coVorabHtml() {
     + '<p>' + (v.art === 'termin' ? 'Neuer Termin' : 'Du willst') + ' „<b>' + esc(kpPrio(v.text).text) + '</b>“' + (v.art === 'termin' ? ' (' + esc(v.dauer) + ')' : ' übernehmen') + '.</p>'
     + '<p class="leise">' + (fokus.length ? 'Dein Fokus gerade: ' + esc(fokus.join(' · ')) + '. ' : '')
     + (v.datum && tag ? (v.datum === isoDatum() ? 'Heute' : 'Am ' + esc(clWt(v.datum)) + ' ' + esc(clKurzDatum(v.datum))) + ' stehen schon ' + tag + ' Aufgaben an.' : '') + '</p>'
+    /* Seit 0.53: ⚑ von außen — hier entsteht Fremdsteuerung */
+    + (v.frist ? '<p class="leise">⚑ Jemand erwartet es bis ' + esc(clWt(v.frist) + ' ' + clKurzDatum(v.frist)) + '. ' + esc(coVorsatzZitat(/gewissen|ja/i) || '„Kein Ja aus schlechtem Gewissen.“') + '</p>' : '')
     + '<label for="coWeg">Was fällt dafür weg?</label><input id="coWeg" class="eingabe" type="text" autocomplete="off" placeholder="z. B. Dienstag-Training">'
     + '<div class="knoepfe co-vorab"><button type="button" class="knopf voll" onclick="coVorabEntscheiden(\'passt\')">Passt, nehme ich</button>'
     + '<button type="button" class="knopf" onclick="coVorabEntscheiden(\'spaeter\')">Bis Sonntag überlegen</button>'
@@ -18731,6 +19260,10 @@ function coEinstSpeichern() {
   if (CO_MAX.indexOf(mx) >= 0) { e.max = mx; }
   var fr = Number(w('coFrist'));
   if (CO_FRIST.indexOf(fr) >= 0) { e.frist = fr; }
+  /* Korb (seit 0.52): ab wie vielen Punkten aufräumen, an welchem Tag leeren */
+  var kg = Number(w('coKorbGrenze'));
+  if (CO_KORB_GRENZE.indexOf(kg) >= 0) { e.korbGrenze = kg; }
+  if (w('coKorbTag') !== '' && CO_WOCHENTAGE.some(function (x) { return x[0] === Number(w('coKorbTag')); })) { e.korbTag = Number(w('coKorbTag')); }
   if (!e.sammlungen || typeof e.sammlungen !== 'object') { e.sammlungen = {}; }
   saAlleEchten().forEach(function (s) {
     var takt = w('coS-' + s.id);
@@ -18781,6 +19314,8 @@ function coFrageHtml(f, offen, k) {
 
 function coachHtml() {
   if (cl.co.ansicht === 'einst') { return coEinstHtml(); }
+  if (cl.co.ansicht === 'korb') { return coKorbHtml(); }
+  if (cl.co.ansicht === 'wesentlich') { return coWesentlichHtml(); }
   var is = cl.co.tag || isoDatum();
   var heute = is === isoDatum();
   var l = heute ? coVerlauf() : (coTag(false, is) ? coTag(false, is).coach.verlauf : []);
@@ -18807,8 +19342,12 @@ function coEinstHtml() {
     + '<p class="leise">CLIE legt dafür kurze Termine „Coach: …“ an — im Kalender „Coach“, wenn es ihn gibt (einmal in Google Kalender anlegen), sonst im Hauptkalender. In CLIE selbst sind sie ausgeblendet.</p>'
     + '<div class="abschnitt kr-ab"><span>Worüber spricht der Coach?</span></div>'
     + CO_QUELLEN.map(function (q) { return '<label class="haken co-haken"><input id="coQ-' + q[0] + '" type="checkbox"' + (e.quellen[q[0]] ? ' checked' : '') + '> ' + q[1] + '</label>'; }).join('')
-    + '<label for="coFrist">Kündigungsfristen — so lange vorher:</label><select id="coFrist" class="eingabe">'
+    + '<label for="coFrist">Kündigungsfristen und Korb — so lange:</label><select id="coFrist" class="eingabe">'
     + CO_FRIST.map(function (m) { return '<option value="' + m + '"' + (m === e.frist ? ' selected' : '') + '>' + m + ' Tage</option>'; }).join('') + '</select>'
+    + '<label for="coKorbGrenze">Korb aufräumen ab:</label><select id="coKorbGrenze" class="eingabe">'
+    + CO_KORB_GRENZE.map(function (m) { return '<option value="' + m + '"' + (m === e.korbGrenze ? ' selected' : '') + '>' + m + ' Punkten</option>'; }).join('') + '</select>'
+    + '<label for="coKorbTag">Korb leeren am:</label><select id="coKorbTag" class="eingabe">'
+    + CO_WOCHENTAGE.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === e.korbTag ? ' selected' : '') + '>' + x[1] + ' (abends)</option>'; }).join('') + '</select>'
     + '<div class="abschnitt kr-ab"><span>Sammlungen: regelmäßig eintragen</span></div>'
     + (saAlleEchten().length ? saAlleEchten().map(function (s) {
       var c = e.sammlungen[s.id] || {};
@@ -18830,6 +19369,8 @@ function coEinstHtml() {
 function coachFussHtml() {
   var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
   if (cl.co.ansicht === 'einst') { return k('OK', 'coEinstSpeichern()', true) + k('Abbrechen', 'coEbeneHoch()'); }
+  if (cl.co.ansicht === 'korb') { return k('Fertig', 'coKorbFertig()', true); }
+  if (cl.co.ansicht === 'wesentlich') { return k('Fertig', 'coWesentlichFertig()', true) + k('Abbrechen', 'coEbeneHoch()'); }
   return k('+ Vornehmen', 'aufNeuAm(isoDatum(),\'\')', true) + k('Vorsätze', 'coMehr(\'prinzipien\')') + k('Mehr…', 'coMehrAuf()');
 }
 
@@ -18843,6 +19384,8 @@ function coMehrHtml() {
   return '<div class="aufklapp" style="bottom:110px;right:6px">'
     + '<button type="button" onclick="coEinstOeffnen()">Einstellungen…</button>'
     + '<button type="button" onclick="coKalenderPlanen(true)">Erinnerungen jetzt eintragen</button><div class="trenn"></div>'
+    + '<button type="button" onclick="coKorbAufraeumen()">Korb aufräumen</button>'
+    + '<button type="button" onclick="coWesentlichAuf()">★ Wesentlich wählen</button>'
     + '<button type="button" onclick="coMehr(\'bilanz\')">Fokus &amp; Lebensbereiche</button>'
     + '<button type="button" onclick="coMehr(\'woche\')">Woche &amp; Rückblick</button>'
     + '<button type="button" onclick="coMehr(\'check\')">Vorab-Check…</button>'
@@ -18866,6 +19409,8 @@ function coTagWahlHtml() {
 
 function coKopfText() {
   if (cl.co.ansicht === 'einst') { return 'Einstellungen'; }
+  if (cl.co.ansicht === 'korb') { return 'Korb aufräumen'; }
+  if (cl.co.ansicht === 'wesentlich') { return '★ Wesentlich'; }
   return (cl.co.tag ? (cl.co.tag === tagePlus(isoDatum(), -1) ? 'Gestern' : clKurzDatum(cl.co.tag)) : 'Heute') + ' ▾';
 }
 
@@ -18881,7 +19426,8 @@ function coZeileHtml() {
 }
 
 function coEbeneHoch() {
-  if (cl.co.ansicht === 'einst') { cl.co.ansicht = 'verlauf'; zeichne(); return true; }
+  if (cl.co.ansicht === 'einst' || cl.co.ansicht === 'wesentlich') { cl.co.ansicht = 'verlauf'; zeichne(); return true; }
+  if (cl.co.ansicht === 'korb') { coKorbFertig(); return true; }
   if (cl.co.tag) { coTagWahl(isoDatum()); return true; }
   return false;
 }

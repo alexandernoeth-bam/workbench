@@ -1962,6 +1962,147 @@ function ckKorbTest() {
 }
 
 /* ============================================================
+   97. Coach und Korb (0.52)
+   Grund: Der Korb funktioniert nur, wenn er leer wird. Der Coach fragt
+   nach Punkten, die zu lange liegen, bietet Aufräumen an (zu voll oder
+   am gewählten Wochentag), schlägt bei gleichem Thema eine Checkliste
+   vor und fragt nach Checklisten, die seit 30 Tagen ruhen.
+   Erkennt: Alter wird nicht gestempelt, Punkte mit Termin/⚑ werden als
+   „zu lange“ gefragt, Thema-Vorschlag verschiebt nicht, Aufräumen ohne
+   Wirkung, Quelle lässt sich nicht abschalten.
+   ============================================================ */
+function coKorbTest() {
+  console.log('\n97. Coach und Korb (0.52)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const vor = n => S.tagePlus(heute, -n);
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
+  S.termineNachTag = {};
+  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, frist: 7, korbGrenze: 5, korbTag: S.ausIso(heute).getDay() });
+  S.DB.themen = [{ id: 'cl-korb', name: 'Korb', kontext: '', korb: true, ordnung: 0, geaendert: 1,
+    text: '[] Dachrinne reinigen\n[] Carport Fundament klären\n[] Carport Bauamt anrufen\n[] Angebot Carport Maier\n[] Fenster abdichten\n[] Steuer',
+    korbSeit: { 'Dachrinne reinigen': vor(9), 'Fenster abdichten': vor(12) } },
+    { id: 'tr', name: 'Jahresgespräche', text: '[] Bögen', kontext: 'privat', ruht: true, ruhtSeit: vor(34), ordnung: 1, geaendert: 1 }];
+  S.ckStempeln(heute);
+  pruefe(S.DB.themen[0].korbSeit['Steuer'] === heute && S.DB.themen[0].korbSeit['Dachrinne reinigen'] === vor(9), 'neue Korb-Punkte werden gestempelt, alte behalten ihr Datum');
+  S.ckZusatzSetzen(S.kpSeiteFinden('cl-korb'), 'Fenster abdichten', S.tagePlus(heute, 5), '');
+  let l = S.coFaellige('20:45', heute);
+  const ka = l.filter(f => /^ka:/.test(f.id));
+  pruefe(ka.length === 1 && ka[0].id === 'ka:Dachrinne reinigen' && /seit 9 Tagen im Korb/.test(ka[0].text) && ka[0].antworten.map(a => a[0]).join() === 'heute,einplanen,checkliste,loeschen',
+    'zu lange im Korb: nur ohne ⚑/Termin, mit Heute · Einplanen · In Checkliste · Löschen');
+  pruefe(l.some(f => /^kv:/.test(f.id) && /6 Punkte/.test(f.text)), 'zu voll (ab 5): Aufräumen wird angeboten');
+  pruefe(l.some(f => /^kw:/.test(f.id) && /Korb leeren\?/.test(f.text)), 'am gewählten Wochentag abends: „Korb leeren?“');
+  const kt = l.filter(f => /^kt:/.test(f.id))[0];
+  pruefe(kt && kt.id === 'kt:carport' && /3 Punkte im Korb betreffen „Carport“/.test(kt.text), 'gleiches Thema in drei Punkten: Checkliste vorschlagen');
+  const cr = l.filter(f => /^cr:/.test(f.id))[0];
+  pruefe(cr && /ruht seit 34 Tagen/.test(cr.text) && cr.antworten.map(a => a[0]).join() === 'abschliessen,wecken,weiter', 'seit 30 Tagen ruhend: Abschließen · Wecken · Weiter ruhen');
+  /* Antworten */
+  S.coAntwort('kt:carport', 'anlegen', 0, '20:45');
+  const neu = S.DB.themen.filter(x => x.name === 'Carport')[0];
+  pruefe(neu && (neu.text.match(/\[\] /g) || []).length === 3 && !/Carport/.test(S.DB.themen[0].text), 'Thema: Checkliste „Carport“ angelegt, drei Punkte aus dem Korb hineingelegt');
+  S.coAntwort('ka:Dachrinne reinigen', 'heute', 0, '20:45');
+  pruefe(S.aufGeplant(S.kpSeiteFinden('cl-korb'), 'Dachrinne reinigen').datum === heute, '„Heute“ plant den Korb-Punkt für heute');
+  S.coAntwort('cr:tr', 'weiter', 2, '20:45');
+  pruefe(S.DB.themen[1].ruht && S.DB.themen[1].ruhtSeit === heute, '„Weiter ruhen“: der Coach fragt erst in 30 Tagen wieder');
+  /* Aufräumen Punkt für Punkt, mit Einsortieren (0.53) */
+  S.coKorbAufraeumen();
+  pruefe(S.cl.app === 'coach' && S.cl.co.ansicht === 'korb' && /Korb aufräumen · noch 2 von 3/.test(inhalt()) && /Fenster abdichten/.test(inhalt()), 'Aufräumen: ein Punkt nach dem anderen (ohne Termin)');
+  S.coKorbPrio(2);
+  pruefe(/\[\] P2 Fenster abdichten/.test(S.DB.themen[0].text), 'Priorität im Aufräumen setzen');
+  S.coKorbTun('spaeter');
+  pruefe(/Steuer/.test(inhalt()) && /Fenster abdichten<\/span><span class="leise">→ später/.test(inhalt()), '„Später“: weiter zum nächsten, unten „Schon entschieden“');
+  S.coKorbTun('loeschen');
+  pruefe(!/Steuer/.test(S.DB.themen[0].text) && /Alles entschieden/.test(inhalt()), 'Löschen nimmt den Punkt heraus — dann ist alles entschieden');
+  S.coKorbFertig();
+  /* Quelle abschaltbar */
+  S.krFinden('kc-einstellungen').quellen = { korb: false };
+  pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Korb“ ausgeschaltet: keine Korb-Fragen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   98. Coach und Prioritäten (0.53)
+   Grund: P1 kam bisher erst, wenn es brannte. Der Coach hilft jetzt im
+   richtigen Moment: morgens „Muss und Will“ nach freier Zeit, ⚑ Frist
+   naht, zu viele P1, P5 seit 30 Tagen, sonntags ★ Wesentlich mit Bilanz
+   „fremd / eigen“, Vorab-Check bei ⚑ von außen.
+   Erkennt: Warteschlange missachtet P/★/Zeit, Frist-Frage fehlt oder
+   kommt bei Eingeplantem, P1-Grenze rechnet falsch, ★ mehr als drei,
+   Bilanz zählt falsch.
+   ============================================================ */
+function coPrioTest() {
+  console.log('\n98. Coach und Prioritäten (0.53)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.localStorage.removeItem('clie-coach-gesehen');
+  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
+  S.termineNachTag = {};
+  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, morgen: '07:30', abend: '20:30' });
+  S.DB.kurs.push({ id: 'kp1', typ: 'prinzip', text: 'Erst das Wichtige, dann das Dringende.', rang: 1, geaendert: 1 });
+  S.DB.themen = [
+    { id: 'ta', name: 'Q4', kontext: 'privat', ordnung: 1, geaendert: 1, text: '[] Zahlen an Controlling\n[] P2 Präsentation\n[] P1 Lange Analyse\n[] P5 Keller',
+      zusatz: { 'Zahlen an Controlling': { frist: heute }, 'Präsentation': { frist: S.tagePlus(heute, 2), dauer: 120 }, 'Lange Analyse': { dauer: 240 } },
+      p5Seit: { Keller: S.tagePlus(heute, -40) } },
+    { id: 'tb', name: 'PV-Anlage', kontext: 'privat', stern: true, ordnung: 2, geaendert: 1, text: '[] P1 ZEO-Auftrag', zusatz: { 'ZEO-Auftrag': { dauer: 30 } } }];
+  /* Warteschlange: P1 mit ★ zuerst, Zeitgrenze */
+  const w = S.coWarteschlange(heute, 300, 3);
+  pruefe(w.map(x => S.kpPrio(x.text).text).join(' | ') === 'ZEO-Auftrag | Lange Analyse', 'Warteschlange: P1 ★ zuerst, dann P1 — nur so viel, wie in 5 Std passt (P2 mit 2 Std nicht mehr)');
+  pruefe(S.coWarteschlange(heute, 0, 3).length === 0, 'keine freie Zeit: kein Vorschlag');
+  const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
+  pruefe(mo && /^Guten Morgen\. „Erst das Wichtige, dann das Dringende\.“ Frei heute: etwa/.test(mo.text) && /Muss ⚑: „Zahlen an Controlling“ \(heute\)/.test(mo.text) && /„ZEO-Auftrag“ \(1 ★ · 30 Min\)/.test(mo.text),
+    'Morgen: dein Vorsatz, freie Zeit, Muss ⚑ getrennt, Will nach Priorität mit ★ und Dauer');
+  /* ⚑ Frist naht */
+  let l = S.coFaellige('09:00', heute);
+  const fn = l.filter(f => /^fn:/.test(f.id));
+  pruefe(fn.length === 1 && fn[0].id === 'fn:P2 Präsentation' && fn[0].rang === 1 && /noch nicht eingeplant/.test(fn[0].text), '⚑ Frist in 2 Tagen, nicht eingeplant: der Coach fragt (Rang 1)');
+  S.coAntwort('fn:P2 Präsentation', 'morgen', 1, '09:00');
+  pruefe(S.aufGeplant(S.kpSeiteFinden('ta'), 'P2 Präsentation').datum === S.tagePlus(heute, 1), '„Morgen“ plant sie ein');
+  pruefe(!S.coFaellige('09:05', heute).some(f => f.id === 'fn:P2 Präsentation'), 'eingeplant: keine Frist-Frage mehr');
+  /* P1-Grenze: 4,5 Std P1 */
+  S.krFinden('kc-einstellungen').abend = '09:30';
+  const pg = S.coFaellige('08:00', heute).filter(f => /^pg:/.test(f.id))[0];
+  pruefe(pg && /P1 für 4,5 Std, frei bis morgen Abend 3 Std/.test(pg.text), 'zu viele P1 für die freie Zeit: der Coach fragt nach dem Richtungsweisenden');
+  /* P5 seit 40 Tagen */
+  const p5 = S.coFaellige('08:00', heute).filter(f => /^p5:/.test(f.id))[0];
+  pruefe(p5 && /seit 40 Tagen auf P5/.test(p5.text), 'P5 seit über 30 Tagen: löschen?');
+  S.coAntwort(p5.id, 'loeschen', 0, '08:00');
+  pruefe(!/Keller/.test(S.DB.themen[0].text), 'gelöscht');
+  /* ★ Wesentlich und Bilanz */
+  S.kpTagAnlegen(heute);
+  const tg = S.kpTagFinden(heute);
+  tg.text = '[x] Zahlen an Controlling\n[x] P1 ZEO-Auftrag\n[x] Rasen';
+  tg.eintraege = [{ id: 'e1', abschnitt: 'h', text: 'Zahlen an Controlling', quelle: 'ta', erledigt: true }, { id: 'e2', abschnitt: 'h', text: 'P1 ZEO-Auftrag', quelle: 'tb', erledigt: true }, { id: 'e3', abschnitt: 'h', text: 'Rasen', quelle: 'ta', erledigt: true }];
+  const b = S.coWochenBilanz(heute);
+  pruefe(b.fremd === 1 && b.eigen === 1 && b.sonst === 1, 'Bilanz der Woche: ⚑ fremd 1, eigen 1, übrige 1');
+  S.DB.themen.push({ id: 'tc', name: 'Carport', text: '[] a', kontext: 'privat', ordnung: 3, geaendert: 1 }, { id: 'td', name: 'Garten', text: '[] b', kontext: 'privat', ordnung: 4, geaendert: 1 },
+                   { id: 'te', name: 'Keller', text: '[] c', kontext: 'privat', ordnung: 5, geaendert: 1 });
+  S.coWesentlichAuf();
+  pruefe(S.cl.co.ansicht === 'wesentlich' && S.cl.co.sterne.join() === 'tb' && /⚑ fremd/.test(inhalt()) && /1 von 3/.test(inhalt()), '★-Wahl: vorbelegt mit dem bisherigen ★, Bilanz oben');
+  S.coSternUm('tc'); S.coSternUm('td'); S.coSternUm('te');
+  pruefe(S.cl.co.sterne.length === 3 && /Höchstens drei/.test(S.document.getElementById('toastText').textContent), 'höchstens drei');
+  S.coSternUm('tb'); S.coSternUm('te');
+  S.coWesentlichFertig();
+  pruefe(!S.DB.themen.filter(x => x.id === 'tb')[0].stern && ['tc', 'td', 'te'].every(id => S.DB.themen.filter(x => x.id === id)[0].stern), 'Fertig: genau die gewählten haben ★');
+  /* Sonntagsfrage */
+  const so = S.coPrioFragen('21:00', '2026-10-25', S.coEinst()).filter(f => /^sw:/.test(f.id))[0];
+  pruefe(so && /bis zu drei bekommen ★/i.test(so.text), 'Sonntagabend: „Welche Checklisten sind wesentlich?“');
+  /* Vorab-Check bei ⚑ von außen */
+  S.oeffne('aufgaben');
+  S.aufNeu();
+  S.document.getElementById('aufText').value = 'Bericht für Chef';
+  S.document.getElementById('aufFrist').value = S.tagePlus(heute, 4);
+  S.aufSpeichern();
+  pruefe(S.cl.aufklapp === 'covorab' && /Jemand erwartet es bis/.test(S.coVorabHtml()), 'neue Aufgabe mit ⚑: der Vorab-Check fragt nach');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    96. Sammlung aus einer Notiz-Tabelle (0.49.1)
    Grund: Manche Notizen sind eigentlich Sammlungen — ihre Daten stehen
    als Markdown-Tabelle darin. Seit 0.49.1 lassen sie sich als neue
@@ -4723,8 +4864,10 @@ function coachQuellenTest() {
   const s = S.kpSeiteAnlegen('liste', 'Büro', 'beruflich', '');
   s.text = '[] P1 Angebot Müller\n[] P1 Heizung Termin\n[] P3 Ablage\n[] Steuer-Unterlagen';
   const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
-  pruefe(mo && /noch nichts vorgenommen\. Aus deinen Listen mit P1: „Angebot Müller“, „Heizung Termin“/.test(mo.text) && mo.antworten.map(a => a[0]).join() === 'nehmen,nehmen,selbst,vornehmen' && mo.quelle === '☑ Aufgaben',
-    'leerer Tag: Vorschläge aus den Listen (P1), Quelle sichtbar');
+  /* seit 0.53: „Muss und Will“ — Warteschlange nach Priorität, so viel wie in die freie Zeit passt */
+  pruefe(mo && /Frei heute: etwa/.test(mo.text) && /Will — nach deinen Prioritäten: „Angebot Müller“ \(1 · 30 Min\), „Heizung Termin“ \(1 · 30 Min\), „Ablage“ \(3 · 30 Min\)/.test(mo.text)
+    && mo.antworten.map(a => a[0]).join() === 'nehmen,nehmen,nehmen,alle,selbst,vornehmen' && mo.quelle === '☑ Aufgaben',
+    'leerer Tag: Vorschläge aus der Warteschlange (P1 zuerst), Quelle sichtbar');
   S.coAntwort('morgen', 'nehmen', 1, '07:40');
   pruefe(S.coTagDaten(heute).offen.some(z => /Heizung Termin/.test(z.a.text)), '„Heizung Termin“ antippen: für heute vorgenommen');
   /* Dauerschieber: drei vergangene Tage liegen gelassen */
@@ -4733,7 +4876,7 @@ function coachQuellenTest() {
   S.aufPlanAnwenden(s, 3, heute, '');
   pruefe(S.coSchiebeZahl(st, heute) === 3, 'Verschiebungen gezählt (liegen gelassene Tage)');
   const ds = S.coFaellige('08:00', heute).filter(f => f.id === 'ds:' + st)[0];
-  pruefe(ds && /3-mal verschoben/.test(ds.text) && ds.antworten.map(a => a[0]).join() === 'klein,fest,streichen', 'Dauerschieber: „3-mal verschoben. Was tun?“');
+  pruefe(ds && /3-mal verschoben/.test(ds.text) && ds.antworten.map(a => a[0]).join() === 'klein,fest,p4,streichen' && /Ist das wirklich eine 3\?/.test(ds.text), 'Dauerschieber: „3-mal verschoben. Ist das wirklich eine 3?“ — mit „Auf P4“ (0.53)');
   S.coAntwort('ds:' + st, 'streichen', 2, '08:00');
   pruefe(/\[-\] Steuer-Unterlagen/.test(s.text) && !S.coTagDaten(heute).offen.some(z => z.a.text === st), 'Streichen: als „nicht relevant“ markiert, aus dem Tag');
   /* Überfälliges */
@@ -6197,6 +6340,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { coPrioTest(); } catch (e) { fail('Coach-Prioritäten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { coKorbTest(); } catch (e) { fail('Coach-Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saImportTest(); } catch (e) { fail('Tabellen-Import warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckPrioTest(); } catch (e) { fail('Prioritäten 1–5 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckKorbTest(); } catch (e) { fail('Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
