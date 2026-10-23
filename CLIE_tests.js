@@ -2024,6 +2024,38 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   99. Notiz löschen (0.53.1)
+   Grund: Notizen ließen sich in CLIE nicht löschen — im Details-Fenster
+   fehlte „Löschen…“.
+   Erkennt: kein Knopf, Löschen ohne Rückfrage, kein Löschvermerk (käme per
+   Abgleich zurück), Eingeplantes bleibt im Tag, Checklisten/Projekte
+   über diesen Weg löschbar.
+   ============================================================ */
+function memoLoeschenTest() {
+  console.log('\n99. Notiz löschen (0.53.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.DB.gedanken.push({ id: 'n1', titel: 'Alte Notiz', text: 'Text\n[] Anrufen', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.aufPlanAnwenden(S.kpSeiteFinden('n1'), 1, heute, '');
+  S.oeffne('memo'); S.memoOeffnen('n1'); S.memoDetails();
+  pruefe(/memoLoeschenFragen\(\)">Löschen…/.test(S.memoFensterHtml()), 'Details einer Notiz: „Löschen…“');
+  S.memoLoeschenFragen();
+  pruefe(/Notiz löschen/.test(S.memoFensterHtml()) && /1 offene Aufgabe/.test(S.memoFensterHtml()) && S.DB.gedanken.some(g => g.id === 'n1'), 'erst die Rückfrage, mit Hinweis auf Offenes');
+  S.memoLoeschen();
+  pruefe(!S.DB.gedanken.some(g => g.id === 'n1') && S.DB.grabsteine.some(x => x.s === 'gedanken' && x.id === 'n1') && !S.cl.memo.id, 'gelöscht, mit Löschvermerk, zurück zur Liste');
+  pruefe(!/Anrufen/.test((S.kpTagFinden(heute) || {}).text || ''), 'Eingeplantes ist aus dem Tag genommen');
+  S.DB.gedanken.push({ id: 'c1', titel: 'Liste', text: '[] a', kontext: 'privat', checkliste: 'lauf', ordnung: 2, geaendert: 1 });
+  S.cl.memo.id = 'c1'; S.memoDetails();
+  pruefe(!/memoLoeschenFragen/.test(S.memoFensterHtml()), 'Checklisten löschen sich nicht über die Notiz-Details');
+  S.memoLoeschen();
+  pruefe(S.DB.gedanken.some(g => g.id === 'c1'), 'auch per Aufruf nicht');
+  S.aufklappZu(); S.cl.memo.id = '';
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    98. Coach und Prioritäten (0.53)
    Grund: P1 kam bisher erst, wenn es brannte. Der Coach hilft jetzt im
    richtigen Moment: morgens „Muss und Will“ nach freier Zeit, ⚑ Frist
@@ -6340,6 +6372,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { memoLoeschenTest(); } catch (e) { fail('Notiz löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coPrioTest(); } catch (e) { fail('Coach-Prioritäten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coKorbTest(); } catch (e) { fail('Coach-Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saImportTest(); } catch (e) { fail('Tabellen-Import warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

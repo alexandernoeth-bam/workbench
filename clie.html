@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.53.0</title>
+<title>CLIE 0.53.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -939,7 +939,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.53.0';
+var APP_VERSION = '0.53.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -7122,7 +7122,17 @@ function memoWahlReihe(feld, werte, an) {
 function memoFensterHtml() {
   var f = cl.memo.fenster;
   if (!f) { return ''; }
-  var s = (f.modus === 'details' && cl.memo.id) ? kpSeiteFinden(cl.memo.id) : null;
+  var s = ((f.modus === 'details' || f.modus === 'loeschen') && cl.memo.id) ? kpSeiteFinden(cl.memo.id) : null;
+  /* Löschen (seit 0.53.1) — mit Rückfrage */
+  if (f.modus === 'loeschen') {
+    var offen = s ? kpOffeneZahl(s) : 0;
+    return '<div class="fenster"><div class="titel">Notiz löschen</div><div class="rumpf">'
+      + '<p>„' + esc(s ? s.titel : '') + '“ löschen?</p>'
+      + (offen ? '<p><b>Achtung:</b> Sie enthält noch ' + offen + ' offene Aufgabe' + (offen === 1 ? '' : 'n') + '.</p>' : '')
+      + '<p class="leise">Die Notiz verschwindet auch in der Workbench.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="memoLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="memoDetails()">Abbrechen</button></div></div></div>';
+  }
   /* Seit 0.43 nur Notizen — Projekte und Ziele legt die App „Projekte“ an */
   var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neue Notiz' : 'Details') + '</div><div class="rumpf">';
   h += '<label for="memoTitel">Name:</label><input id="memoTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
@@ -7133,7 +7143,33 @@ function memoFensterHtml() {
        + '<input id="memoTermin" class="eingabe" type="date" value="' + esc(f.termin) + '">';
   }
   return h + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="memoSpeichern()">OK</button>'
-    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + (s && s.art === 'notiz' && !(s.__satz && s.__satz.checkliste) ? '<button type="button" class="knopf" onclick="memoLoeschenFragen()">Löschen…</button>' : '')
+    + '</div></div></div>';
+}
+
+function memoLoeschenFragen() {
+  var f = memoFensterLesen();
+  if (!f || f.modus !== 'details') { return; }
+  f.modus = 'loeschen';
+  aufklappNeu();
+}
+
+/* Notiz löschen: erst Eingeplantes aus Tag und Woche, dann mit Löschvermerk (sonst käme sie per Abgleich zurück) */
+function memoLoeschen() {
+  var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
+  if (!s || s.art !== 'notiz' || (s.__satz && s.__satz.checkliste)) { aufklappZu(); return; }
+  String(s.text || '').split('\n').forEach(function (z) {
+    var a = kpAufgabe(z);
+    if (a && a.text) { kpEintraegeFinden(s.id, a.text).forEach(function (x) { kpAusplanenKern(x.woche.id, x.eintrag.id); }); }
+  });
+  DB.gedanken = (DB.gedanken || []).filter(function (g) { return g !== s.__satz; });
+  grabsteinSetzen('gedanken', s.id);
+  spaeterSichern();
+  melde('„' + s.titel + '“ gelöscht.', null);
+  aufklappZuStill();
+  cl.memo.fenster = null;
+  memoZurListe();
 }
 
 function memoSpeichern() {
