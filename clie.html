@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.48.4</title>
+<title>CLIE 0.49.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -194,6 +194,10 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .prio.p1{background:var(--px);color:var(--lcd);border-color:var(--px)}
 .prio.p2{border-color:var(--px)}
 .prio.p3{border:2px dotted var(--px);color:var(--px-mitte)}
+/* fünf Stufen (seit 0.49): 4 und 5 leise, ohne Kürzel = 3 noch leiser */
+.prio.p4{color:var(--px-mitte)}
+.prio.p5{color:var(--px-zart)}
+.prio.still{border-color:var(--px-zart);color:var(--px-zart)}
 .aufg .prio{margin-right:0}
 .aufg .prio.p0{border:2px dotted var(--px-zart)}
 .k.an{background:var(--px)}
@@ -361,6 +365,11 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .cls-zeile.vorl .tx{white-space:nowrap}
 .cls-zeile .balken{width:36px;flex:0 0 36px;height:10px}
 .cls-name{resize:none;line-height:1.3;overflow:hidden}
+/* Alles ist eine Checkliste (seit 0.49): Korb, Bereiche, geweckt, ⚑ Frist */
+.cls-korb{display:flex;justify-content:space-between;align-items:center;width:100%;margin:8px 0 2px;padding:6px 8px;border:2px solid var(--px);border-radius:6px;font-size:17.5px;text-align:left}
+.cls-bereich{font-size:15.5px;color:var(--px-mitte);letter-spacing:.5px;margin:8px 0 0;text-transform:uppercase}
+.cls-geweckt{font-size:15.5px;background:var(--px);color:var(--lcd);padding:0 5px;border-radius:4px;white-space:nowrap}
+.frist-marke{font-size:15.5px;border:2px solid var(--px);padding:0 4px;border-radius:4px;white-space:nowrap;margin-left:4px}
 .balken{display:inline-block;width:64px;height:12px;border:2px solid var(--px);position:relative;flex:0 0 64px;vertical-align:middle}
 .balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
 .cls-zahl{font-size:18px;white-space:nowrap;margin-left:6px}
@@ -915,7 +924,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.48.4';
+var APP_VERSION = '0.49.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -2424,7 +2433,7 @@ var KP_ARTEN = {
   notiz:    { zeichen: '✎', name: 'Notiz',    gruppe: 'Notizen',  neu: 'Titel der Notiz' }
 };
 
-var KP_PRIO = /^[P]([1-3])\s+(\S[\s\S]*)$/;
+var KP_PRIO = /^[P]([1-5])\s+(\S[\s\S]*)$/;
 
 var KP_VERWEIS = /\[\[(projekt|ziel|flaeche|aufgabe|notiz):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]/g;
 
@@ -2594,7 +2603,7 @@ function kpPrio(text) {
 
 function kpPrioText(text, p) {
   var rest = kpPrio(text).text;
-  return (p >= 1 && p <= 3) ? 'P' + p + ' ' + rest : rest;
+  return (p >= 1 && p <= 5) ? 'P' + p + ' ' + rest : rest;
 }
 
 function kpPrioHtml(text) {
@@ -3153,7 +3162,7 @@ var CL_KATEGORIEN = [['alle', 'Alle'], ['beruflich', 'Beruf'], ['privat', 'Priva
 var CL_APPS = [
   /* Seit 0.35: Start im 3×4-Raster — was ständig gebraucht wird, dazu drei Ordner */
   { id: 'kalender', name: 'Kalender', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
-  { id: 'aufgaben', name: 'Aufgaben', stufe: '',    was: 'Alle offenen Aufgaben in einer Liste. Oben rechts wählst du Alle, Beruf, Privat oder eine einzelne Liste. Abhaken wirkt in der Seite.' },
+  { id: 'aufgaben', name: 'Aufgaben', stufe: '',    was: 'Alle offenen Aufgaben aus Checklisten, Korb und Projekten. Oben rechts wählst du Alle, Beruf, Privat oder einen Lebensbereich. Abhaken wirkt in der Seite.' },
   { id: 'checklisten', name: 'Checklisten', stufe: '', was: '' },
   { id: 'sammlungen', name: 'Sammlungen', stufe: '', was: '' },
   /* Seit 0.43: Projekte als eigene App wie „Projects“ am Palm; Memo heißt „Notizen“ und hat nur noch Notizen */
@@ -5867,6 +5876,8 @@ function jaJtLoeschen() {
    Seite, Tag und Woche zusammenbleiben — wie in der Workbench. */
 
 var AUF_LISTE_KEY = 'clie-aufgaben-liste';
+/* Seit 0.49: Aufgaben filtern nach Lebensbereich statt nach einzelnen Listen */
+var AUF_BEREICH_KEY = 'clie-aufgaben-bereich';
 /* Seit 0.17: Ansicht Gruppiert | Prio | Geplant und „1. Nächste“ */
 var AUF_ANSICHT_KEY = 'clie-aufgaben-ansicht';
 var AUF_NAECHSTE_KEY = 'clie-aufgaben-naechste';
@@ -5874,7 +5885,7 @@ var AUF_ANSICHTEN = [['gruppiert', 'Gruppiert'], ['prio', 'Prio'], ['geplant', '
 var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
-cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null };
+cl.auf = { liste: '', bereich: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null };
 cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
@@ -5883,16 +5894,20 @@ function aufSeiten() {
   return kpNachRang(kpSeitenAlle().filter(function (s) {
     if (s.art === 'notiz') { return false; }
     if (s.art === 'vorhaben' && s.zustand !== 'laeuft') { return false; }
+    /* Seit 0.49: ruhende und abgeschlossene Checklisten (Listen) nicht */
+    if (s.art === 'liste' && ckZustand(s) !== 'lauf') { return false; }
     return kpPasstFilter(s, cl.filter);
   }));
 }
 
 /* Was in der Auswahl stehen darf: Projekte und Listen, keine Ziele. */
 function aufWaehlbar(mitLeeren) {
+  /* Seit 0.49 auch laufende Checklisten aus DB.gedanken */
+  var cls = mitLeeren ? clsAlle('lauf').map(function (g) { return kpSeiteFinden(g.id); }).filter(function (s) { return !!s && ckZustand(s) === 'lauf'; }) : [];
   return aufSeiten().filter(function (s) {
     if (s.art === 'vorhaben' && s.typ === 'ziel') { return false; }
     return mitLeeren || kpOffeneZahl(s) > 0;
-  });
+  }).concat(cls);
 }
 
 function aufAnsichtLaden() {
@@ -5905,8 +5920,10 @@ function aufAnsichtLaden() {
 
 function aufListeLaden() {
   var l = '';
-  try { l = window.localStorage.getItem(AUF_LISTE_KEY) || ''; } catch (e) { l = ''; }
+  var b = '';
+  try { l = window.localStorage.getItem(AUF_LISTE_KEY) || ''; b = window.localStorage.getItem(AUF_BEREICH_KEY) || ''; } catch (e) { l = ''; }
   cl.auf.liste = l;
+  cl.auf.bereich = b;
 }
 
 function zuletztListe() {
@@ -5991,7 +6008,7 @@ function aufQuellen() {
   var l = seiten.map(function (s, i) { return { s: s, i: i }; })
     .sort(function (a, b) { return (art(a.s) - art(b.s)) || (a.i - b.i); })
     .map(function (x) { return x.s; });
-  return l.concat(clsAlle('lauf').map(function (g) { return kpSeiteFinden(g.id); }).filter(function (s) { return !!s; }));
+  return l.concat(clsAlle('lauf').map(function (g) { return kpSeiteFinden(g.id); }).filter(function (s) { return !!s && ckZustand(s) === 'lauf'; }));
 }
 
 function aufIstCheckliste(s) {
@@ -6000,22 +6017,32 @@ function aufIstCheckliste(s) {
 
 /* Alle Aufgaben der Ansicht — offene, dazu gerade Abgehakte (bleiben
    bis zum Verlassen der App durchgestrichen stehen). */
+/* Ein Punkt mit allem, was die Zeile braucht: Termin, ⚑ Frist, ◷ Dauer, ★ */
+function ckPunkt(s, nr, a) {
+  var g = a.erledigt ? null : aufGeplant(s, a.text);
+  var z = ckZusatz(s, a.text);
+  return { seite: s, nr: nr, a: a, key: aufSchluessel(s, nr), datum: g ? g.datum : '', zeit: g ? g.zeit : '', cls: aufIstCheckliste(s),
+           frist: z.frist || '', dauer: z.dauer || 0, stern: !!(s.__satz && s.__satz.stern && ckZustand(s) === 'lauf') };
+}
+
 function aufAufgaben() {
   var liste = aufListe();
   var seiten = liste ? [liste] : aufQuellen();
   var aus = [];
   seiten.forEach(function (s) {
+    /* Filter nach Lebensbereich (seit 0.49) */
+    if (!liste && cl.auf.bereich && (s.__satz || {}).bereich !== cl.auf.bereich) { return; }
     var cls = aufIstCheckliste(s);
     String(s.text || '').split('\n').forEach(function (z, nr) {
       var a = kpAufgabe(z);
       if (!a || !a.text) { return; }
-      var key = aufSchluessel(s, nr);
-      var frisch = !!cl.auf.frisch[key];
+      var x = ckPunkt(s, nr, a);
+      var frisch = !!cl.auf.frisch[x.key];
       if (a.erledigt && !frisch && !cl.auf.erlZeigen) { return; }
-      var g = a.erledigt ? null : aufGeplant(s, a.text);
-      /* Checklisten: nur Eingeplantes (oder gerade hier Abgehaktes) */
-      if (cls && !g && !frisch) { return; }
-      aus.push({ seite: s, nr: nr, a: a, key: key, datum: g ? g.datum : '', zeit: g ? g.zeit : '', cls: cls });
+      /* Checklisten zum Abhaken: nur Eingeplantes oder Fälliges (oder gerade hier Abgehaktes);
+         Checklisten der Art „Aufgaben“ (seit 0.49) mit allen Punkten */
+      if (cls && ckArt(s) !== 'aufgaben' && !x.datum && !x.frist && !frisch) { return; }
+      aus.push(x);
     });
   });
   return aus;
@@ -6023,15 +6050,26 @@ function aufAufgaben() {
 
 /* Sortierschlüssel: Tag + Uhrzeit (ohne Datum ans Ende) und Priorität */
 function aufPlanSchluessel(x) { return x.datum ? x.datum + ' ' + (x.zeit || '99:99') : '9999'; }
-function aufPrioRang(x) { return kpPrio(x.a.text).p || 9; }
+/* Seit 0.49: fünf Stufen, ohne Kürzel gilt 3 (Normal) */
+function clPrioEff(text) { return kpPrio(text).p || 3; }
+function aufPrioRang(x) { return clPrioEff(x.a.text); }
 
 /* Prio: P1 → P3 → ohne, bei gleicher Prio das frühere Datum zuerst.
    Geplant: nach Tag und Uhrzeit, dann Prio; ohne Datum am Ende. */
+/* Seit 0.49 bei „Prio“: zuerst heute Fälliges (Termin oder ⚑ Frist), dann P,
+   innerhalb der Stufe ★ wesentlich zuerst, dann nach Termin */
+function aufDringend(x) {
+  var heute = isoDatum();
+  return !!((x.datum && x.datum <= heute) || (x.frist && x.frist <= heute));
+}
+
 function aufSortiert(l, ansicht) {
   return l.map(function (x, i) { return { x: x, i: i }; }).sort(function (p, q) {
     var pp = aufPrioRang(p.x) - aufPrioRang(q.x);
     var pd = aufPlanSchluessel(p.x) < aufPlanSchluessel(q.x) ? -1 : (aufPlanSchluessel(p.x) > aufPlanSchluessel(q.x) ? 1 : 0);
-    return (ansicht === 'prio' ? (pp || pd) : (pd || pp)) || (p.i - q.i);
+    var dr = (aufDringend(p.x) ? 0 : 1) - (aufDringend(q.x) ? 0 : 1);
+    var st = (p.x.stern ? 0 : 1) - (q.x.stern ? 0 : 1);
+    return (ansicht === 'prio' ? (dr || pp || st || pd) : (pd || pp)) || (p.i - q.i);
   }).map(function (y) { return y.x; });
 }
 
@@ -6063,14 +6101,18 @@ function aufZeileHtml(x, o) {
   o = o || {};
   var plan = o.ohneTag ? (x.zeit ? clZeitText(x.zeit) : '') : clPlanText(x.datum, x.zeit);
   var marke = plan ? '<span class="plan-marke">' + esc(plan) + '</span>' : '';
+  /* ⚑ Frist (seit 0.49): jemand anders erwartet es bis dann */
+  if (x.frist && !x.a.erledigt) { marke += '<span class="frist-marke">⚑ ' + esc(x.frist === isoDatum() ? 'heute' : clKurzDatum(x.frist)) + '</span>'; }
   var pr = kpPrio(x.a.text);
+  var pe = pr.p || 3;
+  var herkunft = o.herkunft ? (x.stern ? '★ ' : '') + x.seite.titel + (x.dauer ? ' · ◷ ' + ckDauerText(x.dauer) : '') : '';
   return '<div class="aufg' + (x.a.erledigt ? ' erl' : '') + (cl.auf.wahl === x.key ? ' gewaehlt' : '') + '">'
-    /* Priorität (seit 0.12): antippen schaltet – → 1 → 2 → 3 → – */
-    + '<button type="button" class="prio p' + pr.p + '" onclick="aufPrioUm(\'' + esc(x.seite.id) + '\',' + x.nr + ')" aria-label="Priorität">' + (pr.p || '') + '</button>'
+    /* Priorität (seit 0.49 fünf Stufen): antippen schaltet 1 → 2 → 3 → 4 → 5 → 1; 3 ist die Vorgabe */
+    + '<button type="button" class="prio p' + pe + (pr.p ? '' : ' still') + '" onclick="aufPrioUm(\'' + esc(x.seite.id) + '\',' + x.nr + ')" aria-label="Priorität">' + pe + '</button>'
     + clKastenHtml(x.a.erledigt, 'aufHaken(\'' + esc(x.seite.id) + '\',' + x.nr + ')')
     /* Mit Herkunft darf der Text zwei Zeilen haben, die Herkunft eine dritte */
     + '<button type="button" class="tx umbruch' + (o.herkunft ? ' drei' : '') + '" onclick="aufTippen(\'' + esc(x.seite.id) + '\',' + x.nr + ')">' + esc(clSchlicht(pr.text))
-    + (o.herkunft ? clHerkunftHtml(clSeitenZeichen(x.seite), x.seite.titel) : '') + '</button>'
+    + (o.herkunft ? clHerkunftHtml(clSeitenZeichen(x.seite), herkunft) : (x.dauer && !x.a.erledigt ? '<small class="herkunft">◷ ' + esc(ckDauerText(x.dauer)) + '</small>' : '')) + '</button>'
     + marke
     + (o.mehr ? '<button type="button" class="mehr" onclick="aufGanzUm(\'' + esc(x.seite.id) + '\')" aria-label="alle zeigen">+' + o.mehr + '</button>' : '')
     + '</div>';
@@ -6090,7 +6132,8 @@ function aufPrioUm(seiteId, nr) {
   var s = kpSeiteFinden(seiteId);
   var a = s ? kpAufgabe(String(s.text || '').split('\n')[nr] || '') : null;
   if (!a) { return; }
-  if (kpPrioSetzenKern(s, nr, (kpPrio(a.text).p + 1) % 4)) {
+  var naechste = clPrioEff(a.text) % 5 + 1;
+  if (kpPrioSetzenKern(s, nr, naechste === 3 ? 0 : naechste)) {
     spaeterSichern();
     zeichne();
   }
@@ -6098,7 +6141,7 @@ function aufPrioUm(seiteId, nr) {
 
 function aufPrioWahl(p) {
   var f = aufFensterLesen();
-  if (!f || p < 0 || p > 3) { return; }
+  if (!f || p < 1 || p > 5) { return; }
   f.prio = p;
   f.prioGesetzt = true;
   aufklappNeu();
@@ -6213,7 +6256,9 @@ function aufDetailsGewaehlt() {
 /* ---- Fenster: Neu und Details ---- */
 
 function aufNeu() {
-  var liste = aufListe();
+  /* Seit 0.49: aus einer geöffneten Checkliste dort hinein, sonst in den Korb */
+  var offen = cl.app === 'checklisten' ? ckSeite(cl.cls.id) : null;
+  var liste = (offen && ckZustand(offen) !== 'vorlage') ? offen : aufListe();
   cl.auf.fenster = { modus: 'neu', seite: liste ? liste.id : '', nr: -1, text: '', datum: '', zeit: '', mitZeit: false, ausKalender: false };
   cl.aufklapp = 'aufgabe';
   aufklappNeu();
@@ -6231,13 +6276,15 @@ function aufNeuAm(datum, zeit) {
 function aufDetails(seiteId, nr) {
   var s = kpSeiteFinden(seiteId);
   /* Checklisten-Punkt (seit 0.17): dort einplanen und bearbeiten */
-  if (aufIstCheckliste(s)) { aufklappZuStill(); oeffne('checklisten'); clsOeffnen(s.id); return; }
+  if (aufIstCheckliste(s) && ckArt(s) !== 'aufgaben') { aufklappZuStill(); oeffne('checklisten'); clsOeffnen(s.id); return; }
   var zeilen = s ? String(s.text || '').split('\n') : [];
   var a = (nr >= 0 && nr < zeilen.length) ? kpAufgabe(zeilen[nr]) : null;
   if (!a) { return; }
   var g = a.erledigt ? null : aufGeplant(s, a.text);
   cl.auf.wahl = seiteId + '|' + nr;
+  var zu = ckZusatz(s, a.text);
   cl.auf.fenster = { modus: 'details', seite: s.id, quelle: s.id, nr: nr, alt: a.text, text: kpPrio(a.text).text, prio: kpPrio(a.text).p, erledigt: a.erledigt,
+                     frist: zu.frist || '', dauer: zu.dauer || 0,
                      datum: g ? g.datum : '', zeit: g ? g.zeit : '', mitZeit: !!(g && g.zeit), ausKalender: false };
   cl.aufklapp = 'aufgabe';
   aufklappNeu();
@@ -6260,7 +6307,24 @@ function aufFensterLesen() {
   if (t && typeof t.value === 'string') { f.text = t.value; }
   if (d && typeof d.value === 'string') { f.datum = d.value; }
   if (z && typeof z.value === 'string') { f.zeit = z.value; }
+  var fr = document.getElementById('aufFrist');
+  if (fr && typeof fr.value === 'string') { f.frist = fr.value; }
   return f;
+}
+
+function aufFristWeg() {
+  var f = aufFensterLesen();
+  if (!f) { return; }
+  f.frist = '';
+  aufklappNeu();
+}
+
+/* Gleiche Dauer noch einmal: wieder ohne (gilt als 30 Min) */
+function aufDauerWahl(d) {
+  var f = aufFensterLesen();
+  if (!f || !CK_DAUER.some(function (x) { return x[0] === d; })) { return; }
+  f.dauer = (Number(f.dauer) === d) ? 0 : d;
+  aufklappNeu();
 }
 
 /* „Uhrzeit“ blendet das Feld ein; ohne Datum gilt heute */
@@ -6296,7 +6360,7 @@ function aufFensterHtml() {
       + '<button type="button" class="knopf" onclick="aufZurueckZuDetails()">Abbrechen</button></div></div></div>';
   }
   var seite = f.seite ? kpSeiteFinden(f.seite) : null;
-  var ok = !!(seite && String(f.text || '').trim());
+  var ok = !!String(f.text || '').trim();
   var plan = f.erledigt ? '' : '<label for="aufDatum">Datum:</label><div class="zeitpaar">'
     + '<input id="aufDatum" class="eingabe" type="date" min="' + isoDatum() + '" value="' + esc(f.datum) + '">'
     + (f.datum ? '<button type="button" class="knopf" onclick="aufDatumWeg()" aria-label="nicht einplanen">✕</button>' : '') + '</div>'
@@ -6307,19 +6371,25 @@ function aufFensterHtml() {
     + (f.ausKalender ? '<div class="wahlreihe"><button type="button" onclick="terminStatt()">Termin</button><button type="button" class="an">Aufgabe</button></div>' : '')
     + '<label for="aufText">Aufgabe:</label><input id="aufText" class="eingabe" type="text" autocomplete="off" value="' + esc(f.text) + '"'
     + ' oninput="aufTextGetippt()">'
-    + '<label>Priorität:</label><div class="wahlreihe">' + [0, 1, 2, 3].map(function (p) {
-        return '<button type="button"' + ((f.prio || 0) === p ? ' class="an"' : '') + ' onclick="aufPrioWahl(' + p + ')">' + (p || '–') + '</button>';
+    + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (p) {
+        return '<button type="button"' + ((f.prio || 3) === p ? ' class="an"' : '') + ' onclick="aufPrioWahl(' + p + ')">' + p + '</button>';
       }).join('') + '</div>'
-    + '<label>Liste:' + (f.modus === 'neu' ? ' (Pflicht)' : '') + '</label>'
-    + '<button type="button" class="eingabe wahlfeld' + (seite ? '' : ' pflicht') + '" onclick="listenwahlOeffnen(\'aufgabe\')">'
-    + (seite ? clSeitenZeichen(seite) + ' ' + esc(seite.titel) : '▼ bitte wählen') + '</button>'
+    /* Seit 0.49: ⚑ Frist (erwartet jemand bis …) und ◷ grobe Dauer */
+    + (f.erledigt ? '' : '<label for="aufFrist">⚑ Frist (erwartet jemand bis):</label><div class="zeitpaar">'
+      + '<input id="aufFrist" class="eingabe" type="date" value="' + esc(f.frist || '') + '">'
+      + (f.frist ? '<button type="button" class="knopf" onclick="aufFristWeg()" aria-label="keine Frist">✕</button>' : '') + '</div>'
+      + '<label>◷ Dauer:</label><div class="wahlreihe">' + CK_DAUER.map(function (d) {
+          return '<button type="button"' + (Number(f.dauer) === d[0] ? ' class="an"' : '') + ' onclick="aufDauerWahl(' + d[0] + ')">' + d[1] + '</button>';
+        }).join('') + '</div>')
+    + '<label>Checkliste:</label>'
+    + '<button type="button" class="eingabe wahlfeld" onclick="listenwahlOeffnen(\'aufgabe\')">'
+    + (seite ? '▼ ' + clSeitenZeichen(seite) + ' ' + esc(seite.titel) : '▼ Korb') + '</button>'
     + plan
     + '<div class="knoepfe"><button type="button" id="aufOk" class="knopf voll"' + (ok ? '' : ' disabled') + ' onclick="aufSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
     + (f.modus === 'details' ? '<div class="knoepfe"><button type="button" class="knopf" onclick="memoZeile(\'' + esc(f.quelle) + '\',' + f.nr + ')">'
       + ({ liste: 'Liste zeigen', vorhaben: 'Im Projekt zeigen', ziel: 'Im Ziel zeigen' }[((kpSeiteFinden(f.quelle) || {}).typ === 'ziel') ? 'ziel' : (kpSeiteFinden(f.quelle) || {}).art] || 'In Notizen zeigen') + '</button>'
       + '<button type="button" class="knopf" onclick="aufLoeschenFragen()">Löschen…</button></div>' : '')
-    + (f.modus === 'neu' && !seite ? '<p class="leise">OK geht erst, wenn eine Liste gewählt ist.</p>' : '')
     + '</div></div>';
 }
 
@@ -6337,7 +6407,7 @@ function terminStatt() {
 function aufTextGetippt() {
   var f = aufFensterLesen();
   var ok = document.getElementById('aufOk');
-  if (f && ok) { ok.disabled = !(f.seite && String(f.text || '').trim()); }
+  if (f && ok) { ok.disabled = !String(f.text || '').trim(); }
 }
 
 function aufLoeschenFragen() {
@@ -6412,6 +6482,7 @@ function aufTextAendern(seite, nr, alt, neu) {
   zeilen[nr] = m[1] + neu;
   seite.text = zeilen.join('\n');
   seite.geaendert = jetzt();
+  ckZusatzUmziehen(seite, alt, seite, neu);
 }
 
 /* In eine andere Liste: Zeile umziehen, Planung zieht mit */
@@ -6428,6 +6499,7 @@ function aufVerschieben(von, nr, nach) {
   nach.text = t + zeile.replace(/^\s+/, '');
   nach.geaendert = jetzt();
   funde.forEach(function (f) { f.eintrag.quelle = nach.id; f.woche.geaendert = jetzt(); });
+  ckZusatzUmziehen(von, a.text, nach, a.text);
   return String(nach.text).split('\n').length - 1;
 }
 
@@ -6436,14 +6508,19 @@ function aufSpeichern() {
   if (!f) { return; }
   /* Priorität: aus der Wahl im Fenster — oder wie getippt („P2 …“) */
   var getippt = kpPrio(kpSchluessel(f.text));
-  var text = kpSchluessel(getippt.text) ? kpPrioText(kpSchluessel(getippt.text), f.prioGesetzt ? f.prio : (getippt.p || f.prio || 0)) : '';
-  var seite = f.seite ? kpSeiteFinden(f.seite) : null;
-  if (!seite) { melde('Bitte eine Liste wählen.', 'warn'); return; }
+  var stufe = f.prioGesetzt ? f.prio : (getippt.p || f.prio || 0);
+  /* 3 ist die Vorgabe und braucht kein Kürzel (seit 0.49) */
+  var text = kpSchluessel(getippt.text) ? kpPrioText(kpSchluessel(getippt.text), stufe === 3 ? 0 : stufe) : '';
   if (!text) { melde('Bitte die Aufgabe eingeben.', 'warn'); return; }
+  /* Ohne Wahl in den Korb (seit 0.49) */
+  var seite = f.seite ? kpSeiteFinden(f.seite) : null;
+  if (!seite) { seite = ckKorb(true); }
+  if (!seite) { melde('Der Korb ließ sich nicht anlegen.', 'warn'); return; }
   var datum = String(f.datum || '');
   var zeit = f.mitZeit ? String(f.zeit || '') : '';
   if (datum && (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || datum < isoDatum())) { melde('Bitte heute oder einen späteren Tag wählen.', 'warn'); return; }
   if (f.mitZeit && !/^\d{2}:\d{2}$/.test(zeit)) { melde('Bitte eine Uhrzeit wählen.', 'warn'); return; }
+  if (f.frist && !/^\d{4}-\d{2}-\d{2}$/.test(String(f.frist))) { melde('Bitte eine gültige Frist wählen.', 'warn'); return; }
   var nr;
   if (f.modus === 'neu') {
     nr = aufZeileAnhaengen(seite, text);
@@ -6457,8 +6534,10 @@ function aufSpeichern() {
     if (seite.id !== quelle.id) { nr = aufVerschieben(quelle, nr, seite); }
   }
   if (!f.erledigt && nr >= 0) { aufPlanAnwenden(seite, nr, datum, zeit); }
+  if (!f.erledigt && nr >= 0) { ckZusatzSetzen(seite, text, f.frist || '', f.dauer || ''); }
   zuletztMerken(seite.id);
   cl.auf.wahl = '';
+  ckWecken();
   spaeterSichern();
   aufklappZu();
   /* Größeres hinterfragt der Coach gleich (seit 0.33) */
@@ -6477,6 +6556,7 @@ function aufLoeschen() {
   zeilen.splice(nr, 1);
   s.text = zeilen.join('\n');
   s.geaendert = jetzt();
+  ckZusatzSetzen(s, f.alt, '', '');
   cl.auf.wahl = '';
   spaeterSichern();
   aufklappZu();
@@ -6488,29 +6568,28 @@ function aufLoeschen() {
 /* Aufklappliste oben rechts: Filter, Alle Aufgaben, zuletzt benutzt,
    Weitere…; dazu „Liste bearbeiten…“ und „Erledigte zeigen“. */
 function listeAufklappHtml() {
-  var waehlbar = aufWaehlbar(false);
-  var ids = waehlbar.map(function (s) { return s.id; });
-  var zuletzt = zuletztListe().filter(function (id) { return ids.indexOf(id) >= 0; }).slice(0, ZULETZT_ZAHL);
   var liste = aufListe();
   var h = '<div class="aufklapp liste-aufklapp" style="top:49px;right:6px">'
     + '<div class="schalter">' + CL_KATEGORIEN.map(function (k) {
         return '<button type="button"' + (k[0] === cl.filter ? ' class="an"' : '') + ' onclick="aufFilter(\'' + k[0] + '\')">' + k[1] + '</button>';
       }).join('') + '</div>'
-    + '<button type="button"' + (!liste ? ' class="an"' : '') + ' onclick="aufListeSetzen(\'\')">Alle Aufgaben</button>';
-  if (zuletzt.length) {
-    h += '<div class="trenn"></div><div class="zw">Zuletzt benutzt</div>';
-    zuletzt.forEach(function (id) {
-      var s = kpSeiteFinden(id);
-      h += '<button type="button"' + (cl.auf.liste === id ? ' class="an"' : '') + ' onclick="aufListeSetzen(\'' + esc(id) + '\')">'
-         + clSeitenZeichen(s) + ' ' + esc(s.titel) + '</button>';
-    });
-  }
-  h += '<div class="trenn"></div><button type="button" onclick="listenwahlOeffnen(\'filter\')">Weitere …</button>';
+    + '<button type="button"' + (!liste && !cl.auf.bereich ? ' class="an"' : '') + ' onclick="aufBereichSetzen(\'\')">Alle Aufgaben</button>';
+  /* Seit 0.49: Lebensbereiche statt einzelner Listen — die stehen in Checklisten */
+  h += '<div class="trenn"></div><div class="zw">Bereich</div>' + ckBereiche().map(function (b) {
+    return '<button type="button"' + (cl.auf.bereich === b.id && !liste ? ' class="an"' : '') + ' onclick="aufBereichSetzen(\'' + esc(b.id) + '\')">' + esc(b.name) + '</button>';
+  }).join('');
   if (liste && liste.art === 'liste') {
-    h += '<button type="button" onclick="listeBearbeiten()">„' + esc(liste.titel) + '“ bearbeiten …</button>'
+    h += '<div class="trenn"></div><button type="button" onclick="listeBearbeiten()">„' + esc(liste.titel) + '“ bearbeiten …</button>'
        + '<button type="button" onclick="listeAlsText()">„' + esc(liste.titel) + '“ als Text bearbeiten …</button>';
   }
   return h + '<div class="trenn"></div><button type="button" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '■' : '▢') + ' Erledigte zeigen</button></div>';
+}
+
+/* Ein Lebensbereich (oder alle) — hebt eine gewählte Einzelliste auf */
+function aufBereichSetzen(id) {
+  cl.auf.bereich = ckBereichName(id) ? id : '';
+  try { window.localStorage.setItem(AUF_BEREICH_KEY, cl.auf.bereich); } catch (e) { /* nur für jetzt */ }
+  aufListeSetzen('');
 }
 
 function aufFilter(f) {
@@ -6539,20 +6618,23 @@ function listenwahlHtml() {
     return '<button type="button" class="wahl' + (leer ? ' leise' : '') + '" onclick="listeGewaehlt(\'' + esc(s.id) + '\')">'
       + clSeitenZeichen(s) + ' ' + esc(s.titel) + (leer ? ' (keine offenen)' : '') + '</button>';
   };
-  var h = '<div class="fenster"><div class="titel">Liste wählen · ' + esc(katName(cl.filter)) + '</div><div class="rumpf">';
+  var h = '<div class="fenster"><div class="titel">' + (fuerAufgabe ? 'Checkliste wählen' : 'Liste wählen') + ' · ' + esc(katName(cl.filter)) + '</div><div class="rumpf">';
+  /* Seit 0.49: zuerst der Korb, dann Checklisten (Listen und Checklisten), dann Projekte */
+  if (fuerAufgabe) { h += '<button type="button" class="wahl" onclick="listeGewaehlt(\'' + CK_KORB_ID + '\')">Korb</button>'; }
   if (zuletzt.length) { h += '<div class="gruppe">Zuletzt benutzt</div>' + zuletzt.map(function (id) { return zeile(kpSeiteFinden(id)); }).join(''); }
   var projekte = seiten.filter(function (s) { return s.art === 'vorhaben'; });
-  var listen = seiten.filter(function (s) { return s.art === 'liste'; });
+  var listen = seiten.filter(function (s) { return s.art !== 'vorhaben' && !ckIstKorb(s); });
+  if (listen.length) { h += '<div class="gruppe">Checklisten</div>' + listen.map(zeile).join(''); }
   if (projekte.length) { h += '<div class="gruppe">Projekte</div>' + projekte.map(zeile).join(''); }
-  if (listen.length) { h += '<div class="gruppe">Listen</div>' + listen.map(zeile).join(''); }
-  if (!seiten.length) { h += '<p class="leise">Keine passenden Listen.</p>'; }
-  return h + '<div class="knoepfe"><button type="button" class="knopf" onclick="neueListeOeffnen()">Neue Liste …</button>'
+  if (!seiten.length && !fuerAufgabe) { h += '<p class="leise">Keine passenden Listen.</p>'; }
+  return h + '<div class="knoepfe"><button type="button" class="knopf" onclick="neueListeOeffnen()">Neue Checkliste …</button>'
     + '<button type="button" class="knopf" onclick="listenwahlZurueck()">Abbrechen</button></div></div></div>';
 }
 
 function listeGewaehlt(id) {
   if (cl.auf.wahlFuer === 'aufgabe' && cl.auf.fenster) {
-    cl.auf.fenster.seite = id;
+    /* Korb (seit 0.49): erst beim Speichern anlegen */
+    cl.auf.fenster.seite = (id === CK_KORB_ID && !ckKorb(false)) ? '' : id;
     cl.aufklapp = 'aufgabe';
     aufklappNeu();
     return;
@@ -6586,7 +6668,7 @@ function listeBearbeiten() {
    (z. B. eigene Schritte unter einer Aufgabe). Geschrieben wird im
    Schreibfeld des Memo; „Fertig“ und Zurück führen wieder zur Liste. */
 function listeAlsText() {
-  var s = aufListe();
+  var s = (cl.app === 'checklisten' && ckIstListe(ckSeite(cl.cls.id))) ? ckSeite(cl.cls.id) : aufListe();
   if (!s || s.art !== 'liste') { return; }
   cl.aufklapp = '';
   cl.app = 'memo';
@@ -6605,8 +6687,9 @@ function listeTextFertig() {
   cl.memo.schreiben = false;
   cl.memo.hervor = '';
   cl.memo.ausListe = '';
-  cl.app = 'aufgaben';
-  aufListeSetzen(id);
+  /* Seit 0.49 zurück in die Checkliste */
+  cl.app = 'checklisten';
+  clsOeffnen(id);
 }
 
 function neueListeKontext(k) {
@@ -6621,7 +6704,7 @@ function neueListeKontext(k) {
 function neueListeHtml() {
   var n = cl.auf.neueListe;
   if (!n) { return ''; }
-  return '<div class="fenster"><div class="titel">' + (n.id ? 'Liste bearbeiten' : 'Neue Liste') + '</div><div class="rumpf">'
+  return '<div class="fenster"><div class="titel">' + (n.id ? 'Liste bearbeiten' : 'Neue Checkliste') + '</div><div class="rumpf">'
     + '<label for="listeTitel">Name:</label><input id="listeTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(n.titel) + '">'
     + '<label>Kategorie:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
         return '<button type="button"' + (n.kontext === k[0] ? ' class="an"' : '') + ' onclick="neueListeKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
@@ -6629,6 +6712,17 @@ function neueListeHtml() {
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="neueListeSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="listenwahlZurueck()">Abbrechen</button>'
     + (n.id ? '<button type="button" class="knopf" onclick="listeLoeschenFragen()">Löschen…</button>' : '') + '</div></div></div>';
+}
+
+/* Aus den Details einer Checkliste (seit 0.49): dieselbe Rückfrage wie bisher */
+function ckListeLoeschenFragen() {
+  var s = ckSeite(cl.cls.id);
+  if (!s || !ckIstListe(s) || ckIstKorb(s)) { return; }
+  cl.cls.fenster = null;
+  cl.auf.wahlFuer = 'filter';
+  cl.auf.neueListe = { id: s.id, titel: s.titel, kontext: s.kontext === 'beruflich' ? 'beruflich' : 'privat' };
+  cl.aufklapp = 'liste-loeschen';
+  aufklappNeu();
 }
 
 /* Liste löschen (seit 0.31.1) — mit Rückfrage; offene Aufgaben werden genannt */
@@ -6651,7 +6745,7 @@ function listeLoeschenHtml() {
     + (offen ? '<p><b>Achtung:</b> Die Liste hat noch ' + offen + ' offene Aufgabe' + (offen === 1 ? '' : 'n') + '.</p>' : '<p class="leise">Alle Aufgaben sind erledigt.</p>')
     + '<p class="leise">Die Liste verschwindet auch in der Workbench.</p>'
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="listeLoeschen()">Löschen</button>'
-    + '<button type="button" class="knopf" onclick="listeBearbeiten()">Abbrechen</button></div></div></div>';
+    + '<button type="button" class="knopf" onclick="' + (cl.app === 'checklisten' ? 'clsDetails()' : 'listeBearbeiten()') + '">Abbrechen</button></div></div></div>';
 }
 
 function listeLoeschen() {
@@ -6666,6 +6760,7 @@ function listeLoeschen() {
   grabsteinSetzen(sammlung, s.id);
   try { window.localStorage.setItem(ZULETZT_KEY, JSON.stringify(zuletztListe().filter(function (x) { return x !== s.id; }))); } catch (e) { /* nur für jetzt */ }
   cl.auf.neueListe = null;
+  if (cl.cls.id === s.id) { cl.cls.id = ''; }
   spaeterSichern();
   melde('Liste „' + s.titel + '“ gelöscht.', 'gut');
   aufListeSetzen('');
@@ -6862,7 +6957,7 @@ function memoZeile(seiteId, nr) {
   var a = kpAufgabe(String(s.text || '').split('\n')[nr] || '');
   aufklappZu();
   /* Listen stehen seit 0.6 nicht im Memo: dann die Liste in den Aufgaben */
-  if (s.art === 'liste') { cl.app = 'aufgaben'; aufListeSetzen(s.id); return; }
+  if (s.art === 'liste') { aufklappZu(); oeffne('checklisten'); clsOeffnen(s.id); return; }
   /* Projekte stehen seit 0.43 in der App Projekte */
   if (s.art === 'vorhaben' && s.typ === 'ziel') { ziOeffnen(s.id); return; }
   if (s.art === 'vorhaben') { pjZeile(s.id, nr); return; }
@@ -7680,7 +7775,7 @@ function ziFussHtml() {
 function seiteOeffnen(id) {
   var s = kpSeiteFinden(id);
   if (!s) { return; }
-  if (s.art === 'liste') { oeffne('aufgaben'); aufListeSetzen(s.id); return; }
+  if (s.art === 'liste') { oeffne('checklisten'); clsOeffnen(s.id); return; }
   if (s.__satz && s.__satz.checkliste) { oeffne('checklisten'); clsOeffnen(s.id); return; }
   /* Jeder Sprung in ein Projekt landet bei „Inhalt“ (seit 0.46.1; 0.44.1: Allgemein) */
   if (s.art === 'vorhaben') { pjOeffnen(s.id, 'inhalt'); return; }
@@ -7699,7 +7794,7 @@ function seiteOeffnen(id) {
    Der Text folgt derselben Schreibweise wie überall: [] Punkt, ## Überschrift.
    So gehen Checklisten ohne Umbau der Workbench durch den Abgleich. */
 
-cl.cls = { id: '', schreiben: false, fertigAuf: false, fenster: null };
+cl.cls = { id: '', schreiben: false, fenster: null };
 
 function clsAlle(art) {
   return kpNachRang((DB.gedanken || []).filter(function (g) {
@@ -7747,30 +7842,218 @@ function clsBalkenHtml(st) {
   return '<span class="balken"><i style="width:' + p + '%"></i></span><span class="cls-zahl">' + st.fertig + '/' + st.alle + '</span>';
 }
 
+/* ---------- Alles ist eine Checkliste (seit 0.49) ----------
+
+   Checklisten sind die Aufgabenlisten (DB.themen, die Workbench liest sie
+   weiter als Listen) und die Checklisten aus DB.gedanken. Jede hat einen
+   Zustand (laufend · ruhend · abgeschlossen), einen Lebensbereich aus
+   Kurs und eine Art: „aufgaben“ (Punkte stehen einzeln in Aufgaben) oder
+   „abhaken“ (nur Eingeplantes, z. B. Packlisten). Der Korb ist die eine
+   Liste ohne Ende für lose Einzelaufgaben. Eine ruhende Checkliste wacht
+   auf, sobald ein Punkt heute fällig ist (Termin oder ⚑ Frist).
+   Felder am Satz: bereich, ruht, geweckt, stern, art (gedanken),
+   abgeschlossen (themen), korb, zusatz { Punkttext: { frist, dauer } }. */
+
+var CK_KORB_ID = 'cl-korb';
+var CK_KLAPP_KEY = 'clie-cls-klapp';
+var CK_DAUER = [[15, '15 Min'], [30, '30 Min'], [60, '1 Std'], [120, '2 Std'], [240, '½ Tag']];
+var CK_ZUSTAENDE = [['lauf', 'Laufend'], ['ruht', 'Ruhend'], ['fertig', 'Abgeschl.']];
+
+/* Die Lebensbereiche aus Kurs — vor dem ersten Öffnen von Kurs die festen sieben */
+function ckBereiche() {
+  var l = krBereiche(false);
+  if (!l.length) { return KR_BEREICHE.map(function (b) { return { id: b[0], name: b[1] }; }); }
+  return l.map(function (b) { return { id: b.id, name: b.name }; });
+}
+
+function ckBereichName(id) {
+  var b = ckBereiche().filter(function (x) { return x.id === id; })[0];
+  return b ? b.name : '';
+}
+
+/* Eine Seite, die in Checklisten steht: Liste oder Checkliste (auch Vorlage) */
+function ckSeite(id) {
+  var s = id ? kpSeiteFinden(id) : null;
+  if (!s) { return null; }
+  return (s.art === 'liste' || (s.__satz && s.__satz.checkliste)) ? s : null;
+}
+
+function ckIstListe(s) { return !!(s && s.art === 'liste'); }
+function ckIstKorb(s) { return !!(s && s.__satz && s.__satz.korb); }
+
+function ckZustand(s) {
+  var x = s && s.__satz;
+  if (!x) { return ''; }
+  if (ckIstListe(s)) { return x.abgeschlossen ? 'fertig' : (x.ruht ? 'ruht' : 'lauf'); }
+  if (x.checkliste === 'vorlage') { return 'vorlage'; }
+  if (x.checkliste === 'fertig') { return 'fertig'; }
+  return x.ruht ? 'ruht' : 'lauf';
+}
+
+function ckZustandSetzen(s, z) {
+  var x = s && s.__satz;
+  if (!x || ckIstKorb(s) || ['lauf', 'ruht', 'fertig'].indexOf(z) < 0 || ckZustand(s) === 'vorlage') { return; }
+  if (ckIstListe(s)) {
+    if (z === 'fertig') { x.abgeschlossen = isoDatum(); } else { delete x.abgeschlossen; }
+  } else {
+    x.checkliste = (z === 'fertig') ? 'fertig' : 'lauf';
+    if (z === 'fertig') { x.abgeschlossen = isoDatum(); } else { delete x.abgeschlossen; }
+  }
+  if (z === 'ruht') { x.ruht = true; } else { delete x.ruht; }
+  if (z !== 'lauf') { delete x.stern; }
+  delete x.geweckt;
+  x.geaendert = jetzt();
+}
+
+function ckArt(s) {
+  if (ckIstListe(s)) { return 'aufgaben'; }
+  return (s && s.__satz && s.__satz.art === 'aufgaben') ? 'aufgaben' : 'abhaken';
+}
+
+/* Alle Checklisten außer Vorlagen — nach Beruf/Privat */
+function ckAlle() {
+  return kpNachRang(kpSeitenAlle().filter(function (s) {
+    var z = ckSeite(s.id) ? ckZustand(s) : '';
+    return z && z !== 'vorlage' && kpPasstFilter(s, cl.filter);
+  }));
+}
+
+/* Der Korb: eine Liste mit fester Kennung — zwei Geräte legen keinen zweiten an */
+function ckKorb(anlegen) {
+  var l = Array.isArray(DB.themen) ? DB.themen : [];
+  var x = l.filter(function (t) { return t && t.id === CK_KORB_ID; })[0];
+  if (!x && anlegen) {
+    if (!Array.isArray(DB.themen)) { DB.themen = []; }
+    x = { id: CK_KORB_ID, name: 'Korb', kontext: '', text: '', korb: true, ordnung: 0, geaendert: jetzt() };
+    DB.themen.push(x);
+  }
+  return x ? kpSeiteFinden(CK_KORB_ID) : null;
+}
+
+/* ⚑ Frist und ◷ Dauer eines Punkts — am Satz, nach dem Text ohne „P1 “ */
+function ckZusatz(s, text) {
+  var z = s && s.__satz && s.__satz.zusatz;
+  var k = kpPrio(text).text;
+  return (z && typeof z === 'object' && z[k]) ? z[k] : {};
+}
+
+function ckZusatzSetzen(s, text, frist, dauer) {
+  var x = s && s.__satz;
+  if (!x) { return; }
+  var k = kpPrio(text).text;
+  if (!x.zusatz || typeof x.zusatz !== 'object') { x.zusatz = {}; }
+  var w = {};
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(frist || ''))) { w.frist = frist; }
+  if (CK_DAUER.some(function (d) { return d[0] === Number(dauer); })) { w.dauer = Number(dauer); }
+  if (w.frist || w.dauer) { x.zusatz[k] = w; } else { delete x.zusatz[k]; }
+  if (!Object.keys(x.zusatz).length) { delete x.zusatz; }
+}
+
+/* Mit dem Text zieht der Zusatz um — umbenannt oder in eine andere Seite */
+function ckZusatzUmziehen(von, alt, nach, neu) {
+  var z = ckZusatz(von, alt);
+  if (!z.frist && !z.dauer) { return; }
+  ckZusatzSetzen(von, alt, '', '');
+  ckZusatzSetzen(nach, neu, z.frist || '', z.dauer || '');
+}
+
+function ckDauerText(d) {
+  var x = CK_DAUER.filter(function (y) { return y[0] === Number(d); })[0];
+  return x ? x[1] : '';
+}
+
+/* Ruhende Checklisten wecken, wenn ein offener Punkt heute (oder früher) fällig ist */
+function ckWecken() {
+  var heute = isoDatum();
+  var namen = [];
+  kpSeitenAlle().forEach(function (s) {
+    if (!ckSeite(s.id) || ckZustand(s) !== 'ruht') { return; }
+    var faellig = String(s.text || '').split('\n').some(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt) { return false; }
+      var g = aufGeplant(s, a.text);
+      var fr = ckZusatz(s, a.text).frist;
+      return !!((g && g.datum && g.datum <= heute) || (fr && fr <= heute));
+    });
+    if (!faellig) { return; }
+    delete s.__satz.ruht;
+    s.__satz.geweckt = heute;
+    s.__satz.geaendert = jetzt();
+    namen.push(s.titel);
+  });
+  if (namen.length) {
+    spaeterSichern();
+    melde('Aufgewacht: ' + namen.map(function (n) { return '„' + n + '“'; }).join(', ') + ' — ein Punkt ist fällig.', 'gut');
+  }
+  return namen.length;
+}
+
+/* ★ Wesentlich: höchstens drei laufende zugleich (wie die Wesentlichen in Kurs) */
+function ckSterne() {
+  return kpSeitenAlle().filter(function (s) { return ckSeite(s.id) && s.__satz.stern && ckZustand(s) === 'lauf'; }).length;
+}
+
+/* Eingeklappte Gruppen der Übersicht — je Gerät */
+function ckKlapp() {
+  var k = {};
+  try { k = JSON.parse(window.localStorage.getItem(CK_KLAPP_KEY) || '{}') || {}; } catch (e) { k = {}; }
+  return (k && typeof k === 'object') ? k : {};
+}
+
+function clsKlappUm(w) {
+  if (['ruht', 'vorl', 'fertig'].indexOf(w) < 0) { return; }
+  var k = ckKlapp();
+  k[w] = !k[w];
+  try { window.localStorage.setItem(CK_KLAPP_KEY, JSON.stringify(k)); } catch (e) { /* nur für jetzt */ }
+  inhaltZeichnen();
+}
+
+function clsKorbOeffnen() {
+  var k = ckKorb(true);
+  if (!k) { return; }
+  spaeterSichern();
+  clsOeffnen(k.id);
+}
+
+/* Eine Zeile der Übersicht: ★, Titel (zwei Zeilen), „geweckt“, kurzer Balken */
+function ckZeileHtml(s) {
+  var x = s.__satz;
+  var z = ckZustand(s);
+  return '<button type="button" class="cls-zeile ' + (z === 'fertig' ? 'erl' : 'lauf') + '" onclick="clsOeffnen(\'' + esc(s.id) + '\')"><span class="tx">'
+    + (x.stern && z === 'lauf' ? '★ ' : '') + esc(s.titel) + '</span>'
+    + (x.geweckt === isoDatum() && z === 'lauf' ? '<span class="cls-geweckt">geweckt</span>' : '')
+    + clsBalkenHtml(clsStand(s)) + '</button>';
+}
+
 function checklistenListeHtml() {
-  var laufend = clsAlle('lauf');
+  var alle = ckAlle();
+  var korb = ckKorb(false);
   var vorlagen = clsAlle('vorlage');
-  var fertig = clsAlle('fertig');
-  var h = '<div class="gruppe">Laufend</div>';
-  h += laufend.length ? laufend.map(function (g) {
-    /* kompakt (seit 0.48.2): Titel höchstens zwei Zeilen, kurzer Balken mit x/y */
-    return '<button type="button" class="cls-zeile lauf" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel)
-      + '</span>' + clsBalkenHtml(clsStand(g)) + '</button>';
-  }).join('') : '<p class="leise">Keine laufende Checkliste.</p>';
-  h += '<div class="gruppe">Vorlagen</div>';
-  h += vorlagen.length ? vorlagen.map(function (g) {
+  var klapp = ckKlapp();
+  /* Oben der Korb (seit 0.49) — die eine Liste ohne Ende */
+  var h = '<button type="button" class="cls-korb" onclick="clsKorbOeffnen()"><span><b>Korb</b></span><span class="cls-zahl">'
+    + (korb ? kpOffeneZahl(korb) : 0) + ' offen ›</span></button>';
+  var laufend = alle.filter(function (s) { return ckZustand(s) === 'lauf' && !ckIstKorb(s); });
+  h += '<div class="gruppe">Laufend</div>';
+  if (!laufend.length) { h += '<p class="leise">Keine laufende Checkliste.</p>'; }
+  /* nach Lebensbereich gruppiert (Kurs), ohne Bereich am Ende */
+  ckBereiche().concat([{ id: '', name: 'Ohne Bereich' }]).forEach(function (b) {
+    var l = laufend.filter(function (s) { return (s.__satz.bereich || '') === b.id || (!b.id && !ckBereichName(s.__satz.bereich)); });
+    if (!l.length) { return; }
+    h += '<div class="cls-bereich">' + esc(b.name) + '</div>' + l.map(ckZeileHtml).join('');
+  });
+  var gruppe = function (w, name, l, zeile) {
+    if (!l.length) { return ''; }
+    return '<button type="button" class="gruppe klapp" onclick="clsKlappUm(\'' + w + '\')">' + (klapp[w] ? '▾' : '›') + ' ' + name + ' · ' + l.length + '</button>'
+      + (klapp[w] ? l.map(zeile).join('') : '');
+  };
+  h += gruppe('ruht', 'Ruhend', alle.filter(function (s) { return ckZustand(s) === 'ruht'; }), ckZeileHtml);
+  h += gruppe('vorl', 'Vorlagen', vorlagen, function (g) {
     /* kompakt (seit 0.48.2): eine Zeile, gestartet wird in der geöffneten Vorlage */
     return '<button type="button" class="cls-zeile vorl" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel) + '</span></button>';
-  }).join('') : '<p class="leise">Noch keine Vorlage — „Neu“ tippen.</p>';
-  if (fertig.length) {
-    h += '<button type="button" class="gruppe klapp" onclick="clsFertigUm()">' + (cl.cls.fertigAuf ? '▾' : '›') + ' Erledigt · ' + fertig.length + '</button>';
-    if (cl.cls.fertigAuf) {
-      h += fertig.map(function (g) {
-        return '<button type="button" class="cls-zeile erl" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel)
-          + '<small>abgeschlossen ' + esc(clKurzDatum(g.abgeschlossen || g.gestartet || isoDatum())) + '</small></span></button>';
-      }).join('');
-    }
-  }
+  });
+  if (!vorlagen.length) { h += '<p class="leise">Noch keine Vorlage — „Neu“ tippen.</p>'; }
+  h += gruppe('fertig', 'Abgeschlossen', alle.filter(function (s) { return ckZustand(s) === 'fertig'; }), ckZeileHtml);
   return h;
 }
 
@@ -7818,13 +8101,63 @@ function checklisteHtml(g) {
 }
 
 function checklistenHtml() {
-  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-  return g ? checklisteHtml(g) : checklistenListeHtml();
+  var s = ckSeite(cl.cls.id);
+  if (!s) { return checklistenListeHtml(); }
+  /* Listen und Checklisten der Art „Aufgaben“ (seit 0.49): Zeilen wie in Aufgaben */
+  if (ckIstListe(s) || (!cl.cls.schreiben && ckArt(s) === 'aufgaben' && ckZustand(s) !== 'vorlage')) { return ckListeHtml(s); }
+  return checklisteHtml(s.__satz);
+}
+
+/* Eine Checkliste mit Aufgaben-Zeilen: Priorität, Haken, Termin, ⚑ Frist —
+   erster Tipp wählt, zweiter öffnet die Details der Aufgabe */
+function ckListeHtml(s) {
+  var z = ckZustand(s);
+  var st = clsStand(s);
+  var b = ckBereichName(s.__satz.bereich);
+  var h = '<div class="cls-kopf leise">' + (ckIstKorb(s) ? 'Lose Einzelaufgaben — erledigen oder in eine Checkliste schieben'
+        : esc((b ? b + ' · ' : '') + { lauf: 'laufend', ruht: 'ruhend', fertig: 'abgeschlossen' }[z]) + ' · ' + clsBalkenHtml(st)) + '</div>';
+  var erl = 0;
+  var zeilen = String(s.text || '').split('\n');
+  zeilen.forEach(function (zeile, nr) {
+    var a = kpAufgabe(zeile);
+    if (a) {
+      if (!a.text) { return; }
+      var x = ckPunkt(s, nr, a);
+      if (a.erledigt && !cl.auf.frisch[x.key] && !cl.auf.erlZeigen) { erl++; return; }
+      h += aufZeileHtml(x, {});
+      return;
+    }
+    var m = zeile.match(/^\s*(#{1,3})\s+(.*)$/);
+    if (m) { h += '<div class="memo-h2">' + esc(m[2]) + '</div>'; }
+  });
+  if (!st.alle) { h += '<p class="leise">Noch leer — „Neu“ tippen.</p>'; }
+  if (erl || cl.auf.erlZeigen) {
+    h += '<button type="button" class="gruppe klapp" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '▾ Erledigte verbergen' : '› Erledigt · ' + erl) + '</button>';
+  }
+  if (z === 'lauf' && !ckIstKorb(s) && st.alle && st.fertig === st.alle) {
+    h += '<div class="knoepfe"><span class="leise">Alles erledigt.</span>'
+       + '<button type="button" class="knopf voll" onclick="clsAbschliessen()">Abschließen</button></div>';
+  }
+  return h;
 }
 
 function checklistenFussHtml() {
-  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-  if (!g) { return '<button type="button" class="knopf" onclick="clsNeu()">Neu</button>'; }
+  var s = ckSeite(cl.cls.id);
+  if (!s) { return '<button type="button" class="knopf" onclick="clsNeu()">Neu</button>'; }
+  /* Liste (seit 0.49): Neu legt eine Aufgabe hier an, Schreiben öffnet den Text */
+  if (ckIstListe(s)) {
+    return '<button type="button" class="knopf" onclick="clsZurListe()">Fertig</button>'
+      + '<button type="button" class="knopf" onclick="aufNeu()">Neu</button>'
+      + '<button type="button" class="knopf" onclick="listeAlsText()">Schreiben</button>'
+      + '<button type="button" class="knopf" onclick="clsDetails()">Details…</button>';
+  }
+  var g = s.__satz;
+  if (!cl.cls.schreiben && ckArt(s) === 'aufgaben' && g.checkliste !== 'vorlage') {
+    return '<button type="button" class="knopf" onclick="clsZurListe()">Fertig</button>'
+      + '<button type="button" class="knopf" onclick="aufNeu()">Neu</button>'
+      + '<button type="button" class="knopf" onclick="clsSchreibenUm()">Schreiben</button>'
+      + '<button type="button" class="knopf" onclick="clsDetails()">Details…</button>';
+  }
   if (cl.cls.schreiben) { return '<button type="button" class="knopf voll" onclick="clsSchreibenUm()">Fertig</button>'; }
   return '<button type="button" class="knopf" onclick="clsZurListe()">Fertig</button>'
     + (g.checkliste === 'vorlage' ? '<button type="button" class="knopf voll" onclick="clsStarten(\'' + esc(g.id) + '\')">Starten</button>' : '')
@@ -7833,15 +8166,18 @@ function checklistenFussHtml() {
 }
 
 function clsReiter() {
-  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-  if (!g) { return 'Checklisten'; }
+  var s = ckSeite(cl.cls.id);
+  if (!s) { return 'Checklisten'; }
+  if (ckIstListe(s)) { return s.titel; }
+  var g = s.__satz;
   return (g.checkliste === 'vorlage' ? 'Vorlage: ' : '') + g.titel;
 }
 
 /* ---- Bedienen ---- */
 
 function clsOeffnen(id) {
-  if (!clsFinden(id)) { return; }
+  if (!ckSeite(id)) { return; }
+  cl.auf.wahl = '';
   cl.cls.id = id;
   cl.cls.schreiben = false;
   var el = document.getElementById('inhalt');
@@ -7853,11 +8189,6 @@ function clsZurListe() {
   cl.cls.id = '';
   cl.cls.schreiben = false;
   zeichne();
-}
-
-function clsFertigUm() {
-  cl.cls.fertigAuf = !cl.cls.fertigAuf;
-  inhaltZeichnen();
 }
 
 function clsHaken(id, nr) {
@@ -7889,6 +8220,8 @@ function clsStartenMit(v, titel, stichtag) {
   var seite = kpSeiteFinden(g.id);
   plan.forEach(function (p) { aufPlanAnwenden(seite, p.nr, p.datum, p.zeit); });
   if (stichtag) { g.stichtag = stichtag; }
+  if (v.art === 'aufgaben') { g.art = 'aufgaben'; }
+  if (v.bereich) { g.bereich = v.bereich; }
   g.vorlage = v.id;
   v.benutzt = (Number(v.benutzt) || 0) + 1;
   v.geaendert = jetzt();
@@ -8020,13 +8353,11 @@ function clsTextGetippt() {
 }
 
 function clsAbschliessen() {
-  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-  if (!g || g.checkliste !== 'lauf') { return; }
-  g.checkliste = 'fertig';
-  g.abgeschlossen = isoDatum();
-  g.geaendert = jetzt();
+  var s = ckSeite(cl.cls.id);
+  if (!s || ckIstKorb(s) || (ckZustand(s) !== 'lauf' && ckZustand(s) !== 'ruht')) { return; }
+  ckZustandSetzen(s, 'fertig');
   spaeterSichern();
-  melde('„' + g.titel + '“ abgeschlossen.', 'gut');
+  melde('„' + s.titel + '“ abgeschlossen.', 'gut');
   aufklappZuStill();
   clsZurListe();
 }
@@ -8046,9 +8377,11 @@ function clsNeu() {
 }
 
 function clsDetails() {
-  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-  if (!g) { return; }
-  cl.cls.fenster = { modus: 'details', titel: g.titel, kontext: g.kontext || 'privat' };
+  var s = ckSeite(cl.cls.id);
+  if (!s) { return; }
+  var g = s.__satz;
+  cl.cls.fenster = { modus: 'details', titel: s.titel, kontext: g.kontext || 'privat', bereich: g.bereich || '', art: ckArt(s),
+                     zustand: ckZustand(s), stern: !!g.stern };
   cl.aufklapp = 'checkliste';
   aufklappNeu();
 }
@@ -8080,12 +8413,24 @@ function clsFensterLesen() {
   if (f && f.modus === 'plan' && d && typeof d.value === 'string') { f.datum = d.value; }
   if (f && f.modus === 'plan' && f.mitZeit && z && typeof z.value === 'string') { f.zeit = z.value; }
   if (f && f.modus === 'start' && st && typeof st.value === 'string') { f.stichtag = st.value; }
+  var be = document.getElementById('clsBereich');
+  if (f && f.modus === 'details' && be && typeof be.value === 'string') { f.bereich = be.value; }
   return f;
 }
 
 /* Neuer Stichtag: die Vorschau neu zeichnen */
 function clsStartVorschau() {
   if (!clsFensterLesen()) { return; }
+  aufklappNeu();
+}
+
+/* Art, Zustand, ★ im Fenster „Details“ (seit 0.49) */
+function clsDetailWahl(was, wert) {
+  var f = clsFensterLesen();
+  if (!f || f.modus !== 'details') { return; }
+  if (was === 'art' && (wert === 'aufgaben' || wert === 'abhaken')) { f.art = wert; }
+  if (was === 'zustand' && ['lauf', 'ruht', 'fertig'].indexOf(wert) >= 0) { f.zustand = wert; if (wert !== 'lauf') { f.stern = false; } }
+  if (was === 'stern') { f.stern = !f.stern && f.zustand === 'lauf'; }
   aufklappNeu();
 }
 
@@ -8115,7 +8460,7 @@ function clsFensterHtml() {
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'kopie\')">Kopie einer Vorlage …</button>'
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'memo\')">Aus einem Memo übernehmen …</button>'
       + '<button type="button" class="wahl" onclick="clsFensterSchritt(\'liste\')">Aus einer Aufgabenliste übernehmen …</button>'
-      + '<button type="button" class="wahl" onclick="clsAnlegen(\'einmalig\',\'\')">Einmalige Checkliste (ohne Vorlage)</button>'
+      + '<button type="button" class="wahl" onclick="clsAnlegen(\'einmalig\',\'\')">Neue Checkliste (ohne Vorlage)</button>'
       + '<p class="leise">„Aus einem Memo“ bzw. „Aus einer Aufgabenliste“ übernimmt alle Punkte (offen, erledigt, nicht relevant) und Überschriften — aus einer Liste wahlweise als Vorlage oder einmalige Checkliste. Die Quelle bleibt, wie sie ist.</p>'
       + abbrechen;
   }
@@ -8176,25 +8521,52 @@ function clsFensterHtml() {
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="clsLoeschen()">Löschen</button>'
       + '<button type="button" class="knopf" onclick="clsFensterSchritt(\'details\')">Abbrechen</button></div></div></div>';
   }
-  if (!g) { return ''; }
-  var h = kopf(g.checkliste === 'vorlage' ? 'Vorlage' : 'Checkliste')
-    + '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
-    + '<label>Kategorie:</label><div class="wahlreihe">'
-    + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
+  var sd = ckSeite(cl.cls.id);
+  if (!sd) { return ''; }
+  var x = sd.__satz;
+  var korb = ckIstKorb(sd);
+  var vorlage = ckZustand(sd) === 'vorlage';
+  var wahl = function (was, liste, an) {
+    return '<div class="wahlreihe">' + liste.map(function (k) {
+      return '<button type="button"' + (an === k[0] ? ' class="an"' : '') + ' onclick="clsDetailWahl(\'' + was + '\',\'' + k[0] + '\')">' + k[1] + '</button>';
+    }).join('') + '</div>';
+  };
+  var h = kopf(vorlage ? 'Vorlage' : (korb ? 'Korb' : 'Checkliste'));
+  if (!korb) {
+    h += '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
+      /* Lebensbereich aus Kurs (seit 0.49) */
+      + '<label for="clsBereich">Bereich:</label><select id="clsBereich" class="eingabe"><option value="">– ohne –</option>'
+      + ckBereiche().map(function (b) { return '<option value="' + esc(b.id) + '"' + (f.bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('')
+      + '</select>';
+    if (!ckIstListe(sd)) { h += '<label>Art:</label>' + wahl('art', [['aufgaben', 'Aufgaben'], ['abhaken', 'Abhaken']], f.art); }
+    if (!vorlage) {
+      h += '<label>Zustand:</label>' + wahl('zustand', CK_ZUSTAENDE, f.zustand);
+      if (f.zustand === 'lauf') {
+        h += '<div class="wahlreihe"><button type="button"' + (f.stern ? ' class="an"' : '') + ' onclick="clsDetailWahl(\'stern\',\'\')">★ Wesentlich diese Woche</button></div>';
+      }
+    }
+    h += '<label>Kategorie:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
         return '<button type="button"' + (f.kontext === k[0] ? ' class="an"' : '') + ' onclick="clsKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
-      }).join('') + '</div>'
-    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="clsSpeichern()">OK</button>'
+      }).join('') + '</div>';
+  } else {
+    h += '<p class="leise">Lose Einzelaufgaben ohne eigene Checkliste. Der Korb soll leer werden: erledigen oder in eine Checkliste schieben.</p>';
+  }
+  h += '<div class="knoepfe"><button type="button" class="knopf voll" onclick="clsSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div><div class="knoepfe">';
-  if (g.checkliste === 'vorlage') {
+  if (ckIstListe(sd)) {
+    h += '<button type="button" class="knopf" onclick="listeAlsText()">Als Text bearbeiten</button>'
+       + (korb ? '' : '<button type="button" class="knopf" onclick="ckListeLoeschenFragen()">Löschen…</button>');
+    return h + '</div></div></div>';
+  }
+  if (vorlage) {
     h += '<button type="button" class="knopf" onclick="clsKopieren()">Kopieren</button>';
   } else {
     h += '<button type="button" class="knopf" onclick="clsZuruecksetzen()">Alles zurücksetzen</button>'
-       + '<button type="button" class="knopf" onclick="clsAlsVorlage()">Als Vorlage speichern</button>'
-       + (g.checkliste === 'lauf' ? '<button type="button" class="knopf" onclick="clsAbschliessen()">Abschließen</button>'
-                                  : '<button type="button" class="knopf" onclick="clsWiederOeffnen()">Wieder öffnen</button>');
+       + '<button type="button" class="knopf" onclick="clsAlsVorlage()">Als Vorlage speichern</button>';
   }
   return h + '<button type="button" class="knopf" onclick="clsFensterSchritt(\'loeschen\')">Löschen…</button></div></div></div>';
 }
+
 
 function clsAlsWahl(als) {
   var f = cl.cls.fenster;
@@ -8223,7 +8595,7 @@ function clsAusListe(text) {
 function clsAnlegen(wie, quelleId) {
   var g = null;
   if (wie === 'leer') { g = clsNeuerSatz('vorlage', 'Neue Vorlage', '[] ', ''); }
-  else if (wie === 'einmalig') { g = clsNeuerSatz('lauf', 'Checkliste ' + clKurzDatum(isoDatum()), '[] ', ''); }
+  else if (wie === 'einmalig') { g = clsNeuerSatz('lauf', 'Checkliste ' + clKurzDatum(isoDatum()), '[] ', ''); g.art = 'aufgaben'; }
   else if (wie === 'kopie') {
     var v = clsFinden(quelleId);
     if (v) { g = clsNeuerSatz('vorlage', 'Kopie von ' + v.titel, clsLeeren(v.text), v.kontext); }
@@ -8238,7 +8610,11 @@ function clsAnlegen(wie, quelleId) {
   else if (wie === 'liste') {
     var li = kpSeiteFinden(quelleId);
     var als = (cl.cls.fenster && cl.cls.fenster.als === 'lauf') ? 'lauf' : 'vorlage';
-    if (li && li.art === 'liste') { g = clsNeuerSatz(als, li.titel, clsAusListe(li.text), li.kontext); }
+    if (li && li.art === 'liste') {
+      g = clsNeuerSatz(als, li.titel, clsAusListe(li.text), li.kontext);
+      g.art = 'aufgaben';
+      if (li.__satz.bereich) { g.bereich = li.__satz.bereich; }
+    }
   }
   if (!g) { melde('Das ließ sich nicht anlegen.', 'warn'); return; }
   spaeterSichern();
@@ -8252,12 +8628,19 @@ function clsAnlegen(wie, quelleId) {
 
 function clsSpeichern() {
   var f = clsFensterLesen();
-  var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-  if (!f || !g) { aufklappZu(); return; }
+  var s = ckSeite(cl.cls.id);
+  if (!f || !s) { aufklappZu(); return; }
+  var g = s.__satz;
+  if (ckIstKorb(s)) { aufklappZu(); return; }
   var titel = String(f.titel || '').trim();
   if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
-  g.titel = titel.slice(0, 200);
+  if (f.stern && !g.stern && ckSterne() >= 3) { melde('Höchstens drei Checklisten sind gleichzeitig ★ wesentlich.', 'warn'); return; }
+  s.titel = titel.slice(0, 200);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { g.kontext = f.kontext; }
+  if (ckBereichName(f.bereich)) { g.bereich = f.bereich; } else { delete g.bereich; }
+  if (!ckIstListe(s)) { if (f.art === 'aufgaben') { g.art = 'aufgaben'; } else { delete g.art; } }
+  if (ckZustand(s) !== 'vorlage' && f.zustand !== ckZustand(s)) { ckZustandSetzen(s, f.zustand); }
+  if (f.stern && ckZustand(s) === 'lauf') { g.stern = true; } else { delete g.stern; }
   g.geaendert = jetzt();
   spaeterSichern();
   aufklappZu();
@@ -21197,6 +21580,7 @@ function rueckkehrPruefen() {
   erneuerungPruefen();
   if (document.hidden) { return; }
   versionPruefen(false);
+  ckWecken();
   zeichne();
   if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
   clTermineHolen(false);
@@ -21353,6 +21737,7 @@ function minutenTakt() {
   if (document.hidden) { return; }
   uhrZeichnen();
   silkZeichnen();
+  if (ckWecken() && cl.app === 'checklisten' && !cl.aufklapp) { inhaltZeichnen(); }
   if ((cl.app === 'uebersicht' || cl.app === 'kalender' || cl.app === 'heute' || (cl.app === 'coach' && cl.co.ansicht === 'verlauf')) && !cl.aufklapp) { inhaltZeichnen(); }
   /* Coach-Erinnerungen im Kalender nachziehen (höchstens alle fünf Minuten) */
   coKalenderPlanen(false);
@@ -21481,6 +21866,7 @@ function start() {
     /* Lernkartei aus 0.23 (nur auf diesem Gerät) einmalig in die Datenbank */
     var lkAlt = lkAltUebernehmen();
     if (lkAlt) { melde('Lernkartei: ' + lkAlt + (lkAlt === 1 ? ' Kasten' : ' Kästen') + ' in die workbench.json übernommen.', 'gut'); }
+    ckWecken();
     zeichne();
     if (tokenGueltig()) { abgleichPlanen(true); verbindungPruefen(); clTermineHolen(false); }
     taktStarten();

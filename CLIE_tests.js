@@ -186,7 +186,9 @@ if (!WB_SKRIPT) {
   const kern = [...SKRIPT.matchAll(/\nfunction (kp\w+)\s*\(/g)].map(m => m[1]);
   /* Anschlüsse gehören jeder App selbst (seit 0.6: kpVerweisHtml öffnet in CLIE das Memo) */
   const ANSCHLUESSE = ['kpVerweisHtml', 'kpTextSetzen', 'kpBzUm', 'kpBzSprung', 'kpKastenUm', 'kpZelleUm', 'kpAbschnittUm'];
-  const kernAb = kern.filter(n => ANSCHLUESSE.indexOf(n) < 0 && funktionText(SKRIPT, n) !== funktionText(WB_SKRIPT, n));
+  /* Seit 0.49 bewusst angepasst (bauen.py): Priorität in fünf Stufen */
+  const ANGEPASST = ['kpPrioText'];
+  const kernAb = kern.filter(n => ANSCHLUESSE.indexOf(n) < 0 && ANGEPASST.indexOf(n) < 0 && funktionText(SKRIPT, n) !== funktionText(WB_SKRIPT, n));
   pruefe(kern.length > 30 && kernAb.length === 0, 'der Aktivitäten-Kern (' + kern.length + ' Funktionen) gleicht der Workbench'
     + (kernAb.length ? ' — abweichend: ' + kernAb.join(', ') : ''));
   const samm = (s) => (s.match(/var SAMMLUNGEN = \[[\s\S]*?\];/) || [''])[0];
@@ -916,8 +918,8 @@ function aufgabenTest() {
   /* Auswahl oben rechts */
   CL.katUm();
   let a = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /Alle Aufgaben/.test(a) && /Weitere/.test(a),
-    'die Aufklappliste: Filter, Alle Aufgaben, Weitere…');
+  pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /Alle Aufgaben/.test(a) && /aufBereichSetzen\('kb-haus'\)/.test(a) && !/Weitere/.test(a),
+    'die Aufklappliste: Filter, Alle Aufgaben, Lebensbereiche (seit 0.49 statt „Weitere…“)');
   CL.listenwahlOeffnen('filter');
   a = CL.document.getElementById('aufklapp').innerHTML;
   pruefe(/Umbau/.test(a) && /Garten/.test(a) && !/Halbmarathon/.test(a) && !/Ruht/.test(a) && !/>◎ Leer/.test(a),
@@ -927,8 +929,8 @@ function aufgabenTest() {
   pruefe(/▼ Umbau/.test(CL.document.getElementById('katKnopf').textContent), 'oben rechts steht die Liste');
   pruefe(JSON.parse(CL.__ablage['clie-zuletzt'])[0] === 'p2' && CL.__ablage['clie-aufgaben-liste'] === 'p2', 'zuletzt benutzt und die Wahl werden gemerkt');
   CL.katUm();
-  pruefe(/Zuletzt benutzt/.test(CL.document.getElementById('aufklapp').innerHTML) && /aufListeSetzen\('p2'\)/.test(CL.document.getElementById('aufklapp').innerHTML),
-    'die zuletzt benutzte Liste steht oben in der Auswahl');
+  pruefe(!/Zuletzt benutzt/.test(CL.document.getElementById('aufklapp').innerHTML) && !/aufListeSetzen\('p2'\)/.test(CL.document.getElementById('aufklapp').innerHTML),
+    'seit 0.49 keine einzelnen Listen mehr oben rechts (die stehen in Checklisten)');
   CL.aufListeSetzen('');
 
   /* Abhaken */
@@ -940,13 +942,17 @@ function aufgabenTest() {
   pruefe(/Fenster messen/.test(inhalt()) && /Pläne/.test(inhalt()), '„Erledigte“ zeigt es wieder');
   CL.aufErlUm();
 
-  /* Neu: Liste ist Pflicht */
+  /* Neu: ohne Wahl in den Korb (seit 0.49 statt „Liste ist Pflicht“) */
   CL.aufNeu();
   let f = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Neue Aufgabe/.test(f) && /id="aufOk" class="knopf voll" disabled/.test(f) && /bitte wählen/.test(f), 'Neu ohne Liste: OK ist gesperrt');
+  pruefe(/Neue Aufgabe/.test(f) && /id="aufOk" class="knopf voll" disabled/.test(f) && /▼ Korb</.test(f) && /Checkliste:/.test(f), 'Neu: „Checkliste: ▼ Korb“, OK erst mit Text');
   CL.document.getElementById('aufText').value = 'Winterreifen';
   CL.aufSpeichern();
-  pruefe(!/Winterreifen/.test(JSON.stringify(CL.DB)) && /Liste/.test(CL.document.getElementById('toastText').textContent), 'auch per Aufruf: ohne Liste wird nichts gespeichert');
+  const korb0 = CL.DB.themen.filter(x => x.id === 'cl-korb')[0];
+  pruefe(korb0 && korb0.korb && /\[\] Winterreifen/.test(korb0.text), 'ohne Wahl landet die Aufgabe im Korb — er wird dabei angelegt');
+  CL.DB.themen = CL.DB.themen.filter(x => x.id !== 'cl-korb');
+  CL.aufNeu();
+  CL.document.getElementById('aufText').value = 'Winterreifen';
   CL.listenwahlOeffnen('aufgabe');
   a = CL.document.getElementById('aufklapp').innerHTML;
   pruefe(/Leer \(keine offenen\)/.test(a) && !/Halbmarathon/.test(a), 'bei Neu stehen alle laufenden Listen zur Wahl, auch ohne offene Aufgaben');
@@ -1106,7 +1112,7 @@ function memoTest() {
   CL.memoZeile('p2', 0);
   pruefe(CL.cl.app === 'projekte' && CL.cl.pj.id === 'p2' && CL.cl.pj.reiter === 'aufgaben' && /class="aufg hervor" id="pjZ0"/.test(inhalt()), '„Im Projekt zeigen“ öffnet das Projekt (seit 0.43) an der Zeile');
   CL.memoZeile('t1', 0);
-  pruefe(CL.cl.app === 'aufgaben' && CL.cl.auf.liste === 't1', '„Liste zeigen“ öffnet bei Listen die Aufgaben');
+  pruefe(CL.cl.app === 'checklisten' && CL.cl.cls.id === 't1', '„Liste zeigen“ öffnet Listen seit 0.49 in Checklisten');
   CL.aufListeSetzen('');
   CL.oeffne('uebersicht');
   CL.oeffne('memo');
@@ -1129,9 +1135,10 @@ function checklistenTest() {
   CL.DB.gedanken.push({ id: 'v1', titel: 'Packliste Urlaub', text: '## Kleidung\n[x] Regenjacke\n[] Badesachen\n## Technik\n[-] Kabel', kontext: 'privat', checkliste: 'vorlage', benutzt: 2, ordnung: 1, geaendert: 1 });
   CL.DB.gedanken.push({ id: 'v2', titel: 'Monatsabschluss', text: '[] Belege', kontext: 'beruflich', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
   CL.DB.projekte.push({ id: 'p1', name: 'Umbau', flaeche: '## Statik\n[x] Pläne\nText\n[] Angebot', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  CL.localStorage.setItem('clie-cls-klapp', JSON.stringify({ vorl: true }));
   CL.oeffne('checklisten');
   let h = inhalt();
-  pruefe(/>Laufend</.test(h) && />Vorlagen</.test(h) && /Packliste Urlaub/.test(h) && !/clsStarten\(/.test(h), 'Übersicht: Laufend und Vorlagen — ohne Startknopf (0.48.2)');
+  pruefe(/>Laufend</.test(h) && /Vorlagen · 2/.test(h) && /Packliste Urlaub/.test(h) && !/clsStarten\(/.test(h), 'Übersicht: Laufend und Vorlagen (aufgeklappt) — ohne Startknopf (0.48.2)');
   CL.katSetzen('beruflich');
   pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'Beruf / Privat filtert');
   CL.katSetzen('alle');
@@ -1151,7 +1158,7 @@ function checklistenTest() {
   pruefe(/Alles erledigt/.test(inhalt()) && /clsAbschliessen/.test(inhalt()), 'alles erledigt: „Abschließen“ wird angeboten');
   CL.clsAbschliessen();
   pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv, zurück zur Übersicht');
-  pruefe(/Erledigt · 1/.test(inhalt()), 'die Übersicht zählt Erledigte (eingeklappt)');
+  pruefe(/Abgeschlossen · 1/.test(inhalt()), 'die Übersicht zählt Abgeschlossene (eingeklappt)');
 
   /* Neu: aus einem Memo, als Kopie, leer */
   CL.clsNeu();
@@ -1304,7 +1311,7 @@ function auszeichnungTest() {
   CL.memoVerweis('p2');
   pruefe(CL.cl.app === 'projekte' && CL.cl.pj.id === 'p2', 'ein Tipp auf den Verweis öffnet die Seite (Projekte seit 0.43 in Projekte)');
   CL.memoVerweis('t1');
-  pruefe(CL.cl.app === 'aufgaben' && CL.cl.auf.liste === 't1', 'ein Verweis auf eine Liste öffnet sie in den Aufgaben');
+  pruefe(CL.cl.app === 'checklisten' && CL.cl.cls.id === 't1', 'ein Verweis auf eine Liste öffnet sie in Checklisten (0.49)');
   CL.aufListeSetzen('');
 
   /* Kalender → Neu → Aufgabe */
@@ -1817,6 +1824,197 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   93. Alles ist eine Checkliste: Zustand, Bereich, Art, Wecken (0.49)
+   Grund: Endlose Listen wie „Haus“ führen nicht zum Ziel. Seit 0.49 sind
+   Aufgabenlisten und Checklisten eins: laufend · ruhend · abgeschlossen,
+   gruppiert nach Lebensbereich aus Kurs, Art Aufgaben oder Abhaken. Eine
+   ruhende Checkliste wacht auf, sobald ein Punkt heute fällig ist.
+   Erkennt: Ruhendes in Aufgaben, Wecken bleibt aus oder weckt ohne
+   Fälliges, Bereich/Art/Zustand gehen beim Speichern verloren, Listen
+   öffnen nicht in Checklisten, ★ mehr als dreimal.
+   ============================================================ */
+function ckZustandTest() {
+  console.log('\n93. Alles ist eine Checkliste: Zustand, Bereich, Art, Wecken (0.49)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = '';
+  S.localStorage.removeItem('clie-cls-klapp');
+  S.DB.themen = [{ id: 'th', name: 'Haus', text: '[] Dachrinne\n[x] Keller', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 },
+                 { id: 'tr', name: 'Carport Angebote', text: '[] Maier nachfassen\n[] Bauamt', kontext: 'privat', bereich: 'kb-haus', ruht: true, ordnung: 2, geaendert: 1 },
+                 { id: 'ta', name: 'Altes', text: '[x] fertig', kontext: 'privat', abgeschlossen: '2026-10-01', ordnung: 3, geaendert: 1 }];
+  S.DB.gedanken.push({ id: 'gp', titel: 'Packen Borkum', text: '[] Koffer\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', bereich: 'kb-beziehungen', gestartet: heute, ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'ga', titel: 'Jahresgespräche', text: '[] Termine\n[] Bögen', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', bereich: 'kb-arbeit', gestartet: heute, ordnung: 5, geaendert: 1 });
+  S.oeffne('checklisten');
+  let h = inhalt();
+  pruefe(/class="cls-korb"/.test(h) && h.indexOf('cls-korb') < h.indexOf('>Laufend<'), 'oben der Korb, darunter „Laufend“');
+  pruefe(/cls-bereich">Haus &amp; Projekte</.test(h) && /cls-bereich">Arbeit</.test(h) && h.indexOf('>Arbeit<') < h.indexOf('>Haus &amp; Projekte<'),
+    'Laufend nach Lebensbereich aus Kurs gruppiert (Reihenfolge wie in Kurs)');
+  pruefe(/Ruhend · 1/.test(h) && /Abgeschlossen · 1/.test(h) && !/Maier/.test(h) && !/>Carport Angebote</.test(h), 'Ruhend und Abgeschlossen eingeklappt mit Zahl');
+  S.clsKlappUm('ruht');
+  pruefe(/Carport Angebote/.test(inhalt()) && JSON.parse(S.localStorage.getItem('clie-cls-klapp')).ruht === true, 'aufklappen zeigt sie, auf dem Gerät gemerkt');
+  /* Aufgaben: ruhende Liste nicht, Abhak-Checkliste nur Eingeplantes, Art Aufgaben ganz */
+  S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.naechste = false;
+  S.oeffne('aufgaben');
+  h = inhalt();
+  pruefe(/Dachrinne/.test(h) && !/Maier nachfassen/.test(h) && !/Koffer/.test(h) && /Termine/.test(h) && /Bögen/.test(h),
+    'Aufgaben: ruhende Liste nicht, Abhaken nur Eingeplantes, Art „Aufgaben“ mit allen Punkten');
+  /* Wecken: ein Punkt der ruhenden Liste wird für heute eingeplant */
+  S.aufPlanAnwenden(S.kpSeiteFinden('tr'), 0, heute, '');
+  const n = S.ckWecken();
+  const tr = S.DB.themen[1];
+  pruefe(n === 1 && !tr.ruht && tr.geweckt === heute && /Aufgewacht: „Carport Angebote“/.test(S.document.getElementById('toastText').textContent), 'fälliger Punkt weckt die ruhende Checkliste, mit Meldung');
+  S.oeffne('checklisten');
+  pruefe(/Carport Angebote<\/span><span class="cls-geweckt">geweckt<\/span>/.test(inhalt()), 'in der Übersicht mit der Marke „geweckt“');
+  pruefe(S.ckWecken() === 0, 'nichts mehr zu wecken: keine weitere Meldung');
+  /* Liste in Checklisten öffnen, Zeilen wie in Aufgaben */
+  S.clsOeffnen('th');
+  h = inhalt();
+  pruefe(S.cl.cls.id === 'th' && /aufHaken\('th',0\)/.test(h) && /aufPrioUm\('th',0\)/.test(h) && /Erledigt · 1/.test(h) && /aufNeu\(\)/.test(S.document.getElementById('fuss').innerHTML),
+    'eine Liste öffnet in Checklisten: Zeilen mit Haken und Priorität, Erledigte eingeklappt, unten „Neu“');
+  /* Details: Bereich, Zustand, ★ */
+  S.clsDetails();
+  let f = S.clsFensterHtml();
+  pruefe(/id="clsBereich"/.test(f) && /<option value="kb-haus" selected>/.test(f) && /clsDetailWahl\('zustand','ruht'\)/.test(f) && /★ Wesentlich/.test(f) && !/clsDetailWahl\('art'/.test(f),
+    'Details einer Liste: Bereich, Zustand, ★ — keine Art (Listen sind immer „Aufgaben“)');
+  S.document.getElementById('clsBereich').value = 'kb-freizeit';
+  S.clsDetailWahl('stern', '');
+  S.clsSpeichern();
+  pruefe(S.DB.themen[0].bereich === 'kb-freizeit' && S.DB.themen[0].stern === true, 'Bereich und ★ gespeichert');
+  S.clsDetails(); S.clsDetailWahl('zustand', 'ruht'); S.clsSpeichern();
+  pruefe(S.DB.themen[0].ruht === true && !S.DB.themen[0].stern, 'ruhend: ★ fällt weg');
+  S.clsDetails(); S.clsDetailWahl('zustand', 'lauf'); S.clsSpeichern();
+  /* ★ höchstens drei */
+  ['tr', 'th'].forEach(id => { S.kpSeiteFinden(id).__satz.stern = true; });
+  S.DB.gedanken.filter(g => g.id === 'gp')[0].stern = true;
+  S.clsOeffnen('ga'); S.clsDetails(); S.clsDetailWahl('stern', ''); S.clsSpeichern();
+  pruefe(!S.DB.gedanken.filter(g => g.id === 'ga')[0].stern && /Höchstens drei/.test(S.document.getElementById('toastText').textContent), 'ein vierter ★ wird abgelehnt');
+  S.aufklappZu();
+  /* Art einer Checkliste umschalten */
+  S.clsOeffnen('gp'); S.clsDetails();
+  pruefe(/clsDetailWahl\('art','aufgaben'\)/.test(S.clsFensterHtml()), 'Checkliste: Art wählbar');
+  S.clsDetailWahl('art', 'aufgaben'); S.clsSpeichern();
+  pruefe(S.DB.gedanken.filter(g => g.id === 'gp')[0].art === 'aufgaben', 'Art „Aufgaben“ gespeichert');
+  /* Vorlage vererbt Art und Bereich */
+  S.DB.gedanken.push({ id: 'vv', titel: 'DFÜ-Test', text: '[] A', kontext: 'beruflich', checkliste: 'vorlage', art: 'aufgaben', bereich: 'kb-arbeit', ordnung: 9, geaendert: 1 });
+  S.clsStarten('vv');
+  const neu = S.DB.gedanken.filter(g => g.vorlage === 'vv')[0];
+  pruefe(neu && neu.art === 'aufgaben' && neu.bereich === 'kb-arbeit', 'Starten aus der Vorlage übernimmt Art und Bereich');
+  S.clsZurListe();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   94. Korb und Aufgaben als Gesamtsicht (0.49)
+   Grund: Lose Einzelaufgaben brauchen keine eigene Liste — sie landen im
+   Korb, der einzigen Liste ohne Ende. „Neue Aufgabe“ hat keine Pflicht-
+   Liste mehr. Aufgaben zeigt nur noch an und filtert nach Lebensbereich.
+   Erkennt: Korb doppelt angelegt, Aufgabe ohne Wahl geht verloren, Korb
+   ruht oder lässt sich löschen, Filter nach Bereich wirkungslos.
+   ============================================================ */
+function ckKorbTest() {
+  console.log('\n94. Korb und Aufgaben als Gesamtsicht (0.49)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = '';
+  S.DB.themen = [{ id: 'tg', name: 'Garten', text: '[] Hecke', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 },
+                 { id: 'tb', name: 'Büro', text: '[] Ablage', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 }];
+  pruefe(S.ckKorb(false) === null, 'ohne Gebrauch kein Korb');
+  S.oeffne('aufgaben');
+  S.aufNeu();
+  S.document.getElementById('aufText').value = 'Dachrinne reinigen';
+  S.aufSpeichern();
+  S.aufNeu();
+  S.document.getElementById('aufText').value = 'Fenster abdichten';
+  S.aufSpeichern();
+  const korb = S.DB.themen.filter(x => x.id === 'cl-korb');
+  pruefe(korb.length === 1 && korb[0].korb && korb[0].text === '[] Dachrinne reinigen\n[] Fenster abdichten' && korb[0].kontext === '', 'ohne Wahl in den Korb — genau ein Korb (feste Kennung), passt zu Beruf und Privat');
+  S.oeffne('checklisten');
+  pruefe(/<b>Korb<\/b><\/span><span class="cls-zahl">2 offen ›/.test(inhalt()) && !/class="cls-zeile lauf" onclick="clsOeffnen\('cl-korb'\)/.test(inhalt()), 'Übersicht: Korb oben mit Zahl, nicht noch einmal unter „Laufend“');
+  S.clsKorbOeffnen();
+  pruefe(S.cl.cls.id === 'cl-korb' && /Lose Einzelaufgaben/.test(inhalt()) && /Dachrinne reinigen/.test(inhalt()), 'der Korb öffnet sich wie eine Checkliste');
+  S.clsDetails();
+  const f = S.clsFensterHtml();
+  pruefe(!/clsDetailWahl\('zustand'/.test(f) && !/ckListeLoeschenFragen/.test(f) && !/id="clsTitel"/.test(f), 'Korb: kein Zustand, kein Löschen, kein Umbenennen');
+  S.aufklappZu();
+  /* Neu aus einer geöffneten Checkliste landet dort */
+  S.clsOeffnen('tg');
+  S.aufNeu();
+  pruefe(S.cl.auf.fenster.seite === 'tg' && /▼ ≡ Garten/.test(S.aufFensterHtml()), 'Neu in einer geöffneten Checkliste: dort vorgewählt');
+  S.document.getElementById('aufText').value = 'Rasen mähen';
+  S.aufSpeichern();
+  pruefe(/\[\] Rasen mähen$/.test(S.DB.themen[0].text), 'und dort angelegt');
+  /* Auswahl im Fenster: Korb, Checklisten, Projekte */
+  S.clsZurListe();
+  S.aufNeu(); S.listenwahlOeffnen('aufgabe');
+  const w = S.listenwahlHtml();
+  pruefe(/Checkliste wählen/.test(w) && w.indexOf('>Korb<') < w.indexOf('>Checklisten<') && /Neue Checkliste …/.test(w), 'Auswahl: zuerst Korb, dann Checklisten, „Neue Checkliste …“');
+  S.aufklappZu();
+  /* Aufgaben nach Lebensbereich */
+  S.oeffne('aufgaben');
+  S.aufBereichSetzen('kb-arbeit');
+  pruefe(/Ablage/.test(inhalt()) && !/Hecke/.test(inhalt()) && !/Dachrinne/.test(inhalt()) && S.localStorage.getItem('clie-aufgaben-bereich') === 'kb-arbeit', 'Filter nach Bereich: nur Arbeit, gemerkt');
+  S.aufBereichSetzen('');
+  pruefe(/Ablage/.test(inhalt()) && /Hecke/.test(inhalt()) && /Dachrinne/.test(inhalt()), 'Alle Aufgaben: wieder alles, auch der Korb');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   95. Prioritäten 1–5, ⚑ Frist, ◷ Dauer, ★ in Aufgaben (0.49)
+   Grund: P1 war nur ein Alarmsignal. Seit 0.49 fünf Stufen (3 = Vorgabe
+   ohne Kürzel), die Frist von außen ist eine eigene Marke statt P1, die
+   grobe Dauer hilft beim Planen, ★ markiert die wesentlichen Checklisten.
+   Erkennt: P4/P5 werden nicht erkannt, Frist/Dauer gehen beim Umbenennen
+   oder Verschieben verloren, Sortierung ohne „heute fällig zuerst“,
+   Frist weckt eine ruhende Checkliste nicht.
+   ============================================================ */
+function ckPrioTest() {
+  console.log('\n95. Prioritäten 1–5, ⚑ Frist, ◷ Dauer, ★ in Aufgaben (0.49)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.cl.cls.id = ''; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = ''; S.cl.auf.frisch = {}; S.cl.auf.wahl = '';
+  S.cl.auf.ansicht = 'prio'; S.cl.auf.naechste = false;
+  S.DB.themen = [{ id: 'tq', name: 'Q4', text: '[] P5 Keller\n[] P4 Ablage\n[] Präsentation\n[] P1 ZEO-Auftrag', kontext: 'privat', ordnung: 1, geaendert: 1 },
+                 { id: 'ts', name: 'PV-Anlage', text: '[] P1 Angebot prüfen', kontext: 'privat', stern: true, ordnung: 2, geaendert: 1 }];
+  pruefe(S.kpPrio('P4 Ablage').p === 4 && S.kpPrio('P5 Keller').p === 5 && S.kpPrioText('x', 5) === 'P5 x' && S.kpPrioText('P2 x', 0) === 'x', 'P4 und P5 werden erkannt und geschrieben');
+  S.oeffne('aufgaben');
+  const zeilen = (x) => (x.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(y => y.replace(/.*>/, '').replace(/<$/, ''));
+  pruefe(zeilen(inhalt()).join(' | ') === 'Angebot prüfen | ZEO-Auftrag | Präsentation | Ablage | Keller', 'Prio: P1 mit ★ zuerst, dann P1, 3, 4, 5 — ' + zeilen(inhalt()).join(' | '));
+  pruefe(/Angebot prüfen<small class="herkunft">≡ ★ PV-Anlage<\/small>/.test(inhalt()), '★ steht in der Herkunft');
+  /* Frist und Dauer im Fenster */
+  S.aufDetails('tq', 2);
+  let f = S.aufFensterHtml();
+  pruefe(/id="aufFrist"/.test(f) && /aufDauerWahl\(60\)">1 Std/.test(f) && /class="an" onclick="aufPrioWahl\(3\)"/.test(f) && /aufPrioWahl\(5\)/.test(f), 'Fenster: Priorität 1–5 (3 vorgewählt), ⚑ Frist, ◷ Dauer');
+  S.document.getElementById('aufFrist').value = heute;
+  S.aufDauerWahl(60);
+  S.document.getElementById('aufText').value = 'Präsentation Q4';
+  S.document.getElementById('aufFrist').value = heute;
+  S.aufSpeichern();
+  const zq = S.DB.themen[0].zusatz;
+  pruefe(zq && zq['Präsentation Q4'] && zq['Präsentation Q4'].frist === heute && zq['Präsentation Q4'].dauer === 60 && !zq['Präsentation'], 'Frist und Dauer am Satz — beim Umbenennen umgezogen');
+  const h = inhalt();
+  pruefe(zeilen(h)[0] === 'Präsentation Q4' && /<span class="frist-marke">⚑ heute<\/span>/.test(h) && /◷ 1 Std/.test(h), 'heute fällige Frist steht ganz oben, mit ⚑ und ◷');
+  /* Verschieben nimmt den Zusatz mit */
+  const nr = S.DB.themen[0].text.split('\n').indexOf('[] Präsentation Q4');
+  S.aufDetails('tq', nr);
+  S.cl.auf.fenster.seite = 'ts';
+  S.aufSpeichern();
+  pruefe(!S.DB.themen[0].zusatz && S.DB.themen[1].zusatz && S.DB.themen[1].zusatz['Präsentation Q4'].frist === heute, 'in eine andere Checkliste verschoben: Frist und Dauer ziehen mit');
+  /* Frist weckt eine ruhende Checkliste */
+  S.DB.themen.push({ id: 'tw', name: 'Steuer', text: '[] Belege', kontext: 'privat', ruht: true, zusatz: { Belege: { frist: S.tagePlus(heute, -1) } }, ordnung: 3, geaendert: 1 });
+  pruefe(S.ckWecken() === 1 && !S.DB.themen[2].ruht, 'eine überfällige ⚑ Frist weckt die ruhende Checkliste');
+  /* Löschen räumt den Zusatz auf */
+  const nr2 = S.DB.themen[1].text.split('\n').indexOf('[] Präsentation Q4');
+  S.aufDetails('ts', nr2); S.aufLoeschenFragen(); S.aufLoeschen();
+  pruefe(!S.DB.themen[1].zusatz, 'gelöschte Aufgabe: Zusatz weg');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    92. Neue Checkliste aus einer Aufgabenliste (0.48.3, einmalig 0.48.4)
    Grund: Bei „Neu“ ließ sich eine Vorlage nur leer, als Kopie oder aus
    einem Memo anlegen. Seit 0.48.3 auch aus einer Aufgabenliste — mit
@@ -1877,6 +2075,7 @@ function clsKompaktTest() {
   const S = CL;
   S.DB.gedanken.push({ id: 'v9', titel: 'Durchführung des DFÜ-Abruftest für eine Auslieferung', text: '[] A\n[] B', kontext: 'beruflich', checkliste: 'vorlage', benutzt: 3, ordnung: 1, geaendert: 1 });
   S.DB.gedanken.push({ id: 'l9', titel: 'Durchführung des DFÜ-Abruftest 29.10.2026', text: '[x] A\n[] B', kontext: 'beruflich', checkliste: 'lauf', gestartet: S.isoDatum(), ordnung: 2, geaendert: 1 });
+  S.localStorage.setItem('clie-cls-klapp', JSON.stringify({ vorl: true }));
   S.oeffne('checklisten');
   const h = S.checklistenListeHtml();
   pruefe(!/clsStarten\(/.test(h) && !/Starten</.test(h), 'kein Startknopf in der Übersicht');
@@ -2716,7 +2915,7 @@ function lesezeichenTest() {
   S.katSetzen('alle');
   /* Öffnen */
   const id = n => S.DB.pinnwand.filter(p => p.zielId === n)[0].id;
-  S.lzOeffnen(id('l1')); pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'l1', 'Liste öffnet in Aufgaben');
+  S.lzOeffnen(id('l1')); pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'l1', 'Liste öffnet in Checklisten (0.49)');
   S.lzOeffnen(id('g:c1')); pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'c1', 'Checkliste öffnet in Checklisten');
   S.lzOeffnen(id('p1')); pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1', 'Projekt öffnet in Projekte (seit 0.43)');
   S.lzOeffnen(id('s1')); pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === 's1', 'Sammlung öffnet');
@@ -3153,7 +3352,8 @@ function prioTest() {
   frisch();
   const S = CL;
   if (WB_QUELLE) {
-    pruefe(['kpPrio', 'kpPrioText', 'kpPrioSetzenKern'].every(n => funktionText(SKRIPT, n) === funktionText(WB_QUELLE, n)), 'Kern-Funktionen wörtlich wie in der Workbench');
+    pruefe(['kpPrio', 'kpPrioSetzenKern'].every(n => funktionText(SKRIPT, n) === funktionText(WB_QUELLE, n)), 'Kern-Funktionen wörtlich wie in der Workbench (kpPrioText seit 0.49 mit fünf Stufen)');
+    pruefe(/var KP_PRIO = \/\^\[P\]\(\[1-5\]\)/.test(SKRIPT) && /p <= 5\) \? 'P' \+ p/.test(SKRIPT), 'fünf Stufen: P1 … P5 werden erkannt und geschrieben (0.49)');
   }
   const heute = S.isoDatum();
   S.DB.themen.push({ id: 'l1', name: 'Haus', text: '[] Keller aufräumen\n[] P2 Rasen vertikutieren\n[] P1 Statik anfragen\n[] P3 Ablage', kontext: 'privat', geaendert: 1 });
@@ -3164,8 +3364,9 @@ function prioTest() {
   S.oeffne('aufgaben');
   let h = inhalt();
   const reihe = (h.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
-  pruefe(reihe.join(' | ') === 'Statik anfragen | Rasen vertikutieren | Ablage | Keller aufräumen', 'nach Priorität sortiert, ohne Kürzel im Text — ' + reihe.join(' | '));
-  pruefe(/class="prio p1" onclick="aufPrioUm\('l1',2\)"[^>]*>1</.test(h) && /class="prio p0" onclick="aufPrioUm\('l1',0\)"[^>]*><\/button>/.test(h), 'Zeichen 1 … und ein leerer Platz zum Setzen');
+  /* seit 0.49: heute Eingeplantes zuerst, dann P (ohne Kürzel = 3) */
+  pruefe(reihe.join(' | ') === 'Rasen vertikutieren | Keller aufräumen | Statik anfragen | Ablage', 'nach Priorität sortiert (heute Geplantes zuerst), ohne Kürzel im Text — ' + reihe.join(' | '));
+  pruefe(/class="prio p1" onclick="aufPrioUm\('l1',2\)"[^>]*>1</.test(h) && /class="prio p3 still" onclick="aufPrioUm\('l1',0\)"[^>]*>3<\/button>/.test(h), 'Zeichen 1 … und ohne Kürzel eine leise 3');
   S.aufAnsicht('gruppiert');
   const reihe2 = (inhalt().match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
   pruefe(reihe2[0] === 'Keller aufräumen' && S.cl.auf.ansicht === 'gruppiert', 'Gruppiert (seit 0.17 statt „↕ Liste“): Reihenfolge wie in der Liste');
@@ -3173,10 +3374,12 @@ function prioTest() {
 
   /* Antippen schaltet weiter — die Einplanung im Tag zieht mit */
   S.aufPrioUm('l1', 0);
+  pruefe(/\[\] P4 Keller aufräumen/.test(S.DB.themen[0].text) && S.DB.tage[0].eintraege[0].text === 'P4 Keller aufräumen', 'Antippen: 3 → 4, auch im eingeplanten Tag (0.49)');
+  S.aufPrioUm('l1', 0); S.aufPrioUm('l1', 0);
   pruefe(/\[\] P1 Keller aufräumen/.test(S.DB.themen[0].text) && /\[\] P1 Keller aufräumen/.test(S.DB.tage[0].text) && S.DB.tage[0].eintraege[0].text === 'P1 Keller aufräumen',
-    'Antippen: – → 1, auch im eingeplanten Tag');
-  S.aufPrioUm('l1', 1); S.aufPrioUm('l1', 1);
-  pruefe(/\[\] Rasen vertikutieren/.test(S.DB.themen[0].text) && S.DB.tage[0].eintraege[1].text === 'Rasen vertikutieren', '2 → 3 → – entfernt das Kürzel wieder');
+    '4 → 5 → 1: rundum, auch im eingeplanten Tag');
+  S.aufPrioUm('l1', 1);
+  pruefe(/\[\] Rasen vertikutieren/.test(S.DB.themen[0].text) && S.DB.tage[0].eintraege[1].text === 'Rasen vertikutieren', '2 → 3 entfernt das Kürzel (3 ist die Vorgabe)');
 
   /* Fenster */
   S.aufDetails('l1', 2);
@@ -3186,7 +3389,7 @@ function prioTest() {
   S.aufPrioWahl(3);
   S.document.getElementById('aufText').value = 'Statik anfragen';
   S.aufSpeichern();
-  pruefe(/\[\] P3 Statik anfragen/.test(S.DB.themen[0].text) && !/P1 Statik/.test(S.DB.themen[0].text), 'Speichern setzt die gewählte Priorität — ohne doppeltes Kürzel');
+  pruefe(/\[\] Statik anfragen/.test(S.DB.themen[0].text) && !/P\d Statik/.test(S.DB.themen[0].text), 'Speichern mit 3 (Vorgabe): ohne Kürzel, ohne doppeltes Kürzel');
   S.aufNeu();
   S.cl.auf.fenster.seite = 'l1';
   S.document.getElementById('aufText').value = 'P2 Hecke schneiden';
@@ -3410,11 +3613,11 @@ function listeTextTest() {
   pruefe(/› Auftrag ausfüllen/.test(S.DB.themen[0].text) && S.kpOffeneZahl(S.kpSeiteFinden('lh')) === 2, 'Textzeilen gespeichert, beide Aufgaben bleiben');
   pruefe(/memoSchreibenUm\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'unten „Fertig“');
   S.memoSchreibenUm();
-  pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'lh' && !S.cl.memo.id && !S.cl.memo.ausListe, '„Fertig“ führt zurück zur Liste „Haus“');
+  pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'lh' && !S.cl.memo.id && !S.cl.memo.ausListe, '„Fertig“ führt zurück zur Liste „Haus“ (seit 0.49 in Checklisten)');
   pruefe(/Fenster warten/.test(inhalt()) && !/Auftrag ausfüllen/.test(inhalt()), 'Aufgabenansicht zeigt weiter nur die Aufgaben');
   S.listeAlsText();
   S.clZurueck();
-  pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
+  pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
   S.listeAlsText();
   S.oeffne('uebersicht'); S.oeffne('memo');
   pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Notizen|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
@@ -3622,8 +3825,8 @@ function ansichtTest() {
 
   S.aufAnsicht('prio');
   h = inhalt();
-  pruefe(zeilen(h).join(' | ') === 'Steckdose | Statik anfragen | Nachbar informieren | Fähre buchen | Koffer packen | Dach prüfen | Lampe tauschen',
-    'Prio: P1, P2, dann ohne — bei gleicher Prio früher Geplantes zuerst — ' + zeilen(h).join(' | '));
+  pruefe(zeilen(h).join(' | ') === 'Nachbar informieren | Fähre buchen | Steckdose | Statik anfragen | Koffer packen | Dach prüfen | Lampe tauschen',
+    'Prio (seit 0.49): heute Fälliges zuerst, dann P1, P2, dann 3 — bei gleicher Prio früher Geplantes zuerst — ' + zeilen(h).join(' | '));
   pruefe(/Steckdose<small class="herkunft">≡ Haus<\/small>/.test(h) && /Fähre buchen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(h) && !/class="gruppe/.test(h), 'Prio: flach, Herkunft unter jeder Aufgabe');
   pruefe(S.__ablage['clie-aufgaben-ansicht'] === 'prio', 'die Wahl wird gemerkt');
 
@@ -5919,6 +6122,9 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { ckPrioTest(); } catch (e) { fail('Prioritäten 1–5 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { ckKorbTest(); } catch (e) { fail('Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { ckZustandTest(); } catch (e) { fail('Checklisten-Zustand warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsAusListeTest(); } catch (e) { fail('Checkliste aus Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsKompaktTest(); } catch (e) { fail('Checklisten kompakt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saSymbolTest(); } catch (e) { fail('Sammlung-Symbole warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
