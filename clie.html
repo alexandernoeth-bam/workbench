@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.57.0</title>
+<title>CLIE 0.58.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -545,13 +545,11 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-suche input::-webkit-search-cancel-button{display:none}
 .sa-suche button{border:0;background:transparent;font:inherit;font-size:16px;padding:2px 6px;color:inherit}
 .sa-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:19px}
-.sa-tab th{font-size:16px;font-weight:600;text-align:left;border-bottom:2px solid var(--px);padding:2px 3px}
+.sa-tab th{font-size:16px;font-weight:600;text-align:left;border-bottom:2px solid var(--px);padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sa-tab td{border-bottom:2px dotted var(--px-zart);padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sa-tab th:first-child,.sa-tab td:first-child{width:46%}
 /* Seit 0.47.1 sortieren die Spaltenköpfe */
 .sa-tab th.sort{cursor:pointer}
 .sa-pfeil{font-weight:400}
-.sa-tab.sa-dat th:first-child,.sa-tab.sa-dat td:first-child{width:22%}
 .sa-tab.sa-vier{font-size:17.5px}
 /* Kopf der Sammlung steht fest, nur die Einträge scrollen (seit 0.14) */
 .sa-fest{position:sticky;top:-6px;z-index:5;background:var(--lcd);margin:-6px -10px 0;padding:6px 10px 0}
@@ -580,8 +578,6 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .sa-dia-zr button{font-size:16px;padding:0 2px}
 .sa-kw.sa-kw3 div{padding:2px 4px}
 .sa-kw.sa-kw3 b{font-size:20px}
-.sa-tab.sa-vier th:first-child,.sa-tab.sa-vier td:first-child{width:34%}
-.sa-tab.sa-vier.sa-dat th:first-child,.sa-tab.sa-vier.sa-dat td:first-child{width:20%}
 .sa-tab .r{text-align:right}
 .sa-tab tr.sa-z{cursor:pointer}
 .sa-tab tr.sa-gr td{font-weight:600;border-bottom:2px solid var(--px-mitte);padding-top:8px}
@@ -955,7 +951,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.57.0';
+var APP_VERSION = '0.58.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -9901,6 +9897,61 @@ function saZelle(s, f, d) {
   return t;
 }
 
+/* ---- Spaltenbreiten (seit 0.58.0) ----
+   Auto: nach der Länge der Inhalte (längster Wert, gekappt — ein Ausreißer
+   verdrängt nicht alles), mindestens so breit wie die Überschrift.
+   Von Hand: schmal / mittel / breit je Feld (f.breite), Vorrang vor Auto. */
+var SA_BREITEN = [['', 'Auto'], ['schmal', 'schmal'], ['mittel', 'mittel'], ['breit', 'breit']];
+var SA_BREITE_ZEICHEN = { schmal: 5, mittel: 12, breit: 24 };
+var SA_BREITE_MAX = 26;
+
+/* Wie viele Zeichen passen in eine Zeile? (Schrift ~0,6 em breit) */
+function saZeichenProZeile(spalten) {
+  var el = document.getElementById('inhalt');
+  var px = (el && el.clientWidth > 100) ? el.clientWidth - 24 : 380;
+  return Math.max(20, px / ((spalten >= 4 ? 17.5 : 19) * 0.6));
+}
+
+function saSpaltenBreiten(s, sp, l) {
+  var platz = saZeichenProZeile(sp.length);
+  var bedarf = sp.map(function (f) {
+    if (SA_BREITE_ZEICHEN[f.breite]) { return { hand: true, n: SA_BREITE_ZEICHEN[f.breite] }; }
+    var n = 0;
+    l.forEach(function (d) { n = Math.max(n, String(saZelle(s, f, d) || '').length); });
+    /* Überschrift zählt höchstens 7 Zeichen (kleinere Schrift, wird sonst gekürzt) —
+       über ganz kurzen Inhalten (✓, ★) nur 5, dann wird sie eben gekürzt */
+    var kopf = Math.min(String(f.name || '').length + 2, Math.max(5, Math.min(7, n + 2))) * 0.85;
+    return { hand: false, n: Math.max(3, kopf, Math.min(SA_BREITE_MAX, n)) + 1 };
+  });
+  /* Kurze Spalten bekommen, was sie brauchen; der Rest geht anteilig an die langen */
+  var breite = bedarf.map(function () { return 0; });
+  var offen = bedarf.map(function (b, i) { return i; });
+  var rest = platz;
+  var schutz = 0;
+  while (offen.length && schutz++ < 10) {
+    var anteil = rest / offen.length;
+    var kurz = offen.filter(function (i) { return bedarf[i].n <= anteil; });
+    if (!kurz.length) {
+      var summe = offen.reduce(function (a, i) { return a + bedarf[i].n; }, 0);
+      offen.forEach(function (i) { breite[i] = rest * bedarf[i].n / summe; });
+      offen = [];
+      rest = 0;
+    } else {
+      kurz.forEach(function (i) { breite[i] = bedarf[i].n; rest -= bedarf[i].n; });
+      offen = offen.filter(function (i) { return kurz.indexOf(i) < 0; });
+    }
+  }
+  /* Platz übrig (alles kurz): anteilig verteilen — die Summe wird unten 100 % */
+  var ges = breite.reduce(function (a, b) { return a + b; }, 0) || 1;
+  var proz = breite.map(function (b) { return Math.round(b / ges * 1000) / 10; });
+  if (proz.length) { proz[proz.length - 1] = Math.round((100 - proz.slice(0, -1).reduce(function (a, b) { return a + b; }, 0)) * 10) / 10; }
+  return proz;
+}
+
+function saColgroup(breiten) {
+  return '<colgroup>' + breiten.map(function (b) { return '<col style="width:' + b + '%">'; }).join('') + '</colgroup>';
+}
+
 function saRechts(f) { return f.typ === 'betrag' || f.typ === 'zahl' || f.typ === 'bewertung' || f.typ === 'formel'; }
 
 function saSummenZeile(s, sp, l, klasse, titel) {
@@ -9918,13 +9969,14 @@ function saTabelleHtml(s) {
   var sp = saSpalten(s);
   var l = saGefiltert(s);
   var klasse = 'sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '');
+  var cols = saColgroup(saSpaltenBreiten(s, sp, l));
   /* Seit 0.14: Überschrift und Kopfwerte stehen fest, nur die Einträge scrollen.
      Zwei Tabellen mit gleichen Spaltenbreiten — so bleibt alles bündig. */
   var h = '<div class="sa-fest">' + saKopfBereichHtml(s)
     + '<div class="sa-suche"><span aria-hidden="true">⌕</span><input id="saSuche" type="search" autocomplete="off" placeholder="Suchen"'
     + ' value="' + esc(cl.sa.suche || '') + '" oninput="saSucheSetzen(this.value)">'
     + (cl.sa.suche ? '<button type="button" onclick="saSucheLeeren()" aria-label="Suche leeren">✕</button>' : '') + '</div>'
-    + '<table class="' + klasse + ' sa-kopf"><tr>' + sp.map(function (f) {
+    + '<table class="' + klasse + ' sa-kopf">' + cols + '<tr>' + sp.map(function (f) {
         /* Seit 0.47.1 sortiert ein Tipp auf die Überschrift, ein zweiter dreht um */
         var so = s.sort || {};
         var aktiv = saFeld(s, so.feld) ? so.feld : ((s.felder || [])[0] || {}).id;
@@ -9932,7 +9984,7 @@ function saTabelleHtml(s) {
         var tipp = saFeld(s, f.id) ? ' onclick="saSortSetzen(\'' + esc(f.id) + '\')"' : '';
         return '<th class="' + (saRechts(f) ? 'r' : '') + (tipp ? ' sort' : '') + '"' + tipp + '>' + esc(f.name) + (pfeil ? '<span class="sa-pfeil">' + pfeil + '</span>' : '') + '</th>';
       }).join('') + '</tr></table></div>'
-    + '<table class="' + klasse + '">';
+    + '<table class="' + klasse + '">' + cols;
   var zeile = function (d) {
     return '<tr class="sa-z" onclick="saEintrag(\'' + esc(d.id) + '\')">' + sp.map(function (f) {
       if (f.typ === 'link' && saLinkGueltig((d.werte || {})[f.id])) {
@@ -11556,6 +11608,9 @@ function saFensterHtml() {
       + '<label for="saFeldWerte">Werte (nur bei Auswahl, je Zeile einer):</label>'
       + '<textarea id="saFeldWerte" class="eingabe" rows="3">' + esc((x.werte || []).join('\n')) + '</textarea>'
       + '<label class="haken"><input id="saFeldSpalte" type="checkbox"' + (x.spalte ? ' checked' : '') + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' disabled' : '') + '> als Spalte in der Liste' + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' (schon ' + SA_SPALTEN_MAX + ')' : '') + '</label>'
+      + '<label for="saFeldBreite">Spaltenbreite:</label><select id="saFeldBreite" class="eingabe">' + SA_BREITEN.map(function (t) {
+          return '<option value="' + t[0] + '"' + (t[0] === (x.breite || '') ? ' selected' : '') + '>' + t[1] + '</option>';
+        }).join('') + '</select>'
       + '<label class="haken"><input id="saFeldGruppe" type="checkbox"' + (fe2 && s.gruppe === fe2.id ? ' checked' : '') + '> danach gruppieren</label>'
       + '<label for="saFeldSumme">Darunter (bei Zahlen):</label><select id="saFeldSumme" class="eingabe">' + SA_SUMMEN.map(function (t) {
           return '<option value="' + t[0] + '"' + (t[0] === (x.summe || '') ? ' selected' : '') + '>' + t[1] + '</option>';
@@ -11843,6 +11898,8 @@ function saFeldSpeichern() {
   var sp = document.getElementById('saFeldSpalte');
   var gr = document.getElementById('saFeldGruppe');
   fe.spalte = !!(sp && sp.checked);
+  var breite = String(saFeldWert('saFeldBreite') || '');
+  if (SA_BREITE_ZEICHEN[breite]) { fe.breite = breite; } else { delete fe.breite; }
   var summe = saFeldWert('saFeldSumme');
   fe.summe = (saRechts(fe) || summe === 'anzahl') ? summe : '';
   if (gr && gr.checked) { s.gruppe = fe.id; }

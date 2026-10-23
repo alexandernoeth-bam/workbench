@@ -2034,6 +2034,60 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   106. Sammlung: Spaltenbreiten Auto und von Hand (0.58.0)
+   Grund: Feste Anteile — „Ergebnis“ bekam viel Platz für ein ✓, die
+   Einheit wurde nach wenigen Zeichen abgeschnitten.
+   Erkennt: kurze Spalten nicht schmal, Breiten ergeben nicht 100 %,
+   Kopf und Einträge verschieden breit (nicht mehr bündig), Ausreißer
+   verdrängt alles, Breite von Hand ohne Vorrang / nicht gespeichert,
+   alte feste Breiten im CSS stehen noch.
+   ============================================================ */
+function spaltenBreitenTest() {
+  console.log('\n106. Sammlung: Spaltenbreiten Auto und von Hand (0.58.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const s = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Breiten', false, []);
+  s.felder = [{ id: 'tag', name: 'Datum', typ: 'datum', spalte: true }, { id: 'einheit', name: 'Einheit', typ: 'text', spalte: true },
+    { id: 'ok', name: 'OK', typ: 'janein', spalte: true }];
+  const neu = (id, w) => S.DB.datensaetze.push({ id: id, sammlung: s.id, werte: w, angelegt: 1, geaendert: 1 });
+  neu('b1', { tag: '2026-10-24', einheit: 'Laufen · Lauf locker 45 min Zone 2', ok: true });
+  neu('b2', { tag: '2026-10-25', einheit: 'Cardio · Grundlage', ok: false });
+  const sp = S.saSpalten(s);
+  const b = S.saSpaltenBreiten(s, sp, S.saGefiltert(s));
+  const summe = Math.round(b.reduce((a, x) => a + x, 0) * 10) / 10;
+  pruefe(b.length === 3 && summe === 100, 'drei Breiten, zusammen 100 % — ' + b.join(' / '));
+  pruefe(b[1] > 55 && b[0] < 25 && b[2] < 25, 'Auto: Textspalte breit, Datum und Ja/Nein schmal — ' + b.join(' / '));
+  neu('b3', { tag: '2026-10-26', einheit: 'x'.repeat(300), ok: true });
+  const b2 = S.saSpaltenBreiten(s, sp, S.saGefiltert(s));
+  pruefe(b2[0] >= 10 && b2[2] >= 10, 'ein Ausreißer (300 Zeichen) verdrängt die anderen nicht — ' + b2.join(' / '));
+  const h = S.saTabelleHtml(s);
+  const cg = h.match(/<colgroup>.*?<\/colgroup>/g) || [];
+  pruefe(cg.length === 2 && cg[0] === cg[1], 'Kopf und Einträge mit gleichen Breiten (bleiben bündig)');
+  s.felder[1].breite = 'schmal'; s.felder[2].breite = 'breit';
+  const b3 = S.saSpaltenBreiten(s, sp, S.saGefiltert(s));
+  pruefe(b3[2] > b3[1], 'von Hand: „breit“ und „schmal“ haben Vorrang vor Auto — ' + b3.join(' / '));
+  pruefe(S.SA_BREITEN[0][0] === '' && S.SA_BREITEN[0][1] === 'Auto', 'Voreinstellung: Auto');
+  S.oeffne('sammlungen'); S.saOeffnen(s.id); S.saFeldOeffnen('einheit');
+  pruefe(/id="saFeldBreite"/.test(S.saFensterHtml()), 'Feld-Details: Auswahl „Spaltenbreite“');
+  S.document.getElementById('saFeldName').value = 'Einheit';
+  S.document.getElementById('saFeldTyp').value = 'text';
+  S.document.getElementById('saFeldSpalte').checked = true;
+  S.document.getElementById('saFeldBreite').value = 'mittel';
+  S.saFeldSpeichern();
+  pruefe(S.saFeld(s, 'einheit').breite === 'mittel', 'Breite wird im Feld gespeichert');
+  S.saFeldOeffnen('einheit');
+  S.document.getElementById('saFeldName').value = 'Einheit';
+  S.document.getElementById('saFeldTyp').value = 'text';
+  S.document.getElementById('saFeldSpalte').checked = true;
+  S.document.getElementById('saFeldBreite').value = '';
+  S.saFeldSpeichern();
+  pruefe(!('breite' in S.saFeld(s, 'einheit')), 'zurück auf Auto: kein Feld „breite“ mehr');
+  pruefe(!/td:first-child\{width:\d+%\}/.test(QUELLE), 'keine festen Breiten mehr im CSS');
+  S.saZurListe(); S.oeffne('uebersicht');
+}
+
+/* ============================================================
    105. Sammlung: Suchen und Filter ≤ / ≥ (0.57.0)
    Grund: In Sammlungen fehlte eine Suche und Filter mit „kleiner/gleich“
    und „größer/gleich“.
@@ -4136,7 +4190,7 @@ function kopfTest() {
   S.saAnsicht('tabelle');
   const h = inhalt();
   pruefe(/^<div class="sa-fest"><div class="sa-kw">/.test(h) && /<small>Ø kg · letzte 30 Tage<\/small><b>85,0<\/b>/.test(h), 'Kacheln oben im festen Kopf');
-  pruefe(/<table class="sa-tab sa-dat sa-kopf"><tr><th class=" sort" onclick="saSortSetzen\('[^']+'\)">Datum(<span class="sa-pfeil"> [▲▼]<\/span>)?<\/th><th class="r sort" onclick="saSortSetzen\('[^']+'\)">kg(<span class="sa-pfeil"> [▲▼]<\/span>)?<\/th><\/tr><\/table><\/div><table class="sa-tab sa-dat">/.test(h),
+  pruefe(/<table class="sa-tab sa-dat sa-kopf">(<colgroup>.*?<\/colgroup>)<tr><th class=" sort" onclick="saSortSetzen\('[^']+'\)">Datum(<span class="sa-pfeil"> [▲▼]<\/span>)?<\/th><th class="r sort" onclick="saSortSetzen\('[^']+'\)">kg(<span class="sa-pfeil"> [▲▼]<\/span>)?<\/th><\/tr><\/table><\/div><table class="sa-tab sa-dat">\1/.test(h),
     'Überschrift im festen Kopf, Einträge in einer zweiten Tabelle mit gleichen Spalten');
   const k = S.saAusVorlage(g, 'Kopie', true, []);
   pruefe(k.kopfwerte.length === 3 && k.kopfwerte !== g.kopfwerte, 'Kopie und Vorlage übernehmen die Kopfwerte');
@@ -6690,6 +6744,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { spaltenBreitenTest(); } catch (e) { fail('Spaltenbreiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungSucheTest(); } catch (e) { fail('Sammlung-Suche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { morgengrussTest(); } catch (e) { fail('Morgengruß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kampagneTest(); } catch (e) { fail('Kampagne warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
