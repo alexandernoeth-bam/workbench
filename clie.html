@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.56.1</title>
+<title>CLIE 0.57.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -539,6 +539,11 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 /* Kennzahl 2 klein darunter (seit 0.11.1) */
 .sa-kz small{display:block;font-size:16px}
 .sa-hinweis{display:block;width:100%;text-align:left;border:2px dashed var(--px);padding:3px 7px;margin:8px 0;font-size:18px}
+.sa-suche{display:flex;align-items:center;gap:4px;border:2px solid var(--px);border-radius:4px;padding:0 4px;margin:0 0 6px}
+.sa-suche span{font-size:18px}
+.sa-suche input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:18px;padding:4px 2px;color:inherit;outline:none}
+.sa-suche input::-webkit-search-cancel-button{display:none}
+.sa-suche button{border:0;background:transparent;font:inherit;font-size:16px;padding:2px 6px;color:inherit}
 .sa-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:19px}
 .sa-tab th{font-size:16px;font-weight:600;text-align:left;border-bottom:2px solid var(--px);padding:2px 3px}
 .sa-tab td{border-bottom:2px dotted var(--px-zart);padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -950,7 +955,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.56.1';
+var APP_VERSION = '0.57.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -8937,7 +8942,7 @@ function clsLoeschen() {
    art: 'budget' | 'abos' | 'buecher' | 'frei'. Die ersten drei bringen
    eigene Auswertungen mit; die „rollen“ sagen, welches Feld wofür steht. */
 
-cl.sa = { id: '', ansicht: 'tabelle', fenster: null, wahl: {} };
+cl.sa = { id: '', ansicht: 'tabelle', fenster: null, wahl: {}, suche: '' };
 
 var SA_FILTER_KEY = 'clie-sa-filter';
 var SA_TYPEN = [['text', 'Text'], ['betrag', 'Betrag'], ['zahl', 'Zahl'], ['formel', 'Formel'], ['auswahl', 'Auswahl'],
@@ -8945,6 +8950,7 @@ var SA_TYPEN = [['text', 'Text'], ['betrag', 'Betrag'], ['zahl', 'Zahl'], ['form
 var SA_SUMMEN = [['', 'nichts'], ['summe', 'Summe'], ['schnitt', 'Ø'], ['min', 'Min'], ['max', 'Max'], ['anzahl', 'Anzahl']];
 var SA_BEDINGUNGEN = [['gleich', 'ist'], ['ungleich', 'ist nicht'], ['enthaelt', 'enthält'], ['leer', 'ist leer'],
                       ['nichtleer', 'ist nicht leer'], ['ja', 'ist ja'], ['nein', 'ist nein'],
+                      ['kleinergleich', 'ist kleiner/gleich'], ['groessergleich', 'ist größer/gleich'],
                       ['diesesJahr', 'in diesem Jahr'], ['dieseWoche', 'in dieser Woche'], ['bald', 'in den nächsten 30 Tagen']];
 var SA_TAKTE = ['monatlich', 'quartalsweise', 'halbjährlich', 'jährlich'];
 var SA_TAKT_MONATE = { 'monatlich': 1, 'quartalsweise': 3, 'halbjährlich': 6, 'jährlich': 12 };
@@ -9488,6 +9494,8 @@ function saPasst(s, d, flt) {
     case 'nichtleer': return !leer;
     case 'ja': return !!w;
     case 'nein': return !w;
+    case 'kleinergleich': return !leer && saVergleich(f, w, flt.wert) <= 0;
+    case 'groessergleich': return !leer && saVergleich(f, w, flt.wert) >= 0;
     case 'diesesJahr': return !leer && String(w).slice(0, 4) === heute.slice(0, 4);
     case 'bald': return !leer && String(w) >= heute && String(w) <= tagePlus(heute, 30);
     case 'dieseWoche': return !leer && String(w) >= montagVon(heute) && String(w) <= tagePlus(montagVon(heute), 6);
@@ -9495,11 +9503,54 @@ function saPasst(s, d, flt) {
   return true;
 }
 
+/* ≤ / ≥ (seit 0.57.0): Zahlen als Zahl (auch „12,50“), Daten als Datum
+   (auch „1.10.2026“), sonst alphabetisch. Ergebnis <0, 0 oder >0;
+   ein nicht lesbarer Vergleichswert ergibt NaN — dann passt nichts. */
+function saVergleich(f, w, wert) {
+  if (saRechts(f)) {
+    var a = (typeof w === 'number') ? w : saZahlLesen(w);
+    var b = saZahlLesen(wert);
+    return (a === null || b === null) ? NaN : a - b;
+  }
+  if (f.typ === 'datum') {
+    var d = saMdDatum(String(wert || ''));
+    if (!d) { return NaN; }
+    var x = String(w).slice(0, 10);
+    return x < d ? -1 : (x > d ? 1 : 0);
+  }
+  return String(w).localeCompare(String(wert || ''), 'de', { sensitivity: 'base' });
+}
+
+/* Suche in der Sammlung (seit 0.57.0): über alle Felder, zusätzlich zum Filter */
+function saSuchTreffer(s, d, q) {
+  if (!q) { return true; }
+  return (s.felder || []).some(function (f) {
+    var roh = saRoh(s, d, f);
+    if (roh === null || roh === undefined || roh === '') { return false; }
+    return (String(roh) + ' ' + saWertText(f, roh)).toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function saSucheText() { return String(cl.sa.suche || '').trim().toLowerCase(); }
+
+function saSucheSetzen(v) {
+  cl.sa.suche = String(v || '');
+  zeichne();
+  var el = document.getElementById('saSuche');
+  if (el && el.focus) {
+    el.focus();
+    if (el.setSelectionRange) { el.setSelectionRange(cl.sa.suche.length, cl.sa.suche.length); }
+  }
+}
+
+function saSucheLeeren() { saSucheSetzen(''); }
+
 function saGefiltert(s) {
   var wahl = saFilterWahl(s);
   var flt = null;
   (s.filter || []).forEach(function (f) { if (f.id === wahl) { flt = f; } });
-  var l = saSaetze(s).filter(function (d) { return !flt || saPasst(s, d, flt); });
+  var q = saSucheText();
+  var l = saSaetze(s).filter(function (d) { return (!flt || saPasst(s, d, flt)) && saSuchTreffer(s, d, q); });
   var so = s.sort || {};
   var f = so.feld ? saFeld(s, so.feld) : null;
   if (!f) { f = (s.felder || [])[0] || null; }
@@ -9870,6 +9921,9 @@ function saTabelleHtml(s) {
   /* Seit 0.14: Überschrift und Kopfwerte stehen fest, nur die Einträge scrollen.
      Zwei Tabellen mit gleichen Spaltenbreiten — so bleibt alles bündig. */
   var h = '<div class="sa-fest">' + saKopfBereichHtml(s)
+    + '<div class="sa-suche"><span aria-hidden="true">⌕</span><input id="saSuche" type="search" autocomplete="off" placeholder="Suchen"'
+    + ' value="' + esc(cl.sa.suche || '') + '" oninput="saSucheSetzen(this.value)">'
+    + (cl.sa.suche ? '<button type="button" onclick="saSucheLeeren()" aria-label="Suche leeren">✕</button>' : '') + '</div>'
     + '<table class="' + klasse + ' sa-kopf"><tr>' + sp.map(function (f) {
         /* Seit 0.47.1 sortiert ein Tipp auf die Überschrift, ein zweiter dreht um */
         var so = s.sort || {};
@@ -9906,7 +9960,10 @@ function saTabelleHtml(s) {
   } else {
     h += l.map(zeile).join('');
   }
-  if (!l.length) { h += '<tr><td colspan="' + sp.length + '" class="leise">Keine Einträge' + (saFilterWahl(s) ? ' für diesen Filter' : '') + '.</td></tr>'; }
+  if (!l.length) {
+    var grund = saSucheText() ? ' zu „' + String(cl.sa.suche).trim() + '“' : (saFilterWahl(s) ? ' für diesen Filter' : '');
+    h += '<tr><td colspan="' + sp.length + '" class="leise">Keine Einträge' + esc(grund) + '.</td></tr>';
+  }
   var mitSumme = sp.some(function (f, i) { return i > 0 && f.summe; });
   if (mitSumme && l.length) { h += saSummenZeile(s, sp, l, 'sa-sum', 'Σ ' + l.length); }
   return h + '</table>';
@@ -10201,6 +10258,7 @@ function saOeffnen(id) {
   if (!saFinden(id)) { return; }
   cl.sa.id = id;
   cl.sa.ansicht = 'tabelle';
+  cl.sa.suche = '';
   var el = document.getElementById('inhalt');
   if (el) { el.scrollTop = 0; }
   zeichne();
@@ -10208,6 +10266,7 @@ function saOeffnen(id) {
 
 function saZurListe() {
   cl.sa.id = '';
+  cl.sa.suche = '';
   cl.sa.ansicht = 'tabelle';
   zeichne();
 }
@@ -11588,7 +11647,7 @@ function saFensterHtml() {
       + '<label for="saFiOp">Bedingung:</label><select id="saFiOp" class="eingabe">' + SA_BEDINGUNGEN.map(function (y) {
           return '<option value="' + y[0] + '"' + (y[0] === z.op ? ' selected' : '') + '>' + y[1] + '</option>';
         }).join('') + '</select>'
-      + '<label for="saFiWert">Wert (bei „ist“, „ist nicht“, „enthält“):</label><input id="saFiWert" class="eingabe" type="text" autocomplete="off" value="' + esc(z.wert || '') + '">'
+      + '<label for="saFiWert">Wert (bei „ist“, „ist nicht“, „enthält“, „≤“, „≥“):</label><input id="saFiWert" class="eingabe" type="text" autocomplete="off" value="' + esc(z.wert || '') + '">'
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saFilterSpeichern()">OK</button>' + abbrechen
         + (fi ? '<button type="button" class="knopf" onclick="saFilterLoeschen()">Löschen</button>' : ''));
   }

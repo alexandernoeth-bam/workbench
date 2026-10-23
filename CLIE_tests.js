@@ -2034,6 +2034,63 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   105. Sammlung: Suchen und Filter ≤ / ≥ (0.57.0)
+   Grund: In Sammlungen fehlte eine Suche und Filter mit „kleiner/gleich“
+   und „größer/gleich“.
+   Erkennt: Suche findet nicht in allen Feldern / ignoriert den Filter /
+   bleibt beim Wechsel der Sammlung stehen; ≤/≥ vergleicht Zahlen als Text
+   („9“ > „10“), liest „12,50“ oder „1.10.2026“ nicht, lässt leere Werte
+   durch, Bedingungen fehlen im Filter-Dialog.
+   ============================================================ */
+function sammlungSucheTest() {
+  console.log('\n105. Sammlung: Suchen und Filter ≤ / ≥ (0.57.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const s = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Suchtest', false, []);
+  s.felder = [{ id: 'name', name: 'Name', typ: 'text', spalte: true }, { id: 'notiz', name: 'Notiz', typ: 'text' },
+    { id: 'preis', name: 'Preis', typ: 'betrag', spalte: true }, { id: 'tag', name: 'Datum', typ: 'datum', spalte: true }];
+  const neu = (id, w) => S.DB.datensaetze.push({ id: id, sammlung: s.id, werte: w, angelegt: 1, geaendert: 1 });
+  neu('d1', { name: 'Netflix', notiz: 'Streaming', preis: 9, tag: '2026-09-15' });
+  neu('d2', { name: 'Spotify', notiz: 'Musik', preis: 10.5, tag: '2026-10-01' });
+  neu('d3', { name: 'Zeitung', notiz: 'netz-Abo', preis: 25, tag: '2026-11-20' });
+  neu('d4', { name: 'Leer', notiz: '', preis: '', tag: '' });
+  const ids = () => S.saGefiltert(s).map(d => d.id).sort().join(',');
+  S.oeffne('sammlungen'); S.saOeffnen(s.id);
+  pruefe(/id="saSuche"/.test(S.saTabelleHtml(s)), 'Suchfeld über der Tabelle');
+  S.saSucheSetzen('NET');
+  pruefe(ids() === 'd1,d3', 'Suche über alle Felder, ohne Groß/Klein (Name „Netflix“, Notiz „netz-Abo“) — ' + ids());
+  pruefe(/Suche leeren/.test(S.saTabelleHtml(s)), '✕ zum Leeren erscheint');
+  S.saSucheSetzen('xyz');
+  pruefe(/Keine Einträge zu „xyz“/.test(S.saTabelleHtml(s)), 'ohne Treffer: „Keine Einträge zu …“');
+  S.saSucheSetzen('10,5');
+  pruefe(ids() === 'd2', 'Suche findet auch den angezeigten Wert (Betrag „10,5“)');
+  S.saSucheLeeren();
+  pruefe(ids() === 'd1,d2,d3,d4', 'leere Suche: alles');
+  /* ≤ / ≥ */
+  const op = (feld, o, wert) => s.felder.some(f => f.id === feld) && S.saSaetze(s).filter(d => S.saPasst(s, d, { feld: feld, op: o, wert: wert })).map(d => d.id).sort().join(',');
+  pruefe(op('preis', 'kleinergleich', '10') === 'd1', 'Betrag ≤ 10: als Zahl (9 ja, 10,5 nein, leer nein) — ' + op('preis', 'kleinergleich', '10'));
+  pruefe(op('preis', 'groessergleich', '10,50') === 'd2,d3', 'Betrag ≥ 10,50: Dezimalkomma gelesen');
+  pruefe(op('preis', 'groessergleich', 'abc') === '', 'unlesbarer Vergleichswert: nichts passt');
+  pruefe(op('tag', 'groessergleich', '1.10.2026') === 'd2,d3', 'Datum ≥ 1.10.2026 (deutsch eingegeben)');
+  pruefe(op('tag', 'kleinergleich', '2026-10-01') === 'd1,d2', 'Datum ≤ 2026-10-01 (inklusive)');
+  pruefe(op('name', 'kleinergleich', 'spotify') === 'd1,d4,d2'.split(',').sort().join(','), 'Text ≤: alphabetisch, ohne Groß/Klein');
+  pruefe(S.SA_BEDINGUNGEN.some(b => b[0] === 'kleinergleich') && S.SA_BEDINGUNGEN.some(b => b[0] === 'groessergleich'), 'Bedingungen im Filter-Dialog');
+  /* Suche wirkt zusätzlich zum gespeicherten Filter */
+  s.filter = [{ id: 'teuer', name: 'Teuer', feld: 'preis', op: 'groessergleich', wert: '10' }];
+  S.saFilterSetzen('teuer');
+  S.saSucheSetzen('a');
+  pruefe(ids() === 'd3', 'Filter „≥ 10“ und Suche „a“ zusammen — ' + ids());
+  S.saZurListe();
+  pruefe(S.cl.sa.suche === '', 'Suche wird beim Verlassen geleert');
+  S.saOeffnen(s.id); S.saSucheSetzen('x'); S.saOeffnen(s.id);
+  pruefe(S.cl.sa.suche === '', 'Suche beginnt beim Öffnen leer');
+  pruefe(!/suche/.test(JSON.stringify(s)), 'Suchbegriff wird nicht in der Sammlung gespeichert');
+  S.saFilterSetzen('');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    104. Morgengruß statt Routine (0.56.1)
    Grund: Die Borkum-Morgenroutine als Checkliste machte morgens Druck.
    Stattdessen nur ein ruhiger Satz bis 10 Uhr — ohne Abhaken, ohne
@@ -6633,6 +6690,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { sammlungSucheTest(); } catch (e) { fail('Sammlung-Suche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { morgengrussTest(); } catch (e) { fail('Morgengruß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kampagneTest(); } catch (e) { fail('Kampagne warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coSubstanzTest(); } catch (e) { fail('Substanz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
