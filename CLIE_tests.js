@@ -1412,8 +1412,8 @@ function datebookTest() {
     'äußere Klammer 7:30 bis 16:00');
   pruefe(/class="kl"><i class="mitte"><\/i><i class="oben"><\/i>/.test(zeile('8:00')) && /<i class="mitte"><\/i><i class="unten"><\/i>/.test(zeile('9:00')),
     'innere Klammer 8:00 bis 9:00 daneben');
-  pruefe(/class="kl"><i class="mitte"><\/i><i class="unten"><\/i>/.test(zeile('15:00')),
-    '13–15 endet in der Zeile des Zahnarzts');
+  pruefe(/class="kl"><i class="mitte"><\/i><i class="wechsel"><\/i>/.test(zeile('15:00')) && /class="kl"><i class="mitte"><\/i><i class="unten"><\/i>/.test(zeile('15:30')),
+    '13–15 endet in der Zeile des Zahnarzts — dort öffnet sich dessen Klammer in derselben Spalte (seit 0.45.1)');
   pruefe(/class="kl"><i class="mitte"><\/i><i class=""><\/i><\/span><span class="z">11:00/.test(zeile('11:00')) && /clTagZeileUm/.test(zeile('11:00')),
     'eingeplante Aufgabe: eine Zeile, keine eigene Klammer');
   pruefe(!/ jetzt/.test(h) && !/class="std jetzt/.test(h), 'kein Strich „jetzt“ mehr');
@@ -1814,6 +1814,43 @@ function kennzahlTest() {
   pruefe(!('gruppeName' in b) && !('kennzahl' in b), 'Gruppe wie die Vorlage und „wie die Vorlage“ speichern nichts Eigenes');
   S.cl.sa.id = ''; S.cl.aufklapp = '';
   S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   82. Zeitklammern: Ende und Beginn in einer Zeile (0.45.1)
+   Grund: Endete ein Termin genau, wenn der nächste begann (11:05–12:00,
+   12:00–12:45), überlappten sich links die Klammern — die zweite rückte
+   in eine eigene Spalte. Jetzt schließt die erste und die zweite öffnet
+   sich in derselben Spalte.
+   Erkennt: zweite Spalte bei Anschlussterminen, fehlender Wechsel,
+   Wechsel auch bei echter Überschneidung.
+   ============================================================ */
+function klammerWechselTest() {
+  console.log('\n82. Zeitklammern: Ende und Beginn in einer Zeile (0.45.1)');
+  if (!CL) { return; }
+  frisch();
+  const tag = CL.tagePlus(CL.isoDatum(), 1);
+  CL.termineNachTag[tag] = [
+    { id: 'a', zeit: '11:05', bis: '12:00', titel: 'WFT-Sync', kontext: 'beruflich', kalId: 'k' },
+    { id: 'b', zeit: '12:00', bis: '12:45', titel: 'Mittagessen', kontext: 'beruflich', kalId: 'k' },
+    { id: 'c', zeit: '13:00', bis: '14:00', titel: 'O-Töne', kontext: 'beruflich', kalId: 'k' },
+    { id: 'd', zeit: '13:05', bis: '13:30', titel: 'Austausch', kontext: 'beruflich', kalId: 'k' },
+    { id: 'e', zeit: '14:00', bis: '15:45', titel: 'Fokus', kontext: 'beruflich', kalId: 'k' },
+    { id: 'f', zeit: '15:45', bis: '16:00', titel: 'Tagesabschluss', kontext: 'beruflich', kalId: 'k' }];
+  CL.oeffne('kalender');
+  CL.clKalGehe(tag, 'tag');
+  const reihen = inhalt().split('<div class="std').slice(1);
+  const zeile = (zeit) => reihen.filter(r => r.indexOf('class="z">' + zeit + '<') >= 0)[0] || '';
+  pruefe(/class="kl"><i class="oben"><\/i><i class=""><\/i>/.test(zeile('11:05')) && /class="kl"><i class="wechsel"><\/i><i class=""><\/i>/.test(zeile('12:00')) && /class="kl"><i class="unten"><\/i><i class=""><\/i>/.test(zeile('12:45')),
+    '11:05–12:00 und 12:00–12:45: eine Spalte — bei 12:00 schließt die eine, die andere öffnet sich');
+  pruefe(/class="kl"><i class="oben"><\/i><i class=""><\/i>/.test(zeile('13:00')) && /class="kl"><i class="mitte"><\/i><i class="oben"><\/i>/.test(zeile('13:05')),
+    'echte Überschneidung (13:05 in 13–14) bleibt daneben in der zweiten Spalte');
+  pruefe(/class="kl"><i class="wechsel"><\/i><i class=""><\/i>/.test(zeile('14:00')) && /class="kl"><i class="wechsel"><\/i><i class=""><\/i>/.test(zeile('15:45')) && /class="kl"><i class="unten"><\/i>/.test(zeile('16:00')),
+    'Kette 13–14 → 14–15:45 → 15:45–16: jeweils Wechsel in derselben Spalte');
+  pruefe(/\.kl i\.wechsel::before\{[^}]*border-bottom/.test(QUELLE) && /\.kl i\.wechsel::after\{[^}]*border-top/.test(QUELLE), 'Wechsel gezeichnet: oben schließen, unten öffnen');
+  delete CL.termineNachTag[tag];
+  CL.clKalGehe(CL.isoDatum(), 'tag');
+  CL.oeffne('uebersicht');
 }
 
 /* ============================================================
@@ -5449,6 +5486,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { klammerWechselTest(); } catch (e) { fail('Klammer-Wechsel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { invasionTest(); } catch (e) { fail('Invasion warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zieleTest(); } catch (e) { fail('Ziele warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { projekteTest(); } catch (e) { fail('Projekte warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
