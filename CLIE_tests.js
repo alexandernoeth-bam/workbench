@@ -155,6 +155,8 @@ function frisch() {
   CL.termineNachTag = {};
   CL.zugriffToken = null; CL.tokenAblauf = 0;
   CL.kalenderListe = []; CL.kalenderLaeuft = false; CL.kalenderFehler = '';
+  /* Morgengruß (0.56.1) in den übrigen Tests aus — sonst hinge das Ergebnis von der Uhrzeit ab */
+  try { CL.localStorage.setItem('clie-morgengruss', CL.isoDatum()); } catch (e) { /* egal */ }
 }
 function inhalt() { return CL.document.getElementById('inhalt').innerHTML; }
 
@@ -2028,6 +2030,39 @@ function coKorbTest() {
   /* Quelle abschaltbar */
   S.krFinden('kc-einstellungen').quellen = { korb: false };
   pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Korb“ ausgeschaltet: keine Korb-Fragen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   104. Morgengruß statt Routine (0.56.1)
+   Grund: Die Borkum-Morgenroutine als Checkliste machte morgens Druck.
+   Stattdessen nur ein ruhiger Satz bis 10 Uhr — ohne Abhaken, ohne
+   Zählen, ohne Erinnerung aufs Handy.
+   Erkennt: Gruß fehlt morgens oder bleibt nach 10 Uhr/„Danke“, wird in
+   der workbench.json gezählt, verdrängt nicht die Coach-Frage, lässt sich
+   nicht ausschalten.
+   ============================================================ */
+function morgengrussTest() {
+  console.log('\n104. Morgengruß statt Routine (0.56.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.localStorage.removeItem('clie-morgengruss');
+  const g = S.coMorgengruss('07:10', heute);
+  pruefe(g && S.CO_MORGENGRUSS.indexOf(g) >= 0, 'morgens ein Satz aus der Liste');
+  pruefe(S.coMorgengruss('10:00', heute) === '' && S.coMorgengruss('03:30', heute) === '', 'nur von 4 bis 10 Uhr');
+  pruefe(S.coMorgengruss('07:10', heute) !== S.coMorgengruss('07:10', S.tagePlus(heute, 1)) || S.CO_MORGENGRUSS.length === 1, 'wechselt täglich');
+  const vorher = JSON.stringify(S.DB);
+  S.coMorgengrussWeg();
+  pruefe(S.coMorgengruss('07:10', heute) === '' && JSON.stringify(S.DB) === vorher, '„Danke“: für heute weg — nur auf dem Gerät, nichts in der workbench.json');
+  S.localStorage.removeItem('clie-morgengruss');
+  pruefe(/Danke/.test(S.coMorgengrussHtml()) || S.clUhrzeit() >= '10:00' || S.clUhrzeit() < '04:00', 'Coach-Zeile zeigt morgens den Gruß mit „Danke“');
+  pruefe(!/coAntwort|Kalender/.test(S.coMorgengrussHtml()) && !/co-ant/.test(S.coMorgengrussHtml()), 'keine Frage, kein Abhaken');
+  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', morgengruss: [] });
+  pruefe(S.coMorgengruss('07:10', heute) === '', 'leere Liste: ausgeschaltet');
+  S.krFinden('kc-einstellungen').morgengruss = ['Nur atmen.'];
+  pruefe(S.coMorgengruss('07:10', heute) === 'Nur atmen.', 'eigene Sätze');
   S.oeffne('uebersicht');
 }
 
@@ -6598,6 +6633,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { morgengrussTest(); } catch (e) { fail('Morgengruß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kampagneTest(); } catch (e) { fail('Kampagne warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coSubstanzTest(); } catch (e) { fail('Substanz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlAusspracheTest(); } catch (e) { fail('Vorlesen-Aussprache warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
