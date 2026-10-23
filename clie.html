@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.59.0</title>
+<title>CLIE 0.60.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -952,7 +952,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.59.0';
+var APP_VERSION = '0.60.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -9551,12 +9551,26 @@ function saSucheSetzen(v) {
 
 function saSucheLeeren() { saSucheSetzen(''); }
 
+/* Ein gespeicherter Filter: eine Bedingung, seit 0.60.0 optional eine zweite
+   mit „und“, „oder“ oder „und nicht“ (flt.zwei = { verkn, feld, op, wert }) */
+var SA_VERKNUEPFUNGEN = [['', '—'], ['und', 'und'], ['oder', 'oder'], ['undnicht', 'und nicht']];
+
+function saFilterPasst(s, d, flt) {
+  var a = saPasst(s, d, flt);
+  var z = flt.zwei;
+  if (!z || !z.verkn || !saFeld(s, z.feld)) { return a; }
+  var b = saPasst(s, d, z);
+  if (z.verkn === 'oder') { return a || b; }
+  if (z.verkn === 'undnicht') { return a && !b; }
+  return a && b;
+}
+
 function saGefiltert(s) {
   var wahl = saFilterWahl(s);
   var flt = null;
   (s.filter || []).forEach(function (f) { if (f.id === wahl) { flt = f; } });
   var q = saSucheText();
-  var l = saSaetze(s).filter(function (d) { return (!flt || saPasst(s, d, flt)) && saSuchTreffer(s, d, q); });
+  var l = saSaetze(s).filter(function (d) { return (!flt || saFilterPasst(s, d, flt)) && saSuchTreffer(s, d, q); });
   var so = s.sort || {};
   var f = so.feld ? saFeld(s, so.feld) : null;
   if (!f) { f = (s.felder || [])[0] || null; }
@@ -10232,13 +10246,26 @@ function saTypName(t) {
   return t;
 }
 
+/* „Sport ist „Lauf“ und Datum in dieser Woche“ */
+function saFilterText(s, x) {
+  var eins = function (c) {
+    var f = saFeld(s, c.feld);
+    var b = (SA_BEDINGUNGEN.filter(function (y) { return y[0] === c.op; })[0] || ['', c.op])[1];
+    return (f ? f.name : '?') + ' ' + b + (c.wert ? ' „' + c.wert + '“' : '');
+  };
+  var t = eins(x);
+  var z = x.zwei;
+  if (z && z.verkn) {
+    t += ' ' + ((SA_VERKNUEPFUNGEN.filter(function (v) { return v[0] === z.verkn; })[0] || ['', z.verkn])[1]) + ' ' + eins(z);
+  }
+  return t;
+}
+
 function saFilterListeHtml(s) {
   var h = '<p class="leise">Diese Filter stehen oben rechts im ▼. Antippen zum Ändern.</p>';
   (s.filter || []).forEach(function (x) {
-    var f = saFeld(s, x.feld);
-    var b = (SA_BEDINGUNGEN.filter(function (y) { return y[0] === x.op; })[0] || ['', x.op])[1];
     h += '<button type="button" class="sa-zeile" onclick="saFilterOeffnen(\'' + esc(x.id) + '\')"><span class="tx">' + esc(x.name)
-       + '<small>' + esc((f ? f.name : '?') + ' ' + b + (x.wert ? ' „' + x.wert + '“' : '')) + '</small></span></button>';
+       + '<small>' + esc(saFilterText(s, x)) + '</small></span></button>';
   });
   if (!(s.filter || []).length) { h += '<p class="leise">Noch kein Filter.</p>'; }
   return h;
@@ -11713,13 +11740,12 @@ function saFensterHtml() {
     var z = fi || { name: '', feld: (s.felder[0] || {}).id, op: 'gleich', wert: '' };
     return kopf(fi ? 'Filter „' + fi.name + '“' : 'Neuer Filter')
       + '<label for="saFiName">Name:</label><input id="saFiName" class="eingabe" type="text" autocomplete="off" value="' + esc(z.name) + '">'
-      + '<label for="saFiFeld">Feld:</label><select id="saFiFeld" class="eingabe">' + (s.felder || []).map(function (y) {
-          return '<option value="' + esc(y.id) + '"' + (y.id === z.feld ? ' selected' : '') + '>' + esc(y.name) + '</option>';
+      + saFilterBedingungHtml(s, '', z)
+      + '<div class="gruppe">2. Bedingung (optional)</div>'
+      + '<label for="saFiVerkn">Verknüpfung:</label><select id="saFiVerkn" class="eingabe">' + SA_VERKNUEPFUNGEN.map(function (y) {
+          return '<option value="' + y[0] + '"' + (y[0] === ((z.zwei || {}).verkn || '') ? ' selected' : '') + '>' + y[1] + '</option>';
         }).join('') + '</select>'
-      + '<label for="saFiOp">Bedingung:</label><select id="saFiOp" class="eingabe">' + SA_BEDINGUNGEN.map(function (y) {
-          return '<option value="' + y[0] + '"' + (y[0] === z.op ? ' selected' : '') + '>' + y[1] + '</option>';
-        }).join('') + '</select>'
-      + '<label for="saFiWert">Wert (bei „ist“, „ist nicht“, „enthält“, „≤“, „≥“):</label><input id="saFiWert" class="eingabe" type="text" autocomplete="off" value="' + esc(z.wert || '') + '">'
+      + saFilterBedingungHtml(s, '2', z.zwei || { feld: (s.felder[0] || {}).id, op: 'gleich', wert: '' })
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saFilterSpeichern()">OK</button>' + abbrechen
         + (fi ? '<button type="button" class="knopf" onclick="saFilterLoeschen()">Löschen</button>' : ''));
   }
@@ -12055,6 +12081,17 @@ function saFeldLoeschen() {
   aufklappZu();
 }
 
+/* Feld, Bedingung und Wert — für die erste (nr '') und die zweite Bedingung (nr '2') */
+function saFilterBedingungHtml(s, nr, z) {
+  return '<label for="saFiFeld' + nr + '">Feld:</label><select id="saFiFeld' + nr + '" class="eingabe">' + (s.felder || []).map(function (y) {
+      return '<option value="' + esc(y.id) + '"' + (y.id === z.feld ? ' selected' : '') + '>' + esc(y.name) + '</option>';
+    }).join('') + '</select>'
+    + '<label for="saFiOp' + nr + '">Bedingung:</label><select id="saFiOp' + nr + '" class="eingabe">' + SA_BEDINGUNGEN.map(function (y) {
+      return '<option value="' + y[0] + '"' + (y[0] === z.op ? ' selected' : '') + '>' + y[1] + '</option>';
+    }).join('') + '</select>'
+    + '<label for="saFiWert' + nr + '">Wert (bei „ist“, „ist nicht“, „enthält“, „≤“, „≥“):</label><input id="saFiWert' + nr + '" class="eingabe" type="text" autocomplete="off" value="' + esc(z.wert || '') + '">';
+}
+
 function saFilterSpeichern() {
   var f = cl.sa.fenster;
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
@@ -12075,6 +12112,16 @@ function saFilterSpeichern() {
   fi.feld = feld;
   fi.op = op;
   fi.wert = String(saFeldWert('saFiWert') || '').trim();
+  /* 2. Bedingung nur, wenn eine Verknüpfung gewählt ist */
+  var verkn = String(saFeldWert('saFiVerkn') || '');
+  var feld2 = saFeldWert('saFiFeld2');
+  var op2 = saFeldWert('saFiOp2');
+  if (verkn && SA_VERKNUEPFUNGEN.some(function (v) { return v[0] === verkn; }) && saFeld(s, feld2)
+      && SA_BEDINGUNGEN.some(function (b) { return b[0] === op2; })) {
+    fi.zwei = { verkn: verkn, feld: feld2, op: op2, wert: String(saFeldWert('saFiWert2') || '').trim() };
+  } else {
+    delete fi.zwei;
+  }
   saGeaendert(s);
   spaeterSichern();
   aufklappZu();

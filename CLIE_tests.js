@@ -2034,6 +2034,53 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   109. Sammlung: Filter mit zwei Bedingungen (0.60.0)
+   Grund: Filter brauchen manchmal zwei Kriterien, verknüpft mit „und“,
+   „oder“ oder „und nicht“.
+   Erkennt: Verknüpfung falsch gerechnet, alte Filter (ohne zweite
+   Bedingung) ändern sich, „—“ speichert trotzdem eine zweite Bedingung,
+   Dialog/Übersicht zeigen die zweite Bedingung nicht.
+   ============================================================ */
+function filterZweiTest() {
+  console.log('\n109. Sammlung: Filter mit zwei Bedingungen (0.60.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const s = S.saAusVorlage(S.SA_VORLAGEN.frei, 'Zwei', false, []);
+  s.felder = [{ id: 'name', name: 'Name', typ: 'text', spalte: true }, { id: 'sport', name: 'Sport', typ: 'text', spalte: true },
+    { id: 'km', name: 'km', typ: 'zahl', spalte: true }];
+  const neu = (id, w) => S.DB.datensaetze.push({ id: id, sammlung: s.id, werte: w, angelegt: 1, geaendert: 1 });
+  neu('a', { name: 'A', sport: 'Lauf', km: 5 });
+  neu('b', { name: 'B', sport: 'Lauf', km: 12 });
+  neu('c', { name: 'C', sport: 'Rad', km: 40 });
+  neu('d', { name: 'D', sport: 'Rad', km: 8 });
+  const mit = (zwei) => { s.filter = [{ id: 'f', name: 'F', feld: 'sport', op: 'gleich', wert: 'Lauf', zwei: zwei }]; S.cl.sa.wahl[s.id] = 'f'; return S.saGefiltert(s).map(d => d.id).sort().join(','); };
+  pruefe(mit(undefined) === 'a,b', 'ohne zweite Bedingung wie bisher');
+  pruefe(mit({ verkn: 'und', feld: 'km', op: 'groessergleich', wert: '10' }) === 'b', 'Lauf und km ≥ 10');
+  pruefe(mit({ verkn: 'oder', feld: 'km', op: 'groessergleich', wert: '10' }) === 'a,b,c', 'Lauf oder km ≥ 10');
+  pruefe(mit({ verkn: 'undnicht', feld: 'km', op: 'groessergleich', wert: '10' }) === 'a', 'Lauf und nicht km ≥ 10');
+  pruefe(mit({ verkn: '', feld: 'km', op: 'groessergleich', wert: '10' }) === 'a,b', 'Verknüpfung „—“: nur die erste Bedingung');
+  pruefe(mit({ verkn: 'und', feld: 'weg', op: 'gleich', wert: 'x' }) === 'a,b', 'gelöschtes Feld in der 2. Bedingung: ignoriert');
+  /* Dialog und Speichern */
+  S.oeffne('sammlungen'); S.saOeffnen(s.id); S.saFilterOeffnen('f');
+  const h = S.saFensterHtml();
+  pruefe(/2\. Bedingung/.test(h) && /id="saFiVerkn"/.test(h) && /id="saFiFeld2"/.test(h) && /id="saFiOp2"/.test(h) && /id="saFiWert2"/.test(h), 'Dialog: Verknüpfung, Feld, Bedingung und Wert der 2. Bedingung');
+  const setze = (id, v) => { S.document.getElementById(id).value = v; };
+  setze('saFiName', 'Lange Läufe'); setze('saFiFeld', 'sport'); setze('saFiOp', 'gleich'); setze('saFiWert', 'Lauf');
+  setze('saFiVerkn', 'und'); setze('saFiFeld2', 'km'); setze('saFiOp2', 'groessergleich'); setze('saFiWert2', '10');
+  S.saFilterSpeichern();
+  const fi = s.filter[0];
+  pruefe(fi.zwei && fi.zwei.verkn === 'und' && fi.zwei.feld === 'km' && fi.zwei.op === 'groessergleich' && fi.zwei.wert === '10', 'zweite Bedingung gespeichert');
+  pruefe(/Sport ist „Lauf“ und km ist größer\/gleich „10“/.test(S.saFilterText(s, fi)), 'Übersicht: ' + S.saFilterText(s, fi));
+  S.saFilterOeffnen('f');
+  setze('saFiName', 'Lange Läufe'); setze('saFiFeld', 'sport'); setze('saFiOp', 'gleich'); setze('saFiWert', 'Lauf');
+  setze('saFiVerkn', ''); setze('saFiFeld2', 'km'); setze('saFiOp2', 'groessergleich'); setze('saFiWert2', '10');
+  S.saFilterSpeichern();
+  pruefe(!('zwei' in s.filter[0]), '„—“ gewählt: zweite Bedingung wird entfernt');
+  S.saZurListe(); S.oeffne('uebersicht');
+}
+
+/* ============================================================
    108. Aus einem Sammlungseintrag eine Aufgabe oder einen Termin (0.59.0)
    Grund: Vieles in Sammlungen ist eine Erinnerung (Abo kündigen,
    Trainingseinheit) — sie soll ohne Abtippen in den Korb oder Kalender.
@@ -6843,6 +6890,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { filterZweiTest(); } catch (e) { fail('Filter zwei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungPlanenTest(); } catch (e) { fail('Sammlung planen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { trainingSportDoppeltTest(); } catch (e) { fail('Training Sport doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenBreitenTest(); } catch (e) { fail('Spaltenbreiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
