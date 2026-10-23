@@ -1817,6 +1817,38 @@ function kennzahlTest() {
 }
 
 /* ============================================================
+   87. Sortieren über die Spaltenköpfe (0.47.1)
+   Grund: „Sortieren“ unten war ein eigener Knopf mit Auswahlliste — es
+   gehört an die Werte. Ein Tipp auf die Überschrift sortiert, ein
+   zweiter dreht um; ▲/▼ zeigt die aktive Spalte. Unten ist so Platz
+   für „Diagramm“ bzw. „Tabelle“.
+   Erkennt: Spaltenköpfe ohne Wirkung, Richtung dreht nicht, Pfeil an
+   falscher Spalte, Knopf „Sortieren“ wieder da.
+   ============================================================ */
+function spaltenSortTest() {
+  console.log('\n87. Sortieren über die Spaltenköpfe (0.47.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.sammlungen = [{ id: 'sb', name: 'Bücher', felder: [{ id: 'bt', name: 'Titel', typ: 'text', spalte: true }, { id: 'bs', name: 'Seiten', typ: 'zahl', spalte: true }], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [{ id: 'b1', sammlung: 'sb', werte: { bt: 'Momo', bs: 280 }, angelegt: 1, geaendert: 1 }, { id: 'b2', sammlung: 'sb', werte: { bt: 'Atomic Habits', bs: 350 }, angelegt: 2, geaendert: 2 },
+    { id: 'b3', sammlung: 'sb', werte: { bt: 'Essentialismus', bs: 300 }, angelegt: 3, geaendert: 3 }];
+  S.oeffne('sammlungen'); S.saOeffnen('sb');
+  let h = inhalt();
+  const reihe = x => (x.match(/(Momo|Atomic Habits|Essentialismus)/g) || []).join(',');
+  pruefe(/onclick="saSortSetzen\('bt'\)">Titel<span class="sa-pfeil"> ▲<\/span><\/th>/.test(h) && reihe(h.slice(h.indexOf('</table></div>'))) === 'Atomic Habits,Essentialismus,Momo', 'ohne Wahl: nach der ersten Spalte aufsteigend, ▲ an „Titel“');
+  S.saSortSetzen('bs');
+  h = inhalt();
+  pruefe(/>Seiten<span class="sa-pfeil"> ▲<\/span>/.test(h) && !/>Titel<span/.test(h) && reihe(h.slice(h.indexOf('</table></div>'))) === 'Momo,Essentialismus,Atomic Habits', 'Tipp auf „Seiten“: nach Seiten aufsteigend');
+  S.saSortSetzen('bs');
+  h = inhalt();
+  pruefe(/>Seiten<span class="sa-pfeil"> ▼<\/span>/.test(h) && reihe(h.slice(h.indexOf('</table></div>'))) === 'Atomic Habits,Essentialismus,Momo' && S.DB.sammlungen[0].sort.ab === true, 'zweiter Tipp: absteigend ▼, an der Sammlung gespeichert');
+  pruefe(!/Sortieren/.test(S.document.getElementById('fuss').innerHTML) && typeof S.saSortOeffnen === 'undefined' && !/Diagramm/.test(S.document.getElementById('fuss').innerHTML), 'unten kein „Sortieren“; ohne Diagramme auch kein „Diagramm“');
+  S.saZurListe();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    86. Diagramme in Sammlungen (0.47)
    Grund: Sammlungen sollen einfache Diagramme zeigen: Linie (Verlauf,
    optional Ziellinie), Balken je Zeit, Balken je Gruppe, Torte — bis zu
@@ -1841,7 +1873,7 @@ function diagrammeTest() {
   const sg = S.DB.sammlungen[0];
   S.oeffne('sammlungen'); S.saOeffnen('sg');
   pruefe(!/class="sa-dia-um"/.test(inhalt()), 'ohne Diagramm kein Umschalter');
-  pruefe(/<small>kg<\/small><b>78<\/b><svg class="sa-mini"/.test(inhalt()) && !/Ziel<\/small><b>73<\/b><svg/.test(inhalt()), 'Mini-Kurve (30 Tage) in der Kachel „letzter Wert“, nicht beim festen Wert');
+  pruefe(/<small>kg<\/small><b>78<\/b><\/div>/.test(inhalt()) && !/sa-mini|<svg/.test(inhalt()), 'Kopfwert-Kacheln ohne Mini-Kurve (seit 0.47.1 entfernt)');
   S.menueUm();
   pruefe(/menueWahl\('saDiagramme'\)">Diagramme…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü der Sammlung: „Diagramme…“');
   S.menueWahl('saDiagramme');
@@ -1870,12 +1902,13 @@ function diagrammeTest() {
   pruefe(S.cl.aufklapp !== 'sa' && /disabled>\+ Diagramm/.test(S.document.getElementById('fuss').innerHTML), 'höchstens drei Diagramme');
   /* Anzeige */
   S.saAnsicht('tabelle');
-  pruefe(/class="sa-dia-um"><button type="button" class="an" onclick="saAnsicht\('tabelle'\)">Tabelle/.test(inhalt()), 'mit Diagrammen: Umschalter „Tabelle | Diagramm“');
+  pruefe(!/sa-dia-um/.test(inhalt()) && /onclick="saAnsicht\('diagramm'\)">Diagramm<\/button>/.test(S.document.getElementById('fuss').innerHTML) && !/Sortieren/.test(S.document.getElementById('fuss').innerHTML),
+    'mit Diagrammen: unten „Diagramm“ (seit 0.47.1), kein „Sortieren“ mehr');
   S.saAnsicht('diagramm');
   let h = inhalt();
   pruefe((h.match(/class="sa-dia"/g) || []).length === 3 && /<span>kg<\/span><small>▼ −2<\/small>/.test(h) && />Ziel 73<\/text>/.test(h), 'Diagramm-Ansicht: drei Diagramme, Linie mit Veränderung und Ziellinie');
   pruefe(/Anteile Einträge je Notiz/.test(h) && /<pattern id="saSchr1"/.test(h) && /50 %<\/text>/.test(h), 'Torte mit Schraffur und Anteilen');
-  pruefe(/saDiaPunkt\('/.test(h) && /saDiaZrUm\(1\)/.test(S.document.getElementById('fuss').innerHTML) && />3 M</.test(S.document.getElementById('fuss').innerHTML), 'Punkte antippbar, Zeitraum unten (Standard 3 M)');
+  pruefe(/saDiaPunkt\('/.test(h) && /saAnsicht\('tabelle'\)">Tabelle<\/button>/.test(S.document.getElementById('fuss').innerHTML) && /saDiaZrUm\(1\)/.test(S.document.getElementById('fuss').innerHTML) && />3 M</.test(S.document.getElementById('fuss').innerHTML), 'Punkte antippbar; unten „Tabelle“ und der Zeitraum (Standard 3 M)');
   pruefe(S.saDiaLinieDaten(sg, sg.diagramme[0]).length === 4, '3 Monate: der Eintrag von vor 100 Tagen fällt heraus');
   S.saDiaZrUm(1); S.saDiaZrUm(1);
   pruefe(S.saDiaZr(sg) === '' && S.saDiaLinieDaten(sg, sg.diagramme[0]).length === 5, '▶ ▶: „alles“ — alle fünf Einträge');
@@ -3142,7 +3175,7 @@ function kopfTest() {
   S.saAnsicht('tabelle');
   const h = inhalt();
   pruefe(/^<div class="sa-fest"><div class="sa-kw">/.test(h) && /<small>Ø kg · letzte 30 Tage<\/small><b>85,0<\/b>/.test(h), 'Kacheln oben im festen Kopf');
-  pruefe(/<table class="sa-tab sa-dat sa-kopf"><tr><th class="">Datum<\/th><th class="r">kg<\/th><\/tr><\/table><\/div><table class="sa-tab sa-dat">/.test(h),
+  pruefe(/<table class="sa-tab sa-dat sa-kopf"><tr><th class=" sort" onclick="saSortSetzen\('[^']+'\)">Datum(<span class="sa-pfeil"> [▲▼]<\/span>)?<\/th><th class="r sort" onclick="saSortSetzen\('[^']+'\)">kg(<span class="sa-pfeil"> [▲▼]<\/span>)?<\/th><\/tr><\/table><\/div><table class="sa-tab sa-dat">/.test(h),
     'Überschrift im festen Kopf, Einträge in einer zweiten Tabelle mit gleichen Spalten');
   const k = S.saAusVorlage(g, 'Kopie', true, []);
   pruefe(k.kopfwerte.length === 3 && k.kopfwerte !== g.kopfwerte, 'Kopie und Vorlage übernehmen die Kopfwerte');
@@ -5694,6 +5727,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { spaltenSortTest(); } catch (e) { fail('Spalten-Sortieren warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { diagrammeTest(); } catch (e) { fail('Diagramme warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kopfwertNameTest(); } catch (e) { fail('Kopfwert-Name warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { blattTest(); } catch (e) { fail('Blättern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
