@@ -176,7 +176,8 @@ if (!WB_SKRIPT) {
     'tokenMerken', 'tokenGueltig', 'klientVorbereiten', 'anmelden', 'anmeldeVersuch', 'abmelden',
     'erneuerungPlanen', 'erneuerungPruefen', 'taktPruefen', 'klickErneuern', 'dateiWaehlen', 'opfsSchreiben', 'opfsLesen',
     'montagVon', 'kalenderwoche', 'neueKennung', 'esc',
-    'kalenderListeHolen', 'kalenderGewaehlt', 'kalenderKontext', 'einenKalenderHolen', 'eintraegeEinsortieren',
+    /* einenKalenderHolen, eintraegeEinsortieren: seit 0.67 mit Sichtbarkeit (privat) — Test 122 */
+    'kalenderListeHolen', 'kalenderGewaehlt', 'kalenderKontext',
     'merkeTermin', 'praktischGanztags', 'titelOhneArt', 'terminKontextUeber', 'termineFuerTag',
     'aufgabeFaelligAn', 'faelligAn', 'istErledigtAn', 'wiederholungSetzen', 'aufgabeZeitAn', 'wochenIndex', 'monatsIndex', 'monatsende'];
   const abweichend = WOERTLICH.filter(n => {
@@ -277,7 +278,7 @@ function uebersichtTest() {
   CL.DB.einstellungen.leitsatz = '- Erst das *Wichtige*\n\nUm 17 Uhr ist Schluss <b>';
   CL.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '[] A\n[x] B\n[-] C\n[ ] D', status: 'laufend', kontext: 'beruflich', geaendert: 1 });
   CL.DB.projekte.push({ id: 'p2', name: 'Alt', flaeche: '[] Ruht', status: 'ruht', kontext: 'beruflich', geaendert: 1 });
-  CL.DB.projekte.push({ id: 'p3', name: 'Umbau', flaeche: '[] Statik', status: 'laufend', kontext: 'privat', geaendert: 1 });
+  CL.DB.projekte.push({ id: 'p3', name: 'Umbau', flaeche: '[] Statik', status: 'laufend', kontext: 'privat', bereich: 'kb-haus', geaendert: 1 });
   CL.DB.themen.push({ id: 't1', name: 'Liste', text: '[] L1', kontext: 'privat', geaendert: 1 });
   CL.DB.gedanken.push({ id: 'g1', titel: 'Notiz', text: '[] zählt nicht', geaendert: 1 });
   CL.DB.gedanken.push({ id: 'g2', titel: 'Kompass', text: '', kompass: true, geaendert: 1 });
@@ -296,13 +297,16 @@ function uebersichtTest() {
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
   pruefe(CL.DB.einstellungen.leitsatz.indexOf('Erst das') >= 0, 'die Leitsätze selbst bleiben unangetastet in der Datei');
 
-  CL.katSetzen('privat');
+  /* Seit 0.67: Kategorien statt Beruf/Privat */
+  CL.katSetzen('kb-haus');
   const p = inhalt();
-  pruefe(CL.cl.filter === 'privat' && CL.__ablage['clie-filter'] === 'privat', 'die Kategorie wird gesetzt und gemerkt');
-  pruefe(CL.clOffeneAufgaben() === 2 && !/Becker/.test(p), 'Privat zeigt nur private Aufgaben und Termine');
-  pruefe(/▼ Privat/.test(CL.document.getElementById('katKnopf').textContent), 'oben rechts steht die Kategorie');
+  pruefe(CL.cl.filter === 'kb-haus' && CL.__ablage['clie-filter'] === 'kb-haus', 'die Kategorie wird gesetzt und gemerkt');
+  pruefe(CL.clOffeneAufgaben() === 1 && !/Becker/.test(p), 'Haus & Projekte zeigt nur diese Aufgaben — und keine beruflichen Termine');
+  pruefe(/▼ Haus/.test(CL.document.getElementById('katKnopf').textContent), 'oben rechts steht die Kategorie');
+  CL.katSetzen('kb-arbeit');
+  pruefe(CL.clOffeneAufgaben() === 2, 'Arbeit = was beruflich war (auch ohne Kategorie)');
   CL.katSetzen('quatsch');
-  pruefe(CL.cl.filter === 'privat', 'unbekannte Kategorien werden ignoriert');
+  pruefe(CL.cl.filter === 'kb-arbeit', 'unbekannte Kategorien werden ignoriert');
   CL.katSetzen('alle');
 }
 
@@ -330,7 +334,7 @@ function bedienTest() {
   CL.menueUm();
   pruefe(CL.cl.aufklapp === 'menue' && /Auf neue Fassung prüfen/.test(CL.document.getElementById('aufklapp').innerHTML), 'der Reiter öffnet das Menü');
   CL.katUm();
-  pruefe(CL.cl.aufklapp === 'kat' && /katSetzen\('beruflich'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'die Kategorie öffnet ihre Liste');
+  pruefe(CL.cl.aufklapp === 'kat' && /katSetzen\('kb-arbeit'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'die Kategorie öffnet ihre Liste');
   CL.aufklappZu();
   pruefe(CL.cl.aufklapp === '' && CL.document.getElementById('aufklapp').innerHTML === '', 'ein Tipp daneben schließt');
   CL.menueUm();
@@ -637,12 +641,12 @@ function kalenderTest() {
   CL.clRoutineUm('r1', heute);
   pruefe(!CL.istErledigtAn(r1, heute), 'und wieder zurück');
 
-  CL.katSetzen('beruflich');
+  CL.katSetzen('kb-arbeit');
   h = inhalt();
-  pruefe(/Rückruf Becker/.test(h) && !/Geburtstag Oma/.test(h) && !/Oskar laufen lassen/.test(h), 'Beruf zeigt nur berufliche Termine und Routinen');
-  CL.katSetzen('privat');
+  pruefe(/Rückruf Becker/.test(h) && !/Geburtstag Oma/.test(h) && !/Oskar laufen lassen/.test(h), 'Arbeit zeigt nur berufliche Termine und Routinen');
+  CL.katSetzen('kb-haus');
   h = inhalt();
-  pruefe(!/Rückruf Becker/.test(h) && !/Offering beschreiben/.test(h), 'Privat blendet berufliche Termine und Aufgaben aus beruflichen Seiten aus');
+  pruefe(!/Rückruf Becker/.test(h) && !/Offering beschreiben/.test(h), 'eine andere Kategorie blendet berufliche Termine und Aufgaben aus beruflichen Seiten aus');
   CL.katSetzen('alle');
 
   CL.clBlaettern(1);
@@ -701,13 +705,13 @@ async function schreibTest() {
   CL.aufklappZu();
   CL.zugriffToken = 'test'; CL.tokenAblauf = Date.now() + 3600000;
   CL.DB.einstellungen.kalender = [{ id: 'buero@x', kontext: 'beruflich' }];
-  CL.katSetzen('beruflich');
+  CL.katSetzen('kb-arbeit');
   CL.terminNeu(heute, '15:00');
   await warte(); await warte();
   let f = CL.document.getElementById('aufklapp').innerHTML;
   pruefe(CL.cl.aufklapp === 'termin' && /class="an">Termin<\/button><button type="button" onclick="aufgabeStatt\(\)">Aufgabe/.test(f) && /value="15:00"/.test(f) && /value="16:00"/.test(f),
     '„Neu“: Termin ist vorgewählt, Aufgabe wählbar; die Stunde ist vorgeschlagen, eine Stunde lang');
-  pruefe(/<option value="buero@x" selected>/.test(f), 'vorgewählt ist ein Kalender, der zu Beruf passt');
+  pruefe(/<option value="buero@x" selected>/.test(f), 'vorgewählt ist ein Kalender, der zu Arbeit passt');
   const feld = (id, w) => { CL.document.getElementById(id).value = w; };
   feld('terminTitel', ''); feld('terminDatum', heute); feld('terminVon', '15:00'); feld('terminBis', '16:00'); feld('terminKal', 'buero@x');
   feld('terminOrt', ''); feld('terminNotiz', '');
@@ -913,18 +917,18 @@ function aufgabenTest() {
   pruefe(!/class="gruppe/.test(inhalt()) && CL.__ablage['clie-aufgaben-ansicht'] === 'prio' && /<small class="herkunft">◎ Büro<\/small>/.test(inhalt()),
     'Ansicht Prio (seit 0.17 statt „Kategorien aus“): flach, mit Herkunft, gemerkt');
   CL.aufAnsicht('gruppiert');
-  CL.aufFilter('beruflich');
-  pruefe(/Angebot einholen/.test(inhalt()) && !/Fenster messen/.test(inhalt()), 'der Filter Beruf zeigt nur berufliche Seiten');
+  CL.aufFilter('kb-arbeit');
+  pruefe(/Angebot einholen/.test(inhalt()) && !/Fenster messen/.test(inhalt()), 'der Filter Arbeit zeigt nur berufliche Seiten');
   CL.aufFilter('alle');
 
   /* Auswahl oben rechts */
   CL.katUm();
   let a = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /todoAlle\(\)/.test(a) && /todoListe\('cl-korb'\)/.test(a) && /todoSicht\('vorlage'\)/.test(a) && !/Weitere/.test(a),
-    'das ▼ (seit 0.61): Beruf/Privat, Alle, Sammler, Listen, Ruhende/Fertige/Vorlagen');
-  CL.todoBereichAuf();
-  pruefe(CL.cl.aufklapp === 'todobereich' && /aufBereichSetzen\('kb-haus'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Bereich wird über „Bereich: … ▾“ gewählt');
-  CL.aufklappZu();
+  pruefe(CL.cl.aufklapp === 'liste' && /todoKategorie\('alle'\)/.test(a) && /todoKategorie\('kb-arbeit'\)/.test(a) && /todoListe\('cl-korb'\)/.test(a) && /todoSicht\('vorlage'\)/.test(a) && !/Weitere/.test(a) && !/Beruf/.test(a),
+    'das ▼ (seit 0.67): Alle und die Kategorien, Sammler, Listen, Ruhende/Fertige/Vorlagen');
+  CL.todoKategorie('kb-haus');
+  pruefe(CL.cl.app === 'aufgaben' && CL.cl.filter === 'kb-haus' && CL.cl.aufklapp === '' && /▼ Haus/.test(CL.document.getElementById('katKnopf').textContent), 'eine Kategorie im ▼ zeigt „Alle“ dieser Kategorie');
+  CL.katSetzen('alle');
   CL.listenwahlOeffnen('filter');
   a = CL.document.getElementById('aufklapp').innerHTML;
   pruefe(/Umbau/.test(a) && /Garten/.test(a) && !/Halbmarathon/.test(a) && !/Ruht/.test(a) && !/>◎ Leer/.test(a),
@@ -1143,8 +1147,8 @@ function checklistenTest() {
   CL.todoSicht('vorlage');
   let h = inhalt();
   pruefe(/Packliste Urlaub/.test(h) && /Monatsabschluss/.test(h) && !/clsStarten\(/.test(h) && /Vorlagen…<\/span><small>2/.test(CL.listeAufklappHtml()), '„Vorlagen…“ im ▼ mit Zahl, ohne Startknopf in der Liste');
-  CL.katSetzen('beruflich');
-  pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'Beruf / Privat filtert');
+  CL.katSetzen('kb-arbeit');
+  pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'die Kategorie ▼ filtert');
   CL.katSetzen('alle');
 
   const vorText = CL.DB.gedanken[0].text;
@@ -1843,7 +1847,7 @@ function ckZustandTest() {
   frisch();
   const S = CL;
   const heute = S.isoDatum();
-  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = '';
+  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = '';
   S.localStorage.removeItem('clie-cls-klapp');
   S.DB.themen = [{ id: 'th', name: 'Haus', text: '[] Dachrinne\n[x] Keller', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 },
                  { id: 'tr', name: 'Carport Angebote', text: '[] Maier nachfassen\n[] Bauamt', kontext: 'privat', bereich: 'kb-haus', ruht: true, ordnung: 2, geaendert: 1 },
@@ -1859,13 +1863,14 @@ function ckZustandTest() {
   pruefe(/Haus<\/span><small>1\/2</.test(h), 'rechts nur x/y');
   pruefe(/☑ Packen Borkum/.test(h) && !/☑ Jahresgespräche/.test(h) && !/☑ Haus/.test(h), '☑ nur vor Listen zum Abhaken');
   pruefe(!/Carport Angebote/.test(h) && !/>Altes</.test(h) && /Ruhende…<\/span><small>1</.test(h) && /Fertige…<\/span><small>1</.test(h), 'Ruhende und Fertige nur gezählt, unter dem Strich');
-  /* Bereich: grenzt „Alle“ und das ▼ ein */
-  S.aufBereichSetzen('kb-arbeit');
+  /* Kategorie (seit 0.67 das ▼ selbst): grenzt „Alle“ und das ▼ ein */
+  S.todoKategorie('kb-arbeit');
   S.katUm();
   h = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Jahresgespräche/.test(h) && !/todoListe\('th'\)/.test(h) && /▼ Alle · Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-aufgaben-bereich') === 'kb-arbeit',
-    'Bereich gewählt: nur dessen Listen, oben „▼ Alle · Arbeit“, gemerkt');
-  S.aufBereichSetzen('');
+  pruefe(/Jahresgespräche/.test(h) && !/todoListe\('th'\)/.test(h) && /▼ Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-filter') === 'kb-arbeit',
+    'Kategorie gewählt: nur deren Listen, oben „▼ Arbeit“, gemerkt');
+  S.aufklappZu();
+  S.katSetzen('alle');
   S.todoSicht('ruht');
   pruefe(S.cl.app === 'checklisten' && /Carport Angebote/.test(inhalt()) && !/>Haus</.test(inhalt()) && /▼ Ruhende/.test(S.document.getElementById('katKnopf').textContent), '„Ruhende…“ zeigt nur die ruhenden Listen');
   S.todoSicht('fertig');
@@ -1934,7 +1939,7 @@ function ckKorbTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = '';
+  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = '';
   S.DB.themen = [{ id: 'tg', name: 'Garten', text: '[] Hecke', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 },
                  { id: 'tb', name: 'Büro', text: '[] Ablage', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 }];
   pruefe(S.ckKorb(false) === null, 'ohne Gebrauch kein Sammler');
@@ -1971,9 +1976,9 @@ function ckKorbTest() {
   S.aufklappZu();
   /* Aufgaben nach Lebensbereich */
   S.oeffne('aufgaben');
-  S.aufBereichSetzen('kb-arbeit');
-  pruefe(/Ablage/.test(inhalt()) && !/Hecke/.test(inhalt()) && !/Dachrinne/.test(inhalt()) && S.localStorage.getItem('clie-aufgaben-bereich') === 'kb-arbeit', 'Filter nach Bereich: nur Arbeit, gemerkt');
-  S.aufBereichSetzen('');
+  S.katSetzen('kb-arbeit');
+  pruefe(/Ablage/.test(inhalt()) && !/Hecke/.test(inhalt()) && /Dachrinne/.test(inhalt()) && S.localStorage.getItem('clie-filter') === 'kb-arbeit', 'Filter nach Kategorie: nur Arbeit (der Sammler gehört zu allen), gemerkt');
+  S.katSetzen('alle');
   pruefe(/Ablage/.test(inhalt()) && /Hecke/.test(inhalt()) && /Dachrinne/.test(inhalt()), 'Alle Aufgaben: wieder alles, auch der Sammler');
   S.oeffne('uebersicht');
 }
@@ -2139,7 +2144,6 @@ function kategorienTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  S.cl.auf.bereich = '';
   const k = S.katNeuAnlegen('PV-Anlage');
   pruefe(k && k.nurKategorie && S.ckBereichName(k.id) === 'PV-Anlage' && !S.krBereiche(false).some(b => b.id === k.id) && S.krBereiche(false).length === 7,
     'neue Kategorie: wählbar überall, aber nicht im Kurs-Rad (7 Lebensbereiche bleiben)');
@@ -2147,13 +2151,13 @@ function kategorienTest() {
   /* Zuordnen: Liste, Notiz, Projekt, Ziel, Sammlung, Blatt, Idee */
   const li = S.kpSeiteAnlegen('liste', 'Zählerschrank', 'privat', ''); S.aufZeileAnhaengen(li, 'Foto machen');
   S.oeffne('checklisten'); S.clsOeffnen(li.id); S.clsDetails();
-  pruefe(/id="clsKat"/.test(S.clsFensterHtml()) && /🔒 privat/.test(S.clsFensterHtml()), 'Details einer Liste: Kategorie ▼ und 🔒 privat');
+  pruefe(/id="clsKat"/.test(S.clsFensterHtml()) && /> privat</.test(S.clsFensterHtml()) && !/🔒/.test(S.clsFensterHtml()), 'Details einer Liste: Kategorie ▼ und „privat“ (ohne Symbol, 0.67)');
   S.document.getElementById('clsTitel').value = 'Zählerschrank';
   S.document.getElementById('clsKat').value = k.id; S.clsSpeichern();
   pruefe(li.__satz.bereich === k.id, 'Liste zugeordnet');
   const no = S.kpSeiteAnlegen('notiz', 'Angebote Vergleich', 'privat', '');
   S.oeffne('memo'); S.memoOeffnen(no.id); S.memoDetails();
-  pruefe(/id="memoKat"/.test(S.memoFensterHtml()) && /Beruf \/ Privat:/.test(S.memoFensterHtml()), 'Details einer Notiz: Kategorie ▼ (Beruf/Privat heißt jetzt so)');
+  pruefe(/id="memoKat"/.test(S.memoFensterHtml()) && !/Beruf/.test(S.memoFensterHtml()), 'Details einer Notiz: Kategorie ▼, kein Beruf/Privat mehr (0.67)');
   S.document.getElementById('memoTitel').value = 'Angebote Vergleich';
   S.document.getElementById('memoKat').value = k.id; S.memoSpeichern();
   pruefe(no.__satz.bereich === k.id, 'Notiz zugeordnet');
@@ -2175,7 +2179,7 @@ function kategorienTest() {
   S.iwSpeichern({ id: 'iw-pv', titel: 'Speicher nachrüsten', stufe: 1, status: 'aktiv', bereich: k.id, varianten: [], meilensteine: [], schritte: [], wochen: [] });
   /* Gesamtsicht */
   S.oeffne('kategorien');
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') < 0 && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0 && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
   S.katOeffnen(k.id);
   const g = inhalt();
   pruefe(/To Do · offen/.test(g) && /Foto machen/.test(g) && /Listen/.test(g) && /Zählerschrank/.test(g) && /Projekte · Ziele/.test(g) && /PV-Anlage Haus/.test(g)
@@ -2198,14 +2202,136 @@ function kategorienTest() {
 }
 
 /* ============================================================
-   120. Kategorien im ▼ der Übersicht (0.66.2)
-   Grund: Im Ordner Planung war die App „Kategorien“ kaum zu finden.
-   Wie am Palm gehören Kategorien ins ▼ oben rechts.
-   Erkennt: Kategorien fehlen im ▼, Tipp öffnet nicht die Gesamtsicht,
-   „bearbeiten…“ führt nicht zum Bearbeiten, Eintrag doch im Ordner.
+   122. Private Termine, „privat“ ohne Symbol (0.67)
+   Grund: „privat“ soll auch für Termine gelten — als Googles eigene
+   Sichtbarkeit „Privat“ — und überall ohne 🔒 erscheinen.
+   Erkennt: Sichtbarkeit nicht geholt, privater Termin im Klartext
+   (Kalender, Suche, Fenster), Haken fehlt, Symbol taucht wieder auf.
+   ============================================================ */
+function privatTermineTest() {
+  console.log('\n122. Private Termine, „privat“ ohne Symbol (0.67)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
+  const heute = S.isoDatum();
+  pruefe(/recurringEventId,visibility\)/.test(SKRIPT) && (SKRIPT.match(/privat: e\.visibility === 'private' \|\| e\.visibility === 'confidential'/g) || []).length === 3,
+    'Google: Sichtbarkeit wird geholt und an jedem Termin gemerkt');
+  const ziel = {};
+  S.eintraegeEinsortieren([{ id: 'e1', summary: 'Arzt', start: { dateTime: heute + 'T12:30:00' }, end: { dateTime: heute + 'T13:30:00' }, visibility: 'private' },
+                           { id: 'e2', summary: 'Laufen', start: { dateTime: heute + 'T16:00:00' }, end: { dateTime: heute + 'T17:00:00' } }], 'Privat', 'privat', ziel);
+  pruefe(ziel[heute] && ziel[heute][0].privat === true && ziel[heute][1].privat === false, 'visibility „private“ → privat, sonst nicht');
+  S.termineNachTag[heute] = [{ id: 'p1', zeit: '12:30', bis: '13:30', titel: 'Arzttermin Dr. Huber', kontext: 'privat', privat: true, kalId: 'k' },
+                             { id: 'p2', zeit: '16:00', bis: '17:00', titel: 'Laufen', kontext: 'privat', kalId: 'k' }];
+  pruefe(S.clTermineAm(heute).zeit.some(x => x.titel === 'Arzttermin Dr. Huber'), 'zeigen: der private Termin im Klartext');
+  S.prModusSetzen('maskieren');
+  let z = S.clTermineAm(heute).zeit;
+  pruefe(z.length === 2 && z[0].titel === '— privat —' && z[0].zeit === '12:30' && !z[0].ort && S.termineNachTag[heute][0].titel === 'Arzttermin Dr. Huber',
+    'maskiert: Uhrzeit mit „— privat —“, der gemerkte Termin bleibt unverändert');
+  S.oeffne('kalender'); S.clKalAnsicht('tag');
+  pruefe(!/Arzttermin/.test(inhalt()) && /— privat —/.test(inhalt()) && !/🔒/.test(inhalt()), 'Kalender: maskiert, ohne Symbol');
+  S.clKalAnsicht('agenda');
+  pruefe(!/Arzttermin/.test(inhalt()), 'Agenda: maskiert');
+  pruefe(!S.suTreffer('arzttermin').length && S.suTreffer('laufen').length, 'Suche findet den privaten Termin nicht');
+  S.terminZeigen(heute, 'p1');
+  pruefe(S.cl.aufklapp !== 'termin' || !/Arzttermin/.test(S.document.getElementById('aufklapp').innerHTML) || S.prModus() === 'zeigen', 'antippen: erst freigeben (PIN), dann zeigen');
+  S.aufklappZu();
+  S.localStorage.setItem('clie-privat', 'verbergen'); S.cl.pr.zurueck = '';
+  pruefe(S.clTermineAm(heute).zeit.length === 1 && S.clTermineRest().every(x => !x.privat), 'verborgen: der private Termin fehlt');
+  S.localStorage.removeItem('clie-privat'); S.cl.pr.zurueck = '';
+  /* Termin-Fenster: Haken „privat“ = Googles Sichtbarkeit */
+  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
+  S.cl.termin = { modus: 'zeigen', t: S.termineNachTag[heute][0], tag: heute };
+  pruefe(!/\(Beruf\)|\(Privat\)/.test(S.terminFensterHtml()) && /· privat/.test(S.terminFensterHtml()), 'Termin zeigen: Kalender ohne „(Beruf)/(Privat)“, „privat“ markiert');
+  S.terminAendern();
+  const f = S.terminFensterHtml();
+  pruefe(/id="terminPrivat" type="checkbox" checked/.test(f) && />\s*privat<\/label>/.test(f) && !/🔒/.test(f), 'Ändern: Haken „privat“ gesetzt, ohne Symbol');
+  const feld = (id, w) => { S.document.getElementById(id).value = w; };
+  feld('terminTitel', 'Arzttermin'); feld('terminDatum', heute); feld('terminVon', '12:30'); feld('terminBis', '13:30');
+  S.document.getElementById('terminGanz').checked = false;
+  S.document.getElementById('terminPrivat').checked = true;
+  pruefe(S.terminAusFenster().koerper.visibility === 'private', 'Haken an → Google „private“');
+  S.document.getElementById('terminPrivat').checked = false;
+  pruefe(S.terminAusFenster().koerper.visibility === 'default', 'Haken aus → Google „default“');
+  S.cl.termin = null; S.aufklappZu();
+  S.zugriffToken = null; S.tokenAblauf = 0;
+  pruefe(!/🔒 privat|— privat — 🔒|private — 🔒/.test(SKRIPT), '„privat“ überall ohne 🔒');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   121. Kategorien statt Beruf/Privat (0.67)
+   Grund: zwei Ordnungen (Beruf/Privat und Kategorien) waren nicht
+   konsistent. Jetzt filtert das ▼ nach Kategorie; Beruf heißt Arbeit.
+   Die Workbench bekommt „kontext“ weiter — aus der Kategorie abgeleitet.
+   Erkennt: Beruf/Privat taucht wieder auf, gemerkter alter Filter kaputt,
+   Umstellung fehlt oder läuft mehrfach, Kontext nicht nachgeführt,
+   Kalender passen nicht zur Kategorie.
+   ============================================================ */
+function katStattBerufTest() {
+  console.log('\n121. Kategorien statt Beruf/Privat (0.67)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(!/Beruf \/ Privat:/.test(SKRIPT) && !/CL_KATEGORIEN/.test(SKRIPT) && typeof S.aufBereichSetzen === 'undefined' && typeof S.todoBereichHtml === 'undefined'
+    && !/kpPasstFilter\([^)]*cl\.filter\)/.test(SKRIPT), 'kein Beruf/Privat mehr in Fenstern und Filtern, kein eigener Bereichsfilter in To Do');
+  /* Gemerkter Filter aus der Zeit davor */
+  S.localStorage.setItem('clie-filter', 'beruflich'); S.clFilterLaden();
+  pruefe(S.cl.filter === 'kb-arbeit', 'gemerkt „Beruf“ → Arbeit');
+  S.localStorage.setItem('clie-filter', 'privat'); S.clFilterLaden();
+  pruefe(S.cl.filter === 'alle', 'gemerkt „Privat“ → Alle');
+  S.localStorage.setItem('clie-filter', 'alle');
+  /* Umstellung */
+  S.DB.themen.push({ id: 'b1', name: 'Büro', text: '[] Ablage', kontext: 'beruflich', geaendert: 1 });
+  S.DB.themen.push({ id: 'b2', name: 'Garten', text: '[] Hecke', kontext: 'privat', geaendert: 1 });
+  S.DB.themen.push({ id: 'b3', name: 'Messe', text: '[] Stand', kontext: 'beruflich', bereich: 'kb-freizeit', geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'r1', titel: 'Wochenbericht', wiederholung: { takt: 'woche', tage: [1], intervall: 1 }, kontext: 'beruflich', geaendert: 1 });
+  S.DB.jahrestermine = [{ id: 'j1', titel: 'Dienstreise Fürth', von: '2026-11-04', art: 'dienstreise', geaendert: 1 }];
+  const n = S.clKategorienUmstellen();
+  pruefe(n === 3 && S.DB.themen[0].bereich === 'kb-arbeit' && !S.DB.themen[1].bereich && S.DB.themen[2].bereich === 'kb-freizeit'
+    && S.DB.aufgaben[0].bereich === 'kb-arbeit' && S.DB.jahrestermine[0].bereich === 'kb-arbeit' && S.DB.themen[0].geaendert > 1,
+    'Umstellung: Berufliches ohne Kategorie → Arbeit (auch Routinen, Jahrestermine nach Art); Vorhandenes bleibt');
+  pruefe(S.clKategorienUmstellen() === 0, 'die Umstellung läuft nur einmal (nichts mehr zu tun)');
+  /* Kontext folgt der Kategorie — für die Workbench */
+  const o = { kontext: 'beruflich', bereich: 'kb-arbeit' };
+  S.katPrivatSchreiben(o, { bereich: 'kb-haus' });
+  pruefe(o.kontext === 'privat' && o.bereich === 'kb-haus', 'andere Kategorie → kontext privat');
+  S.katPrivatSchreiben(o, { bereich: 'kb-arbeit' });
+  pruefe(o.kontext === 'beruflich', 'Arbeit → kontext beruflich');
+  /* Neues bekommt die Kategorie des ▼ */
+  S.katSetzen('kb-haus');
+  pruefe(S.clNeuBereich() === 'kb-haus' && S.clNeuKontext() === 'privat', 'neu unter ▼ Haus: Kategorie Haus, kontext privat');
+  S.katSetzen('kb-arbeit');
+  pruefe(S.clNeuBereich() === 'kb-arbeit' && S.clNeuKontext() === 'beruflich', 'neu unter ▼ Arbeit: kontext beruflich');
+  /* Termine: Arbeit = berufliche Kalender, andere Kategorien = die übrigen */
+  const tb = { id: 'x', kontext: 'beruflich' }, tp = { id: 'y', kontext: 'privat' };
+  pruefe(S.clPasstTermin(tb) && !S.clPasstTermin(tp), '▼ Arbeit: nur berufliche Kalender');
+  S.katSetzen('kb-haus');
+  pruefe(!S.clPasstTermin(tb) && S.clPasstTermin(tp), '▼ Haus: die übrigen Kalender');
+  S.katSetzen('alle');
+  pruefe(S.clPasstTermin(tb) && S.clPasstTermin(tp), '▼ Alle: alle Kalender');
+  /* Eine gelöschte Kategorie im ▼ gilt als „Alle“ */
+  S.cl.filter = 'kb-gibtsnicht';
+  pruefe(S.clFilter() === 'alle' && S.katName(S.cl.filter) === 'Alle', 'unbekannte Kategorie im ▼ → Alle');
+  S.cl.filter = 'alle';
+  /* Fenster */
+  S.oeffne('routinen'); S.rtNeu();
+  pruefe(/id="rtKat"/.test(S.document.getElementById('aufklapp').innerHTML) && !/Beruf/.test(S.document.getElementById('aufklapp').innerHTML), 'Routine: Kategorie statt Beruf/Privat');
+  S.aufklappZu();
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0, 'App „Kategorien“ im Ordner Planung');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   120. Kategorien im ▼ der Übersicht (0.66.2, seit 0.67 als Filter)
+   Grund: Kategorien müssen leicht zu finden sein. Seit 0.67 filtert das ▼
+   überall nach Alle oder einer Kategorie; die Gesamtsicht hat die App
+   „Kategorien“ im Ordner Planung.
+   Erkennt: Kategorien fehlen im ▼, Beruf/Privat taucht wieder auf,
+   App fehlt im Ordner.
    ============================================================ */
 function katUebersichtTest() {
-  console.log('\n120. Kategorien im ▼ der Übersicht (0.66.2)');
+  console.log('\n120. Kategorien im ▼ der Übersicht (0.66.2 / 0.67)');
   if (!CL) { return; }
   frisch();
   const S = CL;
@@ -2213,16 +2339,12 @@ function katUebersichtTest() {
   S.oeffne('uebersicht');
   S.katUm();
   const h = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('beruflich'\)/.test(h) && /<div class="zw">Kategorien<\/div>/.test(h) && /katVonUebersicht\('[^']+'\)">PV-Anlage</.test(h) && /Kategorien bearbeiten…/.test(h),
-    '▼ auf der Übersicht: Alle/Beruf/Privat, darunter die Kategorien und „bearbeiten…“');
-  S.katVonUebersicht(k.id);
-  pruefe(S.cl.app === 'kategorien' && S.cl.kat.id === k.id && S.document.getElementById('reiter').textContent === 'PV-Anlage', 'Tipp: Gesamtsicht der Kategorie');
-  S.katVonUebersicht('');
-  pruefe(S.cl.app === 'kategorien' && S.cl.kat.bearbeiten && /katSchieben/.test(inhalt()), '„Kategorien bearbeiten…“: Liste zum Sortieren und Umbenennen');
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') < 0, 'nicht mehr im Ordner Planung — ein Weg');
-  S.oeffne('aufgaben'); S.katUm();
-  pruefe(!/katVonUebersicht/.test(S.document.getElementById('aufklapp').innerHTML), 'in anderen Apps bleibt ihr eigenes ▼');
-  S.aufklappZu();
+  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('alle'\)/.test(h) && /katSetzen\('kb-arbeit'\)/.test(h) && new RegExp("katSetzen\\('" + k.id + "'\\)").test(h) && !/Beruf|Privat/.test(h),
+    '▼ auf der Übersicht: Alle und die Kategorien — kein Beruf/Privat');
+  S.katSetzen(k.id);
+  pruefe(S.cl.filter === k.id && S.cl.app === 'uebersicht' && /▼ PV-Anlage/.test(S.document.getElementById('katKnopf').textContent), 'Tipp: filtert, bleibt auf der Übersicht');
+  S.katSetzen('alle');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0 && typeof S.katVonUebersicht === 'undefined', 'App „Kategorien“ wieder im Ordner Planung');
   S.oeffne('uebersicht');
 }
 
@@ -2285,13 +2407,13 @@ function privatTest() {
   pruefe(/prModusSetzen\('maskieren'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: Private Einträge zeigen | maskieren | verbergen');
   S.prModusSetzen('maskieren');
   let h = inhalt();
-  pruefe(/— privat — 🔒/.test(h) && !/Tagebuch/.test(h) && /Einkauf/.test(h), 'maskiert: „— privat —“ statt des Titels');
+  pruefe(/— privat —/.test(h) && !/🔒/.test(h) && !/Tagebuch/.test(h) && /Einkauf/.test(h), 'maskiert: „— privat —“ statt des Titels');
   S.memoOeffnen(n1.id);
   pruefe(/Dieser Eintrag ist privat/.test(inhalt()) && !/Tagebuch/.test(S.memoSeiteHtml(n1)), 'geöffnet: nur die Maske');
   S.memoZurListe();
   S.oeffne('aufgaben');
   h = inhalt();
-  pruefe(/— 1 private — 🔒/.test(h) && !/Geschenk Anna/.test(h) && /Dachrinne/.test(h), 'To Do: private Aufgabe maskiert gezählt');
+  pruefe(/— 1 private —/.test(h) && !/Geschenk Anna/.test(h) && /Dachrinne/.test(h), 'To Do: private Aufgabe maskiert gezählt');
   S.oeffne('suchen');
   pruefe(!S.suTreffer('tagebuch').length && !S.suTreffer('geschenk').length && S.suTreffer('einkauf').length, 'Suche findet Privates nicht');
   pruefe(!S.clTagZeilen(heute).some(z => /Geschenk/.test(z.roh)), 'Kalender und Agenda: private eingeplante Aufgabe fehlt');
@@ -2321,7 +2443,7 @@ function privatTest() {
   S.document.getElementById('aufText').value = 'Dachrinne';
   S.document.getElementById('aufPrivat').checked = true;
   S.aufSpeichern();
-  pruefe(S.ckZusatz(li, 'Dachrinne').privat === true, 'Aufgaben-Details: 🔒 privat');
+  pruefe(S.ckZusatz(li, 'Dachrinne').privat === true, 'Aufgaben-Details: privat');
   S.document.getElementById('aufPrivat').checked = false;
   S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
   S.oeffne('uebersicht');
@@ -2587,7 +2709,7 @@ function toDoTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  S.cl.auf.bereich = ''; S.cl.auf.liste = '';
+  S.cl.auf.liste = '';
   S.DB.themen = [{ id: 'lh', name: 'Haus', text: '[] Dachrinne', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 }];
   S.DB.gedanken.push({ id: 'gp', titel: 'Packen', text: '[] Koffer\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', gestartet: S.isoDatum(), ordnung: 2, geaendert: 1 });
   S.DB.gedanken.push({ id: 'gv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 3, geaendert: 1 });
@@ -2603,7 +2725,7 @@ function toDoTest() {
   pruefe(S.cl.app === 'checklisten' && S.cl.aufklapp === '' && S.document.getElementById('reiter').textContent === 'To Do' && /▼ Packen/.test(S.document.getElementById('katKnopf').textContent), 'Liste gewählt: Reiter bleibt „To Do“, oben „▼ Packen“');
   pruefe(!/clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'aus dem ▼ geöffnet: kein „Fertig“ — das ▼ führt weiter');
   S.katUm();
-  pruefe(S.cl.aufklapp === 'liste' && /todoAlle\(\)/.test(S.document.getElementById('aufklapp').innerHTML), 'auch in der Liste dasselbe ▼');
+  pruefe(S.cl.aufklapp === 'liste' && /todoKategorie\('alle'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'auch in der Liste dasselbe ▼');
   S.aufklappZu();
   S.zurueckGedrueckt();
   pruefe(S.cl.app === 'aufgaben', 'Zurück aus einer Liste: „Alle“');
@@ -3341,7 +3463,7 @@ function ckPrioTest() {
   frisch();
   const S = CL;
   const heute = S.isoDatum();
-  S.cl.cls.id = ''; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = ''; S.cl.auf.frisch = {}; S.cl.auf.wahl = '';
+  S.cl.cls.id = ''; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.frisch = {}; S.cl.auf.wahl = '';
   S.cl.auf.ansicht = 'prio'; S.cl.auf.naechste = false;
   S.DB.themen = [{ id: 'tq', name: 'Q4', text: '[] P5 Keller\n[] P4 Ablage\n[] Präsentation\n[] P1 ZEO-Auftrag', kontext: 'privat', ordnung: 1, geaendert: 1 },
                  { id: 'ts', name: 'PV-Anlage', text: '[] P1 Angebot prüfen', kontext: 'privat', stern: true, ordnung: 2, geaendert: 1 }];
@@ -3397,13 +3519,13 @@ function clsAusListeTest() {
   S.DB.themen = [{ id: 't1', name: 'Auslieferung', text: quelle, kontext: 'beruflich', geaendert: 1 },
                  { id: 't2', name: 'Leer', text: 'nur Text', kontext: 'beruflich', geaendert: 1 },
                  { id: 't3', name: 'Garten', text: '[] Rasen', kontext: 'privat', geaendert: 1 }];
-  S.katSetzen('beruflich');
+  S.katSetzen('kb-arbeit');
   S.oeffne('checklisten');
   S.clsNeu();
   pruefe(/clsFensterSchritt\('liste'\)/.test(S.clsFensterHtml()), 'Neu bietet „Aus einer Aufgabenliste …“');
   S.clsFensterSchritt('liste');
   const h = S.clsFensterHtml();
-  pruefe(/Auslieferung/.test(h) && !/>≡ Leer</.test(h) && !/Garten/.test(h), 'zur Wahl: Listen mit Punkten, passend zu Beruf/Privat');
+  pruefe(/Auslieferung/.test(h) && !/>≡ Leer</.test(h) && !/Garten/.test(h), 'zur Wahl: Listen mit Punkten, passend zur Kategorie');
   const vorher = S.DB.gedanken.length;
   S.clsAnlegen('liste', 't1');
   const v = S.DB.gedanken[S.DB.gedanken.length - 1];
@@ -4250,7 +4372,7 @@ function lesezeichenTest() {
   frisch();
   const S = CL;
   S.cl.lz.bearbeiten = false;
-  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] a\n[] b\n[] c', status: 'laufend', kontext: 'privat', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] a\n[] b\n[] c', status: 'laufend', kontext: 'privat', bereich: 'kb-haus', geaendert: 1 });
   S.DB.gedanken.push({ id: 'n1', titel: 'WLAN, Zugänge', text: 'x', ordnung: 1, kontext: 'privat', geaendert: 1 });
   S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub packen', text: '[x] a\n[] b', checkliste: 'lauf', ordnung: 2, kontext: 'privat', geaendert: 1 });
   S.DB.themen.push({ id: 'l1', name: 'Haus', kontext: 'beruflich', text: '[] x', geaendert: 1 });
@@ -4276,9 +4398,9 @@ function lesezeichenTest() {
   pruefe(S.DB.pinnwand.filter(p => p.art === 'flaeche' && p.zielId === 'g:c1').length === 1, 'Checkliste wie in der Workbench als „flaeche“ mit g:-Kennung');
   S.lzUm('liste', 'l1'); S.lzUm('liste', 'l1');
   pruefe(S.DB.pinnwand.filter(p => p.art === 'liste').length === 1, 'zweimal tippen: entfernen und wieder hinzufügen');
-  /* Filter Beruf/Privat */
-  S.katSetzen('privat');
-  pruefe(!/Haus/.test(inhalt()) && /Carport/.test(inhalt()), 'Filter ▼: Privat zeigt keine beruflichen Lesezeichen');
+  /* Filter nach Kategorie (seit 0.67) */
+  S.katSetzen('kb-haus');
+  pruefe(!/>Haus</.test(inhalt()) && !/≡ Haus/.test(inhalt()) && /Carport/.test(inhalt()), 'Filter ▼: eine Kategorie zeigt keine beruflichen Lesezeichen');
   S.katSetzen('alle');
   /* Öffnen */
   const id = n => S.DB.pinnwand.filter(p => p.zielId === n)[0].id;
@@ -4354,8 +4476,8 @@ function jahrTest() {
   pruefe(titel('2026-11-03') === '◆Geburtstag Oma | ◆Urlaub Borkum | ·Herbstferien', 'jährlicher Geburtstag, mehrtägiger Urlaub, Ferien — ' + titel('2026-11-03'));
   pruefe(/Geburtstag Oma/.test(titel('2031-11-03')) && !/Geburtstag Oma/.test(titel('2026-11-04')), 'jährlich: jedes Jahr am selben Tag, sonst nicht');
   pruefe(titel('2026-11-01') === '★Allerheiligen', 'Feiertag mit ★');
-  S.cl.filter = 'beruflich';
-  pruefe(titel('2026-11-04') === '◆Dienstreise Fürth | ·Herbstferien', 'Filter Beruf: nur die Dienstreise (Urlaub ist privat), Ferien bleiben');
+  S.cl.filter = 'kb-arbeit';
+  pruefe(titel('2026-11-04') === '◆Dienstreise Fürth | ·Herbstferien', 'Filter Arbeit: nur die Dienstreise (Urlaub ist privat), Ferien bleiben');
   S.cl.filter = 'alle';
   S.termineNachTag['2026-11-03'] = [{ id: 'g1', titel: 'Geburtstag Oma', ganztags: true, zeit: '', bis: '', kontext: 'privat' }];
   S.termineNachTag['2026-11-01'] = [{ id: 'g2', titel: 'Allerheiligen', ganztags: true, zeit: '', bis: '', kontext: 'privat' }];
@@ -4464,7 +4586,7 @@ function suchenTest() {
   S.DB.gedanken.push({ id: 'c1', titel: 'Carport-Abnahme', text: '[] Dach', checkliste: 'vorlage', kontext: 'privat', geaendert: 1 });
   const sa = S.saAusVorlage(S.SA_VORLAGEN.budget, 'Carport', false, [{ posten: 'Bausatz', gewerk: 'Material', plan: 3500 }, { posten: 'Lasur', notiz: 'für Carport-Holz', plan: 300 }]);
   S.DB.aufgaben.push({ id: 'r1', titel: 'Carport fegen', wiederholung: { takt: 'woche', tage: [1], intervall: 1 }, geaendert: 1 });
-  S.cl.filter = 'beruflich';
+  S.cl.filter = 'kb-arbeit';
   const t = S.suTreffer('carport');
   const g = n => t.filter(x => x.gruppe === n);
   pruefe(g('termine').length === 3, 'Termine: drei — der mehrtägige nur einmal');
@@ -5835,15 +5957,15 @@ function jahrTest() {
   S.jaFilter('');
   S.katUm();
   const jw = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'jahrwahl' && new RegExp('jaJahrSetzen\\(' + (j - 1) + '\\)').test(jw) && /katSetzen\('privat'\)/.test(jw), 'oben rechts: Jahre und Beruf/Privat');
+  pruefe(S.cl.aufklapp === 'jahrwahl' && new RegExp('jaJahrSetzen\\(' + (j - 1) + '\\)').test(jw) && /katSetzen\('kb-haus'\)/.test(jw) && !/Beruf/.test(jw), 'oben rechts: Jahre und Kategorien');
   S.jaJahrSetzen(j - 1);
   pruefe(S.cl.ja.jahr === j - 1 && !S.cl.aufklapp && S.document.getElementById('katKnopf').textContent === '▼ ' + (j - 1), 'Jahr gewählt');
   S.cl.ja.jahr = j;
   S.clBlaettern(1);
   pruefe(S.cl.ja.jahr === j + 1, 'Wischen blättert das Jahr');
   S.cl.ja.jahr = j;
-  S.katSetzen('beruflich');
-  pruefe(!S.jaAn(tagG).some(x => x.id === 'g1'), 'Filter Beruf/Privat gilt auch im Jahr');
+  S.katSetzen('kb-arbeit');
+  pruefe(!S.jaAn(tagG).some(x => x.id === 'g1'), 'Filter nach Kategorie gilt auch im Jahr');
   S.katSetzen('alle');
   S.clKalAnsicht('tag');
   S.oeffne('uebersicht');
@@ -5874,8 +5996,8 @@ function memoBereichTest() {
   S.memoNeu();
   pruefe(/Neue Notiz/.test(S.document.getElementById('aufklapp').innerHTML) && !/◎ Projekt/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu legt nur Notizen an');
   S.aufklappZu();
-  S.katSetzen('beruflich');
-  pruefe(/Teamregeln/.test(inhalt()) && !/Ideen Garten/.test(inhalt()), 'Filter ▼ Beruf/Privat oben rechts gilt weiter');
+  S.katSetzen('kb-arbeit');
+  pruefe(/Teamregeln/.test(inhalt()) && !/Ideen Garten/.test(inhalt()), 'Filter ▼ (Kategorie) oben rechts gilt weiter');
   S.katSetzen('alle');
   S.oeffne('uebersicht');
 }
@@ -7424,6 +7546,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { privatTermineTest(); } catch (e) { fail('Private Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { katStattBerufTest(); } catch (e) { fail('Kategorien statt Beruf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { katUebersichtTest(); } catch (e) { fail('Kategorien-▼ warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoSeiteStattArtTest(); } catch (e) { fail('Seite statt Notizblock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { privatTest(); } catch (e) { fail('Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
