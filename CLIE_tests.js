@@ -291,7 +291,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 27, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 28, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -2198,6 +2198,137 @@ function kategorienTest() {
   pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
   S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
   pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   123. Leitfaden: ein Problem nach Standardverfahren (0.68)
+   Grund: Methodisches Arbeiten (Konstruktion, Diagnose, Abwicklung,
+   Intervention, Verhandlung) getrennt vom Tagesgeschäft; ins To Do geht
+   nur der nächste Schritt.
+   Erkennt: Verfahren unvollständig, Fall ohne Kategorie/Kontext, Notizen
+   gehen verloren, Schritt doppelt in To Do, Abhaken nicht in beide
+   Richtungen, Fall fehlt in Kategorien/Suche, Privates sichtbar,
+   Brücke aus der Ideenwerkstatt fehlt.
+   ============================================================ */
+function leitfadenTest() {
+  console.log('\n123. Leitfaden: ein Problem nach Standardverfahren (0.68)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
+  const heute = S.isoDatum();
+  pruefe(S.clApp('leitfaden') && S.CL_ORDNER.planung.apps.indexOf('leitfaden') === 2 && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
+    'App „Leitfaden“ im Ordner Planung nach der Ideenwerkstatt, Symbol Stufen');
+  pruefe(S.LF_ARTEN.length === 5 && S.LF_ARTEN.every(a => a.schritte.length === 5 && a.schritte.every(s => s[0] && s[1])) && S.LF_ARTEN[4].schritte[0][0] === 'Plan B',
+    'fünf Verfahren mit je fünf Schritten (Name und Erklärung); Verhandlung beginnt mit Plan B');
+  S.oeffne('leitfaden');
+  pruefe(S.document.getElementById('reiter').textContent === 'Leitfaden' && /lfNeu\(\)/.test(S.document.getElementById('fuss').innerHTML), 'Liste: Reiter „Leitfaden“, unten „Neu“');
+  /* Neu */
+  S.katSetzen('kb-arbeit');
+  S.lfNeu();
+  let w = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'leitfaden' && (w.match(/lfArtWahl\(/g) || []).length === 5 && /id="lfKat"/.test(w) && /id="lfPrivat"/.test(w) && /Kepner-Tregoe/.test(w), 'Neu: Titel, fünf Verfahren mit „wann“, Kategorie, privat');
+  S.document.getElementById('lfTitel').value = 'Heizung taktet';
+  S.document.getElementById('lfKat').value = 'kb-arbeit'; S.document.getElementById('lfPrivat').checked = false;
+  S.lfSpeichern();
+  pruefe(S.lfAlle().length === 0 && S.cl.aufklapp === 'leitfaden', 'ohne Verfahren wird nichts angelegt');
+  S.lfArtWahl('diagnose');
+  S.document.getElementById('lfTitel').value = 'Heizung taktet';
+  S.document.getElementById('lfKat').value = 'kb-haus';
+  S.lfSpeichern();
+  const f = S.lfAlle()[0];
+  pruefe(f && f.art === 'diagnose' && f.bereich === 'kb-haus' && f.kontext === 'privat' && f.typ === 'leitfaden' && /^lf-/.test(f.id) && S.DB.kurs.indexOf(f) >= 0,
+    'Fall angelegt: in der workbench.json (kurs), mit Kategorie und abgeleitetem Kontext');
+  S.katSetzen('alle');
+  pruefe(S.cl.lf.id === f.id && S.document.getElementById('reiter').textContent === 'Heizung taktet' && S.document.getElementById('katKnopf').textContent === 'Diagnose',
+    'nach OK: der Fall offen, oben Titel und Verfahren');
+  let h = inhalt();
+  pruefe((h.match(/lfSchrittZeigen\(/g) || []).length === 9 && /id="lfT_was_ist"/.test(h) && /id="lfNotiz"/.test(h) && /lfInsToDo\(\)/.test(h),
+    'Stufen 1–5, Schritt 1 offen mit Ist/Ist-Nicht-Tabelle, Notiz und „→ To Do“');
+  S.lfTabelleGetippt('was', 'ist', 'Brenner taktet'); S.lfTabelleGetippt('was', 'nicht', 'Warmwasser ok');
+  S.lfTabelleGetippt('quatsch', 'ist', 'x');
+  S.document.getElementById('lfNotiz').value = 'seit Oktober, nachts';
+  S.lfNotizGetippt();
+  pruefe(f.tabelle.was.ist === 'Brenner taktet' && !f.tabelle.quatsch && f.schritte[0].notiz === 'seit Oktober, nachts', 'Tabelle und Notiz werden gemerkt — Unbekanntes nicht');
+  S.lfSchrittFertig();
+  h = inhalt();
+  pruefe(f.schritte[0].fertig && S.cl.lf.offen === 1 && /<td>Brenner taktet<\/td>/.test(h) && !/id="lfT_was_ist"/.test(h), 'Schritt fertig: weiter zu Schritt 2, dort die Tabelle zum Lesen');
+  /* → To Do */
+  S.document.getElementById('lfNotiz').value = '';
+  S.lfInsToDo();
+  const korb = S.ckKorb(false);
+  const text = 'Heizung taktet: Unterschiede & Veränderungen';
+  pruefe(korb && /\[\] Heizung taktet: Unterschiede & Veränderungen/.test(korb.text) && f.schritte[1].aufgabe && f.schritte[1].aufgabe.seite === korb.id
+    && /Leitfaden: Heizung taktet · Schritt 2/.test(S.ckZusatz(korb, text).notiz || ''), '→ To Do: genau eine Aufgabe im Sammler, mit Notiz zurück zum Fall');
+  pruefe(S.clTagZeilen(heute).some(z => z.a && /Unterschiede/.test(z.a.text)), 'die Aufgabe ist für heute eingeplant');
+  S.lfInsToDo();
+  pruefe((korb.text.match(/Unterschiede/g) || []).length === 1 && !/lfInsToDo\(\)/.test(inhalt()), 'kein zweites Mal — der Schritt steht schon in To Do');
+  /* In To Do abgehakt → im Fall erledigt */
+  const nr = korb.text.split('\n').findIndex(z => /Unterschiede/.test(z));
+  S.kpSeiteKastenUmKern(korb, nr);
+  S.lfZurListe(); S.lfOeffnen(f.id);
+  pruefe(f.schritte[1].fertig && S.cl.lf.offen === 2, 'in To Do abgehakt → beim Öffnen auch im Fall erledigt');
+  /* Im Fall wieder öffnen → Aufgabe wieder offen */
+  S.lfSchrittZeigen(1); S.lfSchrittFertig();
+  pruefe(!f.schritte[1].fertig && /\[\] Heizung taktet: Unterschiede/.test(korb.text), 'im Fall wieder geöffnet → die Aufgabe ist wieder offen');
+  S.lfSchrittFertig();
+  pruefe(f.schritte[1].fertig && /\[x\] Heizung taktet: Unterschiede/.test(korb.text), 'im Fall fertig → die Aufgabe ist abgehakt');
+  [2, 3, 4].forEach(i => { S.lfSchrittZeigen(i); S.lfSchrittFertig(); });
+  pruefe(f.fertig && S.lfZahlFertig(f) === 5 && /Alle fünf Schritte erledigt/.test(inhalt()), 'alle fünf Schritte → der Fall ist fertig');
+  S.lfZurListe();
+  pruefe(/Fertige…<\/span><small>1/.test(inhalt()) && !/Heizung taktet/.test(inhalt()), 'Liste: fertige Fälle nur gezählt');
+  S.lfFertigeUm();
+  pruefe(/Heizung taktet/.test(inhalt()) && /5\/5/.test(inhalt()), '„Fertige“ aufgeklappt zeigt sie');
+  S.lfFertigeUm();
+  /* Kategorien, Suche, Filter */
+  const v = S.lfAnlegen('Lieferant Preiserhöhung', 'verhandlung', 'kb-arbeit', false);
+  S.lfSchritte(v)[0].notiz = 'Plan B: Zweitlieferant Meier';
+  pruefe(v.kontext === 'beruflich' && S.katInhalt('kb-arbeit').faelle.indexOf(v) >= 0 && S.katInhalt('kb-haus').faelle.indexOf(f) < 0, 'Kategorien-Gesamtsicht: offene Fälle (fertige nicht)');
+  pruefe(S.suTreffer('zweitlieferant').some(x => x.gruppe === 'leitfaden') && S.suTreffer('preiserhöhung').length, 'Suche findet Titel und Notizen der Schritte');
+  S.katSetzen('kb-haus');
+  pruefe(!/Lieferant/.test(inhalt()), 'das ▼ filtert nach Kategorie');
+  S.katSetzen('alle');
+  /* Privat */
+  const p = S.lfAnlegen('Arztbrief', 'abwicklung', '', true);
+  S.prModusSetzen('maskieren');
+  pruefe(/— privat —/.test(inhalt()) && !/Arztbrief/.test(inhalt()) && !S.suTreffer('arztbrief').length, 'privat: maskiert in Liste und Suche');
+  S.lfOeffnen(p.id);
+  pruefe(!/Arztbrief/.test(inhalt()) && S.document.getElementById('reiter').textContent === '— privat —', 'privat: geöffnet nur die Maske');
+  S.localStorage.removeItem('clie-privat'); S.cl.pr.zurueck = '';
+  S.lfSchrittZeigen(0); S.lfInsToDo();
+  pruefe(S.ckZusatz(korb, 'Arztbrief: Pflichtliste').privat === true, 'privater Fall → private Aufgabe in To Do');
+  /* Oben rechts und Zurück */
+  S.katUm();
+  pruefe(S.cl.aufklapp === '', 'im Fall öffnet oben rechts kein ▼');
+  S.clZurueck();
+  pruefe(S.cl.app === 'leitfaden' && !S.cl.lf.id, 'Zurück: vom Fall zur Liste');
+  /* Brücke aus der Ideenwerkstatt */
+  S.iwSpeichern({ id: 'iw-cp', titel: 'Carport', stufe: 4, status: 'aktiv', entscheidung: 'go', gewaehlt: 'v2', bereich: 'kb-haus',
+    varianten: [{ id: 'v1', name: 'Metall', groesse: 'S' }, { id: 'v2', name: 'Holz, Flachdach', groesse: 'M' }], meilensteine: [], schritte: [], wochen: [] });
+  S.oeffne('ideen'); S.iwOeffnen('iw-cp'); S.cl.iw.stufe = 4; S.cl.iw.frisch = true; S.zeichne();
+  pruefe(/lfAusIdee\('iw-cp'\)/.test(inhalt()) && /Als Konstruktion durcharbeiten/.test(inhalt()), 'Ideenwerkstatt, Entscheiden mit Go: „Als Konstruktion durcharbeiten →“');
+  S.lfAusIdee('iw-cp');
+  const k = S.lfAlle().filter(x => x.idee === 'iw-cp')[0];
+  pruefe(k && k.art === 'konstruktion' && k.bereich === 'kb-haus' && /Holz, Flachdach ★/.test(k.schritte[2].notiz) && S.cl.app === 'leitfaden' && S.cl.lf.id === k.id && /aus der Ideenwerkstatt/.test(inhalt()),
+    'Konstruktion angelegt: Kategorie und Varianten (★) übernommen, Verweis zurück');
+  S.lfAusIdee('iw-cp');
+  pruefe(S.lfAlle().filter(x => x.idee === 'iw-cp').length === 1, 'zweites Mal: derselbe Fall, kein neuer');
+  /* Intervention → Diagnose */
+  const iv = S.lfAnlegen('Server down', 'intervention', 'kb-arbeit', false);
+  S.lfSchritte(iv)[1].notiz = 'Platte voll';
+  S.lfSchritte(iv).forEach(s => { s.fertig = true; });
+  S.lfOeffnen(iv.id);
+  pruefe(/lfAlsDiagnose\(\)/.test(inhalt()), 'Intervention fertig: „Als Diagnose weiter →“');
+  S.lfAlsDiagnose();
+  const d = S.lfFinden(S.cl.lf.id);
+  pruefe(d && d.art === 'diagnose' && d.bereich === 'kb-arbeit' && /Platte voll/.test(d.schritte[0].notiz), 'Diagnose angelegt, die Lage als Ausgangspunkt');
+  /* Details und Löschen */
+  S.lfDetails();
+  pruefe(!/lfArtWahl/.test(S.document.getElementById('aufklapp').innerHTML) && /lfLoeschenFragen/.test(S.document.getElementById('aufklapp').innerHTML), 'Details: Verfahren fest, Löschen…');
+  S.lfLoeschenFragen(); S.lfLoeschen();
+  pruefe(!S.lfFinden(d.id) && !S.cl.lf.id, 'Löschen entfernt den Fall');
+  pruefe(/^\d+ Fälle offen$|^1 Fall offen$/.test(S.ordnerStandText('leitfaden')), 'Ordner Planung: Stand „… offen“ — ' + S.ordnerStandText('leitfaden'));
   S.oeffne('uebersicht');
 }
 
@@ -7546,6 +7677,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { leitfadenTest(); } catch (e) { fail('Leitfaden warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { privatTermineTest(); } catch (e) { fail('Private Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { katStattBerufTest(); } catch (e) { fail('Kategorien statt Beruf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { katUebersichtTest(); } catch (e) { fail('Kategorien-▼ warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
