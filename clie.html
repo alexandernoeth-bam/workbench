@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.66.1</title>
+<title>CLIE 0.66.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -997,7 +997,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.66.1';
+var APP_VERSION = '0.66.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3255,6 +3255,7 @@ var CL_APPS = [
   { id: 'spiele', name: 'Spiele', stufe: '', was: '', ordner: true },
   { id: 'kurs', name: 'Kurs', stufe: '', was: '', raster: false },
   /* Seit 0.66: eine Kategorienliste für alle Apps, mit Gesamtsicht */
+  /* Seit 0.66.2 über das ▼ der Übersicht erreichbar (wie die Kategorien am Palm) */
   { id: 'kategorien', name: 'Kategorien', stufe: '', was: '', raster: false },
   { id: 'ideen', name: 'Ideenwerkstatt', rasterName: 'Ideen-\nwerkstatt', stufe: '', was: '', raster: false },
   { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.', raster: false },
@@ -4182,7 +4183,7 @@ function aufklappZeichnen() {
     el.innerHTML = '<div class="aufklapp" style="top:49px;right:6px">'
       + CL_KATEGORIEN.map(function (k) {
           return '<button type="button"' + (k[0] === cl.filter ? ' class="an"' : '') + ' onclick="katSetzen(\'' + k[0] + '\')">' + k[1] + '</button>';
-        }).join('') + '</div>';
+        }).join('') + (cl.app === 'uebersicht' ? katUebersichtWahlHtml() : '') + '</div>';
   } else if (cl.aufklapp === 'einkauf') {
     /* Beim Neuzeichnen (etwa nach einem Abgleich) bleibt Getipptes stehen. */
     if (el.innerHTML.indexOf('einkaufFeld') >= 0) { return; }
@@ -9059,6 +9060,21 @@ function katGesamtHtml(id) {
     return '<button type="button" class="kat-eintrag" onclick="oeffne(\'sammlungen\');saOeffnen(\'' + esc(s.id) + '\')"><span class="tx">' + esc(s.name) + '</span><small>' + saSaetze(s).length + ' Einträge</small></button>';
   });
   return h || '<p class="leise">Noch nichts in dieser Kategorie. In den Details von Listen, Notizen, Projekten, Zielen, Ideen, Sammlungen und Blättern lässt sie sich wählen.</p>';
+}
+
+/* Im ▼ der Übersicht (seit 0.66.2): die Kategorien — ein Tipp öffnet die Gesamtsicht */
+function katUebersichtWahlHtml() {
+  return '<div class="trenn"></div><div class="zw">Kategorien</div>'
+    + kgAlle().map(function (b) {
+        return '<button type="button" onclick="katVonUebersicht(\'' + esc(b.id) + '\')">' + esc(b.name) + '</button>';
+      }).join('')
+    + '<div class="trenn"></div><button type="button" onclick="katVonUebersicht(\'\')">Kategorien bearbeiten…</button>';
+}
+
+function katVonUebersicht(id) {
+  cl.aufklapp = '';
+  oeffne('kategorien');
+  if (id) { katOeffnen(id); } else { cl.kat.id = ''; cl.kat.bearbeiten = true; zeichne(); }
 }
 
 function kategorienHtml() { return cl.kat.id ? katGesamtHtml(cl.kat.id) : katListeHtml(); }
@@ -22662,7 +22678,7 @@ var SP_PAUSE_MS = 60000;
 
 /* Ordner auf dem Start (seit 0.35, vorher nur „Spiele“) */
 var CL_ORDNER = {
-  planung: { name: 'Planung', apps: ['routinen', 'ideen', 'coach', 'kategorien'] },
+  planung: { name: 'Planung', apps: ['routinen', 'ideen', 'coach'] },
   lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
   spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion'] }
 };

@@ -2175,7 +2175,7 @@ function kategorienTest() {
   S.iwSpeichern({ id: 'iw-pv', titel: 'Speicher nachrüsten', stufe: 1, status: 'aktiv', bereich: k.id, varianten: [], meilensteine: [], schritte: [], wochen: [] });
   /* Gesamtsicht */
   S.oeffne('kategorien');
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0 && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App im Ordner Planung: „PV-Anlage · 7“');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') < 0 && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
   S.katOeffnen(k.id);
   const g = inhalt();
   pruefe(/To Do · offen/.test(g) && /Foto machen/.test(g) && /Listen/.test(g) && /Zählerschrank/.test(g) && /Projekte · Ziele/.test(g) && /PV-Anlage Haus/.test(g)
@@ -2194,6 +2194,67 @@ function kategorienTest() {
   pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
   S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
   pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   120. Kategorien im ▼ der Übersicht (0.66.2)
+   Grund: Im Ordner Planung war die App „Kategorien“ kaum zu finden.
+   Wie am Palm gehören Kategorien ins ▼ oben rechts.
+   Erkennt: Kategorien fehlen im ▼, Tipp öffnet nicht die Gesamtsicht,
+   „bearbeiten…“ führt nicht zum Bearbeiten, Eintrag doch im Ordner.
+   ============================================================ */
+function katUebersichtTest() {
+  console.log('\n120. Kategorien im ▼ der Übersicht (0.66.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const k = S.katNeuAnlegen('PV-Anlage');
+  S.oeffne('uebersicht');
+  S.katUm();
+  const h = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('beruflich'\)/.test(h) && /<div class="zw">Kategorien<\/div>/.test(h) && /katVonUebersicht\('[^']+'\)">PV-Anlage</.test(h) && /Kategorien bearbeiten…/.test(h),
+    '▼ auf der Übersicht: Alle/Beruf/Privat, darunter die Kategorien und „bearbeiten…“');
+  S.katVonUebersicht(k.id);
+  pruefe(S.cl.app === 'kategorien' && S.cl.kat.id === k.id && S.document.getElementById('reiter').textContent === 'PV-Anlage', 'Tipp: Gesamtsicht der Kategorie');
+  S.katVonUebersicht('');
+  pruefe(S.cl.app === 'kategorien' && S.cl.kat.bearbeiten && /katSchieben/.test(inhalt()), '„Kategorien bearbeiten…“: Liste zum Sortieren und Umbenennen');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') < 0, 'nicht mehr im Ordner Planung — ein Weg');
+  S.oeffne('aufgaben'); S.katUm();
+  pruefe(!/katVonUebersicht/.test(S.document.getElementById('aufklapp').innerHTML), 'in anderen Apps bleibt ihr eigenes ▼');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   119. Seiten in „Notizen“ trotz ▼ Notizblock/Handschrift (0.66.1)
+   Grund: Projekte → Inhalt → „Schreiben“ landete im Notizblock, weil
+   Notizen zuletzt auf ▼ Notizblock stand.
+   Erkennt: Schreiben/Öffnen einer Seite (Projekt, Ziel, Liste, Notiz)
+   zeigt statt der Seite den Notizblock oder die Handschrift.
+   ============================================================ */
+function memoSeiteStattArtTest() {
+  console.log('\n119. Seiten in „Notizen“ trotz ▼ Notizblock/Handschrift (0.66.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const pj = S.kpSeiteAnlegen('vorhaben', 'Carport', 'privat', '');
+  pj.text = 'Statik klären';
+  const zi = S.kpSeiteAnlegen('vorhaben', 'Autark 60 %', 'privat', 'ziel');
+  const li = S.kpSeiteAnlegen('liste', 'Haus', 'privat', '');
+  const no = S.kpSeiteAnlegen('notiz', 'Angebote', 'privat', '');
+  const pruefeSeite = (wie, tun) => {
+    S.oeffne('memo'); S.memoArtSetzen('notizblock'); S.nbNeu();
+    tun();
+    const h = inhalt();
+    pruefe(S.cl.app === 'memo' && !/nbFlaeche|hs-zeile|Noch kein Blatt/.test(h) && S.cl.memo.art === '' && !/Notizblock/.test(S.document.getElementById('katKnopf').textContent), wie);
+  };
+  pruefeSeite('Projekt → Inhalt → Schreiben: das Schreibfeld des Projekts', () => { S.oeffne('projekte'); S.pjOeffnen(pj.id, 'inhalt'); S.pjSchreiben(); });
+  pruefe(/id="memoFeld"/.test(inhalt()) && /Statik klären/.test(inhalt()), '… mit dem Text des Projekts');
+  pruefeSeite('Ziel → Schreiben: das Schreibfeld des Ziels', () => { S.oeffne('ziele'); S.ziOeffnen(zi.id); S.ziSchreiben(); });
+  pruefeSeite('Liste → Schreiben: das Schreibfeld der Liste', () => { S.todoListe(li.id); S.listeAlsText(); });
+  pruefeSeite('Notiz öffnen (z. B. aus Suche oder Kategorie): die Notiz', () => { S.seiteOeffnen(no.id); });
+  pruefe(!S.kpSeitenAlle().some(s => s.__satz && s.__satz.typ === 'notizblock') && S.nbAlle().length === 0, 'die leeren Blätter von eben sind wieder weg');
   S.oeffne('uebersicht');
 }
 
@@ -5836,7 +5897,8 @@ function startOrdnerTest() {
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
   const imOrdner = [].concat(...Object.keys(S.CL_ORDNER).map(k => S.CL_ORDNER[k].apps));
   /* „checklisten“ ist seit 0.61 die Listen-Ansicht von To Do — erreichbar über dessen ▼ */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten'];
+  /* „kategorien“ seit 0.66.2 über das ▼ der Übersicht */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -7362,6 +7424,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { katUebersichtTest(); } catch (e) { fail('Kategorien-▼ warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { memoSeiteStattArtTest(); } catch (e) { fail('Seite statt Notizblock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { privatTest(); } catch (e) { fail('Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kategorienTest(); } catch (e) { fail('Kategorien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { aufgabenNotizTest(); } catch (e) { fail('Aufgaben-Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
