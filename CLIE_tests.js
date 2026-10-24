@@ -2041,6 +2041,103 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   113. Handschrift aus Drive in Notizen (0.64.0)
+   Grund: Private Notizen und Ideen entstehen auf dem reMarkable Move oder
+   dem iPad als PDF im Drive-Ordner der Workbench. CLIE zeigt den Eingang,
+   lässt Punkte herausschreiben und legt die Notiz ab — als Zeile
+   „!skizze:<ID>“, die auch die Workbench versteht.
+   Erkennt: falscher Ordner/fehlende Anmeldung beim Holen, Abgelegtes im
+   Eingang, Punkte gehen verloren oder landen falsch, Zeile doppelt,
+   „!skizze“ roh im Text statt Vorschau, Coach drängt ohne Stau.
+   ============================================================ */
+function handschriftTest() {
+  console.log('\n113. Handschrift aus Drive in Notizen (0.64.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.oeffne('memo');
+  S.memoArtSetzen('handschrift');
+  pruefe(/Noch kein Ordner/.test(inhalt()) && /▼ Handschrift/.test(S.document.getElementById('katKnopf').textContent), 'ohne Ordner: Hinweis auf die Workbench, oben „▼ Handschrift“');
+  /* Holen: mit Anmeldung, ohne öffentlichen Schlüssel */
+  S.DB.einstellungen.skizzenOrdner = 'ORDNER123';
+  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
+  const rufe = [];
+  S.fetch = function (adresse, o) { rufe.push({ adresse, o: o || {} }); return new Promise(function () {}); };
+  S.cl.hs.laeuft = false;
+  S.hsHolen(true);
+  pruefe(rufe.length === 1 && decodeURIComponent(rufe[0].adresse).indexOf("'ORDNER123' in parents") > 0 && !/&key=/.test(rufe[0].adresse) && /Bearer test/.test(JSON.stringify(rufe[0].o.headers)),
+    'holt den Ordner der Workbench mit der Anmeldung (ohne Freigabe-Schlüssel)');
+  S.cl.hs.laeuft = false;
+  S.cl.hs.fehler = 'Der Ordner ließ sich nicht lesen (Antwort 403).';
+  pruefe(/hsErlauben\(\)">Drive lesen erlauben/.test(S.hsListeHtml()), 'fehlt das Drive-Recht: „Drive lesen erlauben“');
+  pruefe(/VL_DRIVE_KEY, 'an'/.test(QUELLE.slice(QUELLE.indexOf('function hsErlauben'), QUELLE.indexOf('function hsErlauben') + 300)), 'Erlauben fordert drive.readonly an (wie Vorlesen)');
+  S.cl.hs.fehler = '';
+  S.zugriffToken = null; S.tokenAblauf = 0;
+  /* Liste: zwei im Eingang, eine schon im Projekt */
+  const alt = S.tagePlus(heute, -10) + 'T08:00:00Z';
+  S.cl.hs.liste = [{ id: 'f1aaaaaa', name: 'Ideen Carport.pdf', mimeType: 'application/pdf', modifiedTime: heute + 'T07:52:00Z' },
+                   { id: 'f2aaaaaa', name: 'Notizbuch-23.pdf', mimeType: 'application/pdf', modifiedTime: alt },
+                   { id: 'f3aaaaaa', name: 'PV Fragen.png', mimeType: 'image/png', modifiedTime: alt }];
+  S.DB.projekte.push({ id: 'pj1', name: 'Carport', flaeche: 'Text\n!skizze:f3aaaaaa', status: 'laufend', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.zeichne();
+  let h = inhalt();
+  pruefe(/Eingang · 2/.test(h) && /Ideen Carport/.test(h) && /seit 10 T\./.test(h) && /Zuletzt abgelegt/.test(h) && /→ ◎ Carport/.test(h), 'Eingang · 2 (alte mit „seit 10 T.“), darunter Abgelegtes mit Ort');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'memowahl' && /memoArtSetzen\('handschrift'\)"><span>Handschrift<\/span><small>2 neu/.test(S.document.getElementById('aufklapp').innerHTML), '▼: Notizen | Handschrift (2 neu) | Alle Handschriften');
+  S.aufklappZu();
+  /* Ansehen: ohne Recht die Vorschau und „Erlauben“; Punkte sammeln */
+  S.hsOeffnen('f1aaaaaa');
+  h = inhalt();
+  pruefe(/Erlauben/.test(h) && /id="hsPunkt"/.test(h) && /hsAblegenFragen\(\)/.test(S.document.getElementById('fuss').innerHTML) && /✎ Ideen Carport/.test(S.document.getElementById('reiter').textContent),
+    'Ansehen: Vorschau, „Erlauben“ für alle Seiten, Feld zum Herausschreiben, „Ablegen…“');
+  S.document.getElementById('hsPunkt').value = 'Statiker fragen';
+  S.hsPunktDazu();
+  S.document.getElementById('hsPunkt').value = 'Pultdach vergleichen';
+  S.hsPunktTaste({ key: 'Enter', preventDefault() {} });
+  pruefe(S.cl.hs.gesammelt.length === 2 && /Gesammelt: /.test(inhalt()), 'zwei Punkte gesammelt');
+  /* Ablegen im Projekt: Zeile und Punkte dort */
+  S.hsAblegenFragen();
+  pruefe(S.cl.aufklapp === 'handschrift' && /Ideenwerkstatt/.test(S.hsFensterHtml()) && /2 gesammelte Punkte/.test(S.hsFensterHtml()), 'Ablegen: Seite, Idee oder nur ablegen — Punkte gehen mit');
+  S.hsFensterSchritt('ziel');
+  pruefe(/hsAblegen\('seite','pj1'\)">◎ Carport/.test(S.hsFensterHtml()), 'zur Wahl: Projekte, Ziele, Listen, Notizen');
+  S.hsAblegen('seite', 'pj1');
+  const pj = S.DB.projekte[0].flaeche;
+  pruefe(/!skizze:f1aaaaaa/.test(pj) && /\[\] Statiker fragen/.test(pj) && /\[\] Pultdach vergleichen/.test(pj) && S.cl.hs.offen === '' && S.cl.hs.gesammelt.length === 0, 'im Projekt: Zeile „!skizze:…“ und die Punkte');
+  S.hsOeffnen('f1aaaaaa'); S.hsAblegen('seite', 'pj1');
+  pruefe((S.DB.projekte[0].flaeche.match(/!skizze:f1aaaaaa/g) || []).length === 1, 'nochmal ablegen: keine doppelte Zeile');
+  /* Die Seite zeigt die Vorschau, nicht die rohe Zeile */
+  const sh = S.memoSeiteHtml(S.kpSeiteFinden('pj1'), true);
+  pruefe(/class="hs-anhang" onclick="hsOeffnen\('f1aaaaaa'\)"/.test(sh) && !/!skizze/.test(sh), 'auf der Seite: Vorschau „✎ …“ zum Antippen statt „!skizze:…“');
+  /* Nur ablegen: Punkte in den Sammler */
+  S.hsOeffnen('f2aaaaaa');
+  S.document.getElementById('hsPunkt').value = 'Garten planen';
+  S.hsPunktDazu();
+  S.hsAblegen('nur', '');
+  pruefe(S.krFinden('hs-f2aaaaaa') && S.krFinden('hs-f2aaaaaa').abgelegt === heute && /\[\] Garten planen/.test(S.ckKorb(false).text), '„nur ablegen“: gemerkt, Punkte im Sammler');
+  pruefe(S.hsEingang().length === 0 && /Alles verarbeitet/.test(inhalt()), 'Eingang leer');
+  /* Als Idee */
+  S.cl.hs.liste.push({ id: 'f4aaaaaa', name: 'Hochbeet.pdf', mimeType: 'application/pdf', modifiedTime: alt });
+  S.hsOeffnen('f4aaaaaa'); S.hsAblegen('idee', '');
+  const idee = S.iwAlle().filter(x => x.titel === 'Hochbeet')[0];
+  pruefe(idee && JSON.stringify(idee.skizzen) === '["f4aaaaaa"]', 'als neue Idee: Titel aus dem Dateinamen, Handschrift hängt daran');
+  /* Liste zeigt die Zeile ebenfalls */
+  S.DB.themen.push({ id: 'lx', name: 'Haus', text: '[] a\n!skizze:f4aaaaaa', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  pruefe(/hs-anhang/.test(S.ckListeHtml(S.kpSeiteFinden('lx'))), 'auch in einer Liste als Vorschau');
+  /* Coach: erst bei Stau (≥ 5, älteste ≥ 7 Tage), dann eine Woche Ruhe */
+  S.cl.hs.liste = [1, 2, 3, 4].map(i => ({ id: 'n' + i + 'aaaaaa', name: 'N' + i + '.pdf', mimeType: 'application/pdf', modifiedTime: alt }));
+  pruefe(S.coHandschriftFragen(heute).length === 0, 'vier im Eingang: der Coach schweigt');
+  S.cl.hs.liste.push({ id: 'n5aaaaaa', name: 'N5.pdf', mimeType: 'application/pdf', modifiedTime: alt });
+  const q = S.coHandschriftFragen(heute);
+  pruefe(q.length === 1 && /5 Handschriften im Eingang, die älteste seit 10 Tagen/.test(q[0].text), 'fünf, älteste seit 10 Tagen: eine ruhige Frage');
+  S.coRuheSetzen(q[0].id, S.tagePlus(heute, 7));
+  pruefe(S.coHandschriftFragen(heute).length === 0, '„Später“: eine Woche Ruhe');
+  S.memoArtSetzen('');
+  pruefe(!/hs-zeile/.test(inhalt()) && S.localStorage.getItem('clie-memo-art') === '', '▼ Notizen: wieder die Notizen, gemerkt auf dem Gerät');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    112. Keine Zahlen an Symbolen, keine App „Heute“ (0.63.0)
    Grund: Der Palm kannte keine Badges; die App „Heute“ doppelte Kalender
    und Coach.
@@ -6950,6 +7047,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { handschriftTest(); } catch (e) { fail('Handschrift warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ohneHeuteTest(); } catch (e) { fail('Ohne Heute warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlerTest(); } catch (e) { fail('Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { toDoTest(); } catch (e) { fail('To Do warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
