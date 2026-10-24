@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.65.0</title>
+<title>CLIE 0.66.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -171,6 +171,23 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .wochenleiste button{min-width:30px;height:32px;text-align:center}
 .wochenleiste .wt.heute{text-decoration:underline}
 .wochenleiste .wt.an{background:var(--px);color:var(--lcd);border-radius:3px}
+.pr-maske{display:block;width:100%;text-align:left;border:0;border-bottom:2px dotted var(--px-zart);background:transparent;font:inherit;color:var(--px-mitte);letter-spacing:1px;padding:6px 0}
+.kat-zeile{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:7px 0;font:inherit;background:transparent;color:inherit}
+.kat-zeile .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kat-zeile .knopf{flex:0 0 auto;padding:0 8px}
+.kat-zahl{font-size:15.5px;color:var(--px-mitte)}
+.kat-eintrag{display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font:inherit;background:transparent;color:inherit}
+.kat-eintrag .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kat-eintrag small{font-size:15.5px;color:var(--px-mitte);white-space:nowrap}
+.pr-wahl{display:flex;gap:4px;padding:2px 10px 6px}
+.pr-wahl button{flex:1;text-align:center;padding:4px 2px;font-size:16.5px}
+.ag-naechst{background:var(--px);color:var(--lcd);padding:6px 9px;margin:6px 0 4px;font-size:18.5px}
+.ag-gr{display:flex;justify-content:space-between;align-items:baseline;width:100%;text-align:left}
+.ag-gr small{font-size:15.5px;color:var(--px-mitte);font-weight:400}
+.ag-zeile{display:flex;gap:8px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:4px 0}
+.ag-zeile.vorbei{color:var(--px-mitte)}
+.ag-zt{flex:0 0 48px;font-size:16.5px}
+.ag-morgen{margin-top:12px}
 .ganztags{display:block;width:100%;text-align:left;border:2px solid var(--px);padding:2px 6px;margin:3px 0;font-size:19px}
 /* Aus der Workbench (seit 0.8.2): Feiertag kräftig, Ferien leise */
 .ganztags.gz-feiertag{background:var(--px);color:var(--lcd)}
@@ -395,6 +412,8 @@ span.hs-thumb{display:block}
 .cls-korb{display:flex;justify-content:space-between;align-items:center;width:100%;margin:8px 0 2px;padding:6px 8px;border:2px solid var(--px);border-radius:6px;font-size:17.5px;text-align:left}
 .cls-bereich{font-size:15.5px;color:var(--px-mitte);letter-spacing:.5px;margin:8px 0 0;text-transform:uppercase}
 .cls-geweckt{font-size:15.5px;background:var(--px);color:var(--lcd);padding:0 5px;border-radius:4px;white-space:nowrap}
+.notiz-marke{flex:0 0 auto;font:inherit;font-size:15.5px;border:1px solid var(--px-mitte);border-radius:3px;padding:0 4px;color:var(--px-mitte);background:transparent;margin-left:4px}
+.auf-notiz{font:inherit;font-size:17px;resize:vertical;min-height:2.4em}
 .frist-marke{font-size:15.5px;border:2px solid var(--px);padding:0 4px;border-radius:4px;white-space:nowrap;margin-left:4px}
 .balken{display:inline-block;width:64px;height:12px;border:2px solid var(--px);position:relative;flex:0 0 64px;vertical-align:middle}
 .balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
@@ -978,7 +997,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.65.0';
+var APP_VERSION = '0.66.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3235,6 +3254,8 @@ var CL_APPS = [
   { id: 'lernen', name: 'Lernen', stufe: '', was: '', ordner: true },
   { id: 'spiele', name: 'Spiele', stufe: '', was: '', ordner: true },
   { id: 'kurs', name: 'Kurs', stufe: '', was: '', raster: false },
+  /* Seit 0.66: eine Kategorienliste für alle Apps, mit Gesamtsicht */
+  { id: 'kategorien', name: 'Kategorien', stufe: '', was: '', raster: false },
   { id: 'ideen', name: 'Ideenwerkstatt', rasterName: 'Ideen-\nwerkstatt', stufe: '', was: '', raster: false },
   { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.', raster: false },
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '', raster: false },
@@ -3297,6 +3318,8 @@ var CL_BILD = {
          + '<path d="M24 33l5 5 10-11" ' + CL_STRICH + '/>',
   lernen: '<path d="M32 22c-5-4-11-4-16-3v24c5-1 11-1 16 3 5-4 11-4 16-3V19c-5-1-11-1-16 3z" ' + CL_STRICH + '/><path d="M32 22v24" ' + CL_STRICH + '/>',
   /* Fahne am Mast: ein Ziel in Sicht (seit 0.44) */
+  /* Etikett mit Loch (seit 0.66) */
+  kategorien: '<path d="M16 18h18l14 14-14 14H16z" ' + CL_STRICH + ' stroke-linejoin="round"/><circle cx="24" cy="32" r="3.5" ' + CL_FUELL + '/>',
   ziele: '<path d="M20 48V16" ' + CL_STRICH + '/><path d="M20 17h22l-5 6 5 6H20" ' + CL_FUELL + ' stroke="#C9D3B7" stroke-width="2" stroke-linejoin="round"/><path d="M13 48h22" ' + CL_STRICH + '/>',
   /* Ein Pixel-Gegner (seit 0.45) */
   invasion: '<path d="M24 16h4v4h-4zM36 16h4v4h-4zM28 20h8v4h-8zM24 24h16v4H24zM20 28h8v4h-8zM36 28h8v4h-8zM16 32h32v4H16zM16 36h4v4h-4zM24 36h16v4H24zM44 36h4v4h-4zM16 40h4v4h-4zM24 40h4v4h-4zM36 40h4v4h-4zM44 40h4v4h-4zM28 44h8v4h-8z" ' + CL_FUELL + '/>',
@@ -3651,12 +3674,14 @@ function suTreffer(q) {
     if (sei.art !== 'vorhaben' && sei.art !== 'liste') { return; }
     String(sei.text || '').split('\n').forEach(function (z, nr) {
       var a = kpAufgabe(z);
-      if (!a || !a.text || !suFinde(a.text, q)) { return; }
+      var no = a ? (ckZusatz(sei, a.text).notiz || '') : '';
+      if (a && a.text && prPrivatVerborgen(sei, { privat: ckZusatz(sei, a.text).privat })) { return; }
+      if (!a || !a.text || !(suFinde(a.text, q) || (no && suFinde(no, q)))) { return; }
       if (a.erledigt && !cl.su.erl) { return; }
       var g = a.erledigt ? null : aufGeplant(sei, a.text);
       var pr = kpPrio(a.text);
       aus.push({ gruppe: 'aufgaben', titel: (a.erledigt ? '✓ ' : '') + (pr.p ? '<span class="prio p' + pr.p + '">' + pr.p + '</span>' : '') + suMarkiert(pr.text, q, false),
-        unter: esc(clSeitenZeichen(sei) + ' ' + sei.titel + (g ? ' · ' + clPlanText(g.datum, g.zeit) : '')),
+        unter: esc(clSeitenZeichen(sei) + ' ' + sei.titel + (g ? ' · ' + clPlanText(g.datum, g.zeit) : '') + (no && !suFinde(a.text, q) ? ' · ▤ ' + no.split('\n')[0].slice(0, 40) : '')),
         aufruf: 'suAufgabe(\'' + esc(sei.id) + '\',' + nr + ')',
         rang: [a.erledigt ? 1 : 0, g ? 0 : 1, g ? g.datum + (g.zeit || '') : '', wort(a.text), suNorm(a.text)] });
     });
@@ -3664,7 +3689,7 @@ function suTreffer(q) {
 
   /* Memos: Titel vor Text, dann zuletzt geändert */
   kpSeitenAlle().forEach(function (sei) {
-    if (sei.art === 'liste' || (sei.art === 'notiz' && sei.__satz && sei.__satz.checkliste)) { return; }
+    if (sei.art === 'liste' || (sei.art === 'notiz' && sei.__satz && sei.__satz.checkliste) || prPrivatVerborgen(sei, null)) { return; }
     var imTitel = !!suFinde(sei.titel, q);
     if (!imTitel && !suFinde(sei.text, q)) { return; }
     aus.push({ gruppe: 'memo', titel: clSeitenZeichen(sei) + ' ' + suMarkiert(sei.titel, q, false),
@@ -3674,7 +3699,7 @@ function suTreffer(q) {
 
   /* Checklisten: laufend, Vorlagen, erledigt */
   (DB.gedanken || []).forEach(function (g) {
-    if (!g || !g.checkliste) { return; }
+    if (!g || !g.checkliste || prPrivatVerborgen(null, g)) { return; }
     if (g.checkliste === 'fertig' && !cl.su.erl) { return; }
     var imTitel = !!suFinde(g.titel, q);
     if (!imTitel && !suFinde(g.text, q)) { return; }
@@ -3686,7 +3711,7 @@ function suTreffer(q) {
 
   /* Sammlungen: erst die Sammlung selbst, dann ihre Einträge */
   (DB.sammlungen || []).forEach(function (sa) {
-    if (!sa || sa.vorlage) { return; }
+    if (!sa || sa.vorlage || prPrivatVerborgen(null, sa)) { return; }
     if (suFinde(sa.name, q)) {
       aus.push({ gruppe: 'sammlungen', titel: (saIkone(sa.symbol) ? saIkoneSvg(sa.symbol, 'sa-ikone-text') : esc(SA_ZEICHEN[sa.art] || '≡')) + ' ' + suMarkiert(sa.name, q, false),
         unter: esc('Sammlung · ' + saSaetze(sa).length + (saSaetze(sa).length === 1 ? ' Eintrag' : ' Einträge')), aufruf: 'suSammlung(\'' + esc(sa.id) + '\',\'\')', rang: [0, 0] });
@@ -4083,6 +4108,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'ziele') { el.innerHTML = zieleHtml(); }
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
+  else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
   else if (cl.app === 'statistik') { el.innerHTML = statistikHtml(); }
   else if (cl.app === 'suchen') {
     /* Beim Neuzeichnen (Abgleich, Uhr) bleibt das Feld stehen — nur die Treffer kommen neu */
@@ -4104,6 +4130,7 @@ function kopfZeichnen() {
   if (reiter) {
     reiter.textContent = (cl.app === 'kalender') ? clKalReiter()
       : (cl.app === 'checklisten') ? 'To Do'
+      : (cl.app === 'kategorien') ? katKopfText()
       : (cl.app === 'sammlungen') ? saReiter()
       : (cl.app === 'statistik') ? 'Statistik'
       : (cl.app === 'suchen') ? 'Suchen'
@@ -4184,6 +4211,12 @@ function aufklappZeichnen() {
     el.innerHTML = memoWahlHtml();
   } else if (cl.aufklapp === 'handschrift') {
     el.innerHTML = hsFensterHtml();
+  } else if (cl.aufklapp === 'kategorie') {
+    if (el.innerHTML.indexOf('katName') >= 0 || el.innerHTML.indexOf('katNeuName') >= 0) { return; }
+    el.innerHTML = katFensterHtml();
+  } else if (cl.aufklapp === 'privat') {
+    if (el.innerHTML.indexOf('prPin') >= 0) { return; }
+    el.innerHTML = prFensterHtml();
   } else if (cl.aufklapp === 'notizblock') {
     if (el.innerHTML.indexOf('nbTitel') >= 0) { return; }
     el.innerHTML = nbFensterHtml();
@@ -4269,6 +4302,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'stoNeu\')">Neues Spiel</button>'
           + '<button type="button" onclick="menueWahl(\'stoListe\')">Bestenliste</button>' : '')
       + '<div class="trenn"></div>'
+      + prMenueHtml() + '<div class="trenn"></div>'
       + '<button type="button" onclick="menueWahl(\'statistik\')">Statistik</button>'
       + '<button type="button" onclick="menueWahl(\'info\')">Info</button></div>';
   } else {
@@ -4287,6 +4321,7 @@ function fussZeichnen() {
         : (cl.app === 'checklisten') ? checklistenFussHtml()
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
+        : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
         : (cl.app === 'invasion') ? invasionFussHtml()
@@ -4336,6 +4371,7 @@ function oeffne(id) {
   cl.auf.wahl = '';
   if (id === 'memo' && cl.app !== 'memo') { cl.hs.offen = ''; cl.nb.id = ''; cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; cl.memo.ausProjekt = ''; cl.memo.ausZiel = ''; }
   if (id === 'ziele' && cl.app !== 'ziele') { cl.zi.id = ''; }
+  if (id === 'kategorien' && cl.app !== 'kategorien') { cl.kat.id = ''; cl.kat.bearbeiten = false; }
   if (id === 'projekte' && cl.app !== 'projekte') { cl.pj.id = ''; cl.pj.hervor = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; cl.cls.sicht = ''; }
   if (id === 'sammlungen' && cl.app !== 'sammlungen') { cl.sa.id = ''; cl.sa.ansicht = 'tabelle'; }
@@ -4495,6 +4531,7 @@ function clZeitText(z) { return String(z || '').replace(/^0(\d)/, '$1'); }
 function clKalReiter() {
   var d = clKalDatum();
   if (cl.kal.ansicht === 'jahr') { return 'Jahr'; }
+  if (cl.kal.ansicht === 'agenda') { return 'Agenda ' + clWt(isoDatum()) + ' ' + clKurzDatum(isoDatum()); }
   if (cl.kal.ansicht === 'bloecke' && cl.kal.tage === 3) { return clWt(d) + '–' + clWt(tagePlus(d, 2)); }
   if (cl.kal.ansicht === 'woche' || cl.kal.ansicht === 'bloecke') { return 'KW ' + kalenderwoche(d); }
   if (cl.kal.ansicht === 'monat') { return KAL_MONATE[Number(d.slice(5, 7)) - 1] + ' ' + d.slice(0, 4); }
@@ -4581,6 +4618,7 @@ function clTagZeilen(is) {
     var e = (a && a.text) ? kpWocheEintrag(b, a.text) : null;
     var quelle = e ? kpSeiteFinden(e.quelle) : null;
     if (quelle && !kpPasstFilter(quelle, cl.filter)) { return null; }
+    if (quelle && a && a.text && prPrivatVerborgen(quelle, { privat: ckZusatz(quelle, a.text).privat })) { return null; }
     return { nr: nr, roh: z, a: a, zeit: (e && /^\d{1,2}:\d{2}$/.test(String(e.zeit || ''))) ? e.zeit : '',
              quelle: quelle ? quelle.titel : '',
              cls: (quelle && quelle.__satz && quelle.__satz.checkliste) ? quelle.titel : '' };
@@ -4933,9 +4971,96 @@ function kalBloeckeHtml(is) {
   return h + '</div>';
 }
 
+/* ---------- Agenda (seit 0.66) ----------
+   Wie die „Agenda View“ im Date Book ab Palm OS 4: oben das Nächste, dann
+   die Termine von heute, darunter die To Dos von heute (eingeplant oder
+   ⚑ heute fällig), Überfälliges und eine Zeile für morgen. Abhaken geht
+   direkt hier. */
+
+/* Offene Punkte mit ⚑ Frist bis „bis“ — aus allen Listen, Checklisten, Projekten */
+function agFristPunkte(bis) {
+  var aus = [];
+  aufQuellen().forEach(function (s) {
+    String(s.text || '').split('\n').forEach(function (z, nr) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt) { return; }
+      var x = ckPunkt(s, nr, a);
+      if (x.frist && x.frist <= bis && !prPrivatVerborgen(s, x)) { aus.push(x); }
+    });
+  });
+  return aus.sort(function (a, b) { return a.frist < b.frist ? -1 : (a.frist > b.frist ? 1 : 0); });
+}
+
+function agZeitText(min) {
+  if (min <= 0) { return 'jetzt'; }
+  if (min < 60) { return 'in ' + min + ' Min.'; }
+  return 'in ' + Math.floor(min / 60) + ' Std.' + (min % 60 ? ' ' + (min % 60) : '');
+}
+
+function agendaHtml() {
+  var is = isoDatum();
+  var nun = clUhrzeit();
+  var t = clTermineAm(is);
+  var zeilen = clTagZeilen(is).filter(function (z) { return z.a && z.a.text; });
+  var routinen = clRoutinenAm(is).filter(function (a) { return !a.pausiert; });
+  var h = '';
+  /* Als Nächstes */
+  var kommend = t.zeit.filter(function (x) { return x.zeit > nun; });
+  var naechst = kommend[0];
+  h += '<div class="ag-naechst">' + (naechst ? 'Als Nächstes: ' + esc(naechst.titel) + ' · ' + esc(agZeitText(clMinuten(naechst.zeit) - clMinuten(nun)))
+    : 'Heute keine Termine mehr.') + '</div>';
+  /* Termine heute */
+  h += '<div class="gruppe ag-gr"><span>Termine heute</span><small>' + (t.zeit.length + t.ganztags.length) + '</small></div>';
+  t.ganztags.forEach(function (x) {
+    h += '<button type="button" class="ganztags' + (x.jahr ? ' gz-' + x.jahr : '') + '" onclick="' + clGanzAufruf(is, x) + '">' + (x.zeichen || '◆') + ' ' + esc(x.titel) + '</button>';
+  });
+  t.zeit.forEach(function (x) {
+    h += '<div class="ag-zeile' + (clVorbei(is, x.bis || x.zeit) ? ' vorbei' : '') + '"><span class="ag-zt">' + esc(clZeitText(x.zeit)) + '</span>'
+      + '<button type="button" class="tx" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')">' + esc(x.titel) + '</button></div>';
+  });
+  if (!t.zeit.length && !t.ganztags.length) { h += '<p class="leise">Keine Termine.</p>'; }
+  /* To Do heute: eingeplant (mit und ohne Uhrzeit), Routinen, ⚑ heute */
+  var todo = '';
+  var zahl = 0;
+  zeilen.filter(function (z) { return !z.a.erledigt || cl.kal.erlZeigen; }).forEach(function (z) {
+    zahl++;
+    todo += '<div class="aufg' + (z.a.erledigt ? ' erl' : '') + '">' + (z.zeit ? '<span class="ag-zt">' + esc(clZeitText(z.zeit)) + '</span>' : '')
+      + clKastenHtml(z.a.erledigt, 'clTagZeileUm(\'' + is + '\',' + z.nr + ')') + '<span class="tx">' + clPrioHtml(z.a.text) + clHerkunftHtml('☑', z.cls) + '</span></div>';
+  });
+  var geplant = {};
+  zeilen.forEach(function (z) { geplant[kpPrio(z.a.text).text] = true; });
+  var frist = agFristPunkte(tagePlus(is, 0));
+  frist.filter(function (x) { return x.frist === is && !geplant[kpPrio(x.a.text).text]; }).forEach(function (x) {
+    zahl++;
+    todo += '<div class="aufg">' + clKastenHtml(false, 'aufHaken(\'' + esc(x.seite.id) + '\',' + x.nr + ')') + '<span class="tx">' + clPrioHtml(x.a.text) + '</span>'
+      + '<span class="frist-marke">⚑ heute</span></div>';
+  });
+  routinen.filter(function (a) { return !istErledigtAn(a, is); }).forEach(function (a) {
+    zahl++;
+    todo += '<div class="aufg">' + clKastenHtml(false, 'clRoutineUm(\'' + esc(a.id) + '\',\'' + is + '\')') + '<span class="tx">↻ ' + esc(a.titel) + '</span></div>';
+  });
+  h += '<div class="gruppe ag-gr"><span>To Do · heute</span><small>' + zahl + '</small></div>' + (todo || '<p class="leise">Nichts für heute vorgenommen.</p>');
+  /* Überfällig: ⚑ Frist vor heute */
+  var ueber = frist.filter(function (x) { return x.frist < is; });
+  if (ueber.length) {
+    h += '<div class="gruppe ag-gr"><span>Überfällig</span><small>' + ueber.length + '</small></div>' + ueber.map(function (x) {
+      return '<div class="aufg">' + clKastenHtml(false, 'aufHaken(\'' + esc(x.seite.id) + '\',' + x.nr + ')') + '<span class="tx">' + clPrioHtml(x.a.text) + '</span>'
+        + '<span class="frist-marke">⚑ ' + esc(clKurzDatum(x.frist)) + '</span></div>';
+    }).join('');
+  }
+  /* Morgen in einer Zeile */
+  var m = tagePlus(is, 1);
+  var tm = clTermineAm(m);
+  var am = clTagZeilen(m).filter(function (z) { return z.a && z.a.text && !z.a.erledigt; }).length;
+  h += '<button type="button" class="gruppe ag-gr ag-morgen" onclick="clKalGehe(\'' + m + '\',\'tag\')"><span>Morgen ›</span><small>'
+    + (tm.zeit.length + tm.ganztags.length) + ' Termine · ' + am + ' To Dos</small></button>';
+  return h;
+}
+
 function kalenderHtml() {
   var d = clKalDatum();
   if (cl.kal.ansicht === 'jahr') { return jahrHtml(); }
+  if (cl.kal.ansicht === 'agenda') { return agendaHtml(); }
   if (cl.kal.ansicht === 'woche') { return kalWocheHtml(d); }
   if (cl.kal.ansicht === 'bloecke') { return kalBloeckeHtml(d); }
   if (cl.kal.ansicht === 'monat') { return kalMonatHtml(d); }
@@ -4947,7 +5072,7 @@ function kalFussHtml() {
   return (a === 'jahr' ? jaFussHtml() : '<button type="button" class="knopf" onclick="terminNeu(\'\',\'\')">Neu</button>'
     + '<button type="button" class="knopf" onclick="clGeheZuOeffnen()">Gehe zu</button>')
     + '<span class="ansicht">'
-    + [['tag', 'T'], ['woche', 'W'], ['bloecke', '▥'], ['monat', 'M'], ['jahr', 'J']].map(function (x) {
+    + [['agenda', 'A'], ['tag', 'T'], ['woche', 'W'], ['bloecke', '▥'], ['monat', 'M'], ['jahr', 'J']].map(function (x) {
         return '<button type="button"' + (a === x[0] ? ' class="an"' : '') + ' onclick="clKalAnsicht(\'' + x[0] + '\')">' + x[1] + '</button>';
       }).join('') + '</span>';
 }
@@ -4955,8 +5080,9 @@ function kalFussHtml() {
 /* ---- Bedienen ---- */
 
 function clKalAnsicht(a) {
-  if (a !== 'tag' && a !== 'woche' && a !== 'bloecke' && a !== 'monat' && a !== 'jahr') { return; }
+  if (a !== 'agenda' && a !== 'tag' && a !== 'woche' && a !== 'bloecke' && a !== 'monat' && a !== 'jahr') { return; }
   cl.kal.ansicht = a;
+  if (a === 'agenda') { cl.kal.datum = ''; }
   zeichne();
   /* Das Jahr holt seine Termine einmal ganz (seit 0.37) */
   if (a === 'jahr') { jaJahrHolen(jaJahr(), false); }
@@ -4985,6 +5111,8 @@ function clBlattHtml(text) {
 
 function clBlaettern(richtung) {
   if (cl.kal.ansicht === 'jahr') { jaJahrUm(richtung); return; }
+  /* Die Agenda gilt für heute — Blättern führt in den Tag davor/danach */
+  if (cl.kal.ansicht === 'agenda') { clKalGehe(tagePlus(isoDatum(), richtung), 'tag'); return; }
   var d = clKalDatum();
   var neu;
   if (cl.kal.ansicht === 'monat') {
@@ -5708,7 +5836,7 @@ function jaJtHtml() {
     + '<label>Art:</label><div class="ja-chips klein">' + jaArtenAlle().map(function (a) {
       return '<button type="button"' + (e.art === a ? ' class="an"' : '') + ' onclick="jaJtSetzen(\'art\',\'' + esc(a) + '\')"><i style="background:' + esc(jaArtFarbe(a)) + '"></i>' + esc(jaArtName(a)) + '</button>';
     }).join('') + '</div>'
-    + '<label>Kategorie:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
+    + '<label>Beruf / Privat:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
       return '<button type="button"' + (jtKontext(e) === k[0] ? ' class="an"' : '') + ' onclick="jaJtSetzen(\'kontext\',\'' + k[0] + '\')">' + k[1] + '</button>';
     }).join('') + '</div>'
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="jaJtSpeichern()">OK</button>'
@@ -5893,7 +6021,7 @@ var AUF_ANSICHTEN = [['gruppiert', 'Gruppiert'], ['prio', 'Prio'], ['geplant', '
 var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
-cl.auf = { liste: '', bereich: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null };
+cl.auf = { liste: '', bereich: '', wahl: '', frisch: {}, erlZeigen: false, ansicht: 'gruppiert', naechste: false, ganz: {}, fenster: null, wahlFuer: '', neueListe: null, privatZahl: 0 };
 cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
@@ -6030,13 +6158,14 @@ function ckPunkt(s, nr, a) {
   var g = a.erledigt ? null : aufGeplant(s, a.text);
   var z = ckZusatz(s, a.text);
   return { seite: s, nr: nr, a: a, key: aufSchluessel(s, nr), datum: g ? g.datum : '', zeit: g ? g.zeit : '', cls: aufIstCheckliste(s),
-           frist: z.frist || '', dauer: z.dauer || 0, stern: !!(s.__satz && s.__satz.stern && ckZustand(s) === 'lauf') };
+           frist: z.frist || '', dauer: z.dauer || 0, notiz: z.notiz || '', privat: !!z.privat, stern: !!(s.__satz && s.__satz.stern && ckZustand(s) === 'lauf') };
 }
 
 function aufAufgaben() {
   var liste = aufListe();
   var seiten = liste ? [liste] : aufQuellen();
   var aus = [];
+  cl.auf.privatZahl = 0;
   seiten.forEach(function (s) {
     /* Filter nach Lebensbereich (seit 0.49) */
     if (!liste && cl.auf.bereich && (s.__satz || {}).bereich !== cl.auf.bereich) { return; }
@@ -6050,6 +6179,8 @@ function aufAufgaben() {
       /* Checklisten zum Abhaken: nur Eingeplantes oder Fälliges (oder gerade hier Abgehaktes);
          Checklisten der Art „Aufgaben“ (seit 0.49) mit allen Punkten */
       if (cls && ckArt(s) !== 'aufgaben' && !x.datum && !x.frist && !frisch) { return; }
+      /* Privat (seit 0.66): verborgen oder maskiert — gezählt für die Maske */
+      if (prPrivatVerborgen(s, x)) { cl.auf.privatZahl++; return; }
       aus.push(x);
     });
   });
@@ -6111,6 +6242,8 @@ function aufZeileHtml(x, o) {
   var marke = plan ? '<span class="plan-marke">' + esc(plan) + '</span>' : '';
   /* ⚑ Frist (seit 0.49): jemand anders erwartet es bis dann */
   if (x.frist && !x.a.erledigt) { marke += '<span class="frist-marke">⚑ ' + esc(x.frist === isoDatum() ? 'heute' : clKurzDatum(x.frist)) + '</span>'; }
+  /* ▤ Notiz an der Aufgabe (seit 0.66) — antippen öffnet die Details */
+  if (x.notiz) { marke += '<button type="button" class="notiz-marke" onclick="aufDetails(\'' + esc(x.seite.id) + '\',' + x.nr + ')" aria-label="Notiz">▤</button>'; }
   var pr = kpPrio(x.a.text);
   var pe = pr.p || 3;
   var herkunft = o.herkunft ? (x.stern ? '★ ' : '') + x.seite.titel + (x.dauer ? ' · ◷ ' + ckDauerText(x.dauer) : '') : '';
@@ -6158,12 +6291,13 @@ function aufPrioWahl(p) {
 function aufgabenHtml() {
   var liste = aufListe();
   var ansicht = cl.auf.ansicht;
-  var h = (liste ? '' : '<button type="button" class="todo-bereich" onclick="todoBereichAuf()">Bereich: ' + esc(cl.auf.bereich ? ckBereichName(cl.auf.bereich) : 'Alle') + ' ▾</button>')
+  var h = (liste ? '' : '<button type="button" class="todo-bereich" onclick="todoBereichAuf()">Kategorie: ' + esc(cl.auf.bereich ? ckBereichName(cl.auf.bereich) : 'Alle') + ' ▾</button>')
     + '<div class="auf-leiste"><div class="schalter">' + AUF_ANSICHTEN.map(function (a) {
       return '<button type="button"' + (a[0] === ansicht ? ' class="an"' : '') + ' onclick="aufAnsicht(\'' + a[0] + '\')">' + a[1] + '</button>';
     }).join('') + '</div>'
     + '<button type="button" class="naechste' + (cl.auf.naechste ? ' an' : '') + '" onclick="aufNaechsteUm()">1. Nächste</button></div>';
   var l = aufAufgaben();
+  if (cl.auf.privatZahl && prModus() === 'maskieren') { h += '<button type="button" class="pr-maske" onclick="prFreigeben()">— ' + cl.auf.privatZahl + ' private — 🔒</button>'; }
   if (!l.length) {
     return h + '<p class="leise">' + (liste ? 'In „' + esc(liste.titel) + '“ ist nichts offen.' : 'Keine offenen Aufgaben.') + '</p>';
   }
@@ -6293,7 +6427,7 @@ function aufDetails(seiteId, nr) {
   cl.auf.wahl = seiteId + '|' + nr;
   var zu = ckZusatz(s, a.text);
   cl.auf.fenster = { modus: 'details', seite: s.id, quelle: s.id, nr: nr, alt: a.text, text: kpPrio(a.text).text, prio: kpPrio(a.text).p, erledigt: a.erledigt,
-                     frist: zu.frist || '', dauer: zu.dauer || 0,
+                     frist: zu.frist || '', dauer: zu.dauer || 0, notiz: zu.notiz || '', privat: !!zu.privat,
                      datum: g ? g.datum : '', zeit: g ? g.zeit : '', mitZeit: !!(g && g.zeit), ausKalender: false };
   cl.aufklapp = 'aufgabe';
   aufklappNeu();
@@ -6318,6 +6452,10 @@ function aufFensterLesen() {
   if (z && typeof z.value === 'string') { f.zeit = z.value; }
   var fr = document.getElementById('aufFrist');
   if (fr && typeof fr.value === 'string') { f.frist = fr.value; }
+  var no = document.getElementById('aufNotiz');
+  if (no && typeof no.value === 'string') { f.notiz = no.value; }
+  var pv = document.getElementById('aufPrivat');
+  if (pv && typeof pv.checked === 'boolean') { f.privat = pv.checked; }
   return f;
 }
 
@@ -6380,6 +6518,9 @@ function aufFensterHtml() {
     + (f.ausKalender ? '<div class="wahlreihe"><button type="button" onclick="terminStatt()">Termin</button><button type="button" class="an">Aufgabe</button></div>' : '')
     + '<label for="aufText">Aufgabe:</label><input id="aufText" class="eingabe" type="text" autocomplete="off" value="' + esc(f.text) + '"'
     + ' oninput="aufTextGetippt()">'
+    /* Notiz (seit 0.66) */
+    + (f.erledigt ? '' : '<label for="aufNotiz">Notiz:</label><textarea id="aufNotiz" class="eingabe auf-notiz" rows="' + (f.notiz ? 4 : 2) + '" placeholder="optional">' + esc(f.notiz || '') + '</textarea>'
+      + '<label class="haken"><input id="aufPrivat" type="checkbox"' + (f.privat ? ' checked' : '') + '> 🔒 privat</label>')
     + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (p) {
         return '<button type="button"' + ((f.prio || 3) === p ? ' class="an"' : '') + ' onclick="aufPrioWahl(' + p + ')">' + p + '</button>';
       }).join('') + '</div>'
@@ -6552,7 +6693,7 @@ function aufSpeichern() {
     if (seite.id !== quelle.id) { nr = aufVerschieben(quelle, nr, seite); }
   }
   if (!f.erledigt && nr >= 0) { aufPlanAnwenden(seite, nr, datum, zeit); }
-  if (!f.erledigt && nr >= 0) { ckZusatzSetzen(seite, text, f.frist || '', f.dauer || ''); }
+  if (!f.erledigt && nr >= 0) { ckZusatzSetzen(seite, text, f.frist || '', f.dauer || '', f.notiz || ''); ckZusatzPrivat(seite, text, !!f.privat); }
   zuletztMerken(seite.id);
   cl.auf.wahl = '';
   ckWecken();
@@ -6574,7 +6715,8 @@ function aufLoeschen() {
   zeilen.splice(nr, 1);
   s.text = zeilen.join('\n');
   s.geaendert = jetzt();
-  ckZusatzSetzen(s, f.alt, '', '');
+  ckZusatzSetzen(s, f.alt, '', '', '');
+  ckZusatzPrivat(s, f.alt, false);
   cl.auf.wahl = '';
   spaeterSichern();
   aufklappZu();
@@ -6708,7 +6850,7 @@ function neueListeHtml() {
   if (!n) { return ''; }
   return '<div class="fenster"><div class="titel">' + (n.id ? 'Liste bearbeiten' : 'Neue Checkliste') + '</div><div class="rumpf">'
     + '<label for="listeTitel">Name:</label><input id="listeTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(n.titel) + '">'
-    + '<label>Kategorie:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
+    + '<label>Beruf / Privat:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
         return '<button type="button"' + (n.kontext === k[0] ? ' class="an"' : '') + ' onclick="neueListeKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
       }).join('') + '</div>'
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="neueListeSpeichern()">OK</button>'
@@ -6829,8 +6971,8 @@ function memoListeHtml() {
   var l = memoNotizen();
   if (!l.length) { return '<p class="leise">Noch keine Notizen — „Neu“ tippen.</p>'; }
   return l.map(function (s, i) {
-    return '<button type="button" class="memo-zeile" onclick="memoOeffnen(\'' + esc(s.id) + '\')"><span class="mz nr">' + (i + 1) + '.</span>'
-      + '<span class="tx">' + esc(s.titel) + '</span></button>';
+    return prZeile(s, null, '<button type="button" class="memo-zeile" onclick="memoOeffnen(\'' + esc(s.id) + '\')"><span class="mz nr">' + (i + 1) + '.</span>'
+      + '<span class="tx">' + esc(s.titel) + '</span></button>');
   }).join('');
 }
 
@@ -6838,6 +6980,7 @@ function memoListeHtml() {
    Seit 0.43 mit „ohneAufgaben“: der Reiter „Memo“ eines Projekts zeigt nur
    den Text — die Aufgaben stehen dort im eigenen Reiter. */
 function memoSeiteHtml(s, ohneAufgaben, ohneKopf) {
+  if (prPrivatVerborgen(s, null)) { return '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
   var h = '';
   if (s.art === 'vorhaben' && !ohneAufgaben && !ohneKopf) {
     var zt = s.termin ? (s.typ === 'ziel' ? 'Zieltermin ' : 'Ende ') + clKurzDatum(s.termin) + s.termin.slice(0, 4) : '';
@@ -6872,7 +7015,7 @@ function memoSeiteHtml(s, ohneAufgaben, ohneKopf) {
       h += '<div class="aufg' + (a.erledigt ? ' erl' : '') + hervor + '" id="memoZ' + nr + '">'
          + clKastenHtml(a.erledigt, 'memoHaken(\'' + esc(s.id) + '\',' + nr + ')')
          + '<button type="button" class="tx umbruch" onclick="aufDetails(\'' + esc(s.id) + '\',' + nr + ')">' + (clPrioHtml(a.text) || ' ') + '</button>'
-         + clPlanMarke(s, a) + '</div>';
+         + clPlanMarke(s, a) + (!a.erledigt && ckZusatz(s, a.text).notiz ? '<button type="button" class="notiz-marke" onclick="aufDetails(\'' + esc(s.id) + '\',' + nr + ')" aria-label="Notiz">▤</button>' : '') + '</div>';
       return;
     }
     var m = z.match(/^\s*(#{1,3})\s+(.*)$/);
@@ -7092,13 +7235,14 @@ function memoTaste(ev) {
 function memoDetails() {
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
   if (!s) { return; }
-  cl.memo.fenster = { modus: 'details', titel: s.titel, kontext: s.kontext || 'beruflich', zustand: s.zustand || '', termin: s.termin || '' };
+  cl.memo.fenster = { modus: 'details', titel: s.titel, kontext: s.kontext || 'beruflich', zustand: s.zustand || '', termin: s.termin || '',
+                      bereich: (s.__satz && s.__satz.bereich) || '', privat: !!(s.__satz && s.__satz.privat) };
   cl.aufklapp = 'memo';
   aufklappNeu();
 }
 
 function memoNeu() {
-  cl.memo.fenster = { modus: 'neu', art: 'notiz', titel: '', kontext: (cl.filter === 'alle' ? 'privat' : cl.filter) };
+  cl.memo.fenster = { modus: 'neu', art: 'notiz', titel: '', kontext: (cl.filter === 'alle' ? 'privat' : cl.filter), bereich: '', privat: false };
   cl.aufklapp = 'memo';
   aufklappNeu();
 }
@@ -7110,6 +7254,7 @@ function memoFensterLesen() {
   var d = document.getElementById('memoTermin');
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   if (d && typeof d.value === 'string') { f.termin = d.value; }
+  katPrivatLesen('memo', f);
   return f;
 }
 
@@ -7143,7 +7288,8 @@ function memoFensterHtml() {
   /* Seit 0.43 nur Notizen — Projekte und Ziele legt die App „Projekte“ an */
   var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neue Notiz' : 'Details') + '</div><div class="rumpf">';
   h += '<label for="memoTitel">Name:</label><input id="memoTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
-     + '<label>Kategorie:</label>' + memoWahlReihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext);
+     + '<label>Beruf / Privat:</label>' + memoWahlReihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+     + katPrivatHtml('memo', f.bereich, f.privat);
   if (s && s.art === 'vorhaben') {
     h += '<label>Zustand:</label>' + memoWahlReihe('zustand', KP_ZUSTAENDE, f.zustand)
        + '<label for="memoTermin">' + (s.typ === 'ziel' ? 'Zieltermin:' : 'Ende:') + '</label>'
@@ -7188,6 +7334,7 @@ function memoSpeichern() {
     var art = (f.art === 'projekt' || f.art === 'ziel') ? 'vorhaben' : f.art;
     var s = kpSeiteAnlegen(art, titel, f.kontext, f.art === 'ziel' ? 'ziel' : '');
     if (!s) { melde('Das Memo ließ sich nicht anlegen.', 'warn'); return; }
+    katPrivatSchreiben(s.__satz, f);
     spaeterSichern();
     aufklappZu();
     cl.memo.id = s.id;
@@ -7199,6 +7346,7 @@ function memoSpeichern() {
   if (!seite) { aufklappZu(); return; }
   seite.titel = titel.slice(0, 200);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { seite.kontext = f.kontext; }
+  katPrivatSchreiben(seite.__satz, f);
   if (seite.art === 'vorhaben') {
     if (['laeuft', 'ruht', 'erledigt'].indexOf(f.zustand) >= 0) { seite.zustand = f.zustand; }
     seite.termin = /^\d{4}-\d{2}-\d{2}$/.test(String(f.termin || '')) ? f.termin : '';
@@ -7266,8 +7414,8 @@ function pjListeHtml() {
   var fertig = (cl.pj.zustand === 'erledigt');
   return h + '<div class="pj-liste' + (fertig ? ' fertig' : '') + '">' + l.map(function (s) {
     var p = fertig ? 0 : pjPrio(s);
-    return '<button type="button" class="pj-zeile" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'inhalt\')">'
-      + '<span class="pj-n">' + esc(s.titel) + '</span>' + (p ? '<span class="pj-p">P' + p + '</span>' : '') + '</button>';
+    return prZeile(s, null, '<button type="button" class="pj-zeile" onclick="pjOeffnen(\'' + esc(s.id) + '\',\'inhalt\')">'
+      + '<span class="pj-n">' + esc(s.titel) + '</span>' + (p ? '<span class="pj-p">P' + p + '</span>' : '') + '</button>');
   }).join('') + '</div>';
 }
 
@@ -7322,6 +7470,7 @@ function pjSeiteHtml(s) {
     + '<div class="pj-reiter">' + PJ_REITER.map(function (r) {
         return '<button type="button"' + (cl.pj.reiter === r[0] ? ' class="an"' : '') + ' onclick="pjReiter(\'' + r[0] + '\')">' + r[1] + '</button>';
       }).join('') + '</div>';
+  if (prPrivatVerborgen(s, null)) { return h + '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
   if (cl.pj.reiter === 'allgemein') { return h + pjAllgemeinHtml(s); }
   if (cl.pj.reiter === 'meilensteine') { return h + pjMeilensteineHtml(s); }
   if (cl.pj.reiter === 'inhalt') { return h + memoSeiteHtml(s, true); }
@@ -7344,7 +7493,10 @@ function pjAllgemeinHtml(s) {
     + '</div>'
     + '<label>Priorität:</label>' + reihe('prio', [[0, '–'], [1, '1'], [2, '2'], [3, '3']], pjPrio(s))
     + '<label>Zustand:</label>' + reihe('zustand', KP_ZUSTAENDE, s.zustand)
-    + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], s.kontext);
+    + '<label>Beruf / Privat:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], s.kontext)
+    /* Kategorie und privat (seit 0.66) — wirken sofort */
+    + katPrivatHtml('pj', z.bereich || '', !!z.privat).replace('id="pjKat" class="eingabe"', 'id="pjKat" class="eingabe" onchange="pjFeld(\'kategorie\')"')
+      .replace('id="pjPrivat" type="checkbox"', 'id="pjPrivat" type="checkbox" onchange="pjFeld(\'privat\')"');
   return h;
 }
 
@@ -7368,6 +7520,12 @@ function pjMeilensteineHtml(s) {
 /* Name und Daten: beim Verlassen des Feldes übernehmen */
 function pjFeld(feld) {
   var s = cl.pj.id ? kpSeiteFinden(cl.pj.id) : null;
+  if (s && (feld === 'kategorie' || feld === 'privat')) {
+    katPrivatSchreiben(s.__satz, katPrivatLesen('pj', {}));
+    s.geaendert = jetzt();
+    spaeterSichern();
+    return;
+  }
   var id = { name: 'pjName', beginn: 'pjBeginn', ende: 'pjEnde' }[feld];
   var el = id ? document.getElementById(id) : null;
   if (!s || !el || typeof el.value !== 'string') { return; }
@@ -7566,7 +7724,7 @@ function pjNeuHtml() {
   };
   return '<div class="fenster"><div class="titel">Neues Projekt</div><div class="rumpf">'
     + '<label for="pjNeuTitel">Name:</label><input id="pjNeuTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
-    + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+    + '<label>Beruf / Privat:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pjNeuSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
 }
@@ -7681,8 +7839,8 @@ function zieleHtml() {
   }
   var fertig = (cl.zi.zustand === 'erledigt');
   return h + '<div class="pj-liste' + (fertig ? ' fertig' : '') + '">' + l.map(function (s) {
-    return '<button type="button" class="pj-zeile" onclick="ziOeffnen(\'' + esc(s.id) + '\')">'
-      + '<span class="pj-n">' + esc(s.titel) + '</span>' + (fertig ? '' : '<span class="pj-p">' + esc(ziRestKurz(s)) + '</span>') + '</button>';
+    return prZeile(s, null, '<button type="button" class="pj-zeile" onclick="ziOeffnen(\'' + esc(s.id) + '\')">'
+      + '<span class="pj-n">' + esc(s.titel) + '</span>' + (fertig ? '' : '<span class="pj-p">' + esc(ziRestKurz(s)) + '</span>') + '</button>');
   }).join('') + '</div>';
 }
 
@@ -7751,13 +7909,14 @@ function ziTextFertig() {
 function ziDetails() {
   var s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
   if (!s) { return; }
-  cl.zi.fenster = { neu: false, titel: s.titel, termin: ziTermin(s), zustand: s.zustand, kontext: s.kontext === 'beruflich' ? 'beruflich' : 'privat' };
+  cl.zi.fenster = { neu: false, titel: s.titel, termin: ziTermin(s), zustand: s.zustand, kontext: s.kontext === 'beruflich' ? 'beruflich' : 'privat',
+                    bereich: (s.__satz && s.__satz.bereich) || '', privat: !!(s.__satz && s.__satz.privat) };
   cl.aufklapp = 'zidet';
   aufklappNeu();
 }
 
 function ziNeu() {
-  cl.zi.fenster = { neu: true, titel: '', termin: '', zustand: 'laeuft', kontext: (cl.filter === 'beruflich') ? 'beruflich' : 'privat' };
+  cl.zi.fenster = { neu: true, titel: '', termin: '', zustand: 'laeuft', kontext: (cl.filter === 'beruflich') ? 'beruflich' : 'privat', bereich: '', privat: false };
   cl.aufklapp = 'zidet';
   aufklappNeu();
 }
@@ -7769,6 +7928,7 @@ function ziFensterLesen() {
   var d = document.getElementById('ziTermin');
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   if (d && typeof d.value === 'string') { f.termin = d.value; }
+  katPrivatLesen('zi', f);
   return f;
 }
 
@@ -7792,7 +7952,8 @@ function ziFensterHtml() {
     + '<label for="ziTitel">Name:</label><input id="ziTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
     + '<label for="ziTermin">Zieltermin:</label><input id="ziTermin" class="eingabe" type="date" value="' + esc(f.termin) + '">'
     + (f.neu ? '' : '<label>Zustand:</label>' + reihe('zustand', ZI_ZUSTAENDE, f.zustand))
-    + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+    + '<label>Beruf / Privat:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+    + katPrivatHtml('zi', f.bereich, f.privat)
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="ziSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
 }
@@ -7815,6 +7976,7 @@ function ziSpeichern() {
     if (ZI_ZUSTAENDE.some(function (z) { return z[0] === f.zustand; })) { s.zustand = f.zustand; }
   }
   s.termin = termin;
+  katPrivatSchreiben(s.__satz, f);
   s.geaendert = jetzt();
   cl.zi.fenster = null;
   spaeterSichern();
@@ -8430,6 +8592,7 @@ function nbZeileHtml(b) {
   var tag = a.slice(0, 10);
   var info = (tag === isoDatum() ? 'heute ' + a.slice(11, 16) : (/^\d{4}/.test(tag) ? clWt(tag) + ' ' + clKurzDatum(tag) : ''))
     + (b.geraet ? ' · ' + b.geraet : '') + (wo ? ' · → ' + wo.zeichen + ' ' + wo.titel : '');
+  if (prPrivatVerborgen(null, b)) { return prZeile(null, b, ''); }
   var v = nbVorschau(b);
   return '<button type="button" class="hs-zeile" onclick="nbOeffnen(\'' + esc(b.id) + '\')">'
     + (v ? '<img class="hs-thumb" src="' + esc(v) + '" alt="">' : '<span class="hs-thumb"></span>')
@@ -8515,6 +8678,7 @@ function nbLeisteZeichnen() {
 function nbEditorHtml() {
   var b = nbFinden(cl.nb.id);
   if (!b) { return '<p class="leise">Das Blatt gibt es nicht mehr.</p>'; }
+  if (prPrivatVerborgen(null, b)) { return '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
   var wo = nbWo(b);
   return '<div class="nb-leiste" id="nbLeiste">' + nbLeisteHtml() + '</div>'
     + '<div class="nb-blatt" id="nbBlatt"><canvas id="nbFlaeche"></canvas></div>'
@@ -8680,6 +8844,7 @@ function nbFensterHtml() {
   }
   return '<div class="fenster"><div class="titel">Blatt</div><div class="rumpf">'
     + '<label for="nbTitel">Titel:</label><input id="nbTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(b.titel || '') + '" placeholder="' + esc(nbTitel(b)) + '">'
+    + katPrivatHtml('nb', b.bereich || '', !!b.privat)
     + '<p class="leise">' + (b.striche || []).length + ' Striche · etwa ' + Math.max(1, Math.round(JSON.stringify(b.striche || []).length / 1024)) + ' KB</p>'
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="nbSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
@@ -8689,7 +8854,7 @@ function nbFensterHtml() {
 function nbSpeichern() {
   var b = nbFinden(cl.nb.id);
   var el = document.getElementById('nbTitel');
-  if (b && el && typeof el.value === 'string') { b.titel = el.value.trim().slice(0, 120); krSpeichern(b); }
+  if (b && el && typeof el.value === 'string') { b.titel = el.value.trim().slice(0, 120); katPrivatSchreiben(b, katPrivatLesen('nb', {})); krSpeichern(b); }
   cl.nb.fenster = null;
   aufklappZu();
 }
@@ -8715,6 +8880,448 @@ function nbAnhaengeHtml(art, id) {
     return '<button type="button" class="hs-anhang" onclick="nbOeffnen(\'' + esc(b.id) + '\')">'
       + (v ? '<img src="' + esc(v) + '" alt="">' : '') + '<span>✎ ' + esc(nbTitel(b)) + '</span></button>';
   }).join('');
+}
+
+/* ---------- Kategorien und Private Einträge (seit 0.66) ----------
+   Kategorien: eine Liste für ganz CLIE — quer durch Listen, Checklisten,
+   Projekte, Ziele, Notizen, Ideen, Sammlungen und Notizblätter. Sie
+   baut auf den Lebensbereichen aus Kurs auf (Feld „bereich“, die
+   Workbench behält es); neue Kategorien sind Sätze „bereich“ mit
+   „nurKategorie“ — Kurs und Coach rechnen nur mit den Lebensbereichen.
+   Am Palm hatte jede App ihre eigene Liste; die Gesamtsicht einer
+   Kategorie über alle Apps ist neu.
+
+   Private Einträge: wie „Security“ am Palm. Jeder Eintrag kann „privat“
+   sein; im Menü: zeigen, maskieren („— privat —“) oder verbergen. Zum
+   Zeigen fragt CLIE nach der PIN, wenn eine festgelegt ist (nur auf
+   diesem Gerät). Schutz vor Mitlesen — keine Verschlüsselung. */
+
+var PR_KEY = 'clie-privat';
+var PR_PIN_KEY = 'clie-pin';
+
+cl.kat = { id: '', bearbeiten: false, fenster: null };
+cl.pr = { fenster: null, zurueck: '', nach: '' };
+
+/* ---- Kategorien ---- */
+
+function kgAlle() { return ckBereiche(); }
+
+function kgName(id) { return ckBereichName(id); }
+
+/* Kurs-Bereiche erst anlegen, damit neue Kategorien eine Reihenfolge haben */
+function katNeuAnlegen(name) {
+  var n = String(name || '').trim().slice(0, 60);
+  if (!n) { return null; }
+  krAnfangen();
+  var gleich = kgAlle().filter(function (b) { return b.name.toLowerCase() === n.toLowerCase(); })[0];
+  if (gleich) { return krFinden(gleich.id); }
+  var rang = krBereiche(true, true).reduce(function (m, b) { return Math.max(m, Number(b.rang) || 0); }, 0) + 1;
+  return krSpeichern({ id: 'kb-' + neueKennung(), typ: 'bereich', name: n, rang: rang, nurKategorie: true, aus: false });
+}
+
+/* Auswahl „Kategorie ▼“ und Haken „privat“ — in allen Detail-Fenstern gleich */
+function katPrivatHtml(vor, bereich, privat) {
+  return '<label for="' + vor + 'Kat">Kategorie:</label><select id="' + vor + 'Kat" class="eingabe"><option value="">– ohne –</option>'
+    + kgAlle().map(function (b) { return '<option value="' + esc(b.id) + '"' + (bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('')
+    + '</select>'
+    + '<label class="haken"><input id="' + vor + 'Privat" type="checkbox"' + (privat ? ' checked' : '') + '> 🔒 privat</label>';
+}
+
+function katPrivatLesen(vor, f) {
+  var k = document.getElementById(vor + 'Kat');
+  var p = document.getElementById(vor + 'Privat');
+  if (k && typeof k.value === 'string') { f.bereich = k.value; }
+  if (p && typeof p.checked === 'boolean') { f.privat = p.checked; }
+  return f;
+}
+
+function katPrivatSchreiben(o, f) {
+  if (!o || !f) { return; }
+  if (f.bereich !== undefined) { if (kgName(f.bereich)) { o.bereich = f.bereich; } else { delete o.bereich; } }
+  if (f.privat !== undefined) { if (f.privat) { o.privat = true; } else { delete o.privat; } }
+}
+
+function katVon(s) { return (s && s.__satz && s.__satz.bereich) || ''; }
+
+/* Alles einer Kategorie (id '' = nicht zugeordnet) — nach Beruf/Privat und ohne Verborgenes */
+function katInhalt(id) {
+  var r = { todo: [], listen: [], vorhaben: [], notizen: [], blaetter: [], ideen: [], sammlungen: [], handschrift: [] };
+  var passt = function (b) { return (b || '') === id; };
+  var seiten = kpSeitenAlle().filter(function (s) { return kpPasstFilter(s, cl.filter) && !prPrivatVerborgen(s, null); });
+  seiten.forEach(function (s) {
+    if (!passt(katVon(s))) { return; }
+    if (ckSeite(s.id)) {
+      var z = ckZustand(s);
+      if (!ckIstKorb(s) && (z === 'lauf' || z === 'ruht')) { r.listen.push(s); }
+    } else if (s.art === 'vorhaben') {
+      if (s.zustand !== 'erledigt') { r.vorhaben.push(s); }
+    } else if (s.art === 'notiz') {
+      r.notizen.push(s);
+    }
+  });
+  if (id) {
+    aufQuellen().forEach(function (s) {
+      if (!passt(katVon(s)) || prPrivatVerborgen(s, null) || (ckSeite(s.id) && ckArt(s) !== 'aufgaben')) { return; }
+      String(s.text || '').split('\n').forEach(function (zz, nr) {
+        var a = kpAufgabe(zz);
+        if (!a || !a.text || a.erledigt) { return; }
+        var x = ckPunkt(s, nr, a);
+        if (!prPrivatVerborgen(s, x)) { r.todo.push(x); }
+      });
+    });
+    r.todo = aufSortiert(r.todo, 'prio');
+    var kh = hsKarte();
+    cl.hs.liste.forEach(function (f) {
+      var wo = kh[f.id];
+      var s = wo && wo.seite ? kpSeiteFinden(wo.seite) : null;
+      if (s && passt(katVon(s))) { r.handschrift.push(f); }
+    });
+  }
+  nbAlle().forEach(function (b) {
+    if (prPrivatVerborgen(null, b)) { return; }
+    var s = (b.bei && b.bei.seite) ? kpSeiteFinden(b.bei.seite) : null;
+    if (passt(b.bereich || (s ? katVon(s) : ''))) { r.blaetter.push(b); }
+  });
+  iwAlle().forEach(function (x) { if (passt(x.bereich) && !prPrivatVerborgen(null, x)) { r.ideen.push(x); } });
+  saAlle(false).forEach(function (s) { if (passt(s.bereich) && kpPasstFilter(s, cl.filter) && !prPrivatVerborgen(null, s)) { r.sammlungen.push(s); } });
+  return r;
+}
+
+function katZahl(id) {
+  var r = katInhalt(id);
+  return r.todo.length + r.listen.length + r.vorhaben.length + r.notizen.length + r.blaetter.length + r.ideen.length + r.sammlungen.length + r.handschrift.length;
+}
+
+/* ---- App „Kategorien“ ---- */
+
+function katListeHtml() {
+  var l = kgAlle();
+  var h = '<p class="leise">Eine Liste für alle Apps. Antippen zeigt alles, was dazugehört.</p>';
+  l.forEach(function (b, i) {
+    if (cl.kat.bearbeiten) {
+      h += '<div class="kat-zeile"><span class="tx">' + esc(b.name) + '</span>'
+        + '<button type="button" class="knopf" onclick="katSchieben(\'' + esc(b.id) + '\',-1)"' + (i === 0 ? ' disabled' : '') + ' aria-label="nach oben">▲</button>'
+        + '<button type="button" class="knopf" onclick="katSchieben(\'' + esc(b.id) + '\',1)"' + (i === l.length - 1 ? ' disabled' : '') + ' aria-label="nach unten">▼</button>'
+        + '<button type="button" class="knopf" onclick="katDetails(\'' + esc(b.id) + '\')" aria-label="ändern">✎</button></div>';
+      return;
+    }
+    h += '<button type="button" class="kat-zeile" onclick="katOeffnen(\'' + esc(b.id) + '\')"><span class="tx">' + esc(b.name) + '</span><span class="kat-zahl">' + katZahl(b.id) + '</span></button>';
+  });
+  if (!cl.kat.bearbeiten) {
+    h += '<button type="button" class="kat-zeile leise" onclick="katOeffnen(\'_ohne\')"><span class="tx">Nicht zugeordnet</span><span class="kat-zahl">' + katZahl('') + '</span></button>';
+  }
+  return h;
+}
+
+function katGesamtHtml(id) {
+  var r = katInhalt(id === '_ohne' ? '' : id);
+  var h = '';
+  var gruppe = function (titel, l, zeile) {
+    if (!l.length) { return; }
+    h += '<div class="gruppe ag-gr"><span>' + titel + '</span><small>' + l.length + '</small></div>' + l.map(zeile).join('');
+  };
+  gruppe('To Do · offen', r.todo, function (x) { return aufZeileHtml(x, { herkunft: true }); });
+  gruppe('Listen', r.listen, function (s) {
+    var st = clsStand(s);
+    return '<button type="button" class="kat-eintrag" onclick="todoListe(\'' + esc(s.id) + '\')"><span class="tx">' + (ckArt(s) === 'abhaken' ? '☑ ' : '≡ ') + esc(s.titel) + '</span><small>' + st.fertig + '/' + st.alle + (ckZustand(s) === 'ruht' ? ' · ruht' : '') + '</small></button>';
+  });
+  gruppe('Projekte · Ziele', r.vorhaben, function (s) {
+    return '<button type="button" class="kat-eintrag" onclick="seiteOeffnen(\'' + esc(s.id) + '\')"><span class="tx">' + esc(clSeitenZeichen(s) + ' ' + s.titel) + '</span>'
+      + (s.termin ? '<small>' + esc(clKurzDatum(s.termin) + s.termin.slice(0, 4)) + '</small>' : '') + '</button>';
+  });
+  gruppe('Notizen', r.notizen, function (s) {
+    return '<button type="button" class="kat-eintrag" onclick="seiteOeffnen(\'' + esc(s.id) + '\')"><span class="tx">▤ ' + esc(s.titel) + '</span></button>';
+  });
+  gruppe('Handschrift · Blätter', r.handschrift.concat(r.blaetter), function (x) {
+    if (x.typ === 'notizblock') { return '<button type="button" class="kat-eintrag" onclick="nbOeffnen(\'' + esc(x.id) + '\')"><span class="tx">✎ ' + esc(nbTitel(x)) + '</span></button>'; }
+    return '<button type="button" class="kat-eintrag" onclick="hsOeffnen(\'' + esc(x.id) + '\')"><span class="tx">✎ ' + esc(hsName(x)) + '</span></button>';
+  });
+  gruppe('Ideen', r.ideen, function (x) {
+    return '<button type="button" class="kat-eintrag" onclick="oeffne(\'ideen\');iwOeffnen(\'' + esc(x.id) + '\')"><span class="tx">💡 ' + esc(x.titel) + '</span></button>';
+  });
+  gruppe('Sammlungen', r.sammlungen, function (s) {
+    return '<button type="button" class="kat-eintrag" onclick="oeffne(\'sammlungen\');saOeffnen(\'' + esc(s.id) + '\')"><span class="tx">' + esc(s.name) + '</span><small>' + saSaetze(s).length + ' Einträge</small></button>';
+  });
+  return h || '<p class="leise">Noch nichts in dieser Kategorie. In den Details von Listen, Notizen, Projekten, Zielen, Ideen, Sammlungen und Blättern lässt sie sich wählen.</p>';
+}
+
+function kategorienHtml() { return cl.kat.id ? katGesamtHtml(cl.kat.id) : katListeHtml(); }
+
+function kategorienFussHtml() {
+  if (!cl.kat.id) {
+    return cl.kat.bearbeiten ? '<button type="button" class="knopf voll" onclick="katBearbeitenUm()">Fertig</button>'
+      : '<button type="button" class="knopf" onclick="katNeu()">Neu…</button><button type="button" class="knopf" onclick="katBearbeitenUm()">Bearbeiten…</button>';
+  }
+  return '<button type="button" class="knopf" onclick="katZurListe()">Fertig</button>'
+    + (cl.kat.id !== '_ohne' ? '<button type="button" class="knopf" onclick="katNeuIn()">Neu…</button><button type="button" class="knopf" onclick="katDetails(cl.kat.id)">Details…</button>' : '');
+}
+
+function katKopfText() { return cl.kat.id === '_ohne' ? 'Nicht zugeordnet' : (cl.kat.id ? kgName(cl.kat.id) : 'Kategorien'); }
+
+function katOeffnen(id) {
+  cl.kat.id = (id === '_ohne' || kgName(id)) ? id : '';
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
+}
+
+function katZurListe() { cl.kat.id = ''; zeichne(); }
+
+function katBearbeitenUm() { cl.kat.bearbeiten = !cl.kat.bearbeiten; zeichne(); }
+
+function katSchieben(id, d) {
+  krAnfangen();
+  var l = krBereiche(true, true);
+  var i = l.map(function (b) { return b.id; }).indexOf(id);
+  var j = i + d;
+  if (i < 0 || j < 0 || j >= l.length) { return; }
+  var t = l[i]; l[i] = l[j]; l[j] = t;
+  l.forEach(function (b, k) { if (Number(b.rang) !== k + 1) { b.rang = k + 1; krSpeichern(b); } });
+  zeichne();
+}
+
+function katNeu() {
+  cl.kat.fenster = { modus: 'neu', id: '', name: '' };
+  cl.aufklapp = 'kategorie';
+  aufklappNeu();
+}
+
+function katDetails(id) {
+  if (!kgName(id)) { return; }
+  krAnfangen();
+  var b = krFinden(id);
+  cl.kat.fenster = { modus: 'details', id: id, name: kgName(id), nur: !!(b && b.nurKategorie) };
+  cl.aufklapp = 'kategorie';
+  aufklappNeu();
+}
+
+/* Neu in der Gesamtsicht: eine Liste oder Notiz mit dieser Kategorie */
+function katNeuIn() {
+  cl.kat.fenster = { modus: 'neuin', id: cl.kat.id };
+  cl.aufklapp = 'kategorie';
+  aufklappNeu();
+}
+
+function katFensterHtml() {
+  var f = cl.kat.fenster;
+  if (!f) { return ''; }
+  var kopf = function (t) { return '<div class="fenster"><div class="titel">' + esc(t) + '</div><div class="rumpf">'; };
+  if (f.modus === 'neuin') {
+    return kopf('Neu in „' + kgName(f.id) + '“')
+      + '<button type="button" class="wahl" onclick="katNeuAnlegenIn(\'liste\')">≡ Liste</button>'
+      + '<button type="button" class="wahl" onclick="katNeuAnlegenIn(\'notiz\')">▤ Notiz</button>'
+      + '<label for="katNeuName">Name:</label><input id="katNeuName" class="eingabe" type="text" autocomplete="off">'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+  }
+  if (f.modus === 'loeschen') {
+    return kopf('Kategorie löschen') + '<p>„' + esc(f.name) + '“ löschen? Die Einträge bleiben — sie sind dann nicht zugeordnet.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="katLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="katDetails(\'' + esc(f.id) + '\')">Abbrechen</button></div></div></div>';
+  }
+  return kopf(f.modus === 'neu' ? 'Neue Kategorie' : 'Kategorie')
+    + '<label for="katName">Name:</label><input id="katName" class="eingabe" type="text" autocomplete="off" value="' + esc(f.name) + '">'
+    + (f.modus === 'details' && !f.nur ? '<p class="leise">Ein Lebensbereich aus Kurs — umbenennen geht, löschen nur in Kurs (ausblenden).</p>' : '')
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="katSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + (f.modus === 'details' && f.nur ? '<button type="button" class="knopf" onclick="katLoeschenFragen()">Löschen…</button>' : '') + '</div></div></div>';
+}
+
+function katSpeichern() {
+  var f = cl.kat.fenster;
+  var el = document.getElementById('katName');
+  var n = el && typeof el.value === 'string' ? el.value.trim() : '';
+  if (!f) { aufklappZu(); return; }
+  if (!n) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  if (f.modus === 'neu') {
+    katNeuAnlegen(n);
+  } else {
+    krAnfangen();
+    var b = krFinden(f.id);
+    if (b) { b.name = n.slice(0, 60); krSpeichern(b); }
+  }
+  cl.kat.fenster = null;
+  aufklappZu();
+}
+
+function katLoeschenFragen() {
+  if (!cl.kat.fenster) { return; }
+  cl.kat.fenster.modus = 'loeschen';
+  aufklappNeu();
+}
+
+/* Nur eigene Kategorien; die Zuordnung fällt überall weg */
+function katLoeschen() {
+  var f = cl.kat.fenster;
+  var b = f ? krFinden(f.id) : null;
+  if (!b || !b.nurKategorie) { aufklappZu(); return; }
+  var weg = function (o) { if (o && o.bereich === b.id) { delete o.bereich; o.geaendert = jetzt(); } };
+  kpSeitenAlle().forEach(function (s) { weg(s.__satz); });
+  iwAlle().forEach(weg);
+  (Array.isArray(DB.sammlungen) ? DB.sammlungen : []).forEach(weg);
+  nbAlle().forEach(weg);
+  krLoeschen(b.id);
+  if (cl.kat.id === b.id) { cl.kat.id = ''; }
+  if (cl.auf.bereich === b.id) { aufBereichSetzen(''); }
+  cl.kat.fenster = null;
+  melde('Kategorie „' + b.name + '“ gelöscht.', null);
+  aufklappZu();
+}
+
+function katNeuAnlegenIn(art) {
+  var f = cl.kat.fenster;
+  var el = document.getElementById('katNeuName');
+  var n = el && typeof el.value === 'string' ? el.value.trim() : '';
+  if (!f || !kgName(f.id)) { aufklappZu(); return; }
+  if (!n) { melde('Bitte erst einen Namen eingeben.', 'warn'); return; }
+  var s = kpSeiteAnlegen(art, n.slice(0, 200), cl.filter === 'beruflich' ? 'beruflich' : 'privat', '');
+  if (!s) { melde('Das ließ sich nicht anlegen.', 'warn'); return; }
+  s.__satz.bereich = f.id;
+  spaeterSichern();
+  cl.kat.fenster = null;
+  aufklappZuStill();
+  seiteOeffnen(s.id);
+}
+
+/* ---- Private Einträge ---- */
+
+function prModus() {
+  var m = '';
+  try { m = window.localStorage.getItem(PR_KEY) || ''; } catch (e) { m = ''; }
+  return (m === 'maskieren' || m === 'verbergen') ? m : 'zeigen';
+}
+
+/* Ist das (Seite und/oder Punkt bzw. Satz) gerade nicht zu sehen? */
+function prPrivatVerborgen(s, x) {
+  if (prModus() === 'zeigen') { return false; }
+  return !!((s && s.__satz && s.__satz.privat) || (x && x.privat));
+}
+
+function prMaskeHtml() {
+  return '<button type="button" class="pr-maske" onclick="prFreigeben()">— privat — 🔒</button>';
+}
+
+/* Zeile: verborgen → '', maskiert → Maske, sonst die Zeile */
+function prZeile(s, x, html) {
+  if (!prPrivatVerborgen(s, x)) { return html; }
+  return prModus() === 'maskieren' ? prMaskeHtml() : '';
+}
+
+function prPinHash(pin) {
+  var h = 5381;
+  var t = 'clie:' + String(pin || '');
+  var i;
+  for (i = 0; i < t.length; i++) { h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; }
+  return 'p' + h.toString(36);
+}
+
+function prPinDa() {
+  try { return !!window.localStorage.getItem(PR_PIN_KEY); } catch (e) { return false; }
+}
+
+function prModusSetzen(m) {
+  if (m !== 'zeigen' && m !== 'maskieren' && m !== 'verbergen') { return; }
+  if (m === 'zeigen' && prModus() !== 'zeigen' && prPinDa()) { prPinFragen('zeigen'); return; }
+  try { window.localStorage.setItem(PR_KEY, m); } catch (e) { /* nur für jetzt */ }
+  cl.pr.zurueck = '';
+  cl.aufklapp = '';
+  zeichne();
+}
+
+/* Antippen einer Maske: zeigen (mit PIN) — beim Verlassen von CLIE wieder wie vorher */
+function prFreigeben() {
+  if (prPinDa()) { prPinFragen('freigeben'); return; }
+  cl.pr.zurueck = prModus();
+  try { window.localStorage.setItem(PR_KEY, 'zeigen'); } catch (e) { /* nur für jetzt */ }
+  zeichne();
+}
+
+function prPinFragen(nach) {
+  cl.pr.fenster = { modus: 'pin', nach: nach };
+  cl.aufklapp = 'privat';
+  aufklappNeu();
+}
+
+function prPinFestlegen() {
+  cl.pr.fenster = { modus: 'neu' };
+  cl.aufklapp = 'privat';
+  aufklappNeu();
+}
+
+function prFensterHtml() {
+  var f = cl.pr.fenster;
+  if (!f) { return ''; }
+  if (f.modus === 'neu') {
+    return '<div class="fenster"><div class="titel">PIN für private Einträge</div><div class="rumpf">'
+      + '<label for="prPin">Neue PIN (leer = keine):</label><input id="prPin" class="eingabe" type="password" inputmode="numeric" autocomplete="off">'
+      + '<p class="leise">Nur auf diesem Gerät. Sie schützt vor Mitlesen, nicht vor Zugriff auf die Datei.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="prPinSpeichern()">OK</button><button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+  }
+  return '<div class="fenster"><div class="titel">Private Einträge zeigen</div><div class="rumpf">'
+    + '<label for="prPin">PIN:</label><input id="prPin" class="eingabe" type="password" inputmode="numeric" autocomplete="off" onkeydown="prPinTaste(event)">'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="prPinPruefen()">OK</button><button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+}
+
+function prPinTaste(ev) {
+  if (ev && ev.key === 'Enter') { prPinPruefen(); }
+}
+
+function prPinSpeichern() {
+  var el = document.getElementById('prPin');
+  var p = el && typeof el.value === 'string' ? el.value.trim() : '';
+  try {
+    if (p) { window.localStorage.setItem(PR_PIN_KEY, prPinHash(p)); } else { window.localStorage.removeItem(PR_PIN_KEY); }
+  } catch (e) { /* nur für jetzt */ }
+  cl.pr.fenster = null;
+  melde(p ? 'PIN festgelegt.' : 'Keine PIN mehr.', 'gut');
+  aufklappZu();
+}
+
+function prPinPruefen() {
+  var f = cl.pr.fenster;
+  var el = document.getElementById('prPin');
+  var p = el && typeof el.value === 'string' ? el.value.trim() : '';
+  var soll = '';
+  try { soll = window.localStorage.getItem(PR_PIN_KEY) || ''; } catch (e) { soll = ''; }
+  if (!f || prPinHash(p) !== soll) { melde('Die PIN stimmt nicht.', 'warn'); if (el) { el.value = ''; } return; }
+  cl.pr.zurueck = (f.nach === 'freigeben') ? prModus() : '';
+  try { window.localStorage.setItem(PR_KEY, 'zeigen'); } catch (e) { /* nur für jetzt */ }
+  cl.pr.fenster = null;
+  aufklappZu();
+}
+
+/* Beim Verlassen von CLIE: eine vorübergehende Freigabe zurücknehmen */
+function prVerlassen() {
+  if (!cl.pr.zurueck) { return; }
+  try { window.localStorage.setItem(PR_KEY, cl.pr.zurueck); } catch (e) { /* nur für jetzt */ }
+  cl.pr.zurueck = '';
+}
+
+function prMenueHtml() {
+  var m = prModus();
+  return '<div class="menue-zeile"><span>Private Einträge:</span></div><div class="wahlreihe pr-wahl">'
+    + [['zeigen', 'zeigen'], ['maskieren', 'maskieren'], ['verbergen', 'verbergen']].map(function (x) {
+        return '<button type="button"' + (m === x[0] ? ' class="an"' : '') + ' onclick="prModusSetzen(\'' + x[0] + '\')">' + x[1] + '</button>';
+      }).join('') + '</div>'
+    + '<button type="button" onclick="prPinFestlegen()">' + (prPinDa() ? 'PIN ändern…' : 'PIN festlegen…') + '</button>';
+}
+
+/* Coach: Fragen, die Privates nennen, fallen weg, solange es nicht gezeigt wird */
+function prCoachFilter(l) {
+  if (prModus() === 'zeigen') { return l; }
+  var woerter = [];
+  kpSeitenAlle().forEach(function (s) {
+    var priv = !!(s.__satz && s.__satz.privat);
+    if (priv && s.titel) { woerter.push(s.titel); }
+    String(s.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (a && a.text && (priv || ckZusatz(s, a.text).privat)) { woerter.push(kpPrio(a.text).text); }
+    });
+  });
+  if (!woerter.length) { return l; }
+  return l.filter(function (q) {
+    var t = String(q.text || '');
+    return !woerter.some(function (w) { return w && t.indexOf(w) >= 0; });
+  });
 }
 
 function seiteOeffnen(id) {
@@ -8806,7 +9413,7 @@ var CK_ZUSTAENDE = [['lauf', 'Laufend'], ['ruht', 'Ruhend'], ['fertig', 'Abgesch
 
 /* Die Lebensbereiche aus Kurs — vor dem ersten Öffnen von Kurs die festen sieben */
 function ckBereiche() {
-  var l = krBereiche(false);
+  var l = krBereiche(false, true);
   if (!l.length) { return KR_BEREICHE.map(function (b) { return { id: b[0], name: b[1] }; }); }
   return l.map(function (b) { return { id: b.id, name: b.name }; });
 }
@@ -8884,24 +9491,43 @@ function ckZusatz(s, text) {
   return (z && typeof z === 'object' && z[k]) ? z[k] : {};
 }
 
-function ckZusatzSetzen(s, text, frist, dauer) {
+/* notiz (seit 0.66): wie die „Note“ am Palm To Do; undefined = bleibt, wie sie ist */
+function ckZusatzSetzen(s, text, frist, dauer, notiz) {
   var x = s && s.__satz;
   if (!x) { return; }
   var k = kpPrio(text).text;
   if (!x.zusatz || typeof x.zusatz !== 'object') { x.zusatz = {}; }
+  var alt = (x.zusatz[k] && typeof x.zusatz[k] === 'object') ? x.zusatz[k] : {};
   var w = {};
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(frist || ''))) { w.frist = frist; }
   if (CK_DAUER.some(function (d) { return d[0] === Number(dauer); })) { w.dauer = Number(dauer); }
-  if (w.frist || w.dauer) { x.zusatz[k] = w; } else { delete x.zusatz[k]; }
+  var n = (notiz === undefined) ? String(alt.notiz || '') : String(notiz || '').replace(/\s+$/, '').slice(0, 4000);
+  if (n.trim()) { w.notiz = n; }
+  if (alt.privat) { w.privat = true; }
+  if (w.frist || w.dauer || w.notiz || w.privat) { x.zusatz[k] = w; } else { delete x.zusatz[k]; }
   if (!Object.keys(x.zusatz).length) { delete x.zusatz; }
 }
 
 /* Mit dem Text zieht der Zusatz um — umbenannt oder in eine andere Seite */
 function ckZusatzUmziehen(von, alt, nach, neu) {
   var z = ckZusatz(von, alt);
-  if (!z.frist && !z.dauer) { return; }
-  ckZusatzSetzen(von, alt, '', '');
-  ckZusatzSetzen(nach, neu, z.frist || '', z.dauer || '');
+  if (!z.frist && !z.dauer && !z.notiz && !z.privat) { return; }
+  ckZusatzSetzen(von, alt, '', '', '');
+  ckZusatzPrivat(von, alt, false);
+  ckZusatzSetzen(nach, neu, z.frist || '', z.dauer || '', z.notiz || '');
+  ckZusatzPrivat(nach, neu, !!z.privat);
+}
+
+/* 🔒 privat an einer einzelnen Aufgabe (seit 0.66) */
+function ckZusatzPrivat(s, text, an) {
+  var x = s && s.__satz;
+  if (!x) { return; }
+  var k = kpPrio(text).text;
+  if (!x.zusatz || typeof x.zusatz !== 'object') { x.zusatz = {}; }
+  var w = (x.zusatz[k] && typeof x.zusatz[k] === 'object') ? x.zusatz[k] : {};
+  if (an) { w.privat = true; } else { delete w.privat; }
+  if (Object.keys(w).length) { x.zusatz[k] = w; } else { delete x.zusatz[k]; }
+  if (!Object.keys(x.zusatz).length) { delete x.zusatz; }
 }
 
 function ckDauerText(d) {
@@ -8977,7 +9603,8 @@ function ckPunktLoeschen(s, text) {
   zeilen.splice(z.nr, 1);
   s.text = zeilen.join('\n');
   s.geaendert = jetzt();
-  ckZusatzSetzen(s, text, '', '');
+  ckZusatzSetzen(s, text, '', '', '');
+  ckZusatzPrivat(s, text, false);
   return true;
 }
 
@@ -9028,6 +9655,7 @@ function checklistenListeHtml() {
 
 /* Eine Checkliste oder Vorlage anzeigen */
 function checklisteHtml(g) {
+  if (prPrivatVerborgen(null, g)) { return '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
   if (cl.cls.schreiben) {
     return '<div class="schreibleiste">'
       + '<button type="button" onmousedown="event.preventDefault()" onclick="memoZeichen(\'kasten\')" aria-label="Punkt">[ ]</button>'
@@ -9080,6 +9708,7 @@ function checklistenHtml() {
 /* Eine Checkliste mit Aufgaben-Zeilen: Priorität, Haken, Termin, ⚑ Frist —
    erster Tipp wählt, zweiter öffnet die Details der Aufgabe */
 function ckListeHtml(s) {
+  if (prPrivatVerborgen(s, null)) { return '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
   var z = ckZustand(s);
   var st = clsStand(s);
   var b = ckBereichName(s.__satz.bereich);
@@ -9202,8 +9831,8 @@ function todoNeueListe() {
 /* Laufende Listen nach Lebensbereich; ☑ = Liste zum Abhaken */
 function todoWahlZeile(s, an) {
   var st = clsStand(s);
-  return '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="todoListe(\'' + esc(s.id) + '\')"><span>'
-    + (ckArt(s) === 'abhaken' ? '☑ ' : '') + esc(s.titel) + '</span><small>' + st.fertig + '/' + st.alle + '</small></button>';
+  return prZeile(s, null, '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="todoListe(\'' + esc(s.id) + '\')"><span>'
+    + (ckArt(s) === 'abhaken' ? '☑ ' : '') + esc(s.titel) + '</span><small>' + st.fertig + '/' + st.alle + '</small></button>');
 }
 
 function listeAufklappHtml() {
@@ -9243,7 +9872,7 @@ function todoBereichAuf() {
 
 function todoBereichHtml() {
   return '<div class="aufklapp" style="top:96px;left:6px">'
-    + '<button type="button"' + (!cl.auf.bereich ? ' class="an"' : '') + ' onclick="aufBereichSetzen(\'\')">Alle Bereiche</button>'
+    + '<button type="button"' + (!cl.auf.bereich ? ' class="an"' : '') + ' onclick="aufBereichSetzen(\'\')">Alle Kategorien</button>'
     + ckBereiche().map(function (b) {
         return '<button type="button"' + (cl.auf.bereich === b.id ? ' class="an"' : '') + ' onclick="aufBereichSetzen(\'' + esc(b.id) + '\')">' + esc(b.name) + '</button>';
       }).join('') + '</div>';
@@ -9441,7 +10070,7 @@ function clsDetails() {
   if (!s) { return; }
   var g = s.__satz;
   cl.cls.fenster = { modus: 'details', titel: s.titel, kontext: g.kontext || 'privat', bereich: g.bereich || '', art: ckArt(s),
-                     zustand: ckZustand(s), stern: !!g.stern };
+                     zustand: ckZustand(s), stern: !!g.stern, privat: !!g.privat };
   cl.aufklapp = 'checkliste';
   aufklappNeu();
 }
@@ -9473,8 +10102,7 @@ function clsFensterLesen() {
   if (f && f.modus === 'plan' && d && typeof d.value === 'string') { f.datum = d.value; }
   if (f && f.modus === 'plan' && f.mitZeit && z && typeof z.value === 'string') { f.zeit = z.value; }
   if (f && f.modus === 'start' && st && typeof st.value === 'string') { f.stichtag = st.value; }
-  var be = document.getElementById('clsBereich');
-  if (f && f.modus === 'details' && be && typeof be.value === 'string') { f.bereich = be.value; }
+  if (f && f.modus === 'details') { katPrivatLesen('cls', f); }
   return f;
 }
 
@@ -9592,10 +10220,8 @@ function clsFensterHtml() {
   var h = kopf(vorlage ? 'Vorlage' : (korb ? 'Sammler' : 'Checkliste'));
   if (!korb) {
     h += '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
-      /* Lebensbereich aus Kurs (seit 0.49) */
-      + '<label for="clsBereich">Bereich:</label><select id="clsBereich" class="eingabe"><option value="">– ohne –</option>'
-      + ckBereiche().map(function (b) { return '<option value="' + esc(b.id) + '"' + (f.bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('')
-      + '</select>';
+      /* Kategorie (seit 0.66; vorher Lebensbereich) und privat */
+      + katPrivatHtml('cls', f.bereich, f.privat);
     if (!ckIstListe(sd)) { h += '<label>Art:</label>' + wahl('art', [['aufgaben', 'Aufgaben'], ['abhaken', 'Abhaken']], f.art); }
     if (!vorlage) {
       h += '<label>Zustand:</label>' + wahl('zustand', CK_ZUSTAENDE, f.zustand);
@@ -9603,7 +10229,7 @@ function clsFensterHtml() {
         h += '<div class="wahlreihe"><button type="button"' + (f.stern ? ' class="an"' : '') + ' onclick="clsDetailWahl(\'stern\',\'\')">★ Wesentlich diese Woche</button></div>';
       }
     }
-    h += '<label>Kategorie:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
+    h += '<label>Beruf / Privat:</label><div class="wahlreihe">' + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
         return '<button type="button"' + (f.kontext === k[0] ? ' class="an"' : '') + ' onclick="clsKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
       }).join('') + '</div>';
   } else {
@@ -9722,6 +10348,7 @@ function clsSpeichern() {
   s.titel = titel.slice(0, 200);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { g.kontext = f.kontext; }
   if (ckBereichName(f.bereich)) { g.bereich = f.bereich; } else { delete g.bereich; }
+  if (f.privat) { g.privat = true; } else { delete g.privat; }
   if (!ckIstListe(s)) { if (f.art === 'aufgaben') { g.art = 'aufgaben'; } else { delete g.art; } }
   if (ckZustand(s) !== 'vorlage' && f.zustand !== ckZustand(s)) { ckZustandSetzen(s, f.zustand); }
   if (f.stern && ckZustand(s) === 'lauf') { g.stern = true; } else { delete g.stern; }
@@ -10734,9 +11361,9 @@ function saListeHtml() {
     if (!l.length) { return; }
     h += '<div class="gruppe">' + esc(g) + '</div>';
     l.forEach(function (s) {
-      h += '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
+      h += prZeile(null, s, '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
          + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
-         + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>';
+         + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>');
     });
   });
   if (!alle.length) { h += '<p class="leise">Noch keine Sammlung — „Neu…“ tippen und eine Vorlage wählen.</p>'; }
@@ -12330,7 +12957,7 @@ function saDetailsOeffnen() {
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
   if (!s) { return; }
   var kz = s.kennzahl || {};
-  saFensterAuf({ modus: 'details', name: s.name, kontext: s.kontext || 'privat', gruppe: s.gruppeName || '', symbol: saIkone(s.symbol) ? s.symbol : '',
+  saFensterAuf({ modus: 'details', name: s.name, kontext: s.kontext || 'privat', bereich: s.bereich || '', privat: !!s.privat, gruppe: s.gruppeName || '', symbol: saIkone(s.symbol) ? s.symbol : '',
                  kzArt: kz.art || '', kzFeld: kz.feld || ((s.felder || [])[0] || {}).id || '', kzWert: kz.wert || ((s.werte || [])[0] || {}).id || '',
                  kz2Art: (s.kennzahl2 || {}).art || '', kz2Feld: (s.kennzahl2 || {}).feld || ((s.felder || [])[0] || {}).id || '',
                  kz2Wert: (s.kennzahl2 || {}).wert || ((s.werte || [])[0] || {}).id || '' });
@@ -12345,6 +12972,7 @@ function saDetailsLesen(f) {
     var e = document.getElementById(t[0]);
     if (e && typeof e.value === 'string') { f[t[1]] = e.value; }
   });
+  if (f.modus === 'details') { katPrivatLesen('sa', f); }
   return f;
 }
 
@@ -12632,10 +13260,11 @@ function saFensterHtml() {
       /* Symbol (seit 0.48) */
       + '<label>Symbol:</label><button type="button" class="eingabe sa-symwahl" onclick="saSymbolWahl()"><span class="sa-sym">' + (ik ? saIkoneSvg(f.symbol) : esc(SA_ZEICHEN[s.art] || '≡')) + '</span>'
       + '<span>' + esc(ik ? ik[1] : 'wie die Vorlage') + '</span><span class="sa-symwahl-pf">▶</span></button>'
-      + '<label>Kategorie:</label><div class="wahlreihe">'
+      + '<label>Beruf / Privat:</label><div class="wahlreihe">'
       + [['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (k) {
           return '<button type="button"' + (f.kontext === k[0] ? ' class="an"' : '') + ' onclick="saKontext(\'' + k[0] + '\')">' + k[1] + '</button>';
         }).join('') + '</div>'
+      + katPrivatHtml('sa', f.bereich, f.privat)
       /* Gruppe und Kennzahl in der Liste der Sammlungen (seit 0.8.1) */
       + '<label for="saGruppe">Gruppe in der Liste (leer = ' + esc(saGruppeStandard(s)) + '):</label>'
       + '<input id="saGruppe" class="eingabe" type="text" autocomplete="off" list="saGruppen" value="' + esc(f.gruppe) + '">'
@@ -13084,6 +13713,7 @@ function saDetailsSpeichern() {
   if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
   s.name = name.slice(0, 120);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { s.kontext = f.kontext; }
+  katPrivatSchreiben(s, f);
   var gruppe = String(f.gruppe || '').trim().slice(0, 40);
   if (gruppe && gruppe !== saGruppeStandard(s)) { s.gruppeName = gruppe; } else { delete s.gruppeName; }
   if (saIkone(f.symbol)) { s.symbol = f.symbol; } else { delete s.symbol; }
@@ -13332,7 +13962,7 @@ function rtFensterHtml() {
   }
   h += '<label for="rtZeit">Uhrzeit (frei lassen = ohne):</label><input id="rtZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.uhrzeit) + '">'
      + '<label for="rtAb">Ab:</label><input id="rtAb" class="eingabe" type="date" value="' + esc(f.ab) + '">'
-     + '<label>Kategorie:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
+     + '<label>Beruf / Privat:</label>' + reihe('kontext', [['beruflich', 'Beruf'], ['privat', 'Privat']], f.kontext)
      + '<div class="wahlreihe"><button type="button"' + (f.pausiert ? ' class="an"' : '') + ' onclick="rtWahl(\'pausiert\',\'\')">' + (f.pausiert ? '■' : '▢') + ' pausiert</button></div>'
      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="rtSpeichern()">OK</button>'
      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
@@ -18098,8 +18728,9 @@ function krAnfangen() {
   });
 }
 
-function krBereiche(mitAusgeblendeten) {
-  return krAlle('bereich').filter(function (b) { return mitAusgeblendeten || !b.aus; }).sort(function (a, b) {
+/* mitKategorien (seit 0.66): auch die eigenen Kategorien — Kurs rechnet nur mit den Lebensbereichen */
+function krBereiche(mitAusgeblendeten, mitKategorien) {
+  return krAlle('bereich').filter(function (b) { return (mitAusgeblendeten || !b.aus) && (mitKategorien || !b.nurKategorie); }).sort(function (a, b) {
     return (Number(a.rang) || 99) - (Number(b.rang) || 99) || String(a.name).localeCompare(String(b.name));
   });
 }
@@ -19695,7 +20326,8 @@ function coFaellige(nun, is) {
   if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)).concat(coHandschriftFragen(is)); }
   if (e.quellen.aufgaben) { l = l.concat(coPrioFragen(nun, is, e)); }
   l = l.concat(coKampagneFragen(nun, is, e));
-  return l;
+  /* Privates (seit 0.66) nennt der Coach nur, wenn es gezeigt wird */
+  return prCoachFilter(l);
 }
 
 /* Wann eine Frage zuerst gezeigt wurde — nur auf diesem Gerät, damit
@@ -21416,6 +22048,8 @@ function iwLesen() {
     x.warum = String(iwWert('iwWarum') || '').trim().slice(0, 400);
     var b = iwWert('iwBereich');
     if (b !== null) { x.bereich = b; }
+    var ip = document.getElementById('iwPrivat');
+    if (ip && typeof ip.checked === 'boolean') { if (ip.checked) { x.privat = true; } else { delete x.privat; } }
     iwSpeichern(x);
     return x;
   }
@@ -21640,8 +22274,8 @@ function iwListeHtml() {
       var unter = n ? 'nächster Schritt: ' + n.text + (x.projekt ? ' · Projekt in der Workbench' : '')
         : (x.status === 'spaeter' ? (g[0] === 'reifen' ? 'zurück zum Entscheiden' : 'kommt am ' + kurzDatum(x.wiedervorlage) + ' wieder')
           : 'zuletzt ' + (iwTageSeit(x.zuletzt) === 0 ? 'heute' : 'vor ' + iwTageSeit(x.zuletzt) + ' Tag' + (iwTageSeit(x.zuletzt) === 1 ? '' : 'en')));
-      return '<button type="button" class="iw-idee" onclick="iwOeffnen(\'' + esc(x.id) + '\')"><span class="kr-kh"><span class="iw-titel">' + esc(x.titel) + '</span><b>' + esc(marke) + '</b></span>'
-        + '<small>' + esc(unter) + '</small></button>';
+      return prZeile(null, x, '<button type="button" class="iw-idee" onclick="iwOeffnen(\'' + esc(x.id) + '\')"><span class="kr-kh"><span class="iw-titel">' + esc(x.titel) + '</span><b>' + esc(marke) + '</b></span>'
+        + '<small>' + esc(unter) + '</small></button>');
     }).join('');
   });
   if (!h) { h = '<p>Noch keine Idee.</p><p class="leise">„+ Idee“ — ein Satz genügt. Die Werkstatt führt dich dann Stufe für Stufe von der Idee bis zur Umsetzung.</p>'; }
@@ -21667,8 +22301,9 @@ function iwStufeHtml() {
     return h + '<div class="kr-gross">Deine Idee in einem Satz</div>'
       + feld('iwTitel', 'Idee:', x ? x.titel : '', 'z. B. Mit den Kindern ein Hochbeet bauen')
       + feld('iwWarum', 'Warum gerade jetzt? (optional)', x ? x.warum : '', 'z. B. Im Frühjahr wollen wir eigenes Gemüse ernten', true)
-      + '<label for="iwBereich">Lebensbereich (aus Kurs):</label><select id="iwBereich" class="eingabe"><option value="">—</option>'
-      + krBereiche(false).map(function (b) { return '<option value="' + esc(b.id) + '"' + (x && x.bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + '<label for="iwBereich">Kategorie:</label><select id="iwBereich" class="eingabe"><option value="">—</option>'
+      + ckBereiche().map(function (b) { return '<option value="' + esc(b.id) + '"' + (x && x.bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>'
+      + '<label class="haken"><input id="iwPrivat" type="checkbox"' + (x && x.privat ? ' checked' : '') + '> 🔒 privat</label>'
       + '<p class="leise">Einfangen dauert 30 Sekunden. Weiter geht es, wenn du Zeit hast — die Idee wartet im Speicher.</p>'
       + (x && Array.isArray(x.skizzen) ? x.skizzen.map(hsSkizzeHtml).join('') : '')
       + (x ? nbAnhaengeHtml('idee', x.id) : '');
@@ -22011,7 +22646,7 @@ var SP_PAUSE_MS = 60000;
 
 /* Ordner auf dem Start (seit 0.35, vorher nur „Spiele“) */
 var CL_ORDNER = {
-  planung: { name: 'Planung', apps: ['routinen', 'ideen', 'coach'] },
+  planung: { name: 'Planung', apps: ['routinen', 'ideen', 'coach', 'kategorien'] },
   lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
   spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion'] }
 };
@@ -24248,7 +24883,7 @@ function verbindungPruefen() {
 }
 
 function rueckkehrPruefen() {
-  if (document.hidden) { stoPause(); }
+  if (document.hidden) { stoPause(); prVerlassen(); }
   erneuerungPruefen();
   if (document.hidden) { return; }
   versionPruefen(false);
@@ -24383,6 +25018,7 @@ function clZurueck() {
   if (cl.app === 'memo' && cl.memo.id) { memoZurListe(); return true; }
   if (cl.app === 'projekte' && cl.pj.id) { pjZurListe(); return true; }
   if (cl.app === 'ziele' && cl.zi.id) { ziZurListe(); return true; }
+  if (cl.app === 'kategorien' && cl.kat.id) { katZurListe(); return true; }
   if (cl.app === 'checklisten' && cl.cls.schreiben) { clsSchreibenUm(); return true; }
   if (cl.app === 'checklisten') { clsZurListe(); return true; }
   if (cl.app === 'drive' && cl.drv.tab === 'suche') { drvSucheZu(); return true; }

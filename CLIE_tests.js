@@ -290,7 +290,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 26, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 27, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -1892,9 +1892,9 @@ function ckZustandTest() {
   /* Details: Bereich, Zustand, ★ */
   S.clsDetails();
   let f = S.clsFensterHtml();
-  pruefe(/id="clsBereich"/.test(f) && /<option value="kb-haus" selected>/.test(f) && /clsDetailWahl\('zustand','ruht'\)/.test(f) && /★ Wesentlich/.test(f) && !/clsDetailWahl\('art'/.test(f),
+  pruefe(/id="clsKat"/.test(f) && /<option value="kb-haus" selected>/.test(f) && /clsDetailWahl\('zustand','ruht'\)/.test(f) && /★ Wesentlich/.test(f) && !/clsDetailWahl\('art'/.test(f),
     'Details einer Liste: Bereich, Zustand, ★ — keine Art (Listen sind immer „Aufgaben“)');
-  S.document.getElementById('clsBereich').value = 'kb-freizeit';
+  S.document.getElementById('clsKat').value = 'kb-freizeit';
   S.clsDetailWahl('stern', '');
   S.clsSpeichern();
   pruefe(S.DB.themen[0].bereich === 'kb-freizeit' && S.DB.themen[0].stern === true, 'Bereich und ★ gespeichert');
@@ -2037,6 +2037,232 @@ function coKorbTest() {
   /* Quelle abschaltbar */
   S.krFinden('kc-einstellungen').quellen = { korb: false };
   pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Sammler“ ausgeschaltet: keine Sammler-Fragen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   115. Agenda im Kalender (0.66.0)
+   Grund: Wie die „Agenda View“ im Date Book: Termine und To Dos von
+   heute auf einen Blick, Überfälliges, morgen in einer Zeile.
+   Erkennt: Abschnitt fehlt, ⚑ heute doppelt (wenn auch eingeplant),
+   Überfälliges fehlt, Erledigtes steht drin, Blättern ins Leere.
+   ============================================================ */
+function agendaTest() {
+  console.log('\n115. Agenda im Kalender (0.66.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const altUhr = S.clUhrzeit;
+  S.clUhrzeit = () => '11:10';
+  S.termineNachTag[heute] = [{ id: 'm1', zeit: '12:30', bis: '14:00', titel: 'Mittag bei Eltern', kontext: 'privat' },
+                             { id: 'g1', zeit: '', bis: '', titel: 'Geburtstag Anna', ganztags: true, kontext: 'privat' }];
+  const s = S.kpSeiteAnlegen('liste', 'Haus', 'privat', '');
+  ['P1 ZEO Solar Auftrag', 'Netflix kündigen', 'Steuer sortieren', 'Geplant und Frist'].forEach(x => S.aufZeileAnhaengen(s, x));
+  S.aufPlanAnwenden(s, 0, heute, '');
+  S.aufPlanAnwenden(s, 3, heute, '');
+  S.ckZusatzSetzen(s, 'Netflix kündigen', heute, '');
+  S.ckZusatzSetzen(s, 'Steuer sortieren', S.tagePlus(heute, -2), '');
+  S.ckZusatzSetzen(s, 'Geplant und Frist', heute, '');
+  S.oeffne('kalender');
+  S.clKalAnsicht('agenda');
+  const h = inhalt();
+  pruefe(/Als Nächstes: Mittag bei Eltern · in 1 Std\. 20/.test(h), 'oben: als Nächstes mit Abstand');
+  pruefe(/Termine heute/.test(h) && /Geburtstag Anna/.test(h) && /Mittag bei Eltern/.test(h), 'Termine heute, auch ganztägige');
+  pruefe(/To Do · heute/.test(h) && /ZEO Solar Auftrag/.test(h) && /Netflix kündigen<\/span><span class="frist-marke">⚑ heute/.test(h), 'To Dos: eingeplante und ⚑ heute fällige');
+  pruefe((h.match(/Geplant und Frist/g) || []).length === 1, 'eingeplant und fällig: nur einmal');
+  pruefe(/Überfällig/.test(h) && /Steuer sortieren/.test(h), 'Überfälliges (⚑ vor heute)');
+  pruefe(/Morgen ›/.test(h) && /clKalGehe\('[^']+','tag'\)/.test(h), 'eine Zeile für morgen, antippen öffnet den Tag');
+  pruefe(/^Agenda /.test(S.document.getElementById('reiter').textContent) && /clKalAnsicht\('agenda'\)">A</.test(S.document.getElementById('fuss').innerHTML), 'Reiter „Agenda …“, unten A als erste Ansicht');
+  S.aufHaken(s.id, 1);
+  pruefe(!/Netflix kündigen/.test(inhalt()), 'abgehakt direkt in der Agenda');
+  S.clBlaettern(1);
+  pruefe(S.cl.kal.ansicht === 'tag' && S.clKalDatum() === S.tagePlus(heute, 1), 'Blättern führt in den Tag danach');
+  S.clUhrzeit = altUhr;
+  S.clKalAnsicht('tag'); S.clKalGehe(heute, 'tag');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   116. Notiz an einer Aufgabe (0.66.0)
+   Grund: Wie die „Note“ im Palm To Do: Hintergrund zu einer Aufgabe.
+   Erkennt: Notiz geht beim Speichern/Umbenennen/Verschieben verloren,
+   ⚑ Frist wird überschrieben, ▤ fehlt, Suche findet sie nicht, beim
+   Löschen bleibt sie hängen.
+   ============================================================ */
+function aufgabenNotizTest() {
+  console.log('\n116. Notiz an einer Aufgabe (0.66.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const s = S.kpSeiteAnlegen('liste', 'Haus', 'privat', '');
+  S.aufZeileAnhaengen(s, 'ZEO Solar Auftrag');
+  S.ckZusatzSetzen(s, 'ZEO Solar Auftrag', '2026-12-01', '');
+  S.oeffne('aufgaben');
+  S.aufDetails(s.id, 0);
+  pruefe(/id="aufNotiz"/.test(S.document.getElementById('aufklapp').innerHTML), 'Details: Feld „Notiz“');
+  S.document.getElementById('aufText').value = 'ZEO Solar Auftrag';
+  S.document.getElementById('aufFrist').value = '2026-12-01';
+  S.document.getElementById('aufNotiz').value = 'Angebot vom 12.10.\nNotstrom ja/nein?';
+  S.aufSpeichern();
+  let z = S.ckZusatz(s, 'ZEO Solar Auftrag');
+  pruefe(z.notiz === 'Angebot vom 12.10.\nNotstrom ja/nein?' && z.frist === '2026-12-01', 'Notiz gespeichert, ⚑ Frist bleibt');
+  S.ckZusatzSetzen(s, 'ZEO Solar Auftrag', '2026-12-05', '');
+  pruefe(S.ckZusatz(s, 'ZEO Solar Auftrag').notiz === 'Angebot vom 12.10.\nNotstrom ja/nein?', 'Frist ändern (ohne Notiz-Angabe): Notiz bleibt');
+  pruefe(/class="notiz-marke" onclick="aufDetails\('/.test(S.ckListeHtml(s)), 'in der Liste: ▤ zum Antippen');
+  S.oeffne('suchen');
+  pruefe(S.suTreffer('notstrom').some(x => x.gruppe === 'aufgaben' && /▤ Angebot/.test(x.unter)), 'die Suche findet Text in der Notiz');
+  /* Umbenennen: Notiz zieht mit */
+  S.oeffne('aufgaben');
+  S.aufDetails(s.id, 0);
+  S.document.getElementById('aufText').value = 'ZEO Auftrag schreiben';
+  S.document.getElementById('aufFrist').value = '';
+  S.document.getElementById('aufNotiz').value = 'Angebot vom 12.10.\nNotstrom ja/nein?';
+  S.aufSpeichern();
+  pruefe(S.ckZusatz(s, 'ZEO Auftrag schreiben').notiz && !S.ckZusatz(s, 'ZEO Solar Auftrag').notiz, 'umbenannt: Notiz zieht mit');
+  S.ckZusatzSetzen(s, 'ZEO Auftrag schreiben', '', '', '');
+  pruefe(!S.ckZusatz(s, 'ZEO Auftrag schreiben').notiz && !s.__satz.zusatz, 'leer: nichts bleibt übrig');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   117. Kategorien quer durch alles, mit Gesamtsicht (0.66.0)
+   Grund: Eine frei definierbare Kategorienliste für To Dos, Notizen,
+   Projekte, Ziele, Ideen, Sammlungen und Blätter — und eine Sicht auf
+   alles, was zu einer Kategorie gehört.
+   Erkennt: neue Kategorie landet im Kurs-Rad, Zuordnung geht beim
+   Speichern verloren, Gesamtsicht unvollständig, Löschen lässt
+   Zuordnungen stehen, Lebensbereich lässt sich löschen.
+   ============================================================ */
+function kategorienTest() {
+  console.log('\n117. Kategorien quer durch alles, mit Gesamtsicht (0.66.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.cl.auf.bereich = '';
+  const k = S.katNeuAnlegen('PV-Anlage');
+  pruefe(k && k.nurKategorie && S.ckBereichName(k.id) === 'PV-Anlage' && !S.krBereiche(false).some(b => b.id === k.id) && S.krBereiche(false).length === 7,
+    'neue Kategorie: wählbar überall, aber nicht im Kurs-Rad (7 Lebensbereiche bleiben)');
+  pruefe(S.katNeuAnlegen('pv-anlage').id === k.id, 'gleicher Name: keine zweite');
+  /* Zuordnen: Liste, Notiz, Projekt, Ziel, Sammlung, Blatt, Idee */
+  const li = S.kpSeiteAnlegen('liste', 'Zählerschrank', 'privat', ''); S.aufZeileAnhaengen(li, 'Foto machen');
+  S.oeffne('checklisten'); S.clsOeffnen(li.id); S.clsDetails();
+  pruefe(/id="clsKat"/.test(S.clsFensterHtml()) && /🔒 privat/.test(S.clsFensterHtml()), 'Details einer Liste: Kategorie ▼ und 🔒 privat');
+  S.document.getElementById('clsTitel').value = 'Zählerschrank';
+  S.document.getElementById('clsKat').value = k.id; S.clsSpeichern();
+  pruefe(li.__satz.bereich === k.id, 'Liste zugeordnet');
+  const no = S.kpSeiteAnlegen('notiz', 'Angebote Vergleich', 'privat', '');
+  S.oeffne('memo'); S.memoOeffnen(no.id); S.memoDetails();
+  pruefe(/id="memoKat"/.test(S.memoFensterHtml()) && /Beruf \/ Privat:/.test(S.memoFensterHtml()), 'Details einer Notiz: Kategorie ▼ (Beruf/Privat heißt jetzt so)');
+  S.document.getElementById('memoTitel').value = 'Angebote Vergleich';
+  S.document.getElementById('memoKat').value = k.id; S.memoSpeichern();
+  pruefe(no.__satz.bereich === k.id, 'Notiz zugeordnet');
+  const pj = S.kpSeiteAnlegen('vorhaben', 'PV-Anlage Haus', 'privat', '');
+  S.oeffne('projekte'); S.pjOeffnen(pj.id, 'allgemein');
+  pruefe(/id="pjKat"[^>]*onchange="pjFeld\('kategorie'\)"/.test(inhalt()), 'Projekt „Allgemein“: Kategorie wirkt sofort');
+  S.document.getElementById('pjKat').value = k.id; S.pjFeld('kategorie');
+  pruefe(pj.__satz.bereich === k.id, 'Projekt zugeordnet');
+  const sa = S.saAusVorlage(S.SA_VORLAGEN.frei, 'PV-Angebote', false, []);
+  S.oeffne('sammlungen'); S.saOeffnen(sa.id); S.saDetailsOeffnen();
+  S.document.getElementById('saName').value = 'PV-Angebote';
+  S.document.getElementById('saKat').value = k.id; S.saDetailsSpeichern();
+  pruefe(sa.bereich === k.id, 'Sammlung zugeordnet');
+  S.oeffne('memo'); S.memoArtSetzen('notizblock'); S.nbNeu();
+  const b = S.nbFinden(S.cl.nb.id); b.striche = ['1 1,1,5 9,9,5'];
+  S.nbDetails(); S.document.getElementById('nbTitel').value = 'Dachskizze'; S.document.getElementById('nbKat').value = k.id; S.nbSpeichern();
+  pruefe(b.bereich === k.id, 'Blatt zugeordnet');
+  S.memoArtSetzen('');
+  S.iwSpeichern({ id: 'iw-pv', titel: 'Speicher nachrüsten', stufe: 1, status: 'aktiv', bereich: k.id, varianten: [], meilensteine: [], schritte: [], wochen: [] });
+  /* Gesamtsicht */
+  S.oeffne('kategorien');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0 && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App im Ordner Planung: „PV-Anlage · 7“');
+  S.katOeffnen(k.id);
+  const g = inhalt();
+  pruefe(/To Do · offen/.test(g) && /Foto machen/.test(g) && /Listen/.test(g) && /Zählerschrank/.test(g) && /Projekte · Ziele/.test(g) && /PV-Anlage Haus/.test(g)
+    && /Notizen/.test(g) && /Angebote Vergleich/.test(g) && /Dachskizze/.test(g) && /Speicher nachrüsten/.test(g) && /PV-Angebote/.test(g), 'Gesamtsicht: To Dos, Listen, Projekte, Notizen, Blätter, Ideen, Sammlungen');
+  pruefe(S.document.getElementById('reiter').textContent === 'PV-Anlage', 'Reiter: Name der Kategorie');
+  S.katNeuIn(); S.document.getElementById('katNeuName').value = 'Fragen an ZEO'; S.katNeuAnlegenIn('notiz');
+  const neu = S.kpSeitenAlle().filter(x => x.titel === 'Fragen an ZEO')[0];
+  pruefe(neu && neu.__satz.bereich === k.id && S.cl.app === 'memo', 'Neu… in der Gesamtsicht: mit dieser Kategorie');
+  /* Reihenfolge, Umbenennen, Löschen */
+  S.oeffne('kategorien'); S.katSchieben(k.id, -1);
+  pruefe(S.ckBereiche()[S.ckBereiche().length - 2].id === k.id, 'verschieben ▲');
+  S.katDetails('kb-haus');
+  pruefe(!/katLoeschenFragen/.test(S.katFensterHtml()), 'Lebensbereich aus Kurs: kein Löschen');
+  S.aufklappZu();
+  S.katDetails(k.id); S.document.getElementById('katName').value = 'Photovoltaik'; S.katSpeichern();
+  pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
+  S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
+  pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   118. Private Einträge (0.66.0)
+   Grund: Wie „Security“ am Palm: Privates maskieren oder verbergen,
+   zeigen nur mit PIN.
+   Erkennt: Privates sichtbar trotz Maske (Liste, To Do, Suche, Agenda,
+   Coach, geöffnete Seite), falsche PIN zeigt es, vorübergehende Freigabe
+   bleibt nach dem Verlassen bestehen.
+   ============================================================ */
+function privatTest() {
+  console.log('\n118. Private Einträge (0.66.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
+  const n1 = S.kpSeiteAnlegen('notiz', 'Tagebuch', 'privat', ''); n1.__satz.privat = true;
+  const n2 = S.kpSeiteAnlegen('notiz', 'Einkauf', 'privat', '');
+  const li = S.kpSeiteAnlegen('liste', 'Haus', 'privat', '');
+  S.aufZeileAnhaengen(li, 'Geschenk Anna kaufen'); S.aufZeileAnhaengen(li, 'Dachrinne');
+  S.ckZusatzPrivat(li, 'Geschenk Anna kaufen', true);
+  S.aufPlanAnwenden(li, 0, heute, '');
+  pruefe(S.prModus() === 'zeigen' && !S.prPrivatVerborgen(n1, null), 'Vorgabe: zeigen');
+  S.oeffne('memo');
+  S.menueUm();
+  pruefe(/prModusSetzen\('maskieren'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: Private Einträge zeigen | maskieren | verbergen');
+  S.prModusSetzen('maskieren');
+  let h = inhalt();
+  pruefe(/— privat — 🔒/.test(h) && !/Tagebuch/.test(h) && /Einkauf/.test(h), 'maskiert: „— privat —“ statt des Titels');
+  S.memoOeffnen(n1.id);
+  pruefe(/Dieser Eintrag ist privat/.test(inhalt()) && !/Tagebuch/.test(S.memoSeiteHtml(n1)), 'geöffnet: nur die Maske');
+  S.memoZurListe();
+  S.oeffne('aufgaben');
+  h = inhalt();
+  pruefe(/— 1 private — 🔒/.test(h) && !/Geschenk Anna/.test(h) && /Dachrinne/.test(h), 'To Do: private Aufgabe maskiert gezählt');
+  S.oeffne('suchen');
+  pruefe(!S.suTreffer('tagebuch').length && !S.suTreffer('geschenk').length && S.suTreffer('einkauf').length, 'Suche findet Privates nicht');
+  pruefe(!S.clTagZeilen(heute).some(z => /Geschenk/.test(z.roh)), 'Kalender und Agenda: private eingeplante Aufgabe fehlt');
+  pruefe(S.prCoachFilter([{ text: '„Geschenk Anna kaufen“ wartet.' }, { text: 'Dachrinne?' }]).length === 1, 'Coach nennt Privates nicht');
+  S.prModusSetzen('verbergen');
+  S.oeffne('memo');
+  pruefe(!/privat/.test(inhalt()) && /Einkauf/.test(inhalt()), 'verborgen: gar nicht zu sehen');
+  /* PIN */
+  S.prPinFestlegen(); S.document.getElementById('prPin').value = '4711'; S.prPinSpeichern();
+  pruefe(S.prPinDa() && S.localStorage.getItem('clie-pin') !== '4711', 'PIN festgelegt (nicht im Klartext)');
+  S.prModusSetzen('zeigen');
+  pruefe(S.cl.aufklapp === 'privat' && S.prModus() === 'verbergen', 'zeigen fragt nach der PIN');
+  S.document.getElementById('prPin').value = '1234'; S.prPinPruefen();
+  pruefe(S.prModus() === 'verbergen' && /stimmt nicht/.test(S.document.getElementById('toastText').textContent), 'falsche PIN: bleibt verborgen');
+  S.document.getElementById('prPin').value = '4711'; S.prPinPruefen();
+  pruefe(S.prModus() === 'zeigen' && /Tagebuch/.test(inhalt()), 'richtige PIN: gezeigt');
+  /* Vorübergehend freigeben (Antippen der Maske) — beim Verlassen wieder wie vorher */
+  S.prModusSetzen('maskieren');
+  S.prFreigeben(); S.document.getElementById('prPin').value = '4711'; S.prPinPruefen();
+  pruefe(S.prModus() === 'zeigen', 'Maske antippen + PIN: gezeigt');
+  S.prVerlassen();
+  pruefe(S.prModus() === 'maskieren', 'beim Verlassen von CLIE: wieder maskiert');
+  /* privat setzen in den Details */
+  S.oeffne('aufgaben'); S.prModusSetzen('zeigen');
+  S.document.getElementById('prPin').value = '4711'; S.prPinPruefen();
+  S.aufDetails(li.id, 1);
+  S.document.getElementById('aufText').value = 'Dachrinne';
+  S.document.getElementById('aufPrivat').checked = true;
+  S.aufSpeichern();
+  pruefe(S.ckZusatz(li, 'Dachrinne').privat === true, 'Aufgaben-Details: 🔒 privat');
+  S.document.getElementById('aufPrivat').checked = false;
+  S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
   S.oeffne('uebersicht');
 }
 
@@ -7136,6 +7362,10 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { privatTest(); } catch (e) { fail('Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { kategorienTest(); } catch (e) { fail('Kategorien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { aufgabenNotizTest(); } catch (e) { fail('Aufgaben-Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { agendaTest(); } catch (e) { fail('Agenda warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { notizblockTest(); } catch (e) { fail('Notizblock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { handschriftTest(); } catch (e) { fail('Handschrift warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ohneHeuteTest(); } catch (e) { fail('Ohne Heute warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
