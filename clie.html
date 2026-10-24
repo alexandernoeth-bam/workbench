@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.64.0</title>
+<title>CLIE 0.65.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -301,6 +301,15 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 
 /* Memo (seit 0.3) */
 .gruppe{font-size:17.5px;font-weight:600;border-bottom:2px solid var(--px);margin:12px 0 2px}
+.nb-leiste{display:flex;gap:4px;align-items:center;padding:6px 0;border-bottom:2px solid var(--px);margin:0 0 6px}
+.nb-leiste button{border:2px solid var(--px);border-radius:4px;padding:2px 8px;font:inherit;font-size:17.5px;background:transparent;color:inherit}
+.nb-leiste button.an{background:var(--px);color:var(--lcd)}
+.nb-leiste button[disabled]{opacity:.4}
+.nb-leiste .luecke{flex:1}
+.nb-blatt{border:2px solid var(--px);background:var(--lcd-hell);line-height:0}
+.nb-blatt canvas{display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.nb-hinweis{font-size:15.5px;margin:4px 0}
+span.hs-thumb{display:block}
 .hs-zeile{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0}
 .hs-zeile .tx{flex:1;min-width:0}
 .hs-zeile .tx b{display:block;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -969,7 +978,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.64.0';
+var APP_VERSION = '0.65.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4061,7 +4070,10 @@ function inhaltZeichnen() {
     /* Ein angefangener Punkt beim Herausschreiben bleibt stehen (seit 0.64) */
     var hp = document.getElementById('hsPunkt');
     if (hp && document.activeElement === hp && String(hp.value || '').trim() && el.innerHTML.indexOf('hsPunkt') >= 0) { return; }
+    /* Während des Schreibens im Notizblock nicht neu zeichnen (seit 0.65) */
+    if (cl.nb.strich && el.innerHTML.indexOf('nbFlaeche') >= 0) { return; }
     el.innerHTML = memoHtml();
+    nbAnbinden();
   }
   else if (cl.app === 'projekte') {
     /* Beim Tippen in Name oder Datum nicht neu zeichnen (seit 0.43) */
@@ -4095,6 +4107,7 @@ function kopfZeichnen() {
       : (cl.app === 'sammlungen') ? saReiter()
       : (cl.app === 'statistik') ? 'Statistik'
       : (cl.app === 'suchen') ? 'Suchen'
+      : (cl.app === 'memo' && cl.memo.art === 'notizblock' && nbFinden(cl.nb.id)) ? '✎ ' + nbTitel(nbFinden(cl.nb.id))
       : (cl.app === 'memo' && cl.memo.art && cl.hs.offen) ? '✎ ' + hsName(hsDatei(cl.hs.offen))
       : (cl.app === 'memo' && cl.memo.art) ? 'Notizen'
       : memoSeite ? clSeitenZeichen(memoSeite) + ' ' + memoSeite.titel
@@ -4171,6 +4184,9 @@ function aufklappZeichnen() {
     el.innerHTML = memoWahlHtml();
   } else if (cl.aufklapp === 'handschrift') {
     el.innerHTML = hsFensterHtml();
+  } else if (cl.aufklapp === 'notizblock') {
+    if (el.innerHTML.indexOf('nbTitel') >= 0) { return; }
+    el.innerHTML = nbFensterHtml();
   } else if (cl.aufklapp === 'checkliste') {
     if (el.innerHTML.indexOf('clsTitel') >= 0) { return; }
     el.innerHTML = clsFensterHtml();
@@ -4318,7 +4334,7 @@ function oeffne(id) {
   /* Gerade Abgehaktes verschwindet beim Verlassen der Aufgaben */
   cl.auf.frisch = {};
   cl.auf.wahl = '';
-  if (id === 'memo' && cl.app !== 'memo') { cl.hs.offen = ''; cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; cl.memo.ausProjekt = ''; cl.memo.ausZiel = ''; }
+  if (id === 'memo' && cl.app !== 'memo') { cl.hs.offen = ''; cl.nb.id = ''; cl.memo.id = ''; cl.memo.schreiben = false; cl.memo.hervor = ''; cl.memo.ausListe = ''; cl.memo.ausProjekt = ''; cl.memo.ausZiel = ''; }
   if (id === 'ziele' && cl.app !== 'ziele') { cl.zi.id = ''; }
   if (id === 'projekte' && cl.app !== 'projekte') { cl.pj.id = ''; cl.pj.hervor = ''; }
   if (id === 'checklisten' && cl.app !== 'checklisten') { cl.cls.id = ''; cl.cls.schreiben = false; cl.cls.sicht = ''; }
@@ -6835,7 +6851,7 @@ function memoSeiteHtml(s, ohneAufgaben, ohneKopf) {
       + '<textarea id="memoFeld" class="memo-feld" spellcheck="true" oninput="memoTextGetippt()" onkeydown="memoTaste(event)">' + esc(s.text) + '</textarea>';
   }
   var zeilen = String(s.text || '').split('\n');
-  if (!zeilen.join('').trim()) { return h + '<p class="leise">Noch leer — „Schreiben“ tippen.</p>'; }
+  if (!zeilen.join('').trim()) { return h + (nbAnhaengeHtml('seite', s.id) || '<p class="leise">Noch leer — „Schreiben“ tippen.</p>'); }
   var tabelle = [];
   var tabelleAus = function () {
     if (!tabelle.length) { return; }
@@ -6869,10 +6885,12 @@ function memoSeiteHtml(s, ohneAufgaben, ohneKopf) {
     h += z.trim() ? '<div class="memo-text">' + kpAuszeichnen(z) + '</div>' : '<div class="memo-leer"></div>';
   });
   tabelleAus();
-  if (ohneAufgaben && !h.replace(/<div class="memo-leer"><\/div>/g, '')) {
+  /* Abgelegte Notizblätter (seit 0.65) */
+  var blaetter = nbAnhaengeHtml('seite', s.id);
+  if (ohneAufgaben && !h.replace(/<div class="memo-leer"><\/div>/g, '') && !blaetter) {
     return '<p class="leise">Kein Text — nur Aufgaben (Reiter „Aufgaben“). „Schreiben“ tippen.</p>';
   }
-  return h;
+  return h + blaetter;
 }
 
 /* Eine Tabelle aus |-Zeilen; die Trennzeile |---|---| fällt weg */
@@ -6910,12 +6928,19 @@ function clPlanMarke(s, a) {
 
 function memoHtml() {
   /* Handschrift (seit 0.64) */
+  if (cl.memo.art === 'notizblock') { return cl.nb.id ? nbEditorHtml() : nbListeHtml(); }
   if (cl.memo.art) { return cl.hs.offen ? hsAnsichtHtml() : hsListeHtml(); }
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
   return s ? memoSeiteHtml(s) : memoListeHtml();
 }
 
 function memoFussHtml() {
+  if (cl.memo.art === 'notizblock') {
+    if (!cl.nb.id) { return '<button type="button" class="knopf voll" onclick="nbNeu()">Neu</button>'; }
+    return '<button type="button" class="knopf" onclick="nbZurListe()">Fertig</button>'
+      + '<button type="button" class="knopf voll" onclick="hsAblegenFragen()">Ablegen…</button>'
+      + '<button type="button" class="knopf" onclick="nbDetails()">Details…</button>';
+  }
   if (cl.memo.art && cl.hs.offen) {
     return '<button type="button" class="knopf" onclick="hsZurListe()">Fertig</button>'
       + '<button type="button" class="knopf voll" onclick="hsAblegenFragen()">Ablegen…</button>'
@@ -7830,19 +7855,20 @@ function hsOrdner() {
 function memoArtLaden() {
   var a = '';
   try { a = window.localStorage.getItem(HS_ART_KEY) || ''; } catch (e) { a = ''; }
-  cl.memo.art = (a === 'handschrift' || a === 'alle') ? a : '';
+  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
 }
 
 /* ▼ in Notizen: Notizen | Handschrift | Alle Handschriften */
 function memoArtSetzen(a) {
-  cl.memo.art = (a === 'handschrift' || a === 'alle') ? a : '';
+  if (cl.nb.id) { nbZurListe(); }
+  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
   try { window.localStorage.setItem(HS_ART_KEY, cl.memo.art); } catch (e) { /* nur für jetzt */ }
   cl.memo.id = '';
   cl.memo.schreiben = false;
   cl.hs.offen = '';
   cl.aufklapp = '';
   zeichne();
-  if (cl.memo.art && !cl.hs.liste.length) { hsHolen(false); }
+  if ((cl.memo.art === 'handschrift' || cl.memo.art === 'alle') && !cl.hs.liste.length) { hsHolen(false); }
 }
 
 function memoWahlHtml() {
@@ -7856,6 +7882,7 @@ function memoWahlHtml() {
         return '<button type="button"' + (k[0] === cl.filter ? ' class="an"' : '') + ' onclick="aufFilter(\'' + k[0] + '\')">' + k[1] + '</button>';
       }).join('') + '</div>'
     + knopf('', 'Notizen', memoNotizen().length)
+    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length)
     + knopf('handschrift', 'Handschrift', hsOrdner() ? (neu ? neu + ' neu' : '0') : '')
     + '<div class="trenn"></div>'
     + knopf('alle', 'Alle Handschriften', hsOrdner() ? cl.hs.liste.length : '') + '</div>';
@@ -7864,6 +7891,7 @@ function memoWahlHtml() {
 function memoKopfText() {
   if (cl.memo.art === 'handschrift') { return 'Handschrift'; }
   if (cl.memo.art === 'alle') { return 'Alle Handschriften'; }
+  if (cl.memo.art === 'notizblock') { return 'Notizblock'; }
   return katName(cl.filter);
 }
 
@@ -8095,14 +8123,20 @@ function hsAnsichtHtml() {
   }
   var wo = hsKarte()[id];
   if (wo) { h += '<p class="leise">Abgelegt: ' + esc(wo.zeichen + ' ' + (wo.titel || 'ohne Zuordnung')) + '</p>'; }
+  h += hsSammelnHtml();
+  return h + (f ? '' : '<p class="leise">Die Datei ist nicht mehr im Ordner.</p>');
+}
+
+/* Punkte herausschreiben — in Handschrift und Notizblock (seit 0.65 gemeinsam) */
+function hsSammelnHtml() {
+  var h = '';
   if (cl.hs.gesammelt.length) {
     h += '<div class="hs-gesammelt">Gesammelt: ' + cl.hs.gesammelt.map(function (p, i) {
       return '<button type="button" onclick="hsPunktWeg(' + i + ')">„' + esc(p) + '“ ✕</button>';
     }).join(' ') + '</div>';
   }
-  h += '<div class="hs-tippen"><input id="hsPunkt" class="eingabe" type="text" autocomplete="off" placeholder="→ Punkt herausschreiben …" onkeydown="hsPunktTaste(event)">'
+  return h + '<div class="hs-tippen"><input id="hsPunkt" class="eingabe" type="text" autocomplete="off" placeholder="→ Punkt herausschreiben …" onkeydown="hsPunktTaste(event)">'
     + '<button type="button" class="knopf voll" onclick="hsPunktDazu()" aria-label="Punkt sammeln">+</button></div>';
-  return h + (f ? '' : '<p class="leise">Die Datei ist nicht mehr im Ordner.</p>');
 }
 
 function hsInDrive() {
@@ -8159,7 +8193,7 @@ function hsZiele() {
 }
 
 function hsAblegenFragen() {
-  if (!cl.hs.offen) { return; }
+  if (!cl.hs.offen && !(cl.memo.art === 'notizblock' && nbFinden(cl.nb.id))) { return; }
   var el = document.getElementById('hsPunkt');
   if (el && typeof el.value === 'string' && el.value.trim()) { hsPunktDazu(); }
   cl.hs.fenster = { modus: 'wahl' };
@@ -8195,18 +8229,23 @@ function hsFensterSchritt(m) {
 }
 
 /* Legt die geöffnete Datei ab; die gesammelten Punkte gehen mit */
+/* Ein Notizblatt (seit 0.65) wird nicht in den Text geschrieben — es merkt
+   sich selbst, wo es liegt (bei), damit die Workbench-Seiten sauber bleiben. */
 function hsAblegen(wie, zielId) {
-  var id = cl.hs.offen;
-  var f = hsDatei(id);
+  var blatt = (cl.memo.art === 'notizblock') ? nbFinden(cl.nb.id) : null;
+  var id = blatt ? blatt.id : cl.hs.offen;
+  var f = blatt ? null : hsDatei(id);
   if (!id) { aufklappZu(); return; }
-  var name = hsName(f);
+  var name = blatt ? nbTitel(blatt) : hsName(f);
   var punkteZiel = null;
   var wohin = '';
   if (wie === 'seite') {
     var s = kpSeiteFinden(zielId);
     if (!s) { aufklappZu(); return; }
     var t = String(s.text || '');
-    if (t.indexOf('!skizze:' + id) < 0) {
+    if (blatt) {
+      blatt.bei = { seite: s.id };
+    } else if (t.indexOf('!skizze:' + id) < 0) {
       s.text = (t && !/\n$/.test(t) ? t + '\n' : t) + '!skizze:' + id;
       s.geaendert = jetzt();
     }
@@ -8214,13 +8253,16 @@ function hsAblegen(wie, zielId) {
     wohin = '„' + s.titel + '“';
   } else if (wie === 'idee') {
     var x = { id: 'iw-' + neueKennung(), titel: name, warum: '', stufe: 1, status: 'aktiv', angelegt: isoDatum(),
-              varianten: [], meilensteine: [], schritte: [], wochen: [], skizzen: [id] };
+              varianten: [], meilensteine: [], schritte: [], wochen: [] };
+    if (blatt) { blatt.bei = { idee: x.id }; } else { x.skizzen = [id]; }
     iwSpeichern(x);
     wohin = 'die Ideenwerkstatt';
+  } else if (blatt) {
+    blatt.bei = { nur: isoDatum() };
   } else {
     krSpeichern({ id: 'hs-' + id, typ: 'handschrift', datei: id, name: name, abgelegt: isoDatum() });
-    wohin = '';
   }
+  if (blatt) { krSpeichern(blatt); }
   var n = cl.hs.gesammelt.length;
   if (n) {
     if (!punkteZiel) { punkteZiel = ckKorb(true); }
@@ -8232,7 +8274,7 @@ function hsAblegen(wie, zielId) {
   cl.hs.fenster = null;
   cl.hs.gesammelt = [];
   aufklappZuStill();
-  hsZurListe();
+  if (blatt) { nbZurListe(); } else { hsZurListe(); }
 }
 
 /* ---- Eine Zeile „!skizze:<ID>“ auf einer Seite ---- */
@@ -8251,6 +8293,428 @@ function coHandschriftFragen(is) {
   if (e.length < 5 || alt < 7 || coRuhig(id, is)) { return []; }
   return [coQ(id, e.length + ' Handschriften im Eingang, die älteste seit ' + alt + ' Tagen. 10 Minuten verarbeiten?',
     [['jetzt', 'Ansehen'], ['spaeter', 'Später']], { handschrift: true }, '✎ Handschrift', 4)];
+}
+
+/* ---------- Notizblock (seit 0.65) ----------
+   Wie der Note Pad am Palm: ein Blatt zum Schreiben und Skizzieren — am
+   iPad mit dem Apple Pencil (Druck steuert die Stärke, die Hand stört
+   nicht), am Pixel mit dem Finger (✋ schaltet aufs Verschieben).
+   Gespeichert als Linien in DB.kurs (typ „notizblock“): je Strich ein Text
+   „s x,y,p x,y,p …“ — s = Stärke (1 fein, 2 kräftig), x 0–1000, y 0–1414,
+   p = Druck 1–9. Abgelegt wird wie die Handschrift aus Drive; das Blatt
+   merkt sich in „bei“, wo es liegt. */
+
+var NB_B = 1000;
+var NB_H = 1414;
+var NB_STAERKE = { 1: 3.4, 2: 7 };
+
+cl.nb = { id: '', werkzeug: 1, schieben: false, stift: false, strich: null, rueck: [], vorschau: {} };
+
+function nbAlle() {
+  return krAlle('notizblock').slice().sort(function (a, b) { return String(b.angelegt || '') < String(a.angelegt || '') ? -1 : 1; });
+}
+
+function nbFinden(id) {
+  var x = id ? krFinden(id) : null;
+  return (x && x.typ === 'notizblock') ? x : null;
+}
+
+function nbTitel(b) {
+  if (b && String(b.titel || '').trim()) { return String(b.titel).trim(); }
+  var a = String((b && b.angelegt) || '');
+  return 'Notiz ' + (/^\d{4}-\d{2}-\d{2}/.test(a) ? clKurzDatum(a.slice(0, 10)) + ' ' + a.slice(11, 16) : '');
+}
+
+function nbGeraet() {
+  var ua = String((window.navigator && window.navigator.userAgent) || '');
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && window.navigator && window.navigator.maxTouchPoints > 1)) { return 'iPad'; }
+  if (/Pixel/.test(ua)) { return 'Pixel'; }
+  if (/Android/.test(ua)) { return 'Android'; }
+  return '';
+}
+
+/* Wo liegt ein Blatt? → { zeichen, titel } oder null (= neu) */
+function nbWo(b) {
+  var bei = b && b.bei;
+  if (!bei) { return null; }
+  if (bei.seite) {
+    var s = kpSeiteFinden(bei.seite);
+    if (!s) { return { zeichen: '—', titel: 'abgelegt' }; }
+    return { zeichen: s.art === 'vorhaben' ? (s.typ === 'ziel' ? '◇' : '◎') : (s.art === 'liste' ? '☑' : '▤'), titel: s.titel };
+  }
+  if (bei.idee) { var x = iwFinden(bei.idee); return { zeichen: '💡', titel: x ? x.titel : 'Idee' }; }
+  return { zeichen: '—', titel: 'abgelegt' };
+}
+
+function nbNeuZahl() {
+  return nbAlle().filter(function (b) { return !b.bei; }).length;
+}
+
+/* ---- Striche lesen und schreiben ---- */
+
+function nbStrichLesen(text) {
+  var teile = String(text || '').split(' ');
+  var s = Number(teile[0]) === 2 ? 2 : 1;
+  var punkte = teile.slice(1).map(function (t) {
+    var z = t.split(',');
+    return { x: Number(z[0]) || 0, y: Number(z[1]) || 0, p: Math.max(1, Math.min(9, Number(z[2]) || 5)) };
+  });
+  return { s: s, punkte: punkte };
+}
+
+function nbStrichText(st) {
+  return st.s + ' ' + st.punkte.map(function (q) { return Math.round(q.x) + ',' + Math.round(q.y) + ',' + q.p; }).join(' ');
+}
+
+/* ---- Malen ---- */
+
+function nbMalen(ctx, b, breite, nurStrich) {
+  var f = breite / NB_B;
+  var striche = nurStrich ? [nurStrich] : (b.striche || []).map(nbStrichLesen);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#1C2116';
+  striche.forEach(function (st) {
+    var l = st.punkte;
+    if (!l.length) { return; }
+    var basis = (NB_STAERKE[st.s] || 2.2) * f;
+    if (l.length === 1) {
+      ctx.beginPath();
+      ctx.fillStyle = '#1C2116';
+      ctx.arc(l[0].x * f, l[0].y * f, basis * (0.5 + l[0].p / 9) / 2, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    /* Ein Pfad, solange die Stärke gleich bleibt — sonst wirken Linien gestrichelt */
+    var i;
+    var breiteJetzt = -1;
+    for (i = 1; i < l.length; i++) {
+      var a = l[i - 1];
+      var c = l[i];
+      var w = Math.max(0.8, Math.round(basis * (0.5 + (a.p + c.p) / 18) * 4) / 4);
+      if (w !== breiteJetzt) {
+        if (breiteJetzt >= 0) { ctx.stroke(); }
+        ctx.beginPath();
+        ctx.lineWidth = w;
+        ctx.moveTo(a.x * f, a.y * f);
+        breiteJetzt = w;
+      }
+      ctx.lineTo(c.x * f, c.y * f);
+    }
+    ctx.stroke();
+  });
+}
+
+/* Kleine Vorschau für Listen und Anhänge — im Speicher gemerkt */
+function nbVorschau(b) {
+  var k = b.id + '|' + (b.geaendert || 0);
+  if (cl.nb.vorschau[k] !== undefined) { return cl.nb.vorschau[k]; }
+  var c = document.createElement('canvas');
+  if (!c || typeof c.getContext !== 'function') { cl.nb.vorschau[k] = ''; return ''; }
+  c.width = 92;
+  c.height = Math.round(92 * NB_H / NB_B);
+  var ctx = c.getContext('2d');
+  if (!ctx) { cl.nb.vorschau[k] = ''; return ''; }
+  ctx.fillStyle = '#C9D3B7';
+  ctx.fillRect(0, 0, c.width, c.height);
+  nbMalen(ctx, b, c.width, null);
+  cl.nb.vorschau[k] = c.toDataURL('image/png');
+  return cl.nb.vorschau[k];
+}
+
+/* ---- Liste ---- */
+
+function nbZeileHtml(b) {
+  var wo = nbWo(b);
+  var a = String(b.angelegt || '');
+  var tag = a.slice(0, 10);
+  var info = (tag === isoDatum() ? 'heute ' + a.slice(11, 16) : (/^\d{4}/.test(tag) ? clWt(tag) + ' ' + clKurzDatum(tag) : ''))
+    + (b.geraet ? ' · ' + b.geraet : '') + (wo ? ' · → ' + wo.zeichen + ' ' + wo.titel : '');
+  var v = nbVorschau(b);
+  return '<button type="button" class="hs-zeile" onclick="nbOeffnen(\'' + esc(b.id) + '\')">'
+    + (v ? '<img class="hs-thumb" src="' + esc(v) + '" alt="">' : '<span class="hs-thumb"></span>')
+    + '<span class="tx"><b>' + esc(nbTitel(b)) + '</b><small>' + esc(info) + '</small></span></button>';
+}
+
+function nbListeHtml() {
+  var l = nbAlle();
+  if (!l.length) { return '<p class="leise">Noch kein Blatt — „Neu“ tippen und mit Stift oder Finger schreiben.</p>'; }
+  var neu = l.filter(function (b) { return !b.bei; });
+  var ab = l.filter(function (b) { return !!b.bei; });
+  return '<div class="gruppe">Neu · ' + neu.length + '</div>'
+    + (neu.length ? neu.map(nbZeileHtml).join('') : '<p class="leise">Alles abgelegt ✓</p>')
+    + (ab.length ? '<div class="gruppe">Abgelegt</div>' + ab.map(nbZeileHtml).join('') : '');
+}
+
+/* ---- Blatt ---- */
+
+function nbNeu() {
+  var n = new Date();
+  var b = { id: 'nb-' + neueKennung(), typ: 'notizblock', titel: '', angelegt: isoDatum() + 'T' + zwei(n.getHours()) + ':' + zwei(n.getMinutes()),
+            geraet: nbGeraet(), striche: [] };
+  krSpeichern(b);
+  nbOeffnen(b.id);
+}
+
+function nbOeffnen(id) {
+  if (!nbFinden(id)) { return; }
+  if (cl.app !== 'memo') { oeffne('memo'); }
+  cl.memo.art = 'notizblock';
+  cl.memo.id = '';
+  cl.hs.offen = '';
+  cl.hs.gesammelt = [];
+  cl.nb.id = id;
+  cl.nb.strich = null;
+  cl.nb.rueck = [];
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
+}
+
+/* Ein leeres Blatt verschwindet beim Verlassen wieder */
+function nbZurListe() {
+  var b = nbFinden(cl.nb.id);
+  if (b && !(b.striche || []).length && !b.bei && !String(b.titel || '').trim()) { krLoeschen(b.id); }
+  cl.nb.id = '';
+  cl.nb.strich = null;
+  zeichne();
+}
+
+function nbWerkzeug(w) {
+  cl.nb.werkzeug = (w === 2 || w === 'radierer') ? w : 1;
+  nbLeisteZeichnen();
+}
+
+function nbSchiebenUm() {
+  cl.nb.schieben = !cl.nb.schieben;
+  nbLeisteZeichnen();
+  nbAnbinden();
+}
+
+function nbLeisteHtml() {
+  var k = function (w, text, titel) {
+    return '<button type="button"' + (cl.nb.werkzeug === w ? ' class="an"' : '') + ' onclick="nbWerkzeug(' + (typeof w === 'string' ? '\'' + w + '\'' : w) + ')" aria-label="' + titel + '">' + text + '</button>';
+  };
+  return k(1, '✎', 'fein') + k(2, '✎✎', 'kräftig') + k('radierer', '⌫ Radierer', 'Radierer') + '<span class="luecke"></span>'
+    + (cl.nb.stift ? '' : '<button type="button"' + (cl.nb.schieben ? ' class="an"' : '') + ' onclick="nbSchiebenUm()" aria-label="Verschieben">✋</button>')
+    + '<button type="button" onclick="nbRueckgaengig()" aria-label="Rückgängig"' + (cl.nb.rueck.length ? '' : ' disabled') + '>↶</button>';
+}
+
+function nbHinweisText() {
+  if (cl.nb.stift) { return 'Stift erkannt — Finger scrollt'; }
+  return cl.nb.schieben ? '✋ Verschieben — noch ein Tipp auf ✋ zum Zeichnen' : 'Finger zeichnet · ✋ zum Scrollen';
+}
+
+function nbLeisteZeichnen() {
+  var el = document.getElementById('nbLeiste');
+  if (el) { el.innerHTML = nbLeisteHtml(); }
+  var h = document.getElementById('nbHinweis');
+  if (h) { h.textContent = nbHinweisText(); }
+}
+
+function nbEditorHtml() {
+  var b = nbFinden(cl.nb.id);
+  if (!b) { return '<p class="leise">Das Blatt gibt es nicht mehr.</p>'; }
+  var wo = nbWo(b);
+  return '<div class="nb-leiste" id="nbLeiste">' + nbLeisteHtml() + '</div>'
+    + '<div class="nb-blatt" id="nbBlatt"><canvas id="nbFlaeche"></canvas></div>'
+    + '<div class="leise nb-hinweis" id="nbHinweis">' + esc(nbHinweisText()) + '</div>'
+    + (wo ? '<p class="leise">Abgelegt: ' + esc(wo.zeichen + ' ' + wo.titel) + '</p>' : '')
+    + hsSammelnHtml();
+}
+
+/* Nach dem Zeichnen der Seite: Fläche auf Breite bringen, malen, Stift anbinden */
+function nbAnbinden() {
+  var c = document.getElementById('nbFlaeche');
+  var b = nbFinden(cl.nb.id);
+  if (!c || !b || typeof c.getContext !== 'function') { return; }
+  var huelle = document.getElementById('nbBlatt');
+  var breite = (huelle && huelle.clientWidth) ? huelle.clientWidth : 360;
+  var dpr = window.devicePixelRatio || 1;
+  c.style.width = breite + 'px';
+  c.style.height = Math.round(breite * NB_H / NB_B) + 'px';
+  c.width = Math.round(breite * dpr);
+  c.height = Math.round(breite * NB_H / NB_B * dpr);
+  /* Finger scrollt, wenn ein Stift erkannt ist oder ✋ gewählt ist */
+  c.style.touchAction = (cl.nb.stift || cl.nb.schieben) ? 'pan-y' : 'none';
+  var ctx = c.getContext('2d');
+  if (!ctx) { return; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, breite, breite * NB_H / NB_B);
+  nbMalen(ctx, b, breite, null);
+  c.onpointerdown = nbRunter;
+  c.onpointermove = nbZiehen;
+  c.onpointerup = nbHoch;
+  c.onpointercancel = nbHoch;
+}
+
+/* iPad gedreht, Fenster anders breit: Blatt neu einpassen */
+function nbGroesse() {
+  if (cl.app !== 'memo' || cl.memo.art !== 'notizblock' || !cl.nb.id || cl.nb.strich) { return; }
+  var c = document.getElementById('nbFlaeche');
+  var huelle = document.getElementById('nbBlatt');
+  if (c && huelle && huelle.clientWidth && Math.abs((parseFloat(c.style.width) || 0) - huelle.clientWidth) > 2) { nbAnbinden(); }
+}
+
+/* Bildschirm → Blatt (0–1000 × 0–1414) */
+function nbLogisch(ev) {
+  var c = document.getElementById('nbFlaeche');
+  var r = (c && typeof c.getBoundingClientRect === 'function') ? c.getBoundingClientRect() : null;
+  var links = r ? r.left : 0;
+  var oben = r ? r.top : 0;
+  var breite = (r && r.width) ? r.width : NB_B;
+  var f = NB_B / breite;
+  var p = (ev.pointerType === 'pen' && ev.pressure > 0) ? Math.max(1, Math.min(9, Math.round(ev.pressure * 9))) : 5;
+  return { x: Math.max(0, Math.min(NB_B, (ev.clientX - links) * f)), y: Math.max(0, Math.min(NB_H, (ev.clientY - oben) * f)), p: p };
+}
+
+function nbZaehlt(ev) {
+  if (ev.pointerType === 'pen' && !cl.nb.stift) {
+    cl.nb.stift = true;
+    nbLeisteZeichnen();
+    var c = document.getElementById('nbFlaeche');
+    if (c && c.style) { c.style.touchAction = 'pan-y'; }
+  }
+  if (ev.pointerType === 'touch' && (cl.nb.stift || cl.nb.schieben)) { return false; }
+  return true;
+}
+
+function nbRunter(ev) {
+  if (!nbZaehlt(ev)) { return; }
+  if (ev.preventDefault) { ev.preventDefault(); }
+  var c = document.getElementById('nbFlaeche');
+  if (c && c.setPointerCapture && ev.pointerId !== undefined) { try { c.setPointerCapture(ev.pointerId); } catch (e) { /* egal */ } }
+  var q = nbLogisch(ev);
+  if (cl.nb.werkzeug === 'radierer') { cl.nb.strich = { radierer: true }; nbRadieren(q); return; }
+  cl.nb.strich = { s: cl.nb.werkzeug === 2 ? 2 : 1, punkte: [q], id: ev.pointerId };
+  nbStueckMalen();
+}
+
+function nbZiehen(ev) {
+  var st = cl.nb.strich;
+  if (!st) { return; }
+  if (ev.pointerType === 'touch' && (cl.nb.stift || cl.nb.schieben)) { return; }
+  if (ev.preventDefault) { ev.preventDefault(); }
+  var q = nbLogisch(ev);
+  if (st.radierer) { nbRadieren(q); return; }
+  var l = st.punkte[st.punkte.length - 1];
+  /* Vereinfachen: nur Punkte mit etwas Abstand */
+  if (Math.abs(q.x - l.x) + Math.abs(q.y - l.y) < 3) { return; }
+  st.punkte.push(q);
+  nbStueckMalen();
+}
+
+function nbHoch() {
+  var st = cl.nb.strich;
+  cl.nb.strich = null;
+  if (!st || st.radierer) { return; }
+  var b = nbFinden(cl.nb.id);
+  if (!b) { return; }
+  if (!Array.isArray(b.striche)) { b.striche = []; }
+  b.striche.push(nbStrichText(st));
+  cl.nb.rueck.push({ art: 'dazu' });
+  krSpeichern(b);
+  /* Einmal sauber neu malen — die Stücke beim Schreiben sind nur eine Vorschau */
+  nbAnbinden();
+  nbLeisteZeichnen();
+}
+
+/* Nur das letzte Stück des laufenden Strichs malen — schnell genug für den Stift */
+function nbStueckMalen() {
+  var c = document.getElementById('nbFlaeche');
+  var st = cl.nb.strich;
+  if (!c || !st || typeof c.getContext !== 'function') { return; }
+  var ctx = c.getContext('2d');
+  if (!ctx) { return; }
+  var breite = parseFloat(c.style.width) || 360;
+  var l = st.punkte;
+  nbMalen(ctx, null, breite, { s: st.s, punkte: l.length > 1 ? l.slice(-2) : l });
+}
+
+/* Radierer: ganze Striche, die er berührt */
+function nbRadieren(q) {
+  var b = nbFinden(cl.nb.id);
+  if (!b || !(b.striche || []).length) { return; }
+  var weg = -1;
+  b.striche.some(function (t, i) {
+    var st = nbStrichLesen(t);
+    if (st.punkte.some(function (p) { return Math.abs(p.x - q.x) < 14 && Math.abs(p.y - q.y) < 14; })) { weg = i; return true; }
+    return false;
+  });
+  if (weg < 0) { return; }
+  cl.nb.rueck.push({ art: 'weg', nr: weg, text: b.striche[weg] });
+  b.striche.splice(weg, 1);
+  krSpeichern(b);
+  nbAnbinden();
+  nbLeisteZeichnen();
+}
+
+function nbRueckgaengig() {
+  var b = nbFinden(cl.nb.id);
+  var r = cl.nb.rueck.pop();
+  if (!b || !r) { return; }
+  if (r.art === 'dazu') { b.striche.pop(); } else { b.striche.splice(r.nr, 0, r.text); }
+  krSpeichern(b);
+  nbAnbinden();
+  nbLeisteZeichnen();
+}
+
+/* ---- Details: Titel, Löschen ---- */
+
+function nbDetails() {
+  var b = nbFinden(cl.nb.id);
+  if (!b) { return; }
+  cl.nb.fenster = { modus: 'details' };
+  cl.aufklapp = 'notizblock';
+  aufklappNeu();
+}
+
+function nbFensterHtml() {
+  var b = nbFinden(cl.nb.id);
+  var f = cl.nb.fenster;
+  if (!b || !f) { return ''; }
+  if (f.modus === 'loeschen') {
+    return '<div class="fenster"><div class="titel">Blatt löschen</div><div class="rumpf"><p>„' + esc(nbTitel(b)) + '“ löschen?</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="nbLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="nbDetails()">Abbrechen</button></div></div></div>';
+  }
+  return '<div class="fenster"><div class="titel">Blatt</div><div class="rumpf">'
+    + '<label for="nbTitel">Titel:</label><input id="nbTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(b.titel || '') + '" placeholder="' + esc(nbTitel(b)) + '">'
+    + '<p class="leise">' + (b.striche || []).length + ' Striche · etwa ' + Math.max(1, Math.round(JSON.stringify(b.striche || []).length / 1024)) + ' KB</p>'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="nbSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + '<button type="button" class="knopf" onclick="nbLoeschenFragen()">Löschen…</button></div></div></div>';
+}
+
+function nbSpeichern() {
+  var b = nbFinden(cl.nb.id);
+  var el = document.getElementById('nbTitel');
+  if (b && el && typeof el.value === 'string') { b.titel = el.value.trim().slice(0, 120); krSpeichern(b); }
+  cl.nb.fenster = null;
+  aufklappZu();
+}
+
+function nbLoeschenFragen() {
+  if (!cl.nb.fenster) { return; }
+  cl.nb.fenster.modus = 'loeschen';
+  aufklappNeu();
+}
+
+function nbLoeschen() {
+  var b = nbFinden(cl.nb.id);
+  if (b) { krLoeschen(b.id); melde('Blatt gelöscht.', null); }
+  cl.nb.fenster = null;
+  cl.nb.id = '';
+  aufklappZu();
+}
+
+/* ---- Anhänge: Blätter, die bei einer Seite oder Idee liegen ---- */
+function nbAnhaengeHtml(art, id) {
+  return nbAlle().filter(function (b) { return b.bei && b.bei[art] === id; }).map(function (b) {
+    var v = nbVorschau(b);
+    return '<button type="button" class="hs-anhang" onclick="nbOeffnen(\'' + esc(b.id) + '\')">'
+      + (v ? '<img src="' + esc(v) + '" alt="">' : '') + '<span>✎ ' + esc(nbTitel(b)) + '</span></button>';
+  }).join('');
 }
 
 function seiteOeffnen(id) {
@@ -8637,6 +9101,7 @@ function ckListeHtml(s) {
     var sk = zeile.match(HS_MUSTER);
     if (sk) { h += hsSkizzeHtml(sk[1]); }
   });
+  h += nbAnhaengeHtml('seite', s.id);
   if (!st.alle) { h += '<p class="leise">Noch leer — „Neu“ tippen.</p>'; }
   if (erl || cl.auf.erlZeigen) {
     h += '<button type="button" class="gruppe klapp" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '▾ Erledigte verbergen' : '› Erledigt · ' + erl) + '</button>';
@@ -21205,7 +21670,8 @@ function iwStufeHtml() {
       + '<label for="iwBereich">Lebensbereich (aus Kurs):</label><select id="iwBereich" class="eingabe"><option value="">—</option>'
       + krBereiche(false).map(function (b) { return '<option value="' + esc(b.id) + '"' + (x && x.bereich === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>'; }).join('') + '</select>'
       + '<p class="leise">Einfangen dauert 30 Sekunden. Weiter geht es, wenn du Zeit hast — die Idee wartet im Speicher.</p>'
-      + (x && Array.isArray(x.skizzen) ? x.skizzen.map(hsSkizzeHtml).join('') : '');
+      + (x && Array.isArray(x.skizzen) ? x.skizzen.map(hsSkizzeHtml).join('') : '')
+      + (x ? nbAnhaengeHtml('idee', x.id) : '');
   }
   if (!x) { cl.iw.stufe = 1; return iwStufeHtml(); }
   var kopf = '<div class="leise">' + esc(x.titel) + '</div>';
@@ -23912,6 +24378,7 @@ function clZurueck() {
     return true;
   }
   if (cl.app === 'memo' && cl.memo.schreiben) { memoSchreibenUm(); return true; }
+  if (cl.app === 'memo' && cl.memo.art === 'notizblock' && cl.nb.id) { nbZurListe(); return true; }
   if (cl.app === 'memo' && cl.memo.art && cl.hs.offen) { hsZurListe(); return true; }
   if (cl.app === 'memo' && cl.memo.id) { memoZurListe(); return true; }
   if (cl.app === 'projekte' && cl.pj.id) { pjZurListe(); return true; }
@@ -24036,6 +24503,7 @@ function rbAnbinden() {
   if (!el) { return; }
   el.addEventListener('scroll', rbBald);
   window.addEventListener('resize', rbBald);
+  window.addEventListener('resize', nbGroesse);
   window.addEventListener('pointermove', rbZiehen);
   window.addEventListener('pointerup', rbZiehenEnde);
   window.addEventListener('pointercancel', rbZiehenEnde);

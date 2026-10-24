@@ -2041,6 +2041,95 @@ function coKorbTest() {
 }
 
 /* ============================================================
+   114. Notizblock: mit Stift oder Finger schreiben (0.65.0)
+   Grund: Am iPad mit dem Apple Pencil, am Pixel mit dem Finger direkt in
+   CLIE von Hand schreiben und skizzieren — wie der Note Pad am Palm.
+   Erkennt: Striche falsch gespeichert (Format, Druck, Stärke), Finger
+   zeichnet trotz erkanntem Stift, Radierer/Rückgängig kaputt, leere
+   Blätter bleiben liegen, Ablegen schreibt in den Seitentext (würde die
+   Workbench stören), Blätter zu groß für die workbench.json.
+   ============================================================ */
+function notizblockTest() {
+  console.log('\n114. Notizblock: mit Stift oder Finger schreiben (0.65.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.cl.nb.stift = false; S.cl.nb.schieben = false; S.cl.nb.werkzeug = 1;
+  S.oeffne('memo');
+  pruefe(/memoArtSetzen\('notizblock'\)">\<span>Notizblock/.test(S.memoWahlHtml()), '▼ in Notizen: Notizblock');
+  S.memoArtSetzen('notizblock');
+  pruefe(/Noch kein Blatt/.test(inhalt()) && /nbNeu\(\)/.test(S.document.getElementById('fuss').innerHTML), 'leer: Hinweis und „Neu“');
+  S.nbNeu();
+  const b = S.nbFinden(S.cl.nb.id);
+  pruefe(b && b.typ === 'notizblock' && /^nb-/.test(b.id) && /id="nbFlaeche"/.test(inhalt()) && /hsAblegenFragen\(\)/.test(S.document.getElementById('fuss').innerHTML), 'Neu: Blatt in DB.kurs, Fläche, „Ablegen…“');
+  pruefe(/^✎ Notiz \d\d\.\d\d\. \d\d:\d\d$/.test(S.document.getElementById('reiter').textContent), 'Titel ohne Eingabe: „Notiz TT.MM. HH:MM“');
+  const ev = (art, x, y, pr) => ({ pointerType: art, pressure: pr, clientX: x, clientY: y, pointerId: 1, preventDefault() {} });
+  const strich = (art, punkte, pr) => { S.nbRunter(ev(art, punkte[0][0], punkte[0][1], pr)); punkte.slice(1).forEach(q => S.nbZiehen(ev(art, q[0], q[1], pr))); S.nbHoch(); };
+  /* Finger (Pixel) */
+  strich('touch', [[100, 100], [150, 120], [151, 120], [200, 140]], 0.5);
+  pruefe(b.striche.length === 1 && b.striche[0] === '1 100,100,5 150,120,5 200,140,5', 'Finger: ein Strich, fein, Druck 5 — dicht beieinander liegende Punkte fallen weg');
+  S.nbWerkzeug(2);
+  strich('touch', [[300, 300], [320, 340]], 0.5);
+  pruefe(/^2 300,300,5 320,340,5$/.test(b.striche[1]), 'kräftig: Stärke 2');
+  /* Stift (iPad): Druck, danach zeichnet der Finger nicht mehr */
+  S.nbWerkzeug(1);
+  strich('pen', [[400, 400], [420, 410], [440, 430]], 0.9);
+  pruefe(S.cl.nb.stift && /^1 400,400,8 420,410,8 440,430,8$/.test(b.striche[2]), 'Stift: Druck 0,9 → 8; Stift erkannt');
+  strich('touch', [[600, 600], [650, 650]], 0.5);
+  pruefe(b.striche.length === 3 && !/nbSchiebenUm/.test(S.nbLeisteHtml()) && /Finger scrollt/.test(S.nbHinweisText()), 'nach dem Stift zeichnet der Finger nicht (Hand stört nicht), ✋ entfällt');
+  /* Radierer und Rückgängig */
+  S.nbWerkzeug('radierer');
+  S.nbRunter(ev('pen', 151, 121, 0.5)); S.nbHoch();
+  pruefe(b.striche.length === 2 && !/^1 100,100/.test(b.striche[0]), 'Radierer nimmt den berührten Strich ganz weg');
+  S.nbRueckgaengig();
+  pruefe(b.striche.length === 3 && /^1 100,100/.test(b.striche[0]), 'Rückgängig holt ihn zurück (an seinen Platz)');
+  S.nbRueckgaengig();
+  pruefe(b.striche.length === 2, 'Rückgängig nimmt den letzten Strich weg');
+  S.nbWerkzeug(1);
+  /* Lesen */
+  const g = S.nbStrichLesen('2 10,20,3 30,40,9');
+  pruefe(g.s === 2 && g.punkte.length === 2 && g.punkte[1].p === 9 && S.nbStrichText(g) === '2 10,20,3 30,40,9', 'Format liest und schreibt sich gleich');
+  /* Größe: eine volle Seite Handschrift */
+  const voll = [];
+  for (let i = 0; i < 60; i++) { let s = '1'; for (let k = 0; k < 60; k++) { s += ' ' + (100 + k * 7) + ',' + (100 + i * 20) + ',' + (5 + (k % 4)); } voll.push(s); }
+  const kb = JSON.stringify(voll).length / 1024;
+  pruefe(kb < 45, 'eine volle Seite (60 Striche à 60 Punkte) bleibt klein: ' + kb.toFixed(1) + ' KB');
+  /* Ablegen im Projekt: Text bleibt sauber, Blatt merkt sich den Ort */
+  S.DB.projekte.push({ id: 'pjn', name: 'Gartenhaus', flaeche: 'Idee', status: 'laufend', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.document.getElementById('hsPunkt').value = 'Holz bestellen';
+  S.hsPunktDazu();
+  S.hsAblegenFragen();
+  pruefe(S.cl.aufklapp === 'handschrift', 'Ablegen… wie bei der Handschrift aus Drive');
+  S.hsAblegen('seite', 'pjn');
+  pruefe(b.bei && b.bei.seite === 'pjn' && S.DB.projekte[0].flaeche === 'Idee\n[] Holz bestellen' && S.cl.nb.id === '', 'im Projekt: Punkt dort, kein „!skizze“ im Text, Blatt merkt sich den Ort');
+  pruefe(/class="hs-anhang" onclick="nbOeffnen\('/.test(S.memoSeiteHtml(S.kpSeiteFinden('pjn'), true)), 'das Projekt zeigt das Blatt als Anhang');
+  pruefe(/Abgelegt/.test(inhalt()) && /→ ◎ Gartenhaus/.test(inhalt()), 'Liste: unter „Abgelegt“ mit Ort');
+  /* Leeres Blatt verschwindet */
+  S.nbNeu();
+  const leerId = S.cl.nb.id;
+  S.nbZurListe();
+  pruefe(!S.nbFinden(leerId), 'ein leeres Blatt bleibt nicht liegen');
+  /* Nur ablegen, als Idee */
+  S.nbNeu(); const b2 = S.nbFinden(S.cl.nb.id); strich('pen', [[10, 10], [60, 60]], 0.5);
+  S.hsAblegen('nur', '');
+  pruefe(b2.bei && b2.bei.nur, '„nur ablegen“');
+  S.nbNeu(); const b3 = S.nbFinden(S.cl.nb.id); strich('pen', [[10, 10], [60, 60]], 0.5);
+  S.hsAblegen('idee', '');
+  const idee = S.iwFinden(b3.bei && b3.bei.idee);
+  pruefe(idee && /nbOeffnen/.test(S.nbAnhaengeHtml('idee', idee.id)), 'als Idee: die Idee zeigt das Blatt');
+  /* Details: Titel, Löschen */
+  S.nbOeffnen(b2.id);
+  S.nbDetails();
+  S.document.getElementById('nbTitel').value = 'Gartenhaus Skizze';
+  S.nbSpeichern();
+  pruefe(b2.titel === 'Gartenhaus Skizze' && S.nbTitel(b2) === 'Gartenhaus Skizze', 'Details: Titel');
+  S.nbDetails(); S.nbLoeschenFragen(); S.nbLoeschen();
+  pruefe(!S.nbFinden(b2.id) && S.DB.grabsteine.some(x => x.id === b2.id), 'Löschen mit Grabstein (kommt per Abgleich nicht zurück)');
+  S.memoArtSetzen('');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    113. Handschrift aus Drive in Notizen (0.64.0)
    Grund: Private Notizen und Ideen entstehen auf dem reMarkable Move oder
    dem iPad als PDF im Drive-Ordner der Workbench. CLIE zeigt den Eingang,
@@ -7047,6 +7136,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { notizblockTest(); } catch (e) { fail('Notizblock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { handschriftTest(); } catch (e) { fail('Handschrift warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ohneHeuteTest(); } catch (e) { fail('Ohne Heute warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlerTest(); } catch (e) { fail('Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
