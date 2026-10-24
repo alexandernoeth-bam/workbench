@@ -417,9 +417,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","checklisten","sammlungen","projekte","memo","einkauf","vorlesen","rechner","planung","lernen","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","sammlungen","projekte","memo","einkauf","vorlesen","rechner","kurs","planung","lernen","spiele"]'
     && CL.clApp('heute') && CL.clApp('heute').raster === false && CL.clApp('coach').raster === false,
-    'Start 3×4 (seit 0.43): Kalender, Aufgaben, Checklisten / Sammlungen, Projekte, Notizen / Einkauf, Vorlesen, Rechner / Planung ▸, Lernen ▸, Spiele ▸');
+    'Start 3×4 (seit 0.61): Kalender, To Do, Sammlungen / Projekte, Notizen, Einkauf / Vorlesen, Rechner, Kurs / Planung ▸, Lernen ▸, Spiele ▸');
   pruefe(!/oeffne\('(ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Ziele, Listen oder Woche (Ziele stehen in Projekte)');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -920,8 +920,11 @@ function aufgabenTest() {
   /* Auswahl oben rechts */
   CL.katUm();
   let a = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /Alle Aufgaben/.test(a) && /aufBereichSetzen\('kb-haus'\)/.test(a) && !/Weitere/.test(a),
-    'die Aufklappliste: Filter, Alle Aufgaben, Lebensbereiche (seit 0.49 statt „Weitere…“)');
+  pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /todoAlle\(\)/.test(a) && /todoListe\('cl-korb'\)/.test(a) && /todoSicht\('vorlage'\)/.test(a) && !/Weitere/.test(a),
+    'das ▼ (seit 0.61): Beruf/Privat, Alle, Korb, Listen, Ruhende/Fertige/Vorlagen');
+  CL.todoBereichAuf();
+  pruefe(CL.cl.aufklapp === 'todobereich' && /aufBereichSetzen\('kb-haus'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Bereich wird über „Bereich: … ▾“ gewählt');
+  CL.aufklappZu();
   CL.listenwahlOeffnen('filter');
   a = CL.document.getElementById('aufklapp').innerHTML;
   pruefe(/Umbau/.test(a) && /Garten/.test(a) && !/Halbmarathon/.test(a) && !/Ruht/.test(a) && !/>◎ Leer/.test(a),
@@ -1032,14 +1035,13 @@ function aufgabenTest() {
   CL.neueListeKontext('privat');
   CL.neueListeSpeichern();
   const gesch = CL.DB.themen[CL.DB.themen.length - 1];
-  pruefe(gesch.name === 'Geschenkideen' && gesch.kontext === 'privat' && CL.cl.auf.liste === gesch.id, 'die neue Liste liegt in „themen“ und ist gleich gewählt');
-  CL.katUm();
-  pruefe(/listeBearbeiten/.test(CL.document.getElementById('aufklapp').innerHTML), 'eine gewählte Liste lässt sich bearbeiten');
+  pruefe(gesch.name === 'Geschenkideen' && gesch.kontext === 'privat' && CL.cl.app === 'checklisten' && CL.cl.cls.id === gesch.id, 'die neue Liste liegt in „themen“ und ist gleich offen (seit 0.61 in To Do)');
+  pruefe(/clsDetails\(\)/.test(CL.document.getElementById('fuss').innerHTML), 'eine offene Liste lässt sich bearbeiten (Details…)');
   CL.listeBearbeiten();
   CL.document.getElementById('listeTitel').value = 'Geschenke';
   CL.neueListeSpeichern();
   pruefe(gesch.name === 'Geschenke', 'umbenannt');
-  CL.aufListeSetzen('');
+  CL.todoAlle();
   CL.aufTippen('p1', 1);
   pruefe(CL.cl.auf.wahl === 'p1|1' && /class="aufg gewaehlt"/.test(inhalt()) && CL.cl.aufklapp === '', 'erster Tipp wählt aus');
   CL.aufTippen('p1', 1);
@@ -1137,10 +1139,10 @@ function checklistenTest() {
   CL.DB.gedanken.push({ id: 'v1', titel: 'Packliste Urlaub', text: '## Kleidung\n[x] Regenjacke\n[] Badesachen\n## Technik\n[-] Kabel', kontext: 'privat', checkliste: 'vorlage', benutzt: 2, ordnung: 1, geaendert: 1 });
   CL.DB.gedanken.push({ id: 'v2', titel: 'Monatsabschluss', text: '[] Belege', kontext: 'beruflich', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
   CL.DB.projekte.push({ id: 'p1', name: 'Umbau', flaeche: '## Statik\n[x] Pläne\nText\n[] Angebot', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
-  CL.localStorage.setItem('clie-cls-klapp', JSON.stringify({ vorl: true }));
   CL.oeffne('checklisten');
+  CL.todoSicht('vorlage');
   let h = inhalt();
-  pruefe(/class="cls-korb"/.test(h) && /Vorlagen · 2/.test(h) && /Packliste Urlaub/.test(h) && !/clsStarten\(/.test(h), 'Übersicht: Laufend und Vorlagen (aufgeklappt) — ohne Startknopf (0.48.2)');
+  pruefe(/Packliste Urlaub/.test(h) && /Monatsabschluss/.test(h) && !/clsStarten\(/.test(h) && /Vorlagen…<\/span><small>2/.test(CL.listeAufklappHtml()), '„Vorlagen…“ im ▼ mit Zahl, ohne Startknopf in der Liste');
   CL.katSetzen('beruflich');
   pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'Beruf / Privat filtert');
   CL.katSetzen('alle');
@@ -1159,8 +1161,8 @@ function checklistenTest() {
   CL.clsHaken(lauf.id, 2); CL.clsHaken(lauf.id, 4);
   pruefe(/Alles erledigt/.test(inhalt()) && /clsAbschliessen/.test(inhalt()), 'alles erledigt: „Abschließen“ wird angeboten');
   CL.clsAbschliessen();
-  pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv, zurück zur Übersicht');
-  pruefe(/Abgeschlossen · 1/.test(inhalt()), 'die Übersicht zählt Abgeschlossene (eingeklappt)');
+  pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv');
+  pruefe(CL.cl.app === 'aufgaben' && /Fertige…<\/span><small>1/.test(CL.listeAufklappHtml()), 'danach „Alle“; „Fertige…“ im ▼ zählt sie');
 
   /* Neu: aus einem Memo, als Kopie, leer */
   CL.clsNeu();
@@ -1848,22 +1850,26 @@ function ckZustandTest() {
                  { id: 'ta', name: 'Altes', text: '[x] fertig', kontext: 'privat', abgeschlossen: '2026-10-01', ordnung: 3, geaendert: 1 }];
   S.DB.gedanken.push({ id: 'gp', titel: 'Packen Borkum', text: '[] Koffer\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', bereich: 'kb-beziehungen', gestartet: heute, ordnung: 4, geaendert: 1 });
   S.DB.gedanken.push({ id: 'ga', titel: 'Jahresgespräche', text: '[] Termine\n[] Bögen', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', bereich: 'kb-arbeit', gestartet: heute, ordnung: 5, geaendert: 1 });
-  S.oeffne('checklisten');
-  let h = inhalt();
-  pruefe(/class="cls-korb"/.test(h) && h.indexOf('cls-korb') < h.indexOf('class="cls-zeile lauf"') && !/cls-bereich/.test(h) && !/class="balken"/.test(h),
-    'oben der Korb, darunter eine schlichte Liste — ohne Bereichs-Überschriften und Balken (0.53.2)');
-  pruefe(/Haus<\/span><span class="cls-zahl">1\/2</.test(h), 'rechts nur x/y');
-  /* Bereich oben rechts wie die Kategorien am Palm (0.53.2) */
+  /* Seit 0.61: statt der Checklisten-Übersicht das ▼ von To Do */
+  S.oeffne('aufgaben');
   S.katUm();
-  pruefe(S.cl.aufklapp === 'clswahl' && /clsBereichSetzen\('kb-arbeit'\)/.test(S.document.getElementById('aufklapp').innerHTML), '▼ oben rechts: Alle, Beruf, Privat und die Lebensbereiche');
-  S.clsBereichSetzen('kb-arbeit');
-  pruefe(/Jahresgespräche/.test(inhalt()) && !/>Haus</.test(inhalt()) && /▼ Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-cls-bereich') === 'kb-arbeit',
-    'Bereich gewählt: nur dessen Checklisten, oben „▼ Arbeit“, gemerkt');
-  S.clsKatSetzen('alle');
-  pruefe(S.cl.cls.bereich === '' && /Dachrinne|>Haus</.test(inhalt()), '„Alle“ hebt den Bereich auf');
-  pruefe(/Ruhend · 1/.test(h) && /Abgeschlossen · 1/.test(h) && !/Maier/.test(h) && !/>Carport Angebote</.test(h), 'Ruhend und Abgeschlossen eingeklappt mit Zahl');
-  S.clsKlappUm('ruht');
-  pruefe(/Carport Angebote/.test(inhalt()) && JSON.parse(S.localStorage.getItem('clie-cls-klapp')).ruht === true, 'aufklappen zeigt sie, auf dem Gerät gemerkt');
+  let h = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'liste' && h.indexOf("todoListe('cl-korb')") < h.indexOf("todoListe('th')") && /<div class="zw">Haus &amp; Projekte<\/div>/.test(h),
+    '▼: oben Alle und Korb, darunter die laufenden Listen nach Bereich');
+  pruefe(/Haus<\/span><small>1\/2</.test(h), 'rechts nur x/y');
+  pruefe(/☑ Packen Borkum/.test(h) && !/☑ Jahresgespräche/.test(h) && !/☑ Haus/.test(h), '☑ nur vor Listen zum Abhaken');
+  pruefe(!/Carport Angebote/.test(h) && !/>Altes</.test(h) && /Ruhende…<\/span><small>1</.test(h) && /Fertige…<\/span><small>1</.test(h), 'Ruhende und Fertige nur gezählt, unter dem Strich');
+  /* Bereich: grenzt „Alle“ und das ▼ ein */
+  S.aufBereichSetzen('kb-arbeit');
+  S.katUm();
+  h = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Jahresgespräche/.test(h) && !/todoListe\('th'\)/.test(h) && /▼ Alle · Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-aufgaben-bereich') === 'kb-arbeit',
+    'Bereich gewählt: nur dessen Listen, oben „▼ Alle · Arbeit“, gemerkt');
+  S.aufBereichSetzen('');
+  S.todoSicht('ruht');
+  pruefe(S.cl.app === 'checklisten' && /Carport Angebote/.test(inhalt()) && !/>Haus</.test(inhalt()) && /▼ Ruhende/.test(S.document.getElementById('katKnopf').textContent), '„Ruhende…“ zeigt nur die ruhenden Listen');
+  S.todoSicht('fertig');
+  pruefe(/Altes/.test(inhalt()) && !/Carport/.test(inhalt()), '„Fertige…“ zeigt nur die abgeschlossenen');
   /* Aufgaben: ruhende Liste nicht, Abhak-Checkliste nur Eingeplantes, Art Aufgaben ganz */
   S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.naechste = false;
   S.oeffne('aufgaben');
@@ -1876,7 +1882,7 @@ function ckZustandTest() {
   const tr = S.DB.themen[1];
   pruefe(n === 1 && !tr.ruht && tr.geweckt === heute && /Aufgewacht: „Carport Angebote“/.test(S.document.getElementById('toastText').textContent), 'fälliger Punkt weckt die ruhende Checkliste, mit Meldung');
   S.oeffne('checklisten');
-  pruefe(/Carport Angebote<\/span><span class="cls-geweckt">geweckt<\/span>/.test(inhalt()), 'in der Übersicht mit der Marke „geweckt“');
+  pruefe(/Carport Angebote<\/span><span class="cls-geweckt">geweckt<\/span>/.test(inhalt()), 'bei den laufenden Listen mit der Marke „geweckt“');
   pruefe(S.ckWecken() === 0, 'nichts mehr zu wecken: keine weitere Meldung');
   /* Liste in Checklisten öffnen, Zeilen wie in Aufgaben */
   S.clsOeffnen('th');
@@ -1941,9 +1947,10 @@ function ckKorbTest() {
   S.aufSpeichern();
   const korb = S.DB.themen.filter(x => x.id === 'cl-korb');
   pruefe(korb.length === 1 && korb[0].korb && korb[0].text === '[] Dachrinne reinigen\n[] Fenster abdichten' && korb[0].kontext === '', 'ohne Wahl in den Korb — genau ein Korb (feste Kennung), passt zu Beruf und Privat');
-  S.oeffne('checklisten');
-  pruefe(/<b>Korb<\/b><\/span><span class="cls-zahl">2 offen ›/.test(inhalt()) && !/class="cls-zeile lauf" onclick="clsOeffnen\('cl-korb'\)/.test(inhalt()), 'Übersicht: Korb oben mit Zahl, nicht noch einmal unter „Laufend“');
-  S.clsKorbOeffnen();
+  S.katUm();
+  pruefe(/todoListe\('cl-korb'\)"><span>Korb<\/span><small>2</.test(S.document.getElementById('aufklapp').innerHTML) && (S.document.getElementById('aufklapp').innerHTML.match(/todoListe\('cl-korb'\)/g) || []).length === 1, '▼: Korb oben mit Zahl, nicht noch einmal bei den Listen');
+  S.aufklappZu();
+  S.todoListe('cl-korb');
   pruefe(S.cl.cls.id === 'cl-korb' && /Lose Einzelaufgaben/.test(inhalt()) && /Dachrinne reinigen/.test(inhalt()), 'der Korb öffnet sich wie eine Checkliste');
   S.clsDetails();
   const f = S.clsFensterHtml();
@@ -2030,6 +2037,65 @@ function coKorbTest() {
   /* Quelle abschaltbar */
   S.krFinden('kc-einstellungen').quellen = { korb: false };
   pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Korb“ ausgeschaltet: keine Korb-Fragen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   110. Aufgaben und Checklisten sind eine App „To Do“ (0.61.0)
+   Grund: Beide Apps zeigten zu 90 % dieselben Daten. Wie am Palm gibt es
+   jetzt eine App mit ▼ oben rechts: Alle, Korb, jede laufende Liste,
+   Ruhende/Fertige/Vorlagen.
+   Erkennt: „Checklisten“ wieder im Raster, Reiter nicht „To Do“, ▼ fehlt
+   in der Listen-Ansicht, „Fertig“/Zurück führen ins Leere, Abhak-Punkte
+   fluten „Alle“, Vorlage-Start bleibt unter „Vorlagen…“ hängen.
+   ============================================================ */
+function toDoTest() {
+  console.log('\n110. Aufgaben und Checklisten sind eine App „To Do“ (0.61.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.cl.auf.bereich = ''; S.cl.auf.liste = '';
+  S.DB.themen = [{ id: 'lh', name: 'Haus', text: '[] Dachrinne', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 }];
+  S.DB.gedanken.push({ id: 'gp', titel: 'Packen', text: '[] Koffer\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', gestartet: S.isoDatum(), ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'gv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 3, geaendert: 1 });
+  const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  pruefe(raster.indexOf('checklisten') < 0 && S.clApp('aufgaben').name === 'To Do', 'eine App „To Do“ im Raster, „Checklisten“ nicht mehr');
+  S.oeffne('aufgaben');
+  pruefe(S.document.getElementById('reiter').textContent === 'To Do' && /▼ Alle/.test(S.document.getElementById('katKnopf').textContent), 'Reiter „To Do“, oben rechts „▼ Alle“');
+  pruefe(/Dachrinne/.test(inhalt()) && !/Koffer/.test(inhalt()), '„Alle“: Aufgaben ja, Punkte der Abhak-Liste nicht (nur geplant oder mit Frist)');
+  S.katUm();
+  const dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/todoListe\('lh'\)/.test(dd) && /☑ Packen/.test(dd) && !/todoListe\('gv'\)/.test(dd), '▼: laufende Listen, ☑ vor der Abhak-Liste, Vorlagen nicht einzeln');
+  S.todoListe('gp');
+  pruefe(S.cl.app === 'checklisten' && S.cl.aufklapp === '' && S.document.getElementById('reiter').textContent === 'To Do' && /▼ Packen/.test(S.document.getElementById('katKnopf').textContent), 'Liste gewählt: Reiter bleibt „To Do“, oben „▼ Packen“');
+  pruefe(!/clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'aus dem ▼ geöffnet: kein „Fertig“ — das ▼ führt weiter');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'liste' && /todoAlle\(\)/.test(S.document.getElementById('aufklapp').innerHTML), 'auch in der Liste dasselbe ▼');
+  S.aufklappZu();
+  S.zurueckGedrueckt();
+  pruefe(S.cl.app === 'aufgaben', 'Zurück aus einer Liste: „Alle“');
+  /* Vorlagen… */
+  S.todoSicht('vorlage');
+  pruefe(S.cl.app === 'checklisten' && /Packliste Urlaub/.test(inhalt()) && /▼ Vorlagen/.test(S.document.getElementById('katKnopf').textContent), '„Vorlagen…“ zeigt die Vorlagen');
+  S.clsOeffnen('gv');
+  pruefe(/clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML) && /▼ Vorlage: Packliste Urlaub/.test(S.document.getElementById('katKnopf').textContent), 'Vorlage aus „Vorlagen…“: mit „Fertig“');
+  S.clsZurListe();
+  pruefe(S.cl.cls.sicht === 'vorlage' && S.cl.cls.id === '' && S.cl.app === 'checklisten', '„Fertig“ führt zurück zu „Vorlagen…“');
+  S.clsOeffnen('gv');
+  S.clsStarten('gv');
+  pruefe(S.cl.cls.sicht === '' && S.ckZustand(S.kpSeiteFinden(S.cl.cls.id)) === 'lauf', 'gestartet: die Liste läuft, nicht mehr unter „Vorlagen…“');
+  /* Neue Liste öffnet in To Do; ein Projekt filtert weiter „Alle“ */
+  S.todoNeueListe();
+  pruefe(S.cl.aufklapp === 'checkliste', '„+ Neue Liste…“ öffnet „Neu“');
+  S.aufklappZu();
+  S.DB.projekte.push({ id: 'pj', name: 'Umbau', flaeche: '[] Statik', status: 'laufend', kontext: 'privat', ordnung: 9, geaendert: 1 });
+  S.oeffne('aufgaben');
+  S.cl.auf.wahlFuer = 'filter';
+  S.listeGewaehlt('pj');
+  pruefe(S.cl.app === 'aufgaben' && S.cl.auf.liste === 'pj', 'ein Projekt bleibt ein Filter in „Alle“');
+  S.todoAlle();
+  pruefe(S.cl.auf.liste === '' && S.cl.app === 'aufgaben', '„Alle“ hebt ihn auf');
+  pruefe(!/function clsWahlHtml|function clsBereichSetzen|function clsKorbOeffnen|function ckKlapp/.test(QUELLE), 'alte Checklisten-Übersicht ist ganz entfernt');
   S.oeffne('uebersicht');
 }
 
@@ -2843,10 +2909,12 @@ function clsKompaktTest() {
   S.DB.gedanken.push({ id: 'l9', titel: 'Durchführung des DFÜ-Abruftest 29.10.2026', text: '[x] A\n[] B', kontext: 'beruflich', checkliste: 'lauf', gestartet: S.isoDatum(), ordnung: 2, geaendert: 1 });
   S.localStorage.setItem('clie-cls-klapp', JSON.stringify({ vorl: true }));
   S.oeffne('checklisten');
+  const hl = S.checklistenListeHtml();
+  S.todoSicht('vorlage');
   const h = S.checklistenListeHtml();
-  pruefe(!/clsStarten\(/.test(h) && !/Starten</.test(h), 'kein Startknopf in der Übersicht');
-  pruefe(!/× benutzt|Punkte<|<small>seit /.test(h), 'keine Zusatzzeilen (seit … / Punkte · benutzt)');
-  pruefe(/class="cls-zeile vorl"/.test(h) && /class="cls-zeile lauf"[^>]*>.*1\/2/.test(h), 'Vorlage einzeilig, Laufend mit kurzem Balken und 1/2');
+  pruefe(!/clsStarten\(/.test(h) && !/Starten</.test(h), 'kein Startknopf in „Vorlagen…“');
+  pruefe(!/× benutzt|<small>seit /.test(h + hl), 'keine Zusatzzeilen (seit … / benutzt)');
+  pruefe(/class="cls-zeile vorl"/.test(h) && /class="cls-zeile lauf"[^>]*>.*1\/2/.test(hl), 'Vorlage einzeilig, Laufend mit 1/2');
   pruefe(/\.cls-zeile\.vorl \.tx\{white-space:nowrap\}/.test(QUELLE) && /\.cls-zeile\.lauf \.tx,\.cls-zeile\.erl \.tx\{white-space:nowrap\}/.test(QUELLE), 'CSS: alle Zeilen einzeilig (seit 0.53.2)');
   S.clsOeffnen('v9');
   pruefe(/clsStarten\(/.test(S.checklistenFussHtml()), 'gestartet wird in der geöffneten Vorlage');
@@ -4363,12 +4431,9 @@ function listeTextTest() {
   S.DB.themen.push({ id: 'lh', name: 'Haus', kontext: 'privat', text: '[] Fenster warten – Magnat anrufen\n[] Lampe tauschen', geaendert: 1 });
   S.oeffne('aufgaben');
   S.aufListeSetzen('');
-  S.katUm();
-  pruefe(!/listeAlsText/.test(S.document.getElementById('aufklapp').innerHTML), 'ohne gewählte Liste kein „als Text bearbeiten“');
-  S.aufklappZu();
-  S.aufListeSetzen('lh');
-  S.katUm();
-  pruefe(/onclick="listeAlsText\(\)">„Haus“ als Text bearbeiten …/.test(S.document.getElementById('aufklapp').innerHTML), 'im Reiter-Menü: „Haus“ als Text bearbeiten …');
+  pruefe(!/listeAlsText/.test(S.document.getElementById('fuss').innerHTML), 'in „Alle“ kein „als Text bearbeiten“');
+  S.todoListe('lh');
+  pruefe(/onclick="listeAlsText\(\)">Schreiben/.test(S.document.getElementById('fuss').innerHTML), 'in der offenen Liste: „Schreiben“ bearbeitet sie als Text');
   S.listeAlsText();
   pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && S.cl.aufklapp === ''
     && inhalt().indexOf('<textarea id="memoFeld" class="memo-feld" spellcheck="true" oninput="memoTextGetippt()" onkeydown="memoTaste(event)">' + S.esc(S.DB.themen[0].text) + '</textarea>') >= 0,
@@ -5362,7 +5427,8 @@ function startOrdnerTest() {
   const S = CL;
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
   const imOrdner = [].concat(...Object.keys(S.CL_ORDNER).map(k => S.CL_ORDNER[k].apps));
-  const leiste = ['lesezeichen', 'abgleich', 'kurs'];
+  /* „checklisten“ ist seit 0.61 die Listen-Ansicht von To Do — erreichbar über dessen ▼ */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -5555,7 +5621,7 @@ function coachTest() {
   ['Steuer-Unterlagen sortieren', 'P1 Angebot Müller', 'Keller aufräumen', 'Fahrrad flicken'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
   S.termineNachTag = {}; S.termineNachTag[heute] = [{ id: 'tr1', titel: 'Team-Runde', rohTitel: 'Team-Runde', zeit: '10:00', bis: '11:00', ganztags: false, kontext: '' },
     { id: 'tc1', titel: 'Coach: Halbzeit', rohTitel: 'Coach: Halbzeit', zeit: '12:30', bis: '12:35', ganztags: false, kontext: '' }];
-  pruefe(S.clApp('coach') && S.CL_BILD.coach && S.clApp('kurs').raster === false, 'App „Coach“ im Raster, Kurs liegt darunter');
+  pruefe(S.clApp('coach') && S.CL_BILD.coach && S.clApp('kurs').raster !== false, 'App „Coach“ da, Kurs seit 0.61 im Raster');
   pruefe(S.clTermineAm(heute).zeit.length === 1 && S.coTagDaten(heute).termine.length === 1, 'Coach-Termine („Coach: …“) sind in CLIE ausgeblendet');
   /* Morgen */
   const m = S.coFaellige('07:45', heute);
@@ -6399,7 +6465,7 @@ function neu027Test() {
   S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub', text: '[] a', checkliste: 'lauf', geaendert: 1 }, { id: 'c2', titel: 'Fenster', text: '[] b', checkliste: 'lauf', geaendert: 1 },
     { id: 'c3', titel: 'Vorlage', text: '[] c', checkliste: 'vorlage', geaendert: 1 });
   S.oeffne('uebersicht');
-  pruefe(/oeffne\('checklisten'\)"><span class="sym"><svg[^]*?<span class="zahl">2</.test(inhalt()), 'Checklisten-Symbol zeigt 2 laufende (Vorlagen zählen nicht)');
+  pruefe(/oeffne\('aufgaben'\)"><span class="sym"><svg[^]*?<span class="zahl">2</.test(inhalt()), 'To-Do-Symbol zeigt 2 laufende Checklisten (Vorlagen zählen nicht)');
   S.DB.gedanken = []; S.zeichne();
   pruefe(!/oeffne\('checklisten'\)"><span class="sym"><svg[^<]*?(<[^b][^]*?)?<span class="zahl">/.test(inhalt().replace(/oeffne\('heute'\)[\s\S]*?<\/button>/, '')), 'ohne laufende keine Zahl');
   /* Verweise zwischen Sammlungen */
@@ -6890,6 +6956,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { toDoTest(); } catch (e) { fail('To Do warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { filterZweiTest(); } catch (e) { fail('Filter zwei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungPlanenTest(); } catch (e) { fail('Sammlung planen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { trainingSportDoppeltTest(); } catch (e) { fail('Training Sport doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
