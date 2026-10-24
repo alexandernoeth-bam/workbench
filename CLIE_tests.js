@@ -417,10 +417,10 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","sammlungen","projekte","memo","einkauf","vorlesen","rechner","kurs","planung","lernen","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","sammlungen","projekte","memo","einkauf","vorlesen","rechner","ziele","planung","lernen","spiele"]'
     && CL.clApp('heute') && CL.clApp('heute').raster === false && CL.clApp('coach').raster === false,
-    'Start 3×4 (seit 0.61): Kalender, To Do, Sammlungen / Projekte, Notizen, Einkauf / Vorlesen, Rechner, Kurs / Planung ▸, Lernen ▸, Spiele ▸');
-  pruefe(!/oeffne\('(ziele|listen|woche)'\)/.test(h), 'keine eigenen Apps für Ziele, Listen oder Woche (Ziele stehen in Projekte)');
+    'Start 3×4 (seit 0.62): Kalender, To Do, Sammlungen / Projekte, Notizen, Einkauf / Vorlesen, Rechner, Ziele / Planung ▸, Lernen ▸, Spiele ▸');
+  pruefe(!/oeffne\('(listen|woche|kurs)'\)/.test(h) && /oeffne\('ziele'\)/.test(h), 'Ziele seit 0.62 auf der Startseite; keine Apps für Listen, Woche; Kurs nicht im Raster');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
   pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
@@ -921,7 +921,7 @@ function aufgabenTest() {
   CL.katUm();
   let a = CL.document.getElementById('aufklapp').innerHTML;
   pruefe(CL.cl.aufklapp === 'liste' && /aufFilter\('beruflich'\)/.test(a) && /todoAlle\(\)/.test(a) && /todoListe\('cl-korb'\)/.test(a) && /todoSicht\('vorlage'\)/.test(a) && !/Weitere/.test(a),
-    'das ▼ (seit 0.61): Beruf/Privat, Alle, Korb, Listen, Ruhende/Fertige/Vorlagen');
+    'das ▼ (seit 0.61): Beruf/Privat, Alle, Sammler, Listen, Ruhende/Fertige/Vorlagen');
   CL.todoBereichAuf();
   pruefe(CL.cl.aufklapp === 'todobereich' && /aufBereichSetzen\('kb-haus'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Bereich wird über „Bereich: … ▾“ gewählt');
   CL.aufklappZu();
@@ -947,14 +947,14 @@ function aufgabenTest() {
   pruefe(/Fenster messen/.test(inhalt()) && /Pläne/.test(inhalt()), '„Erledigte“ zeigt es wieder');
   CL.aufErlUm();
 
-  /* Neu: ohne Wahl in den Korb (seit 0.49 statt „Liste ist Pflicht“) */
+  /* Neu: ohne Wahl in den Sammler (seit 0.49 statt „Liste ist Pflicht“) */
   CL.aufNeu();
   let f = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Neue Aufgabe/.test(f) && /id="aufOk" class="knopf voll" disabled/.test(f) && /▼ Korb</.test(f) && /Checkliste:/.test(f), 'Neu: „Checkliste: ▼ Korb“, OK erst mit Text');
+  pruefe(/Neue Aufgabe/.test(f) && /id="aufOk" class="knopf voll" disabled/.test(f) && /▼ Sammler</.test(f) && /Checkliste:/.test(f), 'Neu: „Checkliste: ▼ Sammler“, OK erst mit Text');
   CL.document.getElementById('aufText').value = 'Winterreifen';
   CL.aufSpeichern();
   const korb0 = CL.DB.themen.filter(x => x.id === 'cl-korb')[0];
-  pruefe(korb0 && korb0.korb && /\[\] Winterreifen/.test(korb0.text), 'ohne Wahl landet die Aufgabe im Korb — er wird dabei angelegt');
+  pruefe(korb0 && korb0.korb && /\[\] Winterreifen/.test(korb0.text), 'ohne Wahl landet die Aufgabe im Sammler — er wird dabei angelegt');
   CL.DB.themen = CL.DB.themen.filter(x => x.id !== 'cl-korb');
   CL.aufNeu();
   CL.document.getElementById('aufText').value = 'Winterreifen';
@@ -1854,8 +1854,8 @@ function ckZustandTest() {
   S.oeffne('aufgaben');
   S.katUm();
   let h = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'liste' && h.indexOf("todoListe('cl-korb')") < h.indexOf("todoListe('th')") && /<div class="zw">Haus &amp; Projekte<\/div>/.test(h),
-    '▼: oben Alle und Korb, darunter die laufenden Listen nach Bereich');
+  pruefe(S.cl.aufklapp === 'liste' && h.indexOf("todoListe('cl-korb')") < h.indexOf("todoListe('th')") && !/<div class="zw">/.test(h),
+    '▼: oben Alle und Sammler, darunter die laufenden Listen nach Bereich — ohne Überschriften (0.62)');
   pruefe(/Haus<\/span><small>1\/2</.test(h), 'rechts nur x/y');
   pruefe(/☑ Packen Borkum/.test(h) && !/☑ Jahresgespräche/.test(h) && !/☑ Haus/.test(h), '☑ nur vor Listen zum Abhaken');
   pruefe(!/Carport Angebote/.test(h) && !/>Altes</.test(h) && /Ruhende…<\/span><small>1</.test(h) && /Fertige…<\/span><small>1</.test(h), 'Ruhende und Fertige nur gezählt, unter dem Strich');
@@ -1922,22 +1922,22 @@ function ckZustandTest() {
 }
 
 /* ============================================================
-   94. Korb und Aufgaben als Gesamtsicht (0.49)
+   94. Sammler und Aufgaben als Gesamtsicht (0.49)
    Grund: Lose Einzelaufgaben brauchen keine eigene Liste — sie landen im
-   Korb, der einzigen Liste ohne Ende. „Neue Aufgabe“ hat keine Pflicht-
+   Sammler, der einzigen Liste ohne Ende. „Neue Aufgabe“ hat keine Pflicht-
    Liste mehr. Aufgaben zeigt nur noch an und filtert nach Lebensbereich.
-   Erkennt: Korb doppelt angelegt, Aufgabe ohne Wahl geht verloren, Korb
+   Erkennt: Sammler doppelt angelegt, Aufgabe ohne Wahl geht verloren, Sammler
    ruht oder lässt sich löschen, Filter nach Bereich wirkungslos.
    ============================================================ */
 function ckKorbTest() {
-  console.log('\n94. Korb und Aufgaben als Gesamtsicht (0.49)');
+  console.log('\n94. Sammler und Aufgaben als Gesamtsicht (0.49)');
   if (!CL) { return; }
   frisch();
   const S = CL;
   S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.bereich = '';
   S.DB.themen = [{ id: 'tg', name: 'Garten', text: '[] Hecke', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 },
                  { id: 'tb', name: 'Büro', text: '[] Ablage', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 }];
-  pruefe(S.ckKorb(false) === null, 'ohne Gebrauch kein Korb');
+  pruefe(S.ckKorb(false) === null, 'ohne Gebrauch kein Sammler');
   S.oeffne('aufgaben');
   S.aufNeu();
   S.document.getElementById('aufText').value = 'Dachrinne reinigen';
@@ -1946,15 +1946,15 @@ function ckKorbTest() {
   S.document.getElementById('aufText').value = 'Fenster abdichten';
   S.aufSpeichern();
   const korb = S.DB.themen.filter(x => x.id === 'cl-korb');
-  pruefe(korb.length === 1 && korb[0].korb && korb[0].text === '[] Dachrinne reinigen\n[] Fenster abdichten' && korb[0].kontext === '', 'ohne Wahl in den Korb — genau ein Korb (feste Kennung), passt zu Beruf und Privat');
+  pruefe(korb.length === 1 && korb[0].korb && korb[0].text === '[] Dachrinne reinigen\n[] Fenster abdichten' && korb[0].kontext === '', 'ohne Wahl in den Sammler — genau ein Sammler (feste Kennung), passt zu Beruf und Privat');
   S.katUm();
-  pruefe(/todoListe\('cl-korb'\)"><span>Korb<\/span><small>2</.test(S.document.getElementById('aufklapp').innerHTML) && (S.document.getElementById('aufklapp').innerHTML.match(/todoListe\('cl-korb'\)/g) || []).length === 1, '▼: Korb oben mit Zahl, nicht noch einmal bei den Listen');
+  pruefe(/todoListe\('cl-korb'\)"><span>Sammler<\/span><small>2</.test(S.document.getElementById('aufklapp').innerHTML) && (S.document.getElementById('aufklapp').innerHTML.match(/todoListe\('cl-korb'\)/g) || []).length === 1, '▼: Sammler oben mit Zahl, nicht noch einmal bei den Listen');
   S.aufklappZu();
   S.todoListe('cl-korb');
-  pruefe(S.cl.cls.id === 'cl-korb' && /Lose Einzelaufgaben/.test(inhalt()) && /Dachrinne reinigen/.test(inhalt()), 'der Korb öffnet sich wie eine Checkliste');
+  pruefe(S.cl.cls.id === 'cl-korb' && /Lose Einzelaufgaben/.test(inhalt()) && /Dachrinne reinigen/.test(inhalt()), 'der Sammler öffnet sich wie eine Checkliste');
   S.clsDetails();
   const f = S.clsFensterHtml();
-  pruefe(!/clsDetailWahl\('zustand'/.test(f) && !/ckListeLoeschenFragen/.test(f) && !/id="clsTitel"/.test(f), 'Korb: kein Zustand, kein Löschen, kein Umbenennen');
+  pruefe(!/clsDetailWahl\('zustand'/.test(f) && !/ckListeLoeschenFragen/.test(f) && !/id="clsTitel"/.test(f), 'Sammler: kein Zustand, kein Löschen, kein Umbenennen');
   S.aufklappZu();
   /* Neu aus einer geöffneten Checkliste landet dort */
   S.clsOeffnen('tg');
@@ -1963,24 +1963,24 @@ function ckKorbTest() {
   S.document.getElementById('aufText').value = 'Rasen mähen';
   S.aufSpeichern();
   pruefe(/\[\] Rasen mähen$/.test(S.DB.themen[0].text), 'und dort angelegt');
-  /* Auswahl im Fenster: Korb, Checklisten, Projekte */
+  /* Auswahl im Fenster: Sammler, Checklisten, Projekte */
   S.clsZurListe();
   S.aufNeu(); S.listenwahlOeffnen('aufgabe');
   const w = S.listenwahlHtml();
-  pruefe(/Checkliste wählen/.test(w) && w.indexOf('>Korb<') < w.indexOf('>Checklisten<') && /Neue Checkliste …/.test(w), 'Auswahl: zuerst Korb, dann Checklisten, „Neue Checkliste …“');
+  pruefe(/Checkliste wählen/.test(w) && w.indexOf('>Sammler<') < w.indexOf('>Checklisten<') && /Neue Checkliste …/.test(w), 'Auswahl: zuerst Sammler, dann Checklisten, „Neue Checkliste …“');
   S.aufklappZu();
   /* Aufgaben nach Lebensbereich */
   S.oeffne('aufgaben');
   S.aufBereichSetzen('kb-arbeit');
   pruefe(/Ablage/.test(inhalt()) && !/Hecke/.test(inhalt()) && !/Dachrinne/.test(inhalt()) && S.localStorage.getItem('clie-aufgaben-bereich') === 'kb-arbeit', 'Filter nach Bereich: nur Arbeit, gemerkt');
   S.aufBereichSetzen('');
-  pruefe(/Ablage/.test(inhalt()) && /Hecke/.test(inhalt()) && /Dachrinne/.test(inhalt()), 'Alle Aufgaben: wieder alles, auch der Korb');
+  pruefe(/Ablage/.test(inhalt()) && /Hecke/.test(inhalt()) && /Dachrinne/.test(inhalt()), 'Alle Aufgaben: wieder alles, auch der Sammler');
   S.oeffne('uebersicht');
 }
 
 /* ============================================================
-   97. Coach und Korb (0.52)
-   Grund: Der Korb funktioniert nur, wenn er leer wird. Der Coach fragt
+   97. Coach und Sammler (0.52)
+   Grund: Der Sammler funktioniert nur, wenn er leer wird. Der Coach fragt
    nach Punkten, die zu lange liegen, bietet Aufräumen an (zu voll oder
    am gewählten Wochentag), schlägt bei gleichem Thema eine Checkliste
    vor und fragt nach Checklisten, die seit 30 Tagen ruhen.
@@ -1989,7 +1989,7 @@ function ckKorbTest() {
    Wirkung, Quelle lässt sich nicht abschalten.
    ============================================================ */
 function coKorbTest() {
-  console.log('\n97. Coach und Korb (0.52)');
+  console.log('\n97. Coach und Sammler (0.52)');
   if (!CL) { return; }
   frisch();
   const S = CL;
@@ -1999,34 +1999,34 @@ function coKorbTest() {
   S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
   S.termineNachTag = {};
   S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, frist: 7, korbGrenze: 5, korbTag: S.ausIso(heute).getDay() });
-  S.DB.themen = [{ id: 'cl-korb', name: 'Korb', kontext: '', korb: true, ordnung: 0, geaendert: 1,
+  S.DB.themen = [{ id: 'cl-korb', name: 'Sammler', kontext: '', korb: true, ordnung: 0, geaendert: 1,
     text: '[] Dachrinne reinigen\n[] Carport Fundament klären\n[] Carport Bauamt anrufen\n[] Angebot Carport Maier\n[] Fenster abdichten\n[] Steuer',
     korbSeit: { 'Dachrinne reinigen': vor(9), 'Fenster abdichten': vor(12) } },
     { id: 'tr', name: 'Jahresgespräche', text: '[] Bögen', kontext: 'privat', ruht: true, ruhtSeit: vor(34), ordnung: 1, geaendert: 1 }];
   S.ckStempeln(heute);
-  pruefe(S.DB.themen[0].korbSeit['Steuer'] === heute && S.DB.themen[0].korbSeit['Dachrinne reinigen'] === vor(9), 'neue Korb-Punkte werden gestempelt, alte behalten ihr Datum');
+  pruefe(S.DB.themen[0].korbSeit['Steuer'] === heute && S.DB.themen[0].korbSeit['Dachrinne reinigen'] === vor(9), 'neue Sammler-Punkte werden gestempelt, alte behalten ihr Datum');
   S.ckZusatzSetzen(S.kpSeiteFinden('cl-korb'), 'Fenster abdichten', S.tagePlus(heute, 5), '');
   let l = S.coFaellige('20:45', heute);
   const ka = l.filter(f => /^ka:/.test(f.id));
-  pruefe(ka.length === 1 && ka[0].id === 'ka:Dachrinne reinigen' && /seit 9 Tagen im Korb/.test(ka[0].text) && ka[0].antworten.map(a => a[0]).join() === 'heute,einplanen,checkliste,loeschen',
-    'zu lange im Korb: nur ohne ⚑/Termin, mit Heute · Einplanen · In Checkliste · Löschen');
+  pruefe(ka.length === 1 && ka[0].id === 'ka:Dachrinne reinigen' && /seit 9 Tagen im Sammler/.test(ka[0].text) && ka[0].antworten.map(a => a[0]).join() === 'heute,einplanen,checkliste,loeschen',
+    'zu lange im Sammler: nur ohne ⚑/Termin, mit Heute · Einplanen · In Checkliste · Löschen');
   pruefe(l.some(f => /^kv:/.test(f.id) && /6 Punkte/.test(f.text)), 'zu voll (ab 5): Aufräumen wird angeboten');
-  pruefe(l.some(f => /^kw:/.test(f.id) && /Korb leeren\?/.test(f.text)), 'am gewählten Wochentag abends: „Korb leeren?“');
+  pruefe(l.some(f => /^kw:/.test(f.id) && /Sammler leeren\?/.test(f.text)), 'am gewählten Wochentag abends: „Sammler leeren?“');
   const kt = l.filter(f => /^kt:/.test(f.id))[0];
-  pruefe(kt && kt.id === 'kt:carport' && /3 Punkte im Korb betreffen „Carport“/.test(kt.text), 'gleiches Thema in drei Punkten: Checkliste vorschlagen');
+  pruefe(kt && kt.id === 'kt:carport' && /3 Punkte im Sammler betreffen „Carport“/.test(kt.text), 'gleiches Thema in drei Punkten: Checkliste vorschlagen');
   const cr = l.filter(f => /^cr:/.test(f.id))[0];
   pruefe(cr && /ruht seit 34 Tagen/.test(cr.text) && cr.antworten.map(a => a[0]).join() === 'abschliessen,wecken,weiter', 'seit 30 Tagen ruhend: Abschließen · Wecken · Weiter ruhen');
   /* Antworten */
   S.coAntwort('kt:carport', 'anlegen', 0, '20:45');
   const neu = S.DB.themen.filter(x => x.name === 'Carport')[0];
-  pruefe(neu && (neu.text.match(/\[\] /g) || []).length === 3 && !/Carport/.test(S.DB.themen[0].text), 'Thema: Checkliste „Carport“ angelegt, drei Punkte aus dem Korb hineingelegt');
+  pruefe(neu && (neu.text.match(/\[\] /g) || []).length === 3 && !/Carport/.test(S.DB.themen[0].text), 'Thema: Checkliste „Carport“ angelegt, drei Punkte aus dem Sammler hineingelegt');
   S.coAntwort('ka:Dachrinne reinigen', 'heute', 0, '20:45');
-  pruefe(S.aufGeplant(S.kpSeiteFinden('cl-korb'), 'Dachrinne reinigen').datum === heute, '„Heute“ plant den Korb-Punkt für heute');
+  pruefe(S.aufGeplant(S.kpSeiteFinden('cl-korb'), 'Dachrinne reinigen').datum === heute, '„Heute“ plant den Sammler-Punkt für heute');
   S.coAntwort('cr:tr', 'weiter', 2, '20:45');
   pruefe(S.DB.themen[1].ruht && S.DB.themen[1].ruhtSeit === heute, '„Weiter ruhen“: der Coach fragt erst in 30 Tagen wieder');
   /* Aufräumen Punkt für Punkt, mit Einsortieren (0.53) */
   S.coKorbAufraeumen();
-  pruefe(S.cl.app === 'coach' && S.cl.co.ansicht === 'korb' && /Korb aufräumen · noch 2 von 3/.test(inhalt()) && /Fenster abdichten/.test(inhalt()), 'Aufräumen: ein Punkt nach dem anderen (ohne Termin)');
+  pruefe(S.cl.app === 'coach' && S.cl.co.ansicht === 'korb' && /Sammler aufräumen · noch 2 von 3/.test(inhalt()) && /Fenster abdichten/.test(inhalt()), 'Aufräumen: ein Punkt nach dem anderen (ohne Termin)');
   S.coKorbPrio(2);
   pruefe(/\[\] P2 Fenster abdichten/.test(S.DB.themen[0].text), 'Priorität im Aufräumen setzen');
   S.coKorbTun('spaeter');
@@ -2036,14 +2036,51 @@ function coKorbTest() {
   S.coKorbFertig();
   /* Quelle abschaltbar */
   S.krFinden('kc-einstellungen').quellen = { korb: false };
-  pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Korb“ ausgeschaltet: keine Korb-Fragen');
+  pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Sammler“ ausgeschaltet: keine Sammler-Fragen');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   111. Sammler statt Korb, ▼ ohne Überschriften, Ziele auf dem Start (0.62.0)
+   Grund: „Sammler“ passt besser als „Korb“; die Bereichsüberschriften im ▼
+   machten es unruhig; Ziele gehören auf die Startseite.
+   Erkennt: irgendwo in der Oberfläche steht noch „Korb“, ein alter
+   „Korb“ wird nicht umbenannt (oder bekommt eine neue Kennung),
+   Überschriften im ▼, Ziele fehlt auf dem Start.
+   ============================================================ */
+function sammlerTest() {
+  console.log('\n111. Sammler statt Korb, ▼ ohne Überschriften, Ziele auf dem Start (0.62.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  /* Kein „Korb“ mehr in Texten des Programms — Bezeichner (coKorb…, ckKorb…) zählen nicht */
+  /* Ausgenommen: die Umbenennung selbst (0.62) */
+  const reste = QUELLE.split('\n').filter(z => !/0\.62/.test(z) && !/x\.name === 'Korb'/.test(z)).join('\n').match(/(^|[^A-Za-z_])Korb(?![A-Za-z_])/g);
+  const restZahl = (reste || []).length;
+  pruefe(restZahl === 0, 'nirgends mehr „Korb“ in der Oberfläche (' + restZahl + ' Reste)');
+  /* Alter Korb wird umbenannt, Kennung bleibt */
+  S.DB.themen = [{ id: 'cl-korb', name: 'Korb', kontext: '', text: '[] Dachrinne', korb: true, ordnung: 0, geaendert: 1 },
+                 { id: 'lh', name: 'Haus', text: '[] Fenster', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 }];
+  const k = S.ckKorb(false);
+  pruefe(k && k.id === 'cl-korb' && k.titel === 'Sammler' && S.DB.themen[0].name === 'Sammler' && S.DB.themen[0].geaendert > 1 && S.DB.themen.length === 2,
+    'alter „Korb“ heißt jetzt „Sammler“ — gleiche Kennung, kein zweiter');
+  S.oeffne('aufgaben');
+  S.katUm();
+  const dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/<span>Sammler<\/span><small>1</.test(dd) && !/class="zw"/.test(dd) && /todoListe\('lh'\)/.test(dd), '▼: „Sammler“ mit Zahl, Listen ohne Bereichsüberschriften');
+  S.aufklappZu();
+  S.aufNeu();
+  pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
+  S.aufklappZu();
+  const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  pruefe(start.indexOf('ziele') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && S.CL_ORDNER.planung.apps.indexOf('ziele') < 0, 'Start: Ziele statt Kurs, weiter 12 Felder');
   S.oeffne('uebersicht');
 }
 
 /* ============================================================
    110. Aufgaben und Checklisten sind eine App „To Do“ (0.61.0)
    Grund: Beide Apps zeigten zu 90 % dieselben Daten. Wie am Palm gibt es
-   jetzt eine App mit ▼ oben rechts: Alle, Korb, jede laufende Liste,
+   jetzt eine App mit ▼ oben rechts: Alle, Sammler, jede laufende Liste,
    Ruhende/Fertige/Vorlagen.
    Erkennt: „Checklisten“ wieder im Raster, Reiter nicht „To Do“, ▼ fehlt
    in der Listen-Ansicht, „Fertig“/Zurück führen ins Leere, Abhak-Punkte
@@ -2149,10 +2186,10 @@ function filterZweiTest() {
 /* ============================================================
    108. Aus einem Sammlungseintrag eine Aufgabe oder einen Termin (0.59.0)
    Grund: Vieles in Sammlungen ist eine Erinnerung (Abo kündigen,
-   Trainingseinheit) — sie soll ohne Abtippen in den Korb oder Kalender.
+   Trainingseinheit) — sie soll ohne Abtippen in den Sammler oder Kalender.
    Erkennt: Knopf fehlt / erscheint bei „Neu“, Vorbelegung falsch (Text,
    Frist aus „kündbar bis“, Datum in der Vergangenheit), Getipptes geht
-   verloren, Aufgabe landet nicht im Korb, Termin ohne Titel/Dauer.
+   verloren, Aufgabe landet nicht im Sammler, Termin ohne Titel/Dauer.
    ============================================================ */
 function sammlungPlanenTest() {
   console.log('\n108. Aus einem Sammlungseintrag eine Aufgabe oder einen Termin (0.59.0)');
@@ -2196,7 +2233,7 @@ function sammlungPlanenTest() {
   S.document.getElementById('aufFrist').value = S.cl.auf.fenster.frist;
   S.aufSpeichern();
   const korb = S.ckKorb(false);
-  pruefe(korb && /\[\] Netflix Premium kündigen/.test(korb.text) && S.ckZusatz(korb, 'Netflix Premium kündigen').frist === S.tagePlus(heute, 40), 'ohne Wahl: in den Korb, mit ⚑ Frist');
+  pruefe(korb && /\[\] Netflix Premium kündigen/.test(korb.text) && S.ckZusatz(korb, 'Netflix Premium kündigen').frist === S.tagePlus(heute, 40), 'ohne Wahl: in den Sammler, mit ⚑ Frist');
   pruefe(S.cl.app === 'sammlungen' && S.cl.sa.id === ab.id, 'danach bleibt man in der Sammlung');
   /* Termin: Titel und Dauer übernehmen */
   S.aufklappZu();
@@ -2497,8 +2534,8 @@ function coSubstanzTest() {
   pruefe(S.coSubstanzStufe(true, true) === 1 && S.coSubstanzStufe(true, false) === 2 && S.coSubstanzStufe(false, true) === 2 && S.coSubstanzStufe(false, false) === 3, 'Prüffragen: zweimal Ja → P1, einmal → P2, keinmal → P3');
   pruefe(S.coOrgaKlang('P1 Carport Angebote anschauen') && S.coOrgaKlang('Testdaten-Thema mit Team besprechen') && !S.coOrgaKlang('Carport: Angebotsvergleich abgeschlossen & Favorit gewählt') && !S.coOrgaKlang('Fachbuchkapitel durcharbeiten'),
     'Nachher-Test erkennt Organisatorisches an typischen Verben');
-  /* Korb aufräumen mit Prüffragen */
-  S.DB.themen = [{ id: 'cl-korb', name: 'Korb', kontext: '', korb: true, ordnung: 0, geaendert: 1, text: '[] Fundamentplan zeichnen' },
+  /* Sammler aufräumen mit Prüffragen */
+  S.DB.themen = [{ id: 'cl-korb', name: 'Sammler', kontext: '', korb: true, ordnung: 0, geaendert: 1, text: '[] Fundamentplan zeichnen' },
     { id: 'tc', name: 'Carport', kontext: 'privat', stern: true, ordnung: 1, geaendert: 1, text: '[] P1 Carport Angebote anschauen\n[] Ordner anlegen' }];
   S.coKorbAufraeumen();
   pruefe(/coKorbPruef\('ergebnis',true\)/.test(inhalt()) && /coKorbPruef\('hebel',false\)/.test(inhalt()) && /1–2 Substanz/.test(inhalt()), 'Aufräumen: zwei Prüffragen, Hinweis „1–2 Substanz“');
@@ -3426,7 +3463,7 @@ function zieleTest() {
   S.DB.ziele.push({ id: 'z2', name: 'Gewicht 73 kg', kontext: 'privat', status: 'laufend', zieltermin: S.tagePlus(heute, 30), flaeche: '## Warum\nKnie entlasten\n[] Waage kaufen', ordnung: 2, geaendert: 1 });
   S.DB.ziele.push({ id: 'z3', name: 'Italienisch A2', kontext: 'privat', status: 'laufend', zieltermin: '', flaeche: '', ordnung: 3, geaendert: 1 });
   S.DB.ziele.push({ id: 'z4', name: 'Alter Vorsatz', kontext: 'privat', status: 'abgeschlossen', zieltermin: '2025-01-01', flaeche: '', ordnung: 4, geaendert: 1 });
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('ziele') >= 0 && S.clApp('ziele').raster === false && /M20 17h22/.test(S.clSymbol('ziele')), 'Ziele im Ordner Planung, mit Fahne als Symbol');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('ziele') < 0 && S.clApp('ziele').raster !== false && /M20 17h22/.test(S.clSymbol('ziele')), 'Ziele seit 0.62 auf der Startseite (nicht mehr im Ordner), mit Fahne als Symbol');
   pruefe(/2 laufen|3 laufen/.test(S.ordnerStandText('ziele')) && /nächstes in 30 Tage/.test(S.ordnerStandText('ziele')), 'Stand im Ordner: Anzahl und nächstes Ziel');
   S.oeffne('projekte');
   pruefe(!/Haus auf Stand|Gewicht/.test(inhalt()) && /Carport/.test(inhalt()), 'Projekte zeigt keine Ziele mehr');
@@ -3467,7 +3504,7 @@ function zieleTest() {
   S.clZurueck();
   pruefe(S.cl.app === 'ziele' && !S.cl.zi.id, 'Zurück: vom Ziel zur Liste');
   S.clZurueck();
-  pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === 'planung', 'noch einmal Zurück: in den Ordner Planung');
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp !== 'ordner', 'noch einmal Zurück: zur Übersicht (seit 0.62 nicht mehr im Ordner)');
   S.aufklappZu();
   S.seiteOeffnen('z1');
   pruefe(S.cl.app === 'ziele' && S.cl.zi.id === 'z1', 'Lesezeichen, Suche und Verweise öffnen Ziele in Ziele');
@@ -5621,7 +5658,7 @@ function coachTest() {
   ['Steuer-Unterlagen sortieren', 'P1 Angebot Müller', 'Keller aufräumen', 'Fahrrad flicken'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
   S.termineNachTag = {}; S.termineNachTag[heute] = [{ id: 'tr1', titel: 'Team-Runde', rohTitel: 'Team-Runde', zeit: '10:00', bis: '11:00', ganztags: false, kontext: '' },
     { id: 'tc1', titel: 'Coach: Halbzeit', rohTitel: 'Coach: Halbzeit', zeit: '12:30', bis: '12:35', ganztags: false, kontext: '' }];
-  pruefe(S.clApp('coach') && S.CL_BILD.coach && S.clApp('kurs').raster !== false, 'App „Coach“ da, Kurs seit 0.61 im Raster');
+  pruefe(S.clApp('coach') && S.CL_BILD.coach && S.clApp('kurs').raster === false, 'App „Coach“ da, Kurs liegt darunter (seit 0.62 wieder nicht im Raster)');
   pruefe(S.clTermineAm(heute).zeit.length === 1 && S.coTagDaten(heute).termine.length === 1, 'Coach-Termine („Coach: …“) sind in CLIE ausgeblendet');
   /* Morgen */
   const m = S.coFaellige('07:45', heute);
@@ -6956,6 +6993,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { sammlerTest(); } catch (e) { fail('Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { toDoTest(); } catch (e) { fail('To Do warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { filterZweiTest(); } catch (e) { fail('Filter zwei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungPlanenTest(); } catch (e) { fail('Sammlung planen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -6969,10 +7007,10 @@ function lernkarteiTest() {
   try { clsAusNotizTest(); } catch (e) { fail('Checkliste aus Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoLoeschenTest(); } catch (e) { fail('Notiz löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coPrioTest(); } catch (e) { fail('Coach-Prioritäten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coKorbTest(); } catch (e) { fail('Coach-Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { coKorbTest(); } catch (e) { fail('Coach-Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saImportTest(); } catch (e) { fail('Tabellen-Import warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckPrioTest(); } catch (e) { fail('Prioritäten 1–5 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { ckKorbTest(); } catch (e) { fail('Korb warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { ckKorbTest(); } catch (e) { fail('Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckZustandTest(); } catch (e) { fail('Checklisten-Zustand warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsAusListeTest(); } catch (e) { fail('Checkliste aus Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsKompaktTest(); } catch (e) { fail('Checklisten kompakt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
