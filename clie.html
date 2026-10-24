@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.68.0</title>
+<title>CLIE 0.69.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -855,6 +855,26 @@ span.hs-thumb{display:block}
 .sd-gitter button.n{display:grid;grid-template-columns:repeat(3,1fr);font-size:15.5px;line-height:.86;letter-spacing:-1px;color:var(--px-mitte);padding:0;overflow:hidden}
 .sd-gitter button.n i{font-style:normal;text-align:center}
 .sd-gitter button.f.n{color:var(--lcd)}
+/* Minen und Puzzle (seit 0.69) */
+.mi-feld{display:grid;border:2px solid var(--px);margin:0 auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.mi-feld button{aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:0;font-size:17px;font-weight:700;min-width:0}
+.mi-feld button.zu{background:var(--lcd-hell);box-shadow:inset -2px -2px 0 var(--px-zart),inset 2px 2px 0 #dfe6d0}
+.mi-feld button.auf{background:var(--lcd);border:1px solid var(--px-zart)}
+.mi-feld button.mine{color:var(--px)}
+.mi-feld button.knall{background:var(--px);color:var(--lcd)}
+.mi-feld button.falsch{text-decoration:line-through}
+.pz-feld{display:grid;gap:4px;margin:6px auto;max-width:360px}
+.pz-stein,.pz-frei{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-weight:700;padding:0}
+.pz-stein{border:2px solid var(--px);background:var(--lcd-hell);box-shadow:3px 3px 0 var(--px)}
+.pz-stein.recht{background:var(--px);color:var(--lcd)}
+.pz-frei{border:2px dotted var(--px-zart)}
+.pz-3 .pz-stein{font-size:36px}.pz-4 .pz-stein{font-size:30px}.pz-5 .pz-stein{font-size:24px}.pz-6 .pz-stein{font-size:20px}
+.pz-feld.ziel .pz-stein{box-shadow:none}
+.aufklapp.mp-wahl{min-width:260px}
+.aufklapp.mp-wahl button{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.aufklapp.mp-wahl button.an{background:var(--px);color:var(--lcd)}
+.aufklapp.mp-wahl small,.mp-best small{font-size:15.5px;color:inherit;opacity:.8;white-space:nowrap}
+.mp-best{display:flex;justify-content:space-between;padding:3px 10px;font-size:16px}
 .sd-ziffern{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:8px auto 0;max-width:460px}
 .sd-ziffern button{border:2px solid var(--px);font-size:23px;padding:3px 0;text-align:center}
 .sd-ziffern button:active{background:var(--px);color:var(--lcd)}
@@ -1015,7 +1035,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.68.0';
+var APP_VERSION = '0.69.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3280,6 +3300,9 @@ var CL_APPS = [
   { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.', raster: false },
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '', raster: false },
   { id: 'sudoku', name: 'Sudoku', stufe: '', was: '', raster: false },
+  /* Seit 0.69: die eingebauten Palm-Spiele MineHunt und Puzzle, je vier Stufen */
+  { id: 'minen', name: 'Minen', stufe: '', was: '', raster: false },
+  { id: 'puzzle', name: 'Puzzle', stufe: '', was: '', raster: false },
   { id: 'solitaer', name: 'Solitär', stufe: '', was: '', raster: false },
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '', raster: false },
   /* Seit 0.45: nach dem Prinzip von Space Invaders */
@@ -3358,6 +3381,12 @@ var CL_BILD = {
           + '<path d="M37.5 22l5 7-5 7-5-7z" fill="#3B4433"/>',
   /* Stufen mit Pfeil nach oben: Schritt für Schritt (seit 0.68) */
   leitfaden: '<path d="M16 46h9v-8h9v-8h9v-8h7" ' + CL_STRICH + '/><path d="M44 16l6 6-6 6" ' + CL_STRICH + '/><circle cx="20" cy="40" r="2.6" ' + CL_FUELL + '/>',
+  /* Mine mit Zacken; Schiebepuzzle mit freier Ecke (seit 0.69) */
+  minen: '<circle cx="32" cy="33" r="10" ' + CL_FUELL + '/><path d="M32 16v6M32 44v6M15 33h6M43 33h6M20 21l4 4M40 41l4 4M44 21l-4 4M24 41l-4 4" ' + CL_STRICH + '/><circle cx="28" cy="29" r="2.4" fill="#3B4433"/>',
+  puzzle: '<g ' + CL_FUELL + '><rect x="15" y="15" width="10" height="10"/><rect x="27" y="15" width="10" height="10"/><rect x="39" y="15" width="10" height="10"/>'
+        + '<rect x="15" y="27" width="10" height="10"/><rect x="27" y="27" width="10" height="10"/><rect x="39" y="27" width="10" height="10"/>'
+        + '<rect x="15" y="39" width="10" height="10"/><rect x="27" y="39" width="10" height="10"/></g>'
+        + '<rect x="39" y="39" width="10" height="10" stroke="#C9D3B7" stroke-width="1.5" fill="none" stroke-dasharray="2 2"/>',
   /* Glühbirne (seit 0.31) */
   ideen: '<path d="M32 14c-8 0-13 6-13 12 0 5 3 8 5 10 1 1 2 3 2 5h12c0-2 1-4 2-5 2-2 5-5 5-10 0-6-5-12-13-12z" ' + CL_STRICH + '/><rect x="26" y="44" width="12" height="3" ' + CL_FUELL + '/><rect x="27" y="49" width="10" height="3" ' + CL_FUELL + '/>',
   /* Kompassnadel im Kreis (seit 0.28) */
@@ -4086,6 +4115,8 @@ function statistikHtml() {
     + clStatBlock('lesezeichen', 'Lesezeichen', [['Lesezeichen', lzStatZeile()]])
     + clStatBlock('sudoku', 'Sudoku', [['Bestzeit leicht · mittel · schwer', sdStatZeile()]])
     + clStatBlock('solitaer', 'Solitär', [['Spiele · gewonnen · Bestzeit', soStatZeile()]])
+    + clStatBlock('minen', 'Minen', [['Bestzeit leicht · mittel · schwer · experte', miStatZeile()]])
+    + clStatBlock('puzzle', 'Puzzle', [['Bestwert in Zügen 3×3 · 4×4 · 5×5 · 6×6', pzStatZeile()]])
     + clStatBlock('stones', 'Stones', [
       ['Bester · Spiele (dieses Gerät)', (stoBeste().length ? stoZahl(stoBeste()[0].p) : '—') + ' · ' + stoSpiele()]])
     + clStatBlock('invasion', 'Invasion', [
@@ -4186,6 +4217,8 @@ function inhaltZeichnen() {
     ivZeichnen();
   }
   else if (cl.app === 'sudoku') { el.innerHTML = sudokuHtml(); }
+  else if (cl.app === 'minen') { el.innerHTML = minenHtml(); }
+  else if (cl.app === 'puzzle') { el.innerHTML = puzzleHtml(); }
   else if (cl.app === 'lesezeichen') { el.innerHTML = lesezeichenHtml(); }
   else if (cl.app === 'solitaer') { el.innerHTML = solitaerHtml(); }
   else if (cl.app === 'schach') { el.innerHTML = schachHtml(); }
@@ -4290,12 +4323,14 @@ function kopfZeichnen() {
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '')
       : (cl.app === 'sudoku') ? sdKopfText()
+      : (cl.app === 'minen') ? miKopfText()
+      : (cl.app === 'puzzle') ? pzKopfText()
       : (cl.app === 'solitaer') ? soKopfText()
       : (cl.app === 'checklisten') ? '▼ ' + todoKopfText()
       : (cl.app === 'memo') ? '▼ ' + memoKopfText()
       : (cl.app === 'aufgaben' && !liste) ? '▼ ' + katName(cl.filter)
       : '▼ ' + (liste ? liste.titel : (saText !== null ? saText : katName(cl.filter)));
-    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl' || cl.aufklapp === 'sdwahl' || cl.aufklapp === 'sowahl' || cl.aufklapp === 'memowahl' || cl.aufklapp === 'cotag' || cl.aufklapp === 'jahrwahl') ? ' an' : '');
+    kat.className = 'kat' + ((cl.aufklapp === 'kat' || cl.aufklapp === 'liste' || cl.aufklapp === 'safilter' || cl.aufklapp === 'lkwahl' || cl.aufklapp === 'sdwahl' || cl.aufklapp === 'miwahl' || cl.aufklapp === 'pzwahl' || cl.aufklapp === 'sowahl' || cl.aufklapp === 'memowahl' || cl.aufklapp === 'cotag' || cl.aufklapp === 'jahrwahl') ? ' an' : '');
   }
   uhrZeichnen();
 }
@@ -4388,6 +4423,10 @@ function aufklappZeichnen() {
     el.innerHTML = ordnerHtml();
   } else if (cl.aufklapp === 'sdwahl') {
     el.innerHTML = sdWahlHtml();
+  } else if (cl.aufklapp === 'miwahl') {
+    el.innerHTML = miWahlHtml();
+  } else if (cl.aufklapp === 'pzwahl') {
+    el.innerHTML = pzWahlHtml();
   } else if (cl.aufklapp === 'sowahl') {
     el.innerHTML = soWahlHtml();
   } else if (cl.aufklapp === 'lkwahl') {
@@ -4467,6 +4506,8 @@ function fussZeichnen() {
         : (cl.app === 'coach') ? coachFussHtml()
         : (cl.app === 'lesezeichen') ? lesezeichenFussHtml()
         : (cl.app === 'sudoku') ? sudokuFussHtml()
+        : (cl.app === 'minen') ? minenFussHtml()
+        : (cl.app === 'puzzle') ? puzzleFussHtml()
         : (cl.app === 'solitaer') ? solitaerFussHtml() : '';
   el.innerHTML = h;
   el.className = 'fuss' + (h ? ' auf' : '');
@@ -4548,6 +4589,8 @@ function katUm() {
     : (cl.app === 'memo') ? 'memowahl'
     : (cl.app === 'lernkartei') ? 'lkwahl'
     : (cl.app === 'sudoku') ? 'sdwahl'
+    : (cl.app === 'minen') ? 'miwahl'
+    : (cl.app === 'puzzle') ? 'pzwahl'
     : (cl.app === 'solitaer') ? 'sowahl'
     : (cl.app === 'sammlungen' && saKatText() !== null) ? 'safilter' : 'kat';
   cl.aufklapp = (cl.aufklapp === wohin) ? '' : wohin;
@@ -23203,7 +23246,7 @@ var SP_PAUSE_MS = 60000;
 var CL_ORDNER = {
   planung: { name: 'Planung', apps: ['routinen', 'ideen', 'leitfaden', 'coach', 'kategorien'] },
   lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
-  spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion'] }
+  spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion', 'minen', 'puzzle'] }
 };
 
 cl.ordner = '';
@@ -23233,6 +23276,14 @@ function ordnerWahl(id) {
 function ordnerStandText(id) {
   if (id === 'sudoku' || id === 'solitaer' || id === 'stones') { return spStandText(id); }
   if (id === 'invasion') { return ivStandText(); }
+  if (id === 'minen') {
+    var ms = cl.mi.spiel || miLaden();
+    return ms && !ms.fertig && ms.minen.length ? 'angefangen · ' + miStufe(ms.stufe)[1] + ' · ' + spZeitText(spZeitSek(ms)) : 'neues Spiel';
+  }
+  if (id === 'puzzle') {
+    var ps = cl.pz.spiel || pzLaden();
+    return ps && !ps.fertig && ps.zuege ? 'angefangen · ' + ps.n + '×' + ps.n + ' · ' + ps.zuege + ' Züge' : 'neues Puzzle';
+  }
   if (id === 'schach') { return schBilanzLesen().g + ' gewonnen · ' + schBilanzLesen().v + ' verloren'; }
   if (id === 'routinen') {
     var heute = isoDatum();
@@ -23293,7 +23344,7 @@ function spTakt() {
   if (document.hidden) { return; }
   var el = document.getElementById('spZeit');
   if (!el) { return; }
-  var st = cl.app === 'sudoku' ? cl.sd.spiel : (cl.app === 'solitaer' ? cl.so.spiel : null);
+  var st = cl.app === 'sudoku' ? cl.sd.spiel : (cl.app === 'solitaer' ? cl.so.spiel : (cl.app === 'minen' ? cl.mi.spiel : (cl.app === 'puzzle' ? cl.pz.spiel : null)));
   if (st) { el.textContent = spZeitText(spZeitSek(st)); }
 }
 
@@ -23310,6 +23361,389 @@ function spStandText(id) {
     return cl.sto.zustand === 'pause' ? 'pausiert · Level ' + cl.sto.level : (stoBeste().length ? 'Bester ' + stoZahl(stoBeste()[0].p) : 'neues Spiel');
   }
   return '';
+}
+
+/* ---------- Minen (seit 0.69) ----------
+   Wie MineHunt am Palm: Felder aufdecken, Minen meiden. Die Zahl sagt,
+   wie viele Minen ringsum liegen. Vier Stufen statt einer. Der erste Tipp
+   trifft nie eine Mine (und auch keinen Nachbarn). Fahnen per langem
+   Druck oder über den Schalter unten. Spielstand und Bestzeiten bleiben
+   auf diesem Gerät. */
+
+var MI_KEY = 'clie-minen';
+var MI_BESTE_KEY = 'clie-minen-beste';
+/* id, Name, Spalten, Zeilen, Minen */
+var MI_STUFEN = [['leicht', 'Leicht', 8, 8, 10], ['mittel', 'Mittel', 10, 12, 20], ['schwer', 'Schwer', 12, 14, 35], ['experte', 'Experte', 12, 16, 50]];
+var MI_LANG_MS = 450;
+
+cl.mi = { spiel: null, fahne: false, uhr: null, lang: false };
+
+function miStufe(id) {
+  return MI_STUFEN.filter(function (x) { return x[0] === id; })[0] || MI_STUFEN[1];
+}
+
+function miNeu(stufe) {
+  var st = miStufe(stufe);
+  var n = st[2] * st[3];
+  var auf = [];
+  var i;
+  for (i = 0; i < n; i++) { auf.push(0); }
+  cl.mi.spiel = { stufe: st[0], sp: st[2], ze: st[3], zahl: st[4], minen: [], auf: auf, zeitMs: 0, letzte: 0, fertig: false, verloren: false, knall: -1 };
+  cl.mi.fahne = false;
+  cl.aufklapp = '';
+  miSichern();
+  miZeichnen();
+}
+
+function miLaden() {
+  var s = spLesen(MI_KEY);
+  if (!s || !Array.isArray(s.auf) || !Array.isArray(s.minen) || s.auf.length !== s.sp * s.ze) { return null; }
+  return s;
+}
+
+function miSichern() { if (cl.mi.spiel) { spSchreiben(MI_KEY, cl.mi.spiel); } }
+
+function miSpiel() {
+  if (!cl.mi.spiel) { cl.mi.spiel = miLaden(); }
+  if (!cl.mi.spiel) { miNeu('mittel'); }
+  return cl.mi.spiel;
+}
+
+function miNachbarn(s, i) {
+  var r = Math.floor(i / s.sp);
+  var c = i % s.sp;
+  var aus = [];
+  var dr, dc;
+  for (dr = -1; dr <= 1; dr++) {
+    for (dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) { continue; }
+      var rr = r + dr;
+      var cc = c + dc;
+      if (rr >= 0 && rr < s.ze && cc >= 0 && cc < s.sp) { aus.push(rr * s.sp + cc); }
+    }
+  }
+  return aus;
+}
+
+function miIstMine(s, i) { return s.minen.indexOf(i) >= 0; }
+
+function miZahl(s, i) {
+  return miNachbarn(s, i).filter(function (j) { return miIstMine(s, j); }).length;
+}
+
+/* Minen erst beim ersten Tipp legen — nie dort und nicht daneben */
+function miLegen(s, erst) {
+  var frei = [erst].concat(miNachbarn(s, erst));
+  var l = [];
+  var i;
+  for (i = 0; i < s.sp * s.ze; i++) { if (frei.indexOf(i) < 0) { l.push(i); } }
+  s.minen = sdMischen(l).slice(0, s.zahl).sort(function (a, b) { return a - b; });
+}
+
+/* Aufdecken — eine 0 deckt ihre Nachbarn gleich mit auf */
+function miAufdecken(s, i) {
+  var stapel = [i];
+  while (stapel.length) {
+    var k = stapel.pop();
+    if (s.auf[k] !== 0) { continue; }
+    s.auf[k] = 1;
+    if (!miIstMine(s, k) && miZahl(s, k) === 0) {
+      miNachbarn(s, k).forEach(function (j) { if (s.auf[j] === 0) { stapel.push(j); } });
+    }
+  }
+}
+
+function miFahnenZahl(s) { return s.auf.filter(function (a) { return a === 2; }).length; }
+
+function miPruefen(s) {
+  var i;
+  for (i = 0; i < s.auf.length; i++) {
+    if (s.auf[i] === 1 && miIstMine(s, i)) {
+      s.fertig = true;
+      s.verloren = true;
+      s.knall = i;
+      melde('Mine getroffen — nach ' + spZeitText(spZeitSek(s)) + '.', 'warn');
+      return;
+    }
+  }
+  for (i = 0; i < s.auf.length; i++) { if (!miIstMine(s, i) && s.auf[i] !== 1) { return; } }
+  s.fertig = true;
+  s.minen.forEach(function (j) { s.auf[j] = 2; });
+  var sek = spZeitSek(s);
+  var b = spLesen(MI_BESTE_KEY) || {};
+  var neu = !b[s.stufe] || sek < b[s.stufe];
+  if (neu) { b[s.stufe] = sek; spSchreiben(MI_BESTE_KEY, b); }
+  melde('Geschafft in ' + spZeitText(sek) + (neu ? ' — neue Bestzeit!' : '') + '.', 'gut');
+}
+
+function miTippen(i) {
+  var s = miSpiel();
+  if (s.fertig || i < 0 || i >= s.auf.length) { return; }
+  if (cl.mi.fahne && s.auf[i] !== 1) { miFahne(i); return; }
+  if (s.auf[i] === 2) { return; }
+  if (!s.minen.length) { miLegen(s, i); s.letzte = Date.now(); }
+  spZug(s);
+  if (s.auf[i] === 1) {
+    /* Auf einer Zahl mit genug Fahnen ringsum: die übrigen Nachbarn auf */
+    var z = miZahl(s, i);
+    var nb = miNachbarn(s, i);
+    if (!z || nb.filter(function (j) { return s.auf[j] === 2; }).length !== z) { return; }
+    nb.forEach(function (j) { if (s.auf[j] === 0) { miAufdecken(s, j); } });
+  } else {
+    miAufdecken(s, i);
+  }
+  miPruefen(s);
+  miSichern();
+  miZeichnen();
+}
+
+function miFahne(i) {
+  var s = miSpiel();
+  if (s.fertig || s.auf[i] === 1) { return; }
+  s.auf[i] = s.auf[i] === 2 ? 0 : 2;
+  miSichern();
+  miZeichnen();
+}
+
+/* Langer Druck setzt eine Fahne — der folgende Klick zählt dann nicht */
+function miDruck(i) {
+  miLos();
+  cl.mi.lang = false;
+  cl.mi.uhr = window.setTimeout(function () { cl.mi.uhr = null; cl.mi.lang = true; miFahne(i); }, MI_LANG_MS);
+}
+
+function miLos() {
+  if (cl.mi.uhr) { window.clearTimeout(cl.mi.uhr); cl.mi.uhr = null; }
+}
+
+function miKlick(i) {
+  miLos();
+  if (cl.mi.lang) { cl.mi.lang = false; return; }
+  miTippen(i);
+}
+
+function miFahneUm(an) {
+  cl.mi.fahne = !!an;
+  fussZeichnen();
+}
+
+function minenHtml() {
+  var s = miSpiel();
+  var h = '<div class="sd-kopf"><b>✹ ' + Math.max(0, s.zahl - miFahnenZahl(s)) + ' übrig</b><span>◷ <span id="spZeit">' + spZeitText(spZeitSek(s)) + '</span></span></div>'
+    + '<div class="mi-feld" style="grid-template-columns:repeat(' + s.sp + ',1fr);max-width:' + (s.sp * 34) + 'px">';
+  var i;
+  for (i = 0; i < s.auf.length; i++) {
+    var a = s.auf[i];
+    var mine = miIstMine(s, i);
+    var kl = 'zu';
+    var inhalt = '';
+    if (a === 1) {
+      kl = 'auf';
+      if (mine) { kl += ' mine' + (i === s.knall ? ' knall' : ''); inhalt = '✹'; }
+      else { var z = miZahl(s, i); inhalt = z ? String(z) : ''; }
+    } else if (s.verloren && mine) {
+      kl = 'auf mine'; inhalt = a === 2 ? '⚑' : '✹';
+    } else if (a === 2) {
+      kl = 'zu fl' + (s.verloren ? ' falsch' : ''); inhalt = '⚑';
+    }
+    h += '<button type="button" class="' + kl + '" onpointerdown="miDruck(' + i + ')" onpointerup="miLos()" onpointerleave="miLos()" onpointercancel="miLos()"'
+      + ' oncontextmenu="return false" onclick="miKlick(' + i + ')">' + inhalt + '</button>';
+  }
+  h += '</div>';
+  if (s.verloren) { return h + '<div class="kr-hinweis">Mine getroffen. Neues Spiel über ▼ oder „Neu…“.</div>'; }
+  if (s.fertig) { return h + '<div class="kr-hinweis">Geschafft in ' + spZeitText(spZeitSek(s)) + '. Neues Spiel über ▼ oder „Neu…“.</div>'; }
+  return h + '<p class="leise">Tippen deckt auf · lange drücken setzt ⚑ · Tippen auf eine Zahl mit allen Fahnen deckt die Nachbarn auf.</p>';
+}
+
+function minenFussHtml() {
+  return '<button type="button" class="knopf" onclick="katUm()">Neu…</button>'
+    + '<button type="button" class="knopf' + (cl.mi.fahne ? '' : ' voll') + '" onclick="miFahneUm(false)">Aufdecken</button>'
+    + '<button type="button" class="knopf' + (cl.mi.fahne ? ' voll' : '') + '" onclick="miFahneUm(true)">⚑ Fahne</button>';
+}
+
+function miWahlHtml() {
+  var b = spLesen(MI_BESTE_KEY) || {};
+  return '<div class="aufklapp mp-wahl" style="top:49px;right:6px"><div class="zw">Neues Spiel</div>'
+    + MI_STUFEN.map(function (x) {
+      return '<button type="button"' + (miSpiel().stufe === x[0] ? ' class="an"' : '') + ' onclick="miNeu(\'' + x[0] + '\')"><span>' + x[1] + '</span><small>' + x[2] + '×' + x[3] + ' · ' + x[4] + ' Minen</small></button>';
+    }).join('')
+    + '<div class="trenn"></div><div class="zw">Bestzeiten</div>'
+    + MI_STUFEN.map(function (x) { return '<div class="mp-best"><span>' + x[1] + '</span><small>' + (b[x[0]] ? spZeitText(b[x[0]]) : '—') + '</small></div>'; }).join('')
+    + '</div>';
+}
+
+function miKopfText() { return '▼ ' + miStufe(miSpiel().stufe)[1]; }
+
+function miStatZeile() {
+  var b = spLesen(MI_BESTE_KEY) || {};
+  return MI_STUFEN.map(function (x) { return b[x[0]] ? spZeitText(b[x[0]]) : '—'; }).join(' · ');
+}
+
+function miZeichnen() {
+  if (cl.app !== 'minen') { return; }
+  inhaltZeichnen();
+  fussZeichnen();
+  kopfZeichnen();
+}
+
+/* ---------- Puzzle (seit 0.69) ----------
+   Das Schiebepuzzle vom Palm: die Zahlen in die richtige Reihenfolge
+   schieben, das freie Feld unten rechts. Vier Größen von 3×3 bis 6×6.
+   Gemischt wird durch zufällige Züge vom Ziel aus — so ist es immer
+   lösbar. Ein Tipp schiebt auch mehrere Steine einer Reihe auf einmal. */
+
+var PZ_KEY = 'clie-puzzle';
+var PZ_BESTE_KEY = 'clie-puzzle-beste';
+var PZ_STUFEN = [['leicht', 'Leicht', 3], ['klassisch', 'Klassisch', 4], ['schwer', 'Schwer', 5], ['experte', 'Experte', 6]];
+
+cl.pz = { spiel: null, ziel: false };
+
+function pzStufe(id) {
+  return PZ_STUFEN.filter(function (x) { return x[0] === id; })[0] || PZ_STUFEN[1];
+}
+
+function pzGeordnet(n) {
+  var l = [];
+  var i;
+  for (i = 1; i < n * n; i++) { l.push(i); }
+  l.push(0);
+  return l;
+}
+
+function pzGeloest(s) {
+  var g = pzGeordnet(s.n);
+  return s.steine.every(function (v, i) { return v === g[i]; });
+}
+
+/* Zufällige Züge vom Ziel aus, ohne gleich zurückzuschieben */
+function pzMischen(n) {
+  var l = pzGeordnet(n);
+  var frei = n * n - 1;
+  var zurueck = -1;
+  var schritte = n * n * 30;
+  var k;
+  for (k = 0; k < schritte || l.every(function (v, i) { return v === pzGeordnet(n)[i]; }); k++) {
+    var r = Math.floor(frei / n);
+    var c = frei % n;
+    var m = [];
+    if (r > 0) { m.push(frei - n); }
+    if (r < n - 1) { m.push(frei + n); }
+    if (c > 0) { m.push(frei - 1); }
+    if (c < n - 1) { m.push(frei + 1); }
+    m = m.filter(function (j) { return j !== zurueck; });
+    var j = m[Math.floor(Math.random() * m.length)];
+    l[frei] = l[j];
+    l[j] = 0;
+    zurueck = frei;
+    frei = j;
+  }
+  return l;
+}
+
+function pzNeu(stufe) {
+  var st = pzStufe(stufe);
+  cl.pz.spiel = { stufe: st[0], n: st[2], steine: pzMischen(st[2]), zuege: 0, zeitMs: 0, letzte: Date.now(), fertig: false };
+  cl.pz.ziel = false;
+  cl.aufklapp = '';
+  pzSichern();
+  pzZeichnen();
+}
+
+function pzLaden() {
+  var s = spLesen(PZ_KEY);
+  if (!s || !Array.isArray(s.steine) || s.steine.length !== s.n * s.n) { return null; }
+  return s;
+}
+
+function pzSichern() { if (cl.pz.spiel) { spSchreiben(PZ_KEY, cl.pz.spiel); } }
+
+function pzSpiel() {
+  if (!cl.pz.spiel) { cl.pz.spiel = pzLaden(); }
+  if (!cl.pz.spiel) { pzNeu('klassisch'); }
+  return cl.pz.spiel;
+}
+
+/* Tipp auf einen Stein in der Reihe oder Spalte des freien Felds: alles dazwischen rückt nach */
+function pzTippen(i) {
+  var s = pzSpiel();
+  if (s.fertig || cl.pz.ziel) { return; }
+  var n = s.n;
+  var frei = s.steine.indexOf(0);
+  if (i === frei || i < 0 || i >= n * n) { return; }
+  var schritt = 0;
+  if (Math.floor(i / n) === Math.floor(frei / n)) { schritt = i < frei ? -1 : 1; }
+  else if (i % n === frei % n) { schritt = i < frei ? -n : n; }
+  if (!schritt) { return; }
+  spZug(s);
+  while (frei !== i) {
+    s.steine[frei] = s.steine[frei + schritt];
+    s.steine[frei + schritt] = 0;
+    frei += schritt;
+    s.zuege++;
+  }
+  if (pzGeloest(s)) {
+    s.fertig = true;
+    var sek = spZeitSek(s);
+    var b = spLesen(PZ_BESTE_KEY) || {};
+    var alt = b[s.stufe];
+    var neu = !alt || s.zuege < alt.z || (s.zuege === alt.z && sek < alt.sek);
+    if (neu) { b[s.stufe] = { z: s.zuege, sek: sek }; spSchreiben(PZ_BESTE_KEY, b); }
+    melde('Gelöst in ' + s.zuege + ' Zügen · ' + spZeitText(sek) + (neu ? ' — neuer Bestwert!' : '') + '.', 'gut');
+  }
+  pzSichern();
+  pzZeichnen();
+}
+
+function pzZielUm() {
+  cl.pz.ziel = !cl.pz.ziel;
+  pzZeichnen();
+}
+
+function puzzleHtml() {
+  var s = pzSpiel();
+  var l = cl.pz.ziel ? pzGeordnet(s.n) : s.steine;
+  var g = pzGeordnet(s.n);
+  var h = '<div class="sd-kopf"><b>Züge ' + s.zuege + '</b><span>◷ <span id="spZeit">' + spZeitText(spZeitSek(s)) + '</span></span></div>'
+    + '<div class="pz-feld pz-' + s.n + (cl.pz.ziel ? ' ziel' : '') + '" style="grid-template-columns:repeat(' + s.n + ',1fr)">'
+    + l.map(function (v, i) {
+      if (!v) { return '<span class="pz-frei"></span>'; }
+      return '<button type="button" class="pz-stein' + (v === g[i] ? ' recht' : '') + '" onclick="pzTippen(' + i + ')">' + v + '</button>';
+    }).join('') + '</div>';
+  if (cl.pz.ziel) { return h + '<p class="leise">So soll es aussehen. „Zurück“ führt zum Spiel.</p>'; }
+  if (s.fertig) { return h + '<div class="kr-hinweis">Gelöst in ' + s.zuege + ' Zügen · ' + spZeitText(spZeitSek(s)) + '. Neues Puzzle über ▼ oder „Neu…“.</div>'; }
+  return h + '<p class="leise">Tippen schiebt — auch mehrere Steine einer Reihe auf einmal. Steine an ihrem Platz sind dunkel.</p>';
+}
+
+function puzzleFussHtml() {
+  return '<button type="button" class="knopf" onclick="katUm()">Neu…</button>'
+    + '<button type="button" class="knopf' + (cl.pz.ziel ? ' voll' : '') + '" onclick="pzZielUm()">' + (cl.pz.ziel ? 'Zurück' : 'Ziel ansehen') + '</button>';
+}
+
+function pzWahlHtml() {
+  var b = spLesen(PZ_BESTE_KEY) || {};
+  return '<div class="aufklapp mp-wahl" style="top:49px;right:6px"><div class="zw">Neues Puzzle</div>'
+    + PZ_STUFEN.map(function (x) {
+      return '<button type="button"' + (pzSpiel().stufe === x[0] ? ' class="an"' : '') + ' onclick="pzNeu(\'' + x[0] + '\')"><span>' + x[1] + '</span><small>' + x[2] + '×' + x[2] + ' · ' + (x[2] * x[2] - 1) + ' Steine</small></button>';
+    }).join('')
+    + '<div class="trenn"></div><div class="zw">Bestwerte (Züge · Zeit)</div>'
+    + PZ_STUFEN.map(function (x) {
+      var w = b[x[0]];
+      return '<div class="mp-best"><span>' + x[2] + '×' + x[2] + '</span><small>' + (w ? w.z + ' · ' + spZeitText(w.sek) : '—') + '</small></div>';
+    }).join('') + '</div>';
+}
+
+function pzKopfText() { var s = pzSpiel(); return '▼ ' + s.n + '×' + s.n; }
+
+function pzStatZeile() {
+  var b = spLesen(PZ_BESTE_KEY) || {};
+  return PZ_STUFEN.map(function (x) { return b[x[0]] ? b[x[0]].z : '—'; }).join(' · ');
+}
+
+function pzZeichnen() {
+  if (cl.app !== 'puzzle') { return; }
+  inhaltZeichnen();
+  fussZeichnen();
+  kopfZeichnen();
 }
 
 /* ---------- Sudoku ---------- */

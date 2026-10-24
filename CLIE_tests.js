@@ -291,7 +291,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 28, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 30, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -2198,6 +2198,121 @@ function kategorienTest() {
   pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
   S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
   pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   124. Minen und Puzzle mit vier Stufen (0.69)
+   Grund: die eingebauten Palm-Spiele MineHunt und Puzzle — mit mehr
+   Schwierigkeitsgraden.
+   Erkennt: erster Tipp trifft eine Mine, falsche Minenzahl, Aufdecken
+   der Nullen fehlt, Fahnen/Langdruck kaputt, Gewinn/Verlust nicht
+   erkannt, Puzzle unlösbar gemischt, Mehrfachschieben falsch,
+   Bestwerte nicht gemerkt, Stufe im ▼ fehlt.
+   ============================================================ */
+function minenPuzzleTest() {
+  console.log('\n124. Minen und Puzzle mit vier Stufen (0.69)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.localStorage.removeItem('clie-minen'); S.localStorage.removeItem('clie-minen-beste');
+  S.localStorage.removeItem('clie-puzzle'); S.localStorage.removeItem('clie-puzzle-beste');
+  S.cl.mi.spiel = null; S.cl.pz.spiel = null;
+  pruefe(S.CL_ORDNER.spiele.apps.indexOf('minen') >= 0 && S.CL_ORDNER.spiele.apps.indexOf('puzzle') >= 0 && S.clApp('minen').raster === false
+    && /stroke-dasharray/.test(S.clSymbol('puzzle')) && /M32 16v6/.test(S.clSymbol('minen')), 'beide im Ordner Spiele, mit eigenem Symbol');
+  pruefe(S.MI_STUFEN.length === 4 && S.PZ_STUFEN.length === 4 && S.MI_STUFEN.every(x => x[2] <= 12) && S.PZ_STUFEN.map(x => x[2]).join() === '3,4,5,6',
+    'je vier Stufen; Minen höchstens 12 Spalten, Puzzle 3×3 bis 6×6');
+  /* Minen */
+  S.oeffne('minen');
+  let s = S.cl.mi.spiel;
+  pruefe(s && s.stufe === 'mittel' && s.sp === 10 && s.ze === 12 && !s.minen.length && S.document.getElementById('katKnopf').textContent === '▼ Mittel'
+    && (inhalt().match(/miKlick\(/g) || []).length === 120, 'Start: Mittel 10×12, Minen erst nach dem ersten Tipp');
+  S.katUm();
+  const w = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'miwahl' && (w.match(/miNeu\(/g) || []).length === 4 && /12×16 · 50 Minen/.test(w) && /Bestzeiten/.test(w), '▼: vier Stufen mit Größe und Minen, Bestzeiten');
+  S.miNeu('leicht');
+  s = S.cl.mi.spiel;
+  S.miTippen(27);
+  pruefe(s.minen.length === 10 && !S.miIstMine(s, 27) && S.miNachbarn(s, 27).every(j => !S.miIstMine(s, j)) && s.auf[27] === 1 && S.miZahl(s, 27) === 0,
+    'erster Tipp: nie eine Mine, auch nicht daneben — es öffnet sich eine Fläche');
+  pruefe(s.auf.filter(a => a === 1).length > 1 && s.auf.every((a, i) => a !== 1 || !S.miIstMine(s, i)), 'Nullen decken ihre Nachbarn mit auf, keine Mine dabei');
+  const zu = s.auf.findIndex((a, i) => a === 0);
+  S.miFahne(zu);
+  pruefe(s.auf[zu] === 2 && /✹ 9 übrig/.test(inhalt()), 'Fahne setzen zählt „übrig“ herunter');
+  S.miTippen(zu);
+  pruefe(s.auf[zu] === 2, 'eine Fahne lässt sich nicht aus Versehen aufdecken');
+  S.miFahne(zu);
+  pruefe(s.auf[zu] === 0, 'zweimal: Fahne wieder weg');
+  S.miFahneUm(true); S.miTippen(zu);
+  pruefe(s.auf[zu] === 2 && /class="knopf voll" onclick="miFahneUm\(true\)"/.test(S.document.getElementById('fuss').innerHTML), 'Schalter „⚑ Fahne“: Tippen setzt Fahnen');
+  S.miTippen(zu); S.miFahneUm(false);
+  /* Langer Druck */
+  const echt = S.window.setTimeout;
+  let rueckruf = null;
+  S.window.setTimeout = (fn) => { rueckruf = fn; return 1; };
+  S.miDruck(zu); rueckruf(); S.miKlick(zu);
+  S.window.setTimeout = echt;
+  pruefe(s.auf[zu] === 2 && !S.cl.mi.lang, 'langer Druck setzt eine Fahne, der Klick danach deckt nicht auf');
+  S.miFahne(zu);
+  /* Akkord: Zahl mit genug Fahnen deckt die Nachbarn auf */
+  const zahlFeld = s.auf.findIndex((a, i) => a === 1 && S.miZahl(s, i) > 0 && S.miNachbarn(s, i).some(j => s.auf[j] === 0 && !S.miIstMine(s, j)));
+  if (zahlFeld >= 0) {
+    S.miNachbarn(s, zahlFeld).forEach(j => { if (S.miIstMine(s, j)) { s.auf[j] = 2; } });
+    S.miTippen(zahlFeld);
+    pruefe(S.miNachbarn(s, zahlFeld).every(j => S.miIstMine(s, j) ? s.auf[j] === 2 : s.auf[j] === 1), 'Tipp auf eine Zahl mit allen Fahnen deckt die übrigen Nachbarn auf');
+  } else { warn('kein Zahlfeld für den Akkord-Test gefunden'); }
+  /* Gewinnen */
+  for (let i = 0; i < s.auf.length; i++) { if (!S.miIstMine(s, i) && s.auf[i] !== 1) { S.miTippen(i); } }
+  pruefe(s.fertig && !s.verloren && (S.spLesen('clie-minen-beste') || {}).leicht >= 0 && /Geschafft/.test(inhalt()), 'alle freien Felder offen: gewonnen, Bestzeit gemerkt');
+  /* Verlieren */
+  S.miNeu('schwer');
+  s = S.cl.mi.spiel;
+  S.miTippen(0);
+  pruefe(s.sp === 12 && s.ze === 14 && s.minen.length === 35, 'Schwer: 12×14 mit 35 Minen');
+  S.miTippen(s.minen[0]);
+  pruefe(s.fertig && s.verloren && s.knall === s.minen[0] && /Mine getroffen/.test(inhalt()) && /class="auf mine knall"/.test(inhalt()), 'Mine getroffen: verloren, alle Minen sichtbar');
+  S.miTippen(1);
+  pruefe(s.fertig, 'nach dem Ende passiert beim Tippen nichts mehr');
+  S.cl.mi.spiel = null;
+  pruefe(S.miSpiel().stufe === 'schwer' && S.miSpiel().verloren, 'der Spielstand bleibt auf dem Gerät');
+  /* Puzzle */
+  S.oeffne('puzzle');
+  let p = S.cl.pz.spiel;
+  pruefe(p && p.n === 4 && p.steine.length === 16 && p.steine.indexOf(0) >= 0 && !S.pzGeloest(p) && S.document.getElementById('katKnopf').textContent === '▼ 4×4',
+    'Start: Klassisch 4×4, gemischt');
+  /* Lösbarkeit: Inversionen (gerade Breite: plus Zeile des Lochs von unten) */
+  const loesbar = (l, n) => {
+    const z = l.filter(v => v); let inv = 0;
+    for (let i = 0; i < z.length; i++) { for (let j = i + 1; j < z.length; j++) { if (z[i] > z[j]) { inv++; } } }
+    if (n % 2) { return inv % 2 === 0; }
+    const vonUnten = n - Math.floor(l.indexOf(0) / n);
+    return (inv + vonUnten) % 2 === 1;
+  };
+  pruefe([3, 4, 5, 6].every(n => { for (let k = 0; k < 5; k++) { if (!loesbar(S.pzMischen(n), n)) { return false; } } return true; }), 'gemischt ist immer lösbar (3×3 bis 6×6)');
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'pzwahl' && (S.document.getElementById('aufklapp').innerHTML.match(/pzNeu\(/g) || []).length === 4 && /6×6 · 35 Steine/.test(S.document.getElementById('aufklapp').innerHTML), '▼: vier Größen, Bestwerte');
+  S.pzNeu('leicht');
+  p = S.cl.pz.spiel;
+  p.steine = [1, 2, 3, 4, 5, 6, 0, 7, 8]; p.zuege = 0; p.fertig = false;
+  S.pzTippen(4);
+  pruefe(p.steine.join() === '1,2,3,4,5,6,0,7,8' && p.zuege === 0, 'kein Zug, wenn der Stein nicht in Reihe oder Spalte des freien Felds liegt');
+  S.pzTippen(8);
+  pruefe(p.steine.join() === '1,2,3,4,5,6,7,8,0' && p.zuege === 2 && p.fertig && /Gelöst in 2 Zügen/.test(inhalt()), 'ein Tipp schiebt zwei Steine — gelöst');
+  pruefe((S.spLesen('clie-puzzle-beste') || {}).leicht.z === 2, 'Bestwert in Zügen gemerkt');
+  S.pzNeu('experte');
+  p = S.cl.pz.spiel;
+  const frei = p.steine.indexOf(0);
+  const ziel = (frei % 6 === 0) ? frei + 1 : frei - 1;
+  const vorher = p.steine.slice();
+  S.pzTippen(ziel);
+  pruefe(p.n === 6 && p.steine[frei] === vorher[ziel] && p.steine[ziel] === 0 && p.zuege === 1, 'Experte 6×6: ein Stein rückt ins freie Feld');
+  S.pzZielUm();
+  pruefe(/So soll es aussehen/.test(inhalt()) && /class="knopf voll" onclick="pzZielUm\(\)">Zurück/.test(S.document.getElementById('fuss').innerHTML), '„Ziel ansehen“ zeigt die geordnete Fassung');
+  S.pzTippen(0);
+  pruefe(p.zuege === 1, 'beim Ansehen des Ziels wird nicht geschoben');
+  S.pzZielUm();
+  pruefe(/neues Puzzle|angefangen · 6×6 · 1 Züge/.test(S.ordnerStandText('puzzle')) && /Minen|neues Spiel|angefangen/.test(S.ordnerStandText('minen') || 'neues Spiel'), 'Stand im Ordner Spiele');
+  S.aufklappZu();
   S.oeffne('uebersicht');
 }
 
@@ -6533,8 +6648,8 @@ function spieleSudokuTest() {
   pruefe(S.CL_BILD.spiele && S.CL_BILD.sudoku && S.CL_BILD.solitaer, 'Symbole für Spiele, Sudoku und Solitär');
   S.oeffne('spiele');
   const fen = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && /ordnerWahl\('invasion'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 5,
-    'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones, Schach und Invasion (seit 0.35/0.45)');
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && /ordnerWahl\('invasion'\)/.test(fen) && /ordnerWahl\('minen'\)/.test(fen) && /ordnerWahl\('puzzle'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 7,
+    'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones, Schach, Invasion, Minen und Puzzle (seit 0.35/0.45/0.69)');
   pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitär:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
   /* Erzeuger: eindeutig lösbar */
   const stufen = { leicht: 0, mittel: 0, schwer: 0 };
@@ -7677,6 +7792,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { minenPuzzleTest(); } catch (e) { fail('Minen/Puzzle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leitfadenTest(); } catch (e) { fail('Leitfaden warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { privatTermineTest(); } catch (e) { fail('Private Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { katStattBerufTest(); } catch (e) { fail('Kategorien statt Beruf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
