@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.62.0</title>
+<title>CLIE 0.63.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -65,9 +65,6 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .silk button:disabled b{color:var(--px-zart)}
 /* Die einzige Zahl: an „Heute“ — auf der Übersicht und unten (seit 0.9) */
 .silk button{position:relative}
-.zahl{position:absolute;top:-4px;right:-8px;background:var(--px);color:var(--lcd);border-radius:10px;font-size:16px;padding:0 7px;line-height:22px}
-.silk .zahl{top:0;right:12%}
-.zahl.leer{display:none}
 /* Suchen (seit 0.10) */
 .su-feld{display:flex;gap:6px;align-items:center;border:2px solid var(--px);background:var(--lcd-hell);padding:2px 8px;margin:4px 0 8px;font-size:21px}
 .su-feld input{flex:1;min-width:0;font:inherit;font-size:19px;color:var(--px);background:transparent;border:0;padding:6px 2px;outline:none}
@@ -78,8 +75,6 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .su-treffer small{display:block;font-size:16px;color:var(--px-mitte)}
 .su-treffer mark,.su-treffer small mark{background:var(--px);color:var(--lcd);padding:0 2px}
 .su-mehr{font-size:16.5px;color:var(--px-mitte);text-decoration:underline;padding:4px 0}
-.heute-kopf{background:var(--px);color:var(--lcd);padding:6px 9px;margin:4px 0 8px;font-size:19.5px}
-.heute-kopf b{font-weight:400;white-space:nowrap}
 .hz{display:flex;gap:9px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:4px 0;min-height:38px}
 .hz .zt{flex:0 0 52px;text-align:right;color:var(--px-mitte);font-size:19px}
 .hz .tx{flex:1;min-width:0;text-align:left;overflow-wrap:anywhere}
@@ -958,7 +953,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.62.0';
+var APP_VERSION = '0.63.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3216,7 +3211,6 @@ var CL_APPS = [
   { id: 'spiele', name: 'Spiele', stufe: '', was: '', ordner: true },
   { id: 'kurs', name: 'Kurs', stufe: '', was: '', raster: false },
   { id: 'ideen', name: 'Ideenwerkstatt', rasterName: 'Ideen-\nwerkstatt', stufe: '', was: '', raster: false },
-  { id: 'heute', name: 'Heute', stufe: '', was: '', raster: false },
   { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.', raster: false },
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '', raster: false },
   { id: 'sudoku', name: 'Sudoku', stufe: '', was: '', raster: false },
@@ -3246,9 +3240,6 @@ var CL_BILD = {
   checklisten: '<rect x="16" y="17" width="9" height="9" rx="1" ' + CL_STRICH + '/><path d="M18 21.5l2 2 3.5-4" ' + CL_STRICH + '/><path d="M30 21.5h17" ' + CL_STRICH + '/>'
              + '<rect x="16" y="30" width="9" height="9" rx="1" ' + CL_STRICH + '/><path d="M18 34.5l2 2 3.5-4" ' + CL_STRICH + '/><path d="M30 34.5h17" ' + CL_STRICH + '/>'
              + '<rect x="16" y="43" width="9" height="9" rx="1" ' + CL_STRICH + '/><path d="M30 47.5h11" ' + CL_STRICH + '/>',
-  /* Abreißblatt mit Punkt: heute (seit 0.9) */
-  heute: '<rect x="18" y="16" width="28" height="32" rx="2" ' + CL_STRICH + '/><path d="M18 24h28" ' + CL_STRICH + '/>'
-       + '<circle cx="32" cy="36" r="6" ' + CL_FUELL + '/>',
   /* Karteikasten mit zwei Karten (seit 0.7) */
   sammlungen: '<path d="M20 28V19h15v9" ' + CL_STRICH + '/><path d="M29 28V14h15v14" ' + CL_STRICH + '/>'
             + '<rect x="15" y="27" width="34" height="21" rx="2" fill="#3B4433" stroke="#C9D3B7" stroke-width="3" stroke-linejoin="round"/>'
@@ -3474,126 +3465,8 @@ function clOffeneAufgaben() {
   return seiten.reduce(function (n, s) { return n + kpOffeneZahl(s); }, 0);
 }
 
-/* ---------- Heute (seit 0.9) ----------
-   Alles, was heute noch offen ist — eine Liste, die im Lauf des Tages
-   kürzer wird. Die Zahl an der App und unten in der Leiste zählt: Termine,
-   die noch nicht begonnen haben, offene Aufgaben für heute (mit und ohne
-   Uhrzeit) und offene Routinen. Nicht: Ganztägiges, Begonnenes, Vorbei. */
-
-cl.heute = { erlZeigen: false };
-
-function clHeuteDaten() {
-  var is = isoDatum();
-  var nun = clUhrzeit();
-  var t = clTermineAm(is);
-  var d = { is: is, nun: nun, ganztags: t.ganztags, posten: [], vorgenommen: [], routinen: [], erledigt: [] };
-  t.zeit.forEach(function (x) {
-    if (x.zeit > nun) { d.posten.push({ art: 'termin', zeit: x.zeit, titel: x.titel, x: x }); }
-  });
-  clTagZeilen(is).forEach(function (z) {
-    if (!z.a || !z.a.text) { return; }
-    var p = { art: 'aufgabe', zeit: z.zeit, titel: z.a.text, nr: z.nr, cls: z.cls };
-    if (z.a.erledigt) { d.erledigt.push(p); }
-    else if (z.zeit) { d.posten.push(p); }
-    else { d.vorgenommen.push(p); }
-  });
-  clRoutinenAm(is).forEach(function (a) {
-    if (a.pausiert) { return; }
-    var p = { art: 'routine', zeit: aufgabeZeitAn(a, is) || '', titel: a.titel, id: a.id };
-    if (istErledigtAn(a, is)) { d.erledigt.push(p); }
-    else if (p.zeit) { d.posten.push(p); }
-    else { d.routinen.push(p); }
-  });
-  d.posten.sort(function (a, b) { return a.zeit < b.zeit ? -1 : (a.zeit > b.zeit ? 1 : 0); });
-  /* Vorgenommenes nach Priorität: P1, P2, P3, dann ohne (seit 0.12) */
-  d.vorgenommen = clNachPrio(d.vorgenommen, function (p) { return p.titel; });
-  d.zahl = d.posten.length + d.vorgenommen.length + d.routinen.length;
-  return d;
-}
-
-function clHeuteZahl() { return clHeuteDaten().zahl; }
-
-/* Anzahl gestarteter (laufender) Checklisten am Symbol (seit 0.27) */
-function clsLaufZahlHtml() {
-  var n = clsAlle('lauf').length;
-  return n ? '<span class="zahl">' + n + '</span>' : '';
-}
-
-function clHeuteZahlHtml() {
-  var n = clHeuteZahl();
-  return n ? '<span class="zahl">' + n + '</span>' : '';
-}
-
-/* Die Zahl auch unten in der Leiste */
-function silkZeichnen() {
-  var el = document.getElementById('heuteZahl');
-  if (!el) { return; }
-  var n = clHeuteZahl();
-  el.textContent = n ? String(n) : '';
-  el.className = 'zahl' + (n ? '' : ' leer');
-}
-
-function clHeuteZeile(d, p) {
-  var zt = p.zeit ? '<span class="zt">' + esc(clZeitText(p.zeit)) + '</span>' : '';
-  if (p.art === 'termin') {
-    return '<div class="hz">' + zt + '<button type="button" class="tx" onclick="terminZeigen(\'' + esc(d.is) + '\',\'' + esc(p.x.id) + '\')">' + esc(p.titel) + '</button></div>';
-  }
-  var erl = d.erledigt.indexOf(p) >= 0;
-  var aufruf = (p.art === 'aufgabe') ? 'clTagZeileUm(\'' + d.is + '\',' + p.nr + ')' : 'clRoutineUm(\'' + esc(p.id) + '\',\'' + d.is + '\')';
-  return '<div class="hz' + (erl ? ' erl' : '') + '">' + zt + clKastenHtml(erl, aufruf) + '<span class="tx">' + (p.art === 'aufgabe' ? clPrioHtml(p.titel) + clHerkunftHtml('☑', p.cls) : esc(p.titel)) + '</span></div>';
-}
-
-/* „in 25 Min.“ — ab einer Stunde nur noch die Uhrzeit */
-function clCountdown(zeit, nun) {
-  var n = clMinuten(zeit) - clMinuten(nun);
-  if (n <= 0) { return 'jetzt'; }
-  return (n < 60) ? 'in ' + n + ' Min.' : 'um ' + clZeitText(zeit);
-}
-
-function heuteHtml() {
-  var d = clHeuteDaten();
-  var h = '';
-  var naechst = d.posten.filter(function (p) { return p.zeit > d.nun; })[0];
-  h += '<div class="heute-kopf">' + (naechst
-    ? 'Als Nächstes: ' + esc(naechst.titel) + ' <b>' + esc(clCountdown(naechst.zeit, d.nun)) + '</b>'
-    : (d.zahl ? 'Heute keine Termine mehr.' : 'Heute ist nichts mehr offen.')) + '</div>';
-  d.ganztags.forEach(function (x) {
-    h += '<button type="button" class="ganztags' + (x.jahr ? ' gz-' + x.jahr : '') + '" onclick="' + clGanzAufruf(d.is, x) + '">' + (x.zeichen || '◆') + ' ' + esc(x.titel) + '</button>';
-  });
-  if (d.posten.length) { h += '<div class="abschnitt">Als Nächstes</div>' + d.posten.map(function (p) { return clHeuteZeile(d, p); }).join(''); }
-  if (d.vorgenommen.length) { h += '<div class="abschnitt">Vorgenommen</div>' + d.vorgenommen.map(function (p) { return clHeuteZeile(d, p); }).join(''); }
-  if (d.routinen.length) { h += '<div class="abschnitt">Routinen</div>' + d.routinen.map(function (p) { return clHeuteZeile(d, p); }).join(''); }
-  /* Hinweise: laufende Checklisten, fällige Lernkarten und Abo-Fristen — nicht gezählt */
-  var hinweise = clsAlle('lauf').map(function (g) {
-    var st = clsStand(g);
-    return '<button type="button" class="hz" onclick="oeffne(\'checklisten\');clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">☑ ' + esc(g.titel) + ' · ' + st.fertig + '/' + st.alle + '</span></button>';
-  }).concat((coEinst().quellen.ideen ? [] : iwHinweise()).map(function (x) {
-    return '<button type="button" class="hz" onclick="oeffne(\'ideen\');iwOeffnen(\'' + esc(x.id) + '\')"><span class="tx">'
-      + (x.status === 'spaeter' ? '💡 Idee wieder da: ' : '💡 Wochen-Check: ') + esc(x.titel) + '</span></button>';
-  /* Seit 0.33 keine Morgen-/Abend-Runde mehr — der Coach fragt selbst */
-  })).concat(krRueckblickFaellig() ? ['<button type="button" class="hz" onclick="oeffne(\'kurs\');krAnsicht(\'woche\');krFensterAuf(\'rueckblick\')"><span class="tx">◎ Kurs: Wochenrückblick</span></button>'] : [])
-    .concat(lkAlleHeute() ? ['<button type="button" class="hz" onclick="oeffne(\'lernkartei\')"><span class="tx">▤ Lernkartei · ' + lkAlleHeute() + ' Karten fällig</span></button>'] : []).concat(saHinweise().map(function (x) {
-    return '<button type="button" class="hz" onclick="oeffne(\'sammlungen\');saOeffnen(\'' + esc(x.s.id) + '\')"><span class="tx">⚠ ' + esc(x.name) + ' kündbar bis ' + esc(saDatumText(x.bis).slice(0, 6)) + '</span></button>';
-  }));
-  if (hinweise.length) { h += '<div class="abschnitt">Hinweise</div>' + hinweise.join(''); }
-  if (d.erledigt.length) {
-    if (cl.heute.erlZeigen) {
-      h += '<div class="abschnitt">Erledigt</div>' + d.erledigt.map(function (p) { return clHeuteZeile(d, p); }).join('');
-    }
-    h += '<button type="button" class="erl-knopf" onclick="clHeuteErlUm()">' + (cl.heute.erlZeigen ? 'Erledigtes verbergen' : d.erledigt.length + ' erledigt · zeigen') + '</button>';
-  }
-  return h;
-}
-
-function heuteFussHtml() {
-  return '<button type="button" class="knopf" onclick="aufNeuAm(isoDatum(),\'\')">Neu</button>'
-    + '<button type="button" class="knopf" onclick="oeffne(\'kalender\');clKalGehe(isoDatum(),\'tag\')">Kalender</button>';
-}
-
-function clHeuteErlUm() {
-  cl.heute.erlZeigen = !cl.heute.erlZeigen;
-  inhaltZeichnen();
-}
+/* Seit 0.63 keine App „Heute“ und keine Zahlen an Symbolen mehr — wie am Palm.
+   Den Tag zeigt der Kalender, Hinweise gibt der Coach. */
 
 /* ---------- Suchen (seit 0.10) ----------
    Wie „Find“ am Palm: ein Feld, alles durchsuchen, nach App gruppiert.
@@ -4059,7 +3932,7 @@ function uebersichtHtml() {
   var h = coZeileHtml() + '<div class="apps">';
   CL_APPS.filter(function (a) { return a.raster !== false; }).forEach(function (a) {
     h += '<button type="button" class="app" onclick="oeffne(\'' + a.id + '\')">'
-       + '<span class="sym">' + clSymbol(a.id) + (a.id === 'heute' ? clHeuteZahlHtml() : '') + (a.id === 'aufgaben' ? clsLaufZahlHtml() : '') + (a.ordner ? '<span class="ord">▸</span>' : '') + '</span>'
+       + '<span class="sym">' + clSymbol(a.id) +  (a.ordner ? '<span class="ord">▸</span>' : '') + '</span>'
        + esc(a.rasterName || a.name).replace(/\n/g, '<br>') + '</button>';
   });
   /* Seit 0.7.1 keine Zahlen an den Symbolen — außer an „Heute“ (seit 0.9) und laufenden Checklisten (seit 0.27, zum Ausprobieren) */
@@ -4180,7 +4053,6 @@ function inhaltZeichnen() {
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'statistik') { el.innerHTML = statistikHtml(); }
-  else if (cl.app === 'heute') { el.innerHTML = heuteHtml(); }
   else if (cl.app === 'suchen') {
     /* Beim Neuzeichnen (Abgleich, Uhr) bleibt das Feld stehen — nur die Treffer kommen neu */
     if (el.innerHTML.indexOf('suchFeld') >= 0) { suErgebnisZeichnen(); return; }
@@ -4203,7 +4075,6 @@ function kopfZeichnen() {
       : (cl.app === 'checklisten') ? 'To Do'
       : (cl.app === 'sammlungen') ? saReiter()
       : (cl.app === 'statistik') ? 'Statistik'
-      : (cl.app === 'heute') ? 'Heute ' + clWt(isoDatum()) + ' ' + clKurzDatum(isoDatum())
       : (cl.app === 'suchen') ? 'Suchen'
       : memoSeite ? clSeitenZeichen(memoSeite) + ' ' + memoSeite.titel
       : (a ? a.name : 'Übersicht');
@@ -4374,7 +4245,6 @@ function fussZeichnen() {
         : (cl.app === 'checklisten') ? checklistenFussHtml()
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
-        : (cl.app === 'heute') ? heuteFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
         : (cl.app === 'invasion') ? invasionFussHtml()
@@ -4406,7 +4276,6 @@ function zeichne() {
   fussZeichnen();
   aufklappZeichnen();
   standZeichnen();
-  silkZeichnen();
   document.title = 'CLIE ' + APP_VERSION;
 }
 
@@ -19970,7 +19839,7 @@ function coAntwort(id, code, nr, nun, wert) {
   krSpeichern(t);
   if (notiz) { melde(notiz, 'gut'); }
   if (weiter) { coWeiter(weiter, f, is); return; }
-  if (code === 'einzeln') { oeffne('heute'); return; }
+  if (code === 'einzeln') { oeffne('kalender'); clKalGehe(isoDatum(), 'tag'); return; }
   if (id === 'rueckblick' && code === 'jetzt') { coMehr('woche'); krFensterAuf('rueckblick'); return; }
   zeichne();
   coKalenderPlanen(false);
@@ -21183,7 +21052,7 @@ var SP_PAUSE_MS = 60000;
 
 /* Ordner auf dem Start (seit 0.35, vorher nur „Spiele“) */
 var CL_ORDNER = {
-  planung: { name: 'Planung', apps: ['heute', 'routinen', 'ideen', 'coach'] },
+  planung: { name: 'Planung', apps: ['routinen', 'ideen', 'coach'] },
   lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
   spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion'] }
 };
@@ -21221,7 +21090,6 @@ function ordnerStandText(id) {
     var n = clRoutinenAm(heute).filter(function (a) { return !a.pausiert && !istErledigtAn(a, heute); }).length;
     return n ? n + ' heute offen' : 'heute alles erledigt';
   }
-  if (id === 'heute') { var hz = clHeuteZahl(); return hz ? hz + ' offen' : 'nichts mehr offen'; }
   if (id === 'ziele') { return ziStandText(); }
   if (id === 'ideen') { return iwAlle().filter(function (x) { return iwGruppe(x) === 'umsetzung'; }).length + ' in Umsetzung'; }
   if (id === 'lernkartei') { var k = lkAlleHeute(); return k ? k + ' Karten fällig' : 'nichts fällig'; }
@@ -23581,9 +23449,8 @@ function zurueckGedrueckt() {
 function minutenTakt() {
   if (document.hidden) { return; }
   uhrZeichnen();
-  silkZeichnen();
   if (ckWecken() && cl.app === 'checklisten' && !cl.aufklapp) { inhaltZeichnen(); }
-  if ((cl.app === 'uebersicht' || cl.app === 'kalender' || cl.app === 'heute' || (cl.app === 'coach' && cl.co.ansicht === 'verlauf')) && !cl.aufklapp) { inhaltZeichnen(); }
+  if ((cl.app === 'uebersicht' || cl.app === 'kalender' || (cl.app === 'coach' && cl.co.ansicht === 'verlauf')) && !cl.aufklapp) { inhaltZeichnen(); }
   /* Coach-Erinnerungen im Kalender nachziehen (höchstens alle fünf Minuten) */
   coKalenderPlanen(false);
 }

@@ -290,7 +290,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 27, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 26, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -418,7 +418,7 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","sammlungen","projekte","memo","einkauf","vorlesen","rechner","ziele","planung","lernen","spiele"]'
-    && CL.clApp('heute') && CL.clApp('heute').raster === false && CL.clApp('coach').raster === false,
+    && !CL.clApp('heute') && CL.clApp('coach').raster === false,
     'Start 3×4 (seit 0.62): Kalender, To Do, Sammlungen / Projekte, Notizen, Einkauf / Vorlesen, Rechner, Ziele / Planung ▸, Lernen ▸, Spiele ▸');
   pruefe(!/oeffne\('(listen|woche|kurs)'\)/.test(h) && /oeffne\('ziele'\)/.test(h), 'Ziele seit 0.62 auf der Startseite; keine Apps für Listen, Woche; Kurs nicht im Raster');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
@@ -2038,6 +2038,29 @@ function coKorbTest() {
   S.krFinden('kc-einstellungen').quellen = { korb: false };
   pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Sammler“ ausgeschaltet: keine Sammler-Fragen');
   S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   112. Keine Zahlen an Symbolen, keine App „Heute“ (0.63.0)
+   Grund: Der Palm kannte keine Badges; die App „Heute“ doppelte Kalender
+   und Coach.
+   Erkennt: Zahl an einem Symbol, „Heute“ wieder in Apps/Ordner, Aufrufe
+   ins Leere (oeffne('heute'), heuteHtml, clHeuteZahl …), Coach „einzeln“
+   führt nicht in den Kalender.
+   ============================================================ */
+function ohneHeuteTest() {
+  console.log('\n112. Keine Zahlen an Symbolen, keine App „Heute“ (0.63.0)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub', text: '[] a', checkliste: 'lauf', geaendert: 1 });
+  S.oeffne('uebersicht');
+  pruefe(!/class="zahl"/.test(inhalt()) && !/\.zahl\{/.test(QUELLE), 'keine Zahlen an Symbolen, auch kein Stil dafür');
+  pruefe(!S.clApp('heute') && Object.keys(S.CL_ORDNER).every(k => S.CL_ORDNER[k].apps.indexOf('heute') < 0) && !S.CL_BILD.heute, 'keine App „Heute“, auch in keinem Ordner');
+  pruefe(!/oeffne\('heute'\)|oeffne\(\\'heute\\'\)|function heuteHtml|function clHeuteZahl|function silkZeichnen|heuteZahl|cl\.app === 'heute'/.test(QUELLE), 'keine Reste: kein Aufruf ins Leere');
+  S.oeffne('heute');
+  pruefe(S.cl.app === 'uebersicht', 'ein alter Verweis auf „Heute“ landet auf der Übersicht');
+  pruefe(/if \(code === 'einzeln'\) \{ oeffne\('kalender'\); clKalGehe\(isoDatum\(\), 'tag'\)/.test(QUELLE), 'Coach „einzeln“ öffnet den Tag im Kalender');
 }
 
 /* ============================================================
@@ -3891,68 +3914,6 @@ function jahrTest() {
 }
 
 /* ============================================================
-   32. Heute (0.9)
-   Grund: eine Ansicht nur für das, was heute noch offen ist, mit einer
-   Zahl an der App und unten in der Leiste (statt „Menü“).
-   Erkennt: falsch Gezähltes (Ganztägiges, begonnene oder vorbeie
-   Termine), fehlende Abschnitte, Zahl, die nach dem Abhaken nicht sinkt.
-   ============================================================ */
-function heuteTest() {
-  console.log('\n32. Heute (0.9)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const altUhr = S.clUhrzeit;
-  S.clUhrzeit = () => '14:35';
-  const heute = S.isoDatum();
-  const wt = S.ausIso(heute).getDay();
-  S.termineNachTag[heute] = [
-    { id: 'a', zeit: '09:00', bis: '11:00', titel: 'Vorbei', kontext: 'privat' },
-    { id: 'b', zeit: '14:00', bis: '15:30', titel: 'Läuft gerade', kontext: 'privat' },
-    { id: 'c', zeit: '15:00', bis: '16:00', titel: 'Zahnarzt', kontext: 'privat' },
-    { id: 'd', zeit: '19:30', bis: '21:00', titel: 'Elternabend', kontext: 'beruflich' },
-    { id: 'g', zeit: '', bis: '', titel: 'Geburtstag Oma', ganztags: true, kontext: 'privat' }];
-  S.DB.projekte.push({ id: 'p1', name: 'Büro', flaeche: '[] Rechnung prüfen\n[] Offering\n[] Rückruf Becker\n[x] Fertig', status: 'laufend', kontext: 'privat', geaendert: 1 });
-  S.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Rechnung prüfen\n[] Offering\n[] Rückruf Becker\n[x] Fertig', geaendert: 1, eintraege: [
-    { id: 'e1', abschnitt: 'h', text: 'Rechnung prüfen', quelle: 'p1', erledigt: false },
-    { id: 'e2', abschnitt: 'h', text: 'Offering', quelle: 'p1', erledigt: false },
-    { id: 'e3', abschnitt: 'h', text: 'Rückruf Becker', quelle: 'p1', erledigt: false, zeit: '17:00' },
-    { id: 'e4', abschnitt: 'h', text: 'Fertig', quelle: 'p1', erledigt: true }] });
-  S.DB.aufgaben.push({ id: 'r1', titel: 'Oskar laufen lassen', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, kontext: 'privat', geaendert: 1 });
-  S.DB.aufgaben.push({ id: 'r2', titel: 'Pausiert', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, pausiert: true, geaendert: 1 });
-  S.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[x] a\n[] b', checkliste: 'lauf', kontext: 'privat', geaendert: 1 });
-  const d = S.clHeuteDaten();
-  pruefe(d.zahl === 6, 'gezählt: 2 kommende Termine, 1 Aufgabe mit Uhrzeit, 2 vorgenommene, 1 Routine = 6 (ist ' + d.zahl + ')');
-  pruefe(d.posten.map(p => p.titel).join(' | ') === 'Zahnarzt | Rückruf Becker | Elternabend', 'Als Nächstes: nach Zeit, ohne Begonnenes und Vorbei');
-  pruefe(!d.posten.some(p => /Vorbei|Läuft/.test(p.titel)), 'begonnene und beendete Termine fehlen');
-  S.oeffne('heute');
-  let h = inhalt();
-  pruefe(S.document.getElementById('reiter').textContent === 'Heute ' + S.clWt(heute) + ' ' + S.clKurzDatum(heute), 'Reiter: Heute mit Datum');
-  pruefe(/class="heute-kopf">Als Nächstes: Zahnarzt <b>in 25 Min\.<\/b>/.test(h), 'oben: als Nächstes mit Countdown');
-  pruefe(/◆ Geburtstag Oma/.test(h), 'Ganztägiges steht oben, ungezählt');
-  pruefe(/>Vorgenommen</.test(h) && /Rechnung prüfen/.test(h) && />Routinen</.test(h) && /Oskar laufen lassen/.test(h) && !/Pausiert/.test(h), 'Vorgenommen und Routinen, ohne Pausiertes');
-  pruefe(/>Hinweise</.test(h) && /☑ Packliste · 1\/2/.test(h), 'Hinweise: laufende Checkliste');
-  pruefe(/1 erledigt · zeigen/.test(h) && !/>Fertig</.test(h), 'Erledigtes ist eingeklappt');
-  pruefe(S.document.getElementById('heuteZahl').textContent === '6', 'die Zahl steht unten in der Leiste');
-  pruefe(S.clCountdown('19:30', '14:35') === 'um 19:30' && S.clCountdown('14:35', '14:35') === 'jetzt', 'ab einer Stunde die Uhrzeit, sonst Minuten');
-  S.clTagZeileUm(heute, 0);
-  pruefe(S.clHeuteZahl() === 5 && S.document.getElementById('heuteZahl').textContent === '5' && /2 erledigt · zeigen/.test(inhalt()), 'Abhaken senkt die Zahl sofort');
-  S.clHeuteErlUm();
-  pruefe(/>Erledigt</.test(inhalt()) && /class="hz erl"/.test(inhalt()), 'Erledigtes lässt sich zeigen');
-  S.clHeuteErlUm();
-  S.katSetzen('beruflich');
-  pruefe(S.clHeuteDaten().posten.map(p => p.titel).join(' | ') === 'Elternabend', 'der Filter ▼ gilt auch hier');
-  S.katSetzen('alle');
-  S.oeffne('uebersicht');
-  pruefe(!/class="app" onclick="oeffne\('heute'\)"/.test(inhalt()) && S.clHeuteZahl() === 5, 'Heute nicht im Raster (seit 0.28) — die Zahl steht unten in der Leiste');
-  pruefe(/onclick="oeffne\('lesezeichen'\)"><b>☆<\/b>Lesezeichen/.test(QUELLE) && /⌕<\/b>Suchen/.test(QUELLE) && S.CL_ORDNER.planung.apps.indexOf('heute') >= 0,
-    'Leiste unten: Lesezeichen statt Heute (seit 0.38), Heute im Ordner Planung, Suchen bleibt');
-  pruefe(/onclick="aufNeuAm\(isoDatum\(\),\\?'\\?'\)">Neu/.test(SKRIPT) || /aufNeuAm\(isoDatum\(\)/.test(SKRIPT), 'unten: Neu für heute');
-  S.clUhrzeit = altUhr;
-  S.zeichne();
-}
-
-/* ============================================================
    33. Vorlage Training (0.9.1)
    Grund: Trainingsplan für Multisport mit Plan, Ist und Ergebnis
    (geschafft / teilweise / ausgefallen) und eigener Wochenauswertung.
@@ -4268,11 +4229,9 @@ function prioTest() {
   pruefe(/\[\] P2 Hecke schneiden$/.test(S.DB.themen[0].text), 'getipptes „P2 …“ wird als Priorität übernommen');
 
   /* Anzeige anderswo */
-  S.oeffne('heute');
+  S.oeffne('kalender'); S.clKalGehe(S.isoDatum(), 'tag');
   h = inhalt();
-  pruefe(/<span class="prio p1">1<\/span>Keller aufräumen/.test(h) && !/P1 Keller/.test(h), 'Heute: Zeichen statt Kürzel');
-  const vg = h.slice(h.indexOf('>Vorgenommen<'));
-  pruefe(vg.indexOf('Keller') < vg.indexOf('Rasen'), 'Heute: Vorgenommenes nach Priorität');
+  pruefe(/<span class="prio p1">1<\/span>Keller aufräumen/.test(h) && !/P1 Keller/.test(h), 'Kalender-Tag: Zeichen statt Kürzel');
   S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
   pruefe(/<span class="prio p1">1<\/span>Keller aufräumen/.test(inhalt()), 'Kalender-Tag: Zeichen statt Kürzel');
   pruefe(S.suTreffer('keller').some(x => /<span class="prio p1">1<\/span><mark>Keller<\/mark>/.test(x.titel)), 'Suche: Zeichen und Treffer im Text ohne Kürzel');
@@ -4560,9 +4519,9 @@ function clsPlanTest() {
   pruefe(!S.kpEintraegeFinden('c1', 'Ladekabel').length, 'ein vergangener Tag wird abgelehnt');
   S.aufklappZu();
   /* Heute und Kalender */
-  S.oeffne('heute');
+  S.oeffne('kalender'); S.clKalGehe(S.isoDatum(), 'tag');
   let h = inhalt();
-  pruefe(/Müll rausstellen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(h), 'Heute: mit Herkunft „☑ Urlaub Borkum“');
+  pruefe(/Müll rausstellen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(h), 'Kalender-Tag: mit Herkunft „☑ Urlaub Borkum“');
   S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
   pruefe(/Müll rausstellen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(inhalt()), 'Kalender-Tag: mit Herkunft');
   const tag = S.kpTagFinden(heute);
@@ -6449,7 +6408,7 @@ function kursTest() {
   const sonntag = new Date().getDay() === 0;
   pruefe(S.krRueckblickFaellig() === sonntag, 'Rückblick-Hinweis nur sonntags');
   w2.rueckblick = rb;
-  pruefe(/krRueckblickFaellig\(\) \? \['<button type="button" class="hz"/.test(QUELLE), 'Hinweis steht unter „Heute“ bei den Hinweisen');
+  pruefe(/if \(krRueckblickFaellig\(\)\) \{/.test(QUELLE.slice(QUELLE.indexOf('function coFaellige'))), 'Hinweis kommt seit 0.63 vom Coach (keine App „Heute“ mehr)');
   /* Zurück */
   S.krCheckNeu(); S.document.getElementById('krWas').value = 'x'; S.krCheckSchritt(1);
   S.clZurueck(); pruefe(S.cl.kr.check.schritt === 1, 'Zurück im Check: ein Schritt zurück');
@@ -6502,7 +6461,7 @@ function neu027Test() {
   S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub', text: '[] a', checkliste: 'lauf', geaendert: 1 }, { id: 'c2', titel: 'Fenster', text: '[] b', checkliste: 'lauf', geaendert: 1 },
     { id: 'c3', titel: 'Vorlage', text: '[] c', checkliste: 'vorlage', geaendert: 1 });
   S.oeffne('uebersicht');
-  pruefe(/oeffne\('aufgaben'\)"><span class="sym"><svg[^]*?<span class="zahl">2</.test(inhalt()), 'To-Do-Symbol zeigt 2 laufende Checklisten (Vorlagen zählen nicht)');
+  pruefe(!/class="zahl"/.test(inhalt()), 'seit 0.63 keine Zahl am To-Do-Symbol (wie am Palm)');
   S.DB.gedanken = []; S.zeichne();
   pruefe(!/oeffne\('checklisten'\)"><span class="sym"><svg[^<]*?(<[^b][^]*?)?<span class="zahl">/.test(inhalt().replace(/oeffne\('heute'\)[\s\S]*?<\/button>/, '')), 'ohne laufende keine Zahl');
   /* Verweise zwischen Sammlungen */
@@ -6923,8 +6882,7 @@ function lernkarteiTest() {
   pruefe(pk.length === 1 && pk[0].karten.length === 3 && pk[0].karten[0].fach === 4 && pk[0].karten[1].r === 'zwei (neu)' && pk[0].paket.version === 2,
     'Update: kein zweiter Kasten, neue Karte dazu, Text aktualisiert, Lernstand bleibt');
   /* Heute-Hinweis und Zurück */
-  S.oeffne('heute');
-  pruefe(inhalt().indexOf("oeffne('lernkartei')") >= 0 && inhalt().indexOf('Karten fällig') >= 0, 'Heute zeigt fällige Lernkarten als Hinweis');
+  pruefe(/Karten fällig/.test(S.ordnerStandText('lernkartei')), 'fällige Lernkarten stehen im Ordner Lernen (seit 0.63 keine App „Heute“) — ' + S.ordnerStandText('lernkartei'));
   S.oeffne('lernkartei'); S.lkKastenOeffnen(id); S.lkKartenZeigen();
   pruefe(inhalt().indexOf('lkSuche') >= 0, 'Kartenliste mit Suche');
   S.clZurueck(); pruefe(S.cl.lk.ansicht === 'kasten', 'Zurück: Karten → Kasten');
@@ -6972,7 +6930,6 @@ function lernkarteiTest() {
   try { terminArtenTest(); } catch (e) { fail('Arten im Termin warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lesezeichenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { jahrTest(); } catch (e) { fail('Jahrestermine warf: ' + e.message); }
-  try { heuteTest(); } catch (e) { fail('Heute warf: ' + e.message); }
   try { trainingTest(); } catch (e) { fail('Training warf: ' + e.message); }
   try { suchenTest(); } catch (e) { fail('Suchen warf: ' + e.message); }
   try { trendTest(); } catch (e) { fail('Trend/Link warf: ' + e.message); }
@@ -6993,6 +6950,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { ohneHeuteTest(); } catch (e) { fail('Ohne Heute warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlerTest(); } catch (e) { fail('Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { toDoTest(); } catch (e) { fail('To Do warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { filterZweiTest(); } catch (e) { fail('Filter zwei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
