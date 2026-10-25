@@ -151,7 +151,7 @@ if (CL) { ok('CLIE lässt sich außerhalb des Browsers auswerten'); }
 
 function frisch() {
   CL.DB = CL.leereDatenbank();
-  CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false; CL.cl.memo.aktiv = true;
+  CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false; CL.cl.memo.aktiv = true; CL.cl.rt.sicht = 'routinen'; CL.cl.gw.wahl = '';
   CL.termineNachTag = {};
   CL.zugriffToken = null; CL.tokenAblauf = 0;
   CL.kalenderListe = []; CL.kalenderLaeuft = false; CL.kalenderFehler = '';
@@ -291,7 +291,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 30, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 31, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45, SOS seit 0.72)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -421,9 +421,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","leitfaden","planung","lernen","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","planung","lernen","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
-    'Start 3×4 (seit 0.71): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, Guide / Planning ▸, Learning ▸, Games ▸');
+    'Start 3×4 (seit 0.72): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Planning ▸, Learning ▸, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2207,6 +2207,165 @@ function kategorienTest() {
 }
 
 /* ============================================================
+   131. SOS: die 3-Minuten-Selbstdistanzierung (0.72)
+   Grund: In Panik muss die Karte mit einem Tipp da sein und durch fünf
+   Schritte führen — ohne Eingabefelder, mit stiller 60-Sekunden-Anzeige
+   und 15-Minuten-Uhr; „Fertig“ führt zurück, woher man kam.
+   Erkennt: SOS fehlt auf dem Start oder im Menü ≡, Schritt-Zähler
+   falsch, Eingabefelder auf den Karten, Uhr startet nicht/läuft nach dem
+   Verlassen weiter, keine Vibration nach 15 Minuten, „Fertig“ fehlt oder
+   führt woandershin, offener Zustand der App geht verloren.
+   ============================================================ */
+function sosTest() {
+  console.log('\n131. SOS: die 3-Minuten-Selbstdistanzierung (0.72)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  pruefe(S.clApp('sos') && S.clApp('sos').raster !== false && S.clApp('sos').name === 'SOS' && /<circle cx="32" cy="32" r="20"[^>]*\/><text[^>]*>SOS<\/text>/.test(S.clSymbol('sos')),
+    'SOS auf dem Start, Symbol: „SOS“ im Ring');
+  /* aus To Do über das Menü */
+  S.oeffne('aufgaben'); S.menueUm();
+  const m = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(m.indexOf("menueWahl('sos')") >= 0 && m.indexOf("menueWahl('sos')") < m.indexOf("menueWahl('abgleich')"), 'Menu ≡: „SOS…“ ganz oben');
+  S.menueWahl('sos');
+  pruefe(S.cl.app === 'sos' && S.cl.sos.von === 'aufgaben' && S.cl.sos.schritt === 0 && S.document.getElementById('katKnopf').textContent === '1 / 5' && S.document.getElementById('reiter').textContent === 'SOS',
+    'öffnet bei Schritt 1 / 5, merkt sich die App');
+  pruefe(S.cl.sos.bis > Date.now() && S.cl.sos.dauer === 60 && /id="sosUhr" class="sos-uhr">1:00</.test(inhalt()), 'Schritt 1: die 60 Sekunden laufen von selbst');
+  pruefe(/sosFertig\(\)">Abbrechen/.test(S.document.getElementById('fuss').innerHTML) && /sosWeiter\(\)">Weiter/.test(S.document.getElementById('fuss').innerHTML), 'unten: Abbrechen · Weiter');
+  S.katUm();
+  pruefe(S.cl.aufklapp === '', 'oben rechts kein ▼');
+  let ohneFeld = true;
+  for (let i = 1; i < 5; i++) { S.sosWeiter(); if (/<input|<textarea/.test(inhalt())) { ohneFeld = false; } }
+  pruefe(ohneFeld && S.cl.sos.schritt === 4 && S.document.getElementById('katKnopf').textContent === '5 / 5', 'fünf Karten, keine Eingabefelder');
+  pruefe(!S.cl.sos.bis, 'beim Weiterblättern stoppt die 60-Sekunden-Uhr');
+  let f = S.document.getElementById('fuss').innerHTML;
+  pruefe(/sosZurueck\(\)">Zurück/.test(f) && /15 Min\. starten/.test(f) && /class="knopf voll" onclick="sosFertig\(\)">Fertig/.test(f), 'Schritt 5: Zurück · 15 Min. starten · Fertig');
+  S.sosUhrStart(900); S.zeichne();
+  f = S.document.getElementById('fuss').innerHTML;
+  pruefe(/>15:00</.test(inhalt()) && !/15 Min\. starten/.test(f) && /sosFertig\(\)">Fertig/.test(f), 'Uhr läuft: 15:00, „Fertig“ bleibt');
+  let summt = null;
+  S.navigator.vibrate = (x) => { summt = x; return true; };
+  S.cl.sos.bis = Date.now() - 1000; S.sosTakt();
+  pruefe(Array.isArray(summt) && S.cl.sos.um && /15 Minuten sind um/.test(inhalt()) && /Weiter · 15 Min\./.test(inhalt()) && /sosFertig\(\)">Pause/.test(inhalt()), 'nach 15 Minuten: Vibration, „Weiter oder Pause?“');
+  pruefe(!/15 Min\. starten/.test(S.document.getElementById('fuss').innerHTML) && /sosFertig\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'abgelaufen: unten kein zweiter Startknopf, „Fertig“ bleibt');
+  S.sosFertig();
+  pruefe(S.cl.app === 'aufgaben' && !S.cl.sos.bis && S.cl.sos.schritt === 0, '„Fertig“ / „Pause“: zurück in To Do, Uhr aus');
+  /* Schritt 1 läuft still ab */
+  summt = null;
+  S.oeffne('sos'); S.cl.sos.bis = Date.now() - 1000; S.sosTakt();
+  pruefe(summt === null && /0:00/.test(inhalt()), '60 Sekunden laufen still ab — keine Vibration');
+  /* offene App bleibt, wie sie war */
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] Statik', status: 'laufend', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.pjOeffnen('p1', 'aufgaben');
+  S.oeffne('sos');
+  S.sosWeiter(); S.sosZurueck();
+  pruefe(S.cl.sos.schritt === 0 && S.cl.sos.dauer === 60, 'Zurück zu Schritt 1: die Uhr beginnt neu');
+  S.sosWeiter();
+  S.zurueckGedrueckt();
+  pruefe(S.cl.app === 'sos' && S.cl.sos.schritt === 0, 'Zurück-Taste: einen Schritt zurück');
+  S.zurueckGedrueckt();
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1' && S.cl.pj.reiter === 'aufgaben', 'auf Schritt 1 schließt Zurück SOS — das Projekt ist noch offen');
+  S.oeffne('sos'); S.oeffne('kalender');
+  pruefe(!S.cl.sos.bis, 'SOS verlassen: Uhr aus');
+  delete S.navigator.vibrate;
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   130. Gewohnheiten in Routines (0.72)
+   Grund: Kleine Handgriffe nach einem Auslöser („nach dem Essen → Tisch
+   abräumen“) sollen zur Gewohnheit werden — ohne Uhrzeit, ohne To Do,
+   abends abgehakt, mit Blick auf sieben Tage; höchstens fünf zugleich.
+   Erkennt: ▼ ohne Gewohnheiten, Gewohnheiten in To Do/Tag, Abhaken
+   falscher Tage (älter als gestern), Punkte falsch, Obergrenze nicht
+   geprüft, Verinnerlichtes in der Übungsliste, Speichern/Löschen kaputt,
+   Daten nicht im Bereich „kurs“, Sicht nicht gemerkt.
+   ============================================================ */
+function gewohnheitenTest() {
+  console.log('\n130. Gewohnheiten in Routines (0.72)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  const gestern = S.tagePlus(heute, -1);
+  S.localStorage.removeItem('clie-rt-sicht');
+  S.oeffne('routinen');
+  pruefe(/▼ Routinen/.test(S.document.getElementById('katKnopf').textContent), 'Routines: oben „▼ Routinen“ wie bisher');
+  S.katUm();
+  let dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'rtwahl' && dd.indexOf("rtSichtSetzen('routinen')") < dd.indexOf("rtSichtSetzen('gewohnheiten')") && dd.indexOf("rtSichtSetzen('gewohnheiten')") < dd.indexOf("rtSichtSetzen('sitzt')")
+    && /Verinnerlicht…/.test(dd) && /katSetzen\('alle'\)/.test(dd), '▼: Routinen · Gewohnheiten · Verinnerlicht…, darunter die Kategorien');
+  S.rtSichtSetzen('gewohnheiten');
+  pruefe(S.cl.rt.sicht === 'gewohnheiten' && S.localStorage.getItem('clie-rt-sicht') === 'gewohnheiten' && /▼ Gewohnheiten/.test(S.document.getElementById('katKnopf').textContent)
+    && /Noch keine Gewohnheit/.test(inhalt()) && /gwNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML), 'Gewohnheiten: leer mit Hinweis, unten Neu · Details…, gemerkt');
+  /* Neu */
+  S.gwNeu();
+  let fh = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'gewohnheit' && /id="gwWenn"/.test(fh) && /id="gwDann"/.test(fh) && /id="gwKat"/.test(fh) && !/gwWahl\(/.test(fh), 'Neu: Wenn …, … dann, Kategorie — noch kein Zustand');
+  S.document.getElementById('gwWenn').value = ''; S.document.getElementById('gwDann').value = '';
+  S.gwSpeichern();
+  pruefe(S.cl.aufklapp === 'gewohnheit' && S.gwUebenZahl() === 0, 'ohne „dann“ wird nichts gespeichert');
+  S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen'; S.document.getElementById('gwKat').value = 'kb-haus';
+  S.gwSpeichern();
+  const g = S.DB.kurs.filter(x => x.typ === 'gewohnheit')[0];
+  pruefe(g && g.wenn === 'nach dem Essen' && g.dann === 'Tisch abräumen' && g.zustand === 'ueben' && g.bereich === 'kb-haus' && /^gw-/.test(g.id) && Array.isArray(g.tage),
+    'gespeichert im Bereich „kurs“ (typ gewohnheit), mit Kategorie');
+  let h = inhalt();
+  pruefe(/<small>nach dem Essen<\/small>Tisch abräumen/.test(h) && (h.match(/class="gw-p[ "]/g) || []).length === 7, 'Zeile: oben der Auslöser, darunter die Handlung, rechts sieben Punkte');
+  /* Abhaken heute, gestern nachtragen, Älteres nicht */
+  S.gwTagUm(g.id, heute);
+  S.gwTagUm(g.id, gestern);
+  S.gwTagUm(g.id, S.tagePlus(heute, -3));
+  pruefe(g.tage.join(',') === [gestern, heute].join(','), 'heute abgehakt, gestern nachgetragen — Älteres nicht');
+  h = inhalt();
+  pruefe(/class="k an"[^>]*onclick="gwTagUm\('[^']+','\d{4}-\d{2}-\d{2}'\)"|onclick="gwTagUm\('[^']+','[^']+'\)" aria-label="abhaken"/.test(h) && (h.match(/●/g) || []).length === 2
+    && new RegExp('gwTagUm\\(\'' + g.id + '\',\'' + gestern + '\'\\)" aria-label="gestern geschafft">●').test(h), 'Punkte: zwei ●, gestern antippbar');
+  S.gwTagUm(g.id, heute);
+  pruefe(g.tage.join(',') === gestern, 'noch einmal tippen: wieder offen');
+  /* nicht in To Do und nicht im Tag */
+  S.oeffne('aufgaben');
+  pruefe(!/Tisch abräumen/.test(inhalt()), 'nicht in To Do');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  pruefe(!/Tisch abräumen/.test(inhalt()), 'nicht im Tagesplan');
+  /* Obergrenze */
+  for (let i = 0; i < 4; i++) { S.DB.kurs.push({ id: 'gw-x' + i, typ: 'gewohnheit', wenn: 'w', dann: 'Handgriff ' + i, zustand: 'ueben', tage: [], angelegt: heute, rang: 2 + i, kontext: 'privat' }); }
+  S.oeffne('routinen');
+  S.gwNeu();
+  pruefe(S.cl.aufklapp !== 'gewohnheit' && /Höchstens 5/.test(S.document.getElementById('toastText').textContent), 'die sechste wird abgelehnt: erst eine verinnerlichen');
+  /* Details: verinnerlichen */
+  S.gwTippen(g.id);
+  pruefe(/gw-zeile gewaehlt/.test(inhalt()), 'antippen wählt');
+  S.gwDetailsGewaehlt();
+  fh = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/gwWahl\('ueben'\)/.test(fh) && /gwWahl\('sitzt'\)/.test(fh) && /gwLoeschenFragen\(\)/.test(fh), 'Details: Zustand Übe ich / Verinnerlicht, Löschen…');
+  S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen';
+  S.gwWahl('sitzt'); S.gwSpeichern();
+  pruefe(g.zustand === 'sitzt' && g.sitztSeit === heute && !/Tisch abräumen/.test(inhalt()), 'verinnerlicht: aus der Übungsliste');
+  S.rtSichtSetzen('sitzt');
+  pruefe(/Tisch abräumen/.test(inhalt()) && !/Handgriff/.test(inhalt()) && !/gw-punkte/.test(inhalt()), 'unter „Verinnerlicht…“ — ohne Haken und Punkte');
+  /* zurück zum Üben, wenn schon fünf geübt werden: abgelehnt */
+  S.DB.kurs.push({ id: 'gw-y', typ: 'gewohnheit', wenn: 'w', dann: 'Fünfte', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
+  S.gwDetails(g.id); S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen';
+  S.gwWahl('ueben'); S.gwSpeichern();
+  pruefe(g.zustand === 'sitzt' && S.cl.aufklapp === 'gewohnheit', 'zurück zum Üben nur, wenn Platz ist');
+  S.aufklappZu();
+  /* Löschen */
+  S.gwDetails(g.id); S.gwLoeschenFragen(); S.gwLoeschen();
+  pruefe(!S.gwFinden(g.id) && S.DB.kurs.every(x => x.id !== g.id), 'löschen');
+  /* Kategorie-Filter gilt */
+  S.katSetzen('kb-arbeit');
+  S.rtSichtSetzen('gewohnheiten');
+  pruefe(!/Handgriff/.test(inhalt()) && /▼ Gewohnheiten · Arbeit/.test(S.document.getElementById('katKnopf').textContent), 'Kategorie Arbeit: private Gewohnheiten nicht');
+  S.katSetzen('alle');
+  /* Routinen unverändert */
+  S.rtSichtSetzen('routinen');
+  pruefe(/Alle Routinen/.test(inhalt()) && /rtDiesmal\(\)/.test(S.document.getElementById('fuss').innerHTML), '▼ Routinen: die Routinen wie bisher');
+  S.cl.rt.sicht = ''; S.rtSichtLaden();
+  pruefe(S.cl.rt.sicht === 'routinen', 'Sicht nach Neustart gemerkt');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    129. Filter „Privat“ = alles außer Arbeit (0.71.3)
    Grund: Neben einzelnen Kategorien braucht es einen Blick auf alles
    Private — jede Kategorie außer Arbeit, auch ohne Kategorie.
@@ -2360,7 +2519,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,leitfaden,planung,lernen,spiele', 'Start: zwölf Felder, Memo Pad an dritter Stelle, Routines und Guide statt Projekte und Ziele');
+  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,planung,lernen,spiele', 'Start: zwölf Felder, Memo Pad an dritter Stelle, Routines und SOS (seit 0.72) statt Projekte und Ziele');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -2638,8 +2797,8 @@ function leitfadenTest() {
   const S = CL;
   S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
   const heute = S.isoDatum();
-  pruefe(S.clApp('leitfaden') && S.clApp('leitfaden').raster !== false && S.clApp('leitfaden').name === 'Guide' && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
-    'App „Guide“ (Leitfaden) seit 0.71 auf dem Start, Symbol Stufen');
+  pruefe(S.clApp('leitfaden') && S.clApp('leitfaden').raster === false && S.CL_ORDNER.planung.apps.indexOf('leitfaden') >= 0 && S.clApp('leitfaden').name === 'Guide' && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
+    'App „Guide“ (Leitfaden) seit 0.72 im Ordner Planning, Symbol Stufen');
   pruefe(S.LF_ARTEN.length === 5 && S.LF_ARTEN.every(a => a.schritte.length === 5 && a.schritte.every(s => s[0] && s[1])) && S.LF_ARTEN[4].schritte[0][0] === 'Plan B',
     'fünf Verfahren mit je fünf Schritten (Name und Erklärung); Verhandlung beginnt mit Plan B');
   S.oeffne('leitfaden');
@@ -6618,7 +6777,7 @@ function startOrdnerTest() {
   pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).every(k => raster.indexOf(k) >= 0 && S.CL_BILD[k]), 'drei Ordner im Raster, mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 3, 'Ordner am ▸ erkennbar');
-  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('leitfaden'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()), 'seit 0.71 Routines und Guide auf dem Start, Drive nicht');
+  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()), 'seit 0.72 Routines und SOS auf dem Start, Drive nicht');
   [['planung', ['coach', 'ideen', 'kategorien']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
@@ -8114,6 +8273,8 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { sosTest(); } catch (e) { fail('SOS warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { gewohnheitenTest(); } catch (e) { fail('Gewohnheiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { filterPrivatTest(); } catch (e) { fail('Filter Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoAktivTest(); } catch (e) { fail('Show active warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ablaufKuerzelTest(); } catch (e) { fail('Ablauf-Kürzel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
