@@ -151,7 +151,7 @@ if (CL) { ok('CLIE lässt sich außerhalb des Browsers auswerten'); }
 
 function frisch() {
   CL.DB = CL.leereDatenbank();
-  CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = '';
+  CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false;
   CL.termineNachTag = {};
   CL.zugriffToken = null; CL.tokenAblauf = 0;
   CL.kalenderListe = []; CL.kalenderLaeuft = false; CL.kalenderFehler = '';
@@ -318,10 +318,10 @@ function bedienTest() {
   if (!CL) { return; }
   frisch();
   CL.oeffne('routinen');
-  pruefe(CL.document.getElementById('reiter').textContent === 'Routinen' && !/kommt mit CLIE/.test(inhalt()),
+  pruefe(CL.document.getElementById('reiter').textContent === 'Routines' && !/kommt mit CLIE/.test(inhalt()),
     'seit 0.5 sind alle Apps fertig — keine zeigt mehr „kommt mit …“');
   CL.oeffne('gibtsnicht');
-  pruefe(CL.cl.app === 'uebersicht' && CL.document.getElementById('reiter').textContent === 'Übersicht', 'Unbekanntes führt zur Übersicht');
+  pruefe(CL.cl.app === 'uebersicht' && CL.document.getElementById('reiter').textContent === 'Home', 'Unbekanntes führt zur Übersicht (Reiter „Home“, seit 0.71)');
   CL.oeffne('abgleich');
   const a = inhalt();
   pruefe(/hs-knopf/.test(a) && /Mit Google verbinden/.test(a) && /onclick="anmelden\(false\)"/.test(a), 'Abgleich ohne Anmeldung bietet „Anmelden“');
@@ -332,7 +332,7 @@ function bedienTest() {
   pruefe(/>Abgleichen</.test(b) && /clTermineHolen\(true\)/.test(b) && /clAbmelden\(\)/.test(b), 'angemeldet: Abgleichen, Termine holen, Abmelden');
   CL.zugriffToken = null;
   CL.menueUm();
-  pruefe(CL.cl.aufklapp === 'menue' && /Auf neue Fassung prüfen/.test(CL.document.getElementById('aufklapp').innerHTML), 'der Reiter öffnet das Menü');
+  pruefe(CL.cl.aufklapp === 'menue' && /Check for update/.test(CL.document.getElementById('aufklapp').innerHTML), 'der Reiter öffnet das Menü (englisch seit 0.71)');
   CL.katUm();
   pruefe(CL.cl.aufklapp === 'kat' && /katSetzen\('kb-arbeit'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'die Kategorie öffnet ihre Liste');
   CL.aufklappZu();
@@ -421,10 +421,10 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","sammlungen","projekte","memo","einkauf","vorlesen","rechner","ziele","planung","lernen","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","leitfaden","planung","lernen","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
-    'Start 3×4 (seit 0.62): Kalender, To Do, Sammlungen / Projekte, Notizen, Einkauf / Vorlesen, Rechner, Ziele / Planung ▸, Lernen ▸, Spiele ▸');
-  pruefe(!/oeffne\('(listen|woche|kurs)'\)/.test(h) && /oeffne\('ziele'\)/.test(h), 'Ziele seit 0.62 auf der Startseite; keine Apps für Listen, Woche; Kurs nicht im Raster');
+    'Start 3×4 (seit 0.71): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, Guide / Planning ▸, Learning ▸, Games ▸');
+  pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
   pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
@@ -922,8 +922,8 @@ function aufgabenTest() {
   /* Auswahl oben rechts */
   CL.katUm();
   let a = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(CL.cl.aufklapp === 'liste' && /todoKategorie\('alle'\)/.test(a) && /todoKategorie\('kb-arbeit'\)/.test(a) && /todoListe\('cl-korb'\)/.test(a) && /todoSicht\('vorlage'\)/.test(a) && !/Weitere/.test(a) && !/Beruf/.test(a),
-    'das ▼ (seit 0.67): Alle und die Kategorien, Sammler, Listen, Ruhende/Fertige/Vorlagen');
+  pruefe(CL.cl.aufklapp === 'liste' && /todoKategorie\('alle'\)/.test(a) && /todoKategorie\('kb-arbeit'\)/.test(a) && /todoListe\('cl-korb'\)/.test(a) && /todoSicht\('ruht'\)/.test(a) && /todoSicht\('fertig'\)/.test(a) && !/todoSicht\('vorlage'\)/.test(a) && !/Weitere/.test(a) && !/Beruf/.test(a),
+    'das ▼: Alle und die Kategorien, Sammler, Listen, Ruhende, Fertige — Vorlagen seit 0.71 im Memo Pad');
   CL.todoKategorie('kb-haus');
   pruefe(CL.cl.app === 'aufgaben' && CL.cl.filter === 'kb-haus' && CL.cl.aufklapp === '' && /▼ Haus/.test(CL.document.getElementById('katKnopf').textContent), 'eine Kategorie im ▼ zeigt „Alle“ dieser Kategorie');
   CL.katSetzen('alle');
@@ -1064,10 +1064,12 @@ function memoTest() {
   if (!CL) { return; }
   aufgabenDaten();
   CL.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[] Zahnbürste', checkliste: 'vorlage', ordnung: 70, geaendert: 1 });
-  CL.oeffne('memo');
+  CL.oeffne('memo'); CL.memoArtSetzen('alles');
   let h = inhalt();
-  pruefe(CL.document.getElementById('reiter').textContent === 'Notizen' && !/Büro|Halbmarathon|Packliste/.test(h) && typeof CL.MEMO_BEREICHE === 'undefined',
-    'Notizen (seit 0.43): ohne Projekte, Ziele, Listen und Checklisten — keine Bereichsauswahl mehr');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Memo Pad' && /Büro/.test(h) && /Halbmarathon/.test(h) && !/Packliste/.test(h) && !/Garten/.test(h),
+    'Memo Pad „Alle“ (seit 0.71): Notizen, Projekte, Ziele — ohne Listen (To Do) und ohne Vorlagen');
+  CL.memoArtSetzen('notizen');
+  pruefe(!/Büro|Halbmarathon|Packliste/.test(inhalt()) && /Notiz/.test(inhalt()), '▼ Notizen: nur Notizen');
   /* Das Schreibfeld der Notizen dient auch den Projekten (Reiter „Memo“ → Schreiben) */
   CL.memoOeffnen('p1');
   h = inhalt();
@@ -1098,7 +1100,9 @@ function memoTest() {
   CL.memoSpeichern();
   const p1 = CL.DB.projekte[0];
   pruefe(p1.name === 'Büro neu' && p1.ende === '2027-03-31' && p1.status === 'ruht', 'Name, Ende und Zustand werden gespeichert');
-  pruefe(CL.cl.memo.id === '' && !/Büro neu/.test(inhalt()), 'eine ruhende Seite verlässt die Seite (zurück zur Liste)');
+  CL.memoArtSetzen('alles');
+  pruefe(CL.cl.memo.id === '' && /Büro neu <small class="leise">· ruht/.test(inhalt()), 'eine ruhende Seite verlässt die Seite — in der Liste mit „ruht“');
+  CL.memoArtSetzen('notizen');
 
   CL.memoNeu();
   pruefe(!/memoWahl\('art','liste'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'Neu bietet keine Liste mehr an');
@@ -1123,7 +1127,7 @@ function memoTest() {
   CL.aufListeSetzen('');
   CL.oeffne('uebersicht');
   CL.oeffne('memo');
-  pruefe(CL.cl.memo.id === '' && /memoOeffnen/.test(inhalt()), 'von der Übersicht aus beginnt Memo mit der Liste');
+  pruefe(CL.cl.memo.id === '' && /memoEintragOeffnen/.test(inhalt()), 'von der Übersicht aus beginnt Memo mit der Liste');
   CL.oeffne('uebersicht');
 }
 
@@ -1142,10 +1146,9 @@ function checklistenTest() {
   CL.DB.gedanken.push({ id: 'v1', titel: 'Packliste Urlaub', text: '## Kleidung\n[x] Regenjacke\n[] Badesachen\n## Technik\n[-] Kabel', kontext: 'privat', checkliste: 'vorlage', benutzt: 2, ordnung: 1, geaendert: 1 });
   CL.DB.gedanken.push({ id: 'v2', titel: 'Monatsabschluss', text: '[] Belege', kontext: 'beruflich', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
   CL.DB.projekte.push({ id: 'p1', name: 'Umbau', flaeche: '## Statik\n[x] Pläne\nText\n[] Angebot', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
-  CL.oeffne('checklisten');
-  CL.todoSicht('vorlage');
+  CL.oeffne('memo'); CL.memoArtSetzen('vorlagen');
   let h = inhalt();
-  pruefe(/Packliste Urlaub/.test(h) && /Monatsabschluss/.test(h) && !/clsStarten\(/.test(h) && /Vorlagen…<\/span><small>2/.test(CL.listeAufklappHtml()), '„Vorlagen…“ im ▼ mit Zahl, ohne Startknopf in der Liste');
+  pruefe(/Packliste Urlaub/.test(h) && /Monatsabschluss/.test(h) && !/clsStarten\(/.test(h) && /Vorlagen…<\/span><small>2/.test(CL.memoWahlHtml()), 'Memo Pad „Vorlagen…“ (seit 0.71) im ▼ mit Zahl, ohne Startknopf in der Liste');
   CL.katSetzen('kb-arbeit');
   pruefe(!/Packliste/.test(inhalt()) && /Monatsabschluss/.test(inhalt()), 'die Kategorie ▼ filtert');
   CL.katSetzen('alle');
@@ -1165,7 +1168,8 @@ function checklistenTest() {
   pruefe(/Alles erledigt/.test(inhalt()) && /clsAbschliessen/.test(inhalt()), 'alles erledigt: „Abschließen“ wird angeboten');
   CL.clsAbschliessen();
   pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv');
-  pruefe(CL.cl.app === 'aufgaben' && /Fertige…<\/span><small>1/.test(CL.listeAufklappHtml()), 'danach „Alle“; „Fertige…“ im ▼ zählt sie');
+  CL.memoArtSetzen('checklisten');
+  pruefe(CL.cl.app === 'memo' && /Abgeschlossene…<\/span><small>1/.test(inhalt()), 'danach Memo Pad; „Abgeschlossene…“ zählt sie (0.71)');
 
   /* Neu: aus einem Memo, als Kopie, leer */
   CL.clsNeu();
@@ -1565,7 +1569,7 @@ function sammlungenTest() {
     'Sammlung löschen nimmt ihre Einträge mit — mit Löschvermerken');
   S.cl.app = 'sammlungen'; S.cl.sa.id = b.id; S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
   const menue = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/menueWahl\('saFelder'\)">Felder…/.test(menue) && /menueWahl\('saKopieren'\)">Kopieren \/ als Vorlage…/.test(menue), 'im Menü einer Sammlung: Felder… und Kopieren / als Vorlage…');
+  pruefe(/menueWahl\('saFelder'\)">Fields…/.test(menue) && /menueWahl\('saKopieren'\)">Copy \/ save as template…/.test(menue), 'im Menü einer Sammlung: Fields… und Copy / save as template…');
   S.cl.sa.id = ''; S.cl.aufklapp = '';
   S.oeffne('uebersicht');
 }
@@ -1628,11 +1632,11 @@ async function neustartTest() {
   const ohneHeute = h.replace(/oeffne\('heute'\)"><span class="sym">[\s\S]*?<\/button>/, '');
   pruefe(!/class="zahl"/.test(ohneHeute) && /<div class="fassung">CLIE v[\d.]+ · <button type="button" onclick="oeffne\('abgleich'\)"><u>(abgeglichen \d\d:\d\d|nicht abgeglichen)<\/u><\/button> · <button type="button" onclick="oeffne\('statistik'\)"><u>Statistik<\/u>/.test(h), 'Übersicht ohne Zahlen (außer an „Heute“), die Versionszeile führt zu Abgleich (seit 0.46) und Statistik');
   CL.cl.aufklapp = 'menue'; CL.aufklappZeichnen();
-  pruefe(/menueWahl\('statistik'\)">Statistik/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: Statistik');
+  pruefe(/menueWahl\('statistik'\)">Stats/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: Stats');
   CL.cl.aufklapp = '';
   CL.oeffne('statistik');
   h = inhalt();
-  pruefe(CL.document.getElementById('reiter').textContent === 'Statistik', 'der Reiter heißt Statistik');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Stats', 'der Reiter heißt Stats');
   ['kalender', 'aufgaben', 'memo', 'checklisten', 'sammlungen', 'routinen', 'abgleich'].forEach(id => {
     pruefe(new RegExp('class="st-kopf" onclick="oeffne\\(\'' + id + '\'\\)">').test(h), 'Block ' + id + ' öffnet die App');
   });
@@ -1654,7 +1658,7 @@ function zurueckTest() {
   console.log('\n28. Android-Taste Zurück (0.7.2, Leiste seit 0.8 wieder da)');
   if (!CL) { return; }
   frisch();
-  pruefe(/<nav class="silk"/.test(QUELLE) && /onclick="oeffne\('uebersicht'\)"><b>⌂<\/b>Übersicht/.test(QUELLE) && /onclick="menueUm\(\)" id="menueTaste"><b>≡<\/b>Menü/.test(QUELLE) && !/<b>⇅<\/b>Abgleich/.test(QUELLE),
+  pruefe(/<nav class="silk"/.test(QUELLE) && /onclick="oeffne\('uebersicht'\)"><b>⌂<\/b>Home/.test(QUELLE) && /onclick="menueUm\(\)" id="menueTaste"><b>≡<\/b>Menu/.test(QUELLE) && !/<b>⇅<\/b>Abgleich/.test(QUELLE),
     'Tastenleiste unten (seit 0.8); seit 0.46 rechts ≡ Menü statt Abgleich');
   pruefe(/<span class="reiter" id="reiter">/.test(QUELLE) && !/id="reiter" onclick/.test(QUELLE) && !/\.reiter::after/.test(QUELLE), 'seit 0.46 ist der Reiter nur der Titel — ohne ▾ und ohne Menü');
   pruefe(/addEventListener\('popstate', zurueckGedrueckt\)/.test(SKRIPT), 'die Android-Taste Zurück wird abgefangen');
@@ -1767,7 +1771,7 @@ function formelTest() {
   S.cl.sa.ansicht = 'werte'; S.zeichne();
   pruefe(S.document.getElementById('reiter').textContent === 'Feste Werte' && /saWertOeffnen/.test(inhalt()) && /\+ Wert/.test(S.document.getElementById('fuss').innerHTML), 'Ansicht „Feste Werte“ mit „+ Wert“');
   S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
-  pruefe(/menueWahl\('saWerte'\)">Feste Werte…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü: Feste Werte…');
+  pruefe(/menueWahl\('saWerte'\)">Fixed values…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü: Fixed values…');
   S.cl.aufklapp = ''; S.cl.sa.id = ''; S.cl.sa.ansicht = 'tabelle';
   S.oeffne('uebersicht');
 }
@@ -1860,14 +1864,14 @@ function ckZustandTest() {
   pruefe(S.cl.aufklapp === 'liste' && h.indexOf("todoListe('cl-korb')") < h.indexOf("todoListe('th')") && !/<div class="zw">/.test(h),
     '▼: oben Alle und Sammler, darunter die laufenden Listen nach Bereich — ohne Überschriften (0.62)');
   pruefe(/Haus<\/span><small>1\/2</.test(h), 'rechts nur x/y');
-  pruefe(/☑ Packen Borkum/.test(h) && !/☑ Jahresgespräche/.test(h) && !/☑ Haus/.test(h), '☑ nur vor Listen zum Abhaken');
+  pruefe(!/Packen Borkum/.test(h) && !/Jahresgespräche/.test(h) && !/☑/.test(h), 'seit 0.71: Checklisten und Abläufe nicht im ▼ (sie stehen im Memo Pad)');
   pruefe(!/Carport Angebote/.test(h) && !/>Altes</.test(h) && /Ruhende…<\/span><small>1</.test(h) && /Fertige…<\/span><small>1</.test(h), 'Ruhende und Fertige nur gezählt, unter dem Strich');
   /* Kategorie (seit 0.67 das ▼ selbst): grenzt „Alle“ und das ▼ ein */
   S.todoKategorie('kb-arbeit');
   S.katUm();
   h = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Jahresgespräche/.test(h) && !/todoListe\('th'\)/.test(h) && /▼ Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-filter') === 'kb-arbeit',
-    'Kategorie gewählt: nur deren Listen, oben „▼ Arbeit“, gemerkt');
+  pruefe(!/todoListe\('th'\)/.test(h) && /▼ Arbeit/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-filter') === 'kb-arbeit',
+    'Kategorie gewählt: Listen anderer Kategorien nicht, oben „▼ Arbeit“, gemerkt');
   S.aufklappZu();
   S.katSetzen('alle');
   S.todoSicht('ruht');
@@ -1878,8 +1882,8 @@ function ckZustandTest() {
   S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.naechste = false;
   S.oeffne('aufgaben');
   h = inhalt();
-  pruefe(/Dachrinne/.test(h) && !/Maier nachfassen/.test(h) && !/Koffer/.test(h) && /Termine/.test(h) && /Bögen/.test(h),
-    'Aufgaben: ruhende Liste nicht, Abhaken nur Eingeplantes, Art „Aufgaben“ mit allen Punkten');
+  pruefe(/Dachrinne/.test(h) && !/Maier nachfassen/.test(h) && !/Koffer/.test(h) && !/Termine/.test(h) && !/Bögen/.test(h),
+    'Alle: ruhende Liste nicht, Checkliste nie, Ablauf ohne Datum nicht (seit 0.71 ein Plan)');
   /* Wecken: ein Punkt der ruhenden Liste wird für heute eingeplant */
   S.aufPlanAnwenden(S.kpSeiteFinden('tr'), 0, heute, '');
   const n = S.ckWecken();
@@ -2201,6 +2205,111 @@ function kategorienTest() {
 }
 
 /* ============================================================
+   126. Memo Pad: Notizen, Projekte, Abläufe, Checklisten, Ziele (0.71)
+   Grund: Wie am Palm gehört alles Geschriebene in eine App „Memo Pad“ —
+   das ▼ wählt die Art. Jede Art hat Vorlagen. Ablauf = kurzlebiger Plan,
+   Eingeplantes kommt nach To Do; Checkliste (Packliste) nie in Alle oder
+   im Tag, abgehakt nur in der App, mit „Alle Haken entfernen“. Icons und
+   Menü ≡ auf Englisch, alles andere deutsch.
+   Erkennt: Art fehlt im ▼, Zählung falsch, Vorlagen in der Liste,
+   Eintrag öffnet falsch, „Save as template…“ wirkungslos, Start aus der
+   Vorlage übernimmt Haken, Checkliste flutet Alle, Tipp plant statt
+   abzuhaken, Zurücksetzen fehlt, To-Do-▼ zeigt Checklisten, deutsche
+   Icon-Namen zurück.
+   ============================================================ */
+function memoPadTest() {
+  console.log('\n126. Memo Pad: Notizen, Projekte, Abläufe, Checklisten, Ziele (0.71)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.cl.auf.frisch = {}; S.cl.auf.wahl = ''; S.cl.auf.liste = '';
+  S.DB.gedanken.push({ id: 'n1', titel: 'Zaun Ideen', text: 'Holz oder Metall', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[] Statik', status: 'laufend', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Halbmarathon', flaeche: '', status: 'laufend', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'a1', titel: 'Abruftest', text: '[] Daten laden\n[] Prüfen', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', gestartet: heute, ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'k1', titel: 'Packliste Borkum', text: '[] Zahnbürste\n[x] Pass', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 5, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
+  /* Start und Namen */
+  const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,leitfaden,planung,lernen,spiele', 'Start: zwölf Felder, Memo Pad an dritter Stelle, Routines und Guide statt Projekte und Ziele');
+  pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
+    'Icon-Namen englisch wie am Palm');
+  /* Das ▼ */
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  let h = inhalt();
+  pruefe(S.document.getElementById('reiter').textContent === 'Memo Pad' && /▼ Alle/.test(S.document.getElementById('katKnopf').textContent), 'Reiter „Memo Pad“, oben „▼ Alle“');
+  pruefe(['Zaun Ideen', 'Carport', 'Halbmarathon', 'Abruftest', 'Packliste Borkum'].every(x => h.indexOf(x) >= 0) && !/Packliste Urlaub/.test(h),
+    'Alle: jede Art, Vorlagen nicht');
+  pruefe(h.indexOf('Abruftest') < h.indexOf('Carport') && h.indexOf('Carport') < h.indexOf('Halbmarathon') && h.indexOf('Packliste Borkum') < h.indexOf('Zaun Ideen'), 'Alle: nach Titel sortiert');
+  pruefe(/Abruftest<\/span><span class="mz art">⇢/.test(h) && /Packliste Borkum<\/span><span class="mz art">☑/.test(h) && /Carport<\/span><span class="mz art">◎/.test(h), 'Zeichen rechts: ⇢ Ablauf, ☑ Checkliste, ◎ Projekt');
+  S.katUm();
+  const dd = S.document.getElementById('aufklapp').innerHTML;
+  const reihe = ['alles', 'notizen', 'projekte', 'ablaeufe', 'checklisten', 'ziele', 'handschrift', 'alle', 'notizblock', 'vorlagen'].map(k => dd.indexOf("memoArtSetzen('" + k + "')"));
+  pruefe(reihe.every((x, i) => x >= 0 && (i === 0 || x > reihe[i - 1])), '▼: Alle · Notizen · Projekte · Abläufe · Checklisten · Ziele, dann Handschrift, Notizblock, Vorlagen…');
+  pruefe(/memoArtSetzen\('ablaeufe'\)"><span>Abläufe<\/span><small>1</.test(dd) && /memoArtSetzen\('vorlagen'\)"><span>Vorlagen…<\/span><small>1</.test(dd), 'Zahlen je Art');
+  S.aufklappZu();
+  S.memoArtSetzen('checklisten');
+  pruefe(/Packliste Borkum/.test(inhalt()) && !/Abruftest|Carport/.test(inhalt()) && /▼ Checklisten/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-memo-sicht') === 'checklisten',
+    '▼ Checklisten: nur diese, gemerkt');
+  /* Öffnen je Art */
+  S.memoEintragOeffnen('p1');
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1', 'Projekt öffnet als Projekt');
+  S.memoEintragOeffnen('z1');
+  pruefe(S.cl.app === 'ziele' && S.cl.zi.id === 'z1', 'Ziel öffnet als Ziel');
+  S.memoEintragOeffnen('n1');
+  pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'n1', 'Notiz öffnet als Notiz');
+  /* Checkliste: Tipp hakt ab, nie in Alle, Haken entfernen */
+  S.memoEintragOeffnen('k1');
+  pruefe(S.cl.app === 'checklisten' && /☑ Checkliste/.test(S.document.getElementById('katKnopf').textContent), 'Checkliste öffnet, oben die Art');
+  S.clsHaken('k1', 0);
+  pruefe(/\[x\] Zahnbürste/.test(S.kpSeiteFinden('k1').text), 'Tipp hakt ab');
+  pruefe(/clsZuruecksetzen\(\)/.test(inhalt() + S.document.getElementById('fuss').innerHTML), '„Alle Haken entfernen“ sichtbar');
+  S.clsZuruecksetzen();
+  pruefe(!/\[x\]/i.test(S.kpSeiteFinden('k1').text), 'zurückgesetzt: alles wieder offen');
+  S.aufPlanAnwenden(S.kpSeiteFinden('a1'), 0, heute, '');
+  S.oeffne('aufgaben');
+  h = inhalt();
+  pruefe(!/Zahnbürste|Pass/.test(h) && /Daten laden/.test(h) && !/Prüfen/.test(h), 'Alle: Checkliste nie, Ablauf nur Eingeplantes');
+  S.katUm();
+  pruefe(!/todoListe\('k1'\)|todoListe\('a1'\)|Vorlagen…/.test(S.document.getElementById('aufklapp').innerHTML), 'To-Do-▼: keine Checklisten, Abläufe, Vorlagen');
+  S.aufklappZu();
+  /* Vorlagen für jede Art */
+  S.pjOeffnen('p1', 'inhalt');
+  S.menueUm();
+  pruefe(/menueWahl\('alsVorlage'\)">Save as template…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menu ≡: „Save as template…“');
+  S.aufklappZu();
+  S.kpSeiteFinden('p1').text = '[x] Statik';
+  S.memoAlsVorlage();
+  const pv = S.DB.projekte.filter(p => p.istVorlage)[0];
+  pruefe(pv && pv.name === 'Carport' && /\[\] Statik/.test(pv.flaeche) && S.DB.projekte.length === 2, 'Projekt als Vorlage: Kopie ohne Haken, Original bleibt');
+  S.oeffne('memo'); S.memoArtSetzen('projekte');
+  pruefe((inhalt().match(/Carport/g) || []).length === 1, 'Vorlage steht nicht in der Liste');
+  S.memoArtSetzen('vorlagen');
+  h = inhalt();
+  pruefe(/>Projekte</.test(h) && />Checklisten</.test(h) && /memoEintragOeffnen\('kv'\)/.test(h) && new RegExp("memoEintragOeffnen\\('" + pv.id + "'\\)").test(h), 'Vorlagen…: nach Art gruppiert, alte Checklisten-Vorlagen dabei');
+  S.memoEintragOeffnen(pv.id);
+  pruefe(S.cl.aufklapp === 'memovorlage' && /memoVorlageStarten\(\)/.test(S.document.getElementById('aufklapp').innerHTML) && /memoVorlageBearbeiten\(\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Vorlage antippen: Starten oder Bearbeiten');
+  S.document.getElementById('memoVorlageName').value = 'Gartenhaus';
+  S.memoVorlageStarten();
+  const pn = S.DB.projekte.filter(p => p.name === 'Gartenhaus')[0];
+  pruefe(pn && !pn.istVorlage && pn.status === 'laufend' && S.cl.app === 'projekte' && S.cl.pj.id === pn.id, 'Starten: neues laufendes Projekt mit eigenem Namen, geöffnet');
+  /* Neu */
+  S.oeffne('memo'); S.memoArtSetzen('alles'); S.memoNeu();
+  const nh = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'memoneu' && ['notiz', 'projekt', 'ablauf', 'checkliste', 'ziel'].every(a => nh.indexOf("memoNeuArt('" + a + "')") >= 0) && /Aus Vorlage/.test(nh), 'Neu in „Alle“: erst die Art wählen, auch aus Vorlage');
+  S.aufklappZu();
+  /* Menü englisch, sonst deutsch */
+  S.oeffne('uebersicht'); S.menueUm();
+  const mh = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/HotSync…/.test(mh) && /Check for update/.test(mh) && !/Nach Update suchen/.test(mh), 'Menü ≡ englisch');
+  S.aufklappZu();
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  pruefe(/Noch nichts|memo-zeile/.test(inhalt()) && !/Nothing yet/.test(inhalt()), 'Inhalte bleiben deutsch');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    125. Plan und Einplanen: Projekt = Notiz + Schritte (0.70)
    Grund: Wie am Palm (Memo + To Do) — Projekte und Checklisten sind
    Pläne; was dran ist, wird bewusst eingeplant und steht dann in „Alle“
@@ -2221,7 +2330,7 @@ function planEinplanenTest() {
     'nur noch Notiz · Schritte; alte Reiter, Ansichten und „Punkt einplanen“ sind weg');
   S.DB.projekte.push({ id: 'pd', name: 'DFÜ-Abruftest', kontext: 'beruflich', bereich: 'kb-arbeit', status: 'laufend', ordnung: 1, geaendert: 1,
     flaeche: 'Ziel: Abruf einmal komplett durchspielen.\n[] Testdaten bereitstellen\n[] Teilnehmer erinnern\n[] Ergebnis protokollieren' });
-  S.DB.gedanken.push({ id: 'ca', titel: 'Abruftest – Ablauf', text: '[] Abruf starten\n[] Daten gegenprüfen', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', gestartet: heute, ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'ca', titel: 'Abruftest – Ablauf', text: '[] Abruf starten\n[] Daten gegenprüfen', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', gestartet: heute, ordnung: 2, geaendert: 1 });
   /* Einplanen-Fenster */
   S.aufEinplanen('pd', 2);
   let a = S.document.getElementById('aufklapp').innerHTML;
@@ -2401,8 +2510,8 @@ function leitfadenTest() {
   const S = CL;
   S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
   const heute = S.isoDatum();
-  pruefe(S.clApp('leitfaden') && S.CL_ORDNER.planung.apps.indexOf('leitfaden') === 2 && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
-    'App „Leitfaden“ im Ordner Planung nach der Ideenwerkstatt, Symbol Stufen');
+  pruefe(S.clApp('leitfaden') && S.clApp('leitfaden').raster !== false && S.clApp('leitfaden').name === 'Guide' && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
+    'App „Guide“ (Leitfaden) seit 0.71 auf dem Start, Symbol Stufen');
   pruefe(S.LF_ARTEN.length === 5 && S.LF_ARTEN.every(a => a.schritte.length === 5 && a.schritte.every(s => s[0] && s[1])) && S.LF_ARTEN[4].schritte[0][0] === 'Plan B',
     'fünf Verfahren mit je fünf Schritten (Name und Erklärung); Verhandlung beginnt mit Plan B');
   S.oeffne('leitfaden');
@@ -3005,7 +3114,7 @@ function sammlerTest() {
   pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
   S.aufklappZu();
   const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(start.indexOf('ziele') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && S.CL_ORDNER.planung.apps.indexOf('ziele') < 0, 'Start: Ziele statt Kurs, weiter 12 Felder');
+  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && S.CL_ORDNER.planung.apps.indexOf('ziele') < 0, 'Start: Ziele seit 0.71 im Memo Pad, weiter 12 Felder');
   S.oeffne('uebersicht');
 }
 
@@ -3028,31 +3137,31 @@ function toDoTest() {
   S.DB.gedanken.push({ id: 'gp', titel: 'Packen', text: '[] Koffer\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', gestartet: S.isoDatum(), ordnung: 2, geaendert: 1 });
   S.DB.gedanken.push({ id: 'gv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 3, geaendert: 1 });
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.indexOf('checklisten') < 0 && S.clApp('aufgaben').name === 'To Do', 'eine App „To Do“ im Raster, „Checklisten“ nicht mehr');
+  pruefe(raster.indexOf('checklisten') < 0 && S.clApp('aufgaben').name === 'To Do List', 'eine App „To Do List“ im Raster, „Checklisten“ nicht mehr');
   S.oeffne('aufgaben');
-  pruefe(S.document.getElementById('reiter').textContent === 'To Do' && /▼ Alle/.test(S.document.getElementById('katKnopf').textContent), 'Reiter „To Do“, oben rechts „▼ Alle“');
-  pruefe(/Dachrinne/.test(inhalt()) && !/Koffer/.test(inhalt()), '„Alle“: Aufgaben ja, Punkte der Abhak-Liste nicht (nur geplant oder mit Frist)');
+  pruefe(S.document.getElementById('reiter').textContent === 'To Do List' && /▼ Alle/.test(S.document.getElementById('katKnopf').textContent), 'Reiter „To Do List“, oben rechts „▼ Alle“');
+  pruefe(/Dachrinne/.test(inhalt()) && !/Koffer/.test(inhalt()), '„Alle“: Aufgaben ja, Punkte der Checkliste nicht');
   S.katUm();
   const dd = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/todoListe\('lh'\)/.test(dd) && /☑ Packen/.test(dd) && !/todoListe\('gv'\)/.test(dd), '▼: laufende Listen, ☑ vor der Abhak-Liste, Vorlagen nicht einzeln');
-  S.todoListe('gp');
-  pruefe(S.cl.app === 'checklisten' && S.cl.aufklapp === '' && S.document.getElementById('reiter').textContent === 'To Do' && /▼ Packen/.test(S.document.getElementById('katKnopf').textContent), 'Liste gewählt: Reiter bleibt „To Do“, oben „▼ Packen“');
-  pruefe(!/clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'aus dem ▼ geöffnet: kein „Fertig“ — das ▼ führt weiter');
+  pruefe(/todoListe\('lh'\)/.test(dd) && !/todoListe\('gp'\)/.test(dd) && !/todoListe\('gv'\)/.test(dd) && !/Vorlagen…/.test(dd),
+    '▼ seit 0.71: nur Listen — Checklisten und Vorlagen stehen im Memo Pad');
+  S.todoListe('lh');
+  pruefe(S.cl.app === 'checklisten' && S.cl.aufklapp === '' && S.document.getElementById('reiter').textContent === 'To Do List' && /▼ Haus/.test(S.document.getElementById('katKnopf').textContent), 'Liste gewählt: Reiter bleibt „To Do List“, oben „▼ Haus“');
+  pruefe(!/clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'Liste aus dem ▼: kein „Fertig“ — das ▼ führt weiter');
   S.katUm();
   pruefe(S.cl.aufklapp === 'liste' && /todoKategorie\('alle'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'auch in der Liste dasselbe ▼');
   S.aufklappZu();
   S.zurueckGedrueckt();
   pruefe(S.cl.app === 'aufgaben', 'Zurück aus einer Liste: „Alle“');
-  /* Vorlagen… */
-  S.todoSicht('vorlage');
-  pruefe(S.cl.app === 'checklisten' && /Packliste Urlaub/.test(inhalt()) && /▼ Vorlagen/.test(S.document.getElementById('katKnopf').textContent), '„Vorlagen…“ zeigt die Vorlagen');
-  S.clsOeffnen('gv');
-  pruefe(/clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML) && /▼ Vorlage: Packliste Urlaub/.test(S.document.getElementById('katKnopf').textContent), 'Vorlage aus „Vorlagen…“: mit „Fertig“');
+  /* Checkliste aus dem Memo Pad: Reiter „Memo Pad“, „Fertig“ führt zurück */
+  S.oeffne('memo'); S.memoEintragOeffnen('gp');
+  pruefe(S.cl.app === 'checklisten' && S.document.getElementById('reiter').textContent === 'Memo Pad' && /clsZurListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'Checkliste aus dem Memo Pad: Reiter „Memo Pad“, mit „Fertig“');
   S.clsZurListe();
-  pruefe(S.cl.cls.sicht === 'vorlage' && S.cl.cls.id === '' && S.cl.app === 'checklisten', '„Fertig“ führt zurück zu „Vorlagen…“');
-  S.clsOeffnen('gv');
+  pruefe(S.cl.app === 'memo', '„Fertig“ führt zurück ins Memo Pad');
+  /* Vorlage starten (Vorlage alter Art, checkliste: 'vorlage') */
+  S.oeffne('checklisten'); S.clsOeffnen('gv');
   S.clsStarten('gv');
-  pruefe(S.cl.cls.sicht === '' && S.ckZustand(S.kpSeiteFinden(S.cl.cls.id)) === 'lauf', 'gestartet: die Liste läuft, nicht mehr unter „Vorlagen…“');
+  pruefe(S.ckZustand(S.kpSeiteFinden(S.cl.cls.id)) === 'lauf', 'gestartet: die Liste läuft');
   /* Neue Liste öffnet in To Do; ein Projekt filtert weiter „Alle“ */
   S.todoNeueListe();
   pruefe(S.cl.aufklapp === 'checkliste', '„+ Neue Liste…“ öffnet „Neu“');
@@ -3883,7 +3992,9 @@ function clsKompaktTest() {
   const h = S.checklistenListeHtml();
   pruefe(!/clsStarten\(/.test(h) && !/Starten</.test(h), 'kein Startknopf in „Vorlagen…“');
   pruefe(!/× benutzt|<small>seit /.test(h + hl), 'keine Zusatzzeilen (seit … / benutzt)');
-  pruefe(/class="cls-zeile vorl"/.test(h) && /class="cls-zeile lauf"[^>]*>.*1\/2/.test(hl), 'Vorlage einzeilig, Laufend mit 1/2');
+  S.memoArtSetzen('vorlagen');
+  const hm = inhalt();
+  pruefe(/memoEintragOeffnen\('v9'\)/.test(hm) && !/l9/.test(hl), 'seit 0.71: Vorlage einzeilig im Memo Pad unter „Vorlagen…“, laufende Checkliste nicht mehr in der To-Do-Listenübersicht');
   pruefe(/\.cls-zeile\.vorl \.tx\{white-space:nowrap\}/.test(QUELLE) && /\.cls-zeile\.lauf \.tx,\.cls-zeile\.erl \.tx\{white-space:nowrap\}/.test(QUELLE), 'CSS: alle Zeilen einzeilig (seit 0.53.2)');
   S.clsOeffnen('v9');
   pruefe(/clsStarten\(/.test(S.checklistenFussHtml()), 'gestartet wird in der geöffneten Vorlage');
@@ -4069,7 +4180,7 @@ function diagrammeTest() {
   pruefe(!/class="sa-dia-um"/.test(inhalt()), 'ohne Diagramm kein Umschalter');
   pruefe(/<small>kg<\/small><b>78<\/b><\/div>/.test(inhalt()) && !/sa-mini|<svg/.test(inhalt()), 'Kopfwert-Kacheln ohne Mini-Kurve (seit 0.47.1 entfernt)');
   S.menueUm();
-  pruefe(/menueWahl\('saDiagramme'\)">Diagramme…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü der Sammlung: „Diagramme…“');
+  pruefe(/menueWahl\('saDiagramme'\)">Charts…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü der Sammlung: „Charts…“');
   S.menueWahl('saDiagramme');
   pruefe(S.cl.sa.ansicht === 'diagramme' && S.document.getElementById('reiter').textContent === 'Diagramme' && /saDiaNeu\(\)">\+ Diagramm/.test(S.document.getElementById('fuss').innerHTML), 'Einrichten: Liste mit „+ Diagramm“');
   /* Linie mit Ziel anlegen */
@@ -4197,12 +4308,12 @@ function menueInfoTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  pruefe(/<span class="reiter" id="reiter">/.test(QUELLE) && /onclick="menueUm\(\)" id="menueTaste"><b>≡<\/b>Menü<\/button>\s*<\/nav>/.test(QUELLE), 'oben nur der Titel, unten rechts die Taste ≡ Menü');
+  pruefe(/<span class="reiter" id="reiter">/.test(QUELLE) && /onclick="menueUm\(\)" id="menueTaste"><b>≡<\/b>Menu<\/button>\s*<\/nav>/.test(QUELLE), 'oben nur der Titel, unten rechts die Taste ≡ Menu');
   S.oeffne('kalender');
   S.menueUm();
   const m = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/class="aufklapp menue-unten"/.test(m) && m.indexOf('Abgleich…') < m.indexOf('Auf neue Fassung prüfen') && m.indexOf('Auf neue Fassung prüfen') < m.indexOf('Termine holen') && m.indexOf('Termine holen') < m.indexOf('Statistik'),
-    'Menü über der Leiste: Abgleich…, Auf neue Fassung prüfen, Termine holen … Statistik, Info');
+  pruefe(/class="aufklapp menue-unten"/.test(m) && m.indexOf('HotSync…') >= 0 && m.indexOf('HotSync…') < m.indexOf('Check for update') && m.indexOf('Check for update') < m.indexOf('Fetch events') && m.indexOf('Fetch events') < m.indexOf('Stats'),
+    'Menü über der Leiste (englisch seit 0.71): HotSync…, Check for update, Fetch events … Stats, Info');
   S.menueWahl('abgleich');
   pruefe(S.cl.app === 'abgleich' && !S.cl.aufklapp, '„Abgleich…“ öffnet die App Abgleich');
   S.oeffne('uebersicht');
@@ -4395,7 +4506,7 @@ function zieleTest() {
   S.DB.ziele.push({ id: 'z2', name: 'Gewicht 73 kg', kontext: 'privat', status: 'laufend', zieltermin: S.tagePlus(heute, 30), flaeche: '## Warum\nKnie entlasten\n[] Waage kaufen', ordnung: 2, geaendert: 1 });
   S.DB.ziele.push({ id: 'z3', name: 'Italienisch A2', kontext: 'privat', status: 'laufend', zieltermin: '', flaeche: '', ordnung: 3, geaendert: 1 });
   S.DB.ziele.push({ id: 'z4', name: 'Alter Vorsatz', kontext: 'privat', status: 'abgeschlossen', zieltermin: '2025-01-01', flaeche: '', ordnung: 4, geaendert: 1 });
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('ziele') < 0 && S.clApp('ziele').raster !== false && /M20 17h22/.test(S.clSymbol('ziele')), 'Ziele seit 0.62 auf der Startseite (nicht mehr im Ordner), mit Fahne als Symbol');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('ziele') < 0 && S.clApp('ziele').raster === false && S.clApp('ziele').name === 'Memo Pad', 'Ziele seit 0.71 im Memo Pad (nicht auf dem Start, nicht im Ordner)');
   pruefe(/2 laufen|3 laufen/.test(S.ordnerStandText('ziele')) && /nächstes in 30 Tage/.test(S.ordnerStandText('ziele')), 'Stand im Ordner: Anzahl und nächstes Ziel');
   S.oeffne('projekte');
   pruefe(!/Haus auf Stand|Gewicht/.test(inhalt()) && /Carport/.test(inhalt()), 'Projekte zeigt keine Ziele mehr');
@@ -4404,7 +4515,7 @@ function zieleTest() {
   S.aufklappZu();
   S.oeffne('ziele');
   let h = inhalt();
-  pruefe(S.document.getElementById('reiter').textContent === 'Ziele' && /pjZustandFilter|ziZustandFilter\('laeuft'\)">Laufend/.test(h) && /ziZustandFilter\('erledigt'\)">Erreicht/.test(h), 'drei Schalter Laufend · Ruhend · Erreicht');
+  pruefe(S.document.getElementById('reiter').textContent === 'Memo Pad' && /pjZustandFilter|ziZustandFilter\('laeuft'\)">Laufend/.test(h) && /ziZustandFilter\('erledigt'\)">Erreicht/.test(h), 'drei Schalter Laufend · Ruhend · Erreicht');
   pruefe(h.indexOf('Gewicht') < h.indexOf('Haus auf Stand') && h.indexOf('Haus auf Stand') < h.indexOf('Italienisch') && !/Alter Vorsatz/.test(h), 'nächster Zieltermin zuerst, ohne Termin unten');
   pruefe(/Gewicht 73 kg<\/span><span class="pj-p">30 Tage/.test(h) && /Haus auf Stand<\/span><span class="pj-p">13 Mon\./.test(h) && /Italienisch A2<\/span><span class="pj-p">—/.test(h), 'rechts die Restzeit: Tage, Monate oder —');
   S.ziZustandFilter('erledigt');
@@ -4425,7 +4536,7 @@ function zieleTest() {
   const z2 = S.DB.ziele[1];
   pruefe(z2.name === 'Gewicht 72 kg' && z2.zieltermin === '2027-06-30' && z2.status === 'abgeschlossen', 'Details: Name, Zieltermin; „erreicht“ = abgeschlossen in der Workbench');
   S.ziZurListe();
-  pruefe(S.cl.zi.zustand === 'erledigt' && /Gewicht 72 kg/.test(inhalt()), 'zurück: Liste „Erreicht“');
+  pruefe(S.cl.app === 'memo' && !S.cl.zi.id, 'zurück: seit 0.71 ins Memo Pad');
   S.ziNeu();
   pruefe(/Neues Ziel/.test(S.document.getElementById('aufklapp').innerHTML) && !/ziWahl\('zustand'/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu: Name, Zieltermin, Kategorie');
   S.document.getElementById('ziTitel').value = 'Halbmarathon';
@@ -4434,7 +4545,7 @@ function zieleTest() {
   const neu = S.DB.ziele[S.DB.ziele.length - 1];
   pruefe(neu.name === 'Halbmarathon' && neu.zieltermin === '2027-06-20' && neu.status === 'laufend' && S.cl.zi.id === neu.id, 'Neu legt ein Ziel in DB.ziele an und öffnet es');
   S.clZurueck();
-  pruefe(S.cl.app === 'ziele' && !S.cl.zi.id, 'Zurück: vom Ziel zur Liste');
+  pruefe(S.cl.app === 'memo' && !S.cl.zi.id, 'Zurück: vom Ziel ins Memo Pad');
   S.clZurueck();
   pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp !== 'ordner', 'noch einmal Zurück: zur Übersicht (seit 0.62 nicht mehr im Ordner)');
   S.aufklappZu();
@@ -4468,7 +4579,7 @@ function projekteTest() {
   S.DB.ziele.push({ id: 'z1', name: 'Fit bis Sommer', kontext: 'privat', status: 'laufend', zieltermin: '2027-06-30', flaeche: '', ordnung: 4, geaendert: 1 });
   S.oeffne('projekte');
   let h = inhalt();
-  pruefe(S.document.getElementById('reiter').textContent === 'Projekte' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && !/Fit bis Sommer/.test(h),
+  pruefe(S.document.getElementById('reiter').textContent === 'Memo Pad' && h.indexOf('Heizung') < h.indexOf('Carport') && !/Keller/.test(h) && !/Fit bis Sommer/.test(h),
     'Liste „Laufend“: P1 zuerst, Ruhendes nicht, Ziele nicht (seit 0.44 eigene App)');
   /* Seit 0.43.2 schlicht: nur der Name, die Priorität nur wenn gesetzt */
   pruefe(/<button type="button" class="pj-zeile" onclick="pjOeffnen\('p1','inhalt'\)"><span class="pj-n">Carport<\/span><\/button>/.test(h)
@@ -4497,7 +4608,7 @@ function projekteTest() {
   pruefe(/pjAufgabeNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML) && /aufEinplanenGewaehlt\(\)">Einplanen…/.test(S.document.getElementById('fuss').innerHTML) && (S.document.getElementById('fuss').innerHTML.match(/<button/g) || []).length <= 4,
     'unten: Fertig, Neu, Einplanen… — höchstens vier Knöpfe');
   S.menueUm();
-  pruefe(/menueWahl\('pjDetails'\)">Projekt-Details…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: „Projekt-Details…“');
+  pruefe(/menueWahl\('pjDetails'\)">Project details…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: „Project details…“');
   S.aufklappZu();
   /* Einplanen: steht dann in Alle — der Punkt bleibt im Projekt */
   S.oeffne('aufgaben');
@@ -4544,7 +4655,7 @@ function projekteTest() {
   S.pjOeffnen('p1', 'inhalt');
   /* Zurück und Neu */
   S.clZurueck();
-  pruefe(S.cl.app === 'projekte' && !S.cl.pj.id, 'Zurück: vom Projekt zur Liste');
+  pruefe(S.cl.app === 'memo' && !S.cl.pj.id, 'Zurück: vom Projekt ins Memo Pad (seit 0.71)');
   S.pjNeu();
   S.document.getElementById('pjNeuTitel').value = 'Terrassendach';
   S.pjNeuSpeichern();
@@ -4554,7 +4665,7 @@ function projekteTest() {
   pruefe(S.CL_ORDNER.planung.apps.indexOf('coach') >= 0 && S.clOrdnerVon('coach') === 'planung', 'Coach im Ordner Planung');
   pruefe(/<rect x="15" y="18" width="16" height="6"/.test(S.clSymbol('projekte')), 'Symbol „Zeitplan“ (drei versetzte Balken)');
   S.oeffne('uebersicht');
-  pruefe(/oeffne\('projekte'\)/.test(inhalt()) && />Notizen<\/button>/.test(inhalt()), 'Übersicht: Projekte und „Notizen“ statt Memo');
+  pruefe(!/oeffne\('projekte'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()) && />Memo Pad<\/button>/.test(inhalt()), 'Übersicht seit 0.71: „Memo Pad“ statt Projekte und Notizen');
 }
 
 /* ============================================================
@@ -4712,7 +4823,7 @@ function lesezeichenTest() {
   let h = inhalt();
   pruefe(/Carport/.test(h) && /WLAN, Zugänge/.test(h) && h.indexOf('Carport') < h.indexOf('WLAN') && !/xx/.test(h), 'Workbench-Zettel erscheinen als Lesezeichen (Reihenfolge übernommen, Unbekanntes still weg)');
   pruefe(/3 offen/.test(h) && !/farbe|zettel|z-nadel/i.test(h), 'schlichte Liste mit Stand, ohne Pins und Farben');
-  pruefe(S.document.getElementById('reiter').textContent === 'Lesezeichen' && /lzBearbeitenUm/.test(S.document.getElementById('fuss').innerHTML), 'App „Lesezeichen“ mit „Bearbeiten“');
+  pruefe(S.document.getElementById('reiter').textContent === 'Bookmarks' && /lzBearbeitenUm/.test(S.document.getElementById('fuss').innerHTML), 'App „Lesezeichen“ mit „Bearbeiten“');
   /* Hinzufügen */
   S.lzBearbeitenUm(); S.lzNeuAuf();
   const f = S.document.getElementById('aufklapp').innerHTML;
@@ -4933,7 +5044,7 @@ function suchenTest() {
 
   /* Bedienen */
   S.oeffne('suchen');
-  pruefe(S.document.getElementById('reiter').textContent === 'Suchen' && /id="suchFeld"/.test(inhalt()), 'Suchen: Reiter und Feld');
+  pruefe(S.document.getElementById('reiter').textContent === 'Find' && /id="suchFeld"/.test(inhalt()), 'Suchen: Reiter „Find“ und Feld');
   S.document.getElementById('suchFeld').value = 'carport';
   S.suGetippt();
   let h = S.document.getElementById('suchErgebnis').innerHTML;
@@ -4964,7 +5075,7 @@ function suchenTest() {
   S.suRoutine('r1');
   pruefe(S.cl.app === 'routinen' && S.cl.aufklapp === 'routine', 'Routinen-Treffer öffnet die Routine');
   S.aufklappZu();
-  pruefe(/onclick="oeffne\('suchen'\)"><b>⌕<\/b>Suchen/.test(QUELLE) && !/disabled title="Kommt später"/.test(QUELLE), 'Suchen unten ist kein Platzhalter mehr');
+  pruefe(/onclick="oeffne\('suchen'\)"><b>⌕<\/b>Find/.test(QUELLE) && !/disabled title="Kommt später"/.test(QUELLE), 'Suchen unten ist kein Platzhalter mehr');
   S.cl.su = { text: '', erl: false, auf: {}, zuletzt: [] };
   S.oeffne('uebersicht');
 }
@@ -5326,7 +5437,7 @@ function kopfTest() {
   const k = S.saAusVorlage(g, 'Kopie', true, []);
   pruefe(k.kopfwerte.length === 3 && k.kopfwerte !== g.kopfwerte, 'Kopie und Vorlage übernehmen die Kopfwerte');
   S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
-  pruefe(/menueWahl\('saKopf'\)">Kopfwerte…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü: Kopfwerte…');
+  pruefe(/menueWahl\('saKopf'\)">Header values…/.test(S.document.getElementById('aufklapp').innerHTML), 'im Menü: Header values…');
   S.cl.aufklapp = ''; S.cl.sa.id = '';
   S.oeffne('uebersicht');
 }
@@ -5368,7 +5479,7 @@ function listeTextTest() {
   pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
   S.listeAlsText();
   S.oeffne('uebersicht'); S.oeffne('memo');
-  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch keine Notizen|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
+  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch nichts|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
   S.oeffne('uebersicht');
 }
 
@@ -5412,11 +5523,15 @@ function clsPlanTest() {
   const morgen = S.tagePlus(heute, 1);
   const feld = (id, v) => { S.document.getElementById(id).value = v; };
   S.cl.cls.id = ''; S.cl.cls.schreiben = false; S.cl.cls.fenster = null;
-  S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub Borkum', text: '## Vorher\n[] Koffer packen\n[] Müll rausstellen\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 1, geaendert: 1 });
+  /* Seit 0.71: eingeplant werden Abläufe (Art „aufgaben“) — Checklisten nie */
+  S.DB.gedanken.push({ id: 'c1', titel: 'Urlaub Borkum', text: '## Vorher\n[] Koffer packen\n[] Müll rausstellen\n[] Ladekabel', kontext: 'privat', checkliste: 'lauf', art: 'aufgaben', gestartet: heute, ordnung: 1, geaendert: 1 });
   S.DB.gedanken.push({ id: 'v1', titel: 'Vorlage', text: '[] Punkt', kontext: 'privat', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'ck', titel: 'Packliste', text: '[] Zahnbürste', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 3, geaendert: 1 });
   const c = S.DB.gedanken[0];
   S.oeffne('checklisten'); S.clsOeffnen('c1');
-  pruefe(/onclick="aufEinplanen\('c1',1\)">Koffer packen<\/button>/.test(inhalt()), 'laufende Checkliste: Tipp auf den Text öffnet „Einplanen“ (seit 0.70 ein Fenster für alles)');
+  pruefe(/aufEinplanenGewaehlt\(\)">Einplanen…/.test(S.document.getElementById('fuss').innerHTML), 'Ablauf: unten „Einplanen…“');
+  S.clsOeffnen('ck');
+  pruefe(!/aufEinplanen/.test(inhalt() + S.document.getElementById('fuss').innerHTML) && /onclick="clsHaken\('ck',0\)">Zahnbürste/.test(inhalt()), 'Checkliste: nichts einzuplanen — Tipp auf den Text hakt ab');
   S.clsOeffnen('v1');
   pruefe(!/aufEinplanen/.test(inhalt()), 'Vorlage: nichts einzuplanen');
   S.clsOeffnen('c1');
@@ -5426,7 +5541,7 @@ function clsPlanTest() {
   feld('aufEpDatum', morgen);
   S.aufEinplanenOk();
   pruefe(S.aufGeplant(S.kpSeiteFinden('c1'), 'Koffer packen').datum === morgen && /\[\] Koffer packen/.test(S.kpTagFinden(morgen).text), 'eingeplant: im Tag der Workbench (morgen)');
-  pruefe(new RegExp('<span class="plan-marke">' + S.clWt(morgen) + ' ').test(inhalt()), 'Marke rechts am Punkt');
+  pruefe(new RegExp('Koffer packen</span></button><span class="dt">' + S.clKurzDatum(morgen).replace(/\./g, '\\.')).test(inhalt()), 'Datum rechts am Punkt');
   S.aufEinplanen('c1', 2);
   S.aufEpTag(heute);
   S.aufEpZeitUm();
@@ -5554,7 +5669,7 @@ function ansichtTest() {
   S.DB.themen.push({ id: 'lh', name: 'Haus', text: '[] Lampe tauschen\n[] P1 Steckdose\n[] Dach prüfen', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 });
   S.DB.projekte.push({ id: 'pc', name: 'Carport', flaeche: '[] P2 Statik anfragen\n[] Nachbar informieren', status: 'laufend', kontext: 'privat', ordnung: 50, geaendert: 1 });
   S.DB.projekte.push({ id: 'pr', name: 'Ruht', flaeche: '[] unsichtbar', status: 'ruht', kontext: 'privat', ordnung: 60, geaendert: 1 });
-  S.DB.gedanken.push({ id: 'cb', titel: 'Urlaub Borkum', text: '[] Fähre buchen\n[] Koffer packen\n[] Ladekabel\n[x] Hotel', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 70, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'cb', titel: 'Urlaub Borkum', text: '[] Fähre buchen\n[] Koffer packen\n[] Ladekabel\n[x] Hotel', kontext: 'privat', checkliste: 'lauf', art: 'aufgaben', gestartet: heute, ordnung: 70, geaendert: 1 });
   S.DB.gedanken.push({ id: 'cv', titel: 'Vorlage', text: '[] nie', kontext: 'privat', checkliste: 'vorlage', ordnung: 80, geaendert: 1 });
   const plane = (id, nr, d, z) => S.aufPlanAnwenden(S.kpSeiteFinden(id), nr, d, z || '');
   plane('cb', 1, morgen, '18:00'); plane('cb', 0, heute); plane('pc', 1, heute, '09:00'); plane('lh', 2, morgen);
@@ -5600,7 +5715,7 @@ function ansichtTest() {
   S.cl.auf.wahl = '';
   /* Menü ≡ → Anzeigen… */
   S.menueUm();
-  pruefe(/menueWahl\('anzeigen'\)">Anzeigen…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: „Anzeigen…“');
+  pruefe(/menueWahl\('anzeigen'\)">Show…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: „Show…“');
   S.menueWahl('anzeigen');
   let a = S.document.getElementById('aufklapp').innerHTML;
   pruefe(S.cl.aufklapp === 'anzeigen' && /aufAnzForm\('ausfuehrlich'\)/.test(a) && (a.match(/<option /g) || []).length === 4 && /id="aufAnzFaellig"/.test(a) && /id="aufAnzKuerzel"/.test(a),
@@ -5629,9 +5744,10 @@ function ansichtTest() {
   S.aufTippen('lh', 0); S.aufEinplanenGewaehlt();
   pruefe(S.cl.aufklapp === 'einplanen' && /Lampe tauschen/.test(S.document.getElementById('aufklapp').innerHTML), 'gewählter Punkt → „Einplanen…“');
   S.aufklappZu();
-  /* Details zu einem Checklisten-Punkt: in die Checkliste */
+  /* Seit 0.71: Details zu einem Ablauf-Punkt wie beim Projekt — das Fenster */
   S.aufDetails('cb', 0);
-  pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'cb' && S.cl.aufklapp === '', 'Details zu einem Checklisten-Punkt öffnen die Checkliste');
+  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster.seite === 'cb', 'Details zu einem Ablauf-Punkt: Fenster wie beim Projekt-Punkt');
+  S.aufklappZu();
   S.cl.auf.frisch = {}; S.cl.auf.wahl = '';
   S.oeffne('uebersicht');
 }
@@ -6334,12 +6450,12 @@ function memoBereichTest() {
   S.DB.gedanken.push({ id: 'n1', titel: 'Ideen Garten', text: 'x', kontext: 'privat', ordnung: 1, geaendert: 1 });
   S.DB.gedanken.push({ id: 'n2', titel: 'Teamregeln', text: 'y', kontext: 'beruflich', ordnung: 2, geaendert: 1 });
   S.DB.gedanken.push({ id: 'c1', titel: 'Packliste', text: '[] a', checkliste: 'vorlage', ordnung: 3, geaendert: 1 });
-  S.oeffne('memo');
+  S.oeffne('memo'); S.memoArtSetzen('notizen');
   let h = inhalt();
-  pruefe(/<span class="mz nr">1\.<\/span><span class="tx">Ideen Garten/.test(h) && /<span class="mz nr">2\.<\/span><span class="tx">Teamregeln/.test(h), 'nummerierte Notizen wie am Palm');
-  pruefe(!/Carport|Marathon|Packliste/.test(h) && !/memo-bereich/.test(h) && !/function memoBereich/.test(SKRIPT), 'keine Projekte, Ziele, Checklisten — und keine Bereichsauswahl mehr');
+  pruefe(/<span class="mz nr">1\.<\/span><span class="tx">Ideen Garten/.test(h) && /<span class="mz nr">2\.<\/span><span class="tx">Teamregeln/.test(h), 'Memo Pad ▼ Notizen: nummerierte Notizen wie am Palm');
+  pruefe(!/Carport|Marathon|Packliste/.test(h) && !/memo-bereich/.test(h) && !/function memoBereich/.test(SKRIPT), '▼ Notizen: keine Projekte, Ziele, Checklisten — keine Bereichsauswahl');
   S.memoNeu();
-  pruefe(/Neue Notiz/.test(S.document.getElementById('aufklapp').innerHTML) && !/◎ Projekt/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu legt nur Notizen an');
+  pruefe(/Neue Notiz/.test(S.document.getElementById('aufklapp').innerHTML) && !/◎ Projekt/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu in ▼ Notizen legt eine Notiz an');
   S.aufklappZu();
   S.katSetzen('kb-arbeit');
   pruefe(/Teamregeln/.test(inhalt()) && !/Ideen Garten/.test(inhalt()), 'Filter ▼ (Kategorie) oben rechts gilt weiter');
@@ -6365,7 +6481,8 @@ function startOrdnerTest() {
   const imOrdner = [].concat(...Object.keys(S.CL_ORDNER).map(k => S.CL_ORDNER[k].apps));
   /* „checklisten“ ist seit 0.61 die Listen-Ansicht von To Do — erreichbar über dessen ▼ */
   /* „kategorien“ seit 0.66.2 über das ▼ der Übersicht */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien'];
+  /* „projekte“ und „ziele“ seit 0.71 über das Memo Pad */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -6373,8 +6490,8 @@ function startOrdnerTest() {
   pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).every(k => raster.indexOf(k) >= 0 && S.CL_BILD[k]), 'drei Ordner im Raster, mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 3, 'Ordner am ▸ erkennbar');
-  pruefe(/clsLaufZahlHtml|class="sym"/.test(inhalt()) && !/oeffne\('routinen'\)|oeffne\('drive'\)/.test(inhalt()), 'Routinen und Drive nicht mehr auf dem Start');
-  [['planung', ['routinen', 'ideen']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
+  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('leitfaden'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()), 'seit 0.71 Routines und Guide auf dem Start, Drive nicht');
+  [['planung', ['coach', 'ideen', 'kategorien']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
     pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === o && apps.every(id => new RegExp("ordnerWahl\\('" + id + "'\\)").test(h)) && /Schließen/.test(h), 'Ordner ' + o + ': ' + apps.join(', '));
@@ -6386,7 +6503,7 @@ function startOrdnerTest() {
     pruefe(!S.cl.aufklapp, 'nochmal Zurück: Ordner zu');
   });
   S.oeffne('planung');
-  pruefe(/Routinen: /.test(S.document.getElementById('aufklapp').innerHTML) && /Ideenwerkstatt: \d+ in Umsetzung/.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
+  pruefe(!/Routinen: /.test(S.document.getElementById('aufklapp').innerHTML) && /Idea Lab: \d+ in Umsetzung/.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
   S.aufklappZu();
   pruefe(/oeffne\('rechner'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Rechner, Vorlesen und Memo direkt auf dem Start');
 }
@@ -6751,7 +6868,7 @@ function spieleSudokuTest() {
   const fen = S.document.getElementById('aufklapp').innerHTML;
   pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && /ordnerWahl\('invasion'\)/.test(fen) && /ordnerWahl\('minen'\)/.test(fen) && /ordnerWahl\('puzzle'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 7,
     'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones, Schach, Invasion, Minen und Puzzle (seit 0.35/0.45/0.69)');
-  pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitär:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
+  pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitaire:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
   /* Erzeuger: eindeutig lösbar */
   const stufen = { leicht: 0, mittel: 0, schwer: 0 };
   let eindeutig = true; let gueltig = true;
@@ -6976,7 +7093,7 @@ function ideenTest() {
   const S = CL;
   const setz = (o) => Object.keys(o).forEach(k => { S.document.getElementById(k).value = o[k]; });
   const leer = (l) => l.forEach(k => { S.document.getElementById(k).value = ''; });
-  pruefe(S.clApp('ideen') && /Ideen-<br>werkstatt/.test((S.oeffne('planung'), S.document.getElementById('aufklapp').innerHTML)) && S.CL_BILD.ideen, 'App „Ideenwerkstatt“ im Ordner Planung (zweizeilig) mit eigenem Symbol');
+  pruefe(S.clApp('ideen') && />Idea Lab</.test((S.oeffne('planung'), S.document.getElementById('aufklapp').innerHTML)) && S.CL_BILD.ideen, 'App „Idea Lab“ (Ideenwerkstatt) im Ordner Planning mit eigenem Symbol');
   S.aufklappZu();
   pruefe(Array.isArray(S.DB.ideen) && /'ideen'[\],]/.test(QUELLE), 'Bereich „ideen“ kommt aus der Workbench (6.3.5)');
   S.oeffne('ideen');
@@ -7869,6 +7986,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { memoPadTest(); } catch (e) { fail('Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { planEinplanenTest(); } catch (e) { fail('Plan/Einplanen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { minenPuzzleTest(); } catch (e) { fail('Minen/Puzzle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leitfadenTest(); } catch (e) { fail('Leitfaden warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

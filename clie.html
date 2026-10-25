@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.70.0</title>
+<title>CLIE 0.71.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -388,6 +388,9 @@ span.hs-thumb{display:block}
 .memo-zeile .tx{flex:1;min-width:0;white-space:normal;overflow:hidden;overflow-wrap:anywhere;line-height:1.25;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;max-height:2.5em}
 .memo-zeile .q{color:var(--px-mitte);font-size:18px}
 .memo-kopf{margin:2px 0 6px;font-size:17.5px}
+.memo-zeile .mz.art{flex:0 0 24px;color:var(--px-mitte);font-size:16px}
+.memo-zeile.fertig .tx{color:var(--px-mitte);text-decoration:line-through}
+.memo-filter{display:block;width:100%;text-align:left;font:inherit;font-size:15.5px;padding:4px 0;border-bottom:1px dotted var(--px-zart)}
 .memo-zeile .mz.nr{color:var(--px-mitte);text-align:right;flex:0 0 30px}
 /* Projekte (seit 0.43) — wie „Projects“ am Palm */
 .pj-zeile{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);min-height:42px;padding:6px 0}
@@ -1011,7 +1014,7 @@ span.hs-thumb{display:block}
 <body>
 <div class="geraet">
   <header class="kopf">
-    <span class="reiter" id="reiter">Übersicht</span>
+    <span class="reiter" id="reiter">Home</span>
     <span class="luecke"></span>
     <span class="uhr" id="uhr"></span>
     <button type="button" class="kat" id="katKnopf" onclick="katUm()" title="Beruf oder Privat">▼ Alle</button>
@@ -1028,10 +1031,10 @@ span.hs-thumb{display:block}
   <div class="rollbar" id="rollbar" aria-hidden="true"><button type="button" onclick="rbSeite(-1)" tabindex="-1">▲</button><div class="rb-bahn" id="rbBahn" onclick="rbBahnTipp(event)"><i id="rbSchieber" onpointerdown="rbZiehenStart(event)"></i></div><button type="button" onclick="rbSeite(1)" tabindex="-1">▼</button></div>
   <div class="fuss" id="fuss"></div>
   <nav class="silk" aria-label="Tasten">
-    <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Übersicht</button>
-    <button type="button" onclick="oeffne('lesezeichen')"><b>☆</b>Lesezeichen</button>
-    <button type="button" onclick="oeffne('suchen')"><b>⌕</b>Suchen</button>
-    <button type="button" onclick="menueUm()" id="menueTaste"><b>≡</b>Menü</button>
+    <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Home</button>
+    <button type="button" onclick="oeffne('lesezeichen')"><b>☆</b>Bookmarks</button>
+    <button type="button" onclick="oeffne('suchen')"><b>⌕</b>Find</button>
+    <button type="button" onclick="menueUm()" id="menueTaste"><b>≡</b>Menu</button>
   </nav>
   <div class="schleier" id="schleier" onclick="aufklappZu()"></div>
   <div id="aufklapp"></div>
@@ -1050,7 +1053,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.70.0';
+var APP_VERSION = '0.71.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3286,47 +3289,44 @@ var CL_FILTER_KEY = 'clie-filter';
 /* Die Apps der Übersicht, in der Reihenfolge des Rasters.
    „stufe“ = mit welcher Fassung die App kommt; leer = schon da. */
 var CL_APPS = [
-  /* Seit 0.35: Start im 3×4-Raster — was ständig gebraucht wird, dazu drei Ordner */
-  { id: 'kalender', name: 'Kalender', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
-  /* Seit 0.61: Aufgaben und Checklisten sind eine App „To Do“ wie am Palm —
-     oben rechts ▼ Alle, Sammler oder eine Liste; „checklisten“ bleibt intern die Ansicht einer Liste */
-  { id: 'aufgaben', name: 'To Do', stufe: '',    was: 'Alle offenen Aufgaben aus Listen, Sammler und Projekten. Oben rechts im ▼: Alle, der Sammler, jede laufende Liste, dazu ruhende, fertige Listen und Vorlagen.' },
-  { id: 'checklisten', name: 'To Do', stufe: '', was: '', raster: false },
-  { id: 'sammlungen', name: 'Sammlungen', stufe: '', was: '' },
-  /* Seit 0.43: Projekte als eigene App wie „Projects“ am Palm; Memo heißt „Notizen“ und hat nur noch Notizen */
-  { id: 'projekte', name: 'Projekte', stufe: '', was: '' },
-  { id: 'memo',     name: 'Notizen',  stufe: '',    was: 'Notizen wie das Memo Pad am Palm — lesen, schreiben, Details.' },
-  { id: 'einkauf',  name: 'Einkauf',  stufe: '',    was: '' },
-  { id: 'vorlesen', name: 'Vorlesen', stufe: '', was: '' },
-  { id: 'rechner',  name: 'Rechner',  stufe: '',    was: '' },
-  /* Seit 0.43 im Ordner Planung — er meldet sich ohnehin oben auf der Übersicht */
+  /* Seit 0.71: Namen unter den Symbolen englisch wie am Palm (Date Book, Memo Pad …), alles andere deutsch.
+     Raster 3×4 — was ständig gebraucht wird, dazu drei Ordner (seit 0.35) */
+  { id: 'kalender', name: 'Date Book', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
+  /* Seit 0.61 eine App „To Do“; seit 0.71 nur noch Alle, Sammler und Listen */
+  { id: 'aufgaben', name: 'To Do List', stufe: '',    was: 'Alle offenen Aufgaben aus Listen und dem Sammler, dazu Eingeplantes aus Memo Pad.' },
+  { id: 'checklisten', name: 'To Do List', stufe: '', was: '', raster: false },
+  /* Seit 0.71: Notizen, Projekte, Abläufe, Checklisten und Ziele in einer App wie das Memo Pad */
+  { id: 'memo',     name: 'Memo Pad',  stufe: '',    was: 'Alles Geschriebene und Geplante wie das Memo Pad am Palm — oben rechts die Art.' },
+  { id: 'sammlungen', name: 'Collections', stufe: '', was: '' },
+  { id: 'einkauf',  name: 'Shopping',  stufe: '',    was: '' },
+  { id: 'vorlesen', name: 'Reader', stufe: '', was: '' },
+  { id: 'rechner',  name: 'Calc',  stufe: '',    was: '' },
+  { id: 'routinen', name: 'Routines', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.' },
+  { id: 'leitfaden', name: 'Guide', stufe: '', was: '' },
+  { id: 'planung', name: 'Planning', stufe: '', was: '', ordner: true },
+  { id: 'lernen', name: 'Learning', stufe: '', was: '', ordner: true },
+  { id: 'spiele', name: 'Games', stufe: '', was: '', ordner: true },
+  /* Projekte und Ziele öffnen aus Memo Pad (seit 0.71) */
+  { id: 'projekte', name: 'Memo Pad', stufe: '', was: '', raster: false },
+  { id: 'ziele', name: 'Memo Pad', stufe: '', was: '', raster: false },
   { id: 'coach', name: 'Coach', stufe: '', was: '', raster: false },
-  /* Seit 0.62 im Raster auf dem frei gewordenen Platz der Checklisten (0.61 kurz Kurs) */
-  { id: 'ziele', name: 'Ziele', stufe: '', was: '' },
-  { id: 'planung', name: 'Planung', stufe: '', was: '', ordner: true },
-  { id: 'lernen', name: 'Lernen', stufe: '', was: '', ordner: true },
-  { id: 'spiele', name: 'Spiele', stufe: '', was: '', ordner: true },
-  { id: 'kurs', name: 'Kurs', stufe: '', was: '', raster: false },
+  { id: 'kurs', name: 'Course', stufe: '', was: '', raster: false },
   /* Seit 0.66: eine Kategorienliste für alle Apps, mit Gesamtsicht */
-  { id: 'kategorien', name: 'Kategorien', stufe: '', was: '', raster: false },
-  { id: 'ideen', name: 'Ideenwerkstatt', rasterName: 'Ideen-\nwerkstatt', stufe: '', was: '', raster: false },
-  /* Seit 0.68: ein Problem nach einem von fünf Standardverfahren durcharbeiten */
-  { id: 'leitfaden', name: 'Leitfaden', stufe: '', was: '', raster: false },
-  { id: 'routinen', name: 'Routinen', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.', raster: false },
+  { id: 'kategorien', name: 'Categories', stufe: '', was: '', raster: false },
+  { id: 'ideen', name: 'Idea Lab', stufe: '', was: '', raster: false },
   { id: 'drive',    name: 'Drive',    stufe: '',    was: '', raster: false },
   { id: 'sudoku', name: 'Sudoku', stufe: '', was: '', raster: false },
-  /* Seit 0.69: die eingebauten Palm-Spiele MineHunt und Puzzle, je vier Stufen */
-  { id: 'minen', name: 'Minen', stufe: '', was: '', raster: false },
+  { id: 'minen', name: 'MineHunt', stufe: '', was: '', raster: false },
   { id: 'puzzle', name: 'Puzzle', stufe: '', was: '', raster: false },
-  { id: 'solitaer', name: 'Solitär', stufe: '', was: '', raster: false },
+  { id: 'solitaer', name: 'Solitaire', stufe: '', was: '', raster: false },
   { id: 'stones',   name: 'Stones',   stufe: '',    was: '', raster: false },
   /* Seit 0.45: nach dem Prinzip von Space Invaders */
   { id: 'invasion', name: 'Invasion', stufe: '', was: '', raster: false },
-  { id: 'schach',   name: 'Schach',   stufe: '',    was: '', raster: false },
-  { id: 'lernkartei', name: 'Lernkartei', stufe: '', was: '', raster: false },
-  { id: 'abgleich', name: 'Abgleich', stufe: '',    was: '', raster: false },
-  /* Seit 0.38 unten in der Leiste — an der Stelle von „Heute“ */
-  { id: 'lesezeichen', name: 'Lesezeichen', stufe: '', was: '', raster: false }
+  { id: 'schach',   name: 'Chess',   stufe: '',    was: '', raster: false },
+  { id: 'lernkartei', name: 'Flashcards', stufe: '', was: '', raster: false },
+  { id: 'abgleich', name: 'HotSync', stufe: '',    was: '', raster: false },
+  /* Seit 0.38 unten in der Leiste */
+  { id: 'lesezeichen', name: 'Bookmarks', stufe: '', was: '', raster: false }
 ];
 
 /* Symbole wie am Palm: dunkle runde Scheibe, helles Bildzeichen.
@@ -4309,17 +4309,17 @@ function kopfZeichnen() {
   var memoSeite = (cl.app === 'memo' && cl.memo.id) ? kpSeiteFinden(cl.memo.id) : null;
   if (reiter) {
     reiter.textContent = (cl.app === 'kalender') ? clKalReiter()
-      : (cl.app === 'checklisten') ? 'To Do'
+      : (cl.app === 'checklisten') ? (aufIstCheckliste(kpSeiteFinden(cl.cls.id)) ? 'Memo Pad' : 'To Do List')
       : (cl.app === 'kategorien') ? katKopfText()
       : (cl.app === 'leitfaden') ? lfReiter()
       : (cl.app === 'sammlungen') ? saReiter()
-      : (cl.app === 'statistik') ? 'Statistik'
-      : (cl.app === 'suchen') ? 'Suchen'
+      : (cl.app === 'statistik') ? 'Stats'
+      : (cl.app === 'suchen') ? 'Find'
       : (cl.app === 'memo' && cl.memo.art === 'notizblock' && nbFinden(cl.nb.id)) ? '✎ ' + nbTitel(nbFinden(cl.nb.id))
       : (cl.app === 'memo' && cl.memo.art && cl.hs.offen) ? '✎ ' + hsName(hsDatei(cl.hs.offen))
-      : (cl.app === 'memo' && cl.memo.art) ? 'Notizen'
+      : (cl.app === 'memo' && cl.memo.art) ? 'Memo Pad'
       : memoSeite ? clSeitenZeichen(memoSeite) + ' ' + memoSeite.titel
-      : (a ? a.name : 'Übersicht');
+      : (a ? a.name : 'Home');
   }
   var kat = document.getElementById('katKnopf');
   if (kat) {
@@ -4341,6 +4341,9 @@ function kopfZeichnen() {
       : (cl.app === 'minen') ? miKopfText()
       : (cl.app === 'puzzle') ? pzKopfText()
       : (cl.app === 'solitaer') ? soKopfText()
+      : (cl.app === 'checklisten' && aufIstCheckliste(kpSeiteFinden(cl.cls.id))) ? (MEMO_ZEICHEN[memoArtVon(kpSeiteFinden(cl.cls.id))] + ' ' + memoArtName(kpSeiteFinden(cl.cls.id)))
+      : (cl.app === 'projekte' && cl.pj.id) ? 'Projekt'
+      : (cl.app === 'ziele' && cl.zi.id) ? 'Ziel'
       : (cl.app === 'checklisten') ? '▼ ' + todoKopfText()
       : (cl.app === 'memo') ? '▼ ' + memoKopfText()
       : (cl.app === 'aufgaben' && !liste) ? '▼ ' + katName(cl.filter)
@@ -4393,6 +4396,11 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'leitfaden') {
     if (el.innerHTML.indexOf('lfTitel') >= 0) { return; }
     el.innerHTML = lfFensterHtml();
+  } else if (cl.aufklapp === 'memoneu') {
+    el.innerHTML = memoNeuHtml();
+  } else if (cl.aufklapp === 'memovorlage') {
+    if (el.innerHTML.indexOf('memoVorlageName') >= 0) { return; }
+    el.innerHTML = memoVorlageHtml();
   } else if (cl.aufklapp === 'anzeigen') {
     el.innerHTML = aufAnzeigenHtml();
   } else if (cl.aufklapp === 'einplanen') {
@@ -4464,40 +4472,42 @@ function aufklappZeichnen() {
     /* Seit 0.46 öffnet das Menü die Taste ≡ unten rechts — es steht über der Leiste */
     el.innerHTML = '<div class="aufklapp menue-unten">'
       + '<div class="menue-zeile"><span>CLIE ' + esc(APP_VERSION) + '</span></div>'
-      + '<button type="button" onclick="menueWahl(\'abgleich\')">Abgleich…</button>'
-      + '<button type="button" onclick="menueWahl(\'version\')">Auf neue Fassung prüfen</button>'
-      + '<button type="button" onclick="menueWahl(\'termine\')">Termine holen</button>'
-      + '<button type="button" onclick="menueWahl(\'einkauf\')">Einkauf verknüpfen…</button>'
+      + '<button type="button" onclick="menueWahl(\'abgleich\')">HotSync…</button>'
+      + '<button type="button" onclick="menueWahl(\'version\')">Check for update</button>'
+      + '<button type="button" onclick="menueWahl(\'termine\')">Fetch events</button>'
+      + '<button type="button" onclick="menueWahl(\'einkauf\')">Link shopping list…</button>'
       + ((cl.app === 'aufgaben' || cl.app === 'checklisten' || (cl.app === 'projekte' && cl.pj.id)) ? '<div class="trenn"></div>'
-          + '<button type="button" onclick="menueWahl(\'anzeigen\')">Anzeigen…</button>'
-          + ((cl.app === 'projekte' && cl.pj.id) ? '<button type="button" onclick="menueWahl(\'pjDetails\')">Projekt-Details…</button>' : '') : '')
+          + '<button type="button" onclick="menueWahl(\'anzeigen\')">Show…</button>'
+          + ((cl.app === 'projekte' && cl.pj.id) ? '<button type="button" onclick="menueWahl(\'pjDetails\')">Project details…</button>' : '') : '')
+      + (memoOffeneSeite() && !memoIstVorlage(memoOffeneSeite()) && ckZustand(memoOffeneSeite()) !== 'vorlage' ? '<div class="trenn"></div>'
+          + '<button type="button" onclick="menueWahl(\'alsVorlage\')">Save as template…</button>' : '')
       + ((cl.app === 'sammlungen' && cl.sa.id) ? '<div class="trenn"></div>'
           + '<button type="button" onclick="menueWahl(\'saInfo\')">Info…</button>'
-          + '<button type="button" onclick="menueWahl(\'saFelder\')">Felder…</button>'
+          + '<button type="button" onclick="menueWahl(\'saFelder\')">Fields…</button>'
           + '<button type="button" onclick="menueWahl(\'saFilter\')">Filter…</button>'
-          + '<button type="button" onclick="menueWahl(\'saWerte\')">Feste Werte…</button>'
-          + '<button type="button" onclick="menueWahl(\'saKopf\')">Kopfwerte…</button>'
-          + '<button type="button" onclick="menueWahl(\'saDiagramme\')">Diagramme…</button>'
-          + '<button type="button" onclick="menueWahl(\'saImport\')">Aus Notiz-Tabelle anhängen…</button>'
-          + '<button type="button" onclick="menueWahl(\'saKopieren\')">Kopieren / als Vorlage…</button>'
+          + '<button type="button" onclick="menueWahl(\'saWerte\')">Fixed values…</button>'
+          + '<button type="button" onclick="menueWahl(\'saKopf\')">Header values…</button>'
+          + '<button type="button" onclick="menueWahl(\'saDiagramme\')">Charts…</button>'
+          + '<button type="button" onclick="menueWahl(\'saImport\')">Append from memo table…</button>'
+          + '<button type="button" onclick="menueWahl(\'saKopieren\')">Copy / save as template…</button>'
           + '<button type="button" onclick="menueWahl(\'saDetails\')">Details…</button>' : '')
       + (cl.app === 'schach' ? '<div class="trenn"></div>'
-          + '<button type="button" onclick="menueWahl(\'schNeu\')">Neue Partie…</button>'
-          + '<button type="button" onclick="menueWahl(\'schSpeichern\')">Partie speichern…</button>'
-          + '<button type="button" onclick="menueWahl(\'schDrehen\')">Brett drehen</button>' : '')
+          + '<button type="button" onclick="menueWahl(\'schNeu\')">New game…</button>'
+          + '<button type="button" onclick="menueWahl(\'schSpeichern\')">Save game…</button>'
+          + '<button type="button" onclick="menueWahl(\'schDrehen\')">Flip board</button>' : '')
       + (cl.app === 'lernkartei' ? '<div class="trenn"></div>'
-          + '<button type="button" onclick="menueWahl(\'lkNeu\')">Neu…</button>'
-          + '<button type="button" onclick="menueWahl(\'lkPaket\')">Kartenpaket laden…</button>' : '')
+          + '<button type="button" onclick="menueWahl(\'lkNeu\')">New…</button>'
+          + '<button type="button" onclick="menueWahl(\'lkPaket\')">Load card pack…</button>' : '')
       + (cl.app === 'vorlesen' ? '<div class="trenn"></div>'
-          + '<button type="button" onclick="menueWahl(\'vlPdf\')">PDF laden…</button>'
-          + '<button type="button" onclick="menueWahl(\'vlText\')">Text vorlesen…</button>'
-          + '<button type="button" onclick="menueWahl(\'vlStimme\')">Stimme…</button>' : '')
+          + '<button type="button" onclick="menueWahl(\'vlPdf\')">Load PDF…</button>'
+          + '<button type="button" onclick="menueWahl(\'vlText\')">Read text aloud…</button>'
+          + '<button type="button" onclick="menueWahl(\'vlStimme\')">Voice…</button>' : '')
       + (cl.app === 'stones' ? '<div class="trenn"></div>'
-          + '<button type="button" onclick="menueWahl(\'stoNeu\')">Neues Spiel</button>'
-          + '<button type="button" onclick="menueWahl(\'stoListe\')">Bestenliste</button>' : '')
+          + '<button type="button" onclick="menueWahl(\'stoNeu\')">New game</button>'
+          + '<button type="button" onclick="menueWahl(\'stoListe\')">High scores</button>' : '')
       + '<div class="trenn"></div>'
       + prMenueHtml() + '<div class="trenn"></div>'
-      + '<button type="button" onclick="menueWahl(\'statistik\')">Statistik</button>'
+      + '<button type="button" onclick="menueWahl(\'statistik\')">Stats</button>'
       + '<button type="button" onclick="menueWahl(\'info\')">Info</button></div>';
   } else {
     el.innerHTML = '';
@@ -4607,6 +4617,8 @@ function katUm() {
   if (cl.app === 'stones' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'ideen') { return; }
   /* Im Fall steht oben das Verfahren — kein ▼ (seit 0.68) */
   if (cl.app === 'leitfaden' && cl.lf.id) { return; }
+  /* Ein offener Eintrag aus Memo Pad: oben steht seine Art — kein ▼ (seit 0.71) */
+  if ((cl.app === 'projekte' && cl.pj.id) || (cl.app === 'ziele' && cl.zi.id) || (cl.app === 'checklisten' && aufIstCheckliste(kpSeiteFinden(cl.cls.id)))) { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
   var wohin = (cl.app === 'aufgaben' || cl.app === 'checklisten') ? 'liste'
     : (cl.app === 'memo') ? 'memowahl'
@@ -4655,6 +4667,7 @@ function menueWahl(was) {
   if (was === 'statistik') { oeffne('statistik'); return; }
   if (was === 'anzeigen') { aufAnzeigenAuf(); return; }
   if (was === 'pjDetails') { pjDetails(); return; }
+  if (was === 'alsVorlage') { memoAlsVorlage(); return; }
   if (was === 'saInfo') { saInfoBearbeiten(); return; }
   if (was === 'saFelder') { saAnsicht('felder'); return; }
   if (was === 'saFilter') { saAnsicht('filter'); return; }
@@ -6238,7 +6251,7 @@ var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
 cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, anz: aufAnzKopie(AUF_ANZ_STD), anzF: null, ep: null, fenster: null, wahlFuer: '', neueListe: null, privatZahl: 0 };
-cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '' };
+cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '', sicht: 'alles', fertige: false, vorlage: '' };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
    Ziele, alle Listen. Notizen (und damit Checklisten) nicht. */
@@ -6372,7 +6385,8 @@ function aufQuellen() {
   var l = seiten.map(function (s, i) { return { s: s, i: i }; })
     .sort(function (a, b) { return (art(a.s) - art(b.s)) || (a.i - b.i); })
     .map(function (x) { return x.s; });
-  return l.concat(clsAlle('lauf').map(function (g) { return kpSeiteFinden(g.id); }).filter(function (s) { return !!s && ckZustand(s) === 'lauf'; }));
+  /* Seit 0.71: Checklisten (zum Abhaken) nie — nur Abläufe */
+  return l.concat(clsAlle('lauf').map(function (g) { return kpSeiteFinden(g.id); }).filter(function (s) { return !!s && ckZustand(s) === 'lauf' && ckArt(s) === 'aufgaben'; }));
 }
 
 function aufIstCheckliste(s) {
@@ -6406,7 +6420,7 @@ function aufAufgaben() {
       /* Seit 0.70 wie am Palm: Projekte, Ziele und Checklisten zum Abhaken sind Pläne —
          daraus nur, was eingeplant ist oder eine ⚑ Frist hat. Listen (auch Checklisten
          der Art „Aufgaben“) zeigen alles Offene. */
-      var plan = s.art === 'vorhaben' || (cls && ckArt(s) !== 'aufgaben');
+      var plan = s.art === 'vorhaben' || cls;
       if (!liste && plan && !x.datum && !x.frist && !frisch) { return; }
       /* „nur Fälliges“: Späteres erscheint erst an seinem Tag, ohne Datum immer */
       if (!liste && cl.auf.anz.faellig && !frisch && aufEffDatum(x) > isoDatum()) { return; }
@@ -7284,6 +7298,8 @@ function memoSeiten() {
   return kpNachRang(kpSeitenAlle().filter(function (s) {
     if (s.art === 'liste') { return false; }
     if (s.art === 'notiz' && s.__satz && s.__satz.checkliste) { return false; }
+    /* Vorlagen (seit 0.71) stehen nur unter „Vorlagen…“ */
+    if (memoIstVorlage(s)) { return false; }
     return clPasst(s);
   }));
 }
@@ -7295,14 +7311,210 @@ function memoNotizen() {
   return memoSeiten().filter(function (s) { return s.art === 'notiz'; });
 }
 
-function memoListeHtml() {
-  var l = memoNotizen();
-  if (!l.length) { return '<p class="leise">Noch keine Notizen — „Neu“ tippen.</p>'; }
-  return l.map(function (s, i) {
-    return prZeile(s, null, '<button type="button" class="memo-zeile" onclick="memoOeffnen(\'' + esc(s.id) + '\')"><span class="mz nr">' + (i + 1) + '.</span>'
-      + '<span class="tx">' + esc(s.titel) + '</span></button>');
-  }).join('');
+/* ---- Memo Pad (seit 0.71): Notizen, Projekte, Abläufe, Checklisten, Ziele ----
+   Wie das Memo Pad am Palm mit eigenen Kategorien (hier: Arten). Die Daten
+   bleiben, wo sie sind: Notizen und Checklisten in „gedanken“, Projekte in
+   „projekte“, Ziele in „ziele“ — die workbench.json ändert sich nicht.
+   Ablauf = Checkliste der Art „aufgaben“ (Punkte mit Datum in To Do),
+   Checkliste = Art „abhaken“ (nie in To Do). Vorlagen: Checklisten mit
+   Zustand „vorlage“, alles andere mit dem Feld „istVorlage“ („vorlage“ ist an
+   gestarteten Checklisten die Kennung ihrer Vorlage). */
+
+var MEMO_ARTEN = [['alles', 'Alle'], ['notizen', 'Notizen'], ['projekte', 'Projekte'], ['ablaeufe', 'Abläufe'], ['checklisten', 'Checklisten'], ['ziele', 'Ziele']];
+var MEMO_SICHT_KEY = 'clie-memo-sicht';
+var MEMO_ZEICHEN = { notiz: '✎', projekt: '◎', ablauf: '⇢', checkliste: '☑', ziel: '◇' };
+
+function memoIstVorlage(s) { return !!(s && s.__satz && s.__satz.istVorlage === true); }
+
+/* Einträge einer Art: { art, s, fertig } — ohne Vorlagen */
+function memoEintraege(sicht) {
+  var aus = [];
+  var dazu = function (art, s, fertig) { aus.push({ art: art, s: s, fertig: fertig }); };
+  kpSeitenAlle().forEach(function (s) {
+    if (!clPasst(s) || memoIstVorlage(s)) { return; }
+    if (s.art === 'notiz' && !aufIstCheckliste(s)) { dazu('notiz', s, false); return; }
+    if (s.art === 'vorhaben') { dazu(s.typ === 'ziel' ? 'ziel' : 'projekt', s, s.zustand === 'erledigt'); return; }
+    if (aufIstCheckliste(s) && ckZustand(s) !== 'vorlage') { dazu(ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste', s, ckZustand(s) === 'fertig'); }
+  });
+  var art = { notizen: 'notiz', projekte: 'projekt', ablaeufe: 'ablauf', checklisten: 'checkliste', ziele: 'ziel' }[sicht];
+  var l = art ? aus.filter(function (x) { return x.art === art; }) : aus;
+  var rang = function (x) { return Number(x.s.__satz && x.s.__satz.ordnung) || 0; };
+  return l.sort(function (a, b) {
+    return art ? (rang(a) - rang(b)) : String(a.s.titel).localeCompare(String(b.s.titel), 'de');
+  });
 }
+
+/* Alle Vorlagen, nach Art */
+function memoVorlagen() {
+  var aus = [];
+  kpSeitenAlle().forEach(function (s) {
+    if (!clPasst(s)) { return; }
+    if (aufIstCheckliste(s) && ckZustand(s) === 'vorlage') { aus.push({ art: ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste', s: s }); return; }
+    if (memoIstVorlage(s)) { aus.push({ art: s.art === 'vorhaben' ? (s.typ === 'ziel' ? 'ziel' : 'projekt') : 'notiz', s: s }); }
+  });
+  return aus;
+}
+
+function memoZeileHtml(x, nr) {
+  var ruht = (x.art === 'projekt' || x.art === 'ziel') ? x.s.zustand === 'ruht' : (x.art !== 'notiz' && ckZustand(x.s) === 'ruht');
+  return prZeile(x.s, null, '<button type="button" class="memo-zeile' + (x.fertig ? ' fertig' : '') + '" onclick="memoEintragOeffnen(\'' + esc(x.s.id) + '\')">'
+    + '<span class="mz nr">' + (nr ? nr + '.' : '') + '</span><span class="tx">' + esc(x.s.titel) + (ruht ? ' <small class="leise">· ruht</small>' : '') + '</span>'
+    + '<span class="mz art">' + MEMO_ZEICHEN[x.art] + '</span></button>');
+}
+
+function memoListeHtml() {
+  var sicht = cl.memo.sicht;
+  var h = clFilter() !== 'alle' ? '<button type="button" class="memo-filter leise" onclick="katSetzen(\'alle\')">Nur Kategorie „' + esc(katName(cl.filter)) + '“ · alle zeigen</button>' : '';
+  if (sicht === 'vorlagen') {
+    var v = memoVorlagen();
+    if (!v.length) { return h + '<p class="leise">Noch keine Vorlage. Jeder Eintrag lässt sich über Menu ≡ „Save as template…“ als Vorlage speichern.</p>'; }
+    [['ablauf', 'Abläufe'], ['checkliste', 'Checklisten'], ['projekt', 'Projekte'], ['notiz', 'Notizen'], ['ziel', 'Ziele']].forEach(function (g) {
+      var l = v.filter(function (x) { return x.art === g[0]; });
+      if (l.length) { h += '<div class="gruppe">' + g[1] + '</div>' + l.map(function (x) { return memoZeileHtml(x, 0); }).join(''); }
+    });
+    return h + '<p class="leise">Antippen: starten oder bearbeiten.</p>';
+  }
+  var alle = memoEintraege(sicht);
+  var l = alle.filter(function (x) { return !x.fertig; });
+  var fertig = alle.filter(function (x) { return x.fertig; });
+  if (!l.length && !fertig.length) { return h + '<p class="leise">Noch nichts — „Neu“ tippen.</p>'; }
+  h += l.map(function (x, i) { return memoZeileHtml(x, i + 1); }).join('');
+  if (fertig.length) {
+    h += '<button type="button" class="gruppe klick" onclick="memoFertigeUm()"><span>Abgeschlossene' + (cl.memo.fertige ? '' : '…') + '</span><small>' + fertig.length + '</small></button>'
+      + (cl.memo.fertige ? fertig.map(function (x) { return memoZeileHtml(x, 0); }).join('') : '');
+  }
+  return h;
+}
+
+function memoFertigeUm() { cl.memo.fertige = !cl.memo.fertige; inhaltZeichnen(); }
+
+/* Ein Eintrag öffnet dort, wo er bearbeitet wird; eine Vorlage fragt erst */
+function memoEintragOeffnen(id) {
+  var s = kpSeiteFinden(id);
+  if (!s) { return; }
+  if (memoIstVorlage(s)) { cl.memo.vorlage = s.id; cl.aufklapp = 'memovorlage'; aufklappNeu(); return; }
+  if (aufIstCheckliste(s)) { clsOeffnen(s.id); return; }
+  if (s.art === 'vorhaben' && s.typ === 'ziel') { ziOeffnen(s.id); return; }
+  if (s.art === 'vorhaben') { pjOeffnen(s.id, 'inhalt'); return; }
+  if (cl.app !== 'memo') { oeffne('memo'); }
+  memoOeffnen(s.id);
+}
+
+/* ---- Vorlagen für alle Arten (seit 0.71) ---- */
+
+function memoArtName(s) {
+  if (s && aufIstCheckliste(s) && ckZustand(s) === 'vorlage') { return 'Vorlage'; }
+  return { notiz: 'Notiz', projekt: 'Projekt', ablauf: 'Ablauf', checkliste: 'Checkliste', ziel: 'Ziel' }[memoArtVon(s)] || '';
+}
+
+function memoArtVon(s) {
+  if (!s) { return ''; }
+  if (aufIstCheckliste(s)) { return ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste'; }
+  if (s.art === 'vorhaben') { return s.typ === 'ziel' ? 'ziel' : 'projekt'; }
+  return s.art === 'notiz' ? 'notiz' : '';
+}
+
+/* Die Seite, die gerade offen ist (Notiz, Projekt, Ziel, Ablauf, Checkliste) */
+function memoOffeneSeite() {
+  if (cl.app === 'memo' && cl.memo.id && !cl.memo.art) { return kpSeiteFinden(cl.memo.id); }
+  if (cl.app === 'projekte' && cl.pj.id) { return kpSeiteFinden(cl.pj.id); }
+  if (cl.app === 'ziele' && cl.zi.id) { return kpSeiteFinden(cl.zi.id); }
+  if (cl.app === 'checklisten' && cl.cls.id) { var s = kpSeiteFinden(cl.cls.id); return aufIstCheckliste(s) ? s : null; }
+  return null;
+}
+
+/* Text ohne Haken — für Vorlage und Start */
+function memoTextLeer(text) {
+  return String(text || '').split('\n').map(function (z) { return z.replace(/^(\s*)\[[xX-]\]/, '$1[]'); }).join('\n');
+}
+
+/* Kopie einer Seite (Notiz, Projekt, Ziel) — als Vorlage oder als neuer Eintrag */
+function memoKopie(s, titel, vorlage) {
+  var art = s.art === 'vorhaben' ? 'vorhaben' : 'notiz';
+  var n = kpSeiteAnlegen(art, titel, s.kontext || 'privat', s.typ === 'ziel' ? 'ziel' : '');
+  if (!n) { return null; }
+  n.text = memoTextLeer(s.text);
+  katPrivatSchreiben(n.__satz, { bereich: (s.__satz && s.__satz.bereich) || '', privat: !!(s.__satz && s.__satz.privat) });
+  if (vorlage) { n.__satz.istVorlage = true; if (art === 'vorhaben') { n.zustand = 'ruht'; } }
+  else { delete n.__satz.istVorlage; if (art === 'vorhaben') { n.zustand = 'laeuft'; n.__satz.start = isoDatum(); } }
+  n.geaendert = jetzt();
+  return n;
+}
+
+function memoAlsVorlage() {
+  var s = memoOffeneSeite();
+  if (!s || memoIstVorlage(s)) { melde('Erst einen Eintrag öffnen.', null); return; }
+  if (aufIstCheckliste(s)) { cl.cls.id = s.id; clsAlsVorlage(); return; }
+  var v = memoKopie(s, s.titel, true);
+  if (!v) { return; }
+  spaeterSichern();
+  melde('Als Vorlage „' + v.titel + '“ gespeichert.', 'gut');
+}
+
+function memoVorlageHtml() {
+  var s = kpSeiteFinden(cl.memo.vorlage);
+  if (!s) { return ''; }
+  return '<div class="fenster"><div class="titel">Vorlage</div><div class="rumpf">'
+    + '<p>' + MEMO_ZEICHEN[memoArtVon(s)] + ' „' + esc(s.titel) + '“</p>'
+    + '<label for="memoVorlageName">Name des neuen Eintrags:</label><input id="memoVorlageName" class="eingabe" type="text" autocomplete="off" value="' + esc(s.titel) + '">'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="memoVorlageStarten()">Starten</button>'
+    + '<button type="button" class="knopf" onclick="memoVorlageBearbeiten()">Bearbeiten</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+}
+
+function memoVorlageStarten() {
+  var s = kpSeiteFinden(cl.memo.vorlage);
+  var el = document.getElementById('memoVorlageName');
+  var titel = el && typeof el.value === 'string' && el.value.trim() ? el.value.trim() : (s ? s.titel : '');
+  if (!s) { aufklappZu(); return; }
+  var n = memoKopie(s, titel.slice(0, 200), false);
+  cl.memo.vorlage = '';
+  aufklappZu();
+  if (!n) { return; }
+  spaeterSichern();
+  melde('„' + n.titel + '“ aus der Vorlage angelegt.', 'gut');
+  memoEintragOeffnen(n.id);
+}
+
+function memoVorlageBearbeiten() {
+  var s = kpSeiteFinden(cl.memo.vorlage);
+  cl.memo.vorlage = '';
+  aufklappZu();
+  if (!s) { return; }
+  if (s.art === 'vorhaben' && s.typ === 'ziel') { ziOeffnen(s.id); return; }
+  if (s.art === 'vorhaben') { pjOeffnen(s.id, 'inhalt'); return; }
+  if (cl.app !== 'memo') { oeffne('memo'); }
+  memoOeffnen(s.id);
+}
+
+/* ---- Neu: in der gewählten Art, bei „Alle“ erst die Art wählen ---- */
+
+function memoNeuHtml() {
+  return '<div class="fenster"><div class="titel">Neu</div><div class="rumpf">'
+    + [['notiz', '✎ Notiz'], ['projekt', '◎ Projekt'], ['ablauf', '⇢ Ablauf'], ['checkliste', '☑ Checkliste'], ['ziel', '◇ Ziel']].map(function (a) {
+      return '<button type="button" class="wahl" onclick="memoNeuArt(\'' + a[0] + '\')">' + a[1] + '</button>';
+    }).join('')
+    + '<button type="button" class="wahl" onclick="memoArtSetzen(\'vorlagen\')">Aus Vorlage …</button>'
+    + '<div class="knoepfe"><button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+}
+
+function memoNeuArt(art) {
+  cl.aufklapp = '';
+  if (art === 'projekt') { pjNeu(); return; }
+  if (art === 'ziel') { ziNeu(); return; }
+  if (art === 'ablauf' || art === 'checkliste') {
+    clsAnlegen('einmalig', '');
+    var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
+    if (g && art === 'checkliste') { delete g.art; g.titel = 'Checkliste ' + clKurzDatum(isoDatum()); }
+    if (g && art === 'ablauf') { g.titel = 'Ablauf ' + clKurzDatum(isoDatum()); }
+    if (g) { var f = cl.cls.fenster; if (f && f.titel !== undefined) { f.titel = g.titel; f.art = g.art || 'abhaken'; } aufklappNeu(); }
+    return;
+  }
+  cl.memo.fenster = { modus: 'neu', art: 'notiz', titel: '', kontext: clNeuKontext(), bereich: clNeuBereich(), privat: false };
+  cl.aufklapp = 'memo';
+  aufklappNeu();
+}
+
 
 /* Eine Seite lesen: Überschriften, Text, Aufgaben zum Abhaken.
    Seit 0.43 mit „ohneAufgaben“: der Reiter „Memo“ eines Projekts zeigt nur
@@ -7572,8 +7784,9 @@ function memoDetails() {
 }
 
 function memoNeu() {
-  cl.memo.fenster = { modus: 'neu', art: 'notiz', titel: '', kontext: clNeuKontext(), bereich: clNeuBereich(), privat: false };
-  cl.aufklapp = 'memo';
+  var art = { notizen: 'notiz', projekte: 'projekt', ablaeufe: 'ablauf', checklisten: 'checkliste', ziele: 'ziel' }[cl.memo.sicht];
+  if (art) { memoNeuArt(art); return; }
+  cl.aufklapp = 'memoneu';
   aufklappNeu();
 }
 
@@ -7712,7 +7925,7 @@ function pjPrio(s) {
 
 /* Seit 0.44 ohne Ziele — die haben ihre eigene App */
 function pjAlle() {
-  return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === 'vorhaben' && s.typ !== 'ziel' && clPasst(s); }));
+  return kpNachRang(kpSeitenAlle().filter(function (s) { return s.art === 'vorhaben' && s.typ !== 'ziel' && clPasst(s) && !memoIstVorlage(s); }));
 }
 
 /* Die Projekte des gewählten Zustands: nach Priorität —
@@ -7780,12 +7993,11 @@ function pjReiter(r) {
   zeichne();
 }
 
+/* Seit 0.71 zurück ins Memo Pad */
 function pjZurListe() {
-  var s = cl.pj.id ? kpSeiteFinden(cl.pj.id) : null;
-  if (s && s.zustand) { cl.pj.zustand = s.zustand; }
   cl.pj.id = '';
   cl.pj.hervor = '';
-  zeichne();
+  oeffne('memo');
 }
 
 function pjZustandFilter(z) {
@@ -8125,10 +8337,8 @@ function ziOeffnen(id) {
 }
 
 function ziZurListe() {
-  var s = cl.zi.id ? kpSeiteFinden(cl.zi.id) : null;
-  if (s && s.zustand) { cl.zi.zustand = s.zustand; }
   cl.zi.id = '';
-  zeichne();
+  oeffne('memo');
 }
 
 /* Schreiben im Schreibfeld der Notizen, „Fertig“ führt zurück ins Ziel */
@@ -8271,8 +8481,10 @@ function hsOrdner() {
 
 function memoArtLaden() {
   var a = '';
-  try { a = window.localStorage.getItem(HS_ART_KEY) || ''; } catch (e) { a = ''; }
+  var s = '';
+  try { a = window.localStorage.getItem(HS_ART_KEY) || ''; s = window.localStorage.getItem(MEMO_SICHT_KEY) || ''; } catch (e) { a = ''; }
   cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
+  cl.memo.sicht = (s === 'vorlagen' || MEMO_ARTEN.some(function (x) { return x[0] === s; })) ? s : 'alles';
 }
 
 /* ▼ in Notizen: Notizen | Handschrift | Alle Handschriften */
@@ -8289,6 +8501,12 @@ function memoSeitenModus() {
 
 function memoArtSetzen(a) {
   if (cl.nb.id) { nbZurListe(); }
+  /* Seit 0.71: die Arten des Memo Pad (und Vorlagen) — sonst Handschrift / Notizblock */
+  if (a === 'vorlagen' || MEMO_ARTEN.some(function (x) { return x[0] === a; })) {
+    cl.memo.sicht = a;
+    try { window.localStorage.setItem(MEMO_SICHT_KEY, a); } catch (e) { /* nur für jetzt */ }
+  }
+  if (cl.app !== 'memo') { cl.app = 'memo'; }
   cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
   try { window.localStorage.setItem(HS_ART_KEY, cl.memo.art); } catch (e) { /* nur für jetzt */ }
   cl.memo.id = '';
@@ -8301,24 +8519,29 @@ function memoArtSetzen(a) {
 
 function memoWahlHtml() {
   var neu = hsEingang().length;
-  var knopf = function (a, text, zahl) {
-    return '<button type="button"' + ((cl.memo.art || '') === a ? ' class="an"' : '') + ' onclick="memoArtSetzen(\'' + a + '\')"><span>' + text + '</span>'
+  var knopf = function (a, text, zahl, an) {
+    return '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="memoArtSetzen(\'' + a + '\')"><span>' + text + '</span>'
       + (zahl !== '' ? '<small>' + zahl + '</small>' : '') + '</button>';
   };
+  var hs = cl.memo.art;
   return '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
-    + katFilterHtml('aufFilter') + '<div class="trenn"></div>'
-    + knopf('', 'Notizen', memoNotizen().length)
-    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length)
-    + knopf('handschrift', 'Handschrift', hsOrdner() ? (neu ? neu + ' neu' : '0') : '')
+    + MEMO_ARTEN.map(function (a) {
+      return knopf(a[0], a[1], memoEintraege(a[0]).filter(function (x) { return !x.fertig; }).length, !hs && cl.memo.sicht === a[0]);
+    }).join('')
     + '<div class="trenn"></div>'
-    + knopf('alle', 'Alle Handschriften', hsOrdner() ? cl.hs.liste.length : '') + '</div>';
+    + knopf('handschrift', 'Handschrift', hsOrdner() ? (neu ? neu + ' neu' : '0') : '', hs === 'handschrift')
+    + knopf('alle', 'Alle Handschriften', hsOrdner() ? cl.hs.liste.length : '', hs === 'alle')
+    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length, hs === 'notizblock')
+    + '<div class="trenn"></div>'
+    + knopf('vorlagen', 'Vorlagen…', memoVorlagen().length, !hs && cl.memo.sicht === 'vorlagen') + '</div>';
 }
 
 function memoKopfText() {
   if (cl.memo.art === 'handschrift') { return 'Handschrift'; }
   if (cl.memo.art === 'alle') { return 'Alle Handschriften'; }
   if (cl.memo.art === 'notizblock') { return 'Notizblock'; }
-  return katName(cl.filter);
+  if (cl.memo.sicht === 'vorlagen') { return 'Vorlagen'; }
+  return (MEMO_ARTEN.filter(function (a) { return a[0] === cl.memo.sicht; })[0] || MEMO_ARTEN[0])[1];
 }
 
 /* ---- Drive: die Liste des Ordners ---- */
@@ -9215,7 +9438,7 @@ function katVon(s) { return (s && s.__satz && s.__satz.bereich) || ''; }
 function katInhalt(id) {
   var r = { todo: [], listen: [], vorhaben: [], notizen: [], blaetter: [], ideen: [], faelle: [], sammlungen: [], handschrift: [] };
   var passt = function (b) { return (b || '') === id; };
-  var seiten = kpSeitenAlle().filter(function (s) { return clPasst(s) && !prPrivatVerborgen(s, null); });
+  var seiten = kpSeitenAlle().filter(function (s) { return clPasst(s) && !prPrivatVerborgen(s, null) && !memoIstVorlage(s); });
   seiten.forEach(function (s) {
     if (!passt(katVon(s))) { return; }
     if (ckSeite(s.id)) {
@@ -9571,11 +9794,11 @@ function prVerlassen() {
 
 function prMenueHtml() {
   var m = prModus();
-  return '<div class="menue-zeile"><span>Private Einträge:</span></div><div class="wahlreihe pr-wahl">'
-    + [['zeigen', 'zeigen'], ['maskieren', 'maskieren'], ['verbergen', 'verbergen']].map(function (x) {
+  return '<div class="menue-zeile"><span>Private records:</span></div><div class="wahlreihe pr-wahl">'
+    + [['zeigen', 'show'], ['maskieren', 'mask'], ['verbergen', 'hide']].map(function (x) {
         return '<button type="button"' + (m === x[0] ? ' class="an"' : '') + ' onclick="prModusSetzen(\'' + x[0] + '\')">' + x[1] + '</button>';
       }).join('') + '</div>'
-    + '<button type="button" onclick="prPinFestlegen()">' + (prPinDa() ? 'PIN ändern…' : 'PIN festlegen…') + '</button>';
+    + '<button type="button" onclick="prPinFestlegen()">' + (prPinDa() ? 'Change PIN…' : 'Set PIN…') + '</button>';
 }
 
 /* Coach: Fragen, die Privates nennen, fallen weg, solange es nicht gezeigt wird */
@@ -9905,20 +10128,12 @@ function ckImBereich(s) {
 
 /* Ohne gewählte Liste: Ruhende, Fertige oder Vorlagen (seit 0.61 aus dem ▼) —
    ohne Wahl die laufenden Listen */
-var TODO_SICHTEN = { ruht: 'Ruhende', fertig: 'Fertige', vorlage: 'Vorlagen' };
+var TODO_SICHTEN = { ruht: 'Ruhende', fertig: 'Fertige' };
 
 function checklistenListeHtml() {
   var sicht = cl.cls.sicht;
-  if (sicht === 'vorlage') {
-    var vorlagen = clsAlle('vorlage').filter(clPasst);
-    return '<p class="leise">Antippen öffnet die Vorlage — dort „Starten“. Die Checkliste steht dann im ▼.</p>'
-      + (vorlagen.length ? vorlagen.map(function (g) {
-          return '<button type="button" class="cls-zeile vorl" onclick="clsOeffnen(\'' + esc(g.id) + '\')"><span class="tx">' + esc(g.titel) + '</span>'
-            + '<span class="cls-zahl">' + clsStand(g).alle + '</span></button>';
-        }).join('') : '<p class="leise">Noch keine Vorlage — „Neu…“ tippen.</p>');
-  }
   var z = TODO_SICHTEN[sicht] ? sicht : 'lauf';
-  var l = ckAlle().filter(ckImBereich).filter(function (s) { return ckZustand(s) === z && !ckIstKorb(s); });
+  var l = ckAlle().filter(ckImBereich).filter(function (s) { return ckIstListe(s) && ckZustand(s) === z && !ckIstKorb(s); });
   if (!l.length) {
     return '<p class="leise">' + ({ lauf: 'Keine laufende Liste', ruht: 'Keine ruhende Liste', fertig: 'Keine fertige Liste' }[z])
       + (clFilter() !== 'alle' ? ' in „' + esc(katName(cl.filter)) + '“' : '') + '.</p>';
@@ -9952,11 +10167,9 @@ function checklisteHtml(g) {
            + (ab ? '<span class="plan-marke">' + esc(clsAbstandText(ab)) + '</span>' : '') + '</div>';
         return;
       }
-      var lauf = g.checkliste === 'lauf';
+      /* Seit 0.71: eine Checkliste wird nur hier abgehakt — kein Einplanen */
       h += '<div class="aufg' + (a.erledigt ? ' erl' : '') + '">' + clKastenHtml(a.erledigt, 'clsHaken(\'' + esc(g.id) + '\',' + nr + ')')
-         + (lauf ? '<button type="button" class="tx umbruch" onclick="aufEinplanen(\'' + esc(g.id) + '\',' + nr + ')">' + esc(a.text) + '</button>'
-                 : '<span class="tx">' + esc(a.text) + '</span>')
-         + (lauf ? clPlanMarke(kpSeiteFinden(g.id), a) : '') + '</div>';
+         + '<button type="button" class="tx umbruch" onclick="clsHaken(\'' + esc(g.id) + '\',' + nr + ')">' + esc(a.text) + '</button></div>';
       return;
     }
     var m = z.match(/^\s*(#{1,3})\s+(.*)$/);
@@ -9966,6 +10179,10 @@ function checklisteHtml(g) {
   if (g.checkliste === 'lauf' && st.alle && st.fertig === st.alle) {
     h += '<div class="knoepfe"><span class="leise">Alles erledigt.</span>'
        + '<button type="button" class="knopf voll" onclick="clsAbschliessen()">Abschließen</button></div>';
+  }
+  /* Wie bei HandyShopper: für das nächste Mal alle Haken weg (seit 0.71) */
+  if (!vorlage && st.fertig) {
+    h += '<div class="knoepfe"><button type="button" class="knopf" onclick="clsZuruecksetzen()">Alle Haken entfernen</button></div>';
   }
   return h;
 }
@@ -10019,7 +10236,7 @@ function checklistenFussHtml() {
   var s = ckSeite(cl.cls.id);
   if (!s) { return '<button type="button" class="knopf" onclick="clsNeu()">Neu…</button>'; }
   /* „Fertig“ nur, wenn man aus Ruhende/Fertige/Vorlagen kam — sonst führt das ▼ weiter (seit 0.61) */
-  var zurueck = cl.cls.sicht ? '<button type="button" class="knopf" onclick="clsZurListe()">Fertig</button>' : '';
+  var zurueck = (cl.cls.sicht || aufIstCheckliste(s)) ? '<button type="button" class="knopf" onclick="clsZurListe()">Fertig</button>' : '';
   /* Liste (seit 0.49): Neu legt eine Aufgabe hier an, Schreiben öffnet den Text */
   if (ckIstListe(s)) {
     return zurueck
@@ -10060,6 +10277,8 @@ function clsOeffnen(id) {
 /* Zurück: in Ruhende/Fertige/Vorlagen — sonst zu „Alle“ (seit 0.61) */
 function clsZurListe() {
   cl.cls.schreiben = false;
+  /* Abläufe und Checklisten gehören seit 0.71 ins Memo Pad */
+  if (aufIstCheckliste(kpSeiteFinden(cl.cls.id))) { cl.cls.id = ''; oeffne('memo'); return; }
   if (cl.cls.sicht && cl.cls.id) { cl.cls.id = ''; zeichne(); return; }
   todoAlle();
 }
@@ -10114,7 +10333,8 @@ function listeAufklappHtml() {
   var offen = cl.app === 'checklisten' ? cl.cls.id : '';
   var alle = ckAlle().filter(ckImBereich);
   var korb = ckKorb(false);
-  var lauf = alle.filter(function (s) { return ckZustand(s) === 'lauf' && !ckIstKorb(s); });
+  /* Seit 0.71 nur Listen — Abläufe und Checklisten stehen im Memo Pad */
+  var lauf = alle.filter(function (s) { return ckIstListe(s) && ckZustand(s) === 'lauf' && !ckIstKorb(s); });
   var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
     + katFilterHtml('todoKategorie', cl.app === 'aufgaben' ? clFilter() : '-')
     + '<div class="trenn"></div>'
@@ -10127,12 +10347,11 @@ function listeAufklappHtml() {
     h += l.map(function (s) { gezeigt[s.id] = true; return todoWahlZeile(s, s.id === offen); }).join('');
   });
   h += lauf.filter(function (s) { return !gezeigt[s.id]; }).map(function (s) { return todoWahlZeile(s, s.id === offen); }).join('');
-  var zahl = function (z) { return alle.filter(function (s) { return ckZustand(s) === z && !ckIstKorb(s); }).length; };
-  var vorlagen = clsAlle('vorlage').filter(clPasst).length;
+  var zahl = function (z) { return alle.filter(function (s) { return ckIstListe(s) && ckZustand(s) === z && !ckIstKorb(s); }).length; };
   var sicht = function (w, n) {
     return '<button type="button" class="leise' + (cl.app === 'checklisten' && !offen && cl.cls.sicht === w ? ' an' : '') + '" onclick="todoSicht(\'' + w + '\')"><span>' + TODO_SICHTEN[w] + '…</span><small>' + n + '</small></button>';
   };
-  return h + '<div class="trenn"></div>' + sicht('ruht', zahl('ruht')) + sicht('fertig', zahl('fertig')) + sicht('vorlage', vorlagen)
+  return h + '<div class="trenn"></div>' + sicht('ruht', zahl('ruht')) + sicht('fertig', zahl('fertig'))
     + '<button type="button" class="leise" onclick="todoNeueListe()"><span>+ Neue Liste…</span></button>'
     + '<div class="trenn"></div><button type="button" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '■' : '▢') + ' Erledigte zeigen</button></div>';
 }
@@ -10426,7 +10645,8 @@ function clsFensterHtml() {
     h += '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
       /* Kategorie (seit 0.66; vorher Lebensbereich) und privat */
       + katPrivatHtml('cls', f.bereich, f.privat);
-    if (!ckIstListe(sd)) { h += '<label>Art:</label>' + wahl('art', [['aufgaben', 'Aufgaben'], ['abhaken', 'Abhaken']], f.art); }
+    /* Seit 0.71: Ablauf (Punkte mit Datum in To Do) oder Checkliste (nur hier abhaken) */
+    if (!ckIstListe(sd)) { h += '<label>Art:</label>' + wahl('art', [['aufgaben', '⇢ Ablauf'], ['abhaken', '☑ Checkliste']], f.art); }
     if (!vorlage) {
       h += '<label>Zustand:</label>' + wahl('zustand', CK_ZUSTAENDE, f.zustand);
       if (f.zustand === 'lauf') {
@@ -10570,6 +10790,7 @@ function clsKopieren() {
 function clsZuruecksetzen() {
   var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
   if (!g || g.checkliste === 'vorlage') { return; }
+  cl.auf.frisch = {};
   /* Erst über den Kern zurück auf offen — eingeplante Punkte ziehen mit */
   var seite = kpSeiteFinden(g.id);
   String(g.text || '').split('\n').forEach(function (z, nr) {
@@ -23260,9 +23481,9 @@ var SP_PAUSE_MS = 60000;
 
 /* Ordner auf dem Start (seit 0.35, vorher nur „Spiele“) */
 var CL_ORDNER = {
-  planung: { name: 'Planung', apps: ['routinen', 'ideen', 'leitfaden', 'coach', 'kategorien'] },
-  lernen: { name: 'Lernen', apps: ['lernkartei', 'drive'] },
-  spiele: { name: 'Spiele', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion', 'minen', 'puzzle'] }
+  planung: { name: 'Planning', apps: ['ideen', 'coach', 'kategorien'] },
+  lernen: { name: 'Learning', apps: ['lernkartei', 'drive'] },
+  spiele: { name: 'Games', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion', 'minen', 'puzzle'] }
 };
 
 cl.ordner = '';
