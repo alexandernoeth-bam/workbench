@@ -906,17 +906,15 @@ function aufgabenTest() {
   const heute = CL.isoDatum();
   CL.oeffne('aufgaben');
   let h = inhalt();
-  pruefe(/Angebot einholen/.test(h) && /Fenster messen/.test(h) && /Laub/.test(h) && /10 km laufen/.test(h),
-    'alle offenen Aufgaben aus laufenden Projekten, Zielen und Listen');
+  /* Seit 0.70: Projekte und Ziele sind Pläne — in „Alle“ nur Eingeplantes; Listen ganz */
+  pruefe(/Laub/.test(h) && !/Angebot einholen/.test(h) && !/Fenster messen/.test(h) && !/10 km laufen/.test(h),
+    'Alle: offene Punkte aus Listen; aus Projekten und Zielen nur Eingeplantes (0.70)');
   pruefe(!/versteckt/.test(h) && !/Pläne/.test(h) && !/Teich/.test(h) && !/in einer Notiz/.test(h),
     'nicht: Ruhendes, Erledigtes, nicht Relevantes, Notizen');
-  pruefe(/class="gruppe klick" onclick="aufGanzUm\('p1'\)"><span>◎ Büro<\/span><small>1<\/small><\/button>/.test(h) && /<span>≡ Garten<\/span>/.test(h) && !/class="q">/.test(h),
-    'nach Liste gruppiert (Überschrift mit Zahl, seit 0.17) — keine zweite Spalte, der Titel hat die volle Breite');
-  pruefe(/class="tx umbruch"/.test(h), 'lange Titel brechen um');
-  CL.aufAnsicht('prio');
-  pruefe(!/class="gruppe/.test(inhalt()) && CL.__ablage['clie-aufgaben-ansicht'] === 'prio' && /<small class="herkunft">◎ Büro<\/small>/.test(inhalt()),
-    'Ansicht Prio (seit 0.17 statt „Kategorien aus“): flach, mit Herkunft, gemerkt');
-  CL.aufAnsicht('gruppiert');
+  CL.aufPlanAnwenden(CL.kpSeiteFinden('p1'), 1, heute, ''); CL.aufPlanAnwenden(CL.kpSeiteFinden('p2'), 0, heute, '');
+  CL.zeichne(); h = inhalt();
+  pruefe(/Angebot einholen/.test(h) && /Fenster messen/.test(h) && !/class="gruppe/.test(h) && /class="aufg palm"/.test(h) && !/class="q">/.test(h),
+    'eingeplant: steht in Alle — flach, ohne Gruppen, eine Zeile je Aufgabe');
   CL.aufFilter('kb-arbeit');
   pruefe(/Angebot einholen/.test(inhalt()) && !/Fenster messen/.test(inhalt()), 'der Filter Arbeit zeigt nur berufliche Seiten');
   CL.aufFilter('alle');
@@ -944,11 +942,12 @@ function aufgabenTest() {
 
   /* Abhaken */
   CL.aufHaken('p2', 0);
-  pruefe(/^\[x\] Fenster messen/.test(CL.DB.projekte[1].flaeche) && /class="aufg erl/.test(inhalt()), 'abhaken: in der Seite erledigt, bleibt kurz durchgestrichen stehen');
+  pruefe(/^\[x\] Fenster messen/.test(CL.DB.projekte[1].flaeche) && /class="aufg palm erl/.test(inhalt()), 'abhaken: in der Seite erledigt, bleibt kurz durchgestrichen stehen');
   CL.oeffne('uebersicht'); CL.oeffne('aufgaben');
   pruefe(!/Fenster messen/.test(inhalt()), 'nach dem Verlassen ist es weg');
+  CL.aufHaken('t1', 0); CL.oeffne('uebersicht'); CL.oeffne('aufgaben');
   CL.aufErlUm();
-  pruefe(/Fenster messen/.test(inhalt()) && /Pläne/.test(inhalt()), '„Erledigte“ zeigt es wieder');
+  pruefe(/Laub/.test(inhalt()) && JSON.parse(CL.__ablage['clie-todo-anzeige']).erl === true, '„Erledigte“ zeigt Erledigtes aus Listen wieder — und bleibt gemerkt');
   CL.aufErlUm();
 
   /* Neu: ohne Wahl in den Sammler (seit 0.49 statt „Liste ist Pflicht“) */
@@ -982,8 +981,8 @@ function aufgabenTest() {
   const tag = CL.kpTagFinden(heute);
   const e = tag && tag.eintraege.filter(x => x.text === 'Winterreifen')[0];
   pruefe(e && e.quelle === 't1' && e.zeit === '15:00' && /\[\] Winterreifen/.test(tag.text), 'für heute um 15:00 eingeplant — im selben Tag wie die Workbench');
-  pruefe(/Winterreifen<\/button><span class="plan-marke">15:00<\/span>/.test(inhalt()) && inhalt().indexOf('≡ Garten') < inhalt().indexOf('Winterreifen'),
-    'Eingeplantes steht bei seiner Liste, mit Uhrzeit als Marke');
+  pruefe(new RegExp('Winterreifen</span></button><span class="dt">' + CL.clKurzDatum(heute).replace(/\./g, '\\.') + '</span>').test(inhalt()),
+    'Eingeplantes steht mit seinem Datum „TT.MM.“ in der Zeile (0.70, flach)');
   CL.oeffne('kalender');
   pruefe(/class="z">15:00<\/span><span class="t"><button type="button" class="k" onclick="clTagZeileUm[^>]*><\/button><span class="tx">Winterreifen/.test(inhalt()),
     'und steht im Kalender an seiner Stunde');
@@ -1012,8 +1011,8 @@ function aufgabenTest() {
   const spaeter = CL.kpTagFinden(uebermorgen);
   pruefe(!/Winterreifen/.test(CL.kpTagFinden(heute).text) && spaeter && /\[\] Winterreifen wechseln/.test(spaeter.text) && spaeter.eintraege.some(x => x.quelle === 'p2'),
     'ein anderes Datum: aus heute heraus, in den neuen Tag hinein');
-  pruefe(new RegExp('<span class="plan-marke">' + CL.clWt(uebermorgen) + ' ' + CL.clKurzDatum(uebermorgen).replace(/\./g, '\\.') + '</span>').test(inhalt()),
-    'in der Liste steht der Tag, etwa „Mi 21.10.“');
+  pruefe(new RegExp('<span class="dt">' + CL.clKurzDatum(uebermorgen).replace(/\./g, '\\.') + '</span>').test(inhalt()),
+    'in der Zeile steht das Datum, etwa „21.10.“');
   CL.aufDetails('p2', nr2);
   CL.document.getElementById('aufDatum').value = CL.tagePlus(heute, -1);
   CL.aufSpeichern();
@@ -1047,7 +1046,7 @@ function aufgabenTest() {
   pruefe(gesch.name === 'Geschenke', 'umbenannt');
   CL.todoAlle();
   CL.aufTippen('p1', 1);
-  pruefe(CL.cl.auf.wahl === 'p1|1' && /class="aufg gewaehlt"/.test(inhalt()) && CL.cl.aufklapp === '', 'erster Tipp wählt aus');
+  pruefe(CL.cl.auf.wahl === 'p1|1' && /class="aufg palm gewaehlt"/.test(inhalt()) && /<small class="herkunft">◎ Büro/.test(inhalt()) && CL.cl.aufklapp === '', 'erster Tipp wählt aus — zeigt den ganzen Text und woher');
   CL.aufTippen('p1', 1);
   pruefe(CL.cl.aufklapp === 'aufgabe' && /value="Angebot einholen"/.test(CL.document.getElementById('aufklapp').innerHTML), 'zweiter Tipp öffnet die Details');
   CL.aufklappZu();
@@ -1118,7 +1117,7 @@ function memoTest() {
 
   CL.DB.projekte[1].flaeche = '[] Fenster messen';
   CL.memoZeile('p2', 0);
-  pruefe(CL.cl.app === 'projekte' && CL.cl.pj.id === 'p2' && CL.cl.pj.reiter === 'aufgaben' && /class="aufg hervor" id="pjZ0"/.test(inhalt()), '„Im Projekt zeigen“ öffnet das Projekt (seit 0.43) an der Zeile');
+  pruefe(CL.cl.app === 'projekte' && CL.cl.pj.id === 'p2' && CL.cl.pj.reiter === 'aufgaben' && /class="aufg palm hervor" id="pjZ0"/.test(inhalt()), '„Im Projekt zeigen“ öffnet das Projekt (seit 0.43) an der Zeile');
   CL.memoZeile('t1', 0);
   pruefe(CL.cl.app === 'checklisten' && CL.cl.cls.id === 't1', '„Liste zeigen“ öffnet Listen seit 0.49 in Checklisten');
   CL.aufListeSetzen('');
@@ -1366,8 +1365,8 @@ function feinschliffTest() {
   CL.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Laub', geaendert: 1, eintraege: [{ id: 'e1', abschnitt: 'h', text: 'Laub', quelle: 't1', erledigt: false }] });
   CL.oeffne('aufgaben');
   const h = inhalt();
-  pruefe(!/class="zw"/.test(h) && /≡ Garten<\/span><small>[^<]*<\/small><\/button><div class="aufg[^"]*">[\s\S]*?Laub<\/button><span class="plan-marke">heute<\/span>/.test(h),
-    'Gruppiert: keine Gruppe „Geplant“ — die Aufgabe steht bei ihrer Liste mit der Marke „heute“');
+  pruefe(!/class="zw"/.test(h) && new RegExp('Laub</span></button><span class="dt">' + CL.clKurzDatum(heute).replace(/\./g, '\\.') + '</span>').test(h),
+    'keine Gruppe „Geplant“ — die Aufgabe steht flach mit ihrem Datum (seit 0.70)');
   pruefe(CL.document.getElementById('uhr').textContent === '', 'auf App-Seiten keine Uhrzeit im Kopf');
   CL.oeffne('uebersicht');
   pruefe(/^\d{2}:\d{2}$/.test(CL.document.getElementById('uhr').textContent), 'auf der Übersicht bleibt die Uhr');
@@ -2114,7 +2113,7 @@ function aufgabenNotizTest() {
   pruefe(z.notiz === 'Angebot vom 12.10.\nNotstrom ja/nein?' && z.frist === '2026-12-01', 'Notiz gespeichert, ⚑ Frist bleibt');
   S.ckZusatzSetzen(s, 'ZEO Solar Auftrag', '2026-12-05', '');
   pruefe(S.ckZusatz(s, 'ZEO Solar Auftrag').notiz === 'Angebot vom 12.10.\nNotstrom ja/nein?', 'Frist ändern (ohne Notiz-Angabe): Notiz bleibt');
-  pruefe(/class="notiz-marke" onclick="aufDetails\('/.test(S.ckListeHtml(s)), 'in der Liste: ▤ zum Antippen');
+  pruefe(/ZEO Solar Auftrag <span class="nm">▤<\/span>/.test(S.ckListeHtml(s)), 'in der Liste: ▤ hinter dem Text (seit 0.70)');
   S.oeffne('suchen');
   pruefe(S.suTreffer('notstrom').some(x => x.gruppe === 'aufgaben' && /▤ Angebot/.test(x.unter)), 'die Suche findet Text in der Notiz');
   /* Umbenennen: Notiz zieht mit */
@@ -2162,9 +2161,9 @@ function kategorienTest() {
   S.document.getElementById('memoKat').value = k.id; S.memoSpeichern();
   pruefe(no.__satz.bereich === k.id, 'Notiz zugeordnet');
   const pj = S.kpSeiteAnlegen('vorhaben', 'PV-Anlage Haus', 'privat', '');
-  S.oeffne('projekte'); S.pjOeffnen(pj.id, 'allgemein');
-  pruefe(/id="pjKat"[^>]*onchange="pjFeld\('kategorie'\)"/.test(inhalt()), 'Projekt „Allgemein“: Kategorie wirkt sofort');
-  S.document.getElementById('pjKat').value = k.id; S.pjFeld('kategorie');
+  S.oeffne('projekte'); S.pjOeffnen(pj.id, 'inhalt'); S.pjDetails();
+  pruefe(/id="pjKat"/.test(S.document.getElementById('aufklapp').innerHTML), 'Projekt „Details…“: Kategorie (seit 0.70 statt Reiter „Allgemein“)');
+  S.document.getElementById('pjName').value = 'PV-Anlage Haus'; S.document.getElementById('pjKat').value = k.id; S.pjDetSpeichern();
   pruefe(pj.__satz.bereich === k.id, 'Projekt zugeordnet');
   const sa = S.saAusVorlage(S.SA_VORLAGEN.frei, 'PV-Angebote', false, []);
   S.oeffne('sammlungen'); S.saOeffnen(sa.id); S.saDetailsOeffnen();
@@ -2198,6 +2197,75 @@ function kategorienTest() {
   pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
   S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
   pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   125. Plan und Einplanen: Projekt = Notiz + Schritte (0.70)
+   Grund: Wie am Palm (Memo + To Do) — Projekte und Checklisten sind
+   Pläne; was dran ist, wird bewusst eingeplant und steht dann in „Alle“
+   und im Tagesplan. Ein Fenster „Einplanen“ für alles.
+   Erkennt: alte Reiter/Fenster wieder da, Einplanen nimmt Vergangenes an,
+   „Nicht einplanen“ fehlt, ⚑ Frist fehlt im Tagesplan, Uhrzeit landet
+   nicht an der Stunde, Plan-Punkt wird kopiert statt bewegt.
+   ============================================================ */
+function planEinplanenTest() {
+  console.log('\n125. Plan und Einplanen: Projekt = Notiz + Schritte (0.70)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.cl.auf.anz = S.aufAnzKopie(S.AUF_ANZ_STD); S.cl.auf.wahl = ''; S.cl.auf.frisch = {};
+  pruefe(S.PJ_REITER.map(r => r[1]).join('|') === 'Notiz|Schritte' && typeof S.pjMsAuf === 'undefined' && typeof S.pjAllgemeinHtml === 'undefined'
+    && typeof S.clsPlanOk === 'undefined' && typeof S.aufAnsicht === 'undefined' && typeof S.aufNaechste === 'undefined',
+    'nur noch Notiz · Schritte; alte Reiter, Ansichten und „Punkt einplanen“ sind weg');
+  S.DB.projekte.push({ id: 'pd', name: 'DFÜ-Abruftest', kontext: 'beruflich', bereich: 'kb-arbeit', status: 'laufend', ordnung: 1, geaendert: 1,
+    flaeche: 'Ziel: Abruf einmal komplett durchspielen.\n[] Testdaten bereitstellen\n[] Teilnehmer erinnern\n[] Ergebnis protokollieren' });
+  S.DB.gedanken.push({ id: 'ca', titel: 'Abruftest – Ablauf', text: '[] Abruf starten\n[] Daten gegenprüfen', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', gestartet: heute, ordnung: 2, geaendert: 1 });
+  /* Einplanen-Fenster */
+  S.aufEinplanen('pd', 2);
+  let a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'einplanen' && (a.match(/aufEpTag\('/g) || []).length === 7 && />Heute</.test(a) && />Morgen</.test(a) && !/aufEinplanenWeg/.test(a),
+    'Fenster: sieben Tage zur Schnellwahl; „Nicht einplanen“ nur, wenn schon eingeplant');
+  S.document.getElementById('aufEpDatum').value = S.tagePlus(heute, -1);
+  S.aufEinplanenOk();
+  pruefe(!S.aufGeplant(S.kpSeiteFinden('pd'), 'Teilnehmer erinnern') && S.cl.aufklapp === 'einplanen', 'ein vergangener Tag wird abgelehnt');
+  S.aufEpTag(heute); S.document.getElementById('aufEpDatum').value = heute;
+  S.aufEinplanenOk();
+  pruefe(S.aufGeplant(S.kpSeiteFinden('pd'), 'Teilnehmer erinnern').datum === heute && (S.DB.projekte[0].flaeche.match(/Teilnehmer erinnern/g) || []).length === 1,
+    'eingeplant — der Punkt bleibt im Projekt, keine Kopie');
+  /* Checkliste mit Uhrzeit → im Tagesplan an der Stunde */
+  S.aufEinplanen('ca', 0);
+  S.aufEpZeitUm();
+  S.document.getElementById('aufEpDatum').value = heute; S.document.getElementById('aufEpZeit').value = '08:30';
+  S.aufEinplanenOk();
+  /* ⚑ Frist ohne Einplanung → im Tagesplan unter „Vorgenommen“ */
+  S.ckZusatzSetzen(S.kpSeiteFinden('pd'), 'Ergebnis protokollieren', heute, '');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  let h = inhalt();
+  pruefe(/class="z">8:30<\/span><span class="t">[^]*?Abruf starten/.test(h), 'Checklisten-Punkt mit Uhrzeit steht an seiner Stunde');
+  const vg = h.slice(h.indexOf('>Vorgenommen<'));
+  pruefe(/Teilnehmer erinnern/.test(vg) && /Ergebnis protokollieren[^]*?⚑/.test(vg) && !/Testdaten/.test(vg), 'Vorgenommen: eingeplant ohne Uhrzeit und ⚑ Frist von heute — nicht Eingeplantes nicht');
+  /* Alle */
+  S.oeffne('aufgaben');
+  h = inhalt();
+  pruefe(/Teilnehmer erinnern/.test(h) && /Abruf starten/.test(h) && /Ergebnis protokollieren/.test(h) && !/Testdaten/.test(h) && !/Daten gegenprüfen/.test(h),
+    'Alle: Eingeplantes und ⚑ Frist aus Projekt und Checkliste — der Rest bleibt im Plan');
+  /* Nicht einplanen */
+  S.aufEinplanen('pd', 2);
+  pruefe(/aufEinplanenWeg\(\)">Nicht einplanen/.test(S.document.getElementById('aufklapp').innerHTML), 'schon eingeplant: „Nicht einplanen“');
+  S.aufEinplanenWeg();
+  S.zeichne();
+  pruefe(!S.aufGeplant(S.kpSeiteFinden('pd'), 'Teilnehmer erinnern') && !/Teilnehmer erinnern/.test(inhalt()) && /\[\] Teilnehmer erinnern/.test(S.DB.projekte[0].flaeche),
+    '„Nicht einplanen“: aus Alle heraus, bleibt im Projekt');
+  /* ohne Auswahl */
+  S.cl.auf.wahl = '';
+  S.aufEinplanenGewaehlt();
+  pruefe(S.cl.aufklapp !== 'einplanen' && /Erst einen Punkt antippen/.test(S.document.getElementById('toastText').textContent), 'ohne gewählten Punkt: Hinweis');
+  /* Anzeigen… auch im Projekt */
+  S.pjOeffnen('pd', 'aufgaben'); S.menueUm();
+  pruefe(/menueWahl\('anzeigen'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü „Anzeigen…“ auch im Projekt');
+  S.aufklappZu();
   S.oeffne('uebersicht');
 }
 
@@ -3710,14 +3778,14 @@ function ckPrioTest() {
   const S = CL;
   const heute = S.isoDatum();
   S.cl.cls.id = ''; S.cl.aufklapp = ''; S.cl.auf.liste = ''; S.cl.auf.frisch = {}; S.cl.auf.wahl = '';
-  S.cl.auf.ansicht = 'prio'; S.cl.auf.naechste = false;
+  S.cl.auf.anz = S.aufAnzKopie(S.AUF_ANZ_STD);
   S.DB.themen = [{ id: 'tq', name: 'Q4', text: '[] P5 Keller\n[] P4 Ablage\n[] Präsentation\n[] P1 ZEO-Auftrag', kontext: 'privat', ordnung: 1, geaendert: 1 },
                  { id: 'ts', name: 'PV-Anlage', text: '[] P1 Angebot prüfen', kontext: 'privat', stern: true, ordnung: 2, geaendert: 1 }];
   pruefe(S.kpPrio('P4 Ablage').p === 4 && S.kpPrio('P5 Keller').p === 5 && S.kpPrioText('x', 5) === 'P5 x' && S.kpPrioText('P2 x', 0) === 'x', 'P4 und P5 werden erkannt und geschrieben');
   S.oeffne('aufgaben');
-  const zeilen = (x) => (x.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(y => y.replace(/.*>/, '').replace(/<$/, ''));
-  pruefe(zeilen(inhalt()).join(' | ') === 'Angebot prüfen | ZEO-Auftrag | Präsentation | Ablage | Keller', 'Prio: P1 mit ★ zuerst, dann P1, 3, 4, 5 — ' + zeilen(inhalt()).join(' | '));
-  pruefe(/Angebot prüfen<small class="herkunft">≡ ★ PV-Anlage<\/small>/.test(inhalt()), '★ steht in der Herkunft');
+  const zeilen = (x) => (x.match(/<span class="tt">([^<]+)/g) || []).map(y => y.replace(/.*>/, '').trim());
+  pruefe(zeilen(inhalt()).join(' | ') === 'ZEO-Auftrag | Angebot prüfen | Präsentation | Ablage | Keller', 'Prio: 1, 3, 4, 5 (seit 0.70 ohne ★-Vorrang, wie am Palm) — ' + zeilen(inhalt()).join(' | '));
+  pruefe(!/★/.test(inhalt()), 'kein ★ in der flachen Zeile');
   /* Frist und Dauer im Fenster */
   S.aufDetails('tq', 2);
   let f = S.aufFensterHtml();
@@ -3730,7 +3798,7 @@ function ckPrioTest() {
   const zq = S.DB.themen[0].zusatz;
   pruefe(zq && zq['Präsentation Q4'] && zq['Präsentation Q4'].frist === heute && zq['Präsentation Q4'].dauer === 60 && !zq['Präsentation'], 'Frist und Dauer am Satz — beim Umbenennen umgezogen');
   const h = inhalt();
-  pruefe(zeilen(h)[0] === 'Präsentation Q4' && /<span class="frist-marke">⚑ heute<\/span>/.test(h) && /◷ 1 Std/.test(h), 'heute fällige Frist steht ganz oben, mit ⚑ und ◷');
+  pruefe(zeilen(h)[2] === 'Präsentation Q4' && new RegExp('Präsentation Q4( <span class="nm">▤</span>)?</span></button><span class="dt">' + S.clKurzDatum(heute).replace(/\./g, '\\.') + '</span>').test(h), 'die ⚑ Frist steht als Datum in der Zeile; sortiert nach Priorität');
   /* Verschieben nimmt den Zusatz mit */
   const nr = S.DB.themen[0].text.split('\n').indexOf('[] Präsentation Q4');
   S.aufDetails('tq', nr);
@@ -4410,58 +4478,70 @@ function projekteTest() {
   S.seiteOeffnen('p2');
   pruefe(S.cl.app === 'projekte' && S.cl.pj.reiter === 'inhalt', 'auch Lesezeichen, Suche und Verweise landen bei „Inhalt“');
   S.oeffne('projekte');
-  S.pjOeffnen('p1', 'allgemein'); S.pjWahl('prio', '1');
-  pruefe(S.DB.projekte[0].prio === 1, 'Priorität im Reiter Allgemein (am Satz als „prio“)');
-  S.pjWahl('prio', '0');
+  /* Seit 0.70: Eckdaten unter „Details…“ */
+  /* Die Testumgebung übernimmt Werte nicht aus dem HTML — wie im Fenster vorbelegt setzen */
+  const detFelder = () => { S.document.getElementById('pjName').value = 'Carport'; S.document.getElementById('pjBeginn').value = '2026-09-01';
+    S.document.getElementById('pjEnde').value = '2027-04-30'; S.document.getElementById('pjKuerzel').value = ''; };
+  S.pjOeffnen('p1', 'inhalt'); S.pjDetails(); detFelder();
+  S.pjDetWahl('prio', '1'); S.pjDetSpeichern();
+  pruefe(S.DB.projekte[0].prio === 1 && S.cl.aufklapp === '', 'Priorität in „Details…“ (am Satz als „prio“)');
+  S.pjDetails(); detFelder(); S.pjDetWahl('prio', '0'); S.pjDetSpeichern();
   pruefe(!('prio' in S.DB.projekte[0]), '„–“: Feld wieder weg');
-  /* Reiter Aufgaben */
+  /* Reiter Schritte */
   S.pjOeffnen('p1', 'aufgaben');
   h = inhalt();
-  pruefe(/class="pj-reiter"><button type="button" onclick="pjReiter\('inhalt'\)">Inhalt<\/button><button type="button" onclick="pjReiter\('meilensteine'\)">Meilensteine<\/button><button type="button" class="an" onclick="pjReiter\('aufgaben'\)">Aufgaben<\/button><button type="button" onclick="pjReiter\('allgemein'\)">Allgemein<\/button><\/div>/.test(h),
-    'vier Reiter (seit 0.46.1): Inhalt · Meilensteine · Aufgaben · Allgemein — Aufgaben gewählt');
-  pruefe(h.indexOf('Huber nachfassen') < h.indexOf('Statik klären') && h.indexOf('Statik klären') < h.indexOf('Angebote anfragen') && !/Huber 14\.200/.test(h),
-    'Aufgaben: offene oben, erledigte darunter, kein Text');
-  S.memoHaken('p1', 2);
-  pruefe(/\[x\] Huber nachfassen/.test(S.DB.projekte[0].flaeche), 'abhaken im Reiter Aufgaben');
-  S.pjAufgabeNeu();
-  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster.seite === 'p1', '„Neu“: Aufgabe gleich im Projekt');
+  pruefe(/class="pj-reiter"><button type="button" onclick="pjReiter\('inhalt'\)">Notiz<\/button><button type="button" class="an" onclick="pjReiter\('aufgaben'\)">Schritte<\/button><\/div>/.test(h),
+    'zwei Reiter (seit 0.70): Notiz · Schritte — Schritte gewählt');
+  pruefe(h.indexOf('Huber nachfassen') < h.indexOf('Statik klären') && h.indexOf('Statik klären') < h.indexOf('Angebote anfragen') && !/Huber 14\.200/.test(h) && /class="aufg palm"/.test(h),
+    'Schritte: offene oben, erledigte darunter, kein Text — Zeilen wie in To Do');
+  pruefe(/pjAufgabeNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML) && /aufEinplanenGewaehlt\(\)">Einplanen…/.test(S.document.getElementById('fuss').innerHTML) && (S.document.getElementById('fuss').innerHTML.match(/<button/g) || []).length <= 4,
+    'unten: Fertig, Neu, Einplanen… — höchstens vier Knöpfe');
+  S.menueUm();
+  pruefe(/menueWahl\('pjDetails'\)">Projekt-Details…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: „Projekt-Details…“');
   S.aufklappZu();
-  /* Reiter Memo */
+  /* Einplanen: steht dann in Alle — der Punkt bleibt im Projekt */
+  S.oeffne('aufgaben');
+  pruefe(!/Statik klären/.test(inhalt()), 'nicht eingeplant: nicht in Alle');
+  S.pjOeffnen('p1', 'aufgaben');
+  S.aufTippen('p1', 4); S.aufEinplanenGewaehlt();
+  S.aufEpTag(S.isoDatum()); S.document.getElementById('aufEpDatum').value = S.isoDatum(); S.aufEinplanenOk();
+  pruefe(/Statik klären<\/span>(<small[^>]*>[^<]*<\/small>)?<\/button><span class="dt">\d/.test(inhalt()) && /\[\] Statik klären/.test(S.DB.projekte[0].flaeche), 'eingeplant: Datum im Schritt, der Punkt bleibt im Projekt');
+  S.oeffne('aufgaben');
+  pruefe(/Statik klären/.test(inhalt()), '… und steht in Alle');
+  S.aufHaken('p1', 4);
+  pruefe(/\[x\] Statik klären/.test(S.DB.projekte[0].flaeche), 'in Alle abgehakt = im Projekt erledigt');
+  S.pjOeffnen('p1', 'aufgaben');
+  S.memoHaken('p1', 2);
+  pruefe(/\[x\] Huber nachfassen/.test(S.DB.projekte[0].flaeche), 'abhaken im Reiter Schritte');
+  S.pjAufgabeNeu();
+  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster.seite === 'p1', '„Neu“: Schritt gleich im Projekt');
+  S.aufklappZu();
+  /* Reiter Notiz */
   S.pjReiter('inhalt');
   h = inhalt();
-  pruefe(/Huber 14\.200/.test(h) && /memo-h2">Angebote/.test(h) && !/nachfassen|Statik/.test(h) && /pjSchreiben\(\)">Schreiben/.test(S.document.getElementById('fuss').innerHTML), 'Inhalt: Text und Überschriften, ohne Aufgaben; unten „Schreiben“');
+  pruefe(/Huber 14\.200/.test(h) && /memo-h2">Angebote/.test(h) && !/nachfassen|Statik/.test(h) && /pjSchreiben\(\)">Schreiben/.test(S.document.getElementById('fuss').innerHTML), 'Notiz: Text und Überschriften, ohne Schritte; unten „Schreiben“');
   S.pjSchreiben();
   pruefe(S.cl.app === 'memo' && S.cl.memo.schreiben && /id="memoFeld"[^>]*>[^<]*Statik klären/.test(inhalt()), '„Schreiben“: ganzer Text im Schreibfeld');
   S.memoSchreibenUm();
-  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1' && S.cl.pj.reiter === 'inhalt' && !S.cl.memo.ausProjekt, '„Fertig“ führt zurück in den Reiter Inhalt');
-  /* Reiter Allgemein */
-  S.pjReiter('allgemein');
-  h = inhalt();
-  pruefe(/id="pjBeginn"[^>]*value="2026-09-01"/.test(h) && /Ende:<input id="pjEnde"[^>]*value="2027-04-30"/.test(h) && !/Vermessung|Meilensteine <span>/.test(h) && !/pjMsAuf/.test(S.document.getElementById('fuss').innerHTML),
-    'Allgemein: Beginn und Ende aus den Workbench-Feldern — Meilensteine seit 0.46.1 im eigenen Reiter');
-  S.document.getElementById('pjBeginn').value = '2026-10-01'; S.pjFeld('beginn');
-  S.document.getElementById('pjEnde').value = '2027-05-15'; S.pjFeld('ende');
-  S.document.getElementById('pjEnde').value = 'kaputt'; S.pjFeld('ende');
-  pruefe(S.DB.projekte[0].start === '2026-10-01' && S.DB.projekte[0].ende === '2027-05-15', 'Beginn → start, Ende → ende; Unlesbares wird nicht übernommen');
-  S.pjWahl('zustand', 'ruht'); S.pjWahl('kontext', 'beruflich'); S.pjWahl('prio', '2');
-  pruefe(S.DB.projekte[0].status === 'ruht' && S.DB.projekte[0].kontext === 'beruflich' && S.DB.projekte[0].prio === 2, 'Zustand, Kategorie, Priorität');
-  S.pjWahl('zustand', 'laeuft'); S.pjWahl('kontext', 'privat');
-  S.pjReiter('meilensteine');
-  pruefe(/Vermessung/.test(inhalt()) && /Meilensteine <span>1\/1/.test(inhalt()) && /pjMsAuf\(''\)">\+ Meilenstein/.test(S.document.getElementById('fuss').innerHTML), 'Reiter Meilensteine: Liste und „+ Meilenstein“');
-  S.pjMsAuf('');
-  S.document.getElementById('pjMsTitel').value = 'Auftrag vergeben'; S.document.getElementById('pjMsDatum').value = '2026-11-15';
-  S.pjMsSpeichern();
-  const ms = S.DB.projekte[0].meilensteine;
-  pruefe(ms.length === 2 && ms[1].titel === 'Auftrag vergeben' && ms[1].datum === '2026-11-15' && ms[1].erreicht === false && !!ms[1].id, 'Meilenstein im Format der Workbench (id, titel, datum, erreicht)');
-  S.pjMsUm(ms[1].id);
-  pruefe(ms[1].erreicht === true && /Meilensteine <span>2\/2/.test(inhalt()), 'Tipp auf ◆: erreicht');
-  S.pjMsAuf(ms[1].id);
-  S.pjMsLoeschen();
-  pruefe(S.DB.projekte[0].meilensteine.length === 1, 'Meilenstein löschen');
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'p1' && S.cl.pj.reiter === 'inhalt' && !S.cl.memo.ausProjekt, '„Fertig“ führt zurück in den Reiter Notiz');
+  /* Details: Beginn, Ende, Kürzel, Zustand */
+  S.pjDetails();
+  let d = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/id="pjBeginn"[^>]*value="2026-09-01"/.test(d) && /Ende:<input id="pjEnde"[^>]*value="2027-04-30"/.test(d) && /id="pjKuerzel"[^>]*placeholder="Car"/.test(d) && !/Meilenstein/.test(d),
+    'Details: Beginn und Ende aus den Workbench-Feldern, Kürzel-Vorschlag „Car“, keine Meilensteine');
+  S.document.getElementById('pjName').value = 'Carport';
+  S.document.getElementById('pjBeginn').value = '2026-10-01'; S.document.getElementById('pjEnde').value = 'kaputt';
+  S.document.getElementById('pjKuerzel').value = 'CP';
+  S.pjDetWahl('zustand', 'ruht');
+  S.pjDetSpeichern();
+  pruefe(S.DB.projekte[0].start === '2026-10-01' && !S.DB.projekte[0].ende && S.DB.projekte[0].status === 'ruht' && S.DB.projekte[0].kuerzel === 'CP' && S.aufKuerzel(S.kpSeiteFinden('p1')) === 'CP',
+    'Beginn → start, Unlesbares nicht übernommen, Zustand, eigenes Kürzel');
+  S.pjDetails(); detFelder(); S.pjDetWahl('zustand', 'laeuft'); S.pjDetSpeichern();
+  pruefe(S.DB.projekte[0].meilensteine.length === 1 && S.DB.projekte[0].meilensteine[0].titel === 'Vermessung', 'Meilensteine bleiben in den Daten (für die Workbench)');
   /* Ziel: seit 0.44 in der App Ziele */
-  S.pjOeffnen('z1', 'allgemein');
+  S.pjOeffnen('z1', 'inhalt');
   pruefe(S.cl.app === 'ziele' && S.cl.zi.id === 'z1', 'ein Ziel öffnet in der App Ziele');
-  S.pjOeffnen('p1', 'allgemein');
+  S.pjOeffnen('p1', 'inhalt');
   /* Zurück und Neu */
   S.clZurueck();
   pruefe(S.cl.app === 'projekte' && !S.cl.pj.id, 'Zurück: vom Projekt zur Liste');
@@ -4469,7 +4549,7 @@ function projekteTest() {
   S.document.getElementById('pjNeuTitel').value = 'Terrassendach';
   S.pjNeuSpeichern();
   const neu = S.DB.projekte[S.DB.projekte.length - 1];
-  pruefe(neu.name === 'Terrassendach' && neu.start === S.isoDatum() && S.cl.pj.id === neu.id && S.cl.pj.reiter === 'allgemein', 'Neu: Beginn heute, öffnet Allgemein');
+  pruefe(neu.name === 'Terrassendach' && neu.start === S.isoDatum() && S.cl.pj.id === neu.id && S.cl.pj.reiter === 'aufgaben', 'Neu: Beginn heute, öffnet die Schritte');
   /* Start, Ordner, Symbol */
   pruefe(S.CL_ORDNER.planung.apps.indexOf('coach') >= 0 && S.clOrdnerVon('coach') === 'planung', 'Coach im Ordner Planung');
   pruefe(/<rect x="15" y="18" width="16" height="6"/.test(S.clSymbol('projekte')), 'Symbol „Zeitplan“ (drei versetzte Balken)');
@@ -5033,17 +5113,17 @@ function prioTest() {
   S.DB.tage.push({ id: 'tag-' + heute, datum: heute, text: '[] Keller aufräumen\n[] P2 Rasen vertikutieren', geaendert: 1, eintraege: [
     { id: 'e1', abschnitt: 'h', text: 'Keller aufräumen', quelle: 'l1', erledigt: false },
     { id: 'e2', abschnitt: 'h', text: 'P2 Rasen vertikutieren', quelle: 'l1', erledigt: false }] });
-  S.cl.auf.ansicht = 'prio'; S.cl.auf.naechste = false;
+  S.cl.auf.anz = S.aufAnzKopie(S.AUF_ANZ_STD);
   S.oeffne('aufgaben');
   let h = inhalt();
-  const reihe = (h.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
-  /* seit 0.49: heute Eingeplantes zuerst, dann P (ohne Kürzel = 3) */
-  pruefe(reihe.join(' | ') === 'Rasen vertikutieren | Keller aufräumen | Statik anfragen | Ablage', 'nach Priorität sortiert (heute Geplantes zuerst), ohne Kürzel im Text — ' + reihe.join(' | '));
-  pruefe(/class="prio p1" onclick="aufPrioUm\('l1',2\)"[^>]*>1</.test(h) && /class="prio p3 still" onclick="aufPrioUm\('l1',0\)"[^>]*>3<\/button>/.test(h), 'Zeichen 1 … und ohne Kürzel eine leise 3');
-  S.aufAnsicht('gruppiert');
-  const reihe2 = (inhalt().match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace(/<$/, ''));
-  pruefe(reihe2[0] === 'Keller aufräumen' && S.cl.auf.ansicht === 'gruppiert', 'Gruppiert (seit 0.17 statt „↕ Liste“): Reihenfolge wie in der Liste');
-  S.aufAnsicht('prio');
+  const reihe = (h.match(/<span class="tt">([^<]+)/g) || []).map(x => x.replace(/.*>/, '').trim());
+  /* seit 0.70 wie am Palm: Priorität, dann Datum (ohne Kürzel = 3) */
+  pruefe(reihe.join(' | ') === 'Statik anfragen | Rasen vertikutieren | Keller aufräumen | Ablage', 'nach Priorität, dann Datum sortiert, ohne Kürzel im Text — ' + reihe.join(' | '));
+  pruefe(/class="pd" onclick="aufPrioUm\('l1',2\)"[^>]*>1</.test(h) && /class="pd" onclick="aufPrioUm\('l1',0\)"[^>]*>3<\/button>/.test(h), 'Ziffer 1 … und ohne Kürzel eine 3');
+  S.cl.auf.anz.sort = 'datum-prio'; S.zeichne();
+  const reihe2 = (inhalt().match(/<span class="tt">([^<]+)/g) || []).map(x => x.replace(/.*>/, '').trim());
+  pruefe(reihe2.join(' | ') === 'Rasen vertikutieren | Keller aufräumen | Statik anfragen | Ablage', '„Datum, Priorität“: erst Datum, ohne Datum zuletzt — ' + reihe2.join(' | '));
+  S.cl.auf.anz.sort = 'prio-datum';
 
   /* Antippen schaltet weiter — die Einplanung im Tag zieht mit */
   S.aufPrioUm('l1', 0);
@@ -5336,27 +5416,27 @@ function clsPlanTest() {
   S.DB.gedanken.push({ id: 'v1', titel: 'Vorlage', text: '[] Punkt', kontext: 'privat', checkliste: 'vorlage', ordnung: 2, geaendert: 1 });
   const c = S.DB.gedanken[0];
   S.oeffne('checklisten'); S.clsOeffnen('c1');
-  pruefe(/onclick="clsPlanOeffnen\('c1',1\)">Koffer packen<\/button>/.test(inhalt()), 'laufende Checkliste: Tipp auf den Text öffnet „Punkt einplanen“');
+  pruefe(/onclick="aufEinplanen\('c1',1\)">Koffer packen<\/button>/.test(inhalt()), 'laufende Checkliste: Tipp auf den Text öffnet „Einplanen“ (seit 0.70 ein Fenster für alles)');
   S.clsOeffnen('v1');
-  pruefe(!/clsPlanOeffnen/.test(inhalt()), 'Vorlage: nichts einzuplanen');
+  pruefe(!/aufEinplanen/.test(inhalt()), 'Vorlage: nichts einzuplanen');
   S.clsOeffnen('c1');
-  S.clsPlanOeffnen('c1', 1);
+  S.aufEinplanen('c1', 1);
   let a = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Punkt einplanen/.test(a) && /id="clsDatum"/.test(a) && /clsPlanZeitUm/.test(a), 'Fenster mit Datum und Uhrzeit');
-  feld('clsDatum', morgen);
-  S.clsPlanOk();
+  pruefe(/>Einplanen</.test(a) && /id="aufEpDatum"/.test(a) && /aufEpZeitUm/.test(a) && /aufEpTag\('/.test(a) && />Heute</.test(a) && />Morgen</.test(a), 'Fenster mit Schnellwahl der Tage, Datum und Uhrzeit');
+  feld('aufEpDatum', morgen);
+  S.aufEinplanenOk();
   pruefe(S.aufGeplant(S.kpSeiteFinden('c1'), 'Koffer packen').datum === morgen && /\[\] Koffer packen/.test(S.kpTagFinden(morgen).text), 'eingeplant: im Tag der Workbench (morgen)');
   pruefe(new RegExp('<span class="plan-marke">' + S.clWt(morgen) + ' ').test(inhalt()), 'Marke rechts am Punkt');
-  S.clsPlanOeffnen('c1', 2);
-  feld('clsDatum', heute);
-  S.clsPlanZeitUm();
-  feld('clsDatum', heute); feld('clsZeit', '07:00');
-  S.clsPlanOk();
+  S.aufEinplanen('c1', 2);
+  S.aufEpTag(heute);
+  S.aufEpZeitUm();
+  feld('aufEpDatum', heute); feld('aufEpZeit', '07:00');
+  S.aufEinplanenOk();
   const e = S.kpEintraegeFinden('c1', 'Müll rausstellen')[0];
   pruefe(e && e.woche.datum === heute && e.eintrag.zeit === '07:00', 'mit Uhrzeit eingeplant');
-  S.clsPlanOeffnen('c1', 3);
-  feld('clsDatum', S.tagePlus(heute, -1));
-  S.clsPlanOk();
+  S.aufEinplanen('c1', 3);
+  feld('aufEpDatum', S.tagePlus(heute, -1));
+  S.aufEinplanenOk();
   pruefe(!S.kpEintraegeFinden('c1', 'Ladekabel').length, 'ein vergangener Tag wird abgelehnt');
   S.aufklappZu();
   /* Heute und Kalender */
@@ -5375,12 +5455,10 @@ function clsPlanTest() {
   pruefe(/\[x\] Koffer packen/.test(S.kpTagFinden(morgen).text), 'in der Checkliste abgehakt → im Tag erledigt');
   /* Ausplanen mit ✕ */
   S.clsHaken('c1', 1);
-  S.clsPlanOeffnen('c1', 1);
-  S.clsPlanWeg();
-  pruefe(!/id="clsDatum"[^>]*value="2/.test(S.document.getElementById('aufklapp').innerHTML), '✕ leert das Datum');
-  feld('clsDatum', '');
-  S.clsPlanOk();
-  pruefe(!S.kpEintraegeFinden('c1', 'Koffer packen').length && !/Koffer/.test(S.kpTagFinden(morgen).text), 'OK ohne Datum nimmt ihn heraus');
+  S.aufEinplanen('c1', 1);
+  pruefe(/aufEinplanenWeg\(\)">Nicht einplanen/.test(S.document.getElementById('aufklapp').innerHTML), 'eingeplant: „Nicht einplanen“ wird angeboten');
+  S.aufEinplanenWeg();
+  pruefe(!S.kpEintraegeFinden('c1', 'Koffer packen').length && !/Koffer/.test(S.kpTagFinden(morgen).text), '„Nicht einplanen“ nimmt ihn heraus — er bleibt in der Checkliste');
   /* Zurücksetzen und Löschen */
   S.cl.cls.id = 'c1';
   S.clsZuruecksetzen();
@@ -5454,25 +5532,26 @@ function clsStichtagTest() {
 }
 
 /* ============================================================
-   46. Aufgabensicht: Gruppiert | Prio | Geplant, „1. Nächste“ (0.17)
-   Grund: „Alle Aufgaben“ soll Projekte, Listen und laufende Checklisten
-   (nur Eingeplantes) zeigen — gruppiert oder flach nach Prio bzw. Tag —
-   und auf Wunsch je Gruppe nur die nächste Aufgabe.
-   Erkennt: falsche Quellen (Ruhendes, ungeplante Checklisten-Punkte),
-   falsche Gruppenfolge, Sortierfehler, fehlende Tageszeilen/Herkunft,
-   „Nächste“ zeigt mehr/weniger oder falsches „+n“, Wahl nicht gemerkt,
-   alter Knopf „↕ Prio“/„Kategorien“ wieder da.
+   46. To Do „Alle“ flach wie am Palm (0.17, seit 0.70 neu)
+   Grund: „Alle“ war mit Gruppen, Ansichtsknöpfen, Marken und Herkunft zu
+   unruhig. Seit 0.70: eine Zeile je Aufgabe (☐ · Ziffer · Text · TT.MM.),
+   Projekte/Ziele/Checklisten sind Pläne — daraus nur Eingeplantes oder mit
+   ⚑ Frist; Listen ganz. Was gezeigt wird, steht unter „Anzeigen…“.
+   Erkennt: Plan-Punkte ohne Datum in Alle, falsche Sortierung, Datum/„!“/„–“
+   falsch, Kategorie/Kürzel ungefragt, Einstellungen nicht gemerkt,
+   „nur Fälliges“ falsch, alte Ansichtsknöpfe wieder da.
    ============================================================ */
 function ansichtTest() {
-  console.log('\n46. Aufgabensicht: Gruppiert | Prio | Geplant, „1. Nächste“ (0.17)');
+  console.log('\n46. To Do „Alle“ flach wie am Palm (0.70)');
   if (!CL) { return; }
   frisch();
   const S = CL;
   const heute = S.isoDatum();
   const morgen = S.tagePlus(heute, 1);
-  S.cl.auf.liste = ''; S.cl.auf.frisch = {}; S.cl.auf.erlZeigen = false; S.cl.auf.ganz = {}; S.cl.auf.wahl = '';
-  S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.naechste = false;
-  S.DB.themen.push({ id: 'lh', name: 'Haus', text: '[] Lampe tauschen\n[] P1 Steckdose\n[] Dach prüfen', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  const gestern = S.tagePlus(heute, -1);
+  S.cl.auf.liste = ''; S.cl.auf.frisch = {}; S.cl.auf.erlZeigen = false; S.cl.auf.wahl = '';
+  S.cl.auf.anz = S.aufAnzKopie(S.AUF_ANZ_STD);
+  S.DB.themen.push({ id: 'lh', name: 'Haus', text: '[] Lampe tauschen\n[] P1 Steckdose\n[] Dach prüfen', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 });
   S.DB.projekte.push({ id: 'pc', name: 'Carport', flaeche: '[] P2 Statik anfragen\n[] Nachbar informieren', status: 'laufend', kontext: 'privat', ordnung: 50, geaendert: 1 });
   S.DB.projekte.push({ id: 'pr', name: 'Ruht', flaeche: '[] unsichtbar', status: 'ruht', kontext: 'privat', ordnung: 60, geaendert: 1 });
   S.DB.gedanken.push({ id: 'cb', titel: 'Urlaub Borkum', text: '[] Fähre buchen\n[] Koffer packen\n[] Ladekabel\n[x] Hotel', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 70, geaendert: 1 });
@@ -5481,59 +5560,79 @@ function ansichtTest() {
   plane('cb', 1, morgen, '18:00'); plane('cb', 0, heute); plane('pc', 1, heute, '09:00'); plane('lh', 2, morgen);
   S.oeffne('aufgaben');
   let h = inhalt();
-  const titel = (x) => (x.match(/class="gruppe klick"[^>]*><span>([^<]+)<\/span>/g) || []).map(y => y.replace(/.*<span>/, '').replace(/<\/span>$/, ''));
-  pruefe(titel(h).join(' | ') === '◎ Carport | ≡ Haus | ☑ Urlaub Borkum', 'Gruppen: erst Projekte, dann Listen, dann laufende Checklisten — ' + titel(h).join(' | '));
-  pruefe(!/unsichtbar/.test(h) && !/>nie</.test(h), 'nicht: ruhende Projekte, Vorlagen');
-  pruefe(/Fähre buchen/.test(h) && /Koffer packen/.test(h) && !/Ladekabel/.test(h) && !/Hotel/.test(h), 'Checkliste: nur eingeplante, offene Punkte');
-  pruefe(/<span>☑ Urlaub Borkum<\/span><small>1\/4 · 2 geplant<\/small>/.test(h) && /<span>≡ Haus<\/span><small>3<\/small>/.test(h), 'Gruppenzahl: offen bzw. Stand · geplant');
-  const zeilen = (x) => (x.match(/class="tx umbruch[^"]*"[^>]*>([^<]+)</g) || []).map(y => y.replace(/.*>/, '').replace(/<$/, ''));
-  pruefe(zeilen(h).slice(2, 5).join(' | ') === 'Lampe tauschen | Steckdose | Dach prüfen', 'Gruppiert: Reihenfolge der Seite');
-  pruefe(!/aufPrioSortUm|aufKategorienUm|↕/.test(S.document.getElementById('fuss').innerHTML), 'unten nur noch Neu und Details…');
-  pruefe(/class="an" onclick="aufAnsicht\('gruppiert'\)">Gruppiert/.test(h) && /onclick="aufNaechsteUm\(\)">1\. Nächste/.test(h), 'oben der Schalter und „1. Nächste“');
-
-  S.aufAnsicht('prio');
+  const zeilen = (x) => (x.match(/<span class="tt">([^<]+)/g) || []).map(y => y.replace(/.*>/, '').trim());
+  pruefe(!/class="gruppe/.test(h) && !/aufAnsicht|aufNaechsteUm|1\. Nächste|Gruppiert/.test(h) && (h.match(/class="aufg palm/g) || []).length === 6,
+    'flach: keine Gruppen, keine Ansichtsknöpfe — sechs Zeilen');
+  pruefe(!/Statik anfragen/.test(h) && !/Ladekabel/.test(h) && !/Hotel/.test(h) && !/unsichtbar/.test(h) && !/>nie</.test(h),
+    'Pläne (Projekt, Checkliste) ohne Datum nicht; Ruhendes und Vorlagen nicht');
+  pruefe(zeilen(h).join(' | ') === 'Steckdose | Nachbar informieren | Fähre buchen | Dach prüfen | Koffer packen | Lampe tauschen',
+    'Priorität, dann Datum — ' + zeilen(h).join(' | '));
+  const k = (d) => S.clKurzDatum(d).replace(/\./g, '\\.');
+  pruefe(new RegExp('Nachbar informieren</span></button><span class="dt">' + k(heute) + '</span>').test(h) && /Lampe tauschen<\/span><\/button><span class="dt">–<\/span>/.test(h),
+    'Datum „TT.MM.“ rechts, ohne Datum „–“ — keine Uhrzeit, keine Pillen');
+  pruefe(!/class="kt"/.test(h) && !/class="kz"/.test(h) && !/class="herkunft"/.test(h), 'Voreinstellung: ohne Kategorie, ohne Kürzel, ohne Herkunft');
+  /* ⚑ Frist zählt als Datum, Überfälliges mit „!“ */
+  S.ckZusatzSetzen(S.kpSeiteFinden('pc'), 'P2 Statik anfragen', gestern, '');
+  S.zeichne(); h = inhalt();
+  pruefe(new RegExp('Statik anfragen</span></button><span class="dt ue">' + k(gestern) + '!</span>').test(h), '⚑ Frist holt einen Plan-Punkt nach Alle; überfällig mit „!“');
+  /* Sortierung */
+  S.cl.auf.anz.sort = 'datum-prio'; S.zeichne();
+  pruefe(zeilen(inhalt()).join(' | ') === 'Statik anfragen | Nachbar informieren | Fähre buchen | Dach prüfen | Koffer packen | Steckdose | Lampe tauschen',
+    '„Datum, Priorität“ — ' + zeilen(inhalt()).join(' | '));
+  S.cl.auf.anz.sort = 'kat-prio'; S.zeichne();
+  pruefe(zeilen(inhalt())[0] === 'Steckdose' && zeilen(inhalt()).indexOf('Statik anfragen') > zeilen(inhalt()).indexOf('Lampe tauschen'), '„Kategorie, Priorität“: Haus vor ohne Kategorie');
+  S.cl.auf.anz.sort = 'prio-datum';
+  /* nur Fälliges */
+  S.cl.auf.anz.faellig = true; S.zeichne();
+  pruefe(zeilen(inhalt()).join(' | ') === 'Steckdose | Statik anfragen | Nachbar informieren | Fähre buchen | Lampe tauschen', '„nur Fälliges“: Späteres erst an seinem Tag, ohne Datum immer — ' + zeilen(inhalt()).join(' | '));
+  S.cl.auf.anz.faellig = false;
+  /* Kategorie, Kürzel, ausführlich */
+  S.cl.auf.anz.kat = true; S.cl.auf.anz.kuerzel = true; S.zeichne(); h = inhalt();
+  pruefe(/Steckdose<\/span><\/button><span class="dt">–<\/span><span class="kt">Haus &amp; Projekte<\/span>/.test(h) && /Nachbar informieren<\/span><\/button><span class="kz">Car<\/span>/.test(h) && !/Steckdose<\/span><\/button><span class="kz">/.test(h),
+    'auf Wunsch: Kategorie rechts, Projekt-Kürzel nur bei Projekt-/Checklisten-Punkten');
+  S.cl.auf.anz.kat = false; S.cl.auf.anz.kuerzel = false;
+  S.cl.auf.anz.form = 'ausfuehrlich'; S.zeichne(); h = inhalt();
+  pruefe(/class="aufg palm ausf"/.test(h) && /class="tx lang"/.test(h) && !/class="herkunft"/.test(h), 'ausführlich: ganzer Titel bis zwei Zeilen — sonst nichts dazu');
+  S.cl.auf.anz.form = 'kompakt';
+  /* Antippen zeigt den ganzen Text und woher */
+  S.aufTippen('pc', 1);
+  pruefe(/class="aufg palm gewaehlt"/.test(inhalt()) && /<small class="herkunft">◎ Carport<\/small>/.test(inhalt()), 'kompakt, angetippt: ganzer Text und woher');
+  S.cl.auf.wahl = '';
+  /* Menü ≡ → Anzeigen… */
+  S.menueUm();
+  pruefe(/menueWahl\('anzeigen'\)">Anzeigen…/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: „Anzeigen…“');
+  S.menueWahl('anzeigen');
+  let a = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'anzeigen' && /aufAnzForm\('ausfuehrlich'\)/.test(a) && (a.match(/<option /g) || []).length === 4 && /id="aufAnzFaellig"/.test(a) && /id="aufAnzKuerzel"/.test(a),
+    'Anzeigen: kompakt | ausführlich, vier Sortierungen, die Schalter wie am Palm');
+  S.document.getElementById('aufAnzSort').value = 'datum-prio';
+  ['aufAnzFaellig', 'aufAnzErl', 'aufAnzKat', 'aufAnzKuerzel'].forEach(id => { S.document.getElementById(id).checked = false; });
+  S.document.getElementById('aufAnzDatum').checked = true; S.document.getElementById('aufAnzPrio').checked = true;
+  S.document.getElementById('aufAnzFaellig').checked = true;
+  S.aufAnzForm('ausfuehrlich');
+  S.aufAnzeigenOk();
+  const gemerkt = JSON.parse(S.__ablage['clie-todo-anzeige']);
+  pruefe(S.cl.aufklapp === '' && S.cl.auf.anz.form === 'ausfuehrlich' && S.cl.auf.anz.sort === 'datum-prio' && S.cl.auf.anz.faellig && gemerkt.form === 'ausfuehrlich' && gemerkt.faellig === true,
+    'OK übernimmt und merkt die Einstellungen');
+  S.cl.auf.anz = S.aufAnzKopie({ sort: 'quatsch', form: 'riesig', kat: 'ja' });
+  pruefe(S.cl.auf.anz.sort === 'prio-datum' && S.cl.auf.anz.form === 'kompakt' && S.cl.auf.anz.kat === false, 'unbekannte Werte fallen auf die Voreinstellung zurück');
+  S.__ablage['clie-todo-anzeige'] = JSON.stringify({ form: 'ausfuehrlich', erl: true });
+  S.aufAnzeigeLaden();
+  pruefe(S.cl.auf.anz.form === 'ausfuehrlich' && S.cl.auf.erlZeigen === true, 'beim Start gelesen');
+  S.cl.auf.anz = S.aufAnzKopie(S.AUF_ANZ_STD); S.cl.auf.erlZeigen = false; delete S.__ablage['clie-todo-anzeige'];
+  /* In einer Liste: dieselben Zeilen, ohne Kategorie */
+  S.cl.auf.anz.kat = true;
+  S.todoListe('lh');
   h = inhalt();
-  pruefe(zeilen(h).join(' | ') === 'Nachbar informieren | Fähre buchen | Steckdose | Statik anfragen | Koffer packen | Dach prüfen | Lampe tauschen',
-    'Prio (seit 0.49): heute Fälliges zuerst, dann P1, P2, dann 3 — bei gleicher Prio früher Geplantes zuerst — ' + zeilen(h).join(' | '));
-  pruefe(/Steckdose<small class="herkunft">≡ Haus<\/small>/.test(h) && /Fähre buchen<small class="herkunft">☑ Urlaub Borkum<\/small>/.test(h) && !/class="gruppe/.test(h), 'Prio: flach, Herkunft unter jeder Aufgabe');
-  pruefe(S.__ablage['clie-aufgaben-ansicht'] === 'prio', 'die Wahl wird gemerkt');
-
-  S.aufAnsicht('geplant');
-  h = inhalt();
-  const zw = (h.match(/<div class="zw">([^<]+)<\/div>/g) || []).map(y => y.replace(/<[^>]+>/g, ''));
-  pruefe(zw.join(' | ') === 'Heute | ' + S.clWt(morgen) + ' ' + S.clKurzDatum(morgen) + ' | Ohne Datum', 'Geplant: Zwischenzeilen Heute, morgen, Ohne Datum — ' + zw.join(' | '));
-  pruefe(zeilen(h).join(' | ') === 'Nachbar informieren | Fähre buchen | Koffer packen | Dach prüfen | Steckdose | Statik anfragen | Lampe tauschen',
-    'Geplant: Uhrzeit vor ohne, ohne Datum nach Prio — ' + zeilen(h).join(' | '));
-  pruefe(/Koffer packen<small class="herkunft">☑ Urlaub Borkum<\/small><\/button><span class="plan-marke">18:00<\/span>/.test(h), 'Geplant: Marke nur noch Uhrzeit');
-
-  /* 1. Nächste */
-  S.aufAnsicht('gruppiert');
-  S.aufNaechsteUm();
-  h = inhalt();
-  /* Seit 0.29.1: in jeder Gruppe die am frühesten fällige, ohne Daten die oberste */
-  pruefe(zeilen(h).join(' | ') === 'Nachbar informieren | Dach prüfen | Fähre buchen', 'Nächste: je Gruppe die nächste fällige — ' + zeilen(h).join(' | '));
-  pruefe(/Nachbar informieren<small[^]*?<button type="button" class="mehr" onclick="aufGanzUm\('pc'\)"[^>]*>\+1</.test(h) || /Nachbar informieren<\/button>[^]*?aufGanzUm\('pc'\)"[^>]*>\+1</.test(h) && /aufGanzUm\('lh'\)"[^>]*>\+2</.test(h), '„+n“ zeigt, wie viele warten');
-  pruefe(S.__ablage['clie-aufgaben-naechste'] === 'an', '„1. Nächste“ wird gemerkt');
-  S.aufGanzUm('lh');
-  pruefe(zeilen(inhalt()).filter(t => /Lampe|Steckdose|Dach/.test(t)).length === 3 && !/aufGanzUm\('lh'\)"[^>]*>\+/.test(inhalt()), 'Tipp: die Gruppe ganz zeigen');
-  S.aufGanzUm('lh');
-  S.aufHaken('lh', 0);
-  h = inhalt();
-  pruefe(/class="aufg erl[^"]*"[\s\S]*?Lampe tauschen/.test(h) && /Dach prüfen/.test(h) && !/Steckdose/.test(h), 'abgehakt: bleibt durchgestrichen, die nächste fällige bleibt vorn');
-  S.aufAnsicht('prio');
-  h = inhalt();
-  pruefe(/Nachbar informieren/.test(h) && /Dach prüfen/.test(h) && /Fähre buchen/.test(h) && !/Statik|Koffer|Steckdose/.test(h), 'Nächste wirkt auch bei Prio');
-  S.aufNaechsteUm();
-
-  /* Eine Liste gewählt: keine Gruppen, keine Herkunft */
-  S.aufListeSetzen('lh');
-  h = inhalt();
-  pruefe(!/class="gruppe/.test(h) && !/class="herkunft"/.test(h) && /Steckdose/.test(h), 'einzelne Liste: ohne Überschrift und Herkunft');
-  S.aufListeSetzen('');
+  pruefe(/class="aufg palm/.test(h) && !/class="kt"/.test(h) && /aufEinplanenGewaehlt\(\)">Einplanen…/.test(S.document.getElementById('fuss').innerHTML), 'Liste: dieselben Zeilen (ohne Kategorie), unten „Einplanen…“');
+  S.cl.auf.anz.kat = false;
+  S.aufTippen('lh', 0); S.aufEinplanenGewaehlt();
+  pruefe(S.cl.aufklapp === 'einplanen' && /Lampe tauschen/.test(S.document.getElementById('aufklapp').innerHTML), 'gewählter Punkt → „Einplanen…“');
+  S.aufklappZu();
   /* Details zu einem Checklisten-Punkt: in die Checkliste */
   S.aufDetails('cb', 0);
   pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'cb' && S.cl.aufklapp === '', 'Details zu einem Checklisten-Punkt öffnen die Checkliste');
-  S.cl.auf.ansicht = 'gruppiert'; S.cl.auf.frisch = {};
+  S.cl.auf.frisch = {}; S.cl.auf.wahl = '';
   S.oeffne('uebersicht');
 }
 
@@ -6363,7 +6462,9 @@ function coachQuellenTest() {
   S.coAntwort('rr:rj', 'pause', 2, '20:41');
   pruefe(rj.pausiert === true, '„Pausieren“: Routine pausiert');
   /* Ideenwerkstatt: Stillstand */
-  S.DB.ideen = [{ id: 'iw-x', titel: 'Fotobuch', stufe: 6, status: 'aktiv', zuletzt: S.tagePlus(heute, -12), schritte: [{ id: 's1', text: 'Bilder sichten', erledigt: false }], varianten: [], meilensteine: [], wochen: [] }];
+  S.DB.ideen = [{ id: 'iw-x', titel: 'Fotobuch', stufe: 6, status: 'aktiv', zuletzt: S.tagePlus(heute, -12), schritte: [{ id: 's1', text: 'Bilder sichten', erledigt: false }], varianten: [], meilensteine: [],
+    /* Wochen-Check dieser Woche schon da — sonst geht er sonntags vor (Test war vom Wochentag abhängig, 0.70) */
+    wochen: [{ kw: S.krWochenId(), status: 'kurs', datum: heute }] }];
   const is = S.coFaellige('20:45', heute).filter(f => f.id === 'is:iw-x')[0];
   pruefe(is && /Seit 12 Tagen nichts an „Fotobuch“/.test(is.text) && !S.coFaellige('12:00', heute).some(f => f.id === 'is:iw-x'), 'Idee steht still: abends nachgefragt');
   S.coAntwort('is:iw-x', 'pause', 1, '20:45');
@@ -7058,30 +7159,6 @@ function kurs2Test() {
   S.clZurueck(); S.clZurueck(); pruefe(S.cl.app === 'coach', 'dann zum Coach (seit 0.33)');
   S.oeffne('kurs'); S.krAnsicht('prinzipien'); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz', 'Prinzipien → zurück zur Bilanz');
   S.oeffne('uebersicht');
-}
-
-/* ============================================================
-   63. Aufgaben „1. Nächste“: die nächste fällige (0.29.1)
-   Grund: Hat eine Liste Aufgaben mit Datum, soll „1. Nächste“ die am
-   frühesten fällige zeigen — sonst die oberste. Bisher galt das nur für
-   Checklisten, Listen zeigten immer die oberste.
-   Erkennt: oberste statt fälliger, Uhrzeit am selben Tag ignoriert,
-   ohne Datum nicht die oberste, Erledigte gezählt.
-   ============================================================ */
-function naechsteFaelligTest() {
-  console.log('\n63. Aufgaben „1. Nächste“: die nächste fällige (0.29.1)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const x = (seite, nr, datum, zeit, erl) => ({ seite: { id: seite }, nr: nr, datum: datum || '', zeit: zeit || '', a: { erledigt: !!erl, text: 'A' + nr }, key: seite + nr });
-  S.cl.auf.ganz = {};
-  const l = [x('L1', 1), x('L1', 2, '2026-11-05'), x('L1', 3, '2026-10-30', '18:00'), x('L1', 4, '2026-10-30', '09:00'), x('L1', 5, '2026-10-01', '', true),
-             x('L2', 1), x('L2', 2), x('L2', 3)];
-  const n = S.aufNaechste(l);
-  const z = id => n.zeilen.filter(y => y.seite.id === id && !y.a.erledigt).map(y => y.nr);
-  pruefe(JSON.stringify(z('L1')) === '[4]', 'Liste mit Daten: die am frühesten fällige (30.10. 09:00 vor 18:00 und vor der obersten ohne Datum)');
-  pruefe(JSON.stringify(z('L2')) === '[1]', 'Liste ohne Daten: die oberste');
-  pruefe(n.rest.L1 === 3 && n.rest.L2 === 2, '„+n“ zählt die übrigen offenen (Erledigte nicht)');
 }
 
 /* ============================================================
@@ -7792,6 +7869,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { planEinplanenTest(); } catch (e) { fail('Plan/Einplanen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { minenPuzzleTest(); } catch (e) { fail('Minen/Puzzle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leitfadenTest(); } catch (e) { fail('Leitfaden warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { privatTermineTest(); } catch (e) { fail('Private Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -7853,7 +7931,6 @@ function lernkarteiTest() {
   try { eingabeTest(); } catch (e) { fail('Getipptes/Liste löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ideenTest(); } catch (e) { fail('Ideenwerkstatt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kurs2Test(); } catch (e) { fail('Kurs 2.0 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { naechsteFaelligTest(); } catch (e) { fail('1. Nächste warf: ' + e.message); }
   try { vlMarkenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await vlDoppeltTest(); } catch (e) { fail('Vorlesen doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kursTest(); } catch (e) { fail('Kurs warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
