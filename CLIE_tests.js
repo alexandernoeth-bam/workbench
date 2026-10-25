@@ -2205,6 +2205,51 @@ function kategorienTest() {
 }
 
 /* ============================================================
+   127. Ablauf-Kürzel wie beim Projekt (0.71.1)
+   Grund: Abläufe liefern Punkte nach „Alle“ wie Projekte — dort braucht
+   es dasselbe Kürzel, und es muss sich in „Details…“ setzen lassen.
+   Erkennt: Kürzel-Feld fehlt beim Ablauf oder steht bei der Checkliste,
+   Kürzel nicht gespeichert, länger als vier Zeichen, leeres Feld lässt
+   das alte stehen, Kürzel geht beim Umschalten im Fenster verloren,
+   Kürzel fehlt in „Alle“.
+   ============================================================ */
+function ablaufKuerzelTest() {
+  console.log('\n127. Ablauf-Kürzel wie beim Projekt (0.71.1)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.cl.auf.frisch = {}; S.cl.auf.wahl = ''; S.cl.auf.liste = '';
+  S.DB.gedanken.push({ id: 'a1', titel: 'Abruftest Oktober', text: '[] Daten laden', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', gestartet: heute, ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'k1', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 2, geaendert: 1 });
+  const a = () => S.DB.gedanken.filter(g => g.id === 'a1')[0];
+  S.oeffne('memo'); S.memoEintragOeffnen('k1'); S.clsDetails();
+  pruefe(!/id="clsKuerzel"/.test(S.clsFensterHtml()), 'Checkliste: kein Kürzel-Feld');
+  S.aufklappZu();
+  S.memoEintragOeffnen('a1'); S.clsDetails();
+  const f = S.clsFensterHtml();
+  pruefe(/<label for="clsKuerzel">Kürzel \(für „Alle“\):<\/label><input id="clsKuerzel"[^>]*maxlength="4"[^>]*placeholder="Abr"/.test(f), 'Ablauf: Kürzel-Feld mit Vorschlag „Abr“ wie beim Projekt');
+  pruefe(/<div class="titel">Ablauf<\/div>/.test(f), 'Fenstertitel „Ablauf“, nicht „Checkliste“');
+  S.document.getElementById('clsTitel').value = 'Abruftest Oktober';
+  S.document.getElementById('clsKuerzel').value = 'DFÜ-Test';
+  S.clsDetailWahl('zustand', 'lauf');
+  pruefe(S.cl.cls.fenster.kuerzel === 'DFÜ-Test', 'Getipptes bleibt beim Umschalten im Fenster erhalten');
+  S.clsSpeichern();
+  pruefe(a().kuerzel === 'DFÜ-' && S.aufKuerzel(S.kpSeiteFinden('a1')) === 'DFÜ-', 'gespeichert, höchstens vier Zeichen');
+  S.aufPlanAnwenden(S.kpSeiteFinden('a1'), 0, heute, '');
+  S.cl.auf.anz.kuerzel = true;
+  S.oeffne('aufgaben');
+  pruefe(/Daten laden<\/span><\/button><span class="kz">DFÜ-<\/span>/.test(inhalt()), '„Alle“ zeigt das Ablauf-Kürzel');
+  S.cl.auf.anz.kuerzel = false;
+  S.oeffne('memo'); S.memoEintragOeffnen('a1'); S.clsDetails();
+  S.document.getElementById('clsTitel').value = 'Abruftest Oktober';
+  S.document.getElementById('clsKuerzel').value = '';
+  S.clsSpeichern();
+  pruefe(!('kuerzel' in a()) && S.aufKuerzel(S.kpSeiteFinden('a1')) === 'Abr', 'leer: eigenes Kürzel weg, wieder der Vorschlag');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    126. Memo Pad: Notizen, Projekte, Abläufe, Checklisten, Ziele (0.71)
    Grund: Wie am Palm gehört alles Geschriebene in eine App „Memo Pad“ —
    das ▼ wählt die Art. Jede Art hat Vorlagen. Ablauf = kurzlebiger Plan,
@@ -7986,6 +8031,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { ablaufKuerzelTest(); } catch (e) { fail('Ablauf-Kürzel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoPadTest(); } catch (e) { fail('Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { planEinplanenTest(); } catch (e) { fail('Plan/Einplanen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { minenPuzzleTest(); } catch (e) { fail('Minen/Puzzle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

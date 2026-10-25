@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.71.0</title>
+<title>CLIE 0.71.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1053,7 +1053,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.71.0';
+var APP_VERSION = '0.71.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6586,7 +6586,7 @@ function aufAnzeigenHtml() {
     + haken('aufAnzDatum', f.datum, 'Datum zeigen')
     + haken('aufAnzPrio', f.prio, 'Priorität zeigen')
     + haken('aufAnzKat', f.kat, 'Kategorie zeigen')
-    + haken('aufAnzKuerzel', f.kuerzel, 'Projekt-Kürzel zeigen')
+    + haken('aufAnzKuerzel', f.kuerzel, 'Projekt-/Ablauf-Kürzel zeigen')
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufAnzeigenOk()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
 }
@@ -10509,7 +10509,7 @@ function clsDetails() {
   if (!s) { return; }
   var g = s.__satz;
   cl.cls.fenster = { modus: 'details', titel: s.titel, kontext: g.kontext || 'privat', bereich: g.bereich || '', art: ckArt(s),
-                     zustand: ckZustand(s), stern: !!g.stern, privat: !!g.privat };
+                     zustand: ckZustand(s), stern: !!g.stern, privat: !!g.privat, kuerzel: String(g.kuerzel || '') };
   cl.aufklapp = 'checkliste';
   aufklappNeu();
 }
@@ -10538,6 +10538,8 @@ function clsFensterLesen() {
   var st = document.getElementById('clsStichtag');
   if (f && f.modus === 'start' && st && typeof st.value === 'string') { f.stichtag = st.value; }
   if (f && f.modus === 'details') { katPrivatLesen('cls', f); }
+  var kz = document.getElementById('clsKuerzel');
+  if (f && f.modus === 'details' && kz && typeof kz.value === 'string') { f.kuerzel = kz.value; }
   return f;
 }
 
@@ -10640,13 +10642,18 @@ function clsFensterHtml() {
       return '<button type="button"' + (an === k[0] ? ' class="an"' : '') + ' onclick="clsDetailWahl(\'' + was + '\',\'' + k[0] + '\')">' + k[1] + '</button>';
     }).join('') + '</div>';
   };
-  var h = kopf(vorlage ? 'Vorlage' : (korb ? 'Sammler' : 'Checkliste'));
+  var h = kopf(vorlage ? 'Vorlage' : (korb ? 'Sammler' : (ckIstListe(sd) ? 'Liste' : (f.art === 'aufgaben' ? 'Ablauf' : 'Checkliste'))));
   if (!korb) {
     h += '<label for="clsTitel">Name:</label>' + clsNameFeldHtml(f.titel)
       /* Kategorie (seit 0.66; vorher Lebensbereich) und privat */
       + katPrivatHtml('cls', f.bereich, f.privat);
     /* Seit 0.71: Ablauf (Punkte mit Datum in To Do) oder Checkliste (nur hier abhaken) */
     if (!ckIstListe(sd)) { h += '<label>Art:</label>' + wahl('art', [['aufgaben', '⇢ Ablauf'], ['abhaken', '☑ Checkliste']], f.art); }
+    /* Seit 0.71.1: Ablauf-Kürzel wie beim Projekt (für „Alle“) */
+    if (!ckIstListe(sd) && f.art === 'aufgaben') {
+      h += '<label for="clsKuerzel">Kürzel (für „Alle“):</label><input id="clsKuerzel" class="eingabe" type="text" maxlength="4" autocomplete="off" value="' + esc(f.kuerzel || '')
+        + '" placeholder="' + esc(aufKuerzel({ art: 'vorhaben', titel: f.titel, __satz: {} })) + '">';
+    }
     if (!vorlage) {
       h += '<label>Zustand:</label>' + wahl('zustand', CK_ZUSTAENDE, f.zustand);
       if (f.zustand === 'lauf') {
@@ -10773,6 +10780,10 @@ function clsSpeichern() {
   g.kontext = (g.bereich === CL_ARBEIT) ? 'beruflich' : 'privat';
   if (f.privat) { g.privat = true; } else { delete g.privat; }
   if (!ckIstListe(s)) { if (f.art === 'aufgaben') { g.art = 'aufgaben'; } else { delete g.art; } }
+  if (!ckIstListe(s) && f.art === 'aufgaben') {
+    var kz = String(f.kuerzel || '').trim().slice(0, 4);
+    if (kz) { g.kuerzel = kz; } else { delete g.kuerzel; }
+  }
   if (ckZustand(s) !== 'vorlage' && f.zustand !== ckZustand(s)) { ckZustandSetzen(s, f.zustand); }
   if (f.stern && ckZustand(s) === 'lauf') { g.stern = true; } else { delete g.stern; }
   g.geaendert = jetzt();
