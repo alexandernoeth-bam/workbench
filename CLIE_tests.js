@@ -151,7 +151,7 @@ if (CL) { ok('CLIE lässt sich außerhalb des Browsers auswerten'); }
 
 function frisch() {
   CL.DB = CL.leereDatenbank();
-  CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false;
+  CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false; CL.cl.memo.aktiv = true;
   CL.termineNachTag = {};
   CL.zugriffToken = null; CL.tokenAblauf = 0;
   CL.kalenderListe = []; CL.kalenderLaeuft = false; CL.kalenderFehler = '';
@@ -1100,6 +1100,7 @@ function memoTest() {
   CL.memoSpeichern();
   const p1 = CL.DB.projekte[0];
   pruefe(p1.name === 'Büro neu' && p1.ende === '2027-03-31' && p1.status === 'ruht', 'Name, Ende und Zustand werden gespeichert');
+  CL.cl.memo.aktiv = false; /* „Show active“ aus: alles zeigen (0.71.2) */
   CL.memoArtSetzen('alles');
   pruefe(CL.cl.memo.id === '' && /Büro neu <small class="leise">· ruht/.test(inhalt()), 'eine ruhende Seite verlässt die Seite — in der Liste mit „ruht“');
   CL.memoArtSetzen('notizen');
@@ -1168,6 +1169,7 @@ function checklistenTest() {
   pruefe(/Alles erledigt/.test(inhalt()) && /clsAbschliessen/.test(inhalt()), 'alles erledigt: „Abschließen“ wird angeboten');
   CL.clsAbschliessen();
   pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv');
+  CL.cl.memo.aktiv = false;
   CL.memoArtSetzen('checklisten');
   pruefe(CL.cl.app === 'memo' && /Abgeschlossene…<\/span><small>1/.test(inhalt()), 'danach Memo Pad; „Abgeschlossene…“ zählt sie (0.71)');
 
@@ -2201,6 +2203,52 @@ function kategorienTest() {
   pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
   S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
   pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
+   128. Memo Pad: „Show active“ im ▼ (0.71.2)
+   Grund: Im Memo Pad sollen auf Wunsch nur laufende Einträge stehen —
+   ein Haken „Show active“ im ▼, voreingestellt an, gemerkt.
+   Erkennt: Haken fehlt oder steht falsch, Ruhendes/Abgeschlossenes trotz
+   Haken sichtbar, Notizen verschwinden (sie ruhen nie), Zahlen im ▼
+   zählen Ausgeblendetes, Einstellung nicht gemerkt, ohne Haken fehlt
+   Ruhendes oder „Abgeschlossene…“.
+   ============================================================ */
+function memoAktivTest() {
+  console.log('\n128. Memo Pad: „Show active“ im ▼ (0.71.2)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.localStorage.removeItem('clie-memo-aktiv');
+  S.memoArtLaden();
+  pruefe(S.cl.memo.aktiv === true, 'voreingestellt: „Show active“ an');
+  S.DB.gedanken.push({ id: 'n1', titel: 'Zaun Ideen', text: 'x', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '', status: 'laufend', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p2', name: 'Keller', flaeche: '', status: 'ruht', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p3', name: 'Alt', flaeche: '', status: 'abgeschlossen', kontext: 'privat', ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'k1', titel: 'Packliste', text: '[] a', kontext: 'privat', checkliste: 'lauf', ruht: true, gestartet: heute, ordnung: 5, geaendert: 1 });
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  let h = inhalt();
+  pruefe(/Zaun Ideen/.test(h) && /Carport/.test(h) && !/Keller/.test(h) && !/Packliste/.test(h) && !/Abgeschlossene/.test(h), 'an: nur Laufendes und Notizen — kein Ruhendes, kein „Abgeschlossene…“');
+  S.katUm();
+  let dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/onclick="memoAktivUm\(\)">■ Show active</.test(dd) && dd.lastIndexOf('memoAktivUm') > dd.indexOf("memoArtSetzen('vorlagen')"), '▼: „■ Show active“ unten');
+  pruefe(/memoArtSetzen\('projekte'\)"><span>Projekte<\/span><small>1</.test(dd), 'Zahlen im ▼ zählen nur Gezeigtes');
+  S.memoAktivUm();
+  h = inhalt();
+  pruefe(!S.cl.memo.aktiv && S.localStorage.getItem('clie-memo-aktiv') === '0' && S.cl.aufklapp === '', 'abgehakt: gemerkt, ▼ zu');
+  pruefe(/Keller <small class="leise">· ruht/.test(h) && /Packliste/.test(h) && /Abgeschlossene…<\/span><small>1/.test(h), 'aus: Ruhendes mit „ruht“ und „Abgeschlossene…“ wieder da');
+  S.katUm();
+  pruefe(/onclick="memoAktivUm\(\)">▢ Show active</.test(S.document.getElementById('aufklapp').innerHTML), '▼: „▢ Show active“');
+  S.aufklappZu();
+  S.memoArtLaden();
+  pruefe(S.cl.memo.aktiv === false, 'nach Neustart bleibt es aus');
+  S.memoAktivUm();
+  S.DB.projekte = S.DB.projekte.filter(p => p.status !== 'laufend'); S.DB.gedanken = S.DB.gedanken.filter(g => g.id !== 'n1');
+  S.zeichne();
+  pruefe(/Nichts Laufendes/.test(inhalt()), 'nur Ruhendes: Hinweis statt „Noch nichts“');
   S.oeffne('uebersicht');
 }
 
@@ -8031,6 +8079,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { memoAktivTest(); } catch (e) { fail('Show active warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ablaufKuerzelTest(); } catch (e) { fail('Ablauf-Kürzel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoPadTest(); } catch (e) { fail('Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { planEinplanenTest(); } catch (e) { fail('Plan/Einplanen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

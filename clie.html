@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.71.1</title>
+<title>CLIE 0.71.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1053,7 +1053,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.71.1';
+var APP_VERSION = '0.71.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -6251,7 +6251,7 @@ var ZULETZT_KEY = 'clie-zuletzt';
 var ZULETZT_ZAHL = 5;
 
 cl.auf = { liste: '', wahl: '', frisch: {}, erlZeigen: false, anz: aufAnzKopie(AUF_ANZ_STD), anzF: null, ep: null, fenster: null, wahlFuer: '', neueListe: null, privatZahl: 0 };
-cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '', sicht: 'alles', fertige: false, vorlage: '' };
+cl.memo = { id: '', schreiben: false, hervor: '', fenster: null, ausListe: '', ausProjekt: '', ausZiel: '', sicht: 'alles', fertige: false, vorlage: '', aktiv: true };
 
 /* Seiten, deren Aufgaben in „Aufgaben“ stehen: laufende Projekte und
    Ziele, alle Listen. Notizen (und damit Checklisten) nicht. */
@@ -7322,6 +7322,8 @@ function memoNotizen() {
 
 var MEMO_ARTEN = [['alles', 'Alle'], ['notizen', 'Notizen'], ['projekte', 'Projekte'], ['ablaeufe', 'Abläufe'], ['checklisten', 'Checklisten'], ['ziele', 'Ziele']];
 var MEMO_SICHT_KEY = 'clie-memo-sicht';
+/* Seit 0.71.2: „Show active“ im ▼ — nur Laufendes (Ruhendes und Abgeschlossenes aus) */
+var MEMO_AKTIV_KEY = 'clie-memo-aktiv';
 var MEMO_ZEICHEN = { notiz: '✎', projekt: '◎', ablauf: '⇢', checkliste: '☑', ziel: '◇' };
 
 function memoIstVorlage(s) { return !!(s && s.__satz && s.__satz.istVorlage === true); }
@@ -7355,8 +7357,19 @@ function memoVorlagen() {
   return aus;
 }
 
+/* Ruht der Eintrag? Notizen ruhen nie */
+function memoRuht(x) {
+  if (x.art === 'notiz') { return false; }
+  return (x.art === 'projekt' || x.art === 'ziel') ? x.s.zustand === 'ruht' : ckZustand(x.s) === 'ruht';
+}
+
+/* Was die Liste zeigt: mit „Show active“ nur Laufendes */
+function memoGezeigt(x) {
+  return !x.fertig && !(cl.memo.aktiv && memoRuht(x));
+}
+
 function memoZeileHtml(x, nr) {
-  var ruht = (x.art === 'projekt' || x.art === 'ziel') ? x.s.zustand === 'ruht' : (x.art !== 'notiz' && ckZustand(x.s) === 'ruht');
+  var ruht = memoRuht(x);
   return prZeile(x.s, null, '<button type="button" class="memo-zeile' + (x.fertig ? ' fertig' : '') + '" onclick="memoEintragOeffnen(\'' + esc(x.s.id) + '\')">'
     + '<span class="mz nr">' + (nr ? nr + '.' : '') + '</span><span class="tx">' + esc(x.s.titel) + (ruht ? ' <small class="leise">· ruht</small>' : '') + '</span>'
     + '<span class="mz art">' + MEMO_ZEICHEN[x.art] + '</span></button>');
@@ -7375,9 +7388,11 @@ function memoListeHtml() {
     return h + '<p class="leise">Antippen: starten oder bearbeiten.</p>';
   }
   var alle = memoEintraege(sicht);
-  var l = alle.filter(function (x) { return !x.fertig; });
-  var fertig = alle.filter(function (x) { return x.fertig; });
-  if (!l.length && !fertig.length) { return h + '<p class="leise">Noch nichts — „Neu“ tippen.</p>'; }
+  var l = alle.filter(memoGezeigt);
+  var fertig = cl.memo.aktiv ? [] : alle.filter(function (x) { return x.fertig; });
+  if (!l.length && !fertig.length) {
+    return h + '<p class="leise">' + (alle.length ? 'Nichts Laufendes — im ▼ „Show active“ abhaken zeigt alles.' : 'Noch nichts — „Neu“ tippen.') + '</p>';
+  }
   h += l.map(function (x, i) { return memoZeileHtml(x, i + 1); }).join('');
   if (fertig.length) {
     h += '<button type="button" class="gruppe klick" onclick="memoFertigeUm()"><span>Abgeschlossene' + (cl.memo.fertige ? '' : '…') + '</span><small>' + fertig.length + '</small></button>'
@@ -8485,6 +8500,16 @@ function memoArtLaden() {
   try { a = window.localStorage.getItem(HS_ART_KEY) || ''; s = window.localStorage.getItem(MEMO_SICHT_KEY) || ''; } catch (e) { a = ''; }
   cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
   cl.memo.sicht = (s === 'vorlagen' || MEMO_ARTEN.some(function (x) { return x[0] === s; })) ? s : 'alles';
+  var ak = '';
+  try { ak = window.localStorage.getItem(MEMO_AKTIV_KEY) || ''; } catch (e) { ak = ''; }
+  cl.memo.aktiv = ak !== '0';
+}
+
+function memoAktivUm() {
+  cl.memo.aktiv = !cl.memo.aktiv;
+  try { window.localStorage.setItem(MEMO_AKTIV_KEY, cl.memo.aktiv ? '1' : '0'); } catch (e) { /* nur für jetzt */ }
+  cl.aufklapp = '';
+  zeichne();
 }
 
 /* ▼ in Notizen: Notizen | Handschrift | Alle Handschriften */
@@ -8526,14 +8551,15 @@ function memoWahlHtml() {
   var hs = cl.memo.art;
   return '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
     + MEMO_ARTEN.map(function (a) {
-      return knopf(a[0], a[1], memoEintraege(a[0]).filter(function (x) { return !x.fertig; }).length, !hs && cl.memo.sicht === a[0]);
+      return knopf(a[0], a[1], memoEintraege(a[0]).filter(memoGezeigt).length, !hs && cl.memo.sicht === a[0]);
     }).join('')
     + '<div class="trenn"></div>'
     + knopf('handschrift', 'Handschrift', hsOrdner() ? (neu ? neu + ' neu' : '0') : '', hs === 'handschrift')
     + knopf('alle', 'Alle Handschriften', hsOrdner() ? cl.hs.liste.length : '', hs === 'alle')
     + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length, hs === 'notizblock')
     + '<div class="trenn"></div>'
-    + knopf('vorlagen', 'Vorlagen…', memoVorlagen().length, !hs && cl.memo.sicht === 'vorlagen') + '</div>';
+    + knopf('vorlagen', 'Vorlagen…', memoVorlagen().length, !hs && cl.memo.sicht === 'vorlagen')
+    + '<div class="trenn"></div><button type="button" onclick="memoAktivUm()">' + (cl.memo.aktiv ? '■' : '▢') + ' Show active</button></div>';
 }
 
 function memoKopfText() {
