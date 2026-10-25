@@ -2207,6 +2207,41 @@ function kategorienTest() {
 }
 
 /* ============================================================
+   129. Filter „Privat“ = alles außer Arbeit (0.71.3)
+   Grund: Neben einzelnen Kategorien braucht es einen Blick auf alles
+   Private — jede Kategorie außer Arbeit, auch ohne Kategorie.
+   Erkennt: Eintrag fehlt im ▼, Arbeit rutscht durch, Einträge ohne
+   Kategorie fehlen, Filter wird nicht gemerkt oder beim Laden verworfen,
+   Neues bekommt eine falsche Kategorie oder den Kontext „beruflich“,
+   Google-Termine (beruflich/privat) falsch gefiltert.
+   ============================================================ */
+function filterPrivatTest() {
+  console.log('\n129. Filter „Privat“ = alles außer Arbeit (0.71.3)');
+  if (!CL) { return; }
+  frisch();
+  const S = CL;
+  S.DB.themen = [{ id: 'th', name: 'Haus', text: '[] Dachrinne', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 },
+                 { id: 'tb', name: 'Büro', text: '[] Ablage', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 },
+                 { id: 'to', name: 'Ohne', text: '[] Zettel', kontext: 'privat', ordnung: 3, geaendert: 1 }];
+  S.oeffne('aufgaben'); S.katUm();
+  const dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/todoKategorie\('privat'\)"><span>Privat<\/span><small>ohne Arbeit<\/small>/.test(dd) && dd.indexOf("todoKategorie('privat')") > dd.indexOf("todoKategorie('alle')") && dd.indexOf("todoKategorie('privat')") < dd.indexOf("todoKategorie('kb-arbeit')"),
+    '▼: „Privat — ohne Arbeit“ gleich nach „Alle“');
+  S.todoKategorie('privat');
+  const h = inhalt();
+  pruefe(/Dachrinne/.test(h) && /Zettel/.test(h) && !/Ablage/.test(h), 'Privat: andere Kategorien und ohne Kategorie ja, Arbeit nicht');
+  pruefe(/▼ Privat/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-filter') === 'privat', 'oben „▼ Privat“, gemerkt');
+  S.cl.filter = 'alle'; S.clFilterLaden();
+  pruefe(S.clFilter() === 'privat', 'nach Neustart weiter „Privat“');
+  pruefe(S.clNeuBereich() === '' && S.clNeuKontext() === 'privat', 'Neues: ohne Kategorie, Kontext privat');
+  pruefe(S.clPasstKontext('privat') && !S.clPasstKontext('beruflich'), 'Google-Termine: nur private');
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  pruefe(/Nur Kategorie „Privat“/.test(inhalt()), 'Memo Pad zeigt den Hinweis „Nur Kategorie „Privat““');
+  S.katSetzen('alle');
+  S.oeffne('uebersicht');
+}
+
+/* ============================================================
    128. Memo Pad: „Show active“ im ▼ (0.71.2)
    Grund: Im Memo Pad sollen auf Wunsch nur laufende Einträge stehen —
    ein Haken „Show active“ im ▼, voreingestellt an, gemerkt.
@@ -2795,7 +2830,7 @@ function katStattBerufTest() {
   S.localStorage.setItem('clie-filter', 'beruflich'); S.clFilterLaden();
   pruefe(S.cl.filter === 'kb-arbeit', 'gemerkt „Beruf“ → Arbeit');
   S.localStorage.setItem('clie-filter', 'privat'); S.clFilterLaden();
-  pruefe(S.cl.filter === 'alle', 'gemerkt „Privat“ → Alle');
+  pruefe(S.cl.filter === 'privat', 'gemerkt „Privat“ → seit 0.71.3 der Filter „Privat“ (alles außer Arbeit)');
   S.localStorage.setItem('clie-filter', 'alle');
   /* Umstellung */
   S.DB.themen.push({ id: 'b1', name: 'Büro', text: '[] Ablage', kontext: 'beruflich', geaendert: 1 });
@@ -2855,8 +2890,8 @@ function katUebersichtTest() {
   S.oeffne('uebersicht');
   S.katUm();
   const h = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('alle'\)/.test(h) && /katSetzen\('kb-arbeit'\)/.test(h) && new RegExp("katSetzen\\('" + k.id + "'\\)").test(h) && !/Beruf|Privat/.test(h),
-    '▼ auf der Übersicht: Alle und die Kategorien — kein Beruf/Privat');
+  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('alle'\)/.test(h) && /katSetzen\('kb-arbeit'\)/.test(h) && new RegExp("katSetzen\\('" + k.id + "'\\)").test(h) && !/Beruf/.test(h) && /katSetzen\('privat'\)"><span>Privat<\/span><small>ohne Arbeit/.test(h),
+    '▼ auf der Übersicht: Alle, Privat (ohne Arbeit) und die Kategorien — kein Beruf');
   S.katSetzen(k.id);
   pruefe(S.cl.filter === k.id && S.cl.app === 'uebersicht' && /▼ PV-Anlage/.test(S.document.getElementById('katKnopf').textContent), 'Tipp: filtert, bleibt auf der Übersicht');
   S.katSetzen('alle');
@@ -8079,6 +8114,7 @@ function lernkarteiTest() {
   try { schachTest(); } catch (e) { fail('Schach warf: ' + e.message); }
   try { schachPartienTest(); } catch (e) { fail('Schach-Partien warf: ' + e.message); }
   try { schuleTest(); } catch (e) { fail('Schachschule warf: ' + e.message); }
+  try { filterPrivatTest(); } catch (e) { fail('Filter Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoAktivTest(); } catch (e) { fail('Show active warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ablaufKuerzelTest(); } catch (e) { fail('Ablauf-Kürzel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoPadTest(); } catch (e) { fail('Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

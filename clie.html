@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.71.2</title>
+<title>CLIE 0.71.3</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1053,7 +1053,7 @@ span.hs-thumb{display:block}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.71.2';
+var APP_VERSION = '0.71.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3454,22 +3454,29 @@ function bestandStempeln(db) {
    CLIE leitet es aus der Kategorie ab: Arbeit → beruflich, sonst privat. */
 
 var CL_ARBEIT = 'kb-arbeit';
+/* Seit 0.71.3: Filter „Privat“ = alles außer Arbeit (keine echte Kategorie) */
+var CL_PRIVAT = 'privat';
+
+/* Gilt dieser Filterwert? „alle“, „privat“ oder eine bestehende Kategorie */
+function clFilterGueltig(f) {
+  return f === 'alle' || f === CL_PRIVAT || !!ckBereichName(f);
+}
 
 function clFilterLaden() {
   var f = null;
   try { f = window.localStorage.getItem(CL_FILTER_KEY); } catch (e) { f = null; }
   /* Gemerktes aus der Zeit vor 0.67 */
   if (f === 'beruflich') { f = CL_ARBEIT; }
-  cl.filter = (f && /^kb-/.test(f)) ? f : 'alle';
+  cl.filter = (f && (/^kb-/.test(f) || f === CL_PRIVAT)) ? f : 'alle';
 }
 
 /* Der Filter, wie er gerade gilt — eine gelöschte Kategorie gilt als „alle“ */
 function clFilter() {
-  return (cl.filter && cl.filter !== 'alle' && ckBereichName(cl.filter)) ? cl.filter : 'alle';
+  return (cl.filter && cl.filter !== 'alle' && clFilterGueltig(cl.filter)) ? cl.filter : 'alle';
 }
 
 function katSetzen(f) {
-  if (f !== 'alle' && !ckBereichName(f)) { return; }
+  if (!clFilterGueltig(f)) { return; }
   cl.filter = f;
   try { window.localStorage.setItem(CL_FILTER_KEY, f); } catch (e) { /* ohne Speicher eben nur für jetzt */ }
   cl.aufklapp = '';
@@ -3477,6 +3484,7 @@ function katSetzen(f) {
 }
 
 function katName(f) {
+  if (f === CL_PRIVAT) { return 'Privat'; }
   return (f && f !== 'alle' && ckBereichName(f)) ? ckBereichName(f) : 'Alle';
 }
 
@@ -3499,6 +3507,7 @@ function clPasst(o) {
   if (!o) { return false; }
   var f = clFilter();
   if (f === 'alle' || ckIstKorb(o)) { return true; }
+  if (f === CL_PRIVAT) { return clKategorieVon(o) !== CL_ARBEIT; }
   return clKategorieVon(o) === f;
 }
 
@@ -3515,7 +3524,7 @@ function clPasstKontext(k) {
 }
 
 /* Neues bekommt die Kategorie des ▼ — und den passenden Kontext */
-function clNeuBereich() { var f = clFilter(); return f === 'alle' ? '' : f; }
+function clNeuBereich() { var f = clFilter(); return (f === 'alle' || f === CL_PRIVAT) ? '' : f; }
 function clNeuKontext() { return clFilter() === CL_ARBEIT ? 'beruflich' : 'privat'; }
 
 /* Einmal und nach jedem Laden: Berufliches ohne Kategorie → Arbeit */
@@ -3537,8 +3546,9 @@ function clKategorienUmstellen() {
 /* Die Kategorien für jedes ▼ — „Alle“ und die Liste */
 function katFilterHtml(aufruf, an) {
   var f = (an === undefined) ? clFilter() : an;
-  return [{ id: 'alle', name: 'Alle' }].concat(kgAlle()).map(function (b) {
-    return '<button type="button"' + (f === b.id ? ' class="an"' : '') + ' onclick="' + aufruf + '(\'' + esc(b.id) + '\')"><span>' + esc(b.name) + '</span></button>';
+  return [{ id: 'alle', name: 'Alle' }, { id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' }].concat(kgAlle()).map(function (b) {
+    return '<button type="button"' + (f === b.id ? ' class="an"' : '') + ' onclick="' + aufruf + '(\'' + esc(b.id) + '\')"><span>' + esc(b.name) + '</span>'
+      + (b.klein ? '<small>' + b.klein + '</small>' : '') + '</button>';
   }).join('');
 }
 
@@ -7067,7 +7077,7 @@ function aufLoeschen() {
    Weitere…; dazu „Liste bearbeiten…“ und „Erledigte zeigen“. */
 /* Seit 0.67 filtert das ▼ selbst nach Kategorie */
 function aufFilter(f) {
-  if (f !== 'alle' && !ckBereichName(f)) { return; }
+  if (!clFilterGueltig(f)) { return; }
   cl.filter = f;
   try { window.localStorage.setItem(CL_FILTER_KEY, f); } catch (e) { /* nur für jetzt */ }
   zeichne();
@@ -7075,7 +7085,7 @@ function aufFilter(f) {
 
 /* To Do: eine Kategorie wählen heißt „Alle“ dieser Kategorie zeigen */
 function todoKategorie(f) {
-  if (f !== 'alle' && !ckBereichName(f)) { return; }
+  if (!clFilterGueltig(f)) { return; }
   cl.filter = f;
   try { window.localStorage.setItem(CL_FILTER_KEY, f); } catch (e) { /* nur für jetzt */ }
   cl.aufklapp = '';
