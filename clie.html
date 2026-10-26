@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.83.0</title>
+<title>CLIE 0.83.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1123,7 +1123,7 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.83.0';
+var APP_VERSION = '0.83.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27575,7 +27575,7 @@ var KR_PFADE = [
    ============================================================ */
 
 cl.pm = { tab: 'alle', datum: 'heute', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
-          showF: null, mf: null, umst: null, vorlage: '', privat: 0, marke: '' };
+          showF: null, mf: null, zuAlle: false, umst: null, vorlage: '', privat: 0, marke: '' };
 
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
 var PM_SHOW_KEY = 'clie-pm-show';
@@ -28215,7 +28215,14 @@ function pmLoeschen() {
 function pmZuordnenAuf() {
   var f = pmFensterLesen();
   if (!f || !pmAufgabeFinden(f.id)) { return; }
+  cl.pm.zuAlle = false;
   cl.aufklapp = 'pmzuordnen';
+  aufklappNeu();
+}
+
+/* Seit 0.83.1: alle Memos statt nur derselben Seite (Arbeit / Privat) */
+function pmZuordnenAlle() {
+  cl.pm.zuAlle = true;
   aufklappNeu();
 }
 
@@ -28224,18 +28231,23 @@ function pmZuordnenHtml() {
   var a = f ? pmAufgabeFinden(f.id) : null;
   if (!a) { return ''; }
   var kat = f.bereich || clKategorieVon(a);
-  var alle = kpSeitenAlle().filter(function (s) { return !pmIstVorlage(s) && !ckIstKorb(s) && !prPrivatVerborgen(s, null); });
-  var rang = function (s) { return (clKategorieVon(s) === kat ? 0 : 2) + (pmArchiviert(s) ? 1 : 0); };
+  /* Seit 0.83.1: kein Archiv; vorgefiltert nach Arbeit oder Privat — wie die Aufgabe */
+  var arbeit = clIstArbeit(kat);
+  var alle = kpSeitenAlle().filter(function (s) {
+    if (pmIstVorlage(s) || ckIstKorb(s) || pmArchiviert(s) || prPrivatVerborgen(s, null)) { return false; }
+    return cl.pm.zuAlle || clIstArbeit(clKategorieVon(s)) === arbeit;
+  });
+  var rang = function (s) { return clKategorieVon(s) === kat ? 0 : 1; };
   alle.sort(function (x, y) {
     return (rang(x) - rang(y)) || (PM_KUERZEL.indexOf(pmKuerzel(x)) - PM_KUERZEL.indexOf(pmKuerzel(y))) || String(x.titel).localeCompare(String(y.titel), 'de');
   });
   return '<div class="fenster"><div class="titel">Memo zuordnen</div><div class="rumpf">'
     + '<p class="leise">„' + esc(pmTitel(a)) + '“ kommt als Kästchen-Zeile ans Ende des Memos — der Haken gilt dann in beiden.</p>'
     + (alle.length ? alle.map(function (s) {
-      return '<button type="button" class="wahl" onclick="pmZuordnen(\'' + esc(s.id) + '\')"><b>' + pmKuerzel(s) + '</b> ' + esc(s.titel)
-        + (pmArchiviert(s) ? ' <small class="leise">· Archiv</small>' : '') + '</button>';
-    }).join('') : '<p class="leise">Noch kein Memo.</p>')
-    + '<div class="knoepfe"><button type="button" class="knopf" onclick="pmZuordnenZurueck()">Abbrechen</button></div></div></div>';
+      return '<button type="button" class="wahl" onclick="pmZuordnen(\'' + esc(s.id) + '\')"><b>' + pmKuerzel(s) + '</b> ' + esc(s.titel) + '</button>';
+    }).join('') : '<p class="leise">Kein passendes Memo.</p>')
+    + '<div class="knoepfe">' + (cl.pm.zuAlle ? '' : '<button type="button" class="knopf" onclick="pmZuordnenAlle()">' + (arbeit ? 'Auch Privates…' : 'Auch Arbeit…') + '</button>')
+    + '<button type="button" class="knopf" onclick="pmZuordnenZurueck()">Abbrechen</button></div></div></div>';
 }
 
 function pmZuordnenZurueck() {

@@ -8878,8 +8878,8 @@ function palmZuordnenTest() {
   S.document.getElementById('pmTitel').value = 'Dachrinne reinigen'; S.document.getElementById('pmNotiz').value = 'getippt';
   S.pmZuordnenAuf();
   f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'pmzuordnen' && /pmZuordnen\('g1'\)/.test(f) && /pmZuordnen\('th'\)[^>]*><b>–<\/b> Haus <small class="leise">· Archiv/.test(f) && S.cl.pm.fenster.notiz === 'getippt',
-    'Zuordnen…: alle Memos, auch archivierte Listen — Getipptes bleibt im Fenster');
+  pruefe(S.cl.aufklapp === 'pmzuordnen' && /pmZuordnen\('g1'\)/.test(f) && !/pmZuordnen\('th'\)/.test(f) && S.cl.pm.fenster.notiz === 'getippt',
+    'Zuordnen…: Memos ohne Archiv (seit 0.83.1) — Getipptes bleibt im Fenster');
   S.pmZuordnen('g1');
   const g1 = S.DB.gedanken.filter(x => x.id === 'g1')[0];
   pruefe(g1.text === '## Innen\n[] Tür\n[] Dachrinne reinigen ⟦' + a.id + '⟧' && a.memo.id === 'g1' && a.memo.zeile === a.id && S.cl.aufklapp === 'pmaufgabe' && /Reparaturliste · Zeile/.test(S.document.getElementById('aufklapp').innerHTML),
@@ -8887,6 +8887,7 @@ function palmZuordnenTest() {
   S.pmHaken(a.id);
   pruefe(/\[x\] Dachrinne reinigen ⟦/.test(g1.text), 'der Haken gilt in beiden');
   S.pmDetails(a.id);
+  S.DB.themen.filter(x => x.id === 'th')[0].archiv = false; S.DB.themen.filter(x => x.id === 'th')[0].abgeschlossen = false;
   S.pmZuordnenAuf(); S.pmZuordnen('th');
   const th = S.DB.themen.filter(x => x.id === 'th')[0];
   pruefe(!/⟦/.test(g1.text) && /\[x\] Dachrinne reinigen$/.test(g1.text) && /\[x\] Dachrinne reinigen ⟦/.test(th.text) && a.memo.id === 'th', 'neu zugeordnet: die alte Zeile bleibt (ohne Symbol), die neue trägt die Marke');
@@ -8894,6 +8895,7 @@ function palmZuordnenTest() {
   pruefe(!a.memo && !/⟦/.test(th.text) && /\[x\] Dachrinne reinigen/.test(th.text) && /pmZuordnenAuf/.test(S.document.getElementById('aufklapp').innerHTML), 'Lösen: Zeile und Aufgabe bleiben, nur die Verbindung geht');
   S.aufklappZu();
   /* Fehlerart 0.80: umgestellte Listen kamen nicht mehr aus dem Archiv */
+  th.archiv = true; th.abgeschlossen = true;
   S.oeffne('memo'); S.memoArtSetzen('archiv');
   S.pmMemoTipp('th'); S.pmArchivUm('');
   pruefe(!th.archiv && !th.abgeschlossen, 'Zurückholen: auch eine archivierte Liste kommt zurück ins Memo Pad');
@@ -8980,6 +8982,34 @@ function arbeitMetaTest() {
   S.katSetzen(qs);
   pruefe(/QS-Bericht/.test(inhalt()), 'eine einzelne Arbeit-Kategorie bleibt wählbar');
   S.katSetzen('alle');
+  S.oeffne('uebersicht');
+}
+
+
+function zuordnenFilterTest() {
+  console.log('\n143. Memo zuordnen: ohne Archiv, vorgefiltert nach Arbeit / Privat (0.83.1)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  S.katNeuAnlegen('Arbeit - OnPremis QS');
+  const qs = S.kgAlle().filter(b => b.name === 'Arbeit - OnPremis QS')[0].id;
+  S.DB.gedanken.push({ id: 'w1', titel: 'QS-Protokoll', text: '', kontext: 'beruflich', bereich: qs, ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'w2', titel: 'Jour fixe', text: '', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'w3', titel: 'Altes Release', text: '', kontext: 'beruflich', bereich: 'kb-arbeit', archiv: true, ordnung: 3, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'h1', titel: 'Reparaturliste', text: '', kontext: 'privat', ordnung: 4, geaendert: 1 });
+  const a = S.pmNeueAufgabe({ titel: 'Testbericht', bereich: 'kb-arbeit' });
+  S.oeffne('aufgaben'); S.pmDetails(a.id); S.pmZuordnenAuf();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/pmZuordnen\('w1'\)/.test(f) && /pmZuordnen\('w2'\)/.test(f) && !/pmZuordnen\('w3'\)/.test(f) && !/pmZuordnen\('h1'\)/.test(f) && f.indexOf("'w2'") < f.indexOf("'w1'"),
+    'Aufgabe der Arbeit: nur Memos aller Arbeit-Kategorien (eigene Kategorie zuerst), kein Archiv');
+  S.pmZuordnenAlle();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/pmZuordnen\('h1'\)/.test(f) && !/pmZuordnen\('w3'\)/.test(f) && !/pmZuordnenAlle/.test(f), '„Auch Privates…“: alle Memos — das Archiv weiter nicht');
+  S.aufklappZu();
+  const b = S.pmNeueAufgabe({ titel: 'Dachrinne' });
+  S.pmDetails(b.id); S.pmZuordnenAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/pmZuordnen\('h1'\)/.test(f) && !/pmZuordnen\('w1'\)|pmZuordnen\('w2'\)/.test(f) && /Auch Arbeit…/.test(f), 'private Aufgabe: nur private Memos, dazu „Auch Arbeit…“');
+  S.aufklappZu();
   S.oeffne('uebersicht');
 }
 
@@ -9124,6 +9154,7 @@ function arbeitMetaTest() {
   try { palmZuordnenTest(); } catch (e) { fail('0.81 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmKuerzelFilterTest(); } catch (e) { fail('0.82 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { arbeitMetaTest(); } catch (e) { fail('0.83 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { zuordnenFilterTest(); } catch (e) { fail('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
