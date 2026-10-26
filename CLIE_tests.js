@@ -8753,8 +8753,8 @@ function palmUmstellungTest() {
   const tag = S.kpTagFinden(heute);
   tag.text += '\n[] Freie Zeile\nNotiz bleibt';
   const z = S.pmUmstellenKern(false);
-  pruefe(z.listen === 1 && z.listenPunkte === 2 && z.sammler === 1 && z.memo === 2 && z.frei === 1 && z.archiv === 1 && S.DB.aufgaben.length === 0,
-    'Vorschau zählt nur: 1 Liste (2 Punkte), 1 aus dem Sammler, 2 Memo-Zeilen mit Tag, 1 freie Zeile, 1 Abgeschlossenes — ' + JSON.stringify(z));
+  pruefe(z.sammler === 1 && z.memo === 4 && z.frei === 1 && z.archiv === 1 && S.DB.aufgaben.length === 0,
+    'Vorschau zählt nur: 1 aus dem Sammler, 4 Memo-/Listenzeilen mit Tag, 1 freie Zeile, 1 Abgeschlossenes — ' + JSON.stringify(z));
   S.oeffne('aufgaben');
   S.pmUmstellenFragen();
   pruefe(S.cl.aufklapp === 'pmumstellen' && /Sichern und umstellen/.test(S.document.getElementById('aufklapp').innerHTML) && /Sicherung/.test(S.document.getElementById('aufklapp').innerHTML), 'Umstellen…: Vorschau mit Zahlen, vorher eine Sicherung');
@@ -8762,10 +8762,12 @@ function palmUmstellungTest() {
   const A = t => S.DB.aufgaben.filter(x => x.titel === t)[0];
   const haus = S.kgAlle().filter(b => b.name === 'Haus')[0];
   pruefe(S.pmAn() && S.DB.einstellungen.aktivitaetenUmgestellt === true && S.cl.aufklapp === '', 'umgestellt: gemerkt in den Einstellungen (auch für die Workbench)');
-  pruefe(haus && A('Lampe tauschen').bereich === haus.id && A('Lampe tauschen').planung === heute && A('Silikon erneuern').prio === 2 && A('Silikon erneuern').planung === morgen && A('Silikon erneuern').beschreibung === 'weiß',
-    'Liste „Haus“ → Kategorie Haus; ihre Punkte → Aufgaben (eingeplant/⚑ Frist → Datum, P2 → Priorität 2, Notiz)');
   const th = S.DB.themen.filter(x => x.id === 'th')[0];
-  pruefe(th.archiv === true && th.abgeschlossen === true && !/\[\] /.test(th.text) && /\[x\] Fenster/.test(th.text) && /## Innen/.test(th.text), 'die Liste geht ins Archiv — ohne die übernommenen Punkte');
+  /* Seit 0.81 (Fehler aus 0.80): Listen wurden Kategorien, gingen ins Archiv und verloren ihre Punkte — das war nicht gewollt */
+  pruefe(!haus && !th.archiv && !th.abgeschlossen && /\[\] Lampe tauschen ⟦/.test(th.text) && /\[\] P2 Silikon erneuern ⟦/.test(th.text) && /\[x\] Fenster/.test(th.text) && /## Innen/.test(th.text),
+    'Listen bleiben Memos: keine Kategorie, kein Archiv, alle Punkte bleiben stehen (seit 0.81)');
+  pruefe(A('Lampe tauschen').planung === heute && A('Lampe tauschen').memo.id === 'th' && A('Silikon erneuern').prio === 2 && A('Silikon erneuern').planung === morgen && A('Silikon erneuern').beschreibung === 'weiß',
+    'Listenpunkte mit Tag → verbundene Aufgaben wie in jedem Memo (eingeplant/⚑ Frist → Datum, P2 → Priorität 2, Notiz)');
   pruefe(A('Zahnarzt anrufen').prio === 1 && !A('Zahnarzt anrufen').bereich && S.DB.themen[0].text === '[x] erledigt', 'Sammler → Aufgaben ohne Kategorie');
   const b = A('Build-Lauf kontrollieren');
   const g2 = S.DB.gedanken.filter(x => x.id === 'g2')[0];
@@ -8774,20 +8776,21 @@ function palmUmstellungTest() {
   pruefe(A('Anwendungen aufrufen').planung === morgen && /⟦/.test(g2.text.split('\n')[1]) && !A('Ohne Datum') && !/⟦/.test(g2.text.split('\n')[2]), '⚑ Frist → Datum; Zeilen ohne Tag bleiben einfach Text');
   pruefe(A('Freie Zeile').planung === heute && !/Freie Zeile|Lampe|Build/.test(S.kpTagFinden(heute).text) && /Notiz bleibt/.test(S.kpTagFinden(heute).text) && !S.kpTagFinden(heute).eintraege.length,
     'Tag: freie Zeile → Aufgabe; Eingeplantes ausgeplant; Text bleibt');
-  pruefe(S.pmUmstellenKern(true).memo === 0 && S.pmNachpflegen() === 0 && S.DB.aufgaben.length === 6, 'ein zweiter Lauf ändert nichts');
+  pruefe(S.pmUmstellenKern(true).memo === 0 && S.pmNachpflegen() === 0 && S.DB.aufgaben.length === 6 && !S.DB.themen.filter(x => x.id === 'th')[0].archiv, 'ein zweiter Lauf ändert nichts');
   /* Die Workbench legt noch auf die alte Art an */
   S.DB.themen[0].text += '\n[] Aus der Workbench';
   S.kpPlanenKern(S.kpSeiteFinden('g2'), 1, 'h', S.tagePlus(heute, 2));
   S.DB.themen.push({ id: 'tn', name: 'Büro', kontext: 'beruflich', bereich: 'kb-arbeit', text: '[] Ablage', ordnung: 9, geaendert: 1 });
   const n = S.pmNachpflegen();
-  pruefe(n >= 3 && A('Aus der Workbench') && A('Anwendungen aufrufen').planung === S.tagePlus(heute, 2) && A('Ablage').bereich && S.DB.themen.filter(x => x.id === 'tn')[0].archiv,
-    'Nachpflegen: Sammler-Zeile, neu Eingeplantes (Datum an die Aufgabe) und eine neue Liste — ' + n);
+  const tn = S.DB.themen.filter(x => x.id === 'tn')[0];
+  pruefe(n >= 2 && A('Aus der Workbench') && A('Anwendungen aufrufen').planung === S.tagePlus(heute, 2) && !A('Ablage') && !tn.archiv && tn.text === '[] Ablage',
+    'Nachpflegen: Sammler-Zeile und neu Eingeplantes (Datum an die Aufgabe) — eine neue Liste bleibt, wie sie ist (seit 0.81) — ' + n);
   pruefe(/S\.pmNachpflegen|pmNachpflegen\(\);   \/\* Palm-Modell/.test(SKRIPT) && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);\n    pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
   /* Memo Pad danach */
   S.oeffne('memo'); S.memoArtSetzen('alles');
-  pruefe(!/>Haus</.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: alte Listen und der leere Sammler stehen nicht in der Liste');
+  pruefe(/>Haus</.test(inhalt()) && /Büro/.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: Listen stehen als Memos (–) in der Liste, der leere Sammler nicht');
   S.memoArtSetzen('archiv');
-  pruefe(/>Haus</.test(inhalt()) && /Alt/.test(inhalt()), '… sondern im Archiv (mit dem abgeschlossenen Projekt)');
+  pruefe(!/>Haus</.test(inhalt()) && /Alt/.test(inhalt()), 'im Archiv nur Abgeschlossenes');
   S.memoArtSetzen('alles');
   S.oeffne('uebersicht');
 }
@@ -8857,6 +8860,45 @@ function palmFix0801Test() {
   S.DB.themen.push({ id: 'cl-korb', name: 'Sammler', kontext: '', text: '[] x', korb: true, ordnung: 0, geaendert: 1 });
   pruefe(S.pmKuerzelSetzen(S.kpSeiteFinden('cl-korb'), 'P').id === 'cl-korb' && S.DB.themen.some(x => x.id === 'cl-korb'), 'nur der Sammler bleibt, wie er ist');
   S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+
+function palmZuordnenTest() {
+  console.log('\n140. Aufgabe nachträglich einem Memo zuordnen; Listen zurückholen (0.81)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  S.DB.gedanken.push({ id: 'g1', titel: 'Reparaturliste', text: '## Innen\n[] Tür\n\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.themen.push({ id: 'th', name: 'Haus', kontext: 'privat', text: '## Innen\n[x] Fenster', abgeschlossen: true, archiv: true, ordnung: 2, geaendert: 1 });
+  const a = S.pmNeueAufgabe({ titel: 'Dachrinne reinigen', prio: 2 });
+  S.oeffne('aufgaben');
+  S.pmDetails(a.id);
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Memo:<\/label><div class="pm-zeile"><span>–<\/span><button type="button" class="knopf" onclick="pmZuordnenAuf\(\)">Zuordnen…/.test(f), 'Details: „Memo: – Zuordnen…“');
+  S.document.getElementById('pmTitel').value = 'Dachrinne reinigen'; S.document.getElementById('pmNotiz').value = 'getippt';
+  S.pmZuordnenAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'pmzuordnen' && /pmZuordnen\('g1'\)/.test(f) && /pmZuordnen\('th'\)[^>]*><b>–<\/b> Haus <small class="leise">· Archiv/.test(f) && S.cl.pm.fenster.notiz === 'getippt',
+    'Zuordnen…: alle Memos, auch archivierte Listen — Getipptes bleibt im Fenster');
+  S.pmZuordnen('g1');
+  const g1 = S.DB.gedanken.filter(x => x.id === 'g1')[0];
+  pruefe(g1.text === '## Innen\n[] Tür\n[] Dachrinne reinigen ⟦' + a.id + '⟧' && a.memo.id === 'g1' && a.memo.zeile === a.id && S.cl.aufklapp === 'pmaufgabe' && /Reparaturliste · Zeile/.test(S.document.getElementById('aufklapp').innerHTML),
+    'zugeordnet: als Kästchen-Zeile am Ende des Memos (Leerzeilen davor weg), zurück im Fenster');
+  S.pmHaken(a.id);
+  pruefe(/\[x\] Dachrinne reinigen ⟦/.test(g1.text), 'der Haken gilt in beiden');
+  S.pmDetails(a.id);
+  S.pmZuordnenAuf(); S.pmZuordnen('th');
+  const th = S.DB.themen.filter(x => x.id === 'th')[0];
+  pruefe(!/⟦/.test(g1.text) && /\[x\] Dachrinne reinigen$/.test(g1.text) && /\[x\] Dachrinne reinigen ⟦/.test(th.text) && a.memo.id === 'th', 'neu zugeordnet: die alte Zeile bleibt (ohne Symbol), die neue trägt die Marke');
+  S.pmMemoLoesen();
+  pruefe(!a.memo && !/⟦/.test(th.text) && /\[x\] Dachrinne reinigen/.test(th.text) && /pmZuordnenAuf/.test(S.document.getElementById('aufklapp').innerHTML), 'Lösen: Zeile und Aufgabe bleiben, nur die Verbindung geht');
+  S.aufklappZu();
+  /* Fehlerart 0.80: umgestellte Listen kamen nicht mehr aus dem Archiv */
+  S.oeffne('memo'); S.memoArtSetzen('archiv');
+  S.pmMemoTipp('th'); S.pmArchivUm('');
+  pruefe(!th.archiv && !th.abgeschlossen, 'Zurückholen: auch eine archivierte Liste kommt zurück ins Memo Pad');
+  S.memoArtSetzen('alles');
+  pruefe(/>Haus</.test(inhalt()), '… und steht wieder in der Liste');
   S.oeffne('uebersicht');
 }
 
@@ -8998,6 +9040,7 @@ function palmFix0801Test() {
   try { palmUmstellungTest(); } catch (e) { fail('Palm Umstellung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmAgendaTest(); } catch (e) { fail('Palm Agenda warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmFix0801Test(); } catch (e) { fail('0.80.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmZuordnenTest(); } catch (e) { fail('0.81 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

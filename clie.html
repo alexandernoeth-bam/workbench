@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.80.1</title>
+<title>CLIE 0.81.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1120,7 +1120,7 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.80.1';
+var APP_VERSION = '0.81.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -28046,8 +28046,12 @@ function pmFensterHtml() {
       + '<label>Wiederholung:</label><div class="pm-zeile"><span>keine</span><button type="button" class="knopf" onclick="pmWiederholung()">Einrichten…</button></div>';
   }
   x += '<label for="pmNotiz">Notiz:</label><textarea id="pmNotiz" class="eingabe" rows="3">' + esc(f.notiz) + '</textarea>';
+  /* Seit 0.81: nachträglich einem Memo zuordnen oder lösen */
   if (memo) {
-    x += '<label>Memo:</label><button type="button" class="verweis" onclick="pmMemoAusFenster()">' + esc(memo.titel) + (f.memo.zeile ? ' · Zeile' : '') + '</button>';
+    x += '<label>Memo:</label><div class="pm-zeile"><button type="button" class="verweis" onclick="pmMemoAusFenster()">' + esc(memo.titel) + (f.memo.zeile ? ' · Zeile' : '') + '</button>'
+      + (a ? '<button type="button" class="knopf" onclick="pmMemoLoesen()">Lösen</button>' : '') + '</div>';
+  } else if (a) {
+    x += '<label>Memo:</label><div class="pm-zeile"><span>–</span><button type="button" class="knopf" onclick="pmZuordnenAuf()">Zuordnen…</button></div>';
   }
   return x + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
@@ -28184,6 +28188,83 @@ function pmLoeschen() {
   cl.pm.fenster = null;
   aufklappZu();
   melde('Aufgabe gelöscht.', null);
+}
+
+/* ---- Aufgabe nachträglich einem Memo zuordnen (seit 0.81) ---- */
+
+/* Getipptes bleibt im Fenster; die Liste der Memos (eigene Kategorie oben) */
+function pmZuordnenAuf() {
+  var f = pmFensterLesen();
+  if (!f || !pmAufgabeFinden(f.id)) { return; }
+  cl.aufklapp = 'pmzuordnen';
+  aufklappNeu();
+}
+
+function pmZuordnenHtml() {
+  var f = cl.pm.fenster;
+  var a = f ? pmAufgabeFinden(f.id) : null;
+  if (!a) { return ''; }
+  var kat = f.bereich || clKategorieVon(a);
+  var alle = kpSeitenAlle().filter(function (s) { return !pmIstVorlage(s) && !ckIstKorb(s) && !prPrivatVerborgen(s, null); });
+  var rang = function (s) { return (clKategorieVon(s) === kat ? 0 : 2) + (pmArchiviert(s) ? 1 : 0); };
+  alle.sort(function (x, y) {
+    return (rang(x) - rang(y)) || (PM_KUERZEL.indexOf(pmKuerzel(x)) - PM_KUERZEL.indexOf(pmKuerzel(y))) || String(x.titel).localeCompare(String(y.titel), 'de');
+  });
+  return '<div class="fenster"><div class="titel">Memo zuordnen</div><div class="rumpf">'
+    + '<p class="leise">„' + esc(pmTitel(a)) + '“ kommt als Kästchen-Zeile ans Ende des Memos — der Haken gilt dann in beiden.</p>'
+    + (alle.length ? alle.map(function (s) {
+      return '<button type="button" class="wahl" onclick="pmZuordnen(\'' + esc(s.id) + '\')"><b>' + pmKuerzel(s) + '</b> ' + esc(s.titel)
+        + (pmArchiviert(s) ? ' <small class="leise">· Archiv</small>' : '') + '</button>';
+    }).join('') : '<p class="leise">Noch kein Memo.</p>')
+    + '<div class="knoepfe"><button type="button" class="knopf" onclick="pmZuordnenZurueck()">Abbrechen</button></div></div></div>';
+}
+
+function pmZuordnenZurueck() {
+  cl.aufklapp = cl.pm.fenster ? 'pmaufgabe' : '';
+  aufklappNeu();
+}
+
+/* Marke aus der Zeile nehmen — Zeile und Aufgabe bleiben */
+function pmMarkeWeg(a) {
+  var s = pmMemoVon(a);
+  if (!s || !a.memo.zeile) { return; }
+  var nr = pmZeileMitMarke(s, a.memo.zeile);
+  if (nr < 0) { return; }
+  var zeilen = String(s.text || '').split('\n');
+  zeilen[nr] = pmOhneMarke(zeilen[nr]);
+  s.text = zeilen.join('\n');
+  s.geaendert = jetzt();
+}
+
+function pmZuordnen(memoId) {
+  var f = cl.pm.fenster;
+  var a = f ? pmAufgabeFinden(f.id) : null;
+  var s = kpSeiteFinden(memoId);
+  if (!a || !s) { pmZuordnenZurueck(); return; }
+  pmMarkeWeg(a);
+  var zeilen = String(s.text || '').split('\n');
+  while (zeilen.length && !zeilen[zeilen.length - 1].trim()) { zeilen.pop(); }
+  zeilen.push((a.status === 'erledigt' ? '[x] ' : '[] ') + pmTitel(a).replace(/\s+/g, ' ') + ' ⟦' + a.id + '⟧');
+  s.text = zeilen.join('\n');
+  s.geaendert = jetzt();
+  a.memo = { id: s.id, zeile: a.id };
+  a.geaendert = jetzt();
+  f.memo = { id: s.id, zeile: a.id };
+  spaeterSichern();
+  melde('Steht jetzt in „' + s.titel + '“.', 'gut');
+  pmZuordnenZurueck();
+}
+
+function pmMemoLoesen() {
+  var f = pmFensterLesen();
+  var a = f ? pmAufgabeFinden(f.id) : null;
+  if (!a || !a.memo) { return; }
+  pmMarkeWeg(a);
+  delete a.memo;
+  a.geaendert = jetzt();
+  f.memo = null;
+  spaeterSichern();
+  aufklappNeu();
 }
 
 function pmMemoAusFenster() {
@@ -28868,8 +28949,9 @@ function pmArchivUm(id) {
   if (!s) { melde('Erst ein Memo antippen.', null); return; }
   var x = s.__satz;
   if (pmArchiviert(s)) {
-    if (s.art === 'liste') { melde('Alte Listen bleiben im Archiv — ihre Punkte stehen im To Do.', null); return; }
     delete x.archiv;
+    /* Seit 0.81: auch eine Liste kommt zurück ins Memo Pad */
+    if (s.art === 'liste') { delete x.abgeschlossen; }
     if (s.art === 'vorhaben' && s.zustand === 'erledigt') { s.zustand = 'laeuft'; }
     if (x.checkliste === 'fertig') { x.checkliste = 'lauf'; delete x.abgeschlossen; }
     melde('„' + s.titel + '“ zurückgeholt.', 'gut');
@@ -29138,6 +29220,7 @@ function pmAufklapp(el) {
     return true;
   }
   if (a === 'pmumstellen') { el.innerHTML = pmUmstellenHtml(); return true; }
+  if (a === 'pmzuordnen') { el.innerHTML = pmZuordnenHtml(); return true; }
   return false;
 }
 
@@ -29216,18 +29299,8 @@ function pmUmstellenKern(echt) {
         }
         return;
       }
-      n.listen++;
-      n.listenPunkte += offen.length;
-      if (echt) {
-        var kat = katNeuAnlegen(s.titel);
-        var bereich = kat ? kat.id : '';
-        offen.forEach(function (z) { pmAusZeile(s, z, bereich, bereich === CL_ARBEIT ? 'beruflich' : 'privat'); });
-        pmZeilenWeg(s, offen.map(function (z) { return z.nr; }));
-        x.abgeschlossen = true;
-        x.archiv = true;
-        x.geaendert = jetzt();
-      }
-      return;
+      /* Seit 0.81: Listen bleiben Memos, wie sie sind — keine Kategorie, kein Archiv, ihre Punkte bleiben stehen.
+         Wie in jedem Memo werden nur Punkte mit Tag zu verbundenen Aufgaben (unten). */
     }
     if (pmIstVorlage(s)) { return; }
     if (pmArchiviert(s)) { n.archiv++; return; }
@@ -29237,7 +29310,7 @@ function pmUmstellenKern(echt) {
       if (z.mid) {
         var da = pmAufgabeZurMarke(z.mid);
         if (echt && da && plan.datum && !da.wiederholung) { da.planung = plan.datum; if (plan.zeit) { da.uhrzeit = plan.zeit; } da.geaendert = jetzt(); }
-        if (echt && plan.fund.length) { pmAusplanen(plan.fund); }
+        if (plan.fund.length) { n.memo++; if (echt) { pmAusplanen(plan.fund); } }
         return;
       }
       var zu = ckZusatz(s, z.a.text);
@@ -29307,9 +29380,9 @@ function pmUmstellenHtml() {
   if (!n) { return ''; }
   return '<div class="fenster"><div class="titel">Umstellen</div><div class="rumpf">'
     + '<p>Wie am Palm: Aufgaben stehen im To Do, Text im Memo Pad.</p>'
-    + '<p>' + n.listen + ' Liste' + (n.listen === 1 ? '' : 'n') + ' → Kategorie' + (n.listen === 1 ? '' : 'n') + ' mit ' + n.listenPunkte + ' Aufgabe' + (n.listenPunkte === 1 ? '' : 'n') + ' (die Listen gehen ins Archiv)<br>'
+    + '<p>Listen bleiben Memos, wie sie sind.<br>'
     + n.sammler + ' aus dem Sammler → Aufgaben<br>'
-    + n.memo + ' Memo-Zeile' + (n.memo === 1 ? '' : 'n') + ' mit Tag → Aufgaben, mit dem Memo verbunden<br>'
+    + n.memo + ' Memo- und Listenzeile' + (n.memo === 1 ? '' : 'n') + ' mit Tag → Aufgaben, mit dem Memo verbunden<br>'
     + n.frei + ' freie Zeile' + (n.frei === 1 ? '' : 'n') + ' aus Tag und Woche → Aufgaben<br>'
     + n.archiv + ' Abgeschlossene stehen im Archiv</p>'
     + '<p class="leise">Vorher wird eine Sicherung der workbench.json bereitgestellt.</p>'
@@ -29326,7 +29399,7 @@ function pmUmstellen() {
   cl.pm.umst = null;
   spaeterSichern();
   aufklappZu();
-  melde('Umgestellt: ' + (n.listenPunkte + n.sammler + n.memo + n.frei) + ' Aufgaben, ' + n.listen + ' Kategorien aus Listen.', 'gut');
+  melde('Umgestellt: ' + (n.sammler + n.memo + n.frei) + ' Aufgaben.', 'gut');
   zeichne();
 }
 
