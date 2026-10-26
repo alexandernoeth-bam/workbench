@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.81.0</title>
+<title>CLIE 0.83.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1031,6 +1031,9 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 
 /* ---------- Palm-Modell (seit 0.80): To Do, Memo Pad, Agenda ---------- */
 .fuss:has(.pm-tabs){flex-wrap:wrap}
+.fuss:has(.pm-kzleiste){flex-wrap:wrap}
+.pm-kzleiste{display:flex;gap:6px;flex:1 0 100%;margin-top:2px}
+.pm-kzleiste .knopf{min-width:36px;text-align:center;font-weight:600}
 .pm-tabs{display:flex;flex:1 0 100%;border:2px solid var(--px);margin-top:2px}
 .pm-tabs button{flex:1;text-align:center;padding:2px 0;font-size:18px}
 .pm-tabs button+button{border-left:2px solid var(--px)}
@@ -1120,7 +1123,7 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.81.0';
+var APP_VERSION = '0.83.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3534,6 +3537,15 @@ var CL_ARBEIT = 'kb-arbeit';
 /* Seit 0.71.3: Filter „Privat“ = alles außer Arbeit (keine echte Kategorie) */
 var CL_PRIVAT = 'privat';
 
+/* Seit 0.82: Arbeit ist „Arbeit“ und jede Kategorie, deren Name mit „Arbeit“ beginnt
+   (etwa „Arbeit – OnPremis QS“) — nicht aber „Arbeitszimmer“. */
+function clIstArbeit(id) {
+  if (!id) { return false; }
+  if (id === CL_ARBEIT) { return true; }
+  var n = String(ckBereichName(id) || '').trim().toLowerCase();
+  return n.indexOf('arbeit') === 0 && !/[a-zäöüß]/.test(n.charAt(6));
+}
+
 /* Gilt dieser Filterwert? „alle“, „privat“ oder eine bestehende Kategorie */
 function clFilterGueltig(f) {
   return f === 'alle' || f === CL_PRIVAT || !!ckBereichName(f);
@@ -3584,7 +3596,9 @@ function clPasst(o) {
   if (!o) { return false; }
   var f = clFilter();
   if (f === 'alle' || ckIstKorb(o)) { return true; }
-  if (f === CL_PRIVAT) { return clKategorieVon(o) !== CL_ARBEIT; }
+  if (f === CL_PRIVAT) { return !clIstArbeit(clKategorieVon(o)); }
+  /* Seit 0.83: „Arbeit“ ist der Sammelfilter für alle Arbeit-Kategorien — wie „Privat“ für den Rest */
+  if (f === CL_ARBEIT) { return clIstArbeit(clKategorieVon(o)); }
   return clKategorieVon(o) === f;
 }
 
@@ -3592,7 +3606,7 @@ function clPasst(o) {
    Arbeit → beruflich, andere Kategorie → privat */
 function clFilterKontext() {
   var f = clFilter();
-  return f === 'alle' ? 'alle' : (f === CL_ARBEIT ? 'beruflich' : 'privat');
+  return f === 'alle' ? 'alle' : (clIstArbeit(f) ? 'beruflich' : 'privat');
 }
 
 function clPasstKontext(k) {
@@ -3602,7 +3616,7 @@ function clPasstKontext(k) {
 
 /* Neues bekommt die Kategorie des ▼ — und den passenden Kontext */
 function clNeuBereich() { var f = clFilter(); return (f === 'alle' || f === CL_PRIVAT) ? '' : f; }
-function clNeuKontext() { return clFilter() === CL_ARBEIT ? 'beruflich' : 'privat'; }
+function clNeuKontext() { return clIstArbeit(clFilter()) ? 'beruflich' : 'privat'; }
 
 /* Einmal und nach jedem Laden: Berufliches ohne Kategorie → Arbeit */
 function clKategorienUmstellen() {
@@ -3623,7 +3637,10 @@ function clKategorienUmstellen() {
 /* Die Kategorien für jedes ▼ — „Alle“ und die Liste */
 function katFilterHtml(aufruf, an) {
   var f = (an === undefined) ? clFilter() : an;
-  return [{ id: 'alle', name: 'Alle' }, { id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' }].concat(kgAlle()).map(function (b) {
+  return [{ id: 'alle', name: 'Alle' }, { id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' }].concat(kgAlle().map(function (b) {
+    /* Seit 0.83: „Arbeit“ umfasst alle Arbeit-Kategorien */
+    return (b.id === CL_ARBEIT && kgAlle().some(function (x) { return x.id !== CL_ARBEIT && clIstArbeit(x.id); })) ? { id: b.id, name: b.name, klein: 'mit allen Arbeit-…' } : b;
+  })).map(function (b) {
     return '<button type="button"' + (f === b.id ? ' class="an"' : '') + ' onclick="' + aufruf + '(\'' + esc(b.id) + '\')"><span>' + esc(b.name) + '</span>'
       + (b.klein ? '<small>' + b.klein + '</small>' : '') + '</button>';
   }).join('');
@@ -7938,7 +7955,7 @@ function memoFensterHtml() {
       + '<button type="button" class="knopf" onclick="memoDetails()">Abbrechen</button></div></div></div>';
   }
   /* Seit 0.43 nur Notizen — Projekte und Ziele legt die App „Projekte“ an */
-  var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neue Notiz' : 'Details') + '</div><div class="rumpf">';
+  var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? ({ P: 'Neues Projekt', Z: 'Neues Ziel', A: 'Neuer Ablauf' }[f.kz] || 'Neues Memo') : 'Details') + '</div><div class="rumpf">';
   h += '<label for="memoTitel">Name:</label><input id="memoTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
      + katPrivatHtml('memo', f.bereich, f.privat);
   if (s && s.art === 'vorhaben') {
@@ -7986,6 +8003,8 @@ function memoSpeichern() {
     var s = kpSeiteAnlegen(art, titel, f.kontext, f.art === 'ziel' ? 'ziel' : '');
     if (!s) { melde('Das Memo ließ sich nicht anlegen.', 'warn'); return; }
     katPrivatSchreiben(s.__satz, f);
+    /* Seit 0.82: mit gewähltem Kürzelfilter gleich als Projekt, Ziel oder Ablauf */
+    if (f.kz && f.kz !== '–') { s = pmKuerzelSetzen(s, f.kz) || s; }
     spaeterSichern();
     aufklappZu();
     cl.memo.id = s.id;
@@ -9550,7 +9569,7 @@ function katPrivatSchreiben(o, f) {
   if (f.bereich !== undefined) {
     if (kgName(f.bereich)) { o.bereich = f.bereich; } else { delete o.bereich; }
     /* Die Workbench kennt nur beruflich/privat (seit 0.67 aus der Kategorie) */
-    if (o.kontext !== '' || o.bereich) { o.kontext = (o.bereich === CL_ARBEIT) ? 'beruflich' : 'privat'; }
+    if (o.kontext !== '' || o.bereich) { o.kontext = clIstArbeit(o.bereich) ? 'beruflich' : 'privat'; }
   }
   if (f.privat !== undefined) { if (f.privat) { o.privat = true; } else { delete o.privat; } }
 }
@@ -9792,7 +9811,7 @@ function katNeuAnlegenIn(art) {
   var n = el && typeof el.value === 'string' ? el.value.trim() : '';
   if (!f || !kgName(f.id)) { aufklappZu(); return; }
   if (!n) { melde('Bitte erst einen Namen eingeben.', 'warn'); return; }
-  var s = kpSeiteAnlegen(art, n.slice(0, 200), f.id === CL_ARBEIT ? 'beruflich' : 'privat', '');
+  var s = kpSeiteAnlegen(art, n.slice(0, 200), clIstArbeit(f.id) ? 'beruflich' : 'privat', '');
   if (!s) { melde('Das ließ sich nicht anlegen.', 'warn'); return; }
   s.__satz.bereich = f.id;
   spaeterSichern();
@@ -10896,7 +10915,7 @@ function clsSpeichern() {
   s.titel = titel.slice(0, 200);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { g.kontext = f.kontext; }
   if (ckBereichName(f.bereich)) { g.bereich = f.bereich; } else { delete g.bereich; }
-  g.kontext = (g.bereich === CL_ARBEIT) ? 'beruflich' : 'privat';
+  g.kontext = clIstArbeit(g.bereich) ? 'beruflich' : 'privat';
   if (f.privat) { g.privat = true; } else { delete g.privat; }
   if (!ckIstListe(s)) { if (f.art === 'aufgaben') { g.art = 'aufgaben'; } else { delete g.art; } }
   if (!ckIstListe(s) && f.art === 'aufgaben') {
@@ -28367,11 +28386,43 @@ function pmMemos(sicht) {
     var v = pmIstVorlage(s);
     if (sicht === 'vorlagen') { return v; }
     if (v) { return false; }
+    if (!sicht && pmKz() && pmKuerzel(s) !== pmKz()) { return false; }
     return (sicht === 'archiv') === pmArchiviert(s);
   });
   return l.sort(function (a, b) {
     return (PM_KUERZEL.indexOf(pmKuerzel(a)) - PM_KUERZEL.indexOf(pmKuerzel(b))) || String(a.titel).localeCompare(String(b.titel), 'de');
   });
+}
+
+/* ---- Filter nach Kürzel (seit 0.82, Variante C1): kleine Knöpfe Alle · P · Z · A · – ---- */
+
+var PM_KZ_KEY = 'clie-memo-kz';
+
+function pmKz() {
+  var k = '';
+  try { k = window.localStorage.getItem(PM_KZ_KEY) || ''; } catch (e) { k = ''; }
+  return PM_KUERZEL.indexOf(k) >= 0 ? k : '';
+}
+
+function pmKzSetzen(k) {
+  var w = PM_KUERZEL.indexOf(k) >= 0 ? k : '';
+  try { window.localStorage.setItem(PM_KZ_KEY, w); } catch (e) { /* nur für jetzt — dann gilt „Alle“ */ }
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
+}
+
+function pmKzLeisteHtml() {
+  var an = pmKz();
+  return '<div class="pm-kzleiste">' + [['', 'Alle']].concat(PM_KUERZEL.map(function (k) { return [k, k]; })).map(function (x) {
+    return '<button type="button" class="knopf' + (an === x[0] ? ' voll' : '') + '" onclick="pmKzSetzen(\'' + x[0] + '\')">' + x[1] + '</button>';
+  }).join('') + '</div>';
+}
+
+/* Neu: mit gewähltem Kürzel gleich als Projekt, Ziel oder Ablauf */
+function pmMemoNeu() {
+  memoNeuArt('notiz');
+  if (cl.memo.fenster) { cl.memo.fenster.kz = pmKz(); aufklappNeu(); }
 }
 
 function pmMemoSicht() { return (cl.memo.sicht === 'vorlagen' || cl.memo.sicht === 'archiv') ? cl.memo.sicht : ''; }
@@ -28381,6 +28432,7 @@ function pmMemoListeHtml() {
   var l = pmMemos(sicht);
   var h = sicht ? '' : pmBannerHtml();
   if (!l.length) {
+    if (!sicht && pmKz()) { return h + '<p class="leise">Kein Memo mit Kürzel ' + pmKz() + ' — „Alle“ zeigt alles.</p>'; }
     return h + '<p class="leise">' + (sicht === 'vorlagen' ? 'Noch keine Vorlage — im Memo Menü ≡ „Als Vorlage speichern“.'
       : sicht === 'archiv' ? 'Das Archiv ist leer.' : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
   }
@@ -28507,8 +28559,9 @@ function pmMemoFussHtml() {
         + '<button type="button" class="knopf" onclick="pmMemoLoeschenFragen(\'\')">Löschen…</button>';
     }
     if (sicht === 'vorlagen') { return '<button type="button" class="knopf" onclick="memoArtSetzen(\'alles\')">Fertig</button>'; }
-    return '<button type="button" class="knopf" onclick="memoNeuArt(\'notiz\')">Neu</button>'
-      + '<button type="button" class="knopf" onclick="memoArtSetzen(\'vorlagen\')">Neu aus Vorlage…</button>';
+    return '<button type="button" class="knopf" onclick="pmMemoNeu()">Neu</button>'
+      + '<button type="button" class="knopf" onclick="memoArtSetzen(\'vorlagen\')">Neu aus Vorlage…</button>'
+      + pmKzLeisteHtml();
   }
   if (cl.memo.schreiben) { return '<button type="button" class="knopf voll" onclick="pmSchreibenUm()">Fertig</button>'; }
   return '<button type="button" class="knopf" onclick="pmMemoZuListe()">Fertig</button>'
