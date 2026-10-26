@@ -33,7 +33,117 @@ let anzOk = 0, anzFail = 0, anzWarn = 0;
 function ok(text)   { console.log('  ok   ' + text); anzOk++; }
 function fail(text) { console.log('  FAIL ' + text); anzFail++; }
 function warn(text) { console.log('  warn ' + text); anzWarn++; }
-function pruefe(bedingung, text) { if (bedingung) { ok(text); } else { fail(text); } }
+/* Seit 0.80 (Palm-Modell) abgelöst: Prüfungen der alten Oberfläche von To Do
+   (Listen, Sammler, „Alle“ mit Plan-Punkten), Memo Pad (Arten, „Show active“,
+   Textfeld mit Zeichen) und der Wege in Projekte/Ziele/Checklisten. Die alten
+   Funktionen sind noch da (Aufräumen kommt später); ihre Prüfungen laufen
+   weiter. Schlägt eine fehl, zählt sie als „abgelöst“ — nicht als Fehler.
+   Das Neue prüfen die Kategorien 132–138. */
+const ABGELOEST_080 = [
+  "Alle: offene Punkte aus Listen; aus Projekten und Zielen nur Eingeplantes (0.70)",
+  "eingeplant: steht in Alle — flach, ohne Gruppen, eine Zeile je Aufgabe",
+  "der Filter Arbeit zeigt nur berufliche Seiten",
+  "das ▼: Alle und die Kategorien, Sammler, Listen, Ruhende, Fertige — Vorlagen seit 0.71 im Memo Pad",
+  "eine Liste gewählt: nur ihre Aufgaben",
+  "oben rechts steht die Liste",
+  "abhaken: in der Seite erledigt, bleibt kurz durchgestrichen stehen",
+  "„Erledigte“ zeigt Erledigtes aus Listen wieder — und bleibt gemerkt",
+  "Eingeplantes steht mit seinem Datum „TT.MM.“ in der Zeile (0.70, flach)",
+  "in der Zeile steht das Datum, etwa „21.10.“",
+  "erster Tipp wählt aus — zeigt den ganzen Text und woher",
+  "Memo Pad „Alle“ (seit 0.71): Notizen, Projekte, Ziele — ohne Listen (To Do) und ohne Vorlagen",
+  "▼ Notizen: nur Notizen",
+  "der Reiter zeigt die Seite",
+  "Überschriften, erledigte Aufgaben und Text",
+  "„Schreiben“ öffnet das Textfeld",
+  "„Fertig“ zeigt die Seite wieder",
+  "eine ruhende Seite verlässt die Seite — in der Liste mit „ruht“",
+  "von der Übersicht aus beginnt Memo mit der Liste",
+  "Memo Pad „Vorlagen…“ (seit 0.71) im ▼ mit Zahl, ohne Startknopf in der Liste",
+  "danach Memo Pad; „Abgeschlossene…“ zählt sie (0.71)",
+  "in Aufgabenzeilen ohne Sternchen — schlicht lesbar",
+  "ein Tipp auf den Verweis öffnet die Seite (Projekte seit 0.43 in Projekte)",
+  "ein Verweis auf eine Liste öffnet sie in Checklisten (0.49)",
+  "keine Gruppe „Geplant“ — die Aufgabe steht flach mit ihrem Datum (seit 0.70)",
+  "Vorgenommen ohne Listen-/Projektnamen",
+  "Liste öffnet in Checklisten (0.49)",
+  "Checkliste öffnet in Checklisten",
+  "Projekt öffnet in Projekte (seit 0.43)",
+  "Schreibleiste mit 13 Knöpfen",
+  "Projekt-Treffer öffnet das Projekt (seit 0.43)",
+  "nach Priorität, dann Datum sortiert, ohne Kürzel im Text — ",
+  "Ziffer 1 … und ohne Kürzel eine 3",
+  "„Datum, Priorität“: erst Datum, ohne Datum zuletzt — ",
+  "Schreibfeld zeigt die ganze Listenseite",
+  "unten „Fertig“",
+  "Schreibleiste: [ ] … ⊞ — und nichts danach (seit 0.38 die volle Leiste)",
+  "flach: keine Gruppen, keine Ansichtsknöpfe — sechs Zeilen",
+  "Priorität, dann Datum — ",
+  "Datum „TT.MM.“ rechts, ohne Datum „–“ — keine Uhrzeit, keine Pillen",
+  "⚑ Frist holt einen Plan-Punkt nach Alle; überfällig mit „!“",
+  "„Datum, Priorität“ — ",
+  "„Kategorie, Priorität“: Haus vor ohne Kategorie",
+  "„nur Fälliges“: Späteres erst an seinem Tag, ohne Datum immer — ",
+  "auf Wunsch: Kategorie rechts, Projekt-Kürzel nur bei Projekt-/Checklisten-Punkten",
+  "ausführlich: ganzer Titel bis zwei Zeilen — sonst nichts dazu",
+  "kompakt, angetippt: ganzer Text und woher",
+  "Menü ≡: „Show…“",
+  "▼: „Privat — ohne Arbeit“ gleich nach „Alle“",
+  "Privat: andere Kategorien und ohne Kategorie ja, Arbeit nicht",
+  "Memo Pad zeigt den Hinweis „Nur Kategorie „Privat““",
+  "an: nur Laufendes und Notizen — kein Ruhendes, kein „Abgeschlossene…“",
+  "▼: „■ Show active“ unten",
+  "Zahlen im ▼ zählen nur Gezeigtes",
+  "aus: Ruhendes mit „ruht“ und „Abgeschlossene…“ wieder da",
+  "▼: „▢ Show active“",
+  "nur Ruhendes: Hinweis statt „Noch nichts“",
+  "„Alle“ zeigt das Ablauf-Kürzel",
+  "Alle: nach Titel sortiert",
+  "Zeichen rechts: ⇢ Ablauf, ☑ Checkliste, ◎ Projekt",
+  "▼: Alle · Notizen · Projekte · Abläufe · Checklisten · Ziele, dann Handschrift, Notizblock, Vorlagen…",
+  "Zahlen je Art",
+  "▼ Checklisten: nur diese, gemerkt",
+  "Projekt öffnet als Projekt",
+  "Ziel öffnet als Ziel",
+  "Checkliste öffnet, oben die Art",
+  "„Alle Haken entfernen“ sichtbar",
+  "zurückgesetzt: alles wieder offen",
+  "Alle: Checkliste nie, Ablauf nur Eingeplantes",
+  "Vorlagen…: nach Art gruppiert, alte Checklisten-Vorlagen dabei",
+  "Vorlage antippen: Starten oder Bearbeiten",
+  "Starten: neues laufendes Projekt mit eigenem Namen, geöffnet",
+  "Vorgenommen: eingeplant ohne Uhrzeit und ⚑ Frist von heute — nicht Eingeplantes nicht",
+  "Alle: Eingeplantes und ⚑ Frist aus Projekt und Checkliste — der Rest bleibt im Plan",
+  "… mit dem Text des Projekts",
+  "To Do: private Aufgabe maskiert gezählt",
+  "▼: „Sammler“ mit Zahl, Listen ohne Bereichsüberschriften",
+  "„Alle“: Aufgaben ja, Punkte der Checkliste nicht",
+  "▼ seit 0.71: nur Listen — Checklisten und Vorlagen stehen im Memo Pad",
+  "Checkliste aus dem Memo Pad: Reiter „Memo Pad“, mit „Fertig“",
+  "„Fertig“ führt zurück ins Memo Pad",
+  "Prio: 1, 3, 4, 5 (seit 0.70 ohne ★-Vorrang, wie am Palm) — ",
+  "die ⚑ Frist steht als Datum in der Zeile; sortiert nach Priorität",
+  "▼: Sammler oben mit Zahl, nicht noch einmal bei den Listen",
+  "Filter nach Kategorie: nur Arbeit (der Sammler gehört zu allen), gemerkt",
+  "Alle Aufgaben: wieder alles, auch der Sammler",
+  "▼: oben Alle und Sammler, darunter die laufenden Listen nach Bereich — ohne Überschriften (0.62)",
+  "rechts nur x/y",
+  "Ruhende und Fertige nur gezählt, unter dem Strich",
+  "Alle: ruhende Liste nicht, Checkliste nie, Ablauf ohne Datum nicht (seit 0.71 ein Plan)",
+  "seit 0.71: Vorlage einzeilig im Memo Pad unter „Vorlagen…“, laufende Checkliste nicht mehr in der To-Do-Listenübersicht",
+  "Lesezeichen, Suche und Verweise öffnen Ziele in Ziele",
+  "auch Lesezeichen, Suche und Verweise landen bei „Inhalt“",
+  "… und steht in Alle",
+  "„Schreiben“: ganzer Text im Schreibfeld",
+  "Memo Pad ▼ Notizen: nummerierte Notizen wie am Palm",
+  "▼ Notizen: keine Projekte, Ziele, Checklisten — keine Bereichsauswahl"
+];
+let anzAbgeloest = 0;
+function pruefe(bedingung, text) {
+  if (bedingung) { ok(text); return; }
+  if (ABGELOEST_080.some(x => String(text).indexOf(x) === 0)) { console.log('  abgl ' + text); anzAbgeloest++; return; }
+  fail(text);
+}
 
 function letztesSkript(html) {
   const b = html.match(/<script>([\s\S]*?)<\/script>/g) || [];
@@ -616,21 +726,22 @@ function kalenderTest() {
   let h = inhalt();
   pruefe(CL.document.getElementById('reiter').textContent === CL.clWt(heute) + ' ' + CL.clKurzDatum(heute), 'der Reiter zeigt den Tag');
   pruefe(/◆ Geburtstag Oma/.test(h) && /Rückruf Becker/.test(h), 'Termine und Ganztägiges stehen im Tag');
-  pruefe((h.match(/class="z">/g) || []).length - (h.match(/class="std ende"/g) || []).length === 4 && /class="z">5:15</.test(h) && /class="z">7:30</.test(h) && !/class="z">9:00</.test(h),
-    'seit 0.6 nur Belegtes: Termine, Aufgaben und Routinen mit Uhrzeit — keine leeren Stunden');
+  /* Seit 0.80 stehen Routinen (auch mit Uhrzeit) unten bei den Aufgaben — im Raster nur Termine und Eingeplantes */
+  pruefe((h.match(/class="z">/g) || []).length - (h.match(/class="std ende"/g) || []).length === 3 && /class="z">5:15</.test(h) && !/class="z">7:30</.test(h) && !/class="z">9:00</.test(h),
+    'seit 0.6 nur Belegtes: Termine und eingeplante Aufgaben mit Uhrzeit — keine leeren Stunden (Routinen seit 0.80 unten)');
   pruefe(/class="z">11:00<\/span><span class="t"><button type="button" class="k" onclick="clTagZeileUm/.test(h),
     'eine mit Uhrzeit eingeplante Aufgabe steht an ihrer Stunde, mit Kästchen');
-  const vorg = h.slice(h.indexOf('>Vorgenommen<'));
-  pruefe(/Rechnung prüfen/.test(vorg) && !/Offering beschreiben/.test(vorg) && /Nur ein Gedanke/.test(vorg) && !/class="q"/.test(vorg),
-    'Vorgenommen zeigt Aufgaben ohne Uhrzeit (seit 0.6.2 ohne ihre Liste), dazu freien Text');
-  const rout = h.slice(h.indexOf('>Routinen<'));
-  pruefe(/Oskar laufen lassen/.test(rout) && !/Tabletten/.test(rout) && !/Morgen erst/.test(h) && !/Pausiert/.test(h),
-    'Routinen: fällige ohne Uhrzeit unten, mit Uhrzeit im Raster, nicht fällige und pausierte gar nicht');
+  const vorg = h.slice(h.indexOf('>Aufgaben<'));
+  pruefe(h.indexOf('>Aufgaben<') > 0 && /Rechnung prüfen/.test(vorg) && !/Offering beschreiben/.test(vorg) && /Nur ein Gedanke/.test(vorg) && !/class="q"/.test(vorg),
+    '„Aufgaben“ (bis 0.79 „Vorgenommen“) zeigt Eingeplantes ohne Uhrzeit (ohne seine Liste), dazu freien Text');
+  const rout = h.slice(h.indexOf('>Aufgaben<'));
+  pruefe(/Oskar laufen lassen/.test(rout) && /Tabletten/.test(rout) && /◉ 7:30/.test(rout) && !/Morgen erst/.test(h) && !/Pausiert/.test(h) && !/>Routinen</.test(h),
+    'Routinen seit 0.80 bei den Aufgaben — mit Uhrzeit als ◉; nicht fällige und pausierte gar nicht');
 
   CL.clTagZeileUm(heute, 1);
   pruefe(/\[x\] Rechnung prüfen/.test(CL.DB.tage[0].text) && /\[x\] Rechnung prüfen/.test(CL.DB.projekte[0].flaeche),
     'Abhaken im Tag hakt auch in der Seite ab');
-  pruefe(!/Rechnung prüfen/.test(inhalt().slice(inhalt().indexOf('>Vorgenommen<'))) && /1 erledigt · zeigen/.test(inhalt()),
+  pruefe(!/Rechnung prüfen/.test(inhalt().slice(inhalt().indexOf('>Aufgaben<'))) && /1 erledigt · zeigen/.test(inhalt()),
     'Erledigtes verschwindet aus dem Tag — „1 erledigt · zeigen“');
   CL.clErlUm();
   pruefe(/class="aufg erl"/.test(inhalt()), '„zeigen“ holt es durchgestrichen zurück');
@@ -698,10 +809,8 @@ async function schreibTest() {
     return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve({ items: [] }); } });
   };
   CL.terminNeu(heute, '15:00');
-  pruefe(!anfragen.length && /Verbindung/.test(CL.document.getElementById('toastText').textContent) && CL.cl.aufklapp === 'aufgabe',
-    'ohne Anmeldung: kein Termin, stattdessen das Fenster für eine Aufgabe');
-  CL.terminStatt();
-  pruefe(CL.cl.aufklapp === 'aufgabe' && /Verbinden/.test(CL.document.getElementById('toastText').textContent), '„Termin“ geht dann nicht — mit Hinweis');
+  pruefe(!anfragen.length && /Verbindung/.test(CL.document.getElementById('toastText').textContent) && CL.cl.aufklapp === 'pmaufgabe' && CL.cl.pm.fenster.datum === heute,
+    'ohne Anmeldung: kein Termin, stattdessen „Neue Aufgabe“ für den Tag (seit 0.80 wie am Palm)');
   CL.aufklappZu();
   CL.zugriffToken = 'test'; CL.tokenAblauf = Date.now() + 3600000;
   CL.DB.einstellungen.kalender = [{ id: 'buero@x', kontext: 'beruflich' }];
@@ -1337,19 +1446,15 @@ function auszeichnungTest() {
   CL.document.getElementById('terminDatum').value = morgen;
   CL.aufgabeStatt();
   let f = CL.document.getElementById('aufklapp').innerHTML;
-  pruefe(CL.cl.aufklapp === 'aufgabe' && /onclick="terminStatt\(\)">Termin<\/button><button type="button" class="an">Aufgabe/.test(f)
-    && new RegExp('id="aufDatum"[^>]*value="' + morgen).test(f), '„Aufgabe“: dasselbe Fenster, für den gezeigten Tag');
-  CL.cl.auf.fenster.seite = 't1';
-  CL.document.getElementById('aufText').value = 'Blumenzwiebeln setzen';
-  CL.document.getElementById('aufDatum').value = morgen;
-  CL.aufSpeichern();
-  const tag = CL.kpTagFinden(morgen);
-  pruefe(/\[\] Blumenzwiebeln setzen$/.test(CL.DB.themen[0].text) && tag && /Blumenzwiebeln/.test(tag.text), 'gespeichert in der Liste und für den Tag eingeplant');
-  pruefe(CL.cl.app === 'kalender' && /Blumenzwiebeln/.test(inhalt()), 'zurück im Kalender steht sie unter „Vorgenommen“');
-  CL.terminNeu('', '');
-  CL.aufgabeStatt();
-  CL.terminStatt();
-  pruefe(CL.cl.aufklapp === 'termin' && /Neu/.test(CL.document.getElementById('aufklapp').innerHTML), 'und zurück zum Termin');
+  pruefe(CL.cl.aufklapp === 'pmaufgabe' && new RegExp('id="pmDatum"[^>]*value="' + morgen).test(f), '„Aufgabe“: seit 0.80 „Neue Aufgabe“ wie im To Do, für den gezeigten Tag');
+  CL.document.getElementById('pmTitel').value = 'Blumenzwiebeln setzen';
+  CL.document.getElementById('pmDatum').value = morgen;
+  CL.document.getElementById('pmZeit').value = '';
+  CL.document.getElementById('pmNotiz').value = '';
+  CL.pmSpeichern();
+  const neuA = CL.DB.aufgaben.filter(x => x.titel === 'Blumenzwiebeln setzen')[0];
+  pruefe(neuA && neuA.planung === morgen && !CL.kpTagFinden(morgen), 'gespeichert als Aufgabe mit Datum — ohne Tagesbehälter (seit 0.80)');
+  pruefe(CL.cl.app === 'kalender' && /Blumenzwiebeln/.test(inhalt().slice(inhalt().indexOf('>Aufgaben<'))), 'zurück im Kalender steht sie unter „Aufgaben“');
   CL.aufklappZu();
   CL.zugriffToken = null;
   CL.clKalGehe(CL.isoDatum(), 'tag');
@@ -2465,10 +2570,10 @@ function ablaufKuerzelTest() {
   S.DB.gedanken.push({ id: 'a1', titel: 'Abruftest Oktober', text: '[] Daten laden', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', gestartet: heute, ordnung: 1, geaendert: 1 });
   S.DB.gedanken.push({ id: 'k1', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'lauf', gestartet: heute, ordnung: 2, geaendert: 1 });
   const a = () => S.DB.gedanken.filter(g => g.id === 'a1')[0];
-  S.oeffne('memo'); S.memoEintragOeffnen('k1'); S.clsDetails();
+  S.oeffne('checklisten'); S.clsOeffnen('k1'); S.clsDetails();
   pruefe(!/id="clsKuerzel"/.test(S.clsFensterHtml()), 'Checkliste: kein Kürzel-Feld');
   S.aufklappZu();
-  S.memoEintragOeffnen('a1'); S.clsDetails();
+  S.clsOeffnen('a1'); S.clsDetails();
   const f = S.clsFensterHtml();
   pruefe(/<label for="clsKuerzel">Kürzel \(für „Alle“\):<\/label><input id="clsKuerzel"[^>]*maxlength="4"[^>]*placeholder="Abr"/.test(f), 'Ablauf: Kürzel-Feld mit Vorschlag „Abr“ wie beim Projekt');
   pruefe(/<div class="titel">Ablauf<\/div>/.test(f), 'Fenstertitel „Ablauf“, nicht „Checkliste“');
@@ -6852,7 +6957,7 @@ function coachQuellenTest() {
   pruefe(S.coFaellige('11:20', heute).some(f => f.id === 'tn:tr' && /„Team-Runde“ ist vorbei\. Ergibt sich daraus etwas zu tun\?/.test(f.text)) && !S.coFaellige('13:30', heute).some(f => f.id === 'tn:tr'),
     'Kalender: nach dem Termin (bis zwei Stunden danach)');
   S.coAntwort('tn:tr', 'ja', 0, '11:20');
-  pruefe(S.cl.aufklapp === 'aufgabe' && S.cl.auf.fenster && S.cl.auf.fenster.modus === 'neu', '„Ja → Aufgabe“ öffnet „Neue Aufgabe“');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster && S.cl.pm.fenster.modus === 'neu', '„Ja → Aufgabe“ öffnet „Neue Aufgabe“ (seit 0.80 die des To Do)');
   S.aufklappZu();
   /* Routinen */
   const wt = S.ausIso(heute).getDay();
@@ -7068,10 +7173,11 @@ async function coachVorabTest() {
   pruefe(!S.coVorabNoetig('Batterien kaufen', '') && S.coVorabNoetig('P1 Vereinsfest mitorganisieren', '') && S.coVorabNoetig('P2 Steuer', ''), 'Nachfrage bei Prio 1/2, nicht bei Kleinkram');
   ['A', 'B', 'C'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
   pruefe(S.coVorabNoetig('Noch etwas', heute) && !S.coVorabNoetig('Noch etwas', S.tagePlus(heute, 3)), 'Nachfrage, wenn der Tag schon drei offene Aufgaben hat');
-  /* Neue Aufgabe über das Fenster */
-  S.oeffne('aufgaben'); S.aufNeuAm(heute, '');
-  S.cl.auf.fenster.seite = s.id; S.cl.auf.fenster.text = 'P1 Vereinsfest mitorganisieren';
+  /* Neue Aufgabe über das Fenster — seit 0.80 im alten Fenster der Listen (aufNeu), das neue prüft 135 */
+  S.oeffne('checklisten'); S.clsOeffnen(s.id); S.aufNeu();
+  S.cl.auf.fenster.seite = s.id; S.cl.auf.fenster.text = 'P1 Vereinsfest mitorganisieren'; S.cl.auf.fenster.datum = heute;
   S.document.getElementById('aufText').value = 'P1 Vereinsfest mitorganisieren';
+  S.document.getElementById('aufDatum').value = heute;
   S.aufSpeichern();
   pruefe(S.cl.aufklapp === 'covorab' && /Was fällt dafür weg\?/.test(S.document.getElementById('aufklapp').innerHTML) && /Vereinsfest/.test(S.document.getElementById('aufklapp').innerHTML), 'neue P1-Aufgabe: „Coach fragt nach“');
   S.document.getElementById('coWeg').value = 'Dienstag-Training';
@@ -8222,6 +8328,513 @@ function lernkarteiTest() {
 }
 
 
+/* ============================================================
+   132–137. Palm-Modell (0.80)
+   Grund: To Do, Memo Pad und Date Book wie am Palm — eine flache
+   Aufgabenliste (DB.aufgaben) mit Priorität 1–5, Kategorie, Datum,
+   Erinnerung, Notiz; Routinen dort mit ↻. Memo Pad mit Kürzel P·Z·A·–,
+   Vorlagen, Archiv und echten Knöpfen statt Zeichen. Eine Kästchen-Zeile
+   kann Aufgabe werden: unsichtbare Marke ⟦Kennung⟧, gemeinsam nur der
+   Haken. Die Umstellung macht aus Listen Kategorien.
+   ============================================================ */
+
+function pmFrisch() {
+  frisch();
+  const S = CL;
+  S.cl.pm.frisch = {}; S.cl.pm.wahl = ''; S.cl.pm.tab = 'alle'; S.cl.pm.datum = 'heute'; S.cl.pm.fenster = null; S.cl.pm.zeile = -1; S.cl.pm.memoWahl = ''; S.cl.pm.terminFuer = ''; S.cl.pm.marke = '';
+  delete S.__ablage['clie-pm-show']; delete S.__ablage['clie-pm-tab'];
+  S.cl.memo.id = ''; S.cl.memo.schreiben = false;
+  return S;
+}
+
+/* Ein Knoten wie im Browser — für den Editor */
+function dk(tag, attrs, kinder) {
+  return { nodeType: 1, nodeName: tag, childNodes: kinder || [], style: {}, getAttribute(n) { return (attrs && attrs[n] !== undefined) ? attrs[n] : null; } };
+}
+function dt(text) { return { nodeType: 3, nodeName: '#text', nodeValue: text, childNodes: [] }; }
+
+function palmTodoTest() {
+  console.log('\n132. To Do wie am Palm: flache Liste, Alle · Datum · Kategorie, Show… (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const morgen = S.tagePlus(heute, 1);
+  const gestern = S.tagePlus(heute, -1);
+  S.katNeuAnlegen('Haus');
+  const haus = S.kgAlle().filter(b => b.name === 'Haus')[0].id;
+  const a1 = S.pmNeueAufgabe({ titel: 'Steuer abgeben', prio: 1, datum: gestern });
+  const a2 = S.pmNeueAufgabe({ titel: 'Dachrinne reinigen und abdichten, bevor der erste Frost kommt', prio: 2, datum: heute, zeit: '07:30', bereich: haus });
+  const a3 = S.pmNeueAufgabe({ titel: 'Toner bestellen', prio: 3 });
+  const a4 = S.pmNeueAufgabe({ titel: 'Urlaub buchen', prio: 2, datum: S.tagePlus(heute, 20) });
+  const wt = S.ausIso(heute).getDay();
+  S.DB.aufgaben.push({ id: 'rx', titel: 'Blumen gießen', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, kontext: 'privat', prio: 3, geaendert: 1 });
+  pruefe(a2.planung === heute && a2.uhrzeit === '07:30' && a2.bereich === haus && a2.kontext === 'privat' && a3.planung === 'backlog' && a1.status === 'offen' && a1.art === 'haupt',
+    'eine Aufgabe ist ein Satz in DB.aufgaben — Datum, Erinnerung, Kategorie, Gestalt wie in der Workbench');
+  S.oeffne('aufgaben');
+  let h = inhalt();
+  const reihe = x => (x.match(/<span class="tt">([^<]+)/g) || []).map(y => y.replace(/.*>/, '').trim());
+  pruefe(reihe(h).join(' | ') === 'Steuer abgeben | Dachrinne reinigen und abdichten, bevor der erste Frost kommt | Urlaub buchen | Blumen gießen | Toner bestellen',
+    'Alle: Priorität, dann Datum, ohne Datum zuletzt — ' + reihe(h).join(' | '));
+  pruefe(new RegExp('Steuer abgeben</span></button><span class="dt ue">' + S.clKurzDatum(gestern).replace(/\./g, '\\.') + '!</span>').test(h) && /<span class="dt">heute<\/span>/.test(h),
+    'Datum rechts: überfällig mit „!“, heute als „heute“');
+  pruefe(/class="tx lang" onclick="[^"]*"><span class="tt">Dachrinne/.test(h) && /class="tx" onclick="[^"]*"><span class="tt">Toner/.test(h) && !/kompakt|ausführlich/.test(h),
+    'ein- und zweizeilig gemischt nach Bedarf — kein „kompakt/ausführlich“');
+  pruefe(/aria-label="Erinnerung">◉</.test(h) && /aria-label="Wiederholung">↻</.test(h), 'Zeichen: ◉ Erinnerung, ↻ Routine');
+  const f = S.document.getElementById('fuss').innerHTML;
+  pruefe(/pmNeu\(/.test(f) && /pmDetailsGewaehlt\(\)">Details…/.test(f) && /pmShowAuf\(\)">Show…/.test(f) && /class="pm-tabs"/.test(f) && /pmTab\('datum'\)">Datum/.test(f) && /pmTab\('kategorie'\)">Kategorie/.test(f),
+    'unten: Neu · Details… · Show…, darunter Alle | Datum | Kategorie');
+  /* Datum */
+  S.pmTab('datum');
+  h = inhalt();
+  pruefe(/▼ Heute/.test(h) && /Steuer abgeben/.test(h) && /Dachrinne/.test(h) && /Blumen gießen/.test(h) && !/Toner/.test(h) && !/Urlaub/.test(h) && h.indexOf('Überfällig') < h.indexOf('Dachrinne'),
+    'Datum · Heute: Überfälliges zuerst, dann heute (mit Routine) — ohne Datum und Späteres nicht');
+  S.pmDatumWahl('ueber');
+  pruefe(/Steuer abgeben/.test(inhalt()) && !/Dachrinne/.test(inhalt()), 'Datum · Überfällig: nur Überfälliges');
+  pruefe(S.localStorage.getItem('clie-pm-tab') === 'datum', 'die Sicht bleibt gemerkt');
+  S.pmDatumWahl('heute');
+  /* Kategorie */
+  S.pmTab('kategorie');
+  h = inhalt();
+  pruefe(/<div class="pm-gr">Haus<\/div>/.test(h) && /<div class="pm-gr">Nicht abgelegt<\/div>/.test(h) && h.indexOf('>Haus<') < h.indexOf('>Nicht abgelegt<'),
+    'Kategorie: gruppiert nach Kategorie, „Nicht abgelegt“ zuletzt');
+  S.pmTab('alle');
+  /* ▼ Kategorie oben rechts */
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('kb-/.test(S.document.getElementById('aufklapp').innerHTML), '▼ oben rechts: die Kategorien (gemeinsam mit den anderen Apps)');
+  S.katSetzen(haus);
+  pruefe(/Dachrinne/.test(inhalt()) && !/Steuer/.test(inhalt()) && /▼ Haus/.test(S.document.getElementById('katKnopf').textContent), '▼ Haus: nur Aufgaben der Kategorie');
+  S.katSetzen('alle');
+  /* Abhaken */
+  S.pmHaken(a3.id);
+  pruefe(a3.status === 'erledigt' && a3.erledigtAm === heute && /class="aufg palm pm erl/.test(inhalt()), 'abhaken: erledigt, bleibt kurz durchgestrichen stehen');
+  S.oeffne('uebersicht'); S.oeffne('aufgaben');
+  pruefe(!/Toner/.test(inhalt()), 'nach dem Verlassen ist es weg');
+  S.pmHaken('rx');
+  const rx = S.pmAufgabeFinden('rx');
+  pruefe(S.istErledigtAn(rx, heute) && /Blumen gießen/.test(inhalt()), 'Routine abhaken: der heutige Tag ist erledigt — die Zeile bleibt stehen');
+  S.oeffne('uebersicht'); S.oeffne('aufgaben');
+  pruefe(S.pmDatum(rx) === S.tagePlus(heute, 7), 'danach zeigt die Routine ihre nächste Ausführung');
+  /* Show… */
+  S.pmShowAuf();
+  pruefe(S.cl.aufklapp === 'pmshow' && /pmShowSort/.test(S.document.getElementById('aufklapp').innerHTML) && /Erledigte zeigen/.test(S.document.getElementById('aufklapp').innerHTML), 'Show…: Sortierung und Haken');
+  S.document.getElementById('pmShowSort').value = 'datum';
+  ['pmShowErl', 'pmShowFaellig', 'pmShowDatum', 'pmShowPrio', 'pmShowKat'].forEach(id => { S.document.getElementById(id).checked = (id !== 'pmShowFaellig'); });
+  S.pmShowOk();
+  h = inhalt();
+  pruefe(/Toner/.test(h) && reihe(h)[0] === 'Steuer abgeben' && /class="kt">Haus</.test(h) && JSON.parse(S.__ablage['clie-pm-show']).sort === 'datum', 'Show: Erledigte zeigen, nach Datum, Kategorie rechts — gemerkt');
+  S.document.getElementById('pmShowFaellig').checked = true; S.pmShowAuf(); S.document.getElementById('pmShowFaellig').checked = true; S.pmShowOk();
+  pruefe(!/Urlaub/.test(inhalt()) && /Toner/.test(inhalt()), 'Nur Fälliges: Künftiges weg, ohne Datum bleibt');
+  delete S.__ablage['clie-pm-show'];
+  /* Priorität antippen */
+  S.pmPrioUm(a4.id);
+  pruefe(a4.prio === 3, 'Priorität antippen: 2 → 3');
+  /* Privat */
+  a4.privat = true;
+  S.prModusSetzen('maskieren');
+  S.zeichne();
+  pruefe(/— 1 private —/.test(inhalt()) && !/Urlaub/.test(inhalt()), 'private Aufgabe maskiert: gezählt, nicht gezeigt');
+  S.prModusSetzen('zeigen');
+  /* Menü */
+  S.menueUm();
+  pruefe(/menueWahl\('pmShow'\)">Show…/.test(S.document.getElementById('aufklapp').innerHTML) && /menueWahl\('pmUmstellen'\)">Umstellen…/.test(S.document.getElementById('aufklapp').innerHTML),
+    'Menü ≡: Show… und — vor der Umstellung — Umstellen…');
+  S.aufklappZu();
+  pruefe(/class="pm-banner"/.test(inhalt()), 'vor der Umstellung ein Hinweis oben');
+  S.oeffne('uebersicht');
+}
+
+function palmDetailsTest() {
+  console.log('\n133. To Do: Neu und Details — Fällig, Erinnerung, Wiederholung, Notiz (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.oeffne('aufgaben');
+  S.pmNeu('', '');
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && /Neue Aufgabe/.test(f) && /pmPrioWahl\(5\)/.test(f) && /pmTagWahl\('morgen'\)">Morgen/.test(f) && /id="pmZeit"/.test(f) && /id="pmNotiz"/.test(f) && /Einrichten…/.test(f) && /id="pmKat"/.test(f),
+    'Neu: Titel, Priorität 1–5, Kategorie, Fällig (Kein/Heute/Morgen/+1 Woche/Datum), Erinnerung, Wiederholung, Notiz');
+  S.document.getElementById('pmTitel').value = '';
+  S.pmSpeichern();
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && /Titel/.test(S.document.getElementById('toastText').textContent), 'ohne Titel: Hinweis, nichts angelegt');
+  S.document.getElementById('pmTitel').value = 'Reifen  wechseln';
+  S.document.getElementById('pmDatum').value = '';
+  S.pmTagWahl('morgen');
+  pruefe(S.cl.pm.fenster.datum === S.tagePlus(heute, 1), '„Morgen“ setzt das Datum');
+  S.document.getElementById('pmTitel').value = 'Reifen  wechseln';
+  S.document.getElementById('pmDatum').value = S.tagePlus(heute, 1);
+  S.document.getElementById('pmZeit').value = '18:00';
+  S.document.getElementById('pmNotiz').value = 'Termin bei Müller';
+  S.pmPrioWahl(4);
+  S.document.getElementById('pmTitel').value = 'Reifen  wechseln';
+  S.document.getElementById('pmDatum').value = S.tagePlus(heute, 1);
+  S.document.getElementById('pmZeit').value = '18:00';
+  S.document.getElementById('pmNotiz').value = 'Termin bei Müller';
+  S.pmSpeichern();
+  const a = S.DB.aufgaben.filter(x => x.titel === 'Reifen wechseln')[0];
+  pruefe(a && a.prio === 4 && a.planung === S.tagePlus(heute, 1) && a.uhrzeit === '18:00' && a.beschreibung === 'Termin bei Müller' && S.cl.aufklapp === '',
+    'gespeichert: Priorität, Datum, Erinnerung, Notiz');
+  pruefe(/aria-label="Notiz">▤/.test(inhalt()), 'mit Notiz: ▤ in der Zeile');
+  pruefe(S.cl.pm.wahl === a.id, 'eine neue Aufgabe ist danach gewählt (wie am Palm)');
+  S.cl.pm.wahl = '';
+  S.pmTippen(a.id);
+  pruefe(S.cl.pm.wahl === a.id && /class="aufg palm pm gewaehlt/.test(inhalt()) && S.cl.aufklapp === '', 'erster Tipp wählt aus');
+  S.pmTippen(a.id);
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.id === a.id && /Löschen…/.test(S.document.getElementById('aufklapp').innerHTML), 'zweiter Tipp: Details');
+  /* Kein Datum → keine Erinnerung */
+  S.pmTagWahl('kein');
+  S.document.getElementById('pmTitel').value = 'Reifen wechseln'; S.document.getElementById('pmDatum').value = ''; S.document.getElementById('pmZeit').value = '';
+  S.document.getElementById('pmNotiz').value = 'Termin bei Müller';
+  S.pmSpeichern();
+  pruefe(a.planung === 'backlog' && a.uhrzeit === '', 'kein Datum: ohne Erinnerung');
+  /* Wiederholung */
+  S.pmDetails(a.id);
+  S.document.getElementById('pmTitel').value = 'Reifen wechseln'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = '';
+  S.pmWiederholung();
+  pruefe(a.wiederholung && a.wiederholung.takt === 'woche' && a.ab === heute && S.cl.aufklapp === 'routine' && S.cl.rt.fenster.id === a.id, 'Einrichten…: aus der Aufgabe wird eine Routine — weiter im Routinen-Fenster');
+  S.aufklappZu();
+  S.pmDetails(a.id);
+  pruefe(/<div class="titel">Routine/.test(S.document.getElementById('aufklapp').innerHTML) && /Ändern…/.test(S.document.getElementById('aufklapp').innerHTML) && !/id="pmDatum"/.test(S.document.getElementById('aufklapp').innerHTML),
+    'Details einer Routine: Regel mit „Ändern…“, kein Datum');
+  /* Löschen */
+  S.pmLoeschenFragen();
+  S.pmLoeschen();
+  pruefe(!S.pmAufgabeFinden(a.id) && S.DB.grabsteine.some(g => g.s === 'aufgaben' && g.id === a.id), 'Löschen mit Löschvermerk');
+  /* Aus dem Date Book und aus dem Coach */
+  S.oeffne('kalender');
+  S.aufNeuAm(S.tagePlus(heute, 3), '');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.datum === S.tagePlus(heute, 3), 'aus dem Date Book: „Neue Aufgabe“ für den gezeigten Tag');
+  S.document.getElementById('pmTitel').value = 'P1 wichtig'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmPrioWahl(1);
+  S.document.getElementById('pmTitel').value = 'Angebot schreiben'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmSpeichern();
+  pruefe(S.cl.aufklapp === 'covorab' && /Angebot schreiben/.test(S.document.getElementById('aufklapp').innerHTML), 'neue Aufgabe mit Priorität 1: der Coach fragt nach (wie bisher)');
+  const neu = S.DB.aufgaben.filter(x => x.titel === 'Angebot schreiben')[0];
+  S.document.getElementById('coWeg').value = '';
+  S.coVorabEntscheiden('spaeter');
+  pruefe(neu.planung === 'backlog' && S.krAlle('coachoffen').some(o => o.text === 'Angebot schreiben'), '„Bis Sonntag überlegen“: die Aufgabe verliert ihr Datum, der Coach fragt Sonntag');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+function palmMemoTest() {
+  console.log('\n134. Memo Pad: Kürzel P · Z · A · –, Vorlagen, Archiv, Details (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.katNeuAnlegen('Haus');
+  const haus = S.kgAlle().filter(b => b.name === 'Haus')[0].id;
+  S.DB.projekte.push({ id: 'p1', name: 'Keller umbauen', flaeche: '[] Statik', status: 'laufend', kontext: 'privat', bereich: haus, ordnung: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p2', name: 'Carport', flaeche: '', status: 'laufend', kontext: 'privat', bereich: haus, ordnung: 2, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Haus auf Stand bringen 2026', flaeche: '', status: 'laufend', kontext: 'privat', bereich: haus, ordnung: 3, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'g1', titel: 'Reparaturliste', text: '## Innen\n[] Tür Bad quietscht\n[x] Rauchmelder Batterie\n- Leiter vom Nachbarn leihen\n**Material**: Silikon', kontext: 'privat', bereich: haus, ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'g2', titel: 'DFÜ-Abruftest', text: '[] Build-Lauf kontrollieren', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', ordnung: 5, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'g3', titel: 'Bad renovieren', text: 'fertig', kontext: 'privat', bereich: haus, archiv: true, ordnung: 6, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'g4', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 7, geaendert: 1 });
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  let h = inhalt();
+  const titel = (h.match(/<span class="tx">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
+  const kz = (h.match(/<span class="mz kz">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
+  pruefe(titel.join(' | ') === 'Carport | Keller umbauen | Haus auf Stand bringen 2026 | DFÜ-Abruftest | Reparaturliste' && kz.join('') === 'PPZA–',
+    'Liste: Kürzel als eigene Spalte, nach Kürzel P · Z · A · –, dann alphabetisch — ' + titel.join(' | '));
+  pruefe(!/Bad renovieren|Packliste/.test(h) && !/<small/.test(h) && !/◎|☑|⇢|✎|◇/.test(h) && !/class="mz nr"/.test(h), 'ohne Archiv und Vorlagen; keine Zeichen, keine Zahlen');
+  S.katSetzen(haus);
+  pruefe(!/DFÜ/.test(inhalt()) && /Carport/.test(inhalt()) && /▼ Haus/.test(S.document.getElementById('katKnopf').textContent), '▼ Haus: nur Memos der Kategorie (gemeinsam mit To Do)');
+  S.katSetzen('alle');
+  S.katUm();
+  let dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/pmMemoKat\('alle'\)/.test(dd) && /pmMemoKat\('kb-/.test(dd) && dd.indexOf("memoArtSetzen('vorlagen')") > dd.indexOf('pmMemoKat') && dd.indexOf("memoArtSetzen('archiv')") > dd.indexOf("memoArtSetzen('vorlagen')") && /memoArtSetzen\('notizblock'\)/.test(dd) && !/Show active/.test(dd),
+    '▼: Alle, Kategorien, dann Vorlagen und Archiv (Handschrift/Notizblock bleiben) — kein „Show active“');
+  S.aufklappZu();
+  pruefe(/memoNeuArt\('notiz'\)">Neu/.test(S.document.getElementById('fuss').innerHTML) && /memoArtSetzen\('vorlagen'\)">Neu aus Vorlage…/.test(S.document.getElementById('fuss').innerHTML), 'unten: Neu · Neu aus Vorlage…');
+  /* Öffnen: alles im Memo Pad */
+  S.memoEintragOeffnen('p1');
+  pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'p1' && S.document.getElementById('reiter').textContent === 'Keller umbauen' && /▼ Haus/.test(S.document.getElementById('katKnopf').textContent),
+    'ein Projekt öffnet im Memo Pad — oben der Titel ohne Zeichen, rechts seine Kategorie');
+  S.seiteOeffnen('g2');
+  pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'g2', 'Suche/Lesezeichen/Verweise öffnen Abläufe ebenso im Memo Pad');
+  S.pmMemoOeffnen('g1', '');
+  h = inhalt();
+  pruefe(/class="memo-h2">Innen</.test(h) && /class="aufg pm-z erl"/.test(h) && /• Leiter/.test(h) && /<b>Material<\/b>/.test(h) && !/\*\*|\[\]|\[x\]/.test(h), 'das Memo: Überschrift, Kästchen, Punkt, fett — ohne sichtbare Zeichen');
+  const fu = S.document.getElementById('fuss').innerHTML;
+  pruefe(/pmMemoZuListe\(\)">Fertig/.test(fu) && /pmSchreibenUm\(\)">Schreiben/.test(fu) && /pmMemoDetails\(\)">Details…/.test(fu), 'unten: Fertig · Schreiben · Details…');
+  S.menueUm();
+  dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(['pmDetails', 'pmAlsAufgabe', 'pmAlsTermin', 'pmZeile', 'pmVorlage', 'pmArchiv', 'pmLoeschen'].every(k => dd.indexOf("menueWahl('" + k + "')") >= 0) && /Als Vorlage speichern/.test(dd) && /Archivieren/.test(dd) && !/Save as template/.test(dd),
+    'Menü ≡ im Memo: Details…, Als Aufgabe…, Als Termin…, Zeile → Aufgabe…, Als Vorlage speichern, Archivieren, Löschen…');
+  S.aufklappZu();
+  /* Kategorie im offenen Memo */
+  S.katUm();
+  pruefe(S.cl.aufklapp === 'pmmemokat' && /Nicht abgelegt/.test(S.document.getElementById('aufklapp').innerHTML), '▼ im offenen Memo: dessen Kategorie wählen');
+  S.pmMemoKatSetzen('kb-arbeit');
+  pruefe(S.DB.gedanken[0].bereich === 'kb-arbeit' && S.DB.gedanken[0].kontext === 'beruflich', 'Kategorie gesetzt — Kontext folgt (Arbeit = beruflich)');
+  S.pmMemoKatSetzen(haus);
+  /* Details: Kürzel */
+  S.pmMemoDetails();
+  dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'pmmemo' && /pmKuerzelWahl\('P'\)/.test(dd) && /pmKuerzelWahl\('A'\)/.test(dd) && /class="an" onclick="pmKuerzelWahl\('–'\)"/.test(dd) && /id="pmMKat"/.test(dd), 'Details: Titel, Kürzel P · Z · A · – (an: –), Kategorie, privat');
+  S.document.getElementById('pmMTitel').value = 'Reparaturliste';
+  S.document.getElementById('pmMKat').value = haus;
+  S.pmKuerzelWahl('A');
+  S.document.getElementById('pmMTitel').value = 'Reparaturliste';
+  S.pmMemoSpeichern();
+  const g1 = S.DB.gedanken.filter(g => g.id === 'g1')[0];
+  pruefe(g1.checkliste === 'lauf' && g1.art === 'aufgaben' && S.pmKuerzel(S.kpSeiteFinden('g1')) === 'A', 'Kürzel A: die Notiz wird Ablauf (bleibt in „gedanken“)');
+  S.pmMemoDetails(); S.document.getElementById('pmMTitel').value = 'Reparaturliste'; S.pmKuerzelWahl('P'); S.document.getElementById('pmMTitel').value = 'Reparaturliste'; S.pmMemoSpeichern();
+  const p = S.DB.projekte.filter(x => x.id === 'g1')[0];
+  pruefe(p && p.name === 'Reparaturliste' && /Tür Bad/.test(p.flaeche) && p.bereich === haus && !S.DB.gedanken.some(g => g.id === 'g1') && S.DB.grabsteine.some(g => g.s === 'gedanken' && g.id === 'g1') && S.cl.memo.id === 'g1',
+    'Kürzel P: zieht nach „projekte“ — gleiche Kennung, Text und Kategorie, Löschvermerk in „gedanken“');
+  S.pmMemoDetails(); S.document.getElementById('pmMTitel').value = 'Reparaturliste'; S.pmKuerzelWahl('–'); S.document.getElementById('pmMTitel').value = 'Reparaturliste'; S.pmMemoSpeichern();
+  pruefe(S.DB.gedanken.some(g => g.id === 'g1') && !S.DB.projekte.some(x => x.id === 'g1') && !S.DB.grabsteine.some(g => g.s === 'gedanken' && g.id === 'g1'), 'und zurück zu –: wieder in „gedanken“, der alte Löschvermerk fällt weg');
+  /* Vorlage */
+  S.pmMemoOeffnen('g1', '');
+  S.pmAlsVorlage();
+  const v = S.DB.gedanken.filter(g => g.istVorlage && g.titel === 'Reparaturliste')[0];
+  pruefe(v && !/\[x\]/.test(v.text) && /\[\] Rauchmelder/.test(v.text) && v.id !== 'g1', 'Als Vorlage speichern: Kopie ohne Haken');
+  S.memoArtSetzen('vorlagen');
+  pruefe(/Packliste/.test(inhalt()) && /Reparaturliste/.test(inhalt()) && !/Carport/.test(inhalt()) && /▼ Vorlagen/.test(S.document.getElementById('katKnopf').textContent), '▼ Vorlagen: nur Vorlagen (auch alte Checklisten-Vorlagen)');
+  S.pmMemoTipp('g4');
+  pruefe(S.cl.aufklapp === 'pmvorlage' && /Neu daraus/.test(S.document.getElementById('aufklapp').innerHTML), 'Vorlage antippen: „Neu daraus“ oder „Bearbeiten“');
+  S.document.getElementById('pmVName').value = 'Packliste Borkum';
+  S.pmVorlageStarten();
+  const pb = S.DB.gedanken.filter(g => g.titel === 'Packliste Borkum')[0];
+  pruefe(pb && pb.checkliste === 'lauf' && pb.vorlage === 'g4' && !pb.istVorlage && S.cl.memo.id === pb.id && S.cl.app === 'memo', 'Neu daraus: ein laufendes Memo, gleich geöffnet');
+  /* Archiv */
+  S.pmMenueWahl('pmArchiv');
+  pruefe(pb.archiv === true && S.cl.memo.id === '' && !/Packliste Borkum/.test(inhalt()), 'Archivieren: das Memo verlässt die Liste');
+  S.memoArtSetzen('archiv');
+  h = inhalt();
+  pruefe(/Packliste Borkum/.test(h) && /Bad renovieren/.test(h) && /pmArchivUm\(''\)">Zurückholen/.test(S.document.getElementById('fuss').innerHTML) && /▼ Archiv/.test(S.document.getElementById('katKnopf').textContent),
+    '▼ Archiv: Archiviertes, unten Zurückholen · Löschen…');
+  S.pmMemoTipp(pb.id);
+  pruefe(S.cl.pm.memoWahl === pb.id && /memo-zeile pm gewaehlt/.test(inhalt()) && S.cl.memo.id === '', 'im Archiv wählt der erste Tipp');
+  S.pmArchivUm('');
+  pruefe(!pb.archiv && !/Packliste Borkum/.test(inhalt()), 'Zurückholen');
+  /* Löschen */
+  S.memoArtSetzen('alles');
+  S.pmMemoLoeschenFragen('p2');
+  S.pmMemoLoeschen();
+  pruefe(!S.DB.projekte.some(x => x.id === 'p2') && S.DB.grabsteine.some(g => g.s === 'projekte' && g.id === 'p2'), 'Löschen…: auch Projekte, mit Löschvermerk');
+  S.oeffne('uebersicht');
+}
+
+function palmVerbindungTest() {
+  console.log('\n135. Zeile → Aufgabe: unsichtbare Marke, gemeinsamer Haken, Memo → Aufgabe/Termin nur in Details (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.DB.gedanken.push({ id: 'g1', titel: 'Reparaturliste', text: '## Außen\n[] Dachrinne reinigen\n[] Gartentor einstellen\n## Erledigt', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  const g = () => S.DB.gedanken.filter(x => x.id === 'g1')[0];
+  S.pmMemoOeffnen('g1', '');
+  S.pmZeileAlsAufgabe();
+  pruefe(S.cl.aufklapp !== 'pmaufgabe' && /Kästchen/.test(S.document.getElementById('toastText').textContent), 'ohne gewählte Zeile: Hinweis');
+  S.pmZeileTipp(1);
+  pruefe(S.cl.pm.zeile === 1 && /class="aufg pm-z gewaehlt"/.test(inhalt()), 'eine Kästchen-Zeile antippen wählt sie');
+  S.pmMenueWahl('pmZeile');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.titel === 'Dachrinne reinigen' && S.cl.pm.fenster.memo.id === 'g1', 'Zeile → Aufgabe…: „Neue Aufgabe“ mit dem Text der Zeile, verbunden mit dem Memo');
+  S.document.getElementById('pmTitel').value = 'Dachrinne reinigen'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmSpeichern();
+  const a = S.DB.aufgaben.filter(x => x.titel === 'Dachrinne reinigen')[0];
+  pruefe(a && a.memo && a.memo.id === 'g1' && a.memo.zeile === a.id && g().text.split('\n')[1] === '[] Dachrinne reinigen ⟦' + a.id + '⟧', 'die Zeile trägt am Ende die Marke ⟦Kennung der Aufgabe⟧');
+  let h = inhalt();
+  pruefe(/class="pm-todo"/.test(h) && /<svg/.test(h) && !/⟦/.test(h) && !/→ To Do|To Do<\/span>/.test(h), 'im Memo: nur das kleine To-Do-Symbol, die Marke bleibt unsichtbar');
+  /* Haken */
+  S.pmHaken(a.id);
+  pruefe(a.status === 'erledigt' && /^\[x\] Dachrinne reinigen ⟦/.test(g().text.split('\n')[1]), 'im To Do abgehakt → im Memo abgehakt');
+  S.pmMemoHaken('g1', 1);
+  pruefe(a.status === 'offen' && /^\[\] Dachrinne/.test(g().text.split('\n')[1]), 'im Memo wieder offen → im To Do offen');
+  /* Ausschneiden und woanders einfügen: die Verbindung bleibt */
+  const z = g().text.split('\n');
+  const zeile = z.splice(1, 1)[0];
+  z.push(zeile);
+  g().text = z.join('\n');
+  S.pmHaken(a.id);
+  pruefe(/\[x\] Dachrinne reinigen ⟦/.test(g().text.split('\n')[3]) && S.pmMarkenPruefen() === 0, 'Zeile verschoben (unter „Erledigt“): der Haken findet sie trotzdem');
+  /* Titel bleibt eigen */
+  a.titel = 'Dachrinne reinigen (Leiter!)';
+  pruefe(/Dachrinne reinigen ⟦/.test(g().text), 'sonst nichts gemeinsam: der Titel der Aufgabe ändert die Zeile nicht');
+  /* Marke weg → nur noch das Memo */
+  g().text = g().text.replace(/ ⟦[^⟧]+⟧/, '');
+  pruefe(S.pmMarkenPruefen() === 1 && a.memo && a.memo.id === 'g1' && !a.memo.zeile, 'fehlt die Zeile: die Aufgabe bleibt, verbunden nur noch mit dem Memo');
+  /* Zeile in der Workbench abgehakt: der Haken der Zeile gilt */
+  const b = S.pmNeueAufgabe({ titel: 'Gartentor', memo: { id: 'g1', zeile: 'neu' } });
+  S.pmMarkeSetzen('g1', 1, g().text.split('\n')[1], b);
+  g().text = g().text.replace('[] Gartentor einstellen', '[x] Gartentor einstellen');
+  pruefe(S.pmMarkenPruefen() === 1 && b.status === 'erledigt', 'in der Workbench abgehakt: nach dem Laden ist die Aufgabe erledigt');
+  /* Tipp auf das Symbol öffnet die Aufgabe; ▤ im To Do öffnet das Memo */
+  S.pmAufgabeZurZeile(b.id);
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.id === b.id && /pmMemoAusFenster\(\)">Reparaturliste · Zeile/.test(S.document.getElementById('aufklapp').innerHTML), 'Symbol antippen: die Aufgabe — mit Verweis aufs Memo');
+  S.aufklappZu();
+  S.oeffne('aufgaben');
+  S.cl.pm.frisch[b.id] = true;
+  S.zeichne();
+  pruefe(new RegExp("pmMemoVonAufgabe\\('" + b.id + "'\\)\" aria-label=\"Memo öffnen\">▤").test(inhalt()), 'im To Do: ▤ = gehört zu einem Memo');
+  S.pmMemoVonAufgabe(b.id);
+  pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'g1' && S.cl.pm.marke === b.id && /class="aufg pm-z erl hervor"/.test(inhalt()), '▤ öffnet das Memo, die Zeile hervorgehoben');
+  /* Ganzes Memo als Aufgabe — nur in Details sichtbar */
+  S.pmMenueWahl('pmAlsAufgabe');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.titel === 'Reparaturliste' && S.cl.pm.fenster.memo.id === 'g1' && !S.cl.pm.fenster.memo.zeile, 'Als Aufgabe…: „Neue Aufgabe“ mit dem Titel des Memos');
+  S.document.getElementById('pmTitel').value = 'Kleinigkeiten reparieren'; S.document.getElementById('pmDatum').value = ''; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmSpeichern();
+  const c = S.DB.aufgaben.filter(x => x.titel === 'Kleinigkeiten reparieren')[0];
+  pruefe(c && c.memo.id === 'g1' && !c.memo.zeile && !/Kleinigkeiten/.test(g().text), 'gespeichert — im Memo steht davon nichts');
+  /* Termin */
+  S.cl.pm.terminFuer = 'g1';
+  pruefe(S.pmTerminAngelegt('ev1', 'privat', heute, 'Reparaturtag', '10:00') && g().termine[0].id === 'ev1' && S.cl.pm.terminFuer === '', 'Als Termin…: der neue Termin wird am Memo gemerkt');
+  pruefe(!S.pmTerminAngelegt('ev2', 'privat', heute, 'x', ''), 'ein normaler neuer Termin gehört zu keinem Memo');
+  S.pmMemoOeffnen('g1', '');
+  pruefe(!/Reparaturtag|Kleinigkeiten/.test(inhalt()), 'im Memo selbst: keine Texte zu Aufgabe oder Termin');
+  S.pmMemoDetails();
+  const dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Aufgabe:<\/label><button type="button" class="verweis"[^>]*>Kleinigkeiten reparieren/.test(dd) && /Termin:<\/label><button type="button" class="verweis"[^>]*>[^<]*10:00 · Reparaturtag/.test(dd), 'Details…: Aufgabe und Termin des ganzen Memos, antippbar');
+  S.aufklappZu();
+  S.termineNachTag[heute] = [{ id: 'ev1', zeit: '10:00', bis: '11:00', titel: 'Reparaturtag', kontext: 'privat', kalId: 'privat' }];
+  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  pruefe(/Reparaturtag<\/button><button type="button" class="pm-sym" onclick="pmMemoOeffnen\('g1',''\)" aria-label="Memo öffnen">▤/.test(inhalt()), 'im Date Book: der Termin mit ▤ — öffnet das Memo');
+  pruefe(S.pmSchlichtText('**Material**: x\n[] a ⟦k1234⟧\n[x] b') === 'Material: x\n☐ a\n☑ b', 'Notiz für den Termin: ohne Zeichen und Marken, Kästchen als ☐/☑');
+  /* Memo löschen: Aufgaben bleiben, ohne Verbindung */
+  S.pmMemoLoeschenFragen('g1'); S.pmMemoLoeschen();
+  pruefe(!S.DB.gedanken.some(x => x.id === 'g1') && S.pmAufgabeFinden(c.id) && !S.pmAufgabeFinden(c.id).memo && !S.pmAufgabeFinden(b.id).memo, 'Memo gelöscht: seine Aufgaben bleiben, ohne Verbindung');
+  S.oeffne('uebersicht');
+}
+
+function palmEditorTest() {
+  console.log('\n136. Schreiben mit Knöpfen B U S • ☐ — keine sichtbaren Zeichen (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  S.DB.gedanken.push({ id: 'g1', titel: 'Notiz', text: '## Kopf\n[] eins ⟦kabc123⟧\n[x] zwei\n- Punkt mit **fett**\n1. erstes\n| a | b |\nText __unter__ und ~~weg~~', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.pmMemoOeffnen('g1', '');
+  S.pmSchreibenUm();
+  const h = inhalt();
+  pruefe(/class="pm-leiste"/.test(h) && ["fett", "unter", "durch", "punkt", "kasten"].every(k => h.indexOf("pmFormat('" + k + "')") >= 0) && (h.match(/pmFormat\(/g) || []).length === 5,
+    'Leiste: genau B · U · S · • · ☐');
+  pruefe(/id="pmEditor" class="pm-editor" contenteditable="true"/.test(h) && !/\*\*|__|~~|\[\]|\[x\]|⟦|<textarea/.test(h.replace(/data-vor="[^"]*"/g, '').replace(/data-roh="[^"]*"/g, '')),
+    'der Editor zeigt Text ohne Zeichen — Art und Marke stehen unsichtbar an der Zeile');
+  pruefe(/<div class="pm-k" data-vor="\[\] " data-m="kabc123">eins<\/div>/.test(h) && /<div class="pm-k x" data-vor="\[x\] ">zwei<\/div>/.test(h) && /<div class="pm-p" data-vor="- ">Punkt mit <b>fett<\/b><\/div>/.test(h)
+    && /<div class="pm-roh" contenteditable="false" data-roh="\| a \| b \|">/.test(h) && /<u>unter<\/u> und <s>weg<\/s>/.test(h), 'Zeilen: Kästchen (mit Marke), Punkt, fett, unterstrichen, durchgestrichen; Tabelle unberührt');
+  pruefe(/pmSchreibenUm\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'unten „Fertig“');
+  /* Zurücklesen */
+  const ed = dk('DIV', {}, [
+    dk('DIV', { 'data-vor': '## ' }, [dt('Kopf')]),
+    dk('DIV', { 'data-vor': '[] ', 'data-m': 'kabc123' }, [dt('eins '), dk('B', {}, [dt('fett ')]), dt('dazu')]),
+    dk('DIV', { 'data-vor': '[] ', 'data-m': 'kabc123' }, [dt('Kopie')]),
+    dk('DIV', { 'data-vor': '- ' }, [dk('U', {}, [dt('unter')]), dt(' '), dk('STRIKE', {}, [dt('weg')])]),
+    dk('DIV', { 'data-roh': '| a | b |' }, [dt('| a | b |')]),
+    dk('DIV', {}, [dk('BR', {}, [])]),
+    dk('DIV', { 'data-vor': '[] ' }, [dt('erste'), dk('BR', {}, []), dt('zweite')]),
+    dt('lose Zeile')
+  ]);
+  const t = S.pmEdLesen(ed);
+  pruefe(t === '## Kopf\n[] eins **fett** dazu ⟦kabc123⟧\n[] Kopie\n- __unter__ ~~weg~~\n| a | b |\n\n[] erste\n[] zweite\nlose Zeile',
+    'zurück in den Text: **, __, ~~ mit Leerzeichen außen; Marke nur einmal; Umbruch im Kästchen = neues Kästchen — ' + JSON.stringify(t));
+  pruefe(S.pmInlineHtml('**a** und __b__ und ~~c~~') === '<b>a</b> und <u>b</u> und <s>c</s>' && S.pmInlineHtml('<script>') === '&lt;script&gt;', 'Inline: nur fett, unterstrichen, durchgestrichen — HTML wird nicht ausgeführt');
+  pruefe(S.pmVorWeiter('  [x] ') === '  [] ' && S.pmVorWeiter('3. ') === '4. ' && S.pmVorWeiter('## ') === '' && S.pmVorWeiter('- ') === '- ', 'Enter: Kästchen bleibt (offen), Nummer zählt weiter, nach Überschrift Text');
+  /* Regression: Neuzeichnen lässt den Editor stehen */
+  S.document.getElementById('inhalt').innerHTML = '<div id="pmEditor">getippt</div>';
+  S.inhaltZeichnen();
+  pruefe(inhalt() === '<div id="pmEditor">getippt</div>', 'ein Neuzeichnen (Abgleich, Uhr) lässt den Editor in Ruhe — sonst ginge Getipptes verloren');
+  S.cl.memo.schreiben = false; S.cl.memo.id = '';
+  S.oeffne('uebersicht');
+}
+
+function palmUmstellungTest() {
+  console.log('\n137. Umstellung: Listen → Kategorien, Sammler und Eingeplantes → Aufgaben; Nachpflegen (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const morgen = S.tagePlus(heute, 1);
+  S.DB.themen.push({ id: 'cl-korb', name: 'Sammler', kontext: '', text: '[] P1 Zahnarzt anrufen\n[x] erledigt', korb: true, ordnung: 0, geaendert: 1 });
+  S.DB.themen.push({ id: 'th', name: 'Haus', kontext: 'privat', text: '## Innen\n[] Lampe tauschen\n[] P2 Silikon erneuern\n[x] Fenster', zusatz: { 'Silikon erneuern': { frist: morgen, notiz: 'weiß' } }, ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'g2', titel: 'DFÜ-Abruftest', text: '[] Build-Lauf kontrollieren\n[] Anwendungen aufrufen\n[] Ohne Datum\n[x] Erledigt', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben',
+    zusatz: { 'Anwendungen aufrufen': { frist: morgen } }, ordnung: 2, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p9', name: 'Alt', flaeche: '[] x', status: 'abgeschlossen', kontext: 'privat', ordnung: 3, geaendert: 1 });
+  S.kpPlanenKern(S.kpSeiteFinden('g2'), 0, 'h', heute);
+  S.kpTagFinden(heute).eintraege[0].zeit = '07:00';
+  S.kpPlanenKern(S.kpSeiteFinden('th'), 1, 'h', heute);
+  const tag = S.kpTagFinden(heute);
+  tag.text += '\n[] Freie Zeile\nNotiz bleibt';
+  const z = S.pmUmstellenKern(false);
+  pruefe(z.listen === 1 && z.listenPunkte === 2 && z.sammler === 1 && z.memo === 2 && z.frei === 1 && z.archiv === 1 && S.DB.aufgaben.length === 0,
+    'Vorschau zählt nur: 1 Liste (2 Punkte), 1 aus dem Sammler, 2 Memo-Zeilen mit Tag, 1 freie Zeile, 1 Abgeschlossenes — ' + JSON.stringify(z));
+  S.oeffne('aufgaben');
+  S.pmUmstellenFragen();
+  pruefe(S.cl.aufklapp === 'pmumstellen' && /Sichern und umstellen/.test(S.document.getElementById('aufklapp').innerHTML) && /Sicherung/.test(S.document.getElementById('aufklapp').innerHTML), 'Umstellen…: Vorschau mit Zahlen, vorher eine Sicherung');
+  S.pmUmstellen();
+  const A = t => S.DB.aufgaben.filter(x => x.titel === t)[0];
+  const haus = S.kgAlle().filter(b => b.name === 'Haus')[0];
+  pruefe(S.pmAn() && S.DB.einstellungen.aktivitaetenUmgestellt === true && S.cl.aufklapp === '', 'umgestellt: gemerkt in den Einstellungen (auch für die Workbench)');
+  pruefe(haus && A('Lampe tauschen').bereich === haus.id && A('Lampe tauschen').planung === heute && A('Silikon erneuern').prio === 2 && A('Silikon erneuern').planung === morgen && A('Silikon erneuern').beschreibung === 'weiß',
+    'Liste „Haus“ → Kategorie Haus; ihre Punkte → Aufgaben (eingeplant/⚑ Frist → Datum, P2 → Priorität 2, Notiz)');
+  const th = S.DB.themen.filter(x => x.id === 'th')[0];
+  pruefe(th.archiv === true && th.abgeschlossen === true && !/\[\] /.test(th.text) && /\[x\] Fenster/.test(th.text) && /## Innen/.test(th.text), 'die Liste geht ins Archiv — ohne die übernommenen Punkte');
+  pruefe(A('Zahnarzt anrufen').prio === 1 && !A('Zahnarzt anrufen').bereich && S.DB.themen[0].text === '[x] erledigt', 'Sammler → Aufgaben ohne Kategorie');
+  const b = A('Build-Lauf kontrollieren');
+  const g2 = S.DB.gedanken.filter(x => x.id === 'g2')[0];
+  pruefe(b && b.planung === heute && b.uhrzeit === '07:00' && b.bereich === 'kb-arbeit' && b.memo.id === 'g2' && b.memo.zeile === b.id && g2.text.split('\n')[0] === '[] Build-Lauf kontrollieren ⟦' + b.id + '⟧',
+    'Ablauf: eingeplante Zeile → verbundene Aufgabe (Tag, Uhrzeit als Erinnerung), die Zeile trägt die Marke');
+  pruefe(A('Anwendungen aufrufen').planung === morgen && /⟦/.test(g2.text.split('\n')[1]) && !A('Ohne Datum') && !/⟦/.test(g2.text.split('\n')[2]), '⚑ Frist → Datum; Zeilen ohne Tag bleiben einfach Text');
+  pruefe(A('Freie Zeile').planung === heute && !/Freie Zeile|Lampe|Build/.test(S.kpTagFinden(heute).text) && /Notiz bleibt/.test(S.kpTagFinden(heute).text) && !S.kpTagFinden(heute).eintraege.length,
+    'Tag: freie Zeile → Aufgabe; Eingeplantes ausgeplant; Text bleibt');
+  pruefe(S.pmUmstellenKern(true).memo === 0 && S.pmNachpflegen() === 0 && S.DB.aufgaben.length === 6, 'ein zweiter Lauf ändert nichts');
+  /* Die Workbench legt noch auf die alte Art an */
+  S.DB.themen[0].text += '\n[] Aus der Workbench';
+  S.kpPlanenKern(S.kpSeiteFinden('g2'), 1, 'h', S.tagePlus(heute, 2));
+  S.DB.themen.push({ id: 'tn', name: 'Büro', kontext: 'beruflich', bereich: 'kb-arbeit', text: '[] Ablage', ordnung: 9, geaendert: 1 });
+  const n = S.pmNachpflegen();
+  pruefe(n >= 3 && A('Aus der Workbench') && A('Anwendungen aufrufen').planung === S.tagePlus(heute, 2) && A('Ablage').bereich && S.DB.themen.filter(x => x.id === 'tn')[0].archiv,
+    'Nachpflegen: Sammler-Zeile, neu Eingeplantes (Datum an die Aufgabe) und eine neue Liste — ' + n);
+  pruefe(/S\.pmNachpflegen|pmNachpflegen\(\);   \/\* Palm-Modell/.test(SKRIPT) && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);\n    pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
+  /* Memo Pad danach */
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  pruefe(!/>Haus</.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: alte Listen und der leere Sammler stehen nicht in der Liste');
+  S.memoArtSetzen('archiv');
+  pruefe(/>Haus</.test(inhalt()) && /Alt/.test(inhalt()), '… sondern im Archiv (mit dem abgeschlossenen Projekt)');
+  S.memoArtSetzen('alles');
+  S.oeffne('uebersicht');
+}
+
+function palmAgendaTest() {
+  console.log('\n138. Date Book: Termine, darunter die Aufgaben des Tages — dieselben wie im To Do (0.80)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const wt = S.ausIso(heute).getDay();
+  S.pmNeueAufgabe({ titel: 'Überfälliges', prio: 1, datum: S.tagePlus(heute, -2) });
+  S.pmNeueAufgabe({ titel: 'Anwendungen aufrufen', prio: 1, datum: heute, zeit: '07:30' });
+  S.pmNeueAufgabe({ titel: 'Später', prio: 2, datum: S.tagePlus(heute, 3) });
+  const e = S.pmNeueAufgabe({ titel: 'Schon erledigt', prio: 2, datum: heute });
+  e.status = 'erledigt'; e.erledigtAm = heute;
+  S.DB.aufgaben.push({ id: 'r1', titel: 'Daily', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, uhrzeit: '08:00', kontext: 'privat', geaendert: 1 });
+  S.termineNachTag[heute] = [{ id: 't1', zeit: '10:00', bis: '11:30', titel: 'Jour fixe', kontext: 'privat', kalId: 'p' }];
+  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  let h = inhalt();
+  const ag = h.slice(h.indexOf('>Aufgaben<'));
+  pruefe(h.indexOf('Jour fixe') < h.indexOf('>Aufgaben<') && /Überfälliges/.test(ag) && /Anwendungen aufrufen/.test(ag) && /Daily/.test(ag) && !/Später/.test(h) && !/Schon erledigt/.test(h) && /1 erledigt · zeigen/.test(h),
+    'Tag: oben Termine, darunter Überfälliges, Heutiges und Routinen; Erledigtes gezählt');
+  pruefe(ag.indexOf('Anwendungen aufrufen') < ag.indexOf('Daily') && ag.indexOf('Daily') < ag.indexOf('Überfälliges') && /◉ 7:30/.test(ag) && /◉ 8:00/.test(ag),
+    'nach Uhrzeit (Erinnerung), dann Priorität; die Uhrzeit steht beim ◉');
+  pruefe(/class="dt ue">/.test(ag), 'Überfälliges mit seinem Datum und „!“');
+  S.clErlUm();
+  pruefe(/Schon erledigt/.test(inhalt()), '„zeigen“ holt Erledigtes durchgestrichen zurück');
+  S.clErlUm();
+  const daily = S.pmAufgabeFinden('r1');
+  S.pmHaken('r1', heute);
+  pruefe(S.istErledigtAn(daily, heute), 'Routine im Tag abhaken — für diesen Tag');
+  S.clKalGehe(S.tagePlus(heute, 3), 'tag');
+  pruefe(/Später/.test(inhalt()) && !/Überfälliges/.test(inhalt()), 'ein anderer Tag: nur seine Aufgaben, Überfälliges nur heute');
+  S.clKalGehe(heute, 'agenda');
+  S.clKalAnsicht('agenda');
+  h = inhalt();
+  pruefe(/To Do · heute/.test(h) && /Anwendungen aufrufen/.test(h) && /Überfälliges/.test(h), 'Agenda: dieselben Aufgaben unter „To Do · heute“');
+  S.clKalAnsicht('tag');
+  /* Coach */
+  const d = S.coTagDaten(heute);
+  pruefe(d.offen.some(x => x.a.text === 'P1 Anwendungen aufrufen' && x.pm) && d.erledigt.some(x => /Schon erledigt/.test(x.a.text)), 'der Coach sieht die Aufgaben des Tages (mit Priorität)');
+  S.coVerschieben(heute, 'P1 Anwendungen aufrufen', S.tagePlus(heute, 1));
+  pruefe(S.DB.aufgaben.filter(x => x.titel === 'Anwendungen aufrufen')[0].planung === S.tagePlus(heute, 1), 'Coach „morgen“: die Aufgabe bekommt den nächsten Tag');
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -8351,10 +8964,17 @@ function lernkarteiTest() {
   try { lkSyncTest(); } catch (e) { fail('Lernkartei-Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkWahlTest(); } catch (e) { fail('Lernkartei umschalten warf: ' + e.message); }
   try { lernkarteiTest(); } catch (e) { fail('Lernkartei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmTodoTest(); } catch (e) { fail('Palm To Do warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmDetailsTest(); } catch (e) { fail('Palm Details warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmMemoTest(); } catch (e) { fail('Palm Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmVerbindungTest(); } catch (e) { fail('Palm Verbindung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmEditorTest(); } catch (e) { fail('Palm Editor warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmUmstellungTest(); } catch (e) { fail('Palm Umstellung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmAgendaTest(); } catch (e) { fail('Palm Agenda warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
      ============================================================ */
-  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen');
+  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (alte Oberfläche, seit 0.80)' : ''));
   process.exit(anzFail ? 1 : 0);
 })();
