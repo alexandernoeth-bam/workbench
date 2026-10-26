@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.6.0</title>
+<title>Workbench 6.7.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2130,6 +2130,22 @@ body.breit .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
 .ta-dt{width:62px;text-align:right;font-variant-numeric:tabular-nums;color:var(--grau)}.ta-dt.ue{color:var(--weinrot);font-weight:600}
 .ta-hinweis{color:var(--grau);font-size:12.5px;margin:10px 0 0}
 .ep-tage{justify-content:flex-start;margin:10px 0}
+/* Arten, Ablauf/Checkliste, Leitfaden (seit v6.7.0) */
+.vl-stand{font-size:13px;color:var(--grau);margin-right:10px}
+.oa .pille{font-size:13px}
+.vl-kuerzel{width:64px}
+.lw-wann{font-size:12.5px}
+.lw-stufen{display:flex;gap:6px;margin:10px 0}
+.lw-stufen .pille{font:inherit;font-size:13.5px;padding:4px 12px;border:1px solid var(--linie);border-radius:14px;background:var(--karte);cursor:pointer}
+.lw-stufen .pille.fertig{background:var(--tinte);color:#fff;border-color:var(--tinte)}
+.lw-stufen .pille.hier{border-color:var(--weinrot);color:var(--weinrot);font-weight:600}
+.lw-stufen .pille.fertig.hier{color:#fff;box-shadow:0 0 0 2px var(--weinrot)}
+.lw-blatt .lw-hinweis{margin:4px 0 8px;font-size:14px}
+.lw-notiz{width:100%;font:inherit;font-size:14px}
+.lw-blatt .knoepfe{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.lw-uebrige{display:flex;flex-direction:column;align-items:flex-start;margin-top:12px;border-top:1px solid var(--linie);padding-top:8px}
+.lw-zu{border:0;background:none;font:inherit;font-size:14px;color:var(--grau);padding:3px 0;cursor:pointer;text-align:left}
+.lw-tabelle{border-collapse:collapse;font-size:13px;margin:6px 0}.lw-tabelle th,.lw-tabelle td{border:1px solid var(--linie);padding:3px 8px;text-align:left}
 .ep-zeiten{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--grau);margin-top:6px}.ep-zeiten b{color:var(--petrol)}
 /* Google Kalender schreiben und SOS (seit v6.5.0) */
 .gk-wert{align-items:center}
@@ -3060,7 +3076,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.6.0';
+var APP_VERSION = '6.7.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -22003,7 +22019,8 @@ var ak = {
   zielRuhtAuf: false,
   zielFertigAuf: false,
   vorlagenAuf: false,   /* Gruppe „Vorlagen“ aus CLIE (seit v6.4.0) */
-  notizFertigAuf: false,
+  art: 'alle',          /* Art in der Leiste (seit v6.7.0) */
+  aruhtAuf: false, afertigAuf: false, cruhtAuf: false, cfertigAuf: false, lwFertigAuf: false, lwOffen: -1,
   vlStart: null,
   umfang: 'aktiv',      /* aktiv | alle — Einfälle, Ruht, Erledigt zeigen (seit v6.1.0) */
   vorschau: '',         /* Seite, die beim Darüberfahren gezeigt wird (seit v6.1.1) */
@@ -22021,7 +22038,11 @@ var akVorschauEndeUhr = null;
 /* Wie ein Vorhaben in der Leiste heißt und aussieht: Projekt oder Ziel. */
 var AK_TYPEN = {
   vorhaben: { zeichen: '◎', name: 'Projekt', gruppe: 'Projekte', neu: 'Name des Projekts', typ: 'projekt' },
-  ziel:     { zeichen: '◇', name: 'Ziel',    gruppe: 'Ziele',    neu: 'Name des Ziels',    typ: 'ziel' }
+  ziel:     { zeichen: '◇', name: 'Ziel',    gruppe: 'Ziele',    neu: 'Name des Ziels',    typ: 'ziel' },
+  /* Seit v6.7.0 eigene Gruppen — wie die Arten im Memo Pad des CLIE */
+  ablauf:     { zeichen: '⇢', name: 'Ablauf',     gruppe: 'Abläufe',     neu: 'Name des Ablaufs' },
+  checkliste: { zeichen: '☑', name: 'Checkliste', gruppe: 'Checklisten', neu: 'Name der Checkliste' },
+  leitfaden:  { zeichen: '▤', name: 'Leitfaden',  gruppe: 'Leitfäden',   neu: 'Was ist das Problem?' }
 };
 var akGezogen = '';
 
@@ -22136,6 +22157,7 @@ function akSeite() {
 /* Öffnet eine Seite (oder 'routinen') — mit „hervor“ wird eine
    Aufgabenzeile hervorgehoben und in die Mitte gerollt. */
 function akOeffnen(id, hervor) {
+  if ((id || '') !== ak.id) { ak.lwOffen = -1; }
   ak.id = id || '';
   ak.modus = 'ansicht';
   ak.menueAuf = false;
@@ -22252,7 +22274,7 @@ function akEintragHtml(an, aufruf, zeichen, name, extra, klasse, ziehen) {
        + '<span class="zeichen">' + zeichen + '</span><span class="name">' + esc(name) + '</span>' + (extra || '') + '</button>';
 }
 
-function akSeitenEintragHtml(s, klasse) {
+function akSeitenEintragHtml(s, klasse, extra) {
   var id = esc(s.id);
   var ziehen = ' draggable="true" data-id="' + id + '" ondragstart="akZiehStart(event,\'' + id + '\')" '
              + 'ondragover="akZiehUeber(event,\'' + id + '\')" ondragleave="akZiehWeg(event)" '
@@ -22260,7 +22282,7 @@ function akSeitenEintragHtml(s, klasse) {
              + 'onmouseenter="akVorschauStart(\'' + id + '\')" onmouseleave="akVorschauEnde()"';
   /* Abläufe ⇢ und Checklisten ☑ aus CLIE behalten ihr Zeichen (seit v6.4.0) */
   var zeichen = vlZeichen(s) || ((s.art === 'vorhaben' && s.typ === 'ziel') ? AK_TYPEN.ziel.zeichen : KP_ARTEN[s.art].zeichen);
-  var h = akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + id + '\')', zeichen, s.titel || 'ohne Titel', '', klasse, ziehen);
+  var h = akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + id + '\')', zeichen, s.titel || 'ohne Titel', extra || '', klasse, ziehen);
   if (ak.sortieren !== kpGruppenSchluessel(s)) { return h; }
   return '<div class="sort-zeile">' + h
        + '<button type="button" class="sort-pfeil" onclick="akSchieben(\'' + id + '\',-1)" aria-label="Nach oben">▲</button>'
@@ -22277,7 +22299,10 @@ function akNeuFeldHtml() {
   var platz = (ak.neuIn === 'einfall') ? 'Einfall merken'
             : (AK_TYPEN[ak.neuIn] ? AK_TYPEN[ak.neuIn].neu : KP_ARTEN[ak.neuIn].neu);
   return '<div class="neu-feld"><input id="akNeuName" type="text" maxlength="200" placeholder="' + esc(platz) + '" '
-       + 'onkeydown="akNeuTaste(event)"><button type="button" class="pille" onclick="akAnlegen()">Anlegen</button></div>';
+       + 'onkeydown="akNeuTaste(event)"><button type="button" class="pille" onclick="akAnlegen()">Anlegen</button></div>'
+       /* Seit v6.7.0: ein Leitfaden braucht sein Verfahren */
+       + (ak.neuIn === 'leitfaden' ? '<div class="neu-feld"><select id="akNeuLwArt" class="rt-ein">' + LW_ARTEN.map(function (a) {
+           return '<option value="' + a.id + '">' + esc(a.name + ' — ' + a.wann) + '</option>'; }).join('') + '</select></div>' : '');
 }
 
 function akGruppeKopfHtml(art) {
@@ -22298,7 +22323,7 @@ function akGruppeKopfHtml(art) {
 
 function akKlappGruppeHtml(was, titel, seiten, klasse) {
   if (!seiten.length) { return ''; }
-  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf', nfertig: 'notizFertigAuf' }[was];
+  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf', aruht: 'aruhtAuf', afertig: 'afertigAuf', cruht: 'cruhtAuf', cfertig: 'cfertigAuf' }[was];
   var drin = seiten.some(function (s) { return s.id === ak.id; });
   /* Unter „Aktiv“ ausgeblendet — außer die offene Seite liegt darin. */
   if (ak.umfang === 'aktiv' && !drin) { return ''; }
@@ -22335,12 +22360,12 @@ function akEinfaelleHtml() {
 
 function akNotizenAuf() {
   var s = akSeite();
-  return ak.notizenAuf || ak.neuIn === 'notiz' || !!(s && s.art === 'notiz');
+  return ak.notizenAuf || ak.neuIn === 'notiz' || !!(s && s.art === 'notiz' && vlArt(s) === 'notiz');
 }
 
 function akKlappUm(was) {
   var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', notiz: 'notizenAuf', einfall: 'einfallAuf',
-               zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf', nfertig: 'notizFertigAuf' }[was];
+               zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf', aruht: 'aruhtAuf', afertig: 'afertigAuf', cruht: 'cruhtAuf', cfertig: 'cfertigAuf' }[was];
   if (!feld) { return; }
   ak[feld] = !ak[feld];
   akLeisteZeichnen();
@@ -22348,18 +22373,22 @@ function akKlappUm(was) {
 
 function akLeisteHtml() {
   /* Seit v6.6.0: Kategorie statt Beruf/Privat — wie im CLIE */
-  var h = '<div class="kt-platz">' + ktKnopfHtml() + '</div>'
+  var h = '<div class="kt-platz">' + ktKnopfHtml() + '</div><div class="kt-platz">' + akArtKnopfHtml() + '</div>'
         + '<div class="filter" role="group" aria-label="Nur Aktives oder alles">'
         + [['aktiv', 'Aktiv'], ['alle', 'Alle']].map(function (p) {
           return '<button type="button" class="' + (ak.umfang === p[0] ? 'an' : '') + '" onclick="akUmfangSetzen(\'' + p[0] + '\')">' + p[1] + '</button>';
         }).join('') + '</div>';
-  var heute = akRoutinenHeute().length;
-  h += akEintragHtml(ak.id === 'routinen', 'akOeffnen(\'routinen\')', '↻', 'Routinen',
-                     heute ? '<span class="marke-klein">' + heute + ' heute</span>' : '', 'routinen-eintrag', '');
-  /* Seit v6.6.0: die flache Liste wie die To Do List im CLIE */
-  var offen = taZahl();
-  h += akEintragHtml(ak.id === 'aufgaben', 'akOeffnen(\'aufgaben\')', '☐', 'Alle Aufgaben',
-                     offen ? '<span class="marke-klein">' + offen + '</span>' : '', 'aufgaben-eintrag', '');
+  /* Seit v6.7.0: unter einer Art nur deren Gruppe */
+  var zeigt = function (a) { return ak.art === 'alle' || ak.art === a; };
+  if (ak.art === 'alle') {
+    var heute = akRoutinenHeute().length;
+    h += akEintragHtml(ak.id === 'routinen', 'akOeffnen(\'routinen\')', '↻', 'Routinen',
+                       heute ? '<span class="marke-klein">' + heute + ' heute</span>' : '', 'routinen-eintrag', '');
+    /* Seit v6.6.0: die flache Liste wie die To Do List im CLIE */
+    var offen = taZahl();
+    h += akEintragHtml(ak.id === 'aufgaben', 'akOeffnen(\'aufgaben\')', '☐', 'Alle Aufgaben',
+                       offen ? '<span class="marke-klein">' + offen + '</span>' : '', 'aufgaben-eintrag', '');
+  }
   var leer = function (wort) {
     return '<div class="leer-hinweis">' + (ak.filter === 'alle' ? 'Noch keine ' + wort + '.' : 'Keine ' + wort + ' unter diesem Filter.') + '</div>';
   };
@@ -22378,27 +22407,34 @@ function akLeisteHtml() {
     x += akKlappGruppeHtml(fertig, 'Erledigt', liste.filter(function (s) { return s.zustand === 'erledigt'; }), 'ruht');
     return x;
   };
-  h += bereich('vorhaben', alleVh.filter(function (s) { return s.typ !== 'ziel'; }), 'ruht', 'fertig', 'Projekte');
-  h += bereich('ziel', alleVh.filter(function (s) { return s.typ === 'ziel'; }), 'zruht', 'zfertig', 'Ziele');
-  h += akGruppeKopfHtml('liste');
+  if (zeigt('vorhaben')) { h += bereich('vorhaben', alleVh.filter(function (s) { return s.typ !== 'ziel'; }), 'ruht', 'fertig', 'Projekte'); }
+  if (zeigt('ziel')) { h += bereich('ziel', alleVh.filter(function (s) { return s.typ === 'ziel'; }), 'zruht', 'zfertig', 'Ziele'); }
+  if (zeigt('liste')) { h += akListenHtml(leer); }
+  if (zeigt('notiz')) {
+    h += akGruppeKopfHtml('notiz');
+    if (akNotizenAuf() || ak.art === 'notiz') {
+      var notizen = kpSeiten('notiz').filter(akSichtbar).filter(function (s) { return !vlIstVorlage(s) && vlArt(s) === 'notiz'; });
+      if (!notizen.length) { h += leer('Notizen'); }
+      notizen.forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
+    }
+  }
+  if (zeigt('ablauf')) { h += vlGruppeArtHtml('ablauf'); }
+  if (zeigt('checkliste')) { h += vlGruppeArtHtml('checkliste'); }
+  if (zeigt('leitfaden')) { h += lwGruppeHtml(); }
+  return h + (ak.art === 'alle' ? vlGruppeHtml() : '');
+}
+
+/* Die Gruppe „Listen“ — der Sammler aus CLIE oben, mit Zahl (seit v6.6.0) */
+function akListenHtml(leer) {
+  var h = akGruppeKopfHtml('liste');
   var listen = kpSeiten('liste').filter(akSichtbar);
   if (!listen.length) { h += leer('Listen'); }
-  /* Der Sammler aus CLIE steht oben, mit Zahl (seit v6.6.0) */
   listen.filter(taIstKorb).forEach(function (s) {
     var n = kpOffeneZahl(s);
     h += akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + esc(s.id) + '\')', '≡', 'Sammler', n ? '<span class="marke-klein">' + n + '</span>' : '', 'sammler-eintrag', '');
   });
   listen.filter(function (s) { return !taIstKorb(s); }).forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
-  h += akGruppeKopfHtml('notiz');
-  if (akNotizenAuf()) {
-    var alleNz = kpSeiten('notiz').filter(akSichtbar).filter(function (s) { return !vlIstVorlage(s); });
-    var notizen = alleNz.filter(function (s) { return !vlAbgeschlossen(s); });
-    if (!notizen.length) { h += leer('Notizen'); }
-    notizen.forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
-    /* Abgeschlossene Checklisten aus CLIE klappen weg (seit v6.4.0) */
-    h += akKlappGruppeHtml('nfertig', 'Abgeschlossen', alleNz.filter(vlAbgeschlossen), 'ruht');
-  }
-  return h + vlGruppeHtml();
+  return h;
 }
 
 function akLeisteZeichnen() {
@@ -22425,6 +22461,23 @@ function akAnlegen() {
     ak.neuIn = '';
     ak.einfallAuf = true;
     akZeichnen();
+    return;
+  }
+  /* Seit v6.7.0: Ablauf, Checkliste und Leitfaden */
+  if (ak.neuIn === 'ablauf' || ak.neuIn === 'checkliste') {
+    var g = vlNeuAnlegen(ak.neuIn, name);
+    ak.neuIn = '';
+    spaeterSichern();
+    akOeffnen(g.id);
+    akModusSetzen('schreiben');
+    return;
+  }
+  if (ak.neuIn === 'leitfaden') {
+    var wahl = document.getElementById('akNeuLwArt');
+    var fall = lwNeuAnlegen(name, wahl && wahl.value ? wahl.value : 'konstruktion');
+    ak.neuIn = '';
+    ak.lwOffen = -1;
+    akOeffnen(fall.id);
     return;
   }
   /* „ziel“ ist ein Vorhaben in der Sammlung der Ziele. */
@@ -22671,6 +22724,8 @@ function akSeiteHtml(s) {
        + '<input type="date" class="rt-ein" value="' + esc(s.termin || '') + '" onchange="akTermin(this.value)" '
        + 'aria-label="' + (s.typ === 'ziel' ? 'Zieltermin' : 'Ende des Projekts') + '"></label>';
   }
+  /* Seit v6.7.0: Art, Zustand und Kürzel eines Ablaufs oder einer Checkliste */
+  if (vlZustand(s) && vlZustand(s) !== 'vorlage') { h += vlEigenHtml(s); }
   var pin = akPinArt(s);
   h += pinKnopfHtml(pin.art, pin.id) + '</div>';
   if (ak.frage === 'loeschen') {
@@ -22683,7 +22738,8 @@ function akSeiteHtml(s) {
   if (ak.frage === 'vlstart' && vlIstVorlage(s)) { h += vlStartHtml(s); }
   /* Vorlagen und Checklisten zum Abhaken werden nicht eingeplant (seit v6.4.0) */
   var planbar = !vlIstVorlage(s) && !vlNurAbhaken(s);
-  h += '<div class="oa">' + (planbar ? '<button type="button" class="oa-knopf" onclick="akOaUm()" aria-haspopup="dialog" aria-expanded="' + ak.oaAuf + '">☐ Offene Aufgaben</button>' : '')
+  h += '<div class="oa">' + (planbar ? '<button type="button" class="oa-knopf" onclick="akOaUm()" aria-haspopup="dialog" aria-expanded="' + ak.oaAuf + '">☐ Offene Aufgaben</button>'
+                                     : ((vlNurAbhaken(s) && !vlIstVorlage(s)) ? vlCheckHtml(s) : ''))
      + ((ak.modus === 'ansicht' && kpHatUeberschriften(s))
         ? '<span class="ak-falten"><button type="button" class="pille" onclick="akAlleZu(true)" title="Alle Abschnitte einklappen">alles zu</button>'
           + '<button type="button" class="pille" onclick="akAlleZu(false)" title="Alle Abschnitte aufklappen">alles auf</button></span>'
@@ -22714,6 +22770,13 @@ function akSeiteZeichnen() {
   if (vs) { el.innerHTML = akVorschauHtml(vs); return; }
   if (ak.id === 'routinen') { el.innerHTML = akRoutinenHtml(); return; }
   if (ak.id === 'aufgaben') { el.innerHTML = taHtml(); return; }
+  /* Seit v6.7.0: ein Fall aus dem Leitfaden */
+  var fall = lwFinden(ak.id);
+  if (fall) {
+    if (aktiv && aktiv.id === 'lwNotiz' && el.querySelector && el.querySelector('#lwNotiz')) { return; }
+    el.innerHTML = lwSeiteHtml(fall);
+    return;
+  }
   if (ak.id === 'umstellung') { el.innerHTML = akUmstellungHtml(); return; }
   var s = akSeite();
   if (!s) {
@@ -22766,11 +22829,6 @@ function vlArt(seite) {
 }
 
 function vlZeichen(seite) { return VL_ZEICHEN[vlArt(seite)] || ''; }
-
-function vlAbgeschlossen(seite) {
-  var s = vlSatz(seite);
-  return !!(s && s.checkliste === 'fertig');
-}
 
 /* Eine Checkliste zum Abhaken (Packliste) — ihre Punkte gehören nie in Tag und Woche */
 function vlNurAbhaken(seite) {
@@ -24286,6 +24344,397 @@ function epZeitenHtml(t) {
   return '<div class="ep-zeiten">' + l.map(function (e) { return '<span><b>' + esc(e.zeit) + '</b> ' + esc(kpPrio(e.text).text) + '</span>'; }).join('') + '</div>';
 }
 
+/* ---------- Arten in den Aktivitäten (seit v6.7.0) ----------
+
+   Wie das ▼ im Memo Pad des CLIE: Die Leiste zeigt auf Wunsch nur eine
+   Art. Abläufe, Checklisten und Leitfäden haben eigene Gruppen. */
+
+var AK_ART_KEY = 'workbench-art';
+var AK_ARTEN = [['alle', 'Alle', ''], ['vorhaben', 'Projekte', '◎'], ['ziel', 'Ziele', '◇'], ['liste', 'Listen', '≡'],
+                ['notiz', 'Notizen', '✎'], ['ablauf', 'Abläufe', '⇢'], ['checkliste', 'Checklisten', '☑'], ['leitfaden', 'Leitfäden', '▤']];
+
+function akArtGueltig(a) { return AK_ARTEN.some(function (x) { return x[0] === a; }); }
+
+function akArtName(a) {
+  var x = AK_ARTEN.filter(function (y) { return y[0] === a; })[0];
+  return x ? x[1] : 'Alle';
+}
+
+function akArtLaden() {
+  var a = '';
+  try { a = window.localStorage.getItem(AK_ART_KEY) || ''; } catch (e) { a = ''; }
+  ak.art = akArtGueltig(a) ? a : 'alle';
+}
+
+function akArtSetzen(a) {
+  if (!akArtGueltig(a)) { return; }
+  ak.art = a;
+  try { window.localStorage.setItem(AK_ART_KEY, a); } catch (e) { /* nur für jetzt */ }
+  aktionenSchliessen();
+  akLeisteZeichnen();
+}
+
+function akArtKnopfHtml() {
+  return '<button type="button" class="kt-knopf" onclick="akArtMenueAuf()" aria-haspopup="dialog"><span>Art</span><b>' + esc(akArtName(ak.art)) + '</b><i>▾</i></button>';
+}
+
+function akArtMenueAuf() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = akArtMenueHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function akArtMenueHtml() {
+  return blattKopf() + '<div class="as-titel">Art</div><div class="as-meta">zeigt in der Leiste nur diese Art — wie das ▼ im Memo Pad</div><div class="as-linie"></div>'
+    + AK_ARTEN.map(function (x, i) {
+      return (i === 1 ? '<div class="kt-trenn"></div>' : '') + '<button type="button" class="kt-zeile' + (ak.art === x[0] ? ' an' : '') + '" onclick="akArtSetzen(\'' + x[0] + '\')"><span>'
+        + (x[2] ? x[2] + ' ' : '') + esc(x[1]) + '</span></button>';
+    }).join('');
+}
+
+/* Abläufe und Checklisten: laufend, ruhend, abgeschlossen */
+function vlZustand(s) {
+  var x = vlSatz(s);
+  if (!x || !x.checkliste) { return ''; }
+  if (x.checkliste === 'vorlage') { return 'vorlage'; }
+  if (x.checkliste === 'fertig') { return 'fertig'; }
+  return x.ruht ? 'ruht' : 'lauf';
+}
+
+/* Gruppe „Abläufe“ oder „Checklisten“ in der Leiste */
+function vlGruppeArtHtml(art) {
+  var l = kpSeiten('notiz').filter(akSichtbar).filter(function (s) { return !vlIstVorlage(s) && vlArt(s) === art; });
+  var h = akGruppeKopfHtml(art);
+  var laeuft = l.filter(function (s) { return vlZustand(s) === 'lauf'; });
+  if (!laeuft.length) { h += '<div class="leer-hinweis">' + (l.length ? 'Nichts läuft.' : 'Noch keine ' + AK_TYPEN[art].gruppe + '.') + '</div>'; }
+  laeuft.forEach(function (s) {
+    var st = vlStand(s);
+    h += akSeitenEintragHtml(s, '', art === 'checkliste' && st.alle ? '<span class="marke-klein">' + st.fertig + '/' + st.alle + '</span>' : '');
+  });
+  var k = art === 'ablauf' ? 'a' : 'c';
+  h += akKlappGruppeHtml(k + 'ruht', 'Ruht', l.filter(function (s) { return vlZustand(s) === 'ruht'; }), 'ruht');
+  h += akKlappGruppeHtml(k + 'fertig', 'Abgeschlossen', l.filter(function (s) { return vlZustand(s) === 'fertig'; }), 'ruht');
+  return h;
+}
+
+/* Fortschritt: abgehakte (auch [-]) von allen Punkten */
+function vlStand(s) {
+  var n = 0, f = 0;
+  String((s && s.text) || '').split('\n').forEach(function (z) {
+    var a = kpAufgabe(z);
+    if (a && a.text) { n++; if (a.erledigt) { f++; } }
+  });
+  return { alle: n, fertig: f };
+}
+
+/* Oben auf der Seite eines Ablaufs oder einer Checkliste: Art, Zustand, Kürzel */
+function vlEigenHtml(s) {
+  var art = vlArt(s);
+  var z = vlZustand(s);
+  var wahl = function (an, ruf, text) { return '<button type="button" class="' + (an ? 'an' : '') + '" onclick="' + ruf + '">' + text + '</button>'; };
+  return '<span class="gruppe-knopf" role="group" aria-label="Art">' + wahl(art === 'ablauf', 'vlArtSetzen(\'aufgaben\')', '⇢ Ablauf')
+       + wahl(art === 'checkliste', 'vlArtSetzen(\'abhaken\')', '☑ Checkliste') + '</span>'
+       + '<span class="gruppe-knopf" role="group" aria-label="Zustand">' + wahl(z === 'lauf', 'vlZustandSetzen(\'lauf\')', 'läuft')
+       + wahl(z === 'ruht', 'vlZustandSetzen(\'ruht\')', 'ruht') + wahl(z === 'fertig', 'vlZustandSetzen(\'fertig\')', 'abgeschlossen') + '</span>'
+       + (art === 'ablauf' ? '<label class="ak-termin"><span class="leise">Kürzel</span><input class="rt-ein vl-kuerzel" type="text" maxlength="4" value="'
+         + esc(vlSatz(s).kuerzel || '') + '" placeholder="' + esc(taKuerzel(s)) + '" onchange="vlKuerzelSetzen(this.value)" aria-label="Kürzel"></label>' : '');
+}
+
+/* Unter dem Kopf einer Checkliste: Stand und „Alle Haken entfernen“ */
+function vlCheckHtml(s) {
+  var st = vlStand(s);
+  return '<span class="vl-stand">' + st.fertig + ' von ' + st.alle + ' abgehakt</span>'
+       + (st.fertig ? '<button type="button" class="pille" onclick="vlZuruecksetzen()">Alle Haken entfernen</button>' : '')
+       + '<span class="vl-stand">nichts einzuplanen — nur hier abhaken</span>';
+}
+
+function vlArtSetzen(a) {
+  var s = akSeite();
+  if (!s || !vlZustand(s) || vlZustand(s) === 'vorlage') { return; }
+  var x = vlSatz(s);
+  if (a === 'aufgaben') { x.art = 'aufgaben'; } else if (a === 'abhaken') { delete x.art; } else { return; }
+  x.geaendert = jetzt();
+  spaeterSichern();
+  akZeichnen();
+}
+
+function vlZustandSetzen(z) {
+  var s = akSeite();
+  var x = vlSatz(s);
+  if (!s || !vlZustand(s) || vlZustand(s) === 'vorlage' || ['lauf', 'ruht', 'fertig'].indexOf(z) < 0) { return; }
+  x.checkliste = (z === 'fertig') ? 'fertig' : 'lauf';
+  if (z === 'fertig') { x.abgeschlossen = isoDatum(); } else { delete x.abgeschlossen; }
+  if (z === 'ruht') { x.ruht = true; x.ruhtSeit = isoDatum(); } else { delete x.ruht; delete x.ruhtSeit; }
+  if (z !== 'lauf') { delete x.stern; }
+  delete x.geweckt;
+  x.geaendert = jetzt();
+  spaeterSichern();
+  akZeichnen();
+}
+
+function vlKuerzelSetzen(w) {
+  var s = akSeite();
+  if (!s || vlArt(s) !== 'ablauf') { return; }
+  var kz = String(w || '').trim().slice(0, 4);
+  if (kz) { vlSatz(s).kuerzel = kz; } else { delete vlSatz(s).kuerzel; }
+  vlSatz(s).geaendert = jetzt();
+  spaeterSichern();
+}
+
+/* Alle Haken weg — über den Kern, damit Eingeplantes mitzieht */
+function vlZuruecksetzen() {
+  var s = akSeite();
+  if (!s || vlArt(s) !== 'checkliste') { return; }
+  String(s.text || '').split('\n').forEach(function (z, nr) {
+    var a = kpAufgabe(z);
+    if (a && a.erledigt) { kpSeiteKastenUmKern(s, nr); }
+  });
+  s.text = String(s.text || '').split('\n').map(function (z) { return z.replace(/^(\s*)\[[xX-]\]/, '$1[]'); }).join('\n');
+  vlSatz(s).geaendert = jetzt();
+  spaeterSichern();
+  akZeichnen();
+}
+
+/* Neu: Ablauf oder Checkliste — wie im CLIE in den Notizen der workbench.json */
+function vlNeuAnlegen(art, name) {
+  var g = { id: neueKennung(), titel: String(name || '').slice(0, 200), text: '', kontext: ktKontext() === 'beruflich' ? 'beruflich' : 'privat',
+            ordnung: kpNaechsterRang(), checkliste: 'lauf', gestartet: isoDatum(), geaendert: jetzt() };
+  if (art === 'ablauf') { g.art = 'aufgaben'; }
+  if (/^kb-/.test(ktWahlJetzt())) { g.bereich = ktWahlJetzt(); }
+  if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+  DB.gedanken.push(g);
+  return kpHuelle(g, 'notiz', '');
+}
+
+/* ---------- Leitfäden (seit v6.7.0) ----------
+
+   Die Fälle aus dem Leitfaden des CLIE (Bereich „kurs“, typ leitfaden):
+   ein Problem nach einem von fünf Standardverfahren, Schritt für Schritt.
+   Die Ist/Ist-Nicht-Tabelle der Diagnose wird hier nur gezeigt. */
+
+var LW_ARTEN = [
+  { id: 'konstruktion', name: 'Konstruktion', kurz: 'Konstr.', wann: 'etwas Neues entwerfen · VDI 2221', schritte: [
+    ['Anforderungen', 'Was muss es können (Muss), was wäre schön (Wunsch)? Mit Zahlen, wo es geht.'],
+    ['Funktionen zerlegen', 'In welche Teilaufgaben zerfällt das Ganze?'],
+    ['Varianten', 'Mindestens zwei grundverschiedene Lösungen skizzieren.'],
+    ['Bewerten', 'Jede Variante gegen die Anforderungen prüfen: Muss erfüllt? Wie viel Wunsch? Kosten?'],
+    ['Ausarbeiten', 'Erst jetzt die gewählte Variante im Detail ausarbeiten.']] },
+  { id: 'diagnose', name: 'Diagnose', kurz: 'Diagnose', wann: 'Ursache finden, bewerten · Kepner-Tregoe', schritte: [
+    ['Ist / Ist-Nicht', 'Was, wo, wann, wie viel — und wo gerade nicht? Nur Fakten.'],
+    ['Unterschiede & Veränderungen', 'Was unterscheidet das Ist vom Ist-Nicht? Was hat sich kurz vorher geändert?'],
+    ['Mögliche Ursachen', 'Nur Ursachen, die aus den Unterschieden und Veränderungen folgen.'],
+    ['Ursachen prüfen', 'Erklärt die Ursache alle Fakten aus Schritt 1? Wenn nicht: streichen.'],
+    ['Nachweis am Objekt', 'Die übrige Ursache gezielt nachweisen — nicht vermuten.']] },
+  { id: 'abwicklung', name: 'Abwicklung', kurz: 'Abwickl.', wann: 'Papierkram nach Regeln · Checkliste', schritte: [
+    ['Pflichtliste', 'Alles aufschreiben, was verlangt ist — noch nichts erledigen.'],
+    ['Sammeln', 'Unterlagen zusammentragen. Nur sammeln, nichts bearbeiten.'],
+    ['Vollständig?', 'Erst weiter, wenn alles da ist. Was fehlt noch?'],
+    ['Am Stück erfassen', 'Alles in einem Zug eintragen, ohne Unterbrechung.'],
+    ['Prüfen und absenden', 'Plausibel? Zweiter Blick — dann absenden.']] },
+  { id: 'intervention', name: 'Intervention', kurz: 'Interv.', wann: 'es brennt, erst eindämmen · OODA', schritte: [
+    ['Eindämmen', 'Erst die Ausbreitung stoppen: Notlösung, abschalten, begrenzen.'],
+    ['Lage erfassen', 'Nur beobachten und sammeln, was ist — noch nicht spekulieren.'],
+    ['Entscheiden', 'Den risikoärmsten Schritt wählen, der die Lage stabilisiert.'],
+    ['Stabilisieren', 'Umsetzen und beobachten, bis der Normalbetrieb wieder läuft.'],
+    ['Nachbereiten', 'In Ruhe die Ursache suchen — als Diagnose weiter.']] },
+  { id: 'verhandlung', name: 'Verhandlung', kurz: 'Verhandl.', wann: 'Interessen ausgleichen · Harvard', schritte: [
+    ['Plan B', 'Was tust du, wenn es keine Einigung gibt? Vorher festlegen.'],
+    ['Mensch und Sache trennen', 'Was ist Sachfrage, was Beziehung oder Status?'],
+    ['Interessen statt Positionen', 'Was steckt hinter den Forderungen — bei dir und beim anderen?'],
+    ['Optionen sammeln', 'Lösungen sammeln, die beiden nützen — noch nichts festlegen.'],
+    ['Objektive Kriterien', 'Optionen an Maßstäben messen: Markt, Gesetz, Norm.']] }
+];
+var LW_TABELLE = [['was', 'Was'], ['wo', 'Wo'], ['wann', 'Wann'], ['ausmass', 'Ausmaß']];
+
+function lwAlle() {
+  return (Array.isArray(DB.kurs) ? DB.kurs : []).filter(function (x) { return x && x.typ === 'leitfaden'; })
+    .sort(function (a, b) { return String(b.angelegt || '') < String(a.angelegt || '') ? -1 : 1; });
+}
+
+function lwFinden(id) {
+  return lwAlle().filter(function (f) { return f.id === id; })[0] || null;
+}
+
+function lwArt(id) { return LW_ARTEN.filter(function (a) { return a.id === id; })[0] || LW_ARTEN[0]; }
+
+function lwSchritte(f) {
+  if (!Array.isArray(f.schritte)) { f.schritte = []; }
+  while (f.schritte.length < 5) { f.schritte.push({ notiz: '', fertig: false }); }
+  return f.schritte;
+}
+
+function lwZahlFertig(f) { return lwSchritte(f).filter(function (s) { return s.fertig; }).length; }
+
+function lwAktuell(f) {
+  var l = lwSchritte(f);
+  var i;
+  for (i = 0; i < l.length; i++) { if (!l[i].fertig) { return i; } }
+  return l.length - 1;
+}
+
+function lwSpeichern(f) {
+  if (!Array.isArray(DB.kurs)) { DB.kurs = []; }
+  if (DB.kurs.indexOf(f) < 0) { DB.kurs.push(f); }
+  f.geaendert = jetzt();
+  spaeterSichern();
+}
+
+function lwGruppeHtml() {
+  var l = lwAlle().filter(function (f) { return ktPasst(f) && !kontextVerborgen(f.kontext); });
+  var h = akGruppeKopfHtml('leitfaden');
+  var offen = l.filter(function (f) { return !f.fertig; });
+  if (!offen.length) { h += '<div class="leer-hinweis">' + (l.length ? 'Kein Fall offen.' : 'Noch keine Leitfäden.') + '</div>'; }
+  offen.forEach(function (f) {
+    h += akEintragHtml(ak.id === f.id, 'akOeffnen(\'' + esc(f.id) + '\')', '▤', f.titel || 'ohne Titel', '<span class="marke-klein">' + lwZahlFertig(f) + '/5</span>', 'leitfaden-eintrag', '');
+  });
+  var fertig = l.filter(function (f) { return f.fertig; });
+  if (fertig.length && (ak.umfang !== 'aktiv' || fertig.some(function (f) { return f.id === ak.id; }))) {
+    var auf = ak.lwFertigAuf || fertig.some(function (f) { return f.id === ak.id; });
+    h += '<div class="ak-gruppe leise"><button type="button" class="klapp-kopf" onclick="ak.lwFertigAuf=!ak.lwFertigAuf;akLeisteZeichnen()" aria-expanded="' + auf + '">'
+       + (auf ? '⌄ ' : '› ') + 'Fertig · ' + fertig.length + '</button></div>';
+    if (auf) { fertig.forEach(function (f) { h += akEintragHtml(ak.id === f.id, 'akOeffnen(\'' + esc(f.id) + '\')', '▤', f.titel || 'ohne Titel', '', 'ruht', ''); }); }
+  }
+  return h;
+}
+
+function lwTabelleHtml(f) {
+  var t = (f.tabelle && typeof f.tabelle === 'object') ? f.tabelle : {};
+  var zeilen = LW_TABELLE.filter(function (z) { return t[z[0]] && (t[z[0]].ist || t[z[0]].nicht); });
+  if (!zeilen.length) { return ''; }
+  return '<table class="lw-tabelle"><tr><th></th><th>Ist</th><th>Ist nicht</th></tr>' + zeilen.map(function (z) {
+    var w = t[z[0]] || {};
+    return '<tr><th>' + z[1] + '</th><td>' + esc(w.ist || '') + '</td><td>' + esc(w.nicht || '') + '</td></tr>';
+  }).join('') + '</table><p class="vl-stand">Die Tabelle füllst du im CLIE.</p>';
+}
+
+function lwSeiteHtml(f) {
+  var a = lwArt(f.art);
+  var l = lwSchritte(f);
+  var offen = (ak.lwOffen >= 0 && ak.lwOffen < 5) ? ak.lwOffen : lwAktuell(f);
+  var h = '<div class="ak-kopf"><button type="button" class="pille ak-zurueck" onclick="akZurueck()">‹ Aktivitäten</button>'
+        + '<h1 class="ak-titel">' + esc(f.titel || 'ohne Titel') + '</h1></div>'
+        + '<div class="eigen"><span class="art-marke">Leitfaden · ' + esc(a.name) + '</span><span class="leise lw-wann">' + esc(a.wann) + '</span></div>';
+  if (ak.frage === 'lwloeschen') {
+    h += '<div class="frage" role="alertdialog"><p><b>„' + esc(f.titel) + '“ löschen?</b> Auch im CLIE ist der Fall dann weg.</p><div class="knoepfe">'
+       + '<button type="button" class="pille weg" onclick="lwLoeschen()">Löschen</button><button type="button" class="pille" onclick="akFrageWeg()">Abbrechen</button></div></div>';
+  }
+  h += '<div class="lw-stufen">' + l.map(function (s, i) {
+    return '<button type="button" class="pille' + (s.fertig ? ' fertig' : '') + (i === offen ? ' hier' : '') + '" onclick="lwSchrittZeigen(' + i + ')">' + (i + 1) + (s.fertig ? ' ✓' : '') + '</button>';
+  }).join('') + '</div>';
+  var s = l[offen];
+  var aufg = lwAufgabe(f, offen);
+  h += '<div class="blatt lw-blatt"><b>' + (offen + 1) + ' · ' + esc(a.schritte[offen][0]) + '</b><div class="leise lw-hinweis">' + esc(a.schritte[offen][1]) + '</div>'
+     + (f.art === 'diagnose' && offen < 2 ? lwTabelleHtml(f) : '')
+     + '<label class="vl-feld"><span class="leise">Notiz zu diesem Schritt</span><textarea id="lwNotiz" class="rt-ein lw-notiz" rows="3" oninput="lwNotizGetippt(' + offen + ',this.value)">' + esc(s.notiz || '') + '</textarea></label>'
+     + (aufg ? '<p class="vl-stand">Im Sammler: „' + esc(s.aufgabe.text) + '“' + (aufg.erledigt ? ' — erledigt' : '') + '</p>' : '')
+     + '<div class="knoepfe">' + (s.fertig ? '<button type="button" class="pille" onclick="lwSchrittFertig()">Wieder öffnen</button>'
+         : '<button type="button" class="pille voll" onclick="lwSchrittFertig()">Schritt fertig ✓</button>'
+           + (aufg ? '' : '<button type="button" class="pille" onclick="lwInSammler()">→ In den Sammler, für heute</button>'))
+     + '</div><div class="lw-uebrige">' + l.map(function (x, i) {
+       return i === offen ? '' : '<button type="button" class="lw-zu" onclick="lwSchrittZeigen(' + i + ')">' + (i + 1) + ' · ' + esc(a.schritte[i][0]) + (x.fertig ? ' ✓' : '') + '</button>';
+     }).join('') + '</div></div>'
+     + (f.fertig ? '<p class="vl-stand">Alle fünf Schritte erledigt — der Fall steht unter „Fertig“.</p>' : '')
+     + '<div class="knoepfe"><button type="button" class="pille" onclick="akFragen(\'lwloeschen\')">Löschen …</button></div>';
+  return h;
+}
+
+function lwSchrittZeigen(i) {
+  ak.lwOffen = (i >= 0 && i < 5) ? i : -1;
+  akSeiteZeichnen();
+}
+
+/* Getippt: gleich am Satz, ohne neu zu zeichnen */
+function lwNotizGetippt(i, wert) {
+  var f = lwFinden(ak.id);
+  if (!f || i < 0 || i > 4) { return; }
+  lwSchritte(f)[i].notiz = String(wert || '');
+  lwSpeichern(f);
+}
+
+/* Wo steht die Aufgabe eines Schritts? {seite, nr, erledigt} oder null */
+function lwAufgabe(f, i) {
+  var s = lwSchritte(f)[i];
+  var g = s && s.aufgabe;
+  var seite = g && g.seite ? kpSeiteFinden(g.seite) : null;
+  if (!seite) { return null; }
+  var k = kpPrio(g.text).text;
+  var aus = null;
+  String(seite.text || '').split('\n').forEach(function (z, nr) {
+    var a = kpAufgabe(z);
+    if (!aus && a && a.text && kpPrio(a.text).text === k) { aus = { seite: seite, nr: nr, erledigt: !!a.erledigt }; }
+  });
+  return aus;
+}
+
+function lwSchrittFertig() {
+  var f = lwFinden(ak.id);
+  if (!f) { return; }
+  var i = (ak.lwOffen >= 0) ? ak.lwOffen : lwAktuell(f);
+  var s = lwSchritte(f)[i];
+  s.fertig = !s.fertig;
+  var x = lwAufgabe(f, i);
+  if (x && x.erledigt !== s.fertig) { kpSeiteKastenUmKern(x.seite, x.nr); }
+  f.fertig = lwZahlFertig(f) === 5;
+  lwSpeichern(f);
+  ak.lwOffen = s.fertig ? lwAktuell(f) : i;
+  akZeichnen();
+}
+
+/* Der Sammler des CLIE — angelegt, wenn es ihn noch nicht gibt */
+function lwSammler() {
+  if (!Array.isArray(DB.themen)) { DB.themen = []; }
+  var k = DB.themen.filter(function (t) { return t && (t.korb || t.id === 'cl-korb'); })[0];
+  if (!k) {
+    k = { id: 'cl-korb', name: 'Sammler', korb: true, text: '', kontext: '', ordnung: 0, geaendert: jetzt() };
+    DB.themen.push(k);
+  }
+  return kpHuelle(k, 'liste', '');
+}
+
+/* Der Schritt als genau eine Aufgabe — im Sammler, für heute */
+function lwInSammler() {
+  var f = lwFinden(ak.id);
+  if (!f) { return; }
+  var i = (ak.lwOffen >= 0) ? ak.lwOffen : lwAktuell(f);
+  if (lwAufgabe(f, i)) { melde('Dieser Schritt steht schon im Sammler.', null); return; }
+  var a = lwArt(f.art);
+  var korb = lwSammler();
+  var text = (String(f.titel).slice(0, 80) + ': ' + a.schritte[i][0]).replace(/^\[.?\]\s*/, '');
+  var t = String(korb.text || '');
+  if (t && !/\n$/.test(t)) { t += '\n'; }
+  korb.text = t + '[] ' + text;
+  epAnwenden(korb, String(korb.text).split('\n').length - 1, isoDatum(), '');
+  lwSchritte(f)[i].aufgabe = { seite: korb.id, text: text };
+  lwSpeichern(f);
+  melde('Im Sammler, für heute: „' + text + '“', 'gut');
+  akZeichnen();
+  tagZeichnen();
+}
+
+function lwNeuAnlegen(name, art) {
+  var f = { id: 'lf-' + neueKennung(), typ: 'leitfaden', titel: String(name || '').slice(0, 120), art: lwArt(art).id, angelegt: isoDatum(),
+            kontext: ktKontext() === 'beruflich' ? 'beruflich' : 'privat', schritte: [], fertig: false };
+  if (/^kb-/.test(ktWahlJetzt())) { f.bereich = ktWahlJetzt(); }
+  lwSchritte(f);
+  lwSpeichern(f);
+  return f;
+}
+
+function lwLoeschen() {
+  var f = lwFinden(ak.id);
+  if (!f) { akFrageWeg(); return; }
+  DB.kurs = DB.kurs.filter(function (x) { return x !== f; });
+  grabsteinSetzen('kurs', f.id);
+  spaeterSichern();
+  ak.frage = '';
+  ak.id = '';
+  melde('Fall „' + f.titel + '“ gelöscht.', null);
+  akZeichnen();
+}
+
 /* ============================================================
    Google Kalender schreiben (seit v6.5.0)
 
@@ -25027,6 +25476,7 @@ function starten() {
     akFilterLaden();
     ktLaden();
     taLaden();
+    akArtLaden();
     sichtschutzLaden();
     breiteHorchen();
     farbweltAnwenden();

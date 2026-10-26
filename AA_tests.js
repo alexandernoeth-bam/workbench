@@ -4186,7 +4186,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                    + 'globalThis.__taApi = { ktAlle, ktName, ktVon, ktPasst, ktKontext, ktSetzen, ktLaden, ktMenueHtml, ktKnopfHtml, taAufgaben, taHtml, taZahl, taHaken, taWaehlen, taAnz, taSort, taKuerzel, ta,'
                    + ' epAuf, epHtml, epAnwenden, epOk, epWeg, epZeitenHtml, akLeisteHtml, akSichtbar, kpSeitenAlle, kpTagFinden, kpSeiteAnlegen, leereDatenbank, isoDatum, tagePlus, document: document, window: window,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; }, tagFilter: function(){ return tagFilter; }, wahl: function(){ return ktWahl; },'
-                   + ' setzeEp: function(e){ ep = e; }, holeEp: function(){ return ep; }, setzeKt: function(w){ ktWahl = w; } };';
+                   + ' setzeEp: function(e){ ep = e; }, holeEp: function(){ return ep; }, setzeKt: function(w){ ktWahl = w; } };'
+                   /* Seit v6.7.0: Arten, Ablauf/Checkliste, Leitfaden (Kategorien 215, 216) */
+                   + 'globalThis.__lwApi = { akArtSetzen, akArtMenueHtml, akLeisteHtml, akSeiteHtml, akAnlegen, akNeuOeffnen, vlEigenHtml, vlCheckHtml, vlArtSetzen, vlZustandSetzen, vlKuerzelSetzen, vlZuruecksetzen, vlZustand, vlStand, vlNeuAnlegen,'
+                   + ' lwAlle, lwSeiteHtml, lwSchrittFertig, lwInSammler, lwNotizGetippt, lwNeuAnlegen, lwLoeschen, lwSchrittZeigen, kpSeitenAlle, kpTagFinden, leereDatenbank, isoDatum, document: document,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -13668,6 +13672,132 @@ console.log('\n214. Alle Aufgaben, Einplanen, Sammler');
       fail('Alle Aufgaben: ' + e.message);
     }
     T.setzeKt(altWahl); Object.assign(T.ta.anz, altAnz); T.ta.frisch = {}; T.setzeEp(null); T.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   215. Arten, Ablauf und Checkliste (v6.7.0)
+   Grund: Wie im Memo Pad des CLIE soll die Leiste nach Art zeigen;
+   Abläufe und Checklisten haben eigene Gruppen, Art und Zustand lassen
+   sich umstellen, eine Checkliste lässt sich zurücksetzen.
+   Erkennt: Art-Filter wirkungslos, Abläufe/Checklisten unter Notizen,
+   Zustand falsch gespeichert (Format des CLIE), Kürzel nicht gemerkt,
+   Haken bleiben nach „Alle Haken entfernen“, Neu legt falsche Art an.
+   ============================================================ */
+console.log('\n215. Arten, Ablauf und Checkliste');
+{
+  const L = globalThis.__lwApi || {};
+  if (typeof L.akArtSetzen !== 'function') {
+    warn('Arten nicht auswertbar');
+  } else {
+    const alt = L.holeDB(); const ak = L.holeAk(); const altAk = { art: ak.art, umfang: ak.umfang, id: ak.id, notizenAuf: ak.notizenAuf, neuIn: ak.neuIn, filter: ak.filter };
+    try {
+      const db = L.leereDatenbank();
+      db.projekte = [{ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', flaeche: '', ordnung: 1, geaendert: 1 }];
+      db.gedanken = [{ id: 'n1', titel: 'Zaun Ideen', text: 'x', kontext: 'privat', ordnung: 2, geaendert: 1 },
+                     { id: 'al', titel: 'Abruftest', text: '[] Daten laden', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', ordnung: 3, geaendert: 1 },
+                     { id: 'pl', titel: 'Packliste', text: '[x] Pass\n[] Ladekabel\n[-] Schirm', kontext: 'privat', checkliste: 'lauf', ordnung: 4, geaendert: 1 },
+                     { id: 'pr', titel: 'Ruhende', text: '[] a', kontext: 'privat', checkliste: 'lauf', ruht: true, ordnung: 5, geaendert: 1 },
+                     { id: 'pf', titel: 'Fertige', text: '[x] a', kontext: 'privat', checkliste: 'fertig', ordnung: 6, geaendert: 1 }];
+      db.kurs = [{ id: 'lf-1', typ: 'leitfaden', titel: 'Heizung taktet', art: 'diagnose', kontext: 'privat', schritte: [], fertig: false, angelegt: '2026-10-20' }];
+      L.setzeDB(db); ak.art = 'alle'; ak.umfang = 'alle'; ak.notizenAuf = true; ak.id = ''; ak.filter = 'alle';
+      let h = L.akLeisteHtml();
+      const i = (w) => h.indexOf(w);
+      pruefe(i('Notizen</button>') > 0 && i('Notizen</button>') < i('>Abläufe<') && i('>Abläufe<') < i('>Checklisten<') && i('>Checklisten<') < i('>Leitfäden<'), 'Gruppen: Notizen · Abläufe · Checklisten · Leitfäden');
+      const nz = h.slice(i('Notizen</button>'), i('>Abläufe<'));
+      pruefe(/Zaun Ideen/.test(nz) && !/Abruftest|Packliste/.test(nz), 'unter Notizen nur Notizen');
+      pruefe(/☑<\/span><span class="name">Packliste<\/span><span class="marke-klein">2\/3/.test(h) && /Ruht · 1/.test(h) && /Abgeschlossen · 1/.test(h), 'Checkliste mit Stand 2/3, Ruhende und Abgeschlossene klappen weg');
+      pruefe(/>Art<\/span><b>Alle<\/b>/.test(h) && /ktMenueAuf/.test(h), 'Knopf „Art“ unter „Kategorie“');
+      pruefe(/akArtSetzen\('leitfaden'\)"><span>▤ Leitfäden/.test(L.akArtMenueHtml()), 'Art-Auswahl mit allen acht Einträgen');
+      L.akArtSetzen('checkliste');
+      h = L.akLeisteHtml();
+      pruefe(ak.art === 'checkliste' && /Packliste/.test(h) && !/Carport|Zaun|Abruftest|Heizung|Alle Aufgaben|Routinen/.test(h), 'Art „Checklisten“: nur diese Gruppe');
+      L.akArtSetzen('quatsch');
+      pruefe(ak.art === 'checkliste', 'unbekannte Art abgewiesen');
+      L.akArtSetzen('alle');
+      /* Seite einer Checkliste */
+      const s = L.kpSeitenAlle().filter(x => x.id === 'pl')[0];
+      ak.id = 'pl';
+      let sh = L.akSeiteHtml(s);
+      pruefe(/vlArtSetzen\('abhaken'\)">☑ Checkliste/.test(sh) && /class="an" onclick="vlArtSetzen\('abhaken'\)/.test(sh) && /class="an" onclick="vlZustandSetzen\('lauf'\)"/.test(sh), 'Seite: Art und Zustand wählbar');
+      pruefe(/2 von 3 abgehakt/.test(sh) && /vlZuruecksetzen\(\)">Alle Haken entfernen/.test(sh) && !/Offene Aufgaben/.test(sh), 'Checkliste: Stand, „Alle Haken entfernen“, nichts einzuplanen');
+      L.vlZuruecksetzen();
+      pruefe(db.gedanken[2].text === '[] Pass\n[] Ladekabel\n[] Schirm', 'alle Haken weg');
+      L.vlZustandSetzen('ruht');
+      pruefe(db.gedanken[2].ruht === true && db.gedanken[2].checkliste === 'lauf' && L.vlZustand(s) === 'ruht', 'ruht: wie im CLIE (ruht, checkliste bleibt „lauf“)');
+      L.vlZustandSetzen('fertig');
+      pruefe(db.gedanken[2].checkliste === 'fertig' && !db.gedanken[2].ruht && db.gedanken[2].abgeschlossen === L.isoDatum(), 'abgeschlossen: checkliste „fertig“ mit Datum');
+      L.vlZustandSetzen('lauf');
+      L.vlArtSetzen('aufgaben');
+      pruefe(db.gedanken[2].art === 'aufgaben', 'Art Ablauf: art „aufgaben“');
+      sh = L.akSeiteHtml(s);
+      pruefe(/class="rt-ein vl-kuerzel"/.test(sh) && /Offene Aufgaben/.test(sh), 'Ablauf: Kürzel-Feld, einplanbar');
+      L.vlKuerzelSetzen('DFÜ-Test');
+      pruefe(db.gedanken[2].kuerzel === 'DFÜ-', 'Kürzel gespeichert, höchstens vier Zeichen');
+      L.vlArtSetzen('abhaken');
+      pruefe(!('art' in db.gedanken[2]), 'zurück zur Checkliste');
+      /* Neu */
+      const n = L.vlNeuAnlegen('ablauf', 'Monatsabschluss');
+      const ns = db.gedanken.filter(x => x.id === n.id)[0];
+      pruefe(ns && ns.checkliste === 'lauf' && ns.art === 'aufgaben' && ns.gestartet === L.isoDatum(), 'Neu: Ablauf läuft');
+      const c = L.vlNeuAnlegen('checkliste', 'Packen');
+      pruefe(!('art' in db.gedanken.filter(x => x.id === c.id)[0]), 'Neu: Checkliste ohne Art');
+      L.akNeuOeffnen('leitfaden');
+      pruefe(/id="akNeuLwArt"/.test(L.akLeisteHtml()) && /<option value="diagnose">/.test(L.akLeisteHtml()), 'Neuer Leitfaden: Wahl des Verfahrens');
+      ak.neuIn = '';
+    } catch (e) {
+      fail('Arten: ' + e.message);
+    }
+    Object.assign(ak, altAk); L.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   216. Leitfäden (v6.7.0)
+   Grund: Die Fälle aus dem Leitfaden des CLIE sollen am Arbeits-PC
+   weitergeführt werden — dieselben Daten (Bereich „kurs“).
+   Erkennt: Fall fehlt in der Leiste, Schritt fertig ohne Wirkung,
+   „Fertig“ nicht nach fünf Schritten, Sammler-Aufgabe doppelt oder nicht
+   für heute, Notiz nicht gespeichert, Löschen ohne Grabstein.
+   ============================================================ */
+console.log('\n216. Leitfäden');
+{
+  const L = globalThis.__lwApi || {};
+  if (typeof L.lwSeiteHtml !== 'function') {
+    warn('Leitfäden nicht auswertbar');
+  } else {
+    const alt = L.holeDB(); const ak = L.holeAk(); const altAk = { art: ak.art, id: ak.id, lwOffen: ak.lwOffen, frage: ak.frage, filter: ak.filter };
+    try {
+      const db = L.leereDatenbank();
+      db.kurs = [{ id: 'lf-1', typ: 'leitfaden', titel: 'Heizung taktet', art: 'diagnose', kontext: 'privat', schritte: [], fertig: false, angelegt: '2026-10-20',
+                   tabelle: { was: { ist: 'Taktet', nicht: 'Warmwasser' } } }];
+      L.setzeDB(db); ak.art = 'alle'; ak.filter = 'alle'; ak.id = 'lf-1'; ak.lwOffen = -1; ak.frage = '';
+      const f = db.kurs[0];
+      pruefe(/akOeffnen\('lf-1'\)/.test(L.akLeisteHtml()) && /Heizung taktet<\/span><span class="marke-klein">0\/5/.test(L.akLeisteHtml()), 'Fall in der Leiste mit 0/5');
+      let h = L.lwSeiteHtml(f);
+      pruefe(/Leitfaden · Diagnose/.test(h) && (h.match(/lwSchrittZeigen\(\d\)/g) || []).length >= 5 && /1 · Ist \/ Ist-Nicht/.test(h) && /<td>Taktet<\/td><td>Warmwasser<\/td>/.test(h) && /id="lwNotiz"/.test(h),
+             'Seite: Verfahren, fünf Schritte, Tabelle der Diagnose zum Lesen, Notiz');
+      L.lwNotizGetippt(0, 'Nur nachts');
+      pruefe(f.schritte[0].notiz === 'Nur nachts', 'Notiz gleich gespeichert');
+      L.lwInSammler();
+      const korb = db.themen.filter(t => t.id === 'cl-korb')[0];
+      pruefe(korb && korb.korb && /\[\] Heizung taktet: Ist \/ Ist-Nicht/.test(korb.text) && f.schritte[0].aufgabe.seite === 'cl-korb', 'Schritt als Aufgabe in den Sammler (wird angelegt)');
+      const tag = L.kpTagFinden(L.isoDatum());
+      pruefe(tag && tag.eintraege.some(e => e.quelle === 'cl-korb'), '… für heute eingeplant');
+      L.lwInSammler();
+      pruefe((korb.text.match(/Heizung taktet/g) || []).length === 1, 'kein zweites Mal');
+      L.lwSchrittFertig();
+      pruefe(f.schritte[0].fertig && /\[x\] Heizung taktet/.test(korb.text) && ak.lwOffen === 1, 'Schritt fertig: die Aufgabe im Sammler gleich mit, weiter zu Schritt 2');
+      for (let k = 1; k < 5; k++) { L.lwSchrittZeigen(k); L.lwSchrittFertig(); }
+      pruefe(f.fertig === true && /Fertig · 1/.test((ak.umfang = 'alle', L.akLeisteHtml())), 'nach fünf Schritten fertig — unter „Fertig“');
+      const n = L.lwNeuAnlegen('Angebot Dach', 'verhandlung');
+      pruefe(n.typ === 'leitfaden' && n.art === 'verhandlung' && n.schritte.length === 5 && /^lf-/.test(n.id) && db.kurs.indexOf(n) >= 0, 'Neu: Fall im Bereich „kurs“');
+      ak.id = n.id; L.lwLoeschen();
+      pruefe(!db.kurs.some(x => x.id === n.id) && (db.grabsteine || []).some(g => g.id === n.id), 'Löschen mit Grabstein');
+    } catch (e) {
+      fail('Leitfäden: ' + e.message);
+    }
+    Object.assign(ak, altAk); L.setzeDB(alt);
   }
 }
 
