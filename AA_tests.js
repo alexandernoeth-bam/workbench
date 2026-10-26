@@ -4208,7 +4208,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, td: td, ta: ta, schirm: function(){ return schirmOffen; } };'
                    /* Seit v7.2.0: Memo Pad (Kategorie 219) */
                    + 'globalThis.__mpApi = { mpSchritteHtml, mpReiter, mpMitReitern, mpNeuTaste, akSeiteHtml, akLeisteHtml, akOeffnen, tdWaehlen, tdHaken, tdPlanen, kpSeiteFinden, leereDatenbank, isoDatum, tagePlus, taGeplant, zeigeSchirm, document: document,'
-                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, ak: ak, td: td, schirm: function(){ return schirmOffen; }, setzeSchirm: function(w){ schirmOffen = w; } };';
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, ak: ak, td: td, schirm: function(){ return schirmOffen; }, setzeSchirm: function(w){ schirmOffen = w; } };'
+                   /* Seit v7.3.0: Woche als Zeitraster, Coach, + Aufgabe (Kategorie 220) */
+                   + 'globalThis.__kv73Api = { kvWocheHtml, kvSpuren, kvAufgabeNeu, kvFreieUebernehmen, istCoachTermin, eintraegeEinsortieren, kvTagHtml, kpTagFinden, kpSeiteFinden, kpWocheEintrag, leereDatenbank, isoDatum, tagePlus, montagVon,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, setzeTermine: function(t){ var alt = termineNachTag; termineNachTag = t; return alt; }, holeTermine: function(){ return termineNachTag; },'
+                   + ' setzeKal: function(f){ var alt = kalFilter; kalFilter = f; return alt; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -6987,8 +6991,9 @@ console.log('\n60. Weg in den Google-Kalender');
     pruefe(new RegExp('function\\s+' + f + '\\s*\\(').test(skript),
            'Funktion ' + f + ' ist definiert');
   });
-  pruefe(/onclick="googleKalenderOeffnen\(\)"/.test(QUELLE),
-         'der Kalenderkopf hat einen Knopf dafür');
+  /* Seit v7.3.0 ohne Knopf — Termine werden direkt gepflegt */
+  pruefe(!/onclick="googleKalenderOeffnen\(\)"/.test(QUELLE),
+         'der Kalenderkopf braucht keinen Google-Knopf mehr');
 
   const oeffnen = skript.match(/function googleKalenderOeffnen\([\s\S]*?\n\}/);
   pruefe(oeffnen && /GOOGLE_FENSTER/.test(oeffnen[0]),
@@ -13887,7 +13892,8 @@ console.log('\n217. Kalender mit Tag, Woche, Monat, Jahr');
       K.kvSeiteHaken('al|1');
       pruefe(/\[x\] Zugang prüfen/.test(al.text), 'eine Frist lässt sich direkt abhaken');
       const w = K.kvWocheHtml(K.montagVon(H));
-      pruefe((w.match(/class="kv-wtag/g) || []).length === 7 && /kvTagOeffnen\('/.test(w) && /kv-e kv-termin/.test(w) && /kv-e kv-plan/.test(w), 'Woche: sieben Tage, Termine und Eingeplantes, Tipp öffnet den Tag');
+      /* Seit v7.3.0 als Zeitraster */
+      pruefe((w.match(/class="kv-wr-spalte/g) || []).length === 7 && /kvTagOeffnen\('/.test(w) && /kv-wb kv-wb-t/.test(w) && /kv-e kv-plan/.test(w), 'Woche: sieben Spalten, Termine als Blöcke, Eingeplantes, Tipp öffnet den Tag');
       const m = K.kvMonatHtml(H.slice(0, 7));
       const zellen = (m.match(/class="kv-mtag/g) || []).length;
       pruefe(zellen % 7 === 0 && zellen >= 28 && /Dachrinne|Jour fixe/.test(m), 'Monat: volle Wochen als Raster mit Einträgen');
@@ -14042,6 +14048,64 @@ console.log('\n219. Memo Pad');
       fail('Memo Pad: ' + e.message);
     }
     Object.assign(M.ak, altAk); M.td.wahl = altWahl; M.setzeSchirm(altS); M.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   220. Woche als Zeitraster, Coach, Aufgabe im Tag (v7.3.0)
+   Grund: Die Woche fehlte im Zeitraster; Coach-Erinnerungen aus CLIE
+   standen im Kalender; im Tag frei geschriebene Aufgaben standen in
+   keiner Liste und fehlten im To Do.
+   Fehlerart: Aufgabenzeilen ohne Herkunft (frei im Tag) — sie müssen in
+   den Sammler, sonst sieht sie nur der Tag.
+   ============================================================ */
+console.log('\n220. Woche als Zeitraster, Coach, Aufgabe im Tag');
+{
+  const skript = hauptSkript();
+  pruefe(!/onclick="googleKalenderOeffnen\(\)"/.test(QUELLE), 'kein Google-Knopf im Kalender');
+  const ue = skript.match(/function wochenUmstellen\([\s\S]*?\n\}\n/);
+  const ueb = skript.match(/function uebernehmen\([\s\S]*?\n\}\n/);
+  pruefe(ue && /kvFreieUebernehmen\(\)/.test(ue[0]) && ueb && !/kvFreieUebernehmen/.test(ueb[0]), 'nach Laden und Abgleich kommen freie Zeilen in den Sammler — uebernehmen bleibt wie im CLIE');
+  const kz = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(kz && /tippt\.id === 'kvNeu'/.test(kz[0]), 'wer im Tag eintippt, wird nicht überschrieben');
+  const K = globalThis.__kv73Api || {};
+  if (typeof K.kvWocheHtml !== 'function') {
+    warn('7.3.0 nicht auswertbar');
+  } else {
+    const alt = K.holeDB(); const altT = K.setzeTermine({}); const altF = K.setzeKal('alle');
+    const H = K.isoDatum(); const mo = K.montagVon(H);
+    try {
+      pruefe(K.istCoachTermin('Coach: Pause', 'Arbeit') && K.istCoachTermin('Wasser', 'Coach') && !K.istCoachTermin('Coaching-Termin', 'Arbeit'), 'Coach erkannt am Titel „Coach:“ oder am Kalender „Coach“');
+      const ziel = {};
+      K.eintraegeEinsortieren([{ id: 'c1', summary: 'Coach: Pause', start: { dateTime: H + 'T15:00:00' }, end: { dateTime: H + 'T15:05:00' } },
+                               { id: 'n1', summary: 'Jour fixe', start: { dateTime: H + 'T10:00:00' }, end: { dateTime: H + 'T11:00:00' } }], 'Arbeit', 'beruflich', ziel);
+      pruefe(ziel[H] && ziel[H].length === 1 && ziel[H][0].id === 'n1', 'Coach-Termine werden gar nicht erst übernommen');
+      const sp = K.kvSpuren([{ von: 600, bis: 660 }, { von: 630, bis: 675 }, { von: 700, bis: 760 }]);
+      pruefe(sp[0].spuren === 2 && sp[1].spuren === 2 && sp[0].spur !== sp[1].spur && sp[2].spuren === 1 && sp[2].spur === 0, 'Überschneidungen nebeneinander, danach wieder volle Breite');
+      const db = K.leereDatenbank();
+      db.themen = [{ id: 'cl-korb', name: 'Sammler', korb: true, text: '[] Akku', kontext: '', ordnung: 0, geaendert: 1 }];
+      db.tage = [{ id: 't1', datum: H, text: '[] Rechnung prüfen\n[x] Erledigt frei\n[-] Egal\nNotizzeile', eintraege: [], geaendert: 1 }];
+      K.setzeDB(db);
+      const n = K.kvFreieUebernehmen();
+      const korb = K.kpSeiteFinden('cl-korb');
+      pruefe(n === 1 && /\[\] Rechnung prüfen$/.test(korb.text) && !/Erledigt frei|Egal|Notizzeile/.test(korb.text), 'freie offene Aufgabe kommt in den Sammler — Erledigtes, [-] und Text bleiben');
+      const t = K.kpTagFinden(H);
+      pruefe(K.kpWocheEintrag(t, 'Rechnung prüfen') && K.kpWocheEintrag(t, 'Rechnung prüfen').quelle === 'cl-korb' && (t.text.match(/Rechnung prüfen/g) || []).length === 1, 'die Zeile bleibt im Tag, eingeplant aus dem Sammler — keine Doppelung');
+      pruefe(K.kvFreieUebernehmen() === 0 && (korb.text.match(/Rechnung/g) || []).length === 1, 'ein zweites Mal ändert nichts');
+      const neu = K.kvAufgabeNeu(H, '  Zettel  ordnen ');
+      pruefe(neu && /\[\] Zettel ordnen$/.test(korb.text) && K.kpWocheEintrag(K.kpTagFinden(H), 'Zettel ordnen').quelle === 'cl-korb', '„+ Aufgabe“: in den Sammler, für den Tag eingeplant');
+      pruefe(/id="kvNeu"/.test(K.kvTagHtml(H)) && /Zettel ordnen/.test(K.kvTagHtml(H)), 'das Feld steht unter „Vorgenommen“');
+      K.setzeTermine({ [H]: [{ id: 'g1', titel: 'Jour fixe', zeit: '10:00', bis: '11:30', kontext: 'beruflich' }] });
+      const w = K.kvWocheHtml(mo);
+      const sp7 = (w.match(/class="kv-wr-spalte/g) || []).length;
+      const top = w.match(/kv-wb kv-wb-t" style="top:(\d+(?:\.\d+)?)px;height:(\d+(?:\.\d+)?)px/);
+      pruefe(sp7 === 7 && top && Number(top[1]) === (10 - 7) * 40 && Number(top[2]) === 58, 'Termin als Block: 10:00 an seiner Stunde, 1½ Stunden hoch');
+      pruefe(/terminBlattOeffnen\('g1'/.test(w) && /kpBzUm\('/.test(w) && /kvTagOeffnen\('/.test(w), 'Termin öffnet das Blatt, Eingeplantes ist abhakbar, der Tageskopf öffnet den Tag');
+      pruefe(/class="kv-wr-oben[^"]*">[\s\S]*?Rechnung prüfen/.test(w), 'Eingeplantes ohne Uhrzeit steht oben');
+    } catch (e) {
+      fail('7.3.0: ' + e.message);
+    }
+    K.setzeTermine(altT); K.setzeKal(altF); K.setzeDB(alt);
   }
 }
 

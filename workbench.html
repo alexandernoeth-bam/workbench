@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 7.2.0</title>
+<title>Workbench 7.3.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -599,6 +599,34 @@ body.breit .kv-mtag{min-height:104px}
 .kv-mnr{font-size:calc(var(--fs)*0.74);font-weight:600;margin-bottom:2px}
 .kv-mtag.heute .kv-mnr{color:var(--weinrot)}
 .kv-mehr{font-size:calc(var(--fs)*0.66);color:var(--grau)}
+/* Woche als Zeitraster (seit v7.3.0) */
+.kv-wr{margin-top:8px;background:var(--karte);border:1px solid var(--linie);border-radius:10px;overflow-x:auto}
+.kv-wr-innen{min-width:720px}
+.kv-wr-kopf,.kv-wr-ganz,.kv-wr-raster{display:grid;grid-template-columns:40px repeat(7,minmax(0,1fr));min-width:720px}
+.kv-wr-kopf{border-bottom:1px solid var(--linie)}
+.kv-wr-tag{font:inherit;font-size:calc(var(--fs)*0.76);font-weight:600;text-align:left;background:none;border:0;border-left:1px solid var(--linie);padding:6px 6px;cursor:pointer;color:var(--tinte)}
+.kv-wr-tag.heute{color:var(--weinrot);box-shadow:inset 0 3px 0 var(--weinrot)}
+.kv-wr-ganz{border-bottom:1px solid var(--linie)}
+.kv-wr-lbl{font-size:calc(var(--fs)*0.6);color:var(--grau-hell);padding:6px 4px}
+.kv-wr-oben{border-left:1px solid var(--linie);padding:3px 3px 1px;min-height:24px;min-width:0}
+.kv-wr-oben .kv-e{display:flex;align-items:center;gap:4px}
+.kv-wr-zeit div{font-size:calc(var(--fs)*0.62);color:var(--grau-hell);text-align:right;padding-right:5px;border-top:1px solid #EEECE8;box-sizing:border-box}
+.kv-wr-spalte{position:relative;border-left:1px solid var(--linie);cursor:pointer;
+  background:repeating-linear-gradient(to bottom,transparent 0,transparent 39px,#EEECE8 39px,#EEECE8 40px)}
+.kv-wr-spalte.we,.kv-wr-oben.we{background-color:#FBFAF8}
+.kv-wb{position:absolute;border-radius:4px;overflow:hidden;font-size:calc(var(--fs)*0.64);line-height:1.25;box-sizing:border-box;cursor:pointer}
+.kv-wb-in{padding:2px 4px;height:100%;overflow:hidden}
+.kv-wb-in .kv-k{display:inline-block;vertical-align:-2px;margin-right:3px}
+.kv-wb b{white-space:nowrap}
+.kv-wb b{font-weight:500;font-variant-numeric:tabular-nums}
+.kv-wb-t{background:rgba(25,82,90,.13);border-left:3px solid var(--petrol)}
+.kv-wb-t.privat{border-left-color:#5E8C93}
+.kv-wb-p{background:rgba(138,11,34,.08);border-left:3px solid var(--weinrot)}
+.kv-wb-p.erl{text-decoration:line-through;color:var(--grau-hell)}
+.kv-wr-jetzt{position:absolute;left:0;right:0;height:2px;background:var(--weinrot);pointer-events:none}
+.kv-k-klein{flex:0 0 12px;width:12px;height:12px;border-width:1.2px}
+.kv-k-klein.an::after{left:3px;top:0;width:3px;height:6px}
+.kv-neu{width:100%;margin:0 0 8px;border:1.5px solid var(--weinrot);border-radius:6px;padding:6px 9px;font:inherit;font-size:calc(var(--fs)*0.82)}
 /* Am Handy zeigt der Monat Striche statt Text */
 body:not(.breit) .kv-mtag .kv-e{font-size:0;height:5px;padding:0;margin:0 0 3px;border-left-width:0;border-radius:3px}
 body:not(.breit) .kv-mtag .kv-e.kv-termin{background:var(--petrol)}
@@ -3140,8 +3168,6 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
       <span class="kal-luecke"></span>
       <button type="button" class="kv-plus" onclick="kvTerminNeu()">+ Termin</button>
       <span id="kKategorie" class="kt-tag"></span>
-      <button type="button" class="kv-sym" onclick="googleKalenderOeffnen()"
-              title="Den Google-Kalender in einem eigenen Fenster öffnen">Google</button>
       <button type="button" class="kv-sym tk-zahnrad" onclick="zeigeSchirm('Diagnose')"
               title="Diagnose und Einstellungen" aria-label="Diagnose und Einstellungen">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle>
@@ -3233,7 +3259,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '7.2.0';
+var APP_VERSION = '7.3.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -10534,6 +10560,8 @@ function eintraegeEinsortieren(eintraege, quelle, kontext, ziel) {
   for (i = 0; i < eintraege.length; i++) {
     var e = eintraege[i];
     if (e.status === 'cancelled') { continue; }
+    /* Seit v7.3.0 wie im CLIE: Coach-Erinnerungen erscheinen nirgends */
+    if (istCoachTermin(e.summary, quelle)) { continue; }
     /* Das Kürzel gehört nicht in die Anzeige — der rohe Titel bleibt
        daneben erhalten, denn aus ihm wird die Art gelesen. */
     var rohTitel = e.summary || '(ohne Titel)';
@@ -10585,6 +10613,11 @@ function eintraegeEinsortieren(eintraege, quelle, kontext, ziel) {
       kontext: welcher
     }, wohin);
   }
+}
+
+/* Coach-Erinnerungen aus CLIE: Titel „Coach: …“ oder Kalender „Coach“ */
+function istCoachTermin(titel, kalender) {
+  return /^\s*Coach:/.test(String(titel || '')) || /^\s*coach\s*$/i.test(String(kalender || ''));
 }
 
 /* Das Ziel ist das dritte, freiwillige Argument — so bleiben alle
@@ -13145,6 +13178,9 @@ function heuteInSicht(blatt) {
 
 function kalZeichnen() {
   if (!kalAnker) { kalAnker = isoDatum(); }
+  /* Wer gerade eine Aufgabe eintippt, wird nicht vom Takt überschrieben (seit v7.3.0) */
+  var tippt = document.activeElement;
+  if (tippt && tippt.id === 'kvNeu' && kalStufe === 'tag' && schirmOffen === 'Kalender') { return; }
   var titel = document.getElementById('kalTitel');
   var blatt = document.getElementById('kalBlatt');
   if (!blatt) { return; }
@@ -13334,11 +13370,69 @@ function kvTagHtml(is) {
          + (x.p ? '<span class="kv-prio">' + x.p + '</span>' : '')
          + '<span class="kv-tx">' + esc(x.text) + '</span>' + kvQuelleHtml(x.seite) + marke + '</div>';
   }).join('');
-  if (!vh) { vh = '<div class="tleer">Nichts vorgenommen. Einplanen geht in jeder Aufgabe.</div>'; }
+  if (!vh) { vh = '<div class="tleer">Nichts vorgenommen.</div>'; }
+  /* Seit v7.3.0: direkt eintippen — landet im Sammler, eingeplant für diesen Tag */
+  vh = '<input id="kvNeu" class="rt-ein kv-neu" placeholder="+ Aufgabe für ' + (is === heute ? 'heute' : esc(kurzDatum(is))) + ' — Enter legt an" onkeydown="kvNeuTaste(event)">' + vh;
 
   var rechts = tagBlockHtml('Vorgenommen', vh) + routinenKarteHtml(is, e)
              + (e.ganztags.length ? tagBlockHtml('Ganztägig', ganztagsHtml(is, e)) : '');
   return '<div class="kv-tag"><div class="kv-raster">' + raster + '</div><div class="kv-rechts">' + rechts + '</div></div>';
+}
+
+/* Neue Aufgabe in den Sammler und für den Tag einplanen */
+function kvAufgabeNeu(is, text) {
+  var t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(String(is || ''))) { return null; }
+  var korb = lwSammler();
+  var alt = String(korb.text || '');
+  korb.text = (alt.trim() ? alt.replace(/\n+$/, '') + '\n' : '') + '[] ' + t;
+  korb.geaendert = jetzt();
+  var nr = korb.text.split('\n').length - 1;
+  var b = kpPlanenKern(korb, nr, 'h', is);
+  spaeterSichern();
+  return b ? { seite: korb, nr: nr, tag: b } : null;
+}
+
+function kvNeuTaste(ev) {
+  if (ev.key === 'Escape') { ev.target.value = ''; ev.target.blur(); return; }
+  if (ev.key !== 'Enter') { return; }
+  ev.preventDefault();
+  var n = kvAufgabeNeu(kalAnker || isoDatum(), ev.target.value);
+  ev.target.value = '';
+  ev.target.blur();
+  kalZeichnen();
+  if (n) { melde('In den Sammler, eingeplant für ' + kurzDatum(kalAnker) + '.', 'gut'); }
+  var f = document.getElementById('kvNeu');
+  if (f && f.focus) { f.focus(); }
+}
+
+/* Freie Aufgabenzeilen im Tag (ohne Herkunft) gehören in den Sammler —
+   die Zeile bleibt im Tag, bekommt aber ihren Eintrag dorthin. Erledigtes
+   und nicht Relevantes bleibt, wie es ist. Gibt die Zahl zurück. */
+function kvFreieUebernehmen() {
+  var n = 0;
+  var korb = null;
+  (DB.tage || []).forEach(function (b) {
+    if (!b || !b.datum) { return; }
+    String(b.text || '').split('\n').forEach(function (z) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.erledigt || a.nichtRelevant) { return; }
+      if (kpWocheEintrag(b, a.text)) { return; }
+      if (!korb) { korb = lwSammler(); }
+      var kern = kpPrio(a.text).text;
+      var schon = String(korb.text || '').split('\n').some(function (k) { var x = kpAufgabe(k); return x && !x.erledigt && kpPrio(x.text).text === kern; });
+      if (!schon) {
+        var alt = String(korb.text || '');
+        korb.text = (alt.trim() ? alt.replace(/\n+$/, '') + '\n' : '') + '[] ' + a.text;
+        korb.geaendert = jetzt();
+      }
+      if (!Array.isArray(b.eintraege)) { b.eintraege = []; }
+      b.eintraege.push({ id: neueKennung(), abschnitt: 'h', text: a.text, quelle: korb.id, erledigt: false });
+      b.geaendert = jetzt();
+      n++;
+    });
+  });
+  return n;
 }
 
 function kvSeiteHaken(key) {
@@ -13375,18 +13469,90 @@ function kvKurzHtml(x) {
        + (x.zeit ? '<b>' + esc(x.zeit) + '</b> ' : '') + esc(x.text) + '</div>';
 }
 
+/* Seit v7.3.0 die Woche als Zeitraster wie in Outlook: sieben Spalten,
+   Termine als Blöcke nach ihrer Dauer, Überschneidungen nebeneinander.
+   Eingeplantes mit Uhrzeit steht im Raster (abhakbar), ohne Uhrzeit und
+   Ganztägiges in der Zeile oben. */
+var KV_STUNDE_PX = 40;
+
 function kvWocheHtml(mo) {
   var heute = isoDatum();
-  var h = '<div class="kv-woche">';
+  var tage = [];
+  var von = KV_VON, bis = KV_BIS;
   var i;
   for (i = 0; i < 7; i++) {
     var d = tagePlus(mo, i);
-    var l = kvTagKurz(d);
-    h += '<div class="kv-wtag' + (d === heute ? ' heute' : '') + (i >= 5 ? ' we' : '') + '" onclick="kvTagOeffnen(\'' + d + '\')">'
-       + '<div class="kv-wkopf">' + TAGE_KURZ[ausIso(d).getDay()] + ' ' + Number(d.slice(8, 10)) + '.</div>'
-       + (l.length ? l.map(kvKurzHtml).join('') : '<div class="kv-leer">–</div>') + '</div>';
+    var oben = [], bloecke = [];
+    jtAn(d).forEach(function (j) { if (passtZumKalender(jtKontext(j))) { oben.push('<div class="kv-e kv-ganz">' + esc(j.titel) + '</div>'); } });
+    var fei = feiertagAn(d);
+    if (fei) { oben.push('<div class="kv-e kv-ganz">' + esc(fei) + '</div>'); }
+    termineFuerTag(d).zeit.forEach(function (t) {
+      if (!passtZumKalender(t.kontext) || !t.zeit) { return; }
+      var a = minutenAus(t.zeit);
+      var e = t.bis ? minutenAus(t.bis) : a + 30;
+      if (e <= a) { e = 24 * 60; }
+      bloecke.push({ von: a, bis: Math.max(e, a + 20), html: '<div class="kv-wb-in" onclick="event.stopPropagation();terminBlattOeffnen(\'' + esc(t.id || '') + '\',\'' + d + '\')">'
+        + '<b>' + esc(t.zeit) + (t.bis ? '–' + esc(t.bis) : '') + '</b> ' + esc(t.titel) + '</div>', klasse: 'kv-wb-t' + (t.kontext === 'privat' ? ' privat' : '') });
+    });
+    kvGeplant(d).forEach(function (x) {
+      var k = '<button type="button" class="kv-k kv-k-klein' + (x.erledigt ? ' an' : '') + '" onclick="event.stopPropagation();kpBzUm(\'' + esc(x.bid) + '\',' + x.nr + ')" aria-label="abhaken"></button>';
+      if (!x.zeit) { oben.push('<div class="kv-e kv-plan' + (x.erledigt ? ' erl' : '') + '">' + k + esc(x.text) + '</div>'); return; }
+      var a = minutenAus(x.zeit);
+      bloecke.push({ von: a, bis: a + 30, html: '<div class="kv-wb-in">' + k + '<b>' + esc(x.zeit) + '</b> ' + esc(x.text) + '</div>', klasse: 'kv-wb-p' + (x.erledigt ? ' erl' : '') });
+    });
+    bloecke.forEach(function (bl) {
+      von = Math.min(von, Math.floor(bl.von / 60));
+      bis = Math.max(bis, Math.min(23, Math.ceil(bl.bis / 60) - 1));
+    });
+    tage.push({ d: d, oben: oben, bloecke: kvSpuren(bloecke) });
   }
-  return h + '</div>';
+  var hoehe = (bis - von + 1) * KV_STUNDE_PX;
+  var kopf = '<div class="kv-wr-kopf"><div></div>', ganz = '<div class="kv-wr-ganz"><div class="kv-wr-lbl">ganzt.</div>', spalten = '';
+  tage.forEach(function (t, nr) {
+    var kl = (t.d === heute ? ' heute' : '') + (nr >= 5 ? ' we' : '');
+    kopf += '<button type="button" class="kv-wr-tag' + kl + '" onclick="kvTagOeffnen(\'' + t.d + '\')">' + TAGE_KURZ[ausIso(t.d).getDay()] + ' ' + Number(t.d.slice(8, 10)) + '.</button>';
+    ganz += '<div class="kv-wr-oben' + kl + '">' + t.oben.join('') + '</div>';
+    var sp = '<div class="kv-wr-spalte' + kl + '" style="height:' + hoehe + 'px" onclick="kvTagOeffnen(\'' + t.d + '\')">';
+    t.bloecke.forEach(function (bl) {
+      var top = (bl.von - von * 60) * KV_STUNDE_PX / 60;
+      var hh = Math.max(18, (Math.min(bl.bis, (bis + 1) * 60) - bl.von) * KV_STUNDE_PX / 60 - 2);
+      var breite = 100 / bl.spuren;
+      sp += '<div class="kv-wb ' + bl.klasse + '" style="top:' + top + 'px;height:' + hh + 'px;left:calc(' + (bl.spur * breite) + '% + 2px);width:calc(' + breite + '% - 4px)">' + bl.html + '</div>';
+    });
+    if (t.d === heute) {
+      var jetztMin = minutenAus(uhrzeitJetzt());
+      if (jetztMin >= von * 60 && jetztMin <= (bis + 1) * 60) { sp += '<div class="kv-wr-jetzt" style="top:' + ((jetztMin - von * 60) * KV_STUNDE_PX / 60) + 'px"></div>'; }
+    }
+    spalten += sp + '</div>';
+  });
+  var zeit = '<div class="kv-wr-zeit">';
+  var st;
+  for (st = von; st <= bis; st++) { zeit += '<div style="height:' + KV_STUNDE_PX + 'px">' + st + '</div>'; }
+  zeit += '</div>';
+  return '<div class="kv-wr"><div class="kv-wr-innen">' + kopf + '</div>' + ganz + '</div>'
+       + '<div class="kv-wr-raster">' + zeit + spalten + '</div></div></div>';
+}
+
+/* Überschneidungen nebeneinander: jede Gruppe sich überlappender Blöcke
+   teilt die Breite in so viele Spuren, wie sie gleichzeitig braucht. */
+function kvSpuren(bloecke) {
+  var l = bloecke.slice().sort(function (a, b) { return (a.von - b.von) || (b.bis - a.bis); });
+  var gruppe = [], ende = -1, enden = [];
+  var abschliessen = function () {
+    var n = enden.length;
+    gruppe.forEach(function (bl) { bl.spuren = n; });
+    gruppe = []; enden = [];
+  };
+  l.forEach(function (bl) {
+    if (gruppe.length && bl.von >= ende) { abschliessen(); ende = -1; }
+    var spur = enden.findIndex(function (e) { return e <= bl.von; });
+    if (spur < 0) { spur = enden.length; enden.push(bl.bis); } else { enden[spur] = bl.bis; }
+    bl.spur = spur;
+    gruppe.push(bl);
+    ende = Math.max(ende, bl.bis);
+  });
+  if (gruppe.length) { abschliessen(); }
+  return l;
 }
 
 function kvMonatHtml(m0) {
@@ -21239,6 +21405,10 @@ function planungSetzen(a, wert) {
    als eine anderswo abgehakte Aufgabe, und das Abhaken ginge beim
    Verschmelzen verloren. */
 function wochenUmstellen() {
+  /* Seit v7.3.0 — nach dem Laden und jedem Abgleich: frei im Tag
+     Geschriebenes kommt in den Sammler. Hier, weil uebernehmen und
+     abgleichen wörtlich dieselben wie im CLIE bleiben müssen. */
+  if (kvFreieUebernehmen()) { spaeterSichern(); }
   var jetztMo = montagVon(isoDatum());
   var l = DB.aufgaben || [];
   var zahl = 0;
