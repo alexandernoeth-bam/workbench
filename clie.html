@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.80.0</title>
+<title>CLIE 0.80.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1046,7 +1046,8 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .memo-zeile.pm.gewaehlt{background:var(--px);color:var(--lcd)}
 .aufg.pm-z{align-items:flex-start;border-bottom:0;min-height:30px;padding:2px 0}
 .aufg.pm-z .k{margin-top:4px}
-.aufg.pm-z .tx{flex:1;min-width:0;text-align:left;background:none;border:0;padding:2px 0;white-space:normal;overflow:visible}
+/* Seit 0.80.1: im Memo steht der ganze Text — ohne die Zwei-Zeilen-Grenze von .tx.umbruch (sonst lagen Zeilen übereinander) */
+.aufg.pm-z .tx,.aufg.pm-z .tx.umbruch{flex:1;min-width:0;text-align:left;background:none;border:0;padding:2px 0;white-space:normal;overflow:visible;display:block;-webkit-line-clamp:unset;line-clamp:none;max-height:none;line-height:1.3;overflow-wrap:anywhere}
 .aufg.pm-z.erl .tx{color:var(--px-zart);text-decoration:line-through}
 .aufg.pm-z.gewaehlt{background:var(--lcd-hell);outline:2px solid var(--px);outline-offset:-1px}
 .pm-todo{flex:0 0 22px;width:22px;height:24px;padding:3px 2px 0;background:none;border:0;color:var(--px)}
@@ -1119,7 +1120,7 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.80.0';
+var APP_VERSION = '0.80.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -28759,7 +28760,7 @@ function pmMemoFensterHtml() {
   var h = '<div class="fenster"><div class="titel">Details</div><div class="rumpf">'
     + '<label for="pmMTitel">Titel:</label><input id="pmMTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
     + '<label>Kürzel:</label><div class="wahlreihe pm-kz">' + PM_KUERZEL.map(function (k) {
-      return '<button type="button"' + (f.k === k ? ' class="an"' : '') + (s.art === 'liste' && k !== '–' ? ' disabled' : '') + ' onclick="pmKuerzelWahl(\'' + k + '\')">' + k + '</button>';
+      return '<button type="button"' + (f.k === k ? ' class="an"' : '') + (ckIstKorb(s) && k !== '–' ? ' disabled' : '') + ' onclick="pmKuerzelWahl(\'' + k + '\')">' + k + '</button>';
     }).join('') + '</div><p class="leise">P Projekt · Z Ziel · A Ablauf · – alles andere</p>'
     + katPrivatHtml('pmM', f.bereich || '', f.privat);
   var auf = pmMemoAufgaben(s.id);
@@ -28801,7 +28802,8 @@ function pmKuerzelSetzen(s, k) {
   if (!s || PM_KUERZEL.indexOf(k) < 0) { return s; }
   var alt = pmKuerzel(s);
   if (alt === k) { return s; }
-  if (s.art === 'liste') { melde('Eine alte Liste bleibt, wie sie ist.', null); return s; }
+  /* Seit 0.80.1: auch eine alte Liste wird P, Z oder A (zieht um wie eine Notiz) — nur der Sammler nicht */
+  if (ckIstKorb(s)) { melde('Der Sammler bleibt, wie er ist.', null); return s; }
   var x = s.__satz;
   if (s.art === 'notiz' && (k === 'A' || k === '–')) {
     if (k === 'A') {
@@ -28818,7 +28820,7 @@ function pmKuerzelSetzen(s, k) {
   var ny = n.__satz;
   var ziel = kpSammlungVon(n);
   n.text = s.text;
-  ['bereich', 'privat', 'termine', 'archiv', 'ordnung'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
+  ['bereich', 'privat', 'termine', 'archiv', 'ordnung', 'zusatz'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
   if (k === 'A') { ny.checkliste = 'lauf'; ny.art = 'aufgaben'; ny.gestartet = isoDatum(); }
   if (k === '–' && x.checkliste) { ny.checkliste = (x.checkliste === 'fertig') ? 'fertig' : 'lauf'; }
   if (pmArchiviert(s)) { ny.archiv = true; }

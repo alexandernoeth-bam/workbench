@@ -8835,6 +8835,32 @@ function palmAgendaTest() {
 }
 
 
+function palmFix0801Test() {
+  console.log('\n139. Memo: ganze Zeilen statt übereinander; Kürzel auch für alte Listen (0.80.1)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  /* Fehlerart: eine geerbte Zwei-Zeilen-Grenze (.tx.umbruch) mit overflow:visible ließ lange Zeilen übereinanderlaufen */
+  const css = QUELLE.match(/\.aufg\.pm-z \.tx,\.aufg\.pm-z \.tx\.umbruch\{([^}]*)\}/);
+  pruefe(css && /-webkit-line-clamp:unset/.test(css[1]) && /display:block/.test(css[1]) && /max-height:none/.test(css[1]), 'Memo-Zeilen ohne Zwei-Zeilen-Grenze: der ganze Text, nichts liegt übereinander');
+  S.DB.themen.push({ id: 'tl', name: 'OTS-Testumgebung', kontext: 'beruflich', bereich: 'kb-arbeit', text: '[x] Alternative besprechen\n[] Ergebnis dokumentieren', zusatz: { 'Ergebnis dokumentieren': { notiz: 'n' } }, ordnung: 1, geaendert: 1 });
+  S.pmMemoOeffnen('tl', '');
+  S.pmMemoDetails();
+  const dd = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(!/disabled/.test(dd), 'Details einer alten Liste: P · Z · A wählbar');
+  S.document.getElementById('pmMTitel').value = 'OTS-Testumgebung'; S.document.getElementById('pmMKat').value = 'kb-arbeit';
+  S.pmKuerzelWahl('P');
+  S.document.getElementById('pmMTitel').value = 'OTS-Testumgebung'; S.document.getElementById('pmMKat').value = 'kb-arbeit';
+  S.pmMemoSpeichern();
+  const p = S.DB.projekte.filter(x => x.id === 'tl')[0];
+  pruefe(p && /Ergebnis dokumentieren/.test(p.flaeche) && p.bereich === 'kb-arbeit' && p.zusatz && p.zusatz['Ergebnis dokumentieren'] && !S.DB.themen.some(x => x.id === 'tl') && S.DB.grabsteine.some(g => g.s === 'themen' && g.id === 'tl'),
+    'Liste → P: zieht nach „projekte“ — Text, Kategorie und Notizen der Punkte bleiben, Löschvermerk in „themen“');
+  S.DB.themen.push({ id: 'cl-korb', name: 'Sammler', kontext: '', text: '[] x', korb: true, ordnung: 0, geaendert: 1 });
+  pruefe(S.pmKuerzelSetzen(S.kpSeiteFinden('cl-korb'), 'P').id === 'cl-korb' && S.DB.themen.some(x => x.id === 'cl-korb'), 'nur der Sammler bleibt, wie er ist');
+  S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -8971,6 +8997,7 @@ function palmAgendaTest() {
   try { palmEditorTest(); } catch (e) { fail('Palm Editor warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmUmstellungTest(); } catch (e) { fail('Palm Umstellung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmAgendaTest(); } catch (e) { fail('Palm Agenda warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmFix0801Test(); } catch (e) { fail('0.80.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
