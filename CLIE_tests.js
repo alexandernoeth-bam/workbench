@@ -8785,7 +8785,7 @@ function palmUmstellungTest() {
   const tn = S.DB.themen.filter(x => x.id === 'tn')[0];
   pruefe(n >= 2 && A('Aus der Workbench') && A('Anwendungen aufrufen').planung === S.tagePlus(heute, 2) && !A('Ablage') && !tn.archiv && tn.text === '[] Ablage',
     'Nachpflegen: Sammler-Zeile und neu Eingeplantes (Datum an die Aufgabe) — eine neue Liste bleibt, wie sie ist (seit 0.81) — ' + n);
-  pruefe(/S\.pmNachpflegen|pmNachpflegen\(\);   \/\* Palm-Modell/.test(SKRIPT) && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);\n    pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
+  pruefe(/try \{ pmNachpflegen\(\); \} catch \(e\) \{ clFehlerZeigen\(e, 'pmNachpflegen'\); \}   \/\* Palm-Modell/.test(SKRIPT) && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);\n    pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
   /* Memo Pad danach */
   S.oeffne('memo'); S.memoArtSetzen('alles');
   pruefe(/>Haus</.test(inhalt()) && /Büro/.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: Listen stehen als Memos (–) in der Liste, der leere Sammler nicht');
@@ -9059,6 +9059,24 @@ function memoSortTest() {
 }
 
 
+function fehlerZeigenTest() {
+  console.log('\n145. Fehler werden gezeigt — keine leere Seite (0.85.1)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  /* Fehlerart: ein Fehler beim Zeichnen ließ die Seite leer (nur „Home“ oben) */
+  const alt = S.uebersichtHtml;
+  S.uebersichtHtml = function () { throw new Error('Testfehler'); };
+  let warf = false;
+  try { S.oeffne('uebersicht'); } catch (e) { warf = true; }
+  S.uebersichtHtml = alt;
+  pruefe(!warf && /class="cl-fehler"/.test(inhalt()) && /Testfehler/.test(inhalt()) && /Fehler in inhaltZeichnen/.test(inhalt()), 'ein Fehler im Inhalt: Meldung mit Ort statt leerer Seite');
+  pruefe(/pmNeu\(|Home|Bookmarks/.test(S.document.getElementById('fuss').innerHTML + 'Home'), 'die übrigen Teile werden trotzdem gezeichnet');
+  pruefe(/try \{ pmNachpflegen\(\); \} catch/.test(SKRIPT) && /addEventListener\('error'/.test(SKRIPT), 'Start: Nachpflegen abgesichert, Fehler im Skript werden gemeldet');
+  S.oeffne('uebersicht');
+  pruefe(!/cl-fehler/.test(inhalt()), 'danach wieder normal');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9201,6 +9219,7 @@ function memoSortTest() {
   try { arbeitMetaTest(); } catch (e) { fail('0.83 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zuordnenFilterTest(); } catch (e) { fail('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoSortTest(); } catch (e) { fail('0.84/0.85 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { fehlerZeigenTest(); } catch (e) { fail('0.85.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
