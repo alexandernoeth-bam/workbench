@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.83.1</title>
+<title>CLIE 0.84.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1123,7 +1123,7 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.83.1';
+var APP_VERSION = '0.84.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -7955,7 +7955,7 @@ function memoFensterHtml() {
       + '<button type="button" class="knopf" onclick="memoDetails()">Abbrechen</button></div></div></div>';
   }
   /* Seit 0.43 nur Notizen — Projekte und Ziele legt die App „Projekte“ an */
-  var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? ({ P: 'Neues Projekt', Z: 'Neues Ziel', A: 'Neuer Ablauf' }[f.kz] || 'Neues Memo') : 'Details') + '</div><div class="rumpf">';
+  var h = '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neues Memo' : 'Details') + '</div><div class="rumpf">';
   h += '<label for="memoTitel">Name:</label><input id="memoTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
      + katPrivatHtml('memo', f.bereich, f.privat);
   if (s && s.art === 'vorhaben') {
@@ -8003,8 +8003,6 @@ function memoSpeichern() {
     var s = kpSeiteAnlegen(art, titel, f.kontext, f.art === 'ziel' ? 'ziel' : '');
     if (!s) { melde('Das Memo ließ sich nicht anlegen.', 'warn'); return; }
     katPrivatSchreiben(s.__satz, f);
-    /* Seit 0.82: mit gewähltem Kürzelfilter gleich als Projekt, Ziel oder Ablauf */
-    if (f.kz && f.kz !== '–') { s = pmKuerzelSetzen(s, f.kz) || s; }
     spaeterSichern();
     aufklappZu();
     cl.memo.id = s.id;
@@ -28398,43 +28396,57 @@ function pmMemos(sicht) {
     var v = pmIstVorlage(s);
     if (sicht === 'vorlagen') { return v; }
     if (v) { return false; }
-    if (!sicht && pmKz() && pmKuerzel(s) !== pmKz()) { return false; }
+    if (!sicht && pmKzAus().indexOf(pmKuerzel(s)) >= 0) { return false; }
     return (sicht === 'archiv') === pmArchiviert(s);
   });
+  /* Seit 0.84: alphabetisch — nach Typ nur, wenn „Gruppiert“ an ist */
   return l.sort(function (a, b) {
-    return (PM_KUERZEL.indexOf(pmKuerzel(a)) - PM_KUERZEL.indexOf(pmKuerzel(b))) || String(a.titel).localeCompare(String(b.titel), 'de');
+    return (pmGruppiert() ? PM_KUERZEL.indexOf(pmKuerzel(a)) - PM_KUERZEL.indexOf(pmKuerzel(b)) : 0) || String(a.titel).localeCompare(String(b.titel), 'de');
   });
 }
 
-/* ---- Filter nach Kürzel (seit 0.82, Variante C1): kleine Knöpfe Alle · P · Z · A · – ---- */
+/* ---- Kürzel als Ausschalter und „Gruppiert“ (seit 0.84) ----
+   P · Z · A · – sind an; ein Tipp schaltet einen Typ aus, noch einer wieder an. */
 
-var PM_KZ_KEY = 'clie-memo-kz';
+var PM_KZAUS_KEY = 'clie-memo-kzaus';
+var PM_GRUPPE_KEY = 'clie-memo-gruppiert';
+var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', A: 'Abläufe', '–': 'Sonstiges' };
 
-function pmKz() {
+/* Die ausgeschalteten Kürzel, etwa „–“ oder „Z–“ */
+function pmKzAus() {
   var k = '';
-  try { k = window.localStorage.getItem(PM_KZ_KEY) || ''; } catch (e) { k = ''; }
-  return PM_KUERZEL.indexOf(k) >= 0 ? k : '';
+  try { k = window.localStorage.getItem(PM_KZAUS_KEY) || ''; } catch (e) { k = ''; }
+  return PM_KUERZEL.filter(function (x) { return k.indexOf(x) >= 0; }).join('');
 }
 
-function pmKzSetzen(k) {
-  var w = PM_KUERZEL.indexOf(k) >= 0 ? k : '';
-  try { window.localStorage.setItem(PM_KZ_KEY, w); } catch (e) { /* nur für jetzt — dann gilt „Alle“ */ }
+function pmKzUm(k) {
+  if (PM_KUERZEL.indexOf(k) < 0) { return; }
+  var aus = pmKzAus();
+  aus = aus.indexOf(k) >= 0 ? aus.replace(k, '') : aus + k;
+  try { window.localStorage.setItem(PM_KZAUS_KEY, aus); } catch (e) { /* nur für jetzt */ }
   var el = document.getElementById('inhalt');
   if (el) { el.scrollTop = 0; }
   zeichne();
 }
 
+function pmGruppiert() {
+  try { return window.localStorage.getItem(PM_GRUPPE_KEY) === '1'; } catch (e) { return false; }
+}
+
+function pmGruppiertUm() {
+  try { window.localStorage.setItem(PM_GRUPPE_KEY, pmGruppiert() ? '0' : '1'); } catch (e) { /* nur für jetzt */ }
+  zeichne();
+}
+
 function pmKzLeisteHtml() {
-  var an = pmKz();
-  return '<div class="pm-kzleiste">' + [['', 'Alle']].concat(PM_KUERZEL.map(function (k) { return [k, k]; })).map(function (x) {
-    return '<button type="button" class="knopf' + (an === x[0] ? ' voll' : '') + '" onclick="pmKzSetzen(\'' + x[0] + '\')">' + x[1] + '</button>';
+  var aus = pmKzAus();
+  return '<div class="pm-kzleiste">' + PM_KUERZEL.map(function (k) {
+    return '<button type="button" class="knopf' + (aus.indexOf(k) < 0 ? ' voll' : '') + '" onclick="pmKzUm(\'' + k + '\')" aria-label="' + PM_GRUPPEN[k] + ' zeigen">' + k + '</button>';
   }).join('') + '</div>';
 }
 
-/* Neu: mit gewähltem Kürzel gleich als Projekt, Ziel oder Ablauf */
 function pmMemoNeu() {
   memoNeuArt('notiz');
-  if (cl.memo.fenster) { cl.memo.fenster.kz = pmKz(); aufklappNeu(); }
 }
 
 function pmMemoSicht() { return (cl.memo.sicht === 'vorlagen' || cl.memo.sicht === 'archiv') ? cl.memo.sicht : ''; }
@@ -28444,14 +28456,19 @@ function pmMemoListeHtml() {
   var l = pmMemos(sicht);
   var h = sicht ? '' : pmBannerHtml();
   if (!l.length) {
-    if (!sicht && pmKz()) { return h + '<p class="leise">Kein Memo mit Kürzel ' + pmKz() + ' — „Alle“ zeigt alles.</p>'; }
+    if (!sicht && pmKzAus()) { return h + '<p class="leise">Nichts zu zeigen — ausgeschaltet: ' + pmKzAus().split('').join(' ') + '.</p>'; }
     return h + '<p class="leise">' + (sicht === 'vorlagen' ? 'Noch keine Vorlage — im Memo Menü ≡ „Als Vorlage speichern“.'
       : sicht === 'archiv' ? 'Das Archiv ist leer.' : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
   }
+  var gruppe = pmGruppiert();
+  var letzte = '';
   return h + l.map(function (s) {
     var gew = sicht === 'archiv' && cl.pm.memoWahl === s.id;
-    return prZeile(s, null, '<button type="button" class="memo-zeile pm' + (gew ? ' gewaehlt' : '') + '" onclick="pmMemoTipp(\'' + esc(s.id) + '\')">'
-      + '<span class="mz kz">' + pmKuerzel(s) + '</span><span class="tx">' + esc(s.titel) + '</span></button>');
+    var k = pmKuerzel(s);
+    var kopf = (gruppe && k !== letzte) ? '<div class="pm-gr">' + PM_GRUPPEN[k] + '</div>' : '';
+    letzte = k;
+    return kopf + prZeile(s, null, '<button type="button" class="memo-zeile pm' + (gew ? ' gewaehlt' : '') + '" onclick="pmMemoTipp(\'' + esc(s.id) + '\')">'
+      + (gruppe ? '' : '<span class="mz kz">' + k + '</span>') + '<span class="tx">' + esc(s.titel) + '</span></button>');
   }).join('');
 }
 
@@ -28572,7 +28589,8 @@ function pmMemoFussHtml() {
     }
     if (sicht === 'vorlagen') { return '<button type="button" class="knopf" onclick="memoArtSetzen(\'alles\')">Fertig</button>'; }
     return '<button type="button" class="knopf" onclick="pmMemoNeu()">Neu</button>'
-      + '<button type="button" class="knopf" onclick="memoArtSetzen(\'vorlagen\')">Neu aus Vorlage…</button>'
+      + '<button type="button" class="knopf" onclick="memoArtSetzen(\'vorlagen\')">Vorlage…</button>'
+      + '<button type="button" class="knopf' + (pmGruppiert() ? ' voll' : '') + '" onclick="pmGruppiertUm()">Gruppiert</button>'
       + pmKzLeisteHtml();
   }
   if (cl.memo.schreiben) { return '<button type="button" class="knopf voll" onclick="pmSchreibenUm()">Fertig</button>'; }

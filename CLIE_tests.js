@@ -8534,8 +8534,8 @@ function palmMemoTest() {
   let h = inhalt();
   const titel = (h.match(/<span class="tx">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
   const kz = (h.match(/<span class="mz kz">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
-  pruefe(titel.join(' | ') === 'Carport | Keller umbauen | Haus auf Stand bringen 2026 | DFÜ-Abruftest | Reparaturliste' && kz.join('') === 'PPZA–',
-    'Liste: Kürzel als eigene Spalte, nach Kürzel P · Z · A · –, dann alphabetisch — ' + titel.join(' | '));
+  pruefe(titel.join(' | ') === 'Carport | DFÜ-Abruftest | Haus auf Stand bringen 2026 | Keller umbauen | Reparaturliste' && kz.join('') === 'PAZP–',
+    'Liste: Kürzel als eigene Spalte, alphabetisch (seit 0.84) — ' + titel.join(' | '));
   pruefe(!/Bad renovieren|Packliste/.test(h) && !/<small/.test(h) && !/◎|☑|⇢|✎|◇/.test(h) && !/class="mz nr"/.test(h), 'ohne Archiv und Vorlagen; keine Zeichen, keine Zahlen');
   S.katSetzen(haus);
   pruefe(!/DFÜ/.test(inhalt()) && /Carport/.test(inhalt()) && /▼ Haus/.test(S.document.getElementById('katKnopf').textContent), '▼ Haus: nur Memos der Kategorie (gemeinsam mit To Do)');
@@ -8545,7 +8545,7 @@ function palmMemoTest() {
   pruefe(/pmMemoKat\('alle'\)/.test(dd) && /pmMemoKat\('kb-/.test(dd) && dd.indexOf("memoArtSetzen('vorlagen')") > dd.indexOf('pmMemoKat') && dd.indexOf("memoArtSetzen('archiv')") > dd.indexOf("memoArtSetzen('vorlagen')") && /memoArtSetzen\('notizblock'\)/.test(dd) && !/Show active/.test(dd),
     '▼: Alle, Kategorien, dann Vorlagen und Archiv (Handschrift/Notizblock bleiben) — kein „Show active“');
   S.aufklappZu();
-  pruefe(/pmMemoNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML) && /memoArtSetzen\('vorlagen'\)">Neu aus Vorlage…/.test(S.document.getElementById('fuss').innerHTML), 'unten: Neu · Neu aus Vorlage…');
+  pruefe(/pmMemoNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML) && /memoArtSetzen\('vorlagen'\)">Vorlage…/.test(S.document.getElementById('fuss').innerHTML), 'unten: Neu · Vorlage… (seit 0.84 kurz)');
   /* Öffnen: alles im Memo Pad */
   S.memoEintragOeffnen('p1');
   pruefe(S.cl.app === 'memo' && S.cl.memo.id === 'p1' && S.document.getElementById('reiter').textContent === 'Keller umbauen' && /▼ Haus/.test(S.document.getElementById('katKnopf').textContent),
@@ -8906,10 +8906,10 @@ function palmZuordnenTest() {
 
 
 function palmKuerzelFilterTest() {
-  console.log('\n141. Memo Pad: Kürzelfilter Alle · P · Z · A · –; „Privat“ ohne alle Arbeit-Kategorien (0.82)');
+  console.log('\n141. „Privat“ ohne alle Arbeit-Kategorien (0.82)');
   if (!CL) { return; }
   const S = pmFrisch();
-  delete S.__ablage['clie-memo-kz'];
+  delete S.__ablage['clie-memo-kzaus'];
   S.katNeuAnlegen('Arbeit - OnPremis QS'); S.katNeuAnlegen('Arbeitszimmer');
   const qs = S.kgAlle().filter(b => b.name === 'Arbeit - OnPremis QS')[0].id;
   const az = S.kgAlle().filter(b => b.name === 'Arbeitszimmer')[0].id;
@@ -8930,32 +8930,13 @@ function palmKuerzelFilterTest() {
   pruefe(x.kontext === 'beruflich', 'Kategorie „Arbeit - …“ gesetzt: Kontext beruflich (für die Workbench)');
   S.katPrivatSchreiben(x, { bereich: az });
   S.katSetzen('alle');
-  /* Kürzelfilter */
-  const f = S.document.getElementById('fuss').innerHTML;
-  pruefe(/class="pm-kzleiste"/.test(f) && /class="knopf voll" onclick="pmKzSetzen\(''\)">Alle/.test(f) && ['P', 'Z', 'A', '–'].every(k => f.indexOf("pmKzSetzen('" + k + "')\">" + k + '<') >= 0) && f.indexOf('pmMemoNeu()') < f.indexOf('pm-kzleiste'),
-    'unten: Neu · Neu aus Vorlage…, darunter kleine Knöpfe Alle · P · Z · A · – (C1)');
-  S.pmKzSetzen('A');
-  h = inhalt();
-  pruefe(/DFÜ/.test(h) && !/Hybrider|78 KG|Zimmer/.test(h) && S.localStorage.getItem('clie-memo-kz') === 'A' && /class="knopf voll" onclick="pmKzSetzen\('A'\)"/.test(S.document.getElementById('fuss').innerHTML), '„A“: nur Abläufe, Knopf gefüllt, gemerkt');
+  /* Kürzelknöpfe seit 0.84 als Ausschalter (Prüfung 144) — die Kategorie wirkt weiter zusätzlich */
   S.katSetzen('privat');
-  pruefe(/Kein Memo mit Kürzel A/.test(inhalt()), 'zusammen mit der Kategorie: Hinweis, wenn nichts passt');
+  S.localStorage.setItem('clie-memo-kzaus', 'Z–');
+  S.zeichne();
+  pruefe(/Nichts zu zeigen — ausgeschaltet: Z –/.test(inhalt()), 'mit der Kategorie zusammen: Hinweis, wenn nichts passt');
+  S.localStorage.setItem('clie-memo-kzaus', '');
   S.katSetzen('alle');
-  S.pmMemoNeu();
-  pruefe(S.cl.memo.fenster.kz === 'A' && /Neuer Ablauf/.test(S.document.getElementById('aufklapp').innerHTML), 'Neu bei „A“: „Neuer Ablauf“');
-  S.document.getElementById('memoTitel').value = 'Release-Abnahme';
-  S.memoSpeichern();
-  const ra = S.DB.gedanken.filter(g => g.titel === 'Release-Abnahme')[0];
-  pruefe(ra && ra.checkliste === 'lauf' && ra.art === 'aufgaben' && S.cl.memo.id === ra.id, '… angelegt als Ablauf und geöffnet');
-  S.cl.memo.schreiben = false; S.cl.memo.id = '';
-  S.pmKzSetzen('P'); S.pmMemoNeu(); S.document.getElementById('memoTitel').value = 'Carport'; S.memoSpeichern();
-  pruefe(S.DB.projekte.some(p => p.name === 'Carport'), 'Neu bei „P“: ein Projekt');
-  S.cl.memo.schreiben = false; S.cl.memo.id = '';
-  S.memoArtSetzen('archiv');
-  pruefe(!/pm-kzleiste/.test(S.document.getElementById('fuss').innerHTML), 'im Archiv und bei Vorlagen keine Kürzelknöpfe');
-  S.memoArtSetzen('alles');
-  S.pmKzSetzen('');
-  pruefe(/DFÜ/.test(inhalt()) && /Hybrider/.test(inhalt()) && /78 KG/.test(inhalt()), '„Alle“: wieder alles');
-  delete S.__ablage['clie-memo-kz'];
   S.oeffne('uebersicht');
 }
 
@@ -9010,6 +8991,43 @@ function zuordnenFilterTest() {
   f = S.document.getElementById('aufklapp').innerHTML;
   pruefe(/pmZuordnen\('h1'\)/.test(f) && !/pmZuordnen\('w1'\)|pmZuordnen\('w2'\)/.test(f) && /Auch Arbeit…/.test(f), 'private Aufgabe: nur private Memos, dazu „Auch Arbeit…“');
   S.aufklappZu();
+  S.oeffne('uebersicht');
+}
+
+
+function memoSortTest() {
+  console.log('\n144. Memo Pad: alphabetisch, „Gruppiert“ an/aus, P · Z · A · – als Ausschalter (0.84)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  delete S.__ablage['clie-memo-kzaus']; delete S.__ablage['clie-memo-gruppiert'];
+  S.DB.projekte.push({ id: 'p1', name: 'OTS-Testumgebung', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'p2', name: 'Einführung SMAX', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Testautomatisierung 2027', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 3, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'a1', titel: 'DFÜ-Abruftest', text: '', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'n1', titel: 'Jour fixe Protokolle', text: '', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 5, geaendert: 1 });
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  const titel = () => (inhalt().match(/<span class="tx">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
+  pruefe(titel().join(' | ') === 'DFÜ-Abruftest | Einführung SMAX | Jour fixe Protokolle | OTS-Testumgebung | Testautomatisierung 2027', 'Standard: alphabetisch, Kürzel als Spalte — ' + titel().join(' | '));
+  const f = S.document.getElementById('fuss').innerHTML;
+  pruefe(/pmMemoNeu\(\)">Neu/.test(f) && /Vorlage…/.test(f) && /class="knopf" onclick="pmGruppiertUm\(\)">Gruppiert/.test(f) && ['P', 'Z', 'A', '–'].every(k => new RegExp('class="knopf voll" onclick="pmKzUm\\(\'' + k + '\'\\)"').test(f)) && !/>Alle</.test(f),
+    'unten: Neu · Vorlage… · Gruppiert, darunter P · Z · A · – alle an — kein „Alle“');
+  S.pmKzUm('–');
+  pruefe(!/Jour fixe/.test(inhalt()) && /OTS/.test(inhalt()) && S.localStorage.getItem('clie-memo-kzaus') === '–' && /class="knopf" onclick="pmKzUm\('–'\)"/.test(S.document.getElementById('fuss').innerHTML), '„–“ aus: keine sonstigen Notizen, Knopf leer, gemerkt');
+  S.pmKzUm('Z');
+  pruefe(!/Testautomatisierung/.test(inhalt()) && S.pmKzAus() === 'Z–', 'zweiter aus: Z und – weg');
+  S.pmKzUm('–');
+  pruefe(/Jour fixe/.test(inhalt()) && S.pmKzAus() === 'Z', 'noch ein Tipp: „–“ wieder an');
+  S.pmKzUm('Z');
+  S.pmGruppiertUm();
+  const h = inhalt();
+  pruefe(/<div class="pm-gr">Projekte<\/div>/.test(h) && h.indexOf('>Projekte<') < h.indexOf('>Ziele<') && h.indexOf('>Ziele<') < h.indexOf('>Abläufe<') && h.indexOf('>Abläufe<') < h.indexOf('>Sonstiges<') && !/class="mz kz"/.test(h)
+    && h.indexOf('Einführung SMAX') < h.indexOf('OTS-Testumgebung') && /class="knopf voll" onclick="pmGruppiertUm\(\)"/.test(S.document.getElementById('fuss').innerHTML),
+    'Gruppiert: Überschriften Projekte · Ziele · Abläufe · Sonstiges, darin alphabetisch, ohne Kürzel-Spalte');
+  S.pmGruppiertUm();
+  S.pmMemoNeu();
+  pruefe(/Neues Memo/.test(S.document.getElementById('aufklapp').innerHTML) && !S.cl.memo.fenster.kz, '„Neu“ legt immer ein Memo „–“ an');
+  S.aufklappZu();
+  delete S.__ablage['clie-memo-kzaus']; delete S.__ablage['clie-memo-gruppiert'];
   S.oeffne('uebersicht');
 }
 
@@ -9155,6 +9173,7 @@ function zuordnenFilterTest() {
   try { palmKuerzelFilterTest(); } catch (e) { fail('0.82 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { arbeitMetaTest(); } catch (e) { fail('0.83 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zuordnenFilterTest(); } catch (e) { fail('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { memoSortTest(); } catch (e) { fail('0.84 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
