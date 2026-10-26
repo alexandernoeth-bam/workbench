@@ -4177,8 +4177,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   DB = alt; return r;'
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
-    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel, terminListeHtml, routinenKarteHtml, tagesEintraege,'
-                   + ' vlIstVorlage, vlArt, vlStarten, vlPlanVorschau, vlStartHtml, akSeiteHtml, apVorhaben, alleVorhaben, projekteFuer,'
+    const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, mpKopfHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel, terminListeHtml, routinenKarteHtml, tagesEintraege,'
+                   + ' vlIstVorlage, vlArt, vlStarten, vlPlanVorschau, vlStartHtml, akSeiteHtml, mpKopfHtml, apVorhaben, alleVorhaben, projekteFuer,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; },'
                    + ' tagZeigenSetzen: function(w){ tagZeigen.vorgenommen = w; tagZeigen.termine = w; tagZeigen.routinen = w; } };'
                    /* Seit v6.5.0: Kalender schreiben und SOS (Kategorien 211, 212) */
@@ -4187,12 +4187,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                    + ' setze: function(n, w){ if (n === "token") { zugriffToken = w; tokenAblauf = w ? Date.now() + 3600000 : 0; } if (n === "termine") { termineNachTag = w; } if (n === "schreibKal") { gkSchreibKalender = w; } if (n === "fenster") { gkFenster = w; } if (n === "blatt") { terminBlattFuer = w; } },'
                    + ' fenster: function(){ return gkFenster; }, termine: function(){ return termineNachTag; } };'
                    /* Seit v6.6.0: Kategorien, Alle Aufgaben, Einplanen (Kategorien 213, 214) */
-                   + 'globalThis.__taApi = { ktAlle, ktName, ktVon, ktPasst, ktKontext, ktSetzen, ktLaden, ktMenueHtml, ktKnopfHtml, taAufgaben, taHtml, taZahl, taHaken, taWaehlen, taAnz, taSort, taKuerzel, ta,'
+                   + 'globalThis.__taApi = { ktAlle, ktName, ktVon, ktPasst, ktKontext, ktSetzen, ktLaden, ktMenueHtml, ktKnopfHtml, mpKopfHtml, taAufgaben, taHtml, taZahl, taHaken, taWaehlen, taAnz, taSort, taKuerzel, ta,'
                    + ' epAuf, epHtml, epAnwenden, epOk, epWeg, epZeitenHtml, akLeisteHtml, akSichtbar, kpSeitenAlle, kpTagFinden, kpSeiteAnlegen, leereDatenbank, isoDatum, tagePlus, document: document, window: window,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; }, tagFilter: function(){ return tagFilter; }, wahl: function(){ return ktWahl; },'
                    + ' setzeEp: function(e){ ep = e; }, holeEp: function(){ return ep; }, setzeKt: function(w){ ktWahl = w; } };'
                    /* Seit v6.7.0: Arten, Ablauf/Checkliste, Leitfaden (Kategorien 215, 216) */
-                   + 'globalThis.__lwApi = { akArtSetzen, akArtMenueHtml, akLeisteHtml, akSeiteHtml, akAnlegen, akNeuOeffnen, vlEigenHtml, vlCheckHtml, vlArtSetzen, vlZustandSetzen, vlKuerzelSetzen, vlZuruecksetzen, vlZustand, vlStand, vlNeuAnlegen,'
+                   + 'globalThis.__lwApi = { akArtSetzen, akArtMenueHtml, akLeisteHtml, akSeiteHtml, mpKopfHtml, akAnlegen, akNeuOeffnen, vlEigenHtml, vlCheckHtml, vlArtSetzen, vlZustandSetzen, vlKuerzelSetzen, vlZuruecksetzen, vlZustand, vlStand, vlNeuAnlegen,'
                    + ' lwAlle, lwSeiteHtml, lwSchrittFertig, lwInSammler, lwNotizGetippt, lwNeuAnlegen, lwLoeschen, lwSchrittZeigen, kpSeitenAlle, kpTagFinden, leereDatenbank, isoDatum, document: document,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };'
                    /* Seit v7.0.0: Kalender mit Tag, Woche, Monat, Jahr (Kategorie 217) */
@@ -4209,6 +4209,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                    /* Seit v7.2.0: Memo Pad (Kategorie 219) */
                    + 'globalThis.__mpApi = { mpSchritteHtml, mpReiter, mpMitReitern, mpNeuTaste, akSeiteHtml, akLeisteHtml, akOeffnen, tdWaehlen, tdHaken, tdPlanen, kpSeiteFinden, leereDatenbank, isoDatum, tagePlus, taGeplant, zeigeSchirm, document: document,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, ak: ak, td: td, schirm: function(){ return schirmOffen; }, setzeSchirm: function(w){ schirmOffen = w; } };'
+                   /* Seit v7.4.0: To Do und Memo Pad neu gestaltet (Kategorie 221) */
+                   + ';globalThis.__td74Api = { tdMitteHtml, tdZeileHtml, tdAbschnitt, tdDatumWort, tdWaehlen, tdSicht, mpKopfHtml, mpEintragMeta, mpDetailsUm, mpSchreibenUm, akSeiteHtml, akLeisteHtml, akOeffnen, kpSeiteFinden, leereDatenbank, isoDatum, tagePlus, montagVon, epAnwenden, tdZusatzSetzen, document: document,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, ak: ak, td: td, setzeSchirm: function(w){ var a = schirmOffen; schirmOffen = w; return a; } };'
                    /* Seit v7.3.0: Woche als Zeitraster, Coach, + Aufgabe (Kategorie 220) */
                    + 'globalThis.__kv73Api = { kvWocheHtml, kvSpuren, kvAufgabeNeu, kvFreieUebernehmen, istCoachTermin, eintraegeEinsortieren, kvTagHtml, kpTagFinden, kpSeiteFinden, kpWocheEintrag, leereDatenbank, isoDatum, tagePlus, montagVon,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, setzeTermine: function(t){ var alt = termineNachTag; termineNachTag = t; return alt; }, holeTermine: function(){ return termineNachTag; },'
@@ -6433,10 +6436,11 @@ console.log('\n47. Blätter und Darstellung');
     warn('Darstellungsfunktionen nicht auswertbar');
   } else {
     const e = d.pruefeDarstellung();
-    pruefe(e.autoSchmal === false, 'automatisch: ein schmales Fenster gilt als Handy');
+    /* Seit v7.3.1 immer PC — das Handy hat den CLIE */
+    pruefe(e.autoSchmal === true, 'auch ein schmales Fenster zeigt die PC-Ansicht (v7.3.1)');
     pruefe(e.autoBreit === true, 'automatisch: ein breites gilt als großer Bildschirm');
     pruefe(e.erzwungenBreit === true, 'festgelegt auf groß gilt auch im schmalen Fenster');
-    pruefe(e.erzwungenSchmal === false, 'festgelegt auf Handy gilt auch im breiten Fenster');
+    pruefe(e.erzwungenSchmal === true, 'eine alte Festlegung „Handy“ wirkt nicht mehr (v7.3.1)');
     pruefe(e.unsinnFaelltZurueck === 'automatisch',
            'ein unbrauchbarer Wert fällt auf automatisch zurück');
   }
@@ -12819,7 +12823,7 @@ console.log('\n196. Lange Namen');
   pruefe(/\.ak-leiste \.eintrag:hover \.name,\.ak-leiste \.eintrag\.an \.name[^{]*\{white-space:normal/.test(QUELLE),
          'beim Darüberfahren und ausgewählt bricht der Name um statt abgeschnitten zu werden');
   const sh = skript.match(/function akSeiteHtml\([\s\S]*?\n\}/);
-  pruefe(sh && /<textarea id="kpTitel" class="titelfeld" rows="1"/.test(sh[0]) && !/<input id="kpTitel"/.test(sh[0]),
+  pruefe(sh && /<textarea id="kpTitel" class="titelfeld[^"]*" rows="1"/.test(sh[0]) && !/<input id="kpTitel"/.test(sh[0]),
          'der Titel im Detailbereich ist mehrzeilig und zeigt sich ganz');
   const tf = QUELLE.match(/\.ak-kopf \.titelfeld\{[^}]*\}/);
   pruefe(tf && /white-space:pre-wrap/.test(tf[0]) && /overflow-wrap:anywhere/.test(tf[0]) && /resize:none/.test(tf[0]), 'das Feld bricht um und lässt sich nicht von Hand ziehen');
@@ -12869,7 +12873,8 @@ console.log('\n197. Projekte und Ziele');
       /* Seit v7.2.0 ohne Listen im Memo Pad */
       const iP = h.indexOf('>Projekte<'), iZ = h.indexOf('>Ziele<'), iL = h.indexOf('>Listen<');
       pruefe(iP >= 0 && iZ > iP && iL < 0, 'Ziele stehen nach den Projekten, Listen nicht im Memo Pad');
-      pruefe(/akUmfangSetzen\('aktiv'\)/.test(h) && /akUmfangSetzen\('alle'\)/.test(h), 'unter Alle/Beruf/Privat der Schalter Aktiv / Alle');
+      /* Seit v7.4.0 im Kopf des Memo Pad: ein Schalter „nur laufende“ */
+      pruefe(/akUmfangSetzen\('(aktiv|alle)'\)/.test(g.mpKopfHtml()) && !/akUmfangSetzen/.test(h), 'Schalter „nur laufende“ im Kopf, nicht mehr in der Leiste');
       pruefe(!/Ruht ·/.test(h) && !/Einfälle ·/.test(h) && /◇/.test(h), '„Aktiv“ blendet Ruht, Erledigt und Einfälle aus');
       ak.umfang = 'alle';
       h = g.akLeisteHtml();
@@ -13408,7 +13413,8 @@ console.log('\n210. Vorlagen und Checklisten aus CLIE');
       const pa = g.kpSeitenAlle().filter(s => s.id === 'al')[0];
       /* Seit v7.2.0: statt „Offene Aufgaben“ der Reiter „Schritte“ */
       pruefe(!/mpReiter\('schritte'\)/.test(g.akSeiteHtml(pp)) && /mpReiter\('schritte'\)/.test(g.akSeiteHtml(pa)) && !/Offene Aufgaben/.test(g.akSeiteHtml(pa)), 'Packliste nicht einplanbar, Ablauf schon (Reiter „Schritte“)');
-      pruefe(/art-marke">Checkliste</.test(g.akSeiteHtml(pp)) && /art-marke">Ablauf</.test(g.akSeiteHtml(pa)), 'Art-Marke: Checkliste und Ablauf statt Notiz');
+      /* Seit v7.4.0 in der Eckdatenzeile unter dem Titel */
+      pruefe(/class="mp-meta"><span>☑ Checkliste</.test(g.akSeiteHtml(pp)) && /class="mp-meta"><span>⇢ Ablauf</.test(g.akSeiteHtml(pa)), 'Art: Checkliste und Ablauf statt Notiz');
       /* Stichtag */
       const st = g.tagePlus(heute, 10);
       const plan = g.vlPlanVorschau(db.gedanken[1].text, st);
@@ -13612,7 +13618,8 @@ console.log('\n213. Kategorien statt Beruf/Privat');
       T.setzeKt('alle'); T.ktLaden();
       pruefe(T.wahl() === 'kb-haus', 'nach Neustart wieder dieselbe Kategorie');
       T.window.localStorage = altLs;
-      pruefe(/<button type="button" class="kt-knopf" onclick="ktMenueAuf\(\)"/.test(T.akLeisteHtml()) && !/akFilterSetzen\('beruflich'\)/.test(T.akLeisteHtml()), 'Leiste: Knopf „Kategorie“ statt Beruf/Privat');
+      /* Seit v7.4.0 sitzt der Knopf im Kopf des Memo Pad */
+      pruefe(/<button type="button" class="kt-knopf" onclick="ktMenueAuf\(\)"/.test(T.mpKopfHtml()) && !/akFilterSetzen\('beruflich'\)/.test(T.akLeisteHtml()), 'Memo Pad: Knopf „Kategorie“ statt Beruf/Privat');
       pruefe(/id="tKategorie"/.test(QUELLE) && /id="tBeruf" class="pille kt-alt"/.test(QUELLE), 'Tag: Knopf „Kategorie“, die alten Knöpfe verborgen');
       pruefe(/if \(s && \/\^kb-\/\.test\(ktWahlJetzt\(\)\)\) \{ vlSatz\(s\)\.bereich = ktWahlJetzt\(\); \}/.test(hauptSkript()), 'Neues bekommt die gewählte Kategorie');
     } catch (e) {
@@ -13738,8 +13745,8 @@ console.log('\n215. Arten, Ablauf und Checkliste');
       pruefe(i('Notizen</button>') > 0 && i('Notizen</button>') < i('>Abläufe<') && i('>Abläufe<') < i('>Checklisten<') && i('>Leitfäden<') < 0, 'Gruppen: Notizen · Abläufe · Checklisten — keine Leitfäden');
       const nz = h.slice(i('Notizen</button>'), i('>Abläufe<'));
       pruefe(/Zaun Ideen/.test(nz) && !/Abruftest|Packliste/.test(nz), 'unter Notizen nur Notizen');
-      pruefe(/☑<\/span><span class="name">Packliste<\/span><span class="marke-klein">2\/3/.test(h) && /Ruht · 1/.test(h) && /Abgeschlossen · 1/.test(h), 'Checkliste mit Stand 2/3, Ruhende und Abgeschlossene klappen weg');
-      pruefe(/>Art<\/span><b>Alle<\/b>/.test(h) && /ktMenueAuf/.test(h), 'Knopf „Art“ unter „Kategorie“');
+      pruefe(/☑<\/span><span class="name">Packliste<small class="mp-em">[^<]*2 von 3<\/small>/.test(h) && /Ruht · 1/.test(h) && /Abgeschlossen · 1/.test(h), 'Checkliste mit Stand „2 von 3“, Ruhende und Abgeschlossene klappen weg');
+      pruefe(/>Art<\/span><b>Alle<\/b>/.test(L.mpKopfHtml()) && /ktMenueAuf/.test(L.mpKopfHtml()), 'Knöpfe „Art“ und „Kategorie“ im Kopf');
       pruefe(/akArtSetzen\('checkliste'\)/.test(L.akArtMenueHtml()) && !/akArtSetzen\('leitfaden'\)/.test(L.akArtMenueHtml()) && !/akArtSetzen\('liste'\)/.test(L.akArtMenueHtml()), 'Art-Auswahl mit sechs Einträgen — ohne Listen und Leitfäden');
       L.akArtSetzen('checkliste');
       h = L.akLeisteHtml();
@@ -13749,7 +13756,7 @@ console.log('\n215. Arten, Ablauf und Checkliste');
       L.akArtSetzen('alle');
       /* Seite einer Checkliste */
       const s = L.kpSeitenAlle().filter(x => x.id === 'pl')[0];
-      ak.id = 'pl';
+      ak.id = 'pl'; ak.details = true;
       let sh = L.akSeiteHtml(s);
       pruefe(/vlArtSetzen\('abhaken'\)">☑ Checkliste/.test(sh) && /class="an" onclick="vlArtSetzen\('abhaken'\)/.test(sh) && /class="an" onclick="vlZustandSetzen\('lauf'\)"/.test(sh), 'Seite: Art und Zustand wählbar');
       pruefe(/2 von 3 abgehakt/.test(sh) && /vlZuruecksetzen\(\)">Alle Haken entfernen/.test(sh) && !/Offene Aufgaben/.test(sh), 'Checkliste: Stand, „Alle Haken entfernen“, nichts einzuplanen');
@@ -13893,7 +13900,7 @@ console.log('\n217. Kalender mit Tag, Woche, Monat, Jahr');
       pruefe(/\[x\] Zugang prüfen/.test(al.text), 'eine Frist lässt sich direkt abhaken');
       const w = K.kvWocheHtml(K.montagVon(H));
       /* Seit v7.3.0 als Zeitraster */
-      pruefe((w.match(/class="kv-wr-spalte/g) || []).length === 7 && /kvTagOeffnen\('/.test(w) && /kv-wb kv-wb-t/.test(w) && /kv-e kv-plan/.test(w), 'Woche: sieben Spalten, Termine als Blöcke, Eingeplantes, Tipp öffnet den Tag');
+      pruefe((w.match(/class="kv-wr-spalte/g) || []).length === 7 && /kvTagOeffnen\('/.test(w) && /kv-wb kv-wb-t/.test(w) && !/kv-e kv-plan|kpBzUm/.test(w), 'Woche: sieben Spalten, Termine als Blöcke, ohne To-Dos (v7.3.1), Tipp öffnet den Tag');
       const m = K.kvMonatHtml(H.slice(0, 7));
       const zellen = (m.match(/class="kv-mtag/g) || []).length;
       pruefe(zellen % 7 === 0 && zellen >= 28 && /Dachrinne|Jour fixe/.test(m), 'Monat: volle Wochen als Raster mit Einträgen');
@@ -13930,8 +13937,9 @@ console.log('\n217. Kalender mit Tag, Woche, Monat, Jahr');
 console.log('\n218. To Do');
 {
   const skript = hauptSkript();
-  pruefe(/id="navToDo" onclick="zeigeSchirm\('ToDo'\)"/.test(QUELLE) && /id="schirmToDo"/.test(QUELLE) && /id="tdLeiste"/.test(QUELLE) && /id="tdDetail"/.test(QUELLE),
-         'eigener Schirm „To Do“ mit Leiste, Liste und Details');
+  /* Seit v7.4.0 ohne Detailspalte — die Details klappen in der Karte auf */
+  pruefe(/id="navToDo" onclick="zeigeSchirm\('ToDo'\)"/.test(QUELLE) && /id="schirmToDo"/.test(QUELLE) && /id="tdLeiste"/.test(QUELLE) && !/id="tdDetail"/.test(QUELLE),
+         'eigener Schirm „To Do“ mit Leiste und Liste');
   const zs = skript.match(/function zeigeSchirm\([\s\S]*?\n\}\n/);
   pruefe(zs && /'ToDo'/.test(zs[0]) && /if \(name === 'ToDo'\) \{ tdZeichnen\(\); \}/.test(zs[0]), 'zeigeSchirm kennt To Do');
   const ts = skript.match(/function tdSicht\([\s\S]*?\n\}/);
@@ -14011,7 +14019,8 @@ console.log('\n219. Memo Pad');
   const tz = skript.match(/function tdZeichnen\([\s\S]*?\n\}/);
   pruefe(tz && /if \(schirmOffen === 'Aktivitaeten'\) \{ akSeiteZeichnen\(\); return; \}/.test(tz[0]), 'im Memo Pad zeichnet tdZeichnen die Seite (Fehlerart)');
   const twm = skript.match(/function tdWaehlen\([\s\S]*?\n\}/);
-  pruefe(twm && /td\.wahl && schirmOffen === 'ToDo'\)/.test(twm[0]), 'am Handy öffnet nur To Do ein Blatt — im Memo Pad kein leeres Blatt (Fehlerart)');
+  /* Seit v7.4.0 öffnet nichts mehr ein Blatt — die Details stehen in der Zeile */
+  pruefe(twm && !/aktionSheet/.test(twm[0]), 'Antippen öffnet kein Blatt — weder im To Do noch im Memo Pad (Fehlerart)');
   const ash = skript.match(/function akSeiteHtml\([\s\S]*?\n\}/);
   pruefe(ash && !/akOaUm\(\)/.test(ash[0]) && /mpSchritteHtml\(s\)/.test(ash[0]), '„Offene Aufgaben“ ist ersetzt durch den Reiter „Schritte“');
   const M = globalThis.__mpApi || {};
@@ -14036,7 +14045,7 @@ console.log('\n219. Memo Pad');
       pruefe(h.indexOf('Statik') < h.indexOf('Nachbar'), 'in der Reihenfolge der Seite');
       M.tdWaehlen('p1|2');
       h = M.akSeiteHtml(pj);
-      pruefe(/class="mp-detail"/.test(h) && /tdPlanen\('/.test(h), 'antippen zeigt die Details wie im To Do');
+      pruefe(/class="td-karte flach offen"/.test(h) && /class="td-det"/.test(h) && /tdPlanen\('/.test(h), 'antippen klappt die Details in der Zeile auf — wie im To Do');
       M.tdPlanen(M.tagePlus(M.isoDatum(), 1));
       pruefe(M.taGeplant(pj, 'Nachbar informieren') !== null, 'aus dem Memo Pad einplanen');
       M.mpNeuTaste({ key: 'Enter', preventDefault: function () {}, target: { value: ' Bauantrag  stellen ', blur: function () {} } });
@@ -14100,12 +14109,78 @@ console.log('\n220. Woche als Zeitraster, Coach, Aufgabe im Tag');
       const sp7 = (w.match(/class="kv-wr-spalte/g) || []).length;
       const top = w.match(/kv-wb kv-wb-t" style="top:(\d+(?:\.\d+)?)px;height:(\d+(?:\.\d+)?)px/);
       pruefe(sp7 === 7 && top && Number(top[1]) === (10 - 7) * 40 && Number(top[2]) === 58, 'Termin als Block: 10:00 an seiner Stunde, 1½ Stunden hoch');
-      pruefe(/terminBlattOeffnen\('g1'/.test(w) && /kpBzUm\('/.test(w) && /kvTagOeffnen\('/.test(w), 'Termin öffnet das Blatt, Eingeplantes ist abhakbar, der Tageskopf öffnet den Tag');
-      pruefe(/class="kv-wr-oben[^"]*">[\s\S]*?Rechnung prüfen/.test(w), 'Eingeplantes ohne Uhrzeit steht oben');
+      pruefe(/terminBlattOeffnen\('g1'/.test(w) && /kvTagOeffnen\('/.test(w), 'Termin öffnet das Blatt, der Tageskopf öffnet den Tag');
+      /* Seit v7.3.1: Fehlerart „To-Dos in der Wochenblocksicht“ */
+      pruefe(!/Rechnung prüfen|Zettel ordnen/.test(w), 'die Woche zeigt keine To-Dos — weder mit noch ohne Uhrzeit');
     } catch (e) {
       fail('7.3.0: ' + e.message);
     }
     K.setzeTermine(altT); K.setzeKal(altF); K.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   221. To Do und Memo Pad neu gestaltet (v7.4.0)
+   Grund: Beides war weder gut lesbar noch bedienbar — kleine Schrift,
+   abgeschnittene Namen, drei Spalten, viele Schalter auf einmal.
+   Fehlerart: Bedienelemente, die nur selten gebraucht werden, gehören
+   hinter „Details …“ — die Seite zeigt sonst eine Zeile Eckdaten.
+   ============================================================ */
+console.log('\n221. To Do und Memo Pad neu gestaltet');
+{
+  const skript = hauptSkript();
+  pruefe(/<div class="td-kopf mp-kopf" id="mpKopf"><\/div>/.test(QUELLE), 'Memo Pad hat einen Kopf wie To Do');
+  pruefe(/\.mp-titel\{font-family:inherit/.test(QUELLE), 'der Titel steht in der Schrift der App, nicht in der des Textfelds');
+  const D = globalThis.__td74Api || {};
+  if (typeof D.tdMitteHtml !== 'function') {
+    warn('7.4.0 nicht auswertbar');
+  } else {
+    const alt = D.holeDB(); const altTd = Object.assign({}, D.td); const altAk = { id: D.ak.id, details: D.ak.details, modus: D.ak.modus, reiter: D.ak.reiter, umfang: D.ak.umfang };
+    const altS = D.setzeSchirm('ToDo');
+    const H = D.isoDatum();
+    try {
+      const db = D.leereDatenbank();
+      db.projekte = [{ id: 'p1', name: 'Solar', kontext: 'privat', status: 'laufend', ende: '2026-12-10', flaeche: 'Text.\n[] P1 Statik anfragen\n[] Angebot', ordnung: 1, geaendert: 1 }];
+      db.themen = [{ id: 'cl-korb', name: 'Sammler', korb: true, text: '[] Akku', kontext: '', ordnung: 0, geaendert: 1 },
+                   { id: 'li1', name: 'Haus', text: '[] Dachrinne\n[] QS-Tag', kontext: 'privat', ordnung: 1, geaendert: 1 }];
+      D.setzeDB(db);
+      D.tdZusatzSetzen(D.kpSeiteFinden('p1'), 'Statik anfragen', 'frist', D.tagePlus(H, -2));
+      D.epAnwenden(D.kpSeiteFinden('li1'), 1, H, '');
+      D.td.sicht = 'alle'; D.td.wahl = '';
+      let m = D.tdMitteHtml();
+      const iU = m.indexOf('Überfällig'), iH = m.indexOf('>Heute <'), iO = m.indexOf('Ohne Datum');
+      pruefe(iU > 0 && iH > iU && iO > iH && m.indexOf('Statik') > iU && m.indexOf('Statik') < iH && m.indexOf('QS-Tag') > iH && m.indexOf('Akku') > iO, 'Abschnitte: Überfällig · Heute · … · Ohne Datum, jede Aufgabe im richtigen');
+      pruefe(/id="tdNeu"/.test(m) && !/id="tdDetail"/.test(m), 'großes Feld für Neues, keine Detailspalte');
+      pruefe(/class="td-meta"><span>◎ Solar<\/span><span class="r">⚑ Frist/.test(m), 'unter dem Titel: woher und die Frist (überfällig rot)');
+      pruefe(/<span class="td-prio p1">1<\/span>Statik anfragen/.test(m) && !/td-prio p3/.test(m), 'Priorität nur, wenn sie nicht „normal“ ist');
+      D.tdWaehlen('li1|1');
+      m = D.tdMitteHtml();
+      pruefe(/td-karte offen[\s\S]*?class="td-det"[\s\S]*?tdPlanen/.test(m), 'antippen klappt die Details in der Karte auf');
+      D.tdWaehlen('li1|1');
+      pruefe(D.td.wahl === '' && !/class="td-det"/.test(D.tdMitteHtml()), 'ein zweiter Klick klappt sie wieder zu');
+      pruefe(D.tdDatumWort(H) === 'heute' && D.tdDatumWort(D.tagePlus(H, 1)) === 'morgen' && /^\d\d\.\d\d\.$/.test(D.tdDatumWort(D.tagePlus(H, 30))), 'Datum als Wort: heute · morgen · Wochentag · sonst Datum');
+      D.tdSicht('li1');
+      m = D.tdMitteHtml();
+      pruefe(/<h2>Haus<\/h2>/.test(m) && !/≡ Haus<\/span>/.test(m), 'in einer Liste: Name als Überschrift, die Herkunft entfällt an der Zeile');
+      D.setzeSchirm('Aktivitaeten');
+      const k = D.mpKopfHtml();
+      pruefe(/akArtMenueAuf/.test(k) && /nur laufende/.test(k) && /ktMenueAuf/.test(k) && /mpNeuMenueAuf\(\)/.test(k), 'Kopf des Memo Pad: Art · nur laufende · Kategorie · + Neu');
+      const pj = D.kpSeiteFinden('p1');
+      pruefe(D.mpEintragMeta(pj) === 'Privat · bis 10.12. · 2 offen', 'Leiste: unter dem Namen Kategorie · Ende · Stand');
+      pruefe(!/class="name">[^<]*<\/span><span class="marke-klein">/.test(D.akLeisteHtml()) && /<small class="mp-em">/.test(D.akLeisteHtml()), 'Namen werden nicht abgeschnitten, die Zahl steht in der grauen Zeile');
+      D.akOeffnen('p1');
+      let sh = D.akSeiteHtml(pj);
+      pruefe(/class="mp-meta"><span>◎ Projekt<\/span><span>Privat<\/span>/.test(sh) && /bis 10\.12\.2026/.test(sh) && !/akKontext\(/.test(sh) && !/akZustand\(/.test(sh), 'Seite: eine Zeile Eckdaten — Beruf/Privat und Zustand nicht offen');
+      D.mpDetailsUm();
+      sh = D.akSeiteHtml(pj);
+      pruefe(/class="mp-details"/.test(sh) && /akKontext\('privat'\)/.test(sh) && /akFragen\('loeschen'\)/.test(sh), '„Details …“ zeigt Beruf/Privat, Zustand, Ende und Löschen');
+      pruefe(/Schritte · 2/.test(sh), 'Reiter „Schritte“ mit Zahl der offenen');
+      D.ak.reiter = 'schritte'; D.mpSchreibenUm();
+      pruefe(D.ak.modus === 'schreiben' && D.ak.reiter === 'notiz', '„Schreiben“ führt in die Notiz');
+    } catch (e) {
+      fail('7.4.0: ' + e.message);
+    }
+    Object.assign(D.td, altTd); Object.assign(D.ak, altAk); D.setzeSchirm(altS); D.setzeDB(alt);
   }
 }
 
