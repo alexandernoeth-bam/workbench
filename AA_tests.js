@@ -81,9 +81,11 @@ console.log('\n1. Bildschirme und Navigation');
      Ablauf ist etwas, das man abarbeitet. */
   /* Seit v5.7.0: die Suche in den Notizbüchern — erreichbar aus der
      Übersicht und von jeder Notizseite. */
+  /* Seit v7.0.0 ist der Tag eine Stufe des Kalenders — zeigeSchirm('Tag')
+     führt dorthin. */
   const VERSTECKT = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
                      'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen',
-                      'Routine', 'Notizsuche'];
+                      'Routine', 'Notizsuche', 'Tag'];
   schirme.forEach(function (s) {
     if (VERSTECKT.indexOf(s) >= 0) {
       pruefe(navs.indexOf(s) < 0,
@@ -230,7 +232,7 @@ console.log('\n5. Element-IDs');
   const schirme = [...QUELLE.matchAll(/id="schirm([A-Za-zÄÖÜäöü]+)"/g)].map(m => m[1]);
   const OHNE_KNOPF = ['Migration', 'Flaeche', 'Gedanken', 'Diagnose', 'Taetigkeiten',
                       'Tagwechsel', 'Ablauf', 'Ablaeufe', 'Rueckblick', 'Planen',
-                      'Routine', 'Notizsuche'];
+                      'Routine', 'Notizsuche', 'Tag'];
   schirme.forEach(function (s) {
     if (OHNE_KNOPF.indexOf(s) >= 0) {
       pruefe(imHtml.has('schirm' + s), 'ID schirm' + s + ' existiert (ohne Knopf)');
@@ -1290,6 +1292,8 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   window.localStorage = merkL;'
                  + '   return r;'
                  + ' } };'
+                 + 'function __apBlatt(){ var b = document.getElementById("kalBlatt"); if (!b) { return; }'
+                 + '  b.innerHTML = (kalStufe === "woche") ? apWocheHtml(montagVon(kalAnker)) : apMonateHtml(kalAnker.slice(0, 7)); }'
                  + 'globalThis.__apApi = {'
                  + ' pruefe: function(){'
                  + '   var r = {}; var alt = DB; var merkF = kalFilter; var merkS = kalStufe; var merkA = kalAnker;'
@@ -1334,11 +1338,11 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.ereignisse = apEreignisse("2026-11-02").map(function(e){ return e.art + ":" + e.text; }).join(",")'
                  + '     + "|" + apEreignisse("2026-11-16").map(function(e){ return e.art + ":" + e.text; }).join(",")'
                  + '     + "|" + apEreignisse("2026-11-23").map(function(e){ return e.art + ":" + e.text; }).join(",");'
-                 + '   kalStufe = "monat"; kalAnker = "2026-10-01"; kalZeichnen();'
+                 + '   kalStufe = "monat"; kalAnker = "2026-10-01"; __apBlatt();'
                  + '   var bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.tafeln = (bl.match(/class="pl-monat"/g) || []).length;'
                  + '   r.tafelInhalt = /Carport bauen/.test(bl) && /Bauphase 2 abgeschlossen/.test(bl) && /apWaehlen\\(/.test(bl) && /KW 46 ›/.test(bl);'
-                 + '   apWaehlen("2026-11-09", "p5", "projekt"); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   apWaehlen("2026-11-09", "p5", "projekt"); __apBlatt(); bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.stell = /pl-stell/.test(bl) && /apStellen\\(1\\)/.test(bl) && /apMassSetzen\\(/.test(bl);'
                  + '   apStellen(1); r.gestellt = apMenge(p5, "projekt", "2026-11-09");'
                  + '   apGewaehlt = null;'
@@ -1360,7 +1364,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var mo = montagVon(isoDatum());'
                  + '   DB.aufgaben.push({ id: "w1", titel: "Reisekostenantrag stellen", kontext: "beruflich", planung: "woche", art: "haupt",'
                  + '     status: "offen", angelegtAm: isoDatum(), geaendert: 1 });'
-                 + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen();'
+                 + '   kalStufe = "woche"; kalAnker = mo; __apBlatt();'
                  + '   r.liste = /Reisekostenantrag stellen/.test(document.getElementById("kalBlatt").innerHTML);'
                  + '   var f = document.getElementById("wochenNeu"); f.value = "IBAN ändern"; wochenAufgabeNeu(mo);'
                  + '   r.neu = DB.aufgaben.some(function(a){ return a.titel === "IBAN ändern"; });'
@@ -1378,16 +1382,16 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   r.geist = apWochenVorhaben(mo).length === 0;'
                  + '   apWocheDazu("s1", "projekt", mo);'
                  + '   r.fokus = apWochenVorhaben(mo).map(function(x){ return x.v.id; }).join(",") + "|" + apMenge(s1, "projekt", mo);'
-                 + '   kalStufe = "woche"; kalAnker = mo; kalZeichnen(); var bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   kalStufe = "woche"; kalAnker = mo; __apBlatt(); var bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.ohneZaehler = !/ T<\\/b>/.test(bl) && /apWocheWeg\\(/.test(bl) && !/im Monat: /.test(bl);'
-                 + '   apSchritt(c1, "projekt", mo, 1); apSchritt(c1, "projekt", mo, 1); kalZeichnen(); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   apSchritt(c1, "projekt", mo, 1); apSchritt(c1, "projekt", mo, 1); __apBlatt(); bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.tageHinweis = /im Monat: 1 T/.test(bl);'
-                 + '   kalStufe = "monat"; kalAnker = m + "-01"; kalZeichnen(); bl = document.getElementById("kalBlatt").innerHTML;'
+                 + '   kalStufe = "monat"; kalAnker = m + "-01"; __apBlatt(); bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.monatPunkt = /Solar und Wärmepumpe/.test(bl) && /title="Schwerpunkt ohne Tage">•/.test(bl);'
                  + '   kalStufe = "woche"; kalAnker = mo;'
                  + '   apWocheWeg("s1", "projekt", mo); r.wegOhneFrage = !apFokus(s1, mo) && apWochenVorhaben(mo).every(function(x){ return x.v.id !== "s1"; });'
                  + '   apWocheWeg("c1", "projekt", mo); r.frage = apWegFrage === "c1" && apMenge(c1, "projekt", mo) === 1;'
-                 + '   bl = document.getElementById("kalBlatt").innerHTML; r.frageText = /Mit 1 Tag im Monat herausnehmen\\?/.test(bl);'
+                 + '   __apBlatt(); bl = document.getElementById("kalBlatt").innerHTML; r.frageText = /Mit 1 Tag im Monat herausnehmen\\?/.test(bl);'
                  + '   apWegAbbrechen(); r.abgebrochen = apWegFrage === "" && apMenge(c1, "projekt", mo) === 1;'
                  + '   apZustandSetzen("c1", "projekt", mo, "Fundament steht");'
                  + '   apWocheWeg("c1", "projekt", mo, true); r.weg = !apMenge(c1, "projekt", mo) && !apZustandAn(c1, mo);'
@@ -1403,9 +1407,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var k = apEreignisHtml({ art: "grenze", text: "Ende Do 10.12.", titel: "Solar und Wärmepumpe einbauen lassen" });'
                  + '   r.kaertchen = /<b>Ende Do 10\\.12\\.<\\/b><span class="pl-ereignis-name">Solar und Wärmepumpe einbauen lassen<\\/span>/.test(k);'
                  + '   r.ohneName = apEreignisHtml({ art: "urlaub", text: "Urlaub" }) === \'<span class="pl-ereignis urlaub">Urlaub</span>\';'
-                 + '   kalStufe = "monat"; kalAnker = "2026-12-01"; kalZeichnen();'
+                 + '   kalStufe = "monat"; kalAnker = "2026-12-01"; __apBlatt();'
                  + '   r.tafel = /pl-ereignis-name">Solar und Wärmepumpe einbauen lassen</.test(document.getElementById("kalBlatt").innerHTML);'
-                 + '   kalStufe = "woche"; kalAnker = "2026-12-07"; kalZeichnen();'
+                 + '   kalStufe = "woche"; kalAnker = "2026-12-07"; __apBlatt();'
                  + '   var bl = document.getElementById("kalBlatt").innerHTML;'
                  + '   r.woche = /pl-ereignis-name">Solar und Wärmepumpe einbauen lassen</.test(bl) && !/>Ende Do 10\\.12\\. · Solar/.test(bl);'
                  + '   kalStufe = merkS; kalAnker = merkA; kalFilter = merkF; DB = alt;'
@@ -1453,9 +1457,9 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + '   var knopf = document.getElementById("navNotizbuecher");'
                  + '   r.start = nbBereichAn() && knopf.style.display === "";'
                  + '   zeigeSchirm("Notizbuecher"); nbBereichSetzen(false);'
-                 + '   r.aus = !nbBereichAn() && knopf.style.display === "none" && schirmOffen === "Tag";'
+                 + '   r.aus = !nbBereichAn() && knopf.style.display === "none" && schirmOffen === "Kalender";'
                  + '   r.gespeichert = DB.einstellungen.notizbuecherAus === true && DB.einstellungen.stempel > 0;'
-                 + '   zeigeSchirm("Notizbuecher"); r.umgeleitet = schirmOffen === "Tag";'
+                 + '   zeigeSchirm("Notizbuecher"); r.umgeleitet = schirmOffen === "Kalender";'
                  + '   r.datenDa = DB.notizbuecher.length === 1;'
                  + '   nbBereichSetzen(true); r.wiederAn = nbBereichAn() && knopf.style.display === "";'
                  + '   zeigeSchirm("Notizbuecher"); r.offen = schirmOffen === "Notizbuecher";'
@@ -4190,7 +4194,21 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                    /* Seit v6.7.0: Arten, Ablauf/Checkliste, Leitfaden (Kategorien 215, 216) */
                    + 'globalThis.__lwApi = { akArtSetzen, akArtMenueHtml, akLeisteHtml, akSeiteHtml, akAnlegen, akNeuOeffnen, vlEigenHtml, vlCheckHtml, vlArtSetzen, vlZustandSetzen, vlKuerzelSetzen, vlZuruecksetzen, vlZustand, vlStand, vlNeuAnlegen,'
                    + ' lwAlle, lwSeiteHtml, lwSchrittFertig, lwInSammler, lwNotizGetippt, lwNeuAnlegen, lwLoeschen, lwSchrittZeigen, kpSeitenAlle, kpTagFinden, leereDatenbank, isoDatum, document: document,'
-                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };';
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; } };'
+                   /* Seit v7.0.0: Kalender mit Tag, Woche, Monat, Jahr (Kategorie 217) */
+                   + 'globalThis.__kvApi = { kvTagHtml, kvWocheHtml, kvMonatHtml, kvGeplant, kvFaellig, kvTagKurz, kvSeiteHaken, kvTagOeffnen, kpBzUm, epAnwenden, kpSeiteFinden, kpTagFinden,'
+                   + ' zeigeSchirm, setKalStufe, kalBlaettern, kalJetzt, kalZeichnen, ktSetzen, leereDatenbank, isoDatum, tagePlus, montagVon, KT_ARBEIT, document: document,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; },'
+                   + ' stand: function(){ return { schirm: schirmOffen, stufe: kalStufe, anker: kalAnker, tag: tagOffen, filter: kalFilter, kt: ktWahl, tf: tagFilter }; },'
+                   + ' setzeStand: function(x){ schirmOffen = x.schirm; kalStufe = x.stufe; kalAnker = x.anker; tagOffen = x.tag; kalFilter = x.filter; ktWahl = x.kt; tagFilter = x.tf || x.filter; },'
+                   + ' setzeTermine: function(t){ var alt = termineNachTag; termineNachTag = t; return alt; } };'
+                   /* Seit v7.1.0: To Do (Kategorie 218) */
+                   + 'globalThis.__tdApi = { tdLeisteHtml, tdMitteHtml, tdDetailHtml, tdKopfHtml, tdZeichnen, tdSicht, tdWaehlen, tdHaken, tdPrioUm, tdPrioSetzen, tdPlanen, tdZeitSetzen, tdFristSetzen, tdNotizGetippt,'
+                   + ' tdLoeschen, tdNeuAnlegen, tdListeZustand, tdZusatz, tdZusatzSetzen, tdEintraege, taGeplant, taFrist, kpSeiteFinden, kpTagFinden, leereDatenbank, isoDatum, tagePlus, zeigeSchirm, document: document,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, td: td, ta: ta, schirm: function(){ return schirmOffen; } };'
+                   /* Seit v7.2.0: Memo Pad (Kategorie 219) */
+                   + 'globalThis.__mpApi = { mpSchritteHtml, mpReiter, mpMitReitern, mpNeuTaste, akSeiteHtml, akLeisteHtml, akOeffnen, tdWaehlen, tdHaken, tdPlanen, kpSeiteFinden, leereDatenbank, isoDatum, tagePlus, taGeplant, zeigeSchirm, document: document,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, ak: ak, td: td, schirm: function(){ return schirmOffen; }, setzeSchirm: function(w){ schirmOffen = w; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -6786,13 +6804,15 @@ console.log('\n55. Ganztägiges im Tagesverlauf');
          'sie werden nicht zusätzlich angehängt — das gäbe Dubletten');
 
   const tag = skript.match(/function tagZeichnen\([\s\S]*?\n\}\n/);
-  pruefe(tag && /class="tganz/.test(tag[0]),
+  /* Seit v7.0.0 baut ganztagsHtml die Zeilen — für den alten Tag und den Kalender. */
+  const gzh = skript.match(/function ganztagsHtml\([\s\S]*?\n\}\n/);
+  pruefe(gzh && /class="tganz/.test(gzh[0]) && tag && /ganztagsHtml\(is, e\)/.test(tag[0]),
          'sie stehen als schlichte Zeilen, nicht an der Zeitschiene');
   pruefe(tag && !/tverlauf ganztags/.test(tag[0]),
          'sie sind keine Verlaufszeile mehr');
   pruefe(!/\.tganz\{[^}]*tv-schiene/.test(QUELLE) && /\.tganz\{display:flex/.test(QUELLE),
          'sie tragen keine Zeitspalte');
-  const stelleGanz = tag ? tag[0].indexOf('class="tganz') : -1;
+  const stelleGanz = tag ? tag[0].indexOf('ganztagsHtml(is, e)') : -1;
   const stelleZeit = tag ? tag[0].indexOf('terminListeHtml(') : -1;
   pruefe(stelleGanz > -1 && stelleZeit > -1 && stelleGanz < stelleZeit,
          'sie stehen ganz oben, vor allem mit Uhrzeit');
@@ -6981,7 +7001,8 @@ console.log('\n60. Weg in den Google-Kalender');
   const adresse = skript.match(/function googleKalenderAdresse\([\s\S]*?\n\}/);
   pruefe(adresse && /kalStufe === 'monat'/.test(adresse[0]),
          'die gezeigte Stufe bestimmt die Ansicht drüben');
-  pruefe(adresse && /if \(handy\) \{ stufe = 'day'/.test(adresse[0]),
+  /* Seit v7.0.0 führt auch die Stufe Tag auf den Tag. */
+  pruefe(adresse && /if \(handy \|\| kalStufe === 'tag'\) \{ stufe = 'day'/.test(adresse[0]),
          'am Handy führt der Weg auf den Tag — Woche und Jahr kommen dort '
          + 'im Schreibtischformat');
   const oeffnen2 = skript.match(/function googleKalenderOeffnen\([\s\S]*?\n\}/);
@@ -7216,8 +7237,9 @@ console.log('\n63. Monat in zwei Spalten');
 
   const zeichnen = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
   /* Seit v5.17.0 zeigt der Monat die Absichtsplanung statt des Rasters. */
-  pruefe(zeichnen && /apMonateHtml\(m0\)/.test(zeichnen[0]),
-         'der Monat zeigt die Absichtsplanung');
+  /* Seit v7.0.0 zeigt der Monat das Raster wie im CLIE; die Absichtsplanung entfällt. */
+  pruefe(zeichnen && /kvMonatHtml\(m0\)/.test(zeichnen[0]) && !/apMonateHtml\(/.test(zeichnen[0]),
+         'der Monat zeigt das Raster mit Terminen und Eingeplantem');
 
   if (!m) {
     warn('Funktionen nicht auswertbar');
@@ -10373,8 +10395,9 @@ console.log('\n122. Leiste, Kacheln, Wochenfokus');
   const kz = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
   /* Seit v5.18.0 hat die Woche keine Tagesspalten mehr, zu denen sie
      rollen könnte — sie zeigt die Absichtsplanung. */
-  pruefe(kz && /apWocheHtml\(mo\)/.test(kz[0]),
-         'die Woche zeigt die Absichtsplanung');
+  /* Seit v7.0.0 zeigt die Woche Tagesblöcke wie im CLIE. */
+  pruefe(kz && /kvWocheHtml\(mo\)/.test(kz[0]) && !/apWocheHtml\(/.test(kz[0]),
+         'die Woche zeigt sieben Tagesblöcke');
   pruefe(/\.ktag\.heute \.ktag-name\{color:var\(--heute\)\}/.test(QUELLE),
          'und hebt ihn im Signalton hervor');
 
@@ -12287,9 +12310,9 @@ console.log('\n183. Notizbücher ausblendbar');
   else { try { e = t.pruefe(); } catch (x) { fail('Ausblenden läuft nicht: ' + x.message); } }
   if (e) {
     pruefe(e.start === true, 'voreingestellt sind die Notizbücher sichtbar');
-    pruefe(e.aus === true, 'ausgeblendet verschwindet der Knopf, die offene Liste führt in den Tag');
+    pruefe(e.aus === true, 'ausgeblendet verschwindet der Knopf, die offene Liste führt in den Tag (im Kalender)');
     pruefe(e.gespeichert === true, 'die Einstellung liegt im Bestand und bekommt einen Stempel für den Abgleich');
-    pruefe(e.umgeleitet === true, 'ein Sprung zur Liste führt dann in den Tag');
+    pruefe(e.umgeleitet === true, 'ein Sprung zur Liste führt dann in den Tag (im Kalender)');
     pruefe(e.datenDa === true, 'die Notizbücher selbst bleiben erhalten');
     pruefe(e.wiederAn === true && e.offen === true, 'wieder eingeblendet ist alles wie vorher');
     pruefe(e.abgleich === true, 'die Einstellung kommt über den Abgleich auf das andere Gerät');
@@ -12838,13 +12861,15 @@ console.log('\n197. Projekte und Ziele');
       g.holeDB().einfaelle.push({ id: 'e1', titel: 'Idee', kontext: 'privat', stand: 'offen', geaendert: 1 });
       ak.umfang = 'aktiv';
       let h = g.akLeisteHtml();
+      /* Seit v7.2.0 ohne Listen im Memo Pad */
       const iP = h.indexOf('>Projekte<'), iZ = h.indexOf('>Ziele<'), iL = h.indexOf('>Listen<');
-      pruefe(iP >= 0 && iZ > iP && iL > iZ, 'Ziele stehen zwischen Projekten und Listen');
+      pruefe(iP >= 0 && iZ > iP && iL < 0, 'Ziele stehen nach den Projekten, Listen nicht im Memo Pad');
       pruefe(/akUmfangSetzen\('aktiv'\)/.test(h) && /akUmfangSetzen\('alle'\)/.test(h), 'unter Alle/Beruf/Privat der Schalter Aktiv / Alle');
       pruefe(!/Ruht ·/.test(h) && !/Einfälle ·/.test(h) && /◇/.test(h), '„Aktiv“ blendet Ruht, Erledigt und Einfälle aus');
       ak.umfang = 'alle';
       h = g.akLeisteHtml();
-      pruefe((h.match(/Ruht · 1/g) || []).length === 2 && /Einfälle · 1/.test(h), '„Alle“ zeigt sie — Ruht für Projekte und Ziele getrennt');
+      /* Seit v7.2.0 ohne Einfälle */
+      pruefe((h.match(/Ruht · 1/g) || []).length === 2 && !/Einfälle ·/.test(h), '„Alle“ zeigt Ruht für Projekte und Ziele getrennt — Einfälle entfallen');
       g.akUmfangSetzen('quatsch');
       pruefe(ak.umfang === 'alle', 'ein unbekannter Wert wird abgewiesen');
     } catch (e) {
@@ -13376,7 +13401,8 @@ console.log('\n210. Vorlagen und Checklisten aus CLIE');
       ak.frage = '';
       const pp = g.kpSeitenAlle().filter(s => s.id === 'pl')[0];
       const pa = g.kpSeitenAlle().filter(s => s.id === 'al')[0];
-      pruefe(!/Offene Aufgaben/.test(g.akSeiteHtml(pp)) && /Offene Aufgaben/.test(g.akSeiteHtml(pa)), 'Packliste nicht einplanbar, Ablauf schon');
+      /* Seit v7.2.0: statt „Offene Aufgaben“ der Reiter „Schritte“ */
+      pruefe(!/mpReiter\('schritte'\)/.test(g.akSeiteHtml(pp)) && /mpReiter\('schritte'\)/.test(g.akSeiteHtml(pa)) && !/Offene Aufgaben/.test(g.akSeiteHtml(pa)), 'Packliste nicht einplanbar, Ablauf schon (Reiter „Schritte“)');
       pruefe(/art-marke">Checkliste</.test(g.akSeiteHtml(pp)) && /art-marke">Ablauf</.test(g.akSeiteHtml(pa)), 'Art-Marke: Checkliste und Ablauf statt Notiz');
       /* Stichtag */
       const st = g.tagePlus(heute, 10);
@@ -13665,9 +13691,9 @@ console.log('\n214. Alle Aufgaben, Einplanen, Sammler');
       T.setzeKt('alle');
       /* Leiste */
       const l = T.akLeisteHtml();
-      pruefe(/akOeffnen\('aufgaben'\)/.test(l) && /Alle Aufgaben<\/span><span class="marke-klein">\d+</.test(l), 'Leiste: „Alle Aufgaben“ mit Zahl');
-      const iL = l.indexOf('>Listen<'), iS = l.indexOf('>Sammler<'), iH = l.indexOf('>Haus<');
-      pruefe(iL >= 0 && iS > iL && iH > iS && (l.match(/>Sammler</g) || []).length === 1 && /Sammler<\/span><span class="marke-klein">1</.test(l), 'Sammler oben in „Listen“, mit Zahl, nur einmal');
+      /* Seit v7.2.0 stehen „Alle Aufgaben“ und Listen im To Do */
+      pruefe(!/akOeffnen\('aufgaben'\)/.test(l) && !/akOeffnen\('routinen'\)/.test(l), 'Memo Pad ohne „Alle Aufgaben“ und Routinen — die sind im To Do');
+      pruefe(l.indexOf('>Listen<') < 0 && l.indexOf('>Sammler<') < 0, 'Sammler und Listen nicht im Memo Pad');
     } catch (e) {
       fail('Alle Aufgaben: ' + e.message);
     }
@@ -13703,12 +13729,13 @@ console.log('\n215. Arten, Ablauf und Checkliste');
       L.setzeDB(db); ak.art = 'alle'; ak.umfang = 'alle'; ak.notizenAuf = true; ak.id = ''; ak.filter = 'alle';
       let h = L.akLeisteHtml();
       const i = (w) => h.indexOf(w);
-      pruefe(i('Notizen</button>') > 0 && i('Notizen</button>') < i('>Abläufe<') && i('>Abläufe<') < i('>Checklisten<') && i('>Checklisten<') < i('>Leitfäden<'), 'Gruppen: Notizen · Abläufe · Checklisten · Leitfäden');
+      /* Seit v7.2.0 ohne Leitfäden (nur im CLIE) */
+      pruefe(i('Notizen</button>') > 0 && i('Notizen</button>') < i('>Abläufe<') && i('>Abläufe<') < i('>Checklisten<') && i('>Leitfäden<') < 0, 'Gruppen: Notizen · Abläufe · Checklisten — keine Leitfäden');
       const nz = h.slice(i('Notizen</button>'), i('>Abläufe<'));
       pruefe(/Zaun Ideen/.test(nz) && !/Abruftest|Packliste/.test(nz), 'unter Notizen nur Notizen');
       pruefe(/☑<\/span><span class="name">Packliste<\/span><span class="marke-klein">2\/3/.test(h) && /Ruht · 1/.test(h) && /Abgeschlossen · 1/.test(h), 'Checkliste mit Stand 2/3, Ruhende und Abgeschlossene klappen weg');
       pruefe(/>Art<\/span><b>Alle<\/b>/.test(h) && /ktMenueAuf/.test(h), 'Knopf „Art“ unter „Kategorie“');
-      pruefe(/akArtSetzen\('leitfaden'\)"><span>▤ Leitfäden/.test(L.akArtMenueHtml()), 'Art-Auswahl mit allen acht Einträgen');
+      pruefe(/akArtSetzen\('checkliste'\)/.test(L.akArtMenueHtml()) && !/akArtSetzen\('leitfaden'\)/.test(L.akArtMenueHtml()) && !/akArtSetzen\('liste'\)/.test(L.akArtMenueHtml()), 'Art-Auswahl mit sechs Einträgen — ohne Listen und Leitfäden');
       L.akArtSetzen('checkliste');
       h = L.akLeisteHtml();
       pruefe(ak.art === 'checkliste' && /Packliste/.test(h) && !/Carport|Zaun|Abruftest|Heizung|Alle Aufgaben|Routinen/.test(h), 'Art „Checklisten“: nur diese Gruppe');
@@ -13731,7 +13758,7 @@ console.log('\n215. Arten, Ablauf und Checkliste');
       L.vlArtSetzen('aufgaben');
       pruefe(db.gedanken[2].art === 'aufgaben', 'Art Ablauf: art „aufgaben“');
       sh = L.akSeiteHtml(s);
-      pruefe(/class="rt-ein vl-kuerzel"/.test(sh) && /Offene Aufgaben/.test(sh), 'Ablauf: Kürzel-Feld, einplanbar');
+      pruefe(/class="rt-ein vl-kuerzel"/.test(sh) && /mpReiter\('schritte'\)/.test(sh), 'Ablauf: Kürzel-Feld, einplanbar (Schritte)');
       L.vlKuerzelSetzen('DFÜ-Test');
       pruefe(db.gedanken[2].kuerzel === 'DFÜ-', 'Kürzel gespeichert, höchstens vier Zeichen');
       L.vlArtSetzen('abhaken');
@@ -13743,7 +13770,7 @@ console.log('\n215. Arten, Ablauf und Checkliste');
       const c = L.vlNeuAnlegen('checkliste', 'Packen');
       pruefe(!('art' in db.gedanken.filter(x => x.id === c.id)[0]), 'Neu: Checkliste ohne Art');
       L.akNeuOeffnen('leitfaden');
-      pruefe(/id="akNeuLwArt"/.test(L.akLeisteHtml()) && /<option value="diagnose">/.test(L.akLeisteHtml()), 'Neuer Leitfaden: Wahl des Verfahrens');
+      pruefe(!/id="akNeuLwArt"/.test(L.akLeisteHtml()), 'Leitfäden werden in der Workbench nicht mehr angelegt (nur CLIE)');
       ak.neuIn = '';
     } catch (e) {
       fail('Arten: ' + e.message);
@@ -13773,7 +13800,8 @@ console.log('\n216. Leitfäden');
                    tabelle: { was: { ist: 'Taktet', nicht: 'Warmwasser' } } }];
       L.setzeDB(db); ak.art = 'alle'; ak.filter = 'alle'; ak.id = 'lf-1'; ak.lwOffen = -1; ak.frage = '';
       const f = db.kurs[0];
-      pruefe(/akOeffnen\('lf-1'\)/.test(L.akLeisteHtml()) && /Heizung taktet<\/span><span class="marke-klein">0\/5/.test(L.akLeisteHtml()), 'Fall in der Leiste mit 0/5');
+      /* Seit v7.2.0 nicht mehr in der Leiste — die Seite bleibt lesbar, bis Stufe D aufräumt */
+      pruefe(!/akOeffnen\('lf-1'\)/.test(L.akLeisteHtml()), 'Fall steht nicht mehr in der Leiste (Leitfäden nur im CLIE)');
       let h = L.lwSeiteHtml(f);
       pruefe(/Leitfaden · Diagnose/.test(h) && (h.match(/lwSchrittZeigen\(\d\)/g) || []).length >= 5 && /1 · Ist \/ Ist-Nicht/.test(h) && /<td>Taktet<\/td><td>Warmwasser<\/td>/.test(h) && /id="lwNotiz"/.test(h),
              'Seite: Verfahren, fünf Schritte, Tabelle der Diagnose zum Lesen, Notiz');
@@ -13789,7 +13817,7 @@ console.log('\n216. Leitfäden');
       L.lwSchrittFertig();
       pruefe(f.schritte[0].fertig && /\[x\] Heizung taktet/.test(korb.text) && ak.lwOffen === 1, 'Schritt fertig: die Aufgabe im Sammler gleich mit, weiter zu Schritt 2');
       for (let k = 1; k < 5; k++) { L.lwSchrittZeigen(k); L.lwSchrittFertig(); }
-      pruefe(f.fertig === true && /Fertig · 1/.test((ak.umfang = 'alle', L.akLeisteHtml())), 'nach fünf Schritten fertig — unter „Fertig“');
+      pruefe(f.fertig === true, 'nach fünf Schritten fertig');
       const n = L.lwNeuAnlegen('Angebot Dach', 'verhandlung');
       pruefe(n.typ === 'leitfaden' && n.art === 'verhandlung' && n.schritte.length === 5 && /^lf-/.test(n.id) && db.kurs.indexOf(n) >= 0, 'Neu: Fall im Bereich „kurs“');
       ak.id = n.id; L.lwLoeschen();
@@ -13798,6 +13826,222 @@ console.log('\n216. Leitfäden');
       fail('Leitfäden: ' + e.message);
     }
     Object.assign(ak, altAk); L.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   217. Kalender mit Tag, Woche, Monat und Jahr (v7.0.0)
+   Grund: Tag und Kalender waren zwei Schirme mit eigener Logik
+   (Absichtsplanung, Morgenroutine, Wochensatz). Wie im CLIE gehören
+   sie zusammen: Termine und Eingeplantes an einer Stelle.
+   Fehlerart: kalZeichnen setzte beim Zeichnen den offenen Tag
+   (tagOffen) — Haken in einem anderen Tag landeten dann am falschen.
+   ============================================================ */
+console.log('\n217. Kalender mit Tag, Woche, Monat, Jahr');
+{
+  const skript = hauptSkript();
+  const kz = skript.match(/function kalZeichnen\([\s\S]*?\n\}\n/);
+  pruefe(kz && /kvTagHtml\(kalAnker\)/.test(kz[0]) && /kvWocheHtml\(mo\)/.test(kz[0]) && /kvMonatHtml\(m0\)/.test(kz[0]) && /jahrHtml\(kalAnker\)/.test(kz[0]),
+         'kalZeichnen: Tag, Woche, Monat neu — das Jahr bleibt jahrHtml');
+  pruefe(kz && !/tagOffen = kalAnker;/.test(kz[0].replace(/if \(!tagOffen\) \{ tagOffen = kalAnker; \}/, '')),
+         'kalZeichnen setzt den offenen Tag nicht um (nur wenn noch keiner gesetzt ist)');
+  pruefe(!/id="navTag"/.test(QUELLE) && /<div class="schirm aktiv" id="schirmKalender">/.test(QUELLE) && /<div class="schirm" id="schirmTag">/.test(QUELLE),
+         'kein Knopf „Tag“ mehr — der Kalender ist der Startschirm');
+  pruefe(/class="fuss">\s*<button type="button" id="navKalender" class="aktiv"/.test(QUELLE), 'Kalender steht vorn in der Leiste');
+  pruefe(/id="sTag" class="aktiv" onclick="setKalStufe\('tag'\)"/.test(QUELLE) && /var kalStufe = 'tag';/.test(skript), 'Stufe Tag ist voreingestellt');
+  pruefe(/id="kKategorie"/.test(QUELLE) && /onclick="kvTerminNeu\(\)"/.test(QUELLE), 'Kopf mit „+ Termin“ und Kategorie');
+  pruefe(/id="kalVersion"/.test(QUELLE) && kz && /'Workbench ' \+ APP_VERSION/.test(kz[0]), 'die Version steht im Kopf des Kalenders (Startschirm)');
+  const K = globalThis.__kvApi || {};
+  if (typeof K.kvTagHtml !== 'function') {
+    warn('Kalender nicht auswertbar');
+  } else {
+    const alt = K.holeDB(); const st = K.stand();
+    const H = K.isoDatum(); const M = K.tagePlus(H, 2);
+    const altT = K.setzeTermine({});
+    try {
+      const db = K.leereDatenbank();
+      db.themen = [{ id: 'li1', name: 'Haus', text: '[] Dachrinne\n[] QS-Tag kontrollieren', kontext: 'privat', ordnung: 1, geaendert: 1 }];
+      db.gedanken = [{ id: 'al', titel: 'Abruftest', text: '[] Testdaten bereitstellen\n[] Zugang prüfen\n[] Abruf', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', kuerzel: 'DFÜ', ordnung: 3, geaendert: 1,
+                       zusatz: { 'Zugang prüfen': { frist: H } } }];
+      K.setzeDB(db);
+      K.setzeStand({ schirm: 'Kalender', stufe: 'tag', anker: H, tag: H, filter: 'alle', kt: 'alle' });
+      const al = K.kpSeiteFinden('al'), li = K.kpSeiteFinden('li1');
+      K.epAnwenden(al, 0, H, '09:00'); K.epAnwenden(li, 1, H, ''); K.epAnwenden(li, 0, M, '');
+      K.setzeTermine({ [H]: [{ id: 'g1', titel: 'Jour fixe', zeit: '10:00', bis: '11:30', kontext: 'beruflich' }] });
+      const g = K.kvGeplant(H);
+      pruefe(g.length === 2 && g.filter(x => x.zeit === '09:00').length === 1, 'eingeplant: einmal mit, einmal ohne Uhrzeit');
+      const h = K.kvTagHtml(H);
+      const std9 = h.match(/<span class="kv-h">9<\/span><div class="kv-inh">([\s\S]*?)<\/div><\/div>/);
+      pruefe(std9 && /Testdaten bereitstellen/.test(std9[1]) && /kpBzUm\('/.test(std9[1]), 'mit Uhrzeit steht es in seiner Stunde — abhakbar');
+      const std10 = h.match(/<span class="kv-h">10<\/span><div class="kv-inh">([\s\S]*?)<\/div><\/div>/);
+      pruefe(std10 && /Jour fixe/.test(std10[1]) && /terminBlattOeffnen\('g1'/.test(std10[1]), 'Termine in ihrer Stunde, ein Tipp öffnet das Blatt');
+      const rechts = h.slice(h.indexOf('class="kv-rechts"'));
+      pruefe(/Vorgenommen/.test(rechts) && /QS-Tag kontrollieren/.test(rechts) && !/Testdaten/.test(rechts), 'ohne Uhrzeit unter „Vorgenommen“');
+      pruefe(/Zugang prüfen/.test(rechts) && /⚑ heute/.test(rechts) && /kvSeiteHaken\('al\|1'\)/.test(rechts), 'Frist heute kommt dazu, abhakbar');
+      pruefe(/Routinen/.test(rechts), 'die Routinen stehen rechts');
+      pruefe(!/Bringt mich|Verpflichtet|Morgenroutine|kpFeld/.test(h), 'kein Wochensatz, keine Morgenroutine, kein freies Schreiben');
+      const zeilen = K.kpTagFinden(H).text.split('\n');
+      const nr = zeilen.findIndex(z => /Testdaten/.test(z));
+      K.kpBzUm(K.kpTagFinden(H).id, nr);
+      pruefe(/\[x\] Testdaten bereitstellen/.test(al.text), 'abhaken im Tag hakt die Seite mit ab');
+      K.kvSeiteHaken('al|1');
+      pruefe(/\[x\] Zugang prüfen/.test(al.text), 'eine Frist lässt sich direkt abhaken');
+      const w = K.kvWocheHtml(K.montagVon(H));
+      pruefe((w.match(/class="kv-wtag/g) || []).length === 7 && /kvTagOeffnen\('/.test(w) && /kv-e kv-termin/.test(w) && /kv-e kv-plan/.test(w), 'Woche: sieben Tage, Termine und Eingeplantes, Tipp öffnet den Tag');
+      const m = K.kvMonatHtml(H.slice(0, 7));
+      const zellen = (m.match(/class="kv-mtag/g) || []).length;
+      pruefe(zellen % 7 === 0 && zellen >= 28 && /Dachrinne|Jour fixe/.test(m), 'Monat: volle Wochen als Raster mit Einträgen');
+      K.ktSetzen(K.KT_ARBEIT);
+      pruefe(!K.kvGeplant(H).some(x => /QS-Tag/.test(x.text)) && K.stand().filter === 'beruflich', 'Kategorie Arbeit blendet Privates aus — auch im Kalender');
+      K.ktSetzen('alle');
+      const kurz = K.kvTagKurz(H);
+      pruefe(kurz.map(x => x.zeit || '~').join(',') === '09:00,10:00,~', 'Kurzliste: mit Uhrzeit nach der Zeit, ohne Uhrzeit danach');
+      K.setzeStand({ schirm: 'Kalender', stufe: 'tag', anker: H, tag: M, filter: 'alle', kt: 'alle' });
+      K.kalZeichnen();
+      pruefe(K.stand().tag === M, 'Zeichnen lässt den offenen Tag stehen (Fehlerart)');
+      K.kalBlaettern(1);
+      pruefe(K.stand().anker === K.tagePlus(H, 1) && K.stand().tag === K.tagePlus(H, 1), 'Blättern im Tag: ein Tag weiter, der offene Tag folgt');
+      K.setzeStand({ schirm: 'Pinnwand', stufe: 'jahr', anker: H, tag: M, filter: 'alle', kt: 'alle' });
+      K.zeigeSchirm('Tag');
+      pruefe(K.stand().schirm === 'Kalender' && K.stand().stufe === 'tag' && K.stand().anker === M, 'zeigeSchirm(„Tag“) führt in den Kalender, Stufe Tag');
+      K.kvTagOeffnen(M);
+      pruefe(K.stand().stufe === 'tag' && K.stand().anker === M && K.stand().tag === M, 'aus Woche/Monat öffnet ein Tipp den Tag');
+    } catch (e) {
+      fail('Kalender: ' + e.message);
+    }
+    K.setzeTermine(altT); K.setzeDB(alt); K.setzeStand(st);
+  }
+}
+
+/* ============================================================
+   218. To Do (v7.1.0)
+   Grund: Aufgaben waren über „Alle Aufgaben“, Listen und Routinen in
+   den Aktivitäten verteilt. Wie im CLIE: eine App mit Alle · Sammler ·
+   Listen · Routinen und den Details der gewählten Aufgabe.
+   Fehlerart: tdZeichnen hält still, solange ein Eingabefeld den Fokus
+   hat — ein bewusster Wechsel (tdSicht/tdWaehlen) muss es verlassen.
+   ============================================================ */
+console.log('\n218. To Do');
+{
+  const skript = hauptSkript();
+  pruefe(/id="navToDo" onclick="zeigeSchirm\('ToDo'\)"/.test(QUELLE) && /id="schirmToDo"/.test(QUELLE) && /id="tdLeiste"/.test(QUELLE) && /id="tdDetail"/.test(QUELLE),
+         'eigener Schirm „To Do“ mit Leiste, Liste und Details');
+  const zs = skript.match(/function zeigeSchirm\([\s\S]*?\n\}\n/);
+  pruefe(zs && /'ToDo'/.test(zs[0]) && /if \(name === 'ToDo'\) \{ tdZeichnen\(\); \}/.test(zs[0]), 'zeigeSchirm kennt To Do');
+  const ts = skript.match(/function tdSicht\([\s\S]*?\n\}/);
+  const tw = skript.match(/function tdWaehlen\([\s\S]*?\n\}/);
+  pruefe(ts && /tdFeldVerlassen\(\)/.test(ts[0]) && tw && /tdFeldVerlassen\(\)/.test(tw[0]), 'Wechsel verlässt das Eingabefeld (Fehlerart)');
+  const ak = skript.match(/function akSeiteZeichnen\([\s\S]*?\n\}/);
+  pruefe(ak && /if \(schirmOffen === 'ToDo'\) \{ tdZeichnen\(\); return; \}/.test(ak[0]), 'Routinen-Knöpfe zeichnen im To Do neu, nicht doppelt in den Aktivitäten');
+  const T = globalThis.__tdApi || {};
+  if (typeof T.tdLeisteHtml !== 'function') {
+    warn('To Do nicht auswertbar');
+  } else {
+    const alt = T.holeDB(); const altTd = Object.assign({}, T.td); const altAnz = Object.assign({}, T.ta.anz);
+    const H = T.isoDatum(), M = T.tagePlus(H, 1);
+    try {
+      const db = T.leereDatenbank();
+      db.themen = [{ id: 'cl-korb', name: 'Sammler', korb: true, text: '[] Akku tauschen', kontext: '', ordnung: 0, geaendert: 1 },
+                   { id: 'li1', name: 'Haus', text: '[] Dachrinne\n[] P1 Statik anfragen', kontext: 'privat', ordnung: 1, geaendert: 1 },
+                   { id: 'li3', name: 'Garten', text: '[] Laub', kontext: 'privat', ruht: true, ordnung: 3, geaendert: 1 }];
+      db.gedanken = [{ id: 'al', titel: 'Abruf', text: '[] Testdaten\n[] Ohne Datum', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', ordnung: 3, geaendert: 1 }];
+      T.setzeDB(db); T.ta.anz.faellig = false; T.ta.anz.sort = 'prio-datum';
+      T.td.sicht = 'alle'; T.td.wahl = ''; T.td.weitere = false; T.td.frage = '';
+      const le = T.tdLeisteHtml();
+      pruefe(/tdSicht\('alle'\)/.test(le) && /tdSicht\('korb'\)/.test(le) && /tdSicht\('li1'\)/.test(le) && /tdSicht\('routinen'\)/.test(le) && !/tdSicht\('li3'\)/.test(le) && /Ruhende · Fertige \(1\)/.test(le),
+             'Leiste: Alle, Sammler, laufende Listen, Routinen — Ruhendes zugeklappt');
+      let m = T.tdMitteHtml();
+      pruefe(/Statik anfragen/.test(m) && /Akku tauschen/.test(m) && !/Testdaten/.test(m) && m.indexOf('Statik') < m.indexOf('Dachrinne'), 'Alle: Listen und Sammler, Abläufe nur eingeplant — Priorität zuerst');
+      T.tdSicht('li1');
+      m = T.tdMitteHtml();
+      pruefe(/Dachrinne/.test(m) && !/Akku/.test(m) && /tdListeZustand\('ruht'\)/.test(m), 'eine Liste zeigt nur ihre Punkte und lässt sich ruhen lassen');
+      T.tdWaehlen('li1|0');
+      let d = T.tdDetailHtml();
+      pruefe(/tdPlanen\('/.test(d) && /id="tdFrist"/.test(d) && /tdPrioSetzen\(5\)/.test(d) && /id="tdNotiz"/.test(d) && /Löschen …/.test(d), 'Details: Einplanen, Frist, Priorität, Notiz, Löschen');
+      const li = T.kpSeiteFinden('li1');
+      T.tdPlanen(M);
+      pruefe(T.taGeplant(li, 'Dachrinne') && T.taGeplant(li, 'Dachrinne').datum === M, 'Einplanen legt den Punkt in den Tag');
+      T.tdZeitSetzen('14:30');
+      pruefe(T.taGeplant(li, 'Dachrinne').zeit === '14:30', '… auf Wunsch mit Uhrzeit');
+      T.tdPlanen('');
+      pruefe(!T.taGeplant(li, 'Dachrinne'), '„nicht eingeplant“ nimmt ihn wieder heraus');
+      T.tdFristSetzen(H); T.tdNotizGetippt('Leiter holen');
+      pruefe(T.taFrist(li, 'Dachrinne') === H && db.themen[1].zusatz.Dachrinne.notiz === 'Leiter holen', 'Frist und Notiz im „zusatz“ wie im CLIE');
+      T.tdPrioSetzen(2);
+      pruefe(/\[\] P2 Dachrinne/.test(li.text) && db.themen[1].zusatz.Dachrinne.frist === H, 'Priorität als „P2“ — der Zusatz bleibt am Punkt');
+      T.tdFristSetzen(''); T.tdNotizGetippt('');
+      pruefe(!db.themen[1].zusatz, 'leer geräumt verschwindet der Zusatz');
+      T.tdHaken('li1|0');
+      pruefe(/\[x\] P2 Dachrinne/.test(li.text) && /Dachrinne/.test(T.tdMitteHtml()), 'abhaken — frisch Erledigtes bleibt kurz stehen');
+      T.tdWaehlen('li1|1'); T.tdLoeschen();
+      pruefe(!/Statik/.test(li.text) && T.td.wahl === '', 'Löschen nimmt die Zeile aus der Liste');
+      T.tdSicht('alle');
+      const n = T.tdNeuAnlegen('  Zettel   ordnen ');
+      pruefe(n && n.seite.id === 'cl-korb' && /\[\] Zettel ordnen$/.test(n.seite.text), 'Neu unter „Alle“ landet im Sammler');
+      T.tdSicht('li3');
+      T.tdListeZustand('lauf');
+      pruefe(!db.themen[2].ruht && /tdSicht\('li3'\)/.test(T.tdLeisteHtml()), 'eine ruhende Liste lässt sich wecken');
+      T.tdSicht('routinen');
+      pruefe(/akRtNeu\(\)/.test(T.tdMitteHtml()), 'Routinen werden im To Do gepflegt');
+    } catch (e) {
+      fail('To Do: ' + e.message);
+    }
+    Object.assign(T.td, altTd); Object.assign(T.ta.anz, altAnz); T.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   219. Memo Pad (v7.2.0)
+   Grund: Die Aktivitäten trugen Routinen, Listen, Leitfäden, Einfälle
+   und „Offene Aufgaben“ mit H/S/V. Wie im CLIE: Memo Pad mit Projekten,
+   Zielen, Notizen, Abläufen, Checklisten; ein Projekt ist Notiz + Schritte.
+   Fehlerart: Die Details einer Aufgabe zeichnen über tdZeichnen — im
+   Memo Pad muss das die Seite neu zeichnen, nicht den To-Do-Schirm.
+   ============================================================ */
+console.log('\n219. Memo Pad');
+{
+  const skript = hauptSkript();
+  pruefe(/<span>Memo Pad<\/span>/.test(QUELLE) && !/<span>Aktivitäten<\/span>/.test(QUELLE), 'die Leiste unten sagt „Memo Pad“');
+  const tz = skript.match(/function tdZeichnen\([\s\S]*?\n\}/);
+  pruefe(tz && /if \(schirmOffen === 'Aktivitaeten'\) \{ akSeiteZeichnen\(\); return; \}/.test(tz[0]), 'im Memo Pad zeichnet tdZeichnen die Seite (Fehlerart)');
+  const twm = skript.match(/function tdWaehlen\([\s\S]*?\n\}/);
+  pruefe(twm && /td\.wahl && schirmOffen === 'ToDo'\)/.test(twm[0]), 'am Handy öffnet nur To Do ein Blatt — im Memo Pad kein leeres Blatt (Fehlerart)');
+  const ash = skript.match(/function akSeiteHtml\([\s\S]*?\n\}/);
+  pruefe(ash && !/akOaUm\(\)/.test(ash[0]) && /mpSchritteHtml\(s\)/.test(ash[0]), '„Offene Aufgaben“ ist ersetzt durch den Reiter „Schritte“');
+  const M = globalThis.__mpApi || {};
+  if (typeof M.mpSchritteHtml !== 'function') {
+    warn('Memo Pad nicht auswertbar');
+  } else {
+    const alt = M.holeDB(); const altAk = { id: M.ak.id, reiter: M.ak.reiter, modus: M.ak.modus, art: M.ak.art, umfang: M.ak.umfang, filter: M.ak.filter }; const altWahl = M.td.wahl; const altS = M.schirm();
+    try {
+      const db = M.leereDatenbank();
+      db.projekte = [{ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', flaeche: 'Holz.\n[] P1 Statik anfragen\n[] Nachbar informieren\n[x] Maße nehmen', ordnung: 1, geaendert: 1 }];
+      db.themen = [{ id: 'cl-korb', name: 'Sammler', korb: true, text: '[] Akku', kontext: '', ordnung: 0, geaendert: 1 }];
+      db.gedanken = [{ id: 'n1', titel: 'Zaun', text: 'Holz?', kontext: 'privat', ordnung: 2, geaendert: 1 },
+                     { id: 'pl', titel: 'Packliste', text: '[] Badehose', kontext: 'privat', checkliste: 'lauf', ordnung: 4, geaendert: 1 }];
+      M.setzeDB(db); M.setzeSchirm('Aktivitaeten'); M.ak.art = 'alle'; M.ak.umfang = 'aktiv'; M.ak.filter = 'alle';
+      const l = M.akLeisteHtml();
+      pruefe(/Carport/.test(l) && !/Sammler/.test(l) && !/akOeffnen\('routinen'\)/.test(l) && !/Einfälle/.test(l), 'Leiste: Projekte usw. — ohne Listen, Routinen, Einfälle');
+      const pj = M.kpSeiteFinden('p1'), pl = M.kpSeiteFinden('pl'), n1 = M.kpSeiteFinden('n1');
+      pruefe(M.mpMitReitern(pj) && !M.mpMitReitern(pl) && !M.mpMitReitern(n1), 'Reiter nur bei Projekt, Ziel und Ablauf');
+      M.akOeffnen('p1'); M.mpReiter('schritte');
+      let h = M.akSeiteHtml(pj);
+      pruefe(/mpReiter\('notiz'\)/.test(h) && /Statik anfragen/.test(h) && /Erledigt <i>1<\/i>/.test(h) && !/id="kpFeld"/.test(h), 'Schritte: offene Zeilen, Erledigtes darunter');
+      pruefe(h.indexOf('Statik') < h.indexOf('Nachbar'), 'in der Reihenfolge der Seite');
+      M.tdWaehlen('p1|2');
+      h = M.akSeiteHtml(pj);
+      pruefe(/class="mp-detail"/.test(h) && /tdPlanen\('/.test(h), 'antippen zeigt die Details wie im To Do');
+      M.tdPlanen(M.tagePlus(M.isoDatum(), 1));
+      pruefe(M.taGeplant(pj, 'Nachbar informieren') !== null, 'aus dem Memo Pad einplanen');
+      M.mpNeuTaste({ key: 'Enter', preventDefault: function () {}, target: { value: ' Bauantrag  stellen ', blur: function () {} } });
+      pruefe(/\[\] Bauantrag stellen$/.test(pj.text), '„Neuer Schritt“ hängt eine Zeile an');
+      M.mpReiter('notiz');
+      h = M.akSeiteHtml(pj);
+      pruefe(/Holz\./.test(h) && M.td.wahl === '', 'Notiz zeigt die Seite, der Wechsel hebt die Auswahl auf');
+    } catch (e) {
+      fail('Memo Pad: ' + e.message);
+    }
+    Object.assign(M.ak, altAk); M.td.wahl = altWahl; M.setzeSchirm(altS); M.setzeDB(alt);
   }
 }
 
