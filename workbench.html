@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.5.0</title>
+<title>Workbench 6.6.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2106,6 +2106,31 @@ body.breit .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
   border:1px solid var(--linie);border-radius:5px;padding:6px 8px;background:var(--karte);
   color:var(--tinte);outline:none}
 .d-reihe{display:flex;gap:8px;margin-top:12px}
+/* Kategorien, Alle Aufgaben, Einplanen (seit v6.6.0) */
+.kt-alt{display:none !important}
+.kt-knopf{display:flex;align-items:center;gap:6px;width:100%;border:1px solid var(--linie);border-radius:14px;background:var(--karte);font:inherit;font-size:13px;padding:4px 10px;cursor:pointer;color:var(--tinte)}
+.kt-knopf span{color:var(--grau)}.kt-knopf b{flex:1;text-align:left;font-weight:600}.kt-knopf i{font-style:normal;color:var(--grau)}
+.kt-platz{margin:2px 6px 6px}.kt-tag .kt-knopf{width:auto}
+.kt-zeile{display:flex;align-items:center;width:100%;border:0;background:none;font:inherit;font-size:15px;padding:9px 10px;border-radius:7px;text-align:left;cursor:pointer;color:var(--tinte)}
+.kt-zeile small{margin-left:auto;color:var(--grau);font-size:12.5px}.kt-zeile.an{background:var(--papier);font-weight:600}
+.kt-trenn{border-top:1px solid var(--linie);margin:4px 0}
+.ta-leiste{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 12px;font-size:13px}
+.ta-leiste .pille.an{border-color:var(--tinte)}.ta-luecke{flex:1}
+.ta-sort{display:flex;align-items:center;gap:6px}.ta-sort span{color:var(--grau)}
+.ta-blatt{padding:6px 16px 14px}
+.ta-zeile{display:flex;align-items:center;gap:10px;padding:6px 4px;border-bottom:1px solid var(--linie)}
+.ta-zeile.an{background:var(--papier);box-shadow:inset 3px 0 0 var(--weinrot)}
+.ta-k{width:16px;height:16px;border:1.5px solid var(--grau);border-radius:3px;background:var(--karte);padding:0;flex:0 0 16px;cursor:pointer}
+.ta-k.an{background:var(--tinte);border-color:var(--tinte)}
+.ta-p{width:12px;color:var(--weinrot);font-weight:700;font-size:13px}
+.ta-tx{flex:1;min-width:0;border:0;background:none;font:inherit;text-align:left;padding:2px 0;cursor:pointer;color:var(--tinte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ta-zeile.erl .ta-tx{text-decoration:line-through;color:var(--grau)}
+.ta-kat{font-size:12px;color:var(--grau);white-space:nowrap}
+.ta-kz{font-size:11px;border:1px solid var(--linie);border-radius:8px;padding:0 6px;color:var(--grau)}
+.ta-dt{width:62px;text-align:right;font-variant-numeric:tabular-nums;color:var(--grau)}.ta-dt.ue{color:var(--weinrot);font-weight:600}
+.ta-hinweis{color:var(--grau);font-size:12.5px;margin:10px 0 0}
+.ep-tage{justify-content:flex-start;margin:10px 0}
+.ep-zeiten{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--grau);margin-top:6px}.ep-zeiten b{color:var(--petrol)}
 /* Google Kalender schreiben und SOS (seit v6.5.0) */
 .gk-wert{align-items:center}
 .gk-wert .gk-lang{flex:1;min-width:180px;max-width:320px}
@@ -2621,9 +2646,11 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
       <button type="button" onclick="tagHeute()">Heute</button>
       <button type="button" onclick="tagBlaettern(1)">›</button>
       <span class="tk-luecke"></span>
-      <button type="button" id="tAlle" class="pille aktiv" onclick="setTagFilter('alle')">Alle</button>
-      <button type="button" id="tBeruf" class="pille" onclick="setTagFilter('beruflich')">Beruf</button>
-      <button type="button" id="tPrivat" class="pille" onclick="setTagFilter('privat')">Privat</button>
+      <!-- Seit v6.6.0: die Kategorie wählt, was der Filter zeigt; die drei Knöpfe bleiben verborgen für die Zuordnung -->
+      <span id="tKategorie" class="kt-tag"></span>
+      <button type="button" id="tAlle" class="pille aktiv kt-alt" onclick="setTagFilter('alle')">Alle</button>
+      <button type="button" id="tBeruf" class="pille kt-alt" onclick="setTagFilter('beruflich')">Beruf</button>
+      <button type="button" id="tPrivat" class="pille kt-alt" onclick="setTagFilter('privat')">Privat</button>
     </div>
     <div class="tk-zahlen" id="tkZahlen"></div>
    </div>
@@ -3033,7 +3060,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.5.0';
+var APP_VERSION = '6.6.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -8270,6 +8297,7 @@ var tagKleinAuf = false;
 
 function tagZeichnen() {
   if (!tagOffen) { tagOffen = isoDatum(); }
+  ktKnoepfeZeichnen();
   /* Wer gerade im Tag schreibt, wird nicht vom Takt überschrieben. */
   var aktivFeld = document.activeElement;
   if (tagSchreibt && aktivFeld && aktivFeld.id === 'kpFeld' && schirmOffen === 'Tag') { return; }
@@ -22102,7 +22130,7 @@ function kpZelleUm(zeileNr, spalte) {
 /* ---------- Öffnen, Leiste, Filter ---------- */
 
 function akSeite() {
-  return (ak.id && ak.id !== 'routinen' && ak.id !== 'umstellung') ? kpSeiteFinden(ak.id) : null;
+  return (ak.id && ak.id !== 'routinen' && ak.id !== 'umstellung' && ak.id !== 'aufgaben') ? kpSeiteFinden(ak.id) : null;
 }
 
 /* Öffnet eine Seite (oder 'routinen') — mit „hervor“ wird eine
@@ -22214,7 +22242,8 @@ function akUmfangSetzen(u) {
 }
 
 function akSichtbar(s) {
-  return kpPasstFilter(s, ak.filter) && !kontextVerborgen(s.kontext);
+  /* Seit v6.6.0 nach Kategorie (Arbeit = beruflich) */
+  return ktPasst(s) && !kontextVerborgen(s.kontext);
 }
 
 function akEintragHtml(an, aufruf, zeichen, name, extra, klasse, ziehen) {
@@ -22318,10 +22347,8 @@ function akKlappUm(was) {
 }
 
 function akLeisteHtml() {
-  var h = '<div class="filter" role="group" aria-label="Beruf oder Privat">'
-        + [['alle', 'Alle'], ['beruflich', 'Beruf'], ['privat', 'Privat']].map(function (p) {
-          return '<button type="button" class="' + (ak.filter === p[0] ? 'an' : '') + '" onclick="akFilterSetzen(\'' + p[0] + '\')">' + p[1] + '</button>';
-        }).join('') + '</div>'
+  /* Seit v6.6.0: Kategorie statt Beruf/Privat — wie im CLIE */
+  var h = '<div class="kt-platz">' + ktKnopfHtml() + '</div>'
         + '<div class="filter" role="group" aria-label="Nur Aktives oder alles">'
         + [['aktiv', 'Aktiv'], ['alle', 'Alle']].map(function (p) {
           return '<button type="button" class="' + (ak.umfang === p[0] ? 'an' : '') + '" onclick="akUmfangSetzen(\'' + p[0] + '\')">' + p[1] + '</button>';
@@ -22329,6 +22356,10 @@ function akLeisteHtml() {
   var heute = akRoutinenHeute().length;
   h += akEintragHtml(ak.id === 'routinen', 'akOeffnen(\'routinen\')', '↻', 'Routinen',
                      heute ? '<span class="marke-klein">' + heute + ' heute</span>' : '', 'routinen-eintrag', '');
+  /* Seit v6.6.0: die flache Liste wie die To Do List im CLIE */
+  var offen = taZahl();
+  h += akEintragHtml(ak.id === 'aufgaben', 'akOeffnen(\'aufgaben\')', '☐', 'Alle Aufgaben',
+                     offen ? '<span class="marke-klein">' + offen + '</span>' : '', 'aufgaben-eintrag', '');
   var leer = function (wort) {
     return '<div class="leer-hinweis">' + (ak.filter === 'alle' ? 'Noch keine ' + wort + '.' : 'Keine ' + wort + ' unter diesem Filter.') + '</div>';
   };
@@ -22352,7 +22383,12 @@ function akLeisteHtml() {
   h += akGruppeKopfHtml('liste');
   var listen = kpSeiten('liste').filter(akSichtbar);
   if (!listen.length) { h += leer('Listen'); }
-  listen.forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
+  /* Der Sammler aus CLIE steht oben, mit Zahl (seit v6.6.0) */
+  listen.filter(taIstKorb).forEach(function (s) {
+    var n = kpOffeneZahl(s);
+    h += akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + esc(s.id) + '\')', '≡', 'Sammler', n ? '<span class="marke-klein">' + n + '</span>' : '', 'sammler-eintrag', '');
+  });
+  listen.filter(function (s) { return !taIstKorb(s); }).forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
   h += akGruppeKopfHtml('notiz');
   if (akNotizenAuf()) {
     var alleNz = kpSeiten('notiz').filter(akSichtbar).filter(function (s) { return !vlIstVorlage(s); });
@@ -22393,6 +22429,8 @@ function akAnlegen() {
   }
   /* „ziel“ ist ein Vorhaben in der Sammlung der Ziele. */
   var s = (ak.neuIn === 'ziel') ? kpSeiteAnlegen('vorhaben', name, ak.filter, 'ziel') : kpSeiteAnlegen(ak.neuIn, name, ak.filter);
+  /* Unter einer gewählten Kategorie bekommt Neues diese Kategorie (seit v6.6.0) */
+  if (s && /^kb-/.test(ktWahlJetzt())) { vlSatz(s).bereich = ktWahlJetzt(); }
   ak.neuIn = '';
   spaeterSichern();
   if (s) { akOeffnen(s.id); akModusSetzen('schreiben'); }
@@ -22675,6 +22713,7 @@ function akSeiteZeichnen() {
   var vs = ak.vorschau ? kpSeiteFinden(ak.vorschau) : null;
   if (vs) { el.innerHTML = akVorschauHtml(vs); return; }
   if (ak.id === 'routinen') { el.innerHTML = akRoutinenHtml(); return; }
+  if (ak.id === 'aufgaben') { el.innerHTML = taHtml(); return; }
   if (ak.id === 'umstellung') { el.innerHTML = akUmstellungHtml(); return; }
   var s = akSeite();
   if (!s) {
@@ -23785,7 +23824,7 @@ function heuteKarteHtml(is) {
     var weg = (ansicht.match(/class="wz (erl|nr)"/g) || []).length;
     var offen = (ansicht.match(/class="wz"/g) || []).length;
     var frei = String(text).split('\n').some(function (z) { return z.trim() && !kpAufgabe(z) && !/^\s*#/.test(z); });
-    inhalt = '<div class="ruhig ruhig-tag' + (tagZeigen.vorgenommen ? '' : ' erl-aus') + '">' + ansicht + '</div>'
+    inhalt = '<div class="ruhig ruhig-tag' + (tagZeigen.vorgenommen ? '' : ' erl-aus') + '">' + ansicht + '</div>' + epZeitenHtml(t)
            + ((weg && !offen && !frei && !tagZeigen.vorgenommen) ? '<div class="tleer">Alles erledigt.</div>' : '')
            + tagAusHinweisHtml('vorgenommen', weg, 'erledigt oder nicht relevant');
   }
@@ -23827,6 +23866,425 @@ function routinenKarteHtml(is, e) {
   return tagBlockHtml('Routinen', h, '<button class="tag-knopf" type="button" onclick="akOeffnen(\'routinen\')">alle ›</button>');
 }
 
+
+/* ---------- Kategorien statt Beruf/Privat (seit v6.6.0) ----------
+
+   Dieselben Kategorien wie im CLIE: die Lebensbereiche aus dem Bereich
+   „kurs“ (typ „bereich“) samt eigener Kategorien. Jeder Eintrag trägt
+   seine Kategorie in „bereich“; ohne Kategorie gilt Beruflich als
+   „Arbeit“. „Privat“ ist alles außer Arbeit. Termine aus Google kennen
+   nur beruflich/privat: Arbeit zeigt die beruflichen, jede andere
+   Kategorie die privaten. */
+
+var KT_ARBEIT = 'kb-arbeit';
+var KT_KEY = 'workbench-kategorie';
+var KT_STANDARD = [['kb-gesundheit', 'Gesundheit'], ['kb-beziehungen', 'Beziehungen & Familie'], ['kb-arbeit', 'Arbeit'],
+                   ['kb-haus', 'Haus & Projekte'], ['kb-geist', 'Geist & Lernen'], ['kb-freizeit', 'Freizeit'], ['kb-finanzen', 'Finanzen']];
+var ktWahl = 'alle';
+
+function ktAlle() {
+  var l = (Array.isArray(DB.kurs) ? DB.kurs : []).filter(function (b) { return b && b.typ === 'bereich' && !b.aus; })
+    .sort(function (a, b) { return (Number(a.rang) || 99) - (Number(b.rang) || 99) || String(a.name).localeCompare(String(b.name)); });
+  if (!l.length) { return KT_STANDARD.map(function (b) { return { id: b[0], name: b[1] }; }); }
+  return l.map(function (b) { return { id: b.id, name: b.name }; });
+}
+
+function ktName(id) {
+  if (id === 'alle') { return 'Alle'; }
+  if (id === 'privat') { return 'Privat'; }
+  var b = ktAlle().filter(function (x) { return x.id === id; })[0];
+  return b ? b.name : '';
+}
+
+/* Die Kategorie eines Satzes oder einer Hülle */
+function ktVon(x) {
+  var s = vlSatz(x);
+  if (!s) { return ''; }
+  if (s.bereich) { return s.bereich; }
+  return s.kontext === 'beruflich' ? KT_ARBEIT : '';
+}
+
+function ktGueltig(w) { return w === 'alle' || w === 'privat' || !!ktName(w); }
+
+function ktWahlJetzt() { return ktGueltig(ktWahl) ? ktWahl : 'alle'; }
+
+/* Was Beruf/Privat-Filter verstehen: alle · beruflich · privat */
+function ktKontext() {
+  var w = ktWahlJetzt();
+  return w === 'alle' ? 'alle' : (w === KT_ARBEIT ? 'beruflich' : 'privat');
+}
+
+/* Passt ein Eintrag zur Kategorie? Ohne Kontext (Sammler) immer */
+function ktPasst(x) {
+  var w = ktWahlJetzt();
+  var s = vlSatz(x);
+  if (w === 'alle' || !s || (!s.kontext && !s.bereich)) { return true; }
+  if (w === 'privat') { return ktVon(s) !== KT_ARBEIT; }
+  return ktVon(s) === w;
+}
+
+function ktLaden() {
+  var w = '';
+  try { w = window.localStorage.getItem(KT_KEY) || ''; } catch (e) { w = ''; }
+  ktWahl = (w === 'privat' || /^kb-/.test(w)) ? w : 'alle';
+  ak.filter = ktKontext();
+  tagFilter = ktKontext();
+}
+
+function ktSetzen(w) {
+  if (!ktGueltig(w)) { return; }
+  ktWahl = w;
+  try { window.localStorage.setItem(KT_KEY, w); } catch (e) { /* nur für jetzt */ }
+  ak.filter = ktKontext();
+  aktionenSchliessen();
+  setTagFilter(ktKontext());
+  akZeichnen();
+  ktKnoepfeZeichnen();
+}
+
+function ktKnopfHtml() {
+  return '<button type="button" class="kt-knopf" onclick="ktMenueAuf()" aria-haspopup="dialog"><span>Kategorie</span><b>'
+       + esc(ktName(ktWahlJetzt()) || 'Alle') + '</b><i>▾</i></button>';
+}
+
+function ktKnoepfeZeichnen() {
+  var el = document.getElementById('tKategorie');
+  if (el) { el.innerHTML = ktKnopfHtml(); }
+}
+
+function ktMenueAuf() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = ktMenueHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function ktMenueHtml() {
+  var w = ktWahlJetzt();
+  var zeile = function (id, name, klein) {
+    return '<button type="button" class="kt-zeile' + (w === id ? ' an' : '') + '" onclick="ktSetzen(\'' + esc(id) + '\')"><span>' + esc(name) + '</span>'
+         + (klein ? '<small>' + klein + '</small>' : '') + '</button>';
+  };
+  return blattKopf() + '<div class="as-titel">Kategorie</div><div class="as-meta">gilt für Tag und Aktivitäten — wie im CLIE</div><div class="as-linie"></div>'
+    + zeile('alle', 'Alle', '') + zeile('privat', 'Privat', 'ohne Arbeit') + '<div class="kt-trenn"></div>'
+    + ktAlle().map(function (b) { return zeile(b.id, b.name, ''); }).join('');
+}
+
+/* ---------- Alle Aufgaben (seit v6.6.0) ----------
+
+   Die flache Liste wie die To Do List im CLIE: eine Zeile je Aufgabe —
+   ☐ · Priorität · Text · TT.MM. Aus Projekten, Zielen und Abläufen nur,
+   was eingeplant ist oder eine ⚑ Frist hat (sie sind Pläne); Listen und
+   der Sammler ganz. Checklisten zum Abhaken nie. */
+
+var TA_KEY = 'workbench-alle-aufgaben';
+var TA_SORT = [['prio-datum', 'Priorität, Datum'], ['datum-prio', 'Datum, Priorität'], ['kat-prio', 'Kategorie, Priorität']];
+var ta = { wahl: '', frisch: {}, anz: { sort: 'prio-datum', faellig: false, kat: false, kuerzel: false } };
+
+function taLaden() {
+  var roh = null;
+  try { roh = JSON.parse(window.localStorage.getItem(TA_KEY) || 'null'); } catch (e) { roh = null; }
+  if (!roh || typeof roh !== 'object') { return; }
+  if (TA_SORT.some(function (s) { return s[0] === roh.sort; })) { ta.anz.sort = roh.sort; }
+  ['faellig', 'kat', 'kuerzel'].forEach(function (k) { if (typeof roh[k] === 'boolean') { ta.anz[k] = roh[k]; } });
+}
+
+function taMerken() {
+  try { window.localStorage.setItem(TA_KEY, JSON.stringify(ta.anz)); } catch (e) { /* nur für jetzt */ }
+}
+
+function taIstKorb(s) { var x = vlSatz(s); return !!(x && (x.korb || x.id === 'cl-korb')); }
+
+/* Woher die Aufgaben kommen: laufende Projekte und Ziele, Listen (ohne
+   ruhende und abgeschlossene), laufende Abläufe — ohne Vorlagen */
+function taSeiten() {
+  var rang = function (s) { return s.art === 'vorhaben' ? 0 : (s.art === 'liste' ? 1 : 2); };
+  return kpNachRang(kpSeitenAlle().filter(function (s) {
+    if (vlIstVorlage(s) || !ktPasst(s)) { return false; }
+    var x = vlSatz(s);
+    if (s.art === 'vorhaben') { return s.zustand === 'laeuft'; }
+    if (s.art === 'liste') { return !x.ruht && !x.abgeschlossen; }
+    return vlArt(s) === 'ablauf' && x.checkliste === 'lauf' && !x.ruht;
+  })).map(function (s, i) { return { s: s, i: i }; })
+    .sort(function (a, b) { return (rang(a.s) - rang(b.s)) || (a.i - b.i); })
+    .map(function (x) { return x.s; });
+}
+
+/* Eingeplant: der früheste Tag in Tag-Behältern */
+function taGeplant(seite, text) {
+  var beste = null;
+  kpEintraegeFinden(seite.id, text).forEach(function (f) {
+    if (!f.woche.datum) { return; }
+    if (!beste || f.woche.datum < beste.datum) { beste = { datum: f.woche.datum, zeit: f.eintrag.zeit || '' }; }
+  });
+  return beste;
+}
+
+function taFrist(seite, text) {
+  var z = vlSatz(seite) && vlSatz(seite).zusatz;
+  var k = kpPrio(text).text;
+  return (z && typeof z === 'object' && z[k] && z[k].frist) ? z[k].frist : '';
+}
+
+function taDatum(x) {
+  var d = [x.datum, x.frist].filter(function (v) { return !!v; }).sort();
+  return d[0] || '';
+}
+
+function taAufgaben() {
+  var heute = isoDatum();
+  var aus = [];
+  taSeiten().forEach(function (s) {
+    var plan = s.art === 'vorhaben' || vlArt(s) === 'ablauf';
+    String(s.text || '').split('\n').forEach(function (z, nr) {
+      var a = kpAufgabe(z);
+      if (!a || !a.text || a.nichtRelevant) { return; }
+      var key = s.id + '|' + nr;
+      var frisch = !!ta.frisch[key];
+      if (a.erledigt && !frisch) { return; }
+      var g = a.erledigt ? null : taGeplant(s, a.text);
+      var x = { seite: s, nr: nr, a: a, key: key, datum: g ? g.datum : '', zeit: g ? g.zeit : '', frist: taFrist(s, a.text), p: kpPrio(a.text).p };
+      if (plan && !x.datum && !x.frist && !frisch) { return; }
+      if (ta.anz.faellig && !frisch && taDatum(x) > heute) { return; }
+      aus.push(x);
+    });
+  });
+  return taSortieren(aus);
+}
+
+function taSortieren(l) {
+  var prio = function (x) { return x.p || 3; };
+  var datum = function (x) { return taDatum(x) || '9999-99-99'; };
+  var kat = function (x) { var n = ktName(ktVon(x.seite)); return n ? n : '~'; };
+  var vergleich = {
+    'prio-datum': function (a, b) { return (prio(a) - prio(b)) || (datum(a) < datum(b) ? -1 : (datum(a) > datum(b) ? 1 : 0)); },
+    'datum-prio': function (a, b) { return (datum(a) < datum(b) ? -1 : (datum(a) > datum(b) ? 1 : 0)) || (prio(a) - prio(b)); },
+    'kat-prio': function (a, b) { return kat(a).localeCompare(kat(b), 'de') || (prio(a) - prio(b)) || (datum(a) < datum(b) ? -1 : (datum(a) > datum(b) ? 1 : 0)); }
+  }[ta.anz.sort] || function () { return 0; };
+  return l.map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return vergleich(a.x, b.x) || (a.i - b.i); }).map(function (y) { return y.x; });
+}
+
+/* Kürzel eines Projekts oder Ablaufs: eigenes oder die ersten drei Buchstaben */
+function taKuerzel(s) {
+  if (!s || !(s.art === 'vorhaben' || vlArt(s) === 'ablauf')) { return ''; }
+  var eigen = String(vlSatz(s).kuerzel || '').trim();
+  if (eigen) { return eigen.slice(0, 4); }
+  return (String(s.titel || '').split(/[\s\-–:,.\/()]+/).filter(function (w) { return w; })[0] || '').slice(0, 3);
+}
+
+function taKurzDatum(is) { return is ? is.slice(8, 10) + '.' + is.slice(5, 7) + '.' : ''; }
+
+function taZeileHtml(x) {
+  var heute = isoDatum();
+  var d = taDatum(x);
+  var ue = d && d < heute && !x.a.erledigt;
+  var kz = ta.anz.kuerzel ? taKuerzel(x.seite) : '';
+  var kat = ta.anz.kat ? ktName(ktVon(x.seite)) : '';
+  return '<div class="ta-zeile' + (ta.wahl === x.key ? ' an' : '') + (x.a.erledigt ? ' erl' : '') + '">'
+    + '<button type="button" class="ta-k' + (x.a.erledigt ? ' an' : '') + '" onclick="taHaken(\'' + esc(x.key) + '\')" aria-label="abhaken"></button>'
+    + '<span class="ta-p">' + (x.p ? x.p : '') + '</span>'
+    + '<button type="button" class="ta-tx" onclick="taWaehlen(\'' + esc(x.key) + '\')">' + esc(kpPrio(x.a.text).text) + '</button>'
+    + (kat ? '<span class="ta-kat">' + esc(kat) + '</span>' : '')
+    + (kz ? '<span class="ta-kz">' + esc(kz) + '</span>' : '')
+    + '<span class="ta-dt' + (ue ? ' ue' : '') + '">' + (d ? taKurzDatum(d) + (ue ? '!' : '') : '–') + '</span></div>';
+}
+
+function taHtml() {
+  var l = taAufgaben();
+  var schalter = function (k, text) {
+    return '<button type="button" class="pille' + (ta.anz[k] ? ' an' : '') + '" onclick="taAnz(\'' + k + '\')">' + (ta.anz[k] ? '☑ ' : '☐ ') + text + '</button>';
+  };
+  var h = '<div class="ak-kopf"><button type="button" class="pille ak-zurueck" onclick="akZurueck()">‹ Aktivitäten</button>'
+        + '<h1 class="ak-titel">Alle Aufgaben</h1></div>'
+        + '<div class="ta-leiste"><label class="ta-sort"><span>Sortieren</span><select class="rt-ein" onchange="taSort(this.value)">'
+        + TA_SORT.map(function (s) { return '<option value="' + s[0] + '"' + (ta.anz.sort === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('')
+        + '</select></label>' + schalter('faellig', 'nur Fälliges') + schalter('kat', 'Kategorie') + schalter('kuerzel', 'Kürzel')
+        + '<span class="ta-luecke"></span><button type="button" class="oa-knopf" onclick="taEinplanen()">Einplanen …</button>'
+        + '<button type="button" class="pille" onclick="taZeigen()">Im Projekt zeigen</button></div>';
+  h += '<div class="blatt ta-blatt">' + (l.length ? l.map(taZeileHtml).join('') : '<div class="ak-leer">Nichts offen' + (ktWahlJetzt() !== 'alle' ? ' unter „' + esc(ktName(ktWahlJetzt())) + '“' : '') + '.</div>')
+     + '<p class="ta-hinweis">Aus Projekten, Zielen und Abläufen nur, was eingeplant ist oder eine ⚑ Frist hat — der Rest bleibt im Plan. Listen und Sammler ganz.</p></div>';
+  return h;
+}
+
+function taZahl() { return taAufgaben().filter(function (x) { return !x.a.erledigt; }).length; }
+
+function taFinden(key) {
+  var t = String(key || '').split('|');
+  var s = t.length === 2 ? kpSeiteFinden(t[0]) : null;
+  return s ? { seite: s, nr: Number(t[1]) } : null;
+}
+
+function taWaehlen(key) {
+  ta.wahl = (ta.wahl === key) ? '' : key;
+  akSeiteZeichnen();
+}
+
+function taHaken(key) {
+  var f = taFinden(key);
+  if (!f) { return; }
+  if (!kpSeiteKastenUmKern(f.seite, f.nr)) { return; }
+  ta.frisch[key] = true;
+  spaeterSichern();
+  akZeichnen();
+}
+
+function taAnz(k) {
+  if (!(k in ta.anz) || k === 'sort') { return; }
+  ta.anz[k] = !ta.anz[k];
+  taMerken();
+  akSeiteZeichnen();
+}
+
+function taSort(w) {
+  if (!TA_SORT.some(function (s) { return s[0] === w; })) { return; }
+  ta.anz.sort = w;
+  taMerken();
+  akSeiteZeichnen();
+}
+
+function taZeigen() {
+  var f = taFinden(ta.wahl);
+  if (!f) { melde('Erst eine Aufgabe antippen.', null); return; }
+  var a = kpAufgabe(String(f.seite.text || '').split('\n')[f.nr] || '');
+  akOeffnen(f.seite.id, a ? a.text : '');
+}
+
+function taEinplanen() {
+  var f = taFinden(ta.wahl);
+  if (!f) { melde('Erst eine Aufgabe antippen, dann „Einplanen …“.', null); return; }
+  epAuf(f.seite, f.nr);
+}
+
+/* ---------- Einplanen-Fenster (seit v6.6.0) ----------
+
+   Wie im CLIE: sieben Tage zur Schnellwahl, ein Datum, die Uhrzeit nach
+   Wahl, „Nicht einplanen“. Der Punkt kommt in den Tag (Behälter) und
+   bleibt in seiner Seite. */
+
+var ep = null;   /* { seiteId, nr, text, datum, zeit, geplant } */
+
+function epAuf(seite, nr) {
+  var a = kpAufgabe(String(seite.text || '').split('\n')[nr] || '');
+  if (!a || !a.text || a.erledigt) { melde('Diese Aufgabe lässt sich nicht einplanen.', null); return; }
+  var g = taGeplant(seite, a.text);
+  ep = { seiteId: seite.id, nr: nr, text: a.text, titel: seite.titel || '', datum: g ? g.datum : tagePlus(isoDatum(), 1), zeit: g ? g.zeit : '', geplant: !!g };
+  epZeigen();
+}
+
+function epZeigen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = epHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function epLesen() {
+  if (!ep) { return null; }
+  var d = document.getElementById('epDatum');
+  var z = document.getElementById('epZeit');
+  if (d && typeof d.value === 'string') { ep.datum = d.value; }
+  if (z && typeof z.value === 'string') { ep.zeit = z.value; }
+  return ep;
+}
+
+function epTag(d) {
+  if (!epLesen()) { return; }
+  ep.datum = d;
+  epZeigen();
+}
+
+function epHtml() {
+  if (!ep) { return blattKopf(); }
+  var heute = isoDatum();
+  var i;
+  var tage = '';
+  for (i = 0; i < 7; i++) {
+    var d = tagePlus(heute, i);
+    tage += '<button class="d-wahl' + (ep.datum === d ? ' an' : '') + '" type="button" onclick="epTag(\'' + d + '\')">'
+          + (i === 0 ? 'Heute' : (i === 1 ? 'Morgen' : esc(kurzDatum(d)))) + '</button>';
+  }
+  return blattKopf() + '<div class="as-titel">Einplanen</div><div class="as-meta">„' + esc(kpPrio(ep.text).text) + '“ · ' + esc(ep.titel) + '</div><div class="as-linie"></div>'
+    + '<div class="d-wert ep-tage">' + tage + '</div>'
+    + '<div class="d-feld"><div class="d-name">Tag</div><div class="d-wert"><input id="epDatum" class="rt-ein" type="date" value="' + esc(ep.datum) + '"></div></div>'
+    + '<div class="d-feld"><div class="d-name">Uhrzeit</div><div class="d-wert"><input id="epZeit" class="rt-ein" type="time" value="' + esc(ep.zeit) + '"><span class="d-hinweis">leer = ohne</span></div></div>'
+    + '<div class="d-reihe"><button type="button" onclick="epOk()">Einplanen</button>'
+    + (ep.geplant ? '<button type="button" onclick="epWeg()">Nicht einplanen</button>' : '')
+    + '<button type="button" onclick="aktionenSchliessen()">Abbrechen</button></div>'
+    + '<div class="d-hinweis" style="text-align:left">Steht dann im Tag unter „Vorgenommen“. Der Punkt bleibt in seiner Seite.</div>';
+}
+
+/* Einplanen für einen Tag — oder herausnehmen; ein anderer Tag ersetzt den alten */
+function epAnwenden(seite, nr, datum, zeit) {
+  var zeilen = String(seite.text || '').split('\n');
+  var a = kpAufgabe(zeilen[nr] || '');
+  if (!a || !a.text) { return false; }
+  var tage = kpEintraegeFinden(seite.id, a.text).filter(function (f) { return !!f.woche.datum; });
+  var bleibt = null;
+  tage.forEach(function (f) {
+    if (datum && f.woche.datum === datum && !bleibt) { bleibt = f; return; }
+    kpAusplanenKern(f.woche.id, f.eintrag.id);
+  });
+  if (!datum) { return true; }
+  if (!bleibt) {
+    var b = kpPlanenKern(seite, nr, 'h', datum);
+    if (!b) { return false; }
+    bleibt = { woche: b, eintrag: b.eintraege[b.eintraege.length - 1] };
+  }
+  if (/^\d{2}:\d{2}$/.test(String(zeit || ''))) { bleibt.eintrag.zeit = zeit; } else { delete bleibt.eintrag.zeit; }
+  bleibt.woche.geaendert = jetzt();
+  return true;
+}
+
+function epOk() {
+  var e = epLesen();
+  var s = e ? kpSeiteFinden(e.seiteId) : null;
+  if (!s) { aktionenSchliessen(); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(e.datum || ''))) { melde('Bitte einen Tag wählen.', 'warn'); return; }
+  if (e.datum < isoDatum()) { melde('Ein vergangener Tag geht nicht.', 'warn'); return; }
+  if (e.zeit && !/^\d{2}:\d{2}$/.test(e.zeit)) { melde('Die Uhrzeit ist ungültig.', 'warn'); return; }
+  var nr = taZeileNr(s, e.nr, e.text);
+  if (nr < 0 || !epAnwenden(s, nr, e.datum, e.zeit)) { melde('Das ließ sich nicht einplanen.', 'warn'); return; }
+  ep = null;
+  spaeterSichern();
+  aktionenSchliessen();
+  melde('Eingeplant: ' + kurzDatum(e.datum) + (e.zeit ? ' ' + e.zeit : '') + '.', 'gut');
+  akZeichnen();
+  tagZeichnen();
+}
+
+function epWeg() {
+  var e = epLesen();
+  var s = e ? kpSeiteFinden(e.seiteId) : null;
+  if (!s) { aktionenSchliessen(); return; }
+  var nr = taZeileNr(s, e.nr, e.text);
+  if (nr >= 0) { epAnwenden(s, nr, '', ''); }
+  ep = null;
+  spaeterSichern();
+  aktionenSchliessen();
+  akZeichnen();
+  tagZeichnen();
+}
+
+/* Die Zeile wiederfinden, auch wenn sich die Nummer verschoben hat */
+function taZeileNr(seite, nr, text) {
+  var zeilen = String(seite.text || '').split('\n');
+  var a = (nr >= 0 && nr < zeilen.length) ? kpAufgabe(zeilen[nr]) : null;
+  if (a && a.text === text) { return nr; }
+  var z = kpZeileSuchen(seite, text);
+  return z ? z.nr : -1;
+}
+
+/* Im Tag unter „Vorgenommen“: was eine Uhrzeit hat, mit Uhrzeit */
+function epZeitenHtml(t) {
+  var l = ((t && t.eintraege) || []).filter(function (e) { return e.zeit && !e.erledigt; })
+    .sort(function (a, b) { return a.zeit < b.zeit ? -1 : (a.zeit > b.zeit ? 1 : 0); });
+  if (!l.length) { return ''; }
+  return '<div class="ep-zeiten">' + l.map(function (e) { return '<span><b>' + esc(e.zeit) + '</b> ' + esc(kpPrio(e.text).text) + '</span>'; }).join('') + '</div>';
+}
 
 /* ============================================================
    Google Kalender schreiben (seit v6.5.0)
@@ -24567,6 +25025,8 @@ function starten() {
     }
     bestandStempeln(DB);
     akFilterLaden();
+    ktLaden();
+    taLaden();
     sichtschutzLaden();
     breiteHorchen();
     farbweltAnwenden();

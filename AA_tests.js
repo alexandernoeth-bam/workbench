@@ -4181,7 +4181,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                    + 'globalThis.__gkApi = { gkKalIdNachtragen, gkNeu, gkHtml, gkKoerper, gkArtUm, gkWahl, gkSpeichern, gkBearbeiten, gkLoeschenFragen, gkLoeschen, terminBlattHtml,'
                    + ' sosAuf, sosTaste, sosUhrStart, sosZeichnen, sosTakt, sos, isoDatum, tagePlus, document: document, window: window,'
                    + ' setze: function(n, w){ if (n === "token") { zugriffToken = w; tokenAblauf = w ? Date.now() + 3600000 : 0; } if (n === "termine") { termineNachTag = w; } if (n === "schreibKal") { gkSchreibKalender = w; } if (n === "fenster") { gkFenster = w; } if (n === "blatt") { terminBlattFuer = w; } },'
-                   + ' fenster: function(){ return gkFenster; }, termine: function(){ return termineNachTag; } };';
+                   + ' fenster: function(){ return gkFenster; }, termine: function(){ return termineNachTag; } };'
+                   /* Seit v6.6.0: Kategorien, Alle Aufgaben, Einplanen (Kategorien 213, 214) */
+                   + 'globalThis.__taApi = { ktAlle, ktName, ktVon, ktPasst, ktKontext, ktSetzen, ktLaden, ktMenueHtml, ktKnopfHtml, taAufgaben, taHtml, taZahl, taHaken, taWaehlen, taAnz, taSort, taKuerzel, ta,'
+                   + ' epAuf, epHtml, epAnwenden, epOk, epWeg, epZeitenHtml, akLeisteHtml, akSichtbar, kpSeitenAlle, kpTagFinden, kpSeiteAnlegen, leereDatenbank, isoDatum, tagePlus, document: document, window: window,'
+                   + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; }, tagFilter: function(){ return tagFilter; }, wahl: function(){ return ktWahl; },'
+                   + ' setzeEp: function(e){ ep = e; }, holeEp: function(){ return ep; }, setzeKt: function(w){ ktWahl = w; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -13530,6 +13535,139 @@ console.log('\n212. SOS');
     } catch (err) {
       fail('SOS: ' + err.message);
     }
+  }
+}
+
+/* ============================================================
+   213. Kategorien statt Beruf/Privat (v6.6.0)
+   Grund: CLIE ordnet nach Kategorien (Lebensbereiche, „Privat“ = alles
+   außer Arbeit). Die Workbench soll dieselbe Sicht haben.
+   Erkennt: falsche Zuordnung (beruflich ohne Kategorie = Arbeit),
+   Privat lässt Arbeit durch, Sammler verschwindet, Tag-Filter passt
+   nicht zur Kategorie, Wahl nicht gemerkt, Neues ohne Kategorie.
+   ============================================================ */
+console.log('\n213. Kategorien statt Beruf/Privat');
+{
+  const T = globalThis.__taApi || {};
+  if (typeof T.ktPasst !== 'function') {
+    warn('Kategorien nicht auswertbar');
+  } else {
+    const alt = T.holeDB(); const altWahl = T.wahl();
+    try {
+      const db = T.leereDatenbank();
+      db.kurs = [{ id: 'kb-haus', typ: 'bereich', name: 'Haus & Projekte', rang: 2 }, { id: 'kb-arbeit', typ: 'bereich', name: 'Arbeit', rang: 1 }, { id: 'kb-x', typ: 'bereich', name: 'Aus', rang: 3, aus: true }];
+      T.setzeDB(db);
+      pruefe(T.ktAlle().map(b => b.id).join(',') === 'kb-arbeit,kb-haus', 'Kategorien aus dem Bereich „kurs“, nach Rang, ausgeblendete nicht');
+      const a = { kontext: 'beruflich' }, b = { kontext: 'privat', bereich: 'kb-haus' }, c = { kontext: 'privat' }, k = { kontext: '' };
+      pruefe(T.ktVon(a) === 'kb-arbeit' && T.ktVon(b) === 'kb-haus' && T.ktVon(c) === '', 'beruflich ohne Kategorie = Arbeit');
+      T.setzeKt('privat');
+      pruefe(!T.ktPasst(a) && T.ktPasst(b) && T.ktPasst(c) && T.ktPasst(k) && T.ktKontext() === 'privat', '„Privat“ = alles außer Arbeit; ohne Kontext (Sammler) immer');
+      T.setzeKt('kb-haus');
+      pruefe(!T.ktPasst(a) && T.ktPasst(b) && !T.ktPasst(c) && T.ktKontext() === 'privat', 'eine Kategorie: nur ihre Einträge; Termine privat');
+      T.setzeKt('kb-arbeit');
+      pruefe(T.ktPasst(a) && !T.ktPasst(b) && T.ktKontext() === 'beruflich', '„Arbeit“: Termine beruflich');
+      T.setzeKt('alle');
+      const m = T.ktMenueHtml();
+      pruefe(/ktSetzen\('alle'\)/.test(m) && /ktSetzen\('privat'\)"><span>Privat<\/span><small>ohne Arbeit/.test(m) && /ktSetzen\('kb-haus'\)/.test(m), 'Auswahl: Alle, Privat (ohne Arbeit), die Kategorien');
+      let gemerkt = '';
+      const altLs = T.window.localStorage;
+      T.window.localStorage = { getItem() { return gemerkt; }, setItem(k2, v) { if (k2 === 'workbench-kategorie') { gemerkt = v; } }, removeItem() {} };
+      T.ktSetzen('kb-haus');
+      pruefe(gemerkt === 'kb-haus' && T.tagFilter() === 'privat' && T.holeAk().filter === 'privat', 'gewählt: gemerkt, Tag und Aktivitäten folgen');
+      T.setzeKt('alle'); T.ktLaden();
+      pruefe(T.wahl() === 'kb-haus', 'nach Neustart wieder dieselbe Kategorie');
+      T.window.localStorage = altLs;
+      pruefe(/<button type="button" class="kt-knopf" onclick="ktMenueAuf\(\)"/.test(T.akLeisteHtml()) && !/akFilterSetzen\('beruflich'\)/.test(T.akLeisteHtml()), 'Leiste: Knopf „Kategorie“ statt Beruf/Privat');
+      pruefe(/id="tKategorie"/.test(QUELLE) && /id="tBeruf" class="pille kt-alt"/.test(QUELLE), 'Tag: Knopf „Kategorie“, die alten Knöpfe verborgen');
+      pruefe(/if \(s && \/\^kb-\/\.test\(ktWahlJetzt\(\)\)\) \{ vlSatz\(s\)\.bereich = ktWahlJetzt\(\); \}/.test(hauptSkript()), 'Neues bekommt die gewählte Kategorie');
+    } catch (e) {
+      fail('Kategorien: ' + e.message);
+    }
+    T.setzeKt(altWahl); T.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   214. Alle Aufgaben, Einplanen, Sammler (v6.6.0)
+   Grund: Am Arbeits-PC soll die flache Liste der To Do List aus CLIE da
+   sein — Pläne (Projekte, Abläufe) nur mit Datum oder Frist, Listen
+   ganz — und Aufgaben sollen mit wenigen Klicks in den Tag kommen.
+   Erkennt: Plan-Punkte ohne Datum in der Liste, Packlisten oder Vorlagen
+   darin, falsche Sortierung, Überfälliges ohne „!“, Abhaken ohne
+   Wirkung, Einplanen legt doppelt an oder lässt den alten Tag stehen,
+   Sammler nicht oben.
+   ============================================================ */
+console.log('\n214. Alle Aufgaben, Einplanen, Sammler');
+{
+  const T = globalThis.__taApi || {};
+  if (typeof T.taAufgaben !== 'function') {
+    warn('Alle Aufgaben nicht auswertbar');
+  } else {
+    const alt = T.holeDB(); const altWahl = T.wahl(); const altAnz = Object.assign({}, T.ta.anz);
+    try {
+      const heute = T.isoDatum(), gestern = T.tagePlus(heute, -1), morgen = T.tagePlus(heute, 1);
+      const db = T.leereDatenbank();
+      db.projekte = [{ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', flaeche: '[] P1 Statik anfragen\n[] Nachbar informieren', zusatz: { 'Statik anfragen': { frist: gestern } }, ordnung: 1, geaendert: 1 },
+                     { id: 'pv', name: 'Vorlage', kontext: 'privat', status: 'ruht', istVorlage: true, flaeche: '[] nie', ordnung: 2, geaendert: 1 }];
+      db.themen = [{ id: 'cl-korb', name: 'Sammler', korb: true, text: '[] Akku tauschen', kontext: '', ordnung: 0, geaendert: 1 },
+                   { id: 'th', name: 'Haus', text: '[] Dachrinne\n[x] Fertig', kontext: 'privat', ordnung: 5, geaendert: 1 },
+                   { id: 'tr', name: 'Ruht', text: '[] unsichtbar', kontext: 'privat', ruht: true, ordnung: 6, geaendert: 1 }];
+      db.gedanken = [{ id: 'al', titel: 'Abruftest', text: '[] Daten laden\n[] Prüfen', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', ordnung: 7, geaendert: 1 },
+                     { id: 'pl', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'lauf', ordnung: 8, geaendert: 1 }];
+      T.setzeDB(db); T.setzeKt('alle');
+      Object.assign(T.ta.anz, { sort: 'prio-datum', faellig: false, kat: false, kuerzel: false }); T.ta.frisch = {}; T.ta.wahl = '';
+      const texte = () => T.taAufgaben().map(x => x.a.text.replace(/^P\d /, ''));
+      pruefe(texte().join(' | ') === 'Statik anfragen | Akku tauschen | Dachrinne', 'flach: Frist-Punkt aus dem Projekt, Sammler, Liste — Plan ohne Datum, Packliste, Vorlage, Ruhendes, Erledigtes nicht');
+      /* Einplanen */
+      const s = T.kpSeitenAlle().filter(x => x.id === 'al')[0];
+      T.epAuf(s, 0);
+      const eh = T.epHtml();
+      pruefe(/Einplanen/.test(eh) && (eh.match(/epTag\('/g) || []).length === 7 && />Heute</.test(eh) && />Morgen</.test(eh) && !/epWeg/.test(eh), 'Einplanen: sieben Tage zur Schnellwahl, „Nicht einplanen“ erst, wenn eingeplant');
+      T.document.getElementById('epDatum').value = gestern; T.document.getElementById('epZeit').value = '';
+      T.epOk();
+      pruefe(!T.kpTagFinden(gestern), 'ein vergangener Tag wird abgelehnt');
+      T.document.getElementById('epDatum').value = morgen; T.document.getElementById('epZeit').value = '15:00';
+      T.epOk();
+      const tag = T.kpTagFinden(morgen);
+      pruefe(tag && tag.eintraege.length === 1 && tag.eintraege[0].quelle === 'al' && tag.eintraege[0].zeit === '15:00' && /\[\] Daten laden/.test(s.text), 'eingeplant: im Tag, mit Uhrzeit — der Punkt bleibt im Ablauf');
+      pruefe(texte().indexOf('Daten laden') >= 0 && texte().indexOf('Prüfen') < 0, 'eingeplanter Ablauf-Punkt steht in der Liste, der Rest nicht');
+      pruefe(/<b>15:00<\/b> Daten laden/.test(T.epZeitenHtml(tag)), 'im Tag unter „Vorgenommen“ mit Uhrzeit');
+      T.epAuf(s, 0);
+      pruefe(/epWeg\(\)">Nicht einplanen/.test(T.epHtml()), 'schon eingeplant: „Nicht einplanen“');
+      T.document.getElementById('epDatum').value = heute; T.document.getElementById('epZeit').value = '';
+      T.epOk();
+      pruefe(!T.kpTagFinden(morgen).eintraege.length && T.kpTagFinden(heute).eintraege.length === 1 && !('zeit' in T.kpTagFinden(heute).eintraege[0]), 'anderer Tag: der alte wird frei, keine Kopie');
+      T.epAuf(s, 0); T.epWeg();
+      pruefe(!T.kpTagFinden(heute).eintraege.length, '„Nicht einplanen“ nimmt ihn heraus');
+      /* Zeile, Überfälliges, Kürzel */
+      Object.assign(T.ta.anz, { kuerzel: true, kat: true });
+      let h = T.taHtml();
+      pruefe(new RegExp('Statik anfragen</button><span class="ta-kz">Car</span><span class="ta-dt ue">' + gestern.slice(8, 10) + '\\.' + gestern.slice(5, 7) + '\\.!</span>').test(h), 'Überfällig mit „!“, Kürzel des Projekts');
+      pruefe(/Dachrinne<\/button><span class="ta-dt">–<\/span>/.test(h), 'ohne Datum „–“');
+      pruefe(T.taKuerzel(T.kpSeitenAlle().filter(x => x.id === 'th')[0]) === '', 'Listen haben kein Kürzel');
+      /* Sortierung, nur Fälliges */
+      db.themen[1].text = '[] Dachrinne\n[] P2 Zaun';
+      T.taSort('datum-prio');
+      pruefe(texte()[0] === 'Statik anfragen' && texte()[texte().length - 1] !== 'Statik anfragen', '„Datum, Priorität“: Datiertes zuerst');
+      T.taSort('prio-datum');
+      pruefe(texte()[0] === 'Statik anfragen' && texte()[1] === 'Zaun', '„Priorität, Datum“: P1, P2, dann ohne Priorität (zählt als 3)');
+      /* Abhaken */
+      const x = T.taAufgaben().filter(y => /Dachrinne/.test(y.a.text))[0];
+      T.taHaken(x.key);
+      pruefe(/\[x\] Dachrinne/.test(db.themen[1].text) && T.taAufgaben().some(y => y.key === x.key && y.a.erledigt), 'abgehakt: in der Liste erledigt, bleibt bis zum Verlassen durchgestrichen');
+      /* Kategorie */
+      T.setzeKt('kb-arbeit');
+      pruefe(texte().join(' | ') === 'Akku tauschen', 'Kategorie Arbeit: private Aufgaben nicht, Sammler bleibt');
+      T.setzeKt('alle');
+      /* Leiste */
+      const l = T.akLeisteHtml();
+      pruefe(/akOeffnen\('aufgaben'\)/.test(l) && /Alle Aufgaben<\/span><span class="marke-klein">\d+</.test(l), 'Leiste: „Alle Aufgaben“ mit Zahl');
+      const iL = l.indexOf('>Listen<'), iS = l.indexOf('>Sammler<'), iH = l.indexOf('>Haus<');
+      pruefe(iL >= 0 && iS > iL && iH > iS && (l.match(/>Sammler</g) || []).length === 1 && /Sammler<\/span><span class="marke-klein">1</.test(l), 'Sammler oben in „Listen“, mit Zahl, nur einmal');
+    } catch (e) {
+      fail('Alle Aufgaben: ' + e.message);
+    }
+    T.setzeKt(altWahl); Object.assign(T.ta.anz, altAnz); T.ta.frisch = {}; T.setzeEp(null); T.setzeDB(alt);
   }
 }
 
