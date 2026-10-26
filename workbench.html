@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.4.0</title>
+<title>Workbench 6.5.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2106,6 +2106,26 @@ body.breit .plusknopf{bottom:calc(84px + env(safe-area-inset-bottom))}
   border:1px solid var(--linie);border-radius:5px;padding:6px 8px;background:var(--karte);
   color:var(--tinte);outline:none}
 .d-reihe{display:flex;gap:8px;margin-top:12px}
+/* Google Kalender schreiben und SOS (seit v6.5.0) */
+.gk-wert{align-items:center}
+.gk-wert .gk-lang{flex:1;min-width:180px;max-width:320px}
+.gk-wert textarea{font:inherit;font-size:13.5px}
+.d-reihe .gk-weg{color:var(--weinrot);border-color:var(--weinrot)}
+.tabschnitt-titel .gk-plus{font-size:11.5px;padding:2px 10px;margin-left:auto;letter-spacing:0;text-transform:none;font-weight:500}
+.sos-schirm{display:none}
+.sos-schirm.auf{display:flex;position:fixed;inset:0;z-index:2000;background:var(--papier);flex-direction:column;align-items:center;padding:60px 16px 16px;overflow:auto}
+.sos-karte{width:100%;max-width:560px;background:var(--karte);border:1px solid var(--linie);border-radius:12px;padding:22px 26px}
+.sos-kopf{display:flex;justify-content:space-between;color:var(--grau);font-size:13px}
+.sos-karte h2{margin:10px 0;font-size:24px}
+.sos-text{font-size:17px;line-height:1.55}.sos-text ul{padding-left:20px}
+.sos-leise{color:var(--grau);font-size:14px}.sos-mitte{text-align:center}
+.sos-uhr{font-size:64px;text-align:center;margin:18px 0 8px;font-variant-numeric:tabular-nums}
+.sos-balken{height:10px;border:1px solid var(--tinte);border-radius:5px;margin:0 60px;overflow:hidden}.sos-balken i{display:block;height:100%;background:var(--tinte);width:0}
+.sos-um{margin-top:16px;border-top:1px solid var(--linie);padding-top:10px}
+.sos-knoepfe{display:flex;gap:8px;margin-top:18px;align-items:center}.sos-luecke{flex:1}
+.sos-fuss{color:var(--grau);font-size:12.5px;margin-top:12px}
+.sos-schirm .pille{font:inherit;font-size:15px;padding:7px 18px;border:1px solid var(--linie);border-radius:18px;background:var(--karte);color:var(--tinte);cursor:pointer}
+.sos-schirm .pille.voll{background:var(--tinte);color:#fff;border-color:var(--tinte)}
 .d-reihe button{flex:1;font:inherit;font-size:calc(var(--fs)*0.82);padding:9px;
   border:1px solid var(--linie);border-radius:6px;background:var(--karte);
   color:var(--tinte);cursor:pointer}
@@ -2968,6 +2988,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
 
 <div class="aktion-hg" id="aktionHg" onclick="aktionenSchliessen()"></div>
 <div class="aktion-sheet" id="aktionSheet"></div>
+<div class="sos-schirm" id="sosSchirm"></div>
 
 <button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
   <span id="neuText"></span>
@@ -2997,6 +3018,11 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
     <svg viewBox="0 0 24 24"><path d="M7 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7z"></path>
       <path d="M7 3v18M4 7h5M4 12h5M4 17h5M11 8h5"></path></svg><span>Notizbücher</span>
   </button>
+  <!-- Seit v6.5.0: SOS aus jedem Schirm -->
+  <button type="button" id="navSos" onclick="sosAuf()">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle>
+      <path d="M8.5 10.2c0-1 .8-1.4 1.5-1.4s1.4.4 1.4 1.1c0 1.6-2.9 1.1-2.9 2.8 0 .8.7 1.3 1.5 1.3s1.5-.4 1.5-1.2"></path></svg><span>SOS</span>
+  </button>
 
 </div>
 
@@ -3007,7 +3033,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.4.0';
+var APP_VERSION = '6.5.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -3016,8 +3042,11 @@ var LS_KEY      = 'workbench-daten';
 var OPFS_NAME   = 'workbench.json';
 var CLIENT_ID   = '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
 var REDIRECT_URI = 'https://alexandernoeth-bam.github.io/workbench/workbench.html';
+/* Seit v6.5.0 auch Termine schreiben (calendar.events) — wie im CLIE;
+   die Liste der Kalender braucht weiter calendar.readonly. */
 var SCOPES = 'https://www.googleapis.com/auth/drive.file '
-           + 'https://www.googleapis.com/auth/calendar.readonly';
+           + 'https://www.googleapis.com/auth/calendar.readonly '
+           + 'https://www.googleapis.com/auth/calendar.events';
 var GIS_URL   = 'https://accounts.google.com/gsi/client';
 var TOKEN_KEY = 'workbench-zugriff';
 var ANMELDE_MERKER = 'workbench-war-angemeldet';
@@ -8284,7 +8313,7 @@ function tagZeichnen() {
   }
   termin += terminListeHtml(is, e);
 
-  var terminKarte = tagBlockHtml('Termine', termin, '');
+  var terminKarte = tagBlockHtml('Termine', termin, '<button type="button" class="pille gk-plus" onclick="gkNeu(\'' + is + '\')">+ Termin</button>');
   var routinenKarte = routinenKarteHtml(is, e);
   var heuteKarte = heuteKarteHtml(is);
   var wocheKarte = wocheKarteHtml(is);
@@ -9612,7 +9641,7 @@ function zeichneGoogle() {
   h += zeile('Stand bei Drive', driveStand || '—', driveStand ? '' : 'grau');
   h += zeile('Letzte Übertragung', letzteUebertragung || 'noch nie',
              letzteUebertragung ? '' : 'grau');
-  h += zeile('Rechte', 'drive.file · calendar.readonly', 'grau');
+  h += zeile('Rechte', 'drive.file · calendar.readonly · calendar.events', 'grau');
   h += zeile('Letzter Abgleich', letzterAbgleich || 'noch nie', letzterAbgleich ? '' : 'grau');
   h += zeile('Ergebnis', berichtText(letzterBericht),
              (letzterBericht && letzterBericht.konflikte.length) ? 'nein' : 'grau');
@@ -10468,6 +10497,7 @@ function termineHolen(laut, mitBalken) {
         if (balken) { abruf.was = kal.name; abrufZeigen(); }
         return einenKalenderHolen(kal, von, bis, neu);
       }).then(function () {
+        gkKalIdNachtragen(neu, kal.id);
         if (balken) { abrufSchritt(); }
       });
     });
@@ -13940,14 +13970,19 @@ function terminBlattHtml() {
     if (b.length > 300) { b = b.slice(0, 300) + ' …'; }
     h += '<div class="jk-text">' + esc(b) + '</div>';
   }
+  /* Seit v6.5.0: direkt im Google Kalender ändern */
+  if (t.kalId) {
+    h += '<div class="d-reihe"><button type="button" onclick="gkBearbeiten()">Bearbeiten</button>'
+       + '<button type="button" onclick="gkLoeschenFragen()">Löschen …</button></div>';
+  }
   h += '<div class="d-reihe">'
      + '<button type="button" onclick="terminAblaufWahl(\'' + esc(t.id) + '\',\''
      + terminBlattFuer.tag + '\')">Ablauf starten</button>'
      + '<button type="button" onclick="googleTagOeffnen(\'' + terminBlattFuer.tag + '\')">'
      + 'In Google öffnen</button>'
      + '<button type="button" onclick="aktionenSchliessen()">Fertig</button></div>';
-  h += '<div class="d-hinweis" style="text-align:left">Die Zuordnung merkt sich die App, '
-     + 'Google bleibt unberührt.</div>';
+  h += '<div class="d-hinweis" style="text-align:left">Kontext und Art merkt sich die App. '
+     + '„Bearbeiten“ und „Löschen“ ändern den Termin in Google.</div>';
   return h;
 }
 
@@ -23794,6 +23829,415 @@ function routinenKarteHtml(is, e) {
 
 
 /* ============================================================
+   Google Kalender schreiben (seit v6.5.0)
+
+   Wie im CLIE: Termine anlegen, ändern und löschen — direkt im Google
+   Kalender, ohne Umweg über die workbench.json. Dafür braucht die App
+   das Recht calendar.events (die Liste der Kalender liest sie weiter
+   mit calendar.readonly). Fehlt das Recht noch, fragt Google einmal neu.
+   Arten stehen wie im CLIE als #Kürzel in der Notiz. Bei einer Serie
+   gilt jede Änderung nur für diesen einen Termin.
+   ============================================================ */
+
+var GK_ZULETZT_KEY = 'workbench-kal-zuletzt';
+var gkSchreibKalender = [];
+var gkFenster = null;   /* { modus: neu | aendern | loeschen, id, tag, laedt, v: {…} } */
+
+/* Beim Abruf: jeder Termin merkt sich seinen Kalender — fürs Ändern */
+function gkKalIdNachtragen(liste, kalId) {
+  var tag, i;
+  for (tag in liste) {
+    if (!Object.prototype.hasOwnProperty.call(liste, tag)) { continue; }
+    for (i = 0; i < liste[tag].length; i++) {
+      if (!liste[tag][i].kalId) { liste[tag][i].kalId = kalId; }
+    }
+  }
+}
+
+/* Die Kalender, in die geschrieben werden darf — einmal geholt */
+function gkSchreibKalenderHolen() {
+  if (gkSchreibKalender.length) { return Promise.resolve(gkSchreibKalender); }
+  var adresse = 'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer'
+              + '&fields=' + encodeURIComponent('items(id,summary,primary)') + '&maxResults=50';
+  return window.fetch(adresse, { headers: driveKopf() }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      gkSchreibKalender = ((d && d.items) || []).map(function (k) { return { id: k.id, name: k.summary || k.id, primary: !!k.primary }; });
+      return gkSchreibKalender;
+    });
+}
+
+/* Vorgewählt: der zuletzt benutzte, sonst der Hauptkalender */
+function gkKalenderVorschlag() {
+  var zuletzt = '';
+  try { zuletzt = window.localStorage.getItem(GK_ZULETZT_KEY) || ''; } catch (e) { zuletzt = ''; }
+  var ids = gkSchreibKalender.map(function (k) { return k.id; });
+  if (zuletzt && ids.indexOf(zuletzt) >= 0) { return zuletzt; }
+  var haupt = gkSchreibKalender.filter(function (k) { return k.primary; });
+  return haupt.length ? haupt[0].id : (ids[0] || '');
+}
+
+function gkKalenderName(id) {
+  var i;
+  for (i = 0; i < gkSchreibKalender.length; i++) { if (gkSchreibKalender[i].id === id) { return gkSchreibKalender[i].name; } }
+  for (i = 0; i < kalenderListe.length; i++) { if (kalenderListe[i].id === id) { return kalenderListe[i].name; } }
+  return '';
+}
+
+function gkBlattZeigen() {
+  var sheet = document.getElementById('aktionSheet');
+  var hg = document.getElementById('aktionHg');
+  if (!sheet || !hg) { return; }
+  sheet.innerHTML = gkHtml();
+  sheet.classList.add('auf');
+  hg.classList.add('auf');
+}
+
+function gkNeu(tag) {
+  var d = /^\d{4}-\d{2}-\d{2}$/.test(String(tag || '')) ? tag : isoDatum();
+  if (!tokenGueltig()) { melde('Termine anlegen geht nur mit Verbindung zu Google — bitte oben neu verbinden.', 'warn'); return; }
+  var std = (d === isoDatum()) ? Math.min(new Date().getHours() + 1, 22) : 9;
+  gkFenster = { modus: 'neu', id: '', tag: d, laedt: false,
+                v: { titel: '', datum: d, von: zwei(std) + ':00', bis: zwei(std + 1) + ':00', ganztags: false,
+                     kalId: '', ort: '', notiz: '', privat: false, privatBekannt: true } };
+  gkBlattZeigen();
+  gkSchreibKalenderHolen().then(function () {
+    if (gkFenster && gkFenster.modus === 'neu') { gkLesen(); gkFenster.v.kalId = gkFenster.v.kalId || gkKalenderVorschlag(); gkBlattZeigen(); }
+  }).catch(function (f) { gkSchreibFehler(f); });
+}
+
+/* Aus dem Termin-Blatt: erst den Termin bei Google holen (Sichtbarkeit,
+   ganze Notiz), dann das Fenster füllen */
+function gkBearbeiten() {
+  var t = terminFuerKennung(terminBlattFuer.id, terminBlattFuer.tag);
+  if (!t || !t.kalId) { melde('Diesen Termin kann die App nicht ändern.', 'warn'); return; }
+  if (!tokenGueltig()) { melde('Ändern geht nur mit Verbindung zu Google — bitte oben neu verbinden.', 'warn'); return; }
+  gkFenster = { modus: 'aendern', id: t.id, tag: terminBlattFuer.tag, laedt: true, serie: !!t.serieId,
+                v: { titel: t.rohTitel || t.titel, datum: terminBlattFuer.tag, von: t.ganztags ? '09:00' : t.zeit,
+                     bis: t.ganztags ? '10:00' : (t.bis || t.zeit), ganztags: !!t.ganztags, kalId: t.kalId,
+                     ort: t.ort || '', notiz: t.beschreibung || '', privat: false, privatBekannt: false } };
+  gkBlattZeigen();
+  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(t.kalId) + '/events/' + encodeURIComponent(t.id)
+              + '?fields=' + encodeURIComponent('visibility,description,location');
+  return window.fetch(adresse, { headers: driveKopf() }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (r) {
+      if (!gkFenster || gkFenster.id !== t.id) { return; }
+      gkFenster.laedt = false;
+      gkFenster.v.privat = !!(r && (r.visibility === 'private' || r.visibility === 'confidential'));
+      gkFenster.v.privatBekannt = true;
+      if (r && typeof r.description === 'string') { gkFenster.v.notiz = r.description; }
+      if (r && typeof r.location === 'string') { gkFenster.v.ort = r.location; }
+      gkBlattZeigen();
+    }).catch(function () {
+      /* Ohne Antwort trotzdem änderbar — die Sichtbarkeit bleibt dann, wie sie ist */
+      if (gkFenster && gkFenster.id === t.id) { gkFenster.laedt = false; gkBlattZeigen(); }
+    });
+}
+
+function gkLoeschenFragen() {
+  var t = terminFuerKennung(terminBlattFuer.id, terminBlattFuer.tag);
+  if (!t || !t.kalId) { melde('Diesen Termin kann die App nicht löschen.', 'warn'); return; }
+  gkFenster = { modus: 'loeschen', id: t.id, tag: terminBlattFuer.tag, kalId: t.kalId, titel: t.titel, serie: !!t.serieId, v: {} };
+  gkBlattZeigen();
+}
+
+function gkFeld(id) {
+  var f = document.getElementById(id);
+  return (f && typeof f.value === 'string') ? f.value : null;
+}
+
+/* Getipptes ins Fenster-Objekt, bevor neu gezeichnet wird */
+function gkLesen() {
+  if (!gkFenster || !gkFenster.v) { return null; }
+  var v = gkFenster.v;
+  var felder = [['titel', 'gkTitel'], ['datum', 'gkDatum'], ['ort', 'gkOrt'], ['notiz', 'gkNotiz']];
+  if (!v.ganztags) { felder.push(['von', 'gkVon'], ['bis', 'gkBis']); }
+  /* Beim Ändern bleibt der Kalender, wie er ist */
+  if (gkFenster.modus === 'neu') { felder.push(['kalId', 'gkKal']); }
+  felder.forEach(function (p) {
+    var w = gkFeld(p[1]);
+    if (w !== null) { v[p[0]] = w; }
+  });
+  return v;
+}
+
+function gkWahl(was, wert) {
+  var v = gkLesen();
+  if (!v) { return; }
+  if (was === 'ganz') { v.ganztags = !!wert; }
+  if (was === 'privat') { v.privat = !!wert; v.privatBekannt = true; }
+  gkBlattZeigen();
+}
+
+/* Arten als #Kürzel in der Notiz — wie im CLIE */
+function gkArtenHtml(titel, notiz) {
+  var an = artenAusText(String(titel || '') + ' ' + String(notiz || ''));
+  return artenAlle().map(function (a) {
+    return '<button class="d-wahl' + (an.indexOf(a) >= 0 ? ' an' : '') + '" type="button" onclick="gkArtUm(\'' + esc(a) + '\')">' + esc(artName(a)) + '</button>';
+  }).join('');
+}
+
+function gkArtUm(a) {
+  var v = gkLesen();
+  if (!v) { return; }
+  var text = String(v.notiz || '');
+  if (artenAusText(text).indexOf(a) >= 0) {
+    text = text.replace(/(^|\s)#([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{1,23})/g, function (ganz, vor, wort) {
+      return artenAusText('#' + wort)[0] === a ? (vor === '\n' ? '\n' : '') : ganz;
+    }).replace(/\n[ \t]+/g, '\n').replace(/[ \t]+$/gm, '').replace(/\n+$/, '');
+  } else if (artenAusText(String(v.titel || '')).indexOf(a) < 0) {
+    var marke = '#' + artName(a).replace(/\s+/g, '');
+    text = text.replace(/\s+$/, '');
+    text = text ? (/#\S+$/.test(text) ? text + ' ' + marke : text + '\n' + marke) : marke;
+  }
+  v.notiz = text;
+  gkBlattZeigen();
+}
+
+function gkHtml() {
+  var o = gkFenster;
+  if (!o) { return blattKopf(); }
+  var h = blattKopf();
+  if (o.modus === 'loeschen') {
+    return h + '<div class="as-titel">Termin löschen</div>'
+      + '<div class="as-meta">„' + esc(o.titel) + '“ am ' + esc(kurzDatum(o.tag)) + ' wird aus dem Google Kalender gelöscht.'
+      + (o.serie ? ' Nur dieser eine Termin der Serie.' : '') + '</div>'
+      + '<div class="d-reihe"><button type="button" class="gk-weg" onclick="gkLoeschen()">Löschen</button>'
+      + '<button type="button" onclick="aktionenSchliessen()">Abbrechen</button></div>';
+  }
+  var v = o.v;
+  var feld = function (name, inhalt) { return '<div class="d-feld"><div class="d-name">' + name + '</div><div class="d-wert gk-wert">' + inhalt + '</div></div>'; };
+  var wahl = function (an, was, wert, text) { return '<button class="d-wahl' + (an ? ' an' : '') + '" type="button" onclick="gkWahl(\'' + was + '\',' + wert + ')">' + text + '</button>'; };
+  var kal = (o.modus === 'aendern')
+    ? '<span class="d-hinweis">' + esc(gkKalenderName(v.kalId) || '—') + '</span>'
+    : (gkSchreibKalender.length
+      ? '<select id="gkKal" class="rt-ein">' + gkSchreibKalender.map(function (k) {
+          return '<option value="' + esc(k.id) + '"' + (k.id === v.kalId ? ' selected' : '') + '>' + esc(k.name) + '</option>';
+        }).join('') + '</select>'
+      : '<span class="d-hinweis">Kalender werden geholt …</span>');
+  h += '<div class="as-titel">' + (o.modus === 'aendern' ? 'Termin bearbeiten' : 'Neuer Termin') + '</div>'
+     + '<div class="as-meta">' + (o.laedt ? 'Termin wird bei Google geholt …' : 'wird direkt im Google Kalender ' + (o.modus === 'aendern' ? 'geändert' : 'angelegt')) + '</div>'
+     + '<div class="as-linie"></div>'
+     + feld('Titel', '<input id="gkTitel" class="rt-ein gk-lang" type="text" maxlength="200" value="' + esc(v.titel) + '">')
+     + feld('Tag', '<input id="gkDatum" class="rt-ein" type="date" value="' + esc(v.datum) + '">')
+     + feld('Zeit', (v.ganztags ? '' : '<input id="gkVon" class="rt-ein" type="time" value="' + esc(v.von) + '"> – <input id="gkBis" class="rt-ein" type="time" value="' + esc(v.bis) + '">')
+         + wahl(v.ganztags, 'ganz', !v.ganztags, 'ganztägig'))
+     + feld('Kalender', kal)
+     + feld('Sichtbarkeit', wahl(!v.privat, 'privat', false, 'normal') + wahl(v.privat, 'privat', true, 'privat'))
+     + feld('Ort', '<input id="gkOrt" class="rt-ein gk-lang" type="text" value="' + esc(v.ort) + '">')
+     + feld('Notiz', '<textarea id="gkNotiz" class="rt-ein gk-lang" rows="2">' + esc(v.notiz) + '</textarea>')
+     + feld('Art', gkArtenHtml(v.titel, v.notiz))
+     + '<div class="d-reihe"><button type="button" onclick="gkSpeichern()"' + (o.laedt ? ' disabled' : '') + '>Speichern</button>'
+     + '<button type="button" onclick="aktionenSchliessen()">Abbrechen</button></div>'
+     + (o.serie ? '<div class="d-hinweis" style="text-align:left">Ein Termin aus einer Serie — die Änderung gilt nur für diesen einen.</div>' : '');
+  return h;
+}
+
+/* Aus dem Fenster wird, was Google erwartet: {fehler} oder {koerper, kalId, datum} */
+function gkKoerper() {
+  var v = gkLesen();
+  if (!v) { return { fehler: 'Kein Termin offen.' }; }
+  var titel = String(v.titel || '').trim();
+  if (!titel) { return { fehler: 'Bitte einen Titel eingeben.' }; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.datum || ''))) { return { fehler: 'Bitte einen Tag wählen.' }; }
+  if (!v.kalId) { return { fehler: 'Bitte einen Kalender wählen.' }; }
+  var k = { summary: titel, location: String(v.ort || '').trim(), description: String(v.notiz || '') };
+  /* Unbekannte Sichtbarkeit (Abruf misslang) wird nicht überschrieben */
+  if (v.privatBekannt) { k.visibility = v.privat ? 'private' : 'default'; }
+  if (v.ganztags) {
+    k.start = { date: v.datum, dateTime: null };
+    k.end = { date: tagePlus(v.datum, 1), dateTime: null };
+  } else {
+    if (!/^\d{1,2}:\d{2}$/.test(String(v.von || '')) || !/^\d{1,2}:\d{2}$/.test(String(v.bis || ''))) { return { fehler: 'Bitte Beginn und Ende angeben.' }; }
+    if (minutenAus(v.bis) <= minutenAus(v.von)) { return { fehler: 'Das Ende liegt vor dem Beginn.' }; }
+    var zone = '';
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
+    k.start = { dateTime: v.datum + 'T' + v.von + ':00', timeZone: zone || 'Europe/Berlin', date: null };
+    k.end = { dateTime: v.datum + 'T' + v.bis + ':00', timeZone: zone || 'Europe/Berlin', date: null };
+  }
+  return { koerper: k, kalId: v.kalId, datum: v.datum };
+}
+
+/* Fehlt das Recht zum Schreiben (Anmeldung von vor v6.5.0), fragt Google einmal neu */
+function gkSchreibFehler(f) {
+  var text = f ? f.message : 'unbekannter Fehler';
+  if (/403|insufficient|Berechtigung|verweigert/i.test(text)) {
+    melde('Die Workbench darf noch keine Termine schreiben — bitte einmal neu verbinden und zustimmen.', 'warn');
+    tokenVergessen();
+    anmelden(false);
+    return;
+  }
+  melde('Google hat den Termin nicht angenommen.\n' + text, 'warn');
+}
+
+function gkSpeichern() {
+  if (!gkFenster || gkFenster.modus === 'loeschen' || gkFenster.laedt) { return Promise.resolve(false); }
+  var e = gkKoerper();
+  if (e.fehler) { melde(e.fehler, 'warn'); return Promise.resolve(false); }
+  if (!tokenGueltig()) { melde('Keine Verbindung zu Google — der Termin wurde nicht gespeichert.', 'warn'); return Promise.resolve(false); }
+  var aendern = gkFenster.modus === 'aendern';
+  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(e.kalId) + '/events'
+              + (aendern ? '/' + encodeURIComponent(gkFenster.id) : '');
+  try { window.localStorage.setItem(GK_ZULETZT_KEY, e.kalId); } catch (x) { /* egal */ }
+  melde(aendern ? 'Termin wird geändert …' : 'Termin wird angelegt …', null);
+  return window.fetch(adresse, { method: aendern ? 'PATCH' : 'POST', headers: driveKopf({ 'Content-Type': 'application/json' }),
+                                 body: JSON.stringify(e.koerper) })
+    .then(antwortPruefen)
+    .then(function () {
+      gkFenster = null;
+      aktionenSchliessen();
+      melde(aendern ? 'Termin geändert.' : 'Termin im Google Kalender angelegt.', 'gut');
+      return termineHolen(false);
+    }).catch(function (f) { gkSchreibFehler(f); return false; });
+}
+
+function gkLoeschen() {
+  var o = gkFenster;
+  if (!o || o.modus !== 'loeschen') { return Promise.resolve(false); }
+  if (!tokenGueltig()) { melde('Löschen geht nur mit Verbindung zu Google — bitte oben neu verbinden.', 'warn'); return Promise.resolve(false); }
+  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(o.kalId) + '/events/' + encodeURIComponent(o.id);
+  return window.fetch(adresse, { method: 'DELETE', headers: driveKopf() })
+    .then(antwortPruefen)
+    .then(function () {
+      gkFenster = null;
+      aktionenSchliessen();
+      melde('Termin gelöscht.', 'gut');
+      return termineHolen(false);
+    }).catch(function (f) { gkSchreibFehler(f); return false; });
+}
+
+/* ============================================================
+   SOS (seit v6.5.0)
+
+   Die 3-Minuten-Selbstdistanzierung — wie im CLIE: fünf Karten ohne
+   Eingabefelder, Schritt 1 mit stiller 60-Sekunden-Anzeige, Schritt 5
+   mit 15-Minuten-Uhr. Vollbild über allem, aus jedem Schirm über den
+   Knopf „SOS“ unten. Esc schließt, Enter heißt „Weiter“. Nichts wird
+   gespeichert oder gezählt.
+   ============================================================ */
+
+var SOS_SCHRITTE = [
+  { titel: 'Stopp & Körper', uhr: 60, weiter: 'Weiter',
+    text: '<ul><li>Hände sofort weg von Tastatur und Maus.</li><li>Nicht klicken, nicht tippen, kein Tab wechseln.</li>'
+        + '<li>Dreimal tief in den Bauch atmen, bis der erste Adrenalinschub abebbt.</li></ul>' },
+  { titel: 'Rollenwechsel: der Kollege tritt ein', weiter: 'Weiter',
+    text: '<p>Sag dir innerlich: <b>„Ein Kollege sitzt mir gegenüber und schildert mir genau diesen Fall.“</b></p>'
+        + '<p>Behandle den Fall nicht als deine Schuld, sondern als fremdes Ticket.</p>' },
+  { titel: 'Was droht wirklich?', weiter: 'Weiter',
+    text: '<p><b>Was ist die nackte Realität?</b><br><span class="sos-leise">z. B. ein Entwurf trägt nicht; ein Beleg fehlt; eine Frist wackelt.</span></p>'
+        + '<p><b>Was ist das reale Worst-Case-Szenario?</b><br><span class="sos-leise">Fast immer nur: eine unangenehme Korrektur-Mail oder 30 Minuten zähe Arbeit — niemals das Lebensende.</span></p>'
+        + '<p class="sos-leise">Nur nüchtern beantworten — nichts eintippen.</p>' },
+  { titel: 'Berater-Rat — auf Papier', weiter: 'Zettel steht',
+    text: '<p><b>Stift und Zettel.</b> Notiere höchstens zwei mechanische Schritte, die du dem Kollegen aufträgst:</p>'
+        + '<ul><li>Schritt 1: sofortige, kurze Statusmeldung oder Datensammlung (z. B. „Termin für Klärung einstellen“).</li>'
+        + '<li>Schritt 2: genau 15 Minuten sture Ausführung an Punkt 1 — ohne Anspruch auf Perfektion.</li></ul>'
+        + '<p class="sos-leise">Die App schreibt nicht mit — der Zettel ist der Plan.</p>' },
+  { titel: 'Reine Ausführung', uhr: 900, weiter: '',
+    text: '<p>Lies den Zettel. Führ die beiden Punkte wortlos aus.</p>' }
+];
+
+var sos = { auf: false, schritt: 0, bis: 0, dauer: 0, um: false, takt: null };
+
+function sosUhrStopp() {
+  if (sos.takt) { try { window.clearInterval(sos.takt); } catch (e) { /* egal */ } }
+  sos.takt = null;
+  sos.bis = 0;
+  sos.dauer = 0;
+}
+
+function sosUhrStart(sekunden) {
+  sosUhrStopp();
+  sos.um = false;
+  sos.dauer = sekunden;
+  sos.bis = Date.now() + sekunden * 1000;
+  if (typeof window.setInterval === 'function') { sos.takt = window.setInterval(sosTakt, 1000); }
+}
+
+function sosRest() { return sos.bis ? Math.max(0, Math.ceil((sos.bis - Date.now()) / 1000)) : 0; }
+
+function sosZeitText(s) { return Math.floor(s / 60) + ':' + zwei(s % 60); }
+
+function sosTakt() {
+  if (!sos.auf || !sos.bis) { sosUhrStopp(); return; }
+  var rest = sosRest();
+  if (rest <= 0) { sosUhrStopp(); sos.um = true; sosZeichnen(); return; }
+  var u = document.getElementById('sosUhr');
+  var b = document.getElementById('sosBalken');
+  if (u) { u.textContent = sosZeitText(rest); }
+  if (b && b.style && sos.dauer) { b.style.width = Math.round(100 * (sos.dauer - rest) / sos.dauer) + '%'; }
+}
+
+function sosHtml() {
+  var i = Math.max(0, Math.min(SOS_SCHRITTE.length - 1, sos.schritt));
+  var s = SOS_SCHRITTE[i];
+  var letzter = i === SOS_SCHRITTE.length - 1;
+  var h = '<div class="sos-karte" role="dialog" aria-label="SOS"><div class="sos-kopf"><span>SOS · 3-Minuten-Selbstdistanzierung</span><span>' + (i + 1) + ' / ' + SOS_SCHRITTE.length + '</span></div>'
+        + '<h2>' + esc(s.titel) + '</h2><div class="sos-text">' + s.text + '</div>';
+  if (s.uhr) {
+    if (sos.um && s.uhr >= 600) {
+      h += '<div class="sos-um"><p><b>15 Minuten sind um.</b> Weiter oder Pause?</p>'
+         + '<button type="button" class="pille voll" onclick="sosUhrStart(900);sosZeichnen()">Weiter · 15 Min.</button> '
+         + '<button type="button" class="pille" onclick="sosZu()">Pause</button></div>';
+    } else if (sos.um) {
+      h += '<div class="sos-uhr">0:00</div><p class="sos-leise sos-mitte">Gut. Weiter, wenn du so weit bist.</p>';
+    } else if (sos.bis) {
+      var rest = sosRest();
+      h += '<div id="sosUhr" class="sos-uhr">' + sosZeitText(rest) + '</div><div class="sos-balken"><i id="sosBalken" style="width:'
+         + Math.round(100 * (sos.dauer - rest) / sos.dauer) + '%"></i></div>'
+         + '<p class="sos-leise sos-mitte">' + (s.uhr >= 600 ? 'Bildschirm weg. Es meldet sich nach 15 Minuten.' : 'läuft still · kein Ton') + '</p>';
+    } else {
+      h += '<div class="sos-uhr">15:00</div><p class="sos-leise sos-mitte">„15 Min. starten“ — oder „Fertig“, wenn es auch ohne Uhr geht.</p>';
+    }
+  }
+  h += '<div class="sos-knoepfe">' + (i === 0 ? '<button type="button" class="pille" onclick="sosZu()">Abbrechen</button>'
+                                             : '<button type="button" class="pille" onclick="sosSchritt(' + (i - 1) + ')">Zurück</button>')
+     + '<span class="sos-luecke"></span>';
+  if (!letzter) { h += '<button type="button" class="pille voll" onclick="sosSchritt(' + (i + 1) + ')">' + esc(s.weiter) + '</button>'; }
+  else {
+    h += ((sos.bis || sos.um) ? '' : '<button type="button" class="pille" onclick="sosUhrStart(900);sosZeichnen()">15 Min. starten</button>')
+       + '<button type="button" class="pille voll" onclick="sosZu()">Fertig</button>';
+  }
+  return h + '</div></div><p class="sos-fuss">Esc schließt · Enter: weiter</p>';
+}
+
+function sosZeichnen() {
+  var el = document.getElementById('sosSchirm');
+  if (!el) { return; }
+  el.className = 'sos-schirm' + (sos.auf ? ' auf' : '');
+  el.innerHTML = sos.auf ? sosHtml() : '';
+}
+
+function sosAuf() {
+  sos.auf = true;
+  sosSchritt(0);
+}
+
+function sosSchritt(i) {
+  sosUhrStopp();
+  sos.um = false;
+  sos.schritt = Math.max(0, Math.min(SOS_SCHRITTE.length - 1, i));
+  var s = SOS_SCHRITTE[sos.schritt];
+  if (s.uhr && s.uhr < 600) { sosUhrStart(s.uhr); }
+  sosZeichnen();
+}
+
+function sosZu() {
+  sosUhrStopp();
+  sos.auf = false;
+  sos.um = false;
+  sos.schritt = 0;
+  sosZeichnen();
+}
+
+/* Esc schließt, Enter heißt „Weiter“ — nur solange SOS offen ist */
+function sosTaste(e) {
+  if (!sos.auf || !e) { return; }
+  if (e.key === 'Escape') { if (e.preventDefault) { e.preventDefault(); } sosZu(); return; }
+  if (e.key === 'Enter' && sos.schritt < SOS_SCHRITTE.length - 1) { if (e.preventDefault) { e.preventDefault(); } sosSchritt(sos.schritt + 1); }
+}
+
+/* ============================================================
    Als App: Service Worker und Versionsprüfung
 
    Der Service Worker holt alles zuerst aus dem Netz. Eine neue
@@ -24082,6 +24526,7 @@ function starten() {
   document.addEventListener('click', klickErneuern, true);
   erinnerungStarten();
   document.addEventListener('keydown', nbTaste);
+  document.addEventListener('keydown', sosTaste);
   wischenAnmelden();
   window.setInterval(anmeldeStreifenPruefen, 15000);
   taktStarten();

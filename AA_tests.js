@@ -94,7 +94,13 @@ console.log('\n1. Bildschirme und Navigation');
     }
     pruefe(navs.indexOf(s) >= 0, 'Bildschirm "' + s + '" hat einen Navigationsknopf');
   });
+  /* Seit v6.5.0: „SOS“ öffnet keinen Bildschirm, sondern ein Vollbild über allem */
+  const UEBER_ALLEM = { Sos: 'sosAuf()' };
   navs.forEach(function (n) {
+    if (UEBER_ALLEM[n]) {
+      pruefe(QUELLE.indexOf('id="nav' + n + '" onclick="' + UEBER_ALLEM[n] + '"') >= 0, 'Navigationsknopf "' + n + '" öffnet ' + UEBER_ALLEM[n]);
+      return;
+    }
     pruefe(schirme.indexOf(n) >= 0, 'Navigationsknopf "' + n + '" hat einen Bildschirm');
   });
 
@@ -420,11 +426,12 @@ console.log('\n12. Google-Anmeldung und Drive');
            'Funktion ' + f + ' ist definiert');
   });
 
-  /* Rechte: nur lesen beim Kalender, nur eigene Dateien bei Drive */
+  /* Rechte: Kalender lesen und seit v6.5.0 Termine schreiben (calendar.events,
+     kein Vollzugriff), nur eigene Dateien bei Drive */
   pruefe(/auth\/drive\.file/.test(skript), 'Drive-Recht ist auf eigene Dateien beschränkt');
-  pruefe(/auth\/calendar\.readonly/.test(skript), 'Kalender-Recht ist nur lesend');
+  pruefe(/auth\/calendar\.readonly/.test(skript) && /auth\/calendar\.events/.test(skript), 'Kalender: Liste lesen (readonly), Termine schreiben (events)');
   pruefe(!/auth\/drive['" ]/.test(skript), 'kein Drive-Vollzugriff angefordert');
-  pruefe(!/auth\/calendar['" ]/.test(skript), 'kein schreibender Kalenderzugriff angefordert');
+  pruefe(!/auth\/calendar['" ]/.test(skript), 'kein Vollzugriff auf die Kalender angefordert');
 
   /* Der Schlüssel darf nie in die Datendatei */
   const leer = skript.match(/function leereDatenbank\(\)[\s\S]*?\n\}/);
@@ -4169,7 +4176,12 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
     const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel, terminListeHtml, routinenKarteHtml, tagesEintraege,'
                    + ' vlIstVorlage, vlArt, vlStarten, vlPlanVorschau, vlStartHtml, akSeiteHtml, apVorhaben, alleVorhaben, projekteFuer,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; },'
-                   + ' tagZeigenSetzen: function(w){ tagZeigen.vorgenommen = w; tagZeigen.termine = w; tagZeigen.routinen = w; } };';
+                   + ' tagZeigenSetzen: function(w){ tagZeigen.vorgenommen = w; tagZeigen.termine = w; tagZeigen.routinen = w; } };'
+                   /* Seit v6.5.0: Kalender schreiben und SOS (Kategorien 211, 212) */
+                   + 'globalThis.__gkApi = { gkKalIdNachtragen, gkNeu, gkHtml, gkKoerper, gkArtUm, gkWahl, gkSpeichern, gkBearbeiten, gkLoeschenFragen, gkLoeschen, terminBlattHtml,'
+                   + ' sosAuf, sosTaste, sosUhrStart, sosZeichnen, sosTakt, sos, isoDatum, tagePlus, document: document, window: window,'
+                   + ' setze: function(n, w){ if (n === "token") { zugriffToken = w; tokenAblauf = w ? Date.now() + 3600000 : 0; } if (n === "termine") { termineNachTag = w; } if (n === "schreibKal") { gkSchreibKalender = w; } if (n === "fenster") { gkFenster = w; } if (n === "blatt") { terminBlattFuer = w; } },'
+                   + ' fenster: function(){ return gkFenster; }, termine: function(){ return termineNachTag; } };';
     (0, eval)(skript + anhang + anhangV6);
     api = globalThis.__api;
     ok('Skript lässt sich außerhalb des Browsers auswerten');
@@ -5257,9 +5269,10 @@ console.log('\n28. Google Kalender lesen');
            'Funktion ' + f + ' ist definiert');
   });
 
-  /* Nur lesend */
-  pruefe(!/calendar\/v3[^']*'\s*,\s*\{\s*method:\s*'(POST|PATCH|PUT|DELETE)/.test(skript),
-         'am Kalender wird nichts geschrieben');
+  /* Geschrieben wird seit v6.5.0 nur in gkSpeichern und gkLoeschen */
+  const schreiber = [...skript.matchAll(/\nfunction (\w+)\(([\s\S]*?)\n\}/g)].filter(m => /method:\s*(aendern \? 'PATCH' : 'POST'|'(POST|PATCH|PUT|DELETE)')/.test(m[2]) && /calendar\/v3/.test(m[2])).map(m => m[1]);
+  pruefe(schreiber.length && schreiber.every(n => n === 'gkSpeichern' || n === 'gkLoeschen'),
+         'am Kalender schreiben nur gkSpeichern und gkLoeschen' + (schreiber.length ? ' (' + schreiber.join(', ') + ')' : ''));
   const holen = skript.match(/function einenKalenderHolen\([\s\S]*?\n\}/);
   pruefe(holen && /singleEvents=true/.test(holen[0]),
          'Serien werden zu einzelnen Vorkommen aufgelöst');
@@ -7330,8 +7343,8 @@ console.log('\n66. Arten aus dem Kalender');
            'Funktion ' + f + ' ist definiert');
   });
 
-  /* Am Kalender wird nichts geändert */
-  pruefe(/calendar\.readonly/.test(QUELLE), 'das Kalenderrecht bleibt nur lesend');
+  /* Die Kalenderliste wird weiter nur gelesen */
+  pruefe(/calendar\.readonly/.test(QUELLE), 'die Kalenderliste wird mit calendar.readonly gelesen');
   /* Seit v1.4.0 gehen Art und Vorhaben über zuordnungFeldSetzen. */
   const setzen = skript.match(/function zuordnungSetzen\([\s\S]*?\n\}/);
   const feldS = skript.match(/function zuordnungFeldSetzen\([\s\S]*?\n\}/);
@@ -13384,6 +13397,139 @@ console.log('\n210. Vorlagen und Checklisten aus CLIE');
     }
     Object.assign(ak, altAk);
     g.setzeDB(alt);
+  }
+}
+
+/* ============================================================
+   211. Google Kalender schreiben (v6.5.0)
+   Grund: Am Arbeits-PC sollen Termine direkt im Google Kalender
+   angelegt, geändert und gelöscht werden — wie im CLIE.
+   Erkennt: Recht fehlt, Termin ohne Kalender-Kennung, falscher Aufruf
+   (POST/PATCH/DELETE, Adresse), Sichtbarkeit unbeabsichtigt
+   zurückgesetzt, Ende vor Beginn angenommen, Arten nicht als #Kürzel,
+   Knöpfe im Termin-Blatt oder „+ Termin“ im Tag fehlen.
+   ============================================================ */
+console.log('\n211. Google Kalender schreiben');
+{
+  const G = globalThis.__gkApi || {};
+  if (typeof G.gkKoerper !== 'function' || typeof G.gkSpeichern !== 'function') {
+    warn('Kalender schreiben nicht auswertbar');
+  } else {
+    const altFetch = G.window.fetch;
+        const altTermine = G.termine();
+    const aufrufe = [];
+    G.window.fetch = function (adresse, o) { aufrufe.push({ adresse: adresse, o: o || {} }); return new Promise(function () {}); };
+    const setze = (id, w) => { G.document.getElementById(id).value = w; };
+    try {
+      const heute = G.isoDatum();
+      /* Kalender-Kennung beim Abruf */
+      const liste = {}; liste[heute] = [{ id: 'a' }, { id: 'b', kalId: 'schon' }];
+      G.gkKalIdNachtragen(liste, 'k1');
+      pruefe(liste[heute][0].kalId === 'k1' && liste[heute][1].kalId === 'schon', 'jeder Termin merkt sich seinen Kalender, schon gesetzte bleiben');
+      const holen = hauptSkript().match(/function termineHolen\([\s\S]*?\n\}/);
+      pruefe(holen && /einenKalenderHolen\(kal, von, bis, neu\);\s*\}\)\.then\(function \(\) \{\s*gkKalIdNachtragen\(neu, kal\.id\)/.test(holen[0]), 'termineHolen trägt die Kalender-Kennung nach');
+      /* Ohne Google */
+      G.setze('token', null); G.setze('fenster', null);
+      G.gkNeu(heute);
+      pruefe(G.fenster() === null && aufrufe.length === 0, 'ohne Verbindung kein Fenster und kein Aufruf');
+      /* Neu */
+      G.setze('token', 'x');
+      G.setze('schreibKal', [{ id: 'k1', name: 'Privat', primary: true }, { id: 'k2', name: 'Familie', primary: false }]);
+      G.gkNeu(heute);
+      let h = G.gkHtml();
+      pruefe(G.fenster() && G.fenster().modus === 'neu' && /Neuer Termin/.test(h) && /id="gkTitel"/.test(h) && /id="gkKal"/.test(h) && /<option value="k2"/.test(h) && /gkWahl\('ganz',true\)">ganztägig/.test(h),
+             'Neu: Fenster mit Titel, Zeit, ganztägig und den Kalendern mit Schreibrecht');
+      setze('gkTitel', 'Zahnarzt'); setze('gkDatum', heute); setze('gkVon', '08:00'); setze('gkBis', '07:30'); setze('gkOrt', 'Praxis'); setze('gkNotiz', 'Kontrolle'); setze('gkKal', 'k2');
+      pruefe(/Ende liegt vor dem Beginn/.test(G.gkKoerper().fehler || ''), 'Ende vor Beginn wird abgelehnt');
+      setze('gkBis', '08:45');
+      G.gkArtUm('urlaub');
+      pruefe(/Kontrolle\n#Urlaub$/.test(G.fenster().v.notiz), 'Art an: #Kürzel ans Ende der Notiz');
+      setze('gkNotiz', G.fenster().v.notiz);
+      G.gkArtUm('urlaub');
+      pruefe(G.fenster().v.notiz === 'Kontrolle', 'Art aus: #Kürzel wieder heraus');
+      setze('gkNotiz', 'Kontrolle');
+      G.gkWahl('privat', true);
+      const e = G.gkKoerper();
+      pruefe(!e.fehler && e.kalId === 'k2' && e.koerper.summary === 'Zahnarzt' && e.koerper.visibility === 'private' && /T08:00:00$/.test(e.koerper.start.dateTime) && /T08:45:00$/.test(e.koerper.end.dateTime),
+             'Körper für Google: Titel, Zeit, Kalender, privat');
+      aufrufe.length = 0;
+      G.gkSpeichern();
+      pruefe(aufrufe.length === 1 && aufrufe[0].o.method === 'POST' && /calendars\/k2\/events$/.test(aufrufe[0].adresse) && JSON.parse(aufrufe[0].o.body).location === 'Praxis',
+             'Speichern: POST an den gewählten Kalender');
+      /* Ganztägig */
+      G.gkWahl('ganz', true);
+      const eg = G.gkKoerper();
+      pruefe(eg.koerper.start.date === heute && eg.koerper.end.date === G.tagePlus(heute, 1), 'ganztägig: Ende ist der Folgetag');
+      /* Bearbeiten aus dem Termin-Blatt */
+      const tn = {}; G.setze('termine', tn); tn[heute] = [{ id: 't1', titel: 'Elternabend', rohTitel: 'Elternabend #Schule', zeit: '19:00', bis: '20:30', ganztags: false, kontext: 'privat', quelle: 'Familie', kalId: 'k2', beschreibung: 'Aula', serieId: 's1' }];
+      G.setze('blatt', { id: 't1', tag: heute });
+      const blatt = G.terminBlattHtml();
+      pruefe(/gkBearbeiten\(\)">Bearbeiten/.test(blatt) && /gkLoeschenFragen\(\)">Löschen …/.test(blatt) && /ändern den Termin in Google/.test(blatt), 'Termin-Blatt: Bearbeiten und Löschen …');
+      aufrufe.length = 0;
+      G.gkBearbeiten();
+      pruefe(G.fenster().modus === 'aendern' && G.fenster().laedt && aufrufe.length === 1 && /calendars\/k2\/events\/t1\?fields=/.test(aufrufe[0].adresse) && !aufrufe[0].o.method,
+             'Bearbeiten holt erst den Termin bei Google');
+      h = G.gkHtml();
+      pruefe(/Termin bearbeiten/.test(h) && /value="Elternabend #Schule"/.test(h) && !/id="gkKal"/.test(h) && /nur für diesen einen/.test(h) && / disabled>/.test(h),
+             'Fenster: roher Titel mit #Art, Kalender fest, Serie-Hinweis, Speichern erst nach dem Holen');
+      G.fenster().laedt = false;
+      setze('gkTitel', 'Elternabend #Schule'); setze('gkDatum', heute); setze('gkVon', '19:00'); setze('gkBis', '21:00'); setze('gkOrt', ''); setze('gkNotiz', 'Aula');
+      const ea = G.gkKoerper();
+      pruefe(!ea.fehler && !('visibility' in ea.koerper), 'Sichtbarkeit unbekannt: sie wird nicht überschrieben');
+      aufrufe.length = 0;
+      G.gkSpeichern();
+      pruefe(aufrufe.length === 1 && aufrufe[0].o.method === 'PATCH' && /calendars\/k2\/events\/t1$/.test(aufrufe[0].adresse), 'Ändern: PATCH an genau diesen Termin');
+      /* Löschen */
+      G.gkLoeschenFragen();
+      pruefe(/Termin löschen/.test(G.gkHtml()) && /Nur dieser eine Termin der Serie/.test(G.gkHtml()), 'Löschen fragt nach — bei einer Serie nur dieser eine');
+      aufrufe.length = 0;
+      G.gkLoeschen();
+      pruefe(aufrufe.length === 1 && aufrufe[0].o.method === 'DELETE' && /calendars\/k2\/events\/t1$/.test(aufrufe[0].adresse), 'Löschen: DELETE an genau diesen Termin');
+      /* Ein Termin ohne Kalender-Kennung: keine Knöpfe */
+      tn[heute][0].kalId = '';
+      pruefe(!/gkBearbeiten/.test(G.terminBlattHtml()), 'ohne Kalender-Kennung keine Knöpfe');
+      /* Tag */
+      pruefe(/tagBlockHtml\('Termine', termin, '<button type="button" class="pille gk-plus" onclick="gkNeu\(/.test(hauptSkript()), 'Tag: „+ Termin“ im Kasten Termine');
+    } catch (err) {
+      fail('Kalender schreiben: ' + err.message);
+    }
+    G.window.fetch = altFetch; G.setze('token', null); G.setze('termine', altTermine); G.setze('fenster', null);
+  }
+}
+
+/* ============================================================
+   212. SOS (v6.5.0)
+   Grund: Bei Panik muss die 3-Minuten-Selbstdistanzierung mit einem
+   Klick da sein — fünf Karten, stille Uhr, „Fertig“.
+   Erkennt: Knopf fehlt, Karten mit Eingabefeldern, Uhr startet nicht
+   oder läuft nach dem Schließen weiter, kein „Fertig“, Esc/Enter wirkungslos.
+   ============================================================ */
+console.log('\n212. SOS');
+{
+  const G = globalThis.__gkApi || {};
+  pruefe(/id="navSos" onclick="sosAuf\(\)"/.test(QUELLE) && /id="sosSchirm"/.test(QUELLE), 'Knopf „SOS“ in der Leiste, Vollbild im HTML');
+  if (typeof G.sosAuf !== 'function') {
+    warn('SOS nicht auswertbar');
+  } else {
+    try {
+      G.sosAuf();
+      let h = G.document.getElementById('sosSchirm').innerHTML;
+      pruefe(G.sos.auf && G.sos.schritt === 0 && G.sos.dauer === 60 && /1 \/ 5/.test(h) && /Stopp &amp; Körper/.test(h) && /id="sosUhr"/.test(h), 'öffnet bei 1 / 5, die 60 Sekunden laufen');
+      let ohneFeld = true;
+      for (let i = 1; i < 5; i++) { G.sosTaste({ key: 'Enter', preventDefault() {} }); if (/<input|<textarea/.test(G.document.getElementById('sosSchirm').innerHTML)) { ohneFeld = false; } }
+      h = G.document.getElementById('sosSchirm').innerHTML;
+      pruefe(ohneFeld && G.sos.schritt === 4 && !G.sos.bis, 'Enter blättert weiter, keine Eingabefelder; die 60 Sekunden stoppen');
+      pruefe(/15 Min\. starten/.test(h) && /sosZu\(\)">Fertig/.test(h) && /Zurück/.test(h), 'letzte Karte: Zurück · 15 Min. starten · Fertig');
+      G.sosUhrStart(900); G.sosZeichnen();
+      pruefe(G.sos.dauer === 900 && !/15 Min\. starten/.test(G.document.getElementById('sosSchirm').innerHTML), 'die Uhr läuft — kein zweiter Startknopf');
+      G.sos.bis = Date.now() - 1; G.sosTakt();
+      h = G.document.getElementById('sosSchirm').innerHTML;
+      pruefe(G.sos.um && /15 Minuten sind um/.test(h) && /Weiter · 15 Min\./.test(h) && /sosZu\(\)">Pause/.test(h), 'nach 15 Minuten: Weiter oder Pause');
+      G.sosTaste({ key: 'Escape', preventDefault() {} });
+      pruefe(!G.sos.auf && !G.sos.bis && G.document.getElementById('sosSchirm').innerHTML === '', 'Esc schließt, die Uhr ist aus');
+    } catch (err) {
+      fail('SOS: ' + err.message);
+    }
   }
 }
 
