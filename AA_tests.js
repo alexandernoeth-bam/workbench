@@ -4167,6 +4167,7 @@ console.log('\n13. Abgleich zwischen zwei Geräten');
                  + ' } };';
     /* Seit v6.0.0: Zugang zu den Aktivitäten (Kategorie 191). */
     const anhangV6 = ';globalThis.__akApi = { kpHuelle, kpSeitenAlle, kpSeiteAnlegen, kpPasst, kpHatWoertlich, kpZeileSuchen, kpPlanenKern, kpAusplanenKern, kpBehaelterZeileUmKern, kpWocheFinden, kpTagFinden, kpFrequenz, aufgabeFaelligAn, routinenKarteHtml, heuteKarteHtml, wocheKarteHtml, pinUm, pinFinden, pinInhalt, akUmstellungOffen, akUmVorschau, akUmstellenKern, leereDatenbank, isoDatum, montagVon, tagePlus, akRtDiesmalHtml, akRtTagUm, akRtAuslassen, akRtBlattHtml, akRtPlanHtml, aufgabeFinden, kpAnsichtHtml, kpAbschnittSetzen, kpAbschnittZu, kpAlleAbschnitte, kpAbschnitteOeffnenBis, kpAufgabe, kpSeiteKastenUmKern, kpLeisteHtml, kpGruppenSchluessel, akLeisteHtml, akUmfangSetzen, akVorschauHtml, akVorschauStart, kpAbschnitteUmbenennen, kpInAbschnitt, blickBandHtml, blickZiel, terminListeHtml, routinenKarteHtml, tagesEintraege,'
+                   + ' vlIstVorlage, vlArt, vlStarten, vlPlanVorschau, vlStartHtml, akSeiteHtml, apVorhaben, alleVorhaben, projekteFuer,'
                    + ' holeDB: function(){ return DB; }, setzeDB: function(d){ DB = d; }, holeAk: function(){ return ak; },'
                    + ' tagZeigenSetzen: function(w){ tagZeigen.vorgenommen = w; tagZeigen.termine = w; tagZeigen.routinen = w; } };';
     (0, eval)(skript + anhang + anhangV6);
@@ -13288,6 +13289,101 @@ console.log('\n209. Ideenwerkstatt des CLIE bleibt erhalten');
     pruefe(b && b.ideen && b.ideen.length === 1, 'Laden: der Bereich überlebt das Einlesen');
   } else {
     warn('Laden nicht auswertbar');
+  }
+}
+
+/* ============================================================
+   210. Vorlagen und Checklisten aus CLIE (v6.4.0)
+   Grund: CLIE schreibt Vorlagen jeder Art (istVorlage, checkliste:
+   'vorlage') und Checklisten (lauf/fertig, Ablauf oder zum Abhaken) in
+   dieselbe workbench.json. Die Workbench zeigte Vorlagen als laufende
+   oder ruhende Projekte und Notizen, abgeschlossene Checklisten wie
+   offene, und ließ Packlisten-Punkte einplanen.
+   Erkennt: Vorlage bei den laufenden Einträgen oder in Auswahllisten,
+   Gruppe „Vorlagen“ fehlt, Starten übernimmt Haken oder @-Abstände,
+   Stichtag plant falsch, Art/Kategorie gehen verloren, Packliste
+   einplanbar, Kern (kp…) verändert.
+   ============================================================ */
+console.log('\n210. Vorlagen und Checklisten aus CLIE');
+{
+  const g = globalThis.__akApi || {};
+  const skript = hauptSkript();
+  const kernMitVl = [...skript.matchAll(/\nfunction (kp\w+)\s*\(([\s\S]*?)\n\}/g)].filter(m => /vl[A-Z]/.test(m[2])).map(m => m[1]);
+  pruefe(kernMitVl.length === 0, 'der Kern (kp…) bleibt unberührt — wörtlich wie im CLIE' + (kernMitVl.length ? ' — betroffen: ' + kernMitVl.join(', ') : ''));
+  if (typeof g.vlStarten !== 'function' || typeof g.akLeisteHtml !== 'function') {
+    warn('Vorlagen nicht auswertbar');
+  } else {
+    const alt = g.holeDB();
+    const ak = g.holeAk();
+    const altAk = { umfang: ak.umfang, filter: ak.filter, notizenAuf: ak.notizenAuf, vorlagenAuf: ak.vorlagenAuf, id: ak.id, frage: ak.frage };
+    try {
+      const heute = g.isoDatum();
+      const db = g.leereDatenbank();
+      db.projekte = [{ id: 'p1', name: 'Carport', kontext: 'privat', status: 'laufend', flaeche: '[] Statik', ordnung: 1, geaendert: 1 },
+                     { id: 'pv', name: 'Bauvorhaben', kontext: 'privat', status: 'ruht', istVorlage: true, bereich: 'kb-haus', flaeche: '[x] Statik\n[] Nachbar', ordnung: 2, geaendert: 1 }];
+      db.ziele = [{ id: 'zv', name: 'Laufziel', kontext: 'privat', status: 'ruht', istVorlage: true, flaeche: '', ordnung: 3, geaendert: 1 }];
+      db.gedanken = [
+        { id: 'nv', titel: 'Protokoll', text: 'Teilnehmer:', kontext: 'beruflich', istVorlage: true, ordnung: 4, geaendert: 1 },
+        { id: 'cv', titel: 'Monatsabschluss', text: '[] Belege sammeln @-2\n[x] Buchen @0 09:00\n[] Ablegen', kontext: 'beruflich', checkliste: 'vorlage', art: 'aufgaben', bereich: 'kb-arbeit', ordnung: 5, geaendert: 1 },
+        { id: 'pl', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'lauf', ordnung: 6, geaendert: 1 },
+        { id: 'al', titel: 'Abruftest', text: '[] Daten laden', kontext: 'beruflich', checkliste: 'lauf', art: 'aufgaben', ordnung: 7, geaendert: 1 },
+        { id: 'cf', titel: 'Alter Umzug', text: '[x] Kisten', kontext: 'privat', checkliste: 'fertig', ordnung: 8, geaendert: 1 },
+        { id: 'n1', titel: 'Ideen', text: 'frei', kontext: 'privat', ordnung: 9, geaendert: 1 }];
+      g.setzeDB(db);
+      ak.filter = 'alle'; ak.umfang = 'alle'; ak.notizenAuf = true; ak.vorlagenAuf = false; ak.id = '';
+      pruefe(g.vlIstVorlage(db.projekte[1]) && g.vlIstVorlage(db.gedanken[1]) && !g.vlIstVorlage(db.gedanken[2]), 'Vorlage erkannt: istVorlage und checkliste „vorlage“');
+      let h = g.akLeisteHtml();
+      const vor = h.slice(0, h.indexOf('Vorlagen ·'));
+      pruefe(/Vorlagen · 4/.test(h) && !/Bauvorhaben|Laufziel|Protokoll|Monatsabschluss/.test(vor) && /Carport/.test(vor), 'Leiste: Vorlagen nicht bei den laufenden, eigene Gruppe „Vorlagen · 4“ ganz unten');
+      pruefe(!/Bauvorhaben/.test(h), 'die Gruppe „Vorlagen“ ist zu');
+      ak.vorlagenAuf = true; h = g.akLeisteHtml();
+      pruefe(/eintrag vorlage[^>]*>[\s\S]*?Bauvorhaben/.test(h) && /⇢<\/span><span class="name">Monatsabschluss/.test(h), 'aufgeklappt: die Vorlagen mit dem Zeichen ihrer Art');
+      pruefe(/⇢<\/span><span class="name">Abruftest/.test(h) && /☑<\/span><span class="name">Packliste/.test(h), 'laufende Abläufe ⇢ und Checklisten ☑ behalten ihr Zeichen');
+      pruefe(/Abgeschlossen · 1/.test(h) && h.indexOf('Alter Umzug') < 0, 'abgeschlossene Checkliste klappt unter „Abgeschlossen“ weg');
+      /* Auswahllisten */
+      pruefe(!g.projekteFuer('privat').some(p => p.id === 'pv') && !g.apVorhaben().some(x => x.v.id === 'pv' || x.v.id === 'zv') && !g.alleVorhaben().some(x => x.satz.id === 'pv' || x.satz.id === 'zv'),
+        'Vorlagen nicht in Projekt-Auswahl, Absichtsplanung und Vorhabenübersicht');
+      /* Seite einer Vorlage */
+      const sv = g.kpSeitenAlle().filter(s => s.id === 'cv')[0];
+      ak.id = 'cv'; ak.frage = '';
+      let sh = g.akSeiteHtml(sv);
+      pruefe(/class="vl-hinweis"><span>Vorlage · Ablauf/.test(sh) && /vlStartenAuf\(\)">Starten …/.test(sh) && !/Offene Aufgaben/.test(sh), 'Vorlage: Hinweis, „Starten …“, nichts einzuplanen');
+      ak.frage = 'vlstart'; ak.vlStart = { titel: 'Monatsabschluss', stichtag: '2027-01-31' };
+      sh = g.akSeiteHtml(sv);
+      pruefe(/id="vlName"/.test(sh) && /id="vlStichtag"/.test(sh) && /Wird eingeplant \(2\)/.test(sh) && /vlStartOk\(false\)">Ohne Termine/.test(sh), 'Starten: Name, Stichtag, Vorschau und „Ohne Termine“');
+      ak.frage = '';
+      const pp = g.kpSeitenAlle().filter(s => s.id === 'pl')[0];
+      const pa = g.kpSeitenAlle().filter(s => s.id === 'al')[0];
+      pruefe(!/Offene Aufgaben/.test(g.akSeiteHtml(pp)) && /Offene Aufgaben/.test(g.akSeiteHtml(pa)), 'Packliste nicht einplanbar, Ablauf schon');
+      pruefe(/art-marke">Checkliste</.test(g.akSeiteHtml(pp)) && /art-marke">Ablauf</.test(g.akSeiteHtml(pa)), 'Art-Marke: Checkliste und Ablauf statt Notiz');
+      /* Stichtag */
+      const st = g.tagePlus(heute, 10);
+      const plan = g.vlPlanVorschau(db.gedanken[1].text, st);
+      pruefe(plan.length === 2 && plan[0].datum === g.tagePlus(st, -2) && plan[1].datum === st && plan[1].zeit === '09:00', '@-2 und @0 09:00 rechnen vom Stichtag');
+      pruefe(g.vlPlanVorschau(db.gedanken[1].text, g.tagePlus(heute, -30)).every(p => p.datum === heute), 'Vergangenes landet auf heute');
+      /* Starten: Checklisten-Vorlage */
+      const n = g.vlStarten(sv, 'Abschluss Januar', plan, st);
+      const ns = db.gedanken.filter(x => x.id === n.id)[0];
+      pruefe(ns && ns.checkliste === 'lauf' && ns.art === 'aufgaben' && ns.bereich === 'kb-arbeit' && ns.vorlage === 'cv' && ns.stichtag === st && ns.gestartet === heute,
+        'gestartet: läuft, Art, Kategorie, Herkunft und Stichtag übernommen');
+      pruefe(ns.text === '[] Belege sammeln\n[] Buchen\n[] Ablegen', 'Haken leer, @-Abstände weg');
+      const t1 = g.kpTagFinden(g.tagePlus(st, -2)), t2 = g.kpTagFinden(st);
+      pruefe(t1 && t1.eintraege.some(e => e.quelle === n.id && e.text === 'Belege sammeln') && t2 && t2.eintraege.some(e => e.quelle === n.id && e.text === 'Buchen' && e.zeit === '09:00'),
+        'eingeplant am Tag, mit Uhrzeit');
+      pruefe(db.gedanken[1].benutzt === 1 && db.gedanken[1].checkliste === 'vorlage', 'die Vorlage bleibt, „benutzt“ zählt mit');
+      /* Starten: Projekt-Vorlage */
+      const pv = g.kpSeitenAlle().filter(s => s.id === 'pv')[0];
+      const np = g.vlStarten(pv, 'Gartenhaus', [], '');
+      const nps = db.projekte.filter(x => x.id === np.id)[0];
+      pruefe(nps && nps.status === 'laufend' && !nps.istVorlage && nps.flaeche === '[] Statik\n[] Nachbar' && nps.bereich === 'kb-haus' && nps.start === heute,
+        'Projekt aus Vorlage: läuft, ohne Haken, Kategorie und Beginn heute');
+      const nz = g.vlStarten(g.kpSeitenAlle().filter(s => s.id === 'zv')[0], 'Marathon', [], '');
+      pruefe(db.ziele.some(x => x.id === nz.id && x.status === 'laufend' && !x.istVorlage), 'Ziel aus Vorlage läuft');
+    } catch (e) {
+      fail('Vorlagen: ' + e.message);
+    }
+    Object.assign(ak, altAk);
+    g.setzeDB(alt);
   }
 }
 

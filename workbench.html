@@ -8,7 +8,7 @@
 <link rel="icon" href="./icon-192-v2.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./icon-192-v2.png">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Workbench 6.3.5</title>
+<title>Workbench 6.4.0</title>
 <script>
 /* Muss vor dem Rendern stehen, sonst springt das Layout beim ersten Zeichnen. */
 (function () {
@@ -2378,6 +2378,11 @@ body.breit .sortier-knopf{display:none}
 .ak-rumpf .mehr-menue .weg{color:var(--weinrot)}
 .ak-rumpf .eigen{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px;font-size:12.5px;color:var(--grau)}
 .ak-rumpf .eigen .pin-zeile{margin:0}
+.vl-hinweis{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 8px;padding:6px 10px;border:1px dashed var(--linie);border-radius:8px;font-size:13px;color:var(--grau)}
+.vl-hinweis span{flex:1;min-width:180px}
+.vl-feld{display:block;margin:6px 0}.vl-feld span{display:block;font-size:12.5px}.vl-feld input{width:100%;max-width:340px}
+.vl-vorschau{font-size:13px;border:1px solid var(--linie);border-radius:7px;padding:6px 8px;margin:6px 0;line-height:1.6}.vl-vorschau b{color:var(--petrol);font-weight:600;margin-right:6px}
+.ak-leiste .eintrag.vorlage .name{font-style:italic}
 .ak-rumpf .art-marke{font-size:11px;border:1px solid var(--linie);border-radius:8px;padding:1px 8px;background:var(--karte)}
 .ak-rumpf .leise{color:var(--grau);font-size:12px}
 .ak-rumpf .frage{border:1px solid var(--weinrot);border-radius:10px;background:var(--karte);padding:10px 12px;margin-bottom:10px;font-size:14px}
@@ -3002,7 +3007,7 @@ body.breit .blick-liste{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))
    Grunddaten
    ============================================================ */
 
-var APP_VERSION = '6.3.5';
+var APP_VERSION = '6.4.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'workbench-speicher';
 var IDB_STORE   = 'handles';
@@ -7724,7 +7729,7 @@ function brachListe() {
     var l = arten[q][1];
     for (i = 0; i < l.length; i++) {
       var v = l[i];
-      if (v.status === 'abgeschlossen') { continue; }
+      if (v.status === 'abgeschlossen' || vlIstVorlage(v)) { continue; }
       if (!passtZumKalender(v.kontext)) { continue; }
       if (brachRuht(art + ':' + v.id)) { continue; }
       var zahl = vhTaetigZahl(art, v.id);
@@ -7777,7 +7782,7 @@ function demnaechstListe() {
     for (i = 0; i < vs.length; i++) {
       var ende = vs[i][arten[q][2]];
       if (!ende || ende < heute || ende > bis) { continue; }
-      if (vs[i].status === 'abgeschlossen') { continue; }
+      if (vs[i].status === 'abgeschlossen' || vlIstVorlage(vs[i])) { continue; }
       aus.push({ tag: ende, was: (arten[q][0] === 'ziel') ? 'Ziel endet' : 'Projekt endet',
                  titel: vs[i].name, art: arten[q][0], id: vs[i].id });
     }
@@ -8880,7 +8885,7 @@ function gehoertWahlHtml(a) {
       h += '</optgroup>';
     }
     var vor = projekteFuer(k).map(function (p) { return { v: 'p:' + p.id, n: p.name }; })
-      .concat((DB.ziele || []).filter(function (z) { return z.kontext === k && z.status !== 'abgeschlossen'; })
+      .concat((DB.ziele || []).filter(function (z) { return z.kontext === k && z.status !== 'abgeschlossen' && !vlIstVorlage(z); })
         .map(function (z) { return { v: 'z:' + z.id, n: z.name }; }))
       .sort(function (x, y) { return (x.n < y.n) ? -1 : 1; });
     if (vor.length) {
@@ -13790,7 +13795,7 @@ function vorhabenOptionenHtml(kontext, gewaehlt) {
     var vor = kontext ? '' : ((kontexte[k] === 'privat') ? 'Privat · ' : 'Beruflich · ');
     var p = projekteFuer(kontexte[k]);
     var z = (DB.ziele || []).filter(function (x) {
-      return x.kontext === kontexte[k] && x.status !== 'abgeschlossen';
+      return x.kontext === kontexte[k] && x.status !== 'abgeschlossen' && !vlIstVorlage(x);
     }).sort(function (x, y) { return (x.name < y.name) ? -1 : 1; });
     if (p.length) {
       h += '<optgroup label="' + vor + 'Projekte">';
@@ -14591,11 +14596,13 @@ function wbWahlListe() {
   if (wbWahlArt === 'projekt') {
     var p = DB.projekte || [];
     for (i = 0; i < p.length; i++) {
+      if (vlIstVorlage(p[i])) { continue; }
       aus.push({ id: p[i].id, titel: p[i].name, unten: p[i].kontext });
     }
   } else if (wbWahlArt === 'ziel') {
     var z = DB.ziele || [];
     for (i = 0; i < z.length; i++) {
+      if (vlIstVorlage(z[i])) { continue; }
       aus.push({ id: z[i].id, titel: z[i].name, unten: z[i].kontext });
     }
   } else if (wbWahlArt === 'notiz') {
@@ -16226,7 +16233,7 @@ function nbZuordnungOptionen(b) {
   var nachName = function (a, c) { return String(a.name || '').localeCompare(String(c.name || ''), 'de'); };
   var h = opt('', 'Ohne Zuordnung');
   var themen = (DB.themen || []).slice().sort(nachName);
-  var projekte = (DB.projekte || []).filter(function (p) { return p.status !== 'erledigt'; }).sort(nachName);
+  var projekte = (DB.projekte || []).filter(function (p) { return p.status !== 'erledigt' && !vlIstVorlage(p); }).sort(nachName);
   var i;
   if (themen.length) {
     h += '<optgroup label="Themen">';
@@ -18462,8 +18469,8 @@ var apWahlMonat = '';        /* der Monat, in dem „+ Vorhaben" offen ist */
 /* Alle Vorhaben, die noch laufen — Projekte und Ziele. */
 function apVorhaben() {
   var aus = [];
-  (DB.projekte || []).forEach(function (p) { if (p.status !== 'abgeschlossen') { aus.push({ v: p, art: 'projekt' }); } });
-  (DB.ziele || []).forEach(function (z) { if (z.status !== 'abgeschlossen') { aus.push({ v: z, art: 'ziel' }); } });
+  (DB.projekte || []).forEach(function (p) { if (p.status !== 'abgeschlossen' && !vlIstVorlage(p)) { aus.push({ v: p, art: 'projekt' }); } });
+  (DB.ziele || []).forEach(function (z) { if (z.status !== 'abgeschlossen' && !vlIstVorlage(z)) { aus.push({ v: z, art: 'ziel' }); } });
   return aus;
 }
 
@@ -20383,12 +20390,12 @@ function alleVorhaben() {
   var i;
   var z = DB.ziele || [];
   for (i = 0; i < z.length; i++) {
-    if (z[i].status === 'abgeschlossen') { continue; }
+    if (z[i].status === 'abgeschlossen' || vlIstVorlage(z[i])) { continue; }
     aus.push({ art: 'ziel', satz: z[i] });
   }
   var p = DB.projekte || [];
   for (i = 0; i < p.length; i++) {
-    if (p[i].status === 'abgeschlossen') { continue; }
+    if (p[i].status === 'abgeschlossen' || vlIstVorlage(p[i])) { continue; }
     aus.push({ art: 'projekt', satz: p[i] });
   }
   return aus;
@@ -20539,7 +20546,7 @@ function projekteFuer(kontext) {
   var p = DB.projekte || [];
   var i;
   for (i = 0; i < p.length; i++) {
-    if (p[i].kontext === kontext && p[i].status !== 'abgeschlossen') { liste.push(p[i]); }
+    if (p[i].kontext === kontext && p[i].status !== 'abgeschlossen' && !vlIstVorlage(p[i])) { liste.push(p[i]); }
   }
   liste.sort(function (a, b) { return (a.name < b.name) ? -1 : 1; });
   return liste;
@@ -21932,6 +21939,9 @@ var ak = {
   notizenAuf: false,
   zielRuhtAuf: false,
   zielFertigAuf: false,
+  vorlagenAuf: false,   /* Gruppe „Vorlagen“ aus CLIE (seit v6.4.0) */
+  notizFertigAuf: false,
+  vlStart: null,
   umfang: 'aktiv',      /* aktiv | alle — Einfälle, Ruht, Erledigt zeigen (seit v6.1.0) */
   vorschau: '',         /* Seite, die beim Darüberfahren gezeigt wird (seit v6.1.1) */
   rtAnsicht: 'liste',   /* liste | planung */
@@ -22184,7 +22194,8 @@ function akSeitenEintragHtml(s, klasse) {
              + 'ondragover="akZiehUeber(event,\'' + id + '\')" ondragleave="akZiehWeg(event)" '
              + 'ondrop="akZiehAb(event,\'' + id + '\')" ondragend="akZiehEnde()" '
              + 'onmouseenter="akVorschauStart(\'' + id + '\')" onmouseleave="akVorschauEnde()"';
-  var zeichen = (s.art === 'vorhaben' && s.typ === 'ziel') ? AK_TYPEN.ziel.zeichen : KP_ARTEN[s.art].zeichen;
+  /* Abläufe ⇢ und Checklisten ☑ aus CLIE behalten ihr Zeichen (seit v6.4.0) */
+  var zeichen = vlZeichen(s) || ((s.art === 'vorhaben' && s.typ === 'ziel') ? AK_TYPEN.ziel.zeichen : KP_ARTEN[s.art].zeichen);
   var h = akEintragHtml(ak.id === s.id, 'akOeffnen(\'' + id + '\')', zeichen, s.titel || 'ohne Titel', '', klasse, ziehen);
   if (ak.sortieren !== kpGruppenSchluessel(s)) { return h; }
   return '<div class="sort-zeile">' + h
@@ -22223,7 +22234,7 @@ function akGruppeKopfHtml(art) {
 
 function akKlappGruppeHtml(was, titel, seiten, klasse) {
   if (!seiten.length) { return ''; }
-  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf' }[was];
+  var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf', nfertig: 'notizFertigAuf' }[was];
   var drin = seiten.some(function (s) { return s.id === ak.id; });
   /* Unter „Aktiv“ ausgeblendet — außer die offene Seite liegt darin. */
   if (ak.umfang === 'aktiv' && !drin) { return ''; }
@@ -22231,7 +22242,7 @@ function akKlappGruppeHtml(was, titel, seiten, klasse) {
   var schluessel = { ruht: 'vorhaben-ruht', fertig: 'vorhaben-erledigt', zruht: 'ziel-ruht', zfertig: 'ziel-erledigt' }[was];
   var h = '<div class="ak-gruppe leise"><button type="button" class="klapp-kopf" onclick="akKlappUm(\'' + was + '\')" aria-expanded="' + auf + '">'
         + (auf ? '⌄ ' : '› ') + titel + ' · ' + seiten.length + '</button>'
-        + (auf && seiten.length > 1 ? akSortierKnopfHtml(schluessel) : '') + '</div>';
+        + (auf && seiten.length > 1 && schluessel ? akSortierKnopfHtml(schluessel) : '') + '</div>';
   if (auf) { seiten.forEach(function (s) { h += akSeitenEintragHtml(s, klasse); }); }
   return h;
 }
@@ -22265,7 +22276,7 @@ function akNotizenAuf() {
 
 function akKlappUm(was) {
   var feld = { ruht: 'ruhtAuf', fertig: 'fertigAuf', notiz: 'notizenAuf', einfall: 'einfallAuf',
-               zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf' }[was];
+               zruht: 'zielRuhtAuf', zfertig: 'zielFertigAuf', nfertig: 'notizFertigAuf' }[was];
   if (!feld) { return; }
   ak[feld] = !ak[feld];
   akLeisteZeichnen();
@@ -22286,7 +22297,8 @@ function akLeisteHtml() {
   var leer = function (wort) {
     return '<div class="leer-hinweis">' + (ak.filter === 'alle' ? 'Noch keine ' + wort + '.' : 'Keine ' + wort + ' unter diesem Filter.') + '</div>';
   };
-  var alleVh = kpSeiten('vorhaben').filter(akSichtbar);
+  /* Vorlagen aus CLIE stehen in ihrer eigenen Gruppe (seit v6.4.0) */
+  var alleVh = kpSeiten('vorhaben').filter(akSichtbar).filter(function (s) { return !vlIstVorlage(s); });
   var bereich = function (art, liste, ruht, fertig, wort) {
     var t = AK_TYPEN[art].gruppe;
     var x = akGruppeKopfHtml(art);
@@ -22308,11 +22320,14 @@ function akLeisteHtml() {
   listen.forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
   h += akGruppeKopfHtml('notiz');
   if (akNotizenAuf()) {
-    var notizen = kpSeiten('notiz').filter(akSichtbar);
+    var alleNz = kpSeiten('notiz').filter(akSichtbar).filter(function (s) { return !vlIstVorlage(s); });
+    var notizen = alleNz.filter(function (s) { return !vlAbgeschlossen(s); });
     if (!notizen.length) { h += leer('Notizen'); }
     notizen.forEach(function (s) { h += akSeitenEintragHtml(s, ''); });
+    /* Abgeschlossene Checklisten aus CLIE klappen weg (seit v6.4.0) */
+    h += akKlappGruppeHtml('nfertig', 'Abgeschlossen', alleNz.filter(vlAbgeschlossen), 'ruht');
   }
-  return h;
+  return h + vlGruppeHtml();
 }
 
 function akLeisteZeichnen() {
@@ -22569,7 +22584,8 @@ function akSeiteHtml(s) {
         + '<span class="mehr-h"><button type="button" class="mehr" onclick="akMenueUm()" aria-label="Weitere Aktionen" aria-expanded="' + ak.menueAuf + '">⋯</button>'
         + (ak.menueAuf ? '<span class="mehr-menue"><button type="button" class="weg" onclick="akFragen(\'loeschen\')">Löschen …</button></span>' : '')
         + '</span></div>';
-  h += '<div class="eigen"><span class="art-marke">' + (s.art === 'vorhaben' ? (s.typ === 'ziel' ? 'Ziel' : 'Projekt') : KP_ARTEN[s.art].name) + '</span>'
+  if (vlIstVorlage(s)) { h += vlKopfHtml(s); }
+  h += '<div class="eigen"><span class="art-marke">' + (VL_NAMEN[vlArt(s)] || KP_ARTEN[s.art].name) + '</span>'
      + '<span class="gruppe-knopf" role="group" aria-label="Beruf oder Privat">'
      + '<button type="button" class="' + (s.kontext === 'beruflich' ? 'an' : '') + '" onclick="akKontext(\'beruflich\')">Beruf</button>'
      + '<button type="button" class="' + (s.kontext === 'privat' ? 'an' : '') + '" onclick="akKontext(\'privat\')">Privat</button></span>';
@@ -22591,7 +22607,10 @@ function akSeiteHtml(s) {
        + ((s.art === 'vorhaben' && s.zustand !== 'erledigt') ? '<button type="button" class="pille" onclick="akZustand(\'erledigt\')">Lieber auf erledigt</button>' : '')
        + '<button type="button" class="pille" onclick="akFrageWeg()">Abbrechen</button></div></div>';
   }
-  h += '<div class="oa"><button type="button" class="oa-knopf" onclick="akOaUm()" aria-haspopup="dialog" aria-expanded="' + ak.oaAuf + '">☐ Offene Aufgaben</button>'
+  if (ak.frage === 'vlstart' && vlIstVorlage(s)) { h += vlStartHtml(s); }
+  /* Vorlagen und Checklisten zum Abhaken werden nicht eingeplant (seit v6.4.0) */
+  var planbar = !vlIstVorlage(s) && !vlNurAbhaken(s);
+  h += '<div class="oa">' + (planbar ? '<button type="button" class="oa-knopf" onclick="akOaUm()" aria-haspopup="dialog" aria-expanded="' + ak.oaAuf + '">☐ Offene Aufgaben</button>' : '')
      + ((ak.modus === 'ansicht' && kpHatUeberschriften(s))
         ? '<span class="ak-falten"><button type="button" class="pille" onclick="akAlleZu(true)" title="Alle Abschnitte einklappen">alles zu</button>'
           + '<button type="button" class="pille" onclick="akAlleZu(false)" title="Alle Abschnitte aufklappen">alles auf</button></span>'
@@ -22606,7 +22625,7 @@ function akSeiteHtml(s) {
   } else {
     h += '<div class="blatt">' + kpAnsichtHtml(s, false, ak.hervor) + '</div>';
   }
-  if (ak.oaAuf) { h += akOaHtml(s); }
+  if (ak.oaAuf && planbar) { h += akOaHtml(s); }
   return h;
 }
 
@@ -22636,6 +22655,205 @@ function akSeiteZeichnen() {
 function akZeichnen() {
   akLeisteZeichnen();
   akSeiteZeichnen();
+}
+
+/* ---------- Vorlagen und Checklisten aus CLIE (seit v6.4.0) ----------
+
+   CLIE schreibt in dieselbe workbench.json: Vorlagen jeder Art
+   („istVorlage“ an Projekt, Ziel, Notiz; Checklisten-Vorlagen mit
+   checkliste: 'vorlage') und laufende oder abgeschlossene Checklisten
+   (checkliste: 'lauf' | 'fertig', Art 'aufgaben' = Ablauf, sonst
+   Checkliste zum Abhaken). Die Workbench zeigt Vorlagen in einer eigenen
+   Gruppe, nicht bei den laufenden Einträgen, und startet sie wie CLIE:
+   Haken leer, Art und Kategorie übernommen, bei Abständen (@-1 …) mit
+   Stichtag eingeplant. Der Kern (kp…) bleibt unberührt — er ist wörtlich
+   derselbe wie im CLIE. */
+
+var VL_ZEICHEN = { projekt: '◎', ziel: '◇', notiz: '✎', ablauf: '⇢', checkliste: '☑' };
+var VL_NAMEN = { projekt: 'Projekt', ziel: 'Ziel', notiz: 'Notiz', ablauf: 'Ablauf', checkliste: 'Checkliste' };
+var VL_ABSTAND = /^(.*\S)\s+@([+-]?\d{1,3})(?:\s+(\d{1,2}):(\d{2}))?\s*$/;
+
+/* Ein Satz oder eine Hülle: der Satz dahinter */
+function vlSatz(x) { return (x && x.__satz) ? x.__satz : x; }
+
+function vlIstVorlage(x) {
+  var s = vlSatz(x);
+  return !!(s && (s.istVorlage === true || s.checkliste === 'vorlage'));
+}
+
+/* Art einer Seite: projekt · ziel · notiz · ablauf · checkliste · '' (Liste) */
+function vlArt(seite) {
+  if (!seite) { return ''; }
+  if (seite.art === 'vorhaben') { return seite.typ === 'ziel' ? 'ziel' : 'projekt'; }
+  if (seite.art !== 'notiz') { return ''; }
+  var s = vlSatz(seite);
+  if (s && s.checkliste) { return s.art === 'aufgaben' ? 'ablauf' : 'checkliste'; }
+  return 'notiz';
+}
+
+function vlZeichen(seite) { return VL_ZEICHEN[vlArt(seite)] || ''; }
+
+function vlAbgeschlossen(seite) {
+  var s = vlSatz(seite);
+  return !!(s && s.checkliste === 'fertig');
+}
+
+/* Eine Checkliste zum Abhaken (Packliste) — ihre Punkte gehören nie in Tag und Woche */
+function vlNurAbhaken(seite) {
+  return vlArt(seite) === 'checkliste';
+}
+
+function vlLeeren(text) {
+  return String(text || '').split('\n').map(function (z) { return z.replace(/^(\s*)\[[ xX-]?\]/, '$1[]'); }).join('\n');
+}
+
+/* „Koffer packen @-1 18:00“ → { text, tage: -1, zeit: '18:00' } — sonst null */
+function vlAbstand(text) {
+  var m = String(text || '').match(VL_ABSTAND);
+  if (!m) { return null; }
+  var tage = Number(m[2]);
+  var zeit = m[3] ? (m[3].length < 2 ? '0' + m[3] : m[3]) + ':' + m[4] : '';
+  if (Math.abs(tage) > 365 || (zeit && !/^([01]\d|2[0-3]):[0-5]\d$/.test(zeit))) { return null; }
+  return { text: m[1], tage: tage, zeit: zeit };
+}
+
+function vlOhneAbstand(text) {
+  return String(text || '').split('\n').map(function (z) {
+    var a = kpAufgabe(z);
+    var ab = a ? vlAbstand(a.text) : null;
+    if (!ab) { return z; }
+    var vorne = z.match(/^(\s*\[[ xX-]?\]\s*)/);
+    return (vorne ? vorne[1] : '[] ') + ab.text;
+  }).join('\n');
+}
+
+/* Was beim Start wohin kommt; Vergangenes landet auf heute */
+function vlPlanVorschau(text, stichtag) {
+  var heute = isoDatum();
+  var aus = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(stichtag || ''))) { return aus; }
+  String(text || '').split('\n').forEach(function (z, nr) {
+    var a = kpAufgabe(z);
+    var ab = a ? vlAbstand(a.text) : null;
+    if (!ab) { return; }
+    var d = tagePlus(stichtag, ab.tage);
+    aus.push({ nr: nr, text: ab.text, datum: d < heute ? heute : d, zeit: ab.zeit });
+  });
+  return aus;
+}
+
+/* Gruppe „Vorlagen“ in der Leiste — zu, außer eine Vorlage ist offen */
+function vlGruppeHtml() {
+  var l = kpSeitenAlle().filter(function (s) { return vlIstVorlage(s) && akSichtbar(s); })
+    .sort(function (a, b) { return String(a.titel || '').localeCompare(String(b.titel || ''), 'de'); });
+  if (!l.length) { return ''; }
+  var drin = l.some(function (s) { return s.id === ak.id; });
+  var auf = ak.vorlagenAuf || drin;
+  var h = '<div class="ak-gruppe leise vl-gruppe"><button type="button" class="klapp-kopf" onclick="vlGruppeUm()" aria-expanded="' + auf + '">'
+        + (auf ? '⌄ ' : '› ') + 'Vorlagen · ' + l.length + '</button></div>';
+  if (auf) { l.forEach(function (s) { h += akSeitenEintragHtml(s, 'vorlage'); }); }
+  return h;
+}
+
+function vlGruppeUm() {
+  ak.vorlagenAuf = !ak.vorlagenAuf;
+  akLeisteZeichnen();
+}
+
+/* Kopf einer Vorlage: Hinweis und „Starten…“ */
+function vlKopfHtml(s) {
+  return '<div class="vl-hinweis"><span>Vorlage · ' + esc(VL_NAMEN[vlArt(s)] || 'Seite') + ' — steht nicht bei den laufenden Einträgen</span>'
+       + '<button type="button" class="pille voll" onclick="vlStartenAuf()">Starten …</button></div>';
+}
+
+function vlStartenAuf() {
+  var s = akSeite();
+  if (!s || !vlIstVorlage(s)) { return; }
+  ak.vlStart = { titel: s.titel || '', stichtag: isoDatum() };
+  akFragen('vlstart');
+}
+
+function vlStartLesen() {
+  var f = ak.vlStart;
+  if (!f) { return null; }
+  var n = document.getElementById('vlName');
+  var t = document.getElementById('vlStichtag');
+  if (n && typeof n.value === 'string') { f.titel = n.value; }
+  if (t && typeof t.value === 'string') { f.stichtag = t.value; }
+  return f;
+}
+
+function vlStichtagNeu() {
+  if (!vlStartLesen()) { return; }
+  akSeiteZeichnen();
+}
+
+function vlStartHtml(s) {
+  var f = ak.vlStart || { titel: s.titel || '', stichtag: isoDatum() };
+  var mitPlan = vlPlanVorschau(s.text, isoDatum()).length > 0;
+  var h = '<div class="frage vl-start" role="dialog"><p><b>„' + esc(s.titel || 'ohne Titel') + '“ starten</b></p>'
+        + '<label class="vl-feld"><span class="leise">Name</span><input id="vlName" class="rt-ein" type="text" maxlength="200" value="' + esc(f.titel) + '"></label>';
+  if (mitPlan) {
+    var plan = vlPlanVorschau(s.text, f.stichtag);
+    h += '<label class="vl-feld"><span class="leise">Stichtag (für Punkte mit @-Abstand)</span>'
+       + '<input id="vlStichtag" class="rt-ein" type="date" value="' + esc(f.stichtag) + '" onchange="vlStichtagNeu()"></label>'
+       + '<div class="vl-vorschau"><span class="leise">Wird eingeplant (' + plan.length + '):</span>'
+       + plan.map(function (p) { return '<div><b>' + esc(kurzDatum(p.datum)) + (p.zeit ? ' ' + esc(p.zeit) : '') + '</b> ' + esc(p.text) + '</div>'; }).join('') + '</div>';
+  }
+  return h + '<div class="knoepfe"><button type="button" class="pille voll" onclick="vlStartOk(true)">Starten</button>'
+       + (mitPlan ? '<button type="button" class="pille" onclick="vlStartOk(false)">Ohne Termine</button>' : '')
+       + '<button type="button" class="pille" onclick="akFrageWeg()">Abbrechen</button></div></div>';
+}
+
+function vlStartOk(mitTerminen) {
+  var s = akSeite();
+  var f = vlStartLesen();
+  if (!s || !f || !vlIstVorlage(s)) { akFrageWeg(); return; }
+  var titel = String(f.titel || '').trim();
+  if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
+  var plan = (mitTerminen && vlPlanVorschau(s.text, isoDatum()).length) ? vlPlanVorschau(s.text, f.stichtag) : [];
+  if (mitTerminen && vlPlanVorschau(s.text, isoDatum()).length && !/^\d{4}-\d{2}-\d{2}$/.test(String(f.stichtag || ''))) {
+    melde('Bitte einen Stichtag wählen.', 'warn');
+    return;
+  }
+  var neu = vlStarten(s, titel.slice(0, 200), plan, plan.length ? f.stichtag : '');
+  if (!neu) { return; }
+  ak.vlStart = null;
+  spaeterSichern();
+  melde('„' + neu.titel + '“ gestartet' + (plan.length ? ' — ' + plan.length + ' Punkte eingeplant.' : '.'), 'gut');
+  akOeffnen(neu.id);
+}
+
+/* Legt aus einer Vorlage einen laufenden Eintrag an und gibt seine Hülle zurück */
+function vlStarten(vorlage, titel, plan, stichtag) {
+  var v = vlSatz(vorlage);
+  var neu;
+  if (v.checkliste === 'vorlage') {
+    var g = { id: neueKennung(), titel: titel, text: vlOhneAbstand(vlLeeren(v.text)), kontext: v.kontext || 'privat',
+              ordnung: kpNaechsterRang(), checkliste: 'lauf', gestartet: isoDatum(), vorlage: v.id, geaendert: jetzt() };
+    if (v.art === 'aufgaben') { g.art = 'aufgaben'; }
+    if (stichtag) { g.stichtag = stichtag; }
+    if (!Array.isArray(DB.gedanken)) { DB.gedanken = []; }
+    DB.gedanken.push(g);
+    v.benutzt = (Number(v.benutzt) || 0) + 1;
+    neu = kpHuelle(g, 'notiz', '');
+    (plan || []).forEach(function (p) {
+      var b = kpPlanenKern(neu, p.nr, 'h', p.datum);
+      if (b && p.zeit && b.eintraege && b.eintraege.length) { b.eintraege[b.eintraege.length - 1].zeit = p.zeit; }
+    });
+  } else {
+    neu = kpSeiteAnlegen(vorlage.art, titel, v.kontext || 'privat', vorlage.art === 'vorhaben' ? vorlage.typ : '');
+    if (!neu) { return null; }
+    neu.text = vlLeeren(vorlage.text);
+    if (vorlage.art === 'vorhaben' && vorlage.typ !== 'ziel') { vlSatz(neu).start = isoDatum(); }
+  }
+  var n = vlSatz(neu);
+  if (v.bereich) { n.bereich = v.bereich; }
+  if (v.privat) { n.privat = true; }
+  delete n.istVorlage;
+  n.geaendert = jetzt();
+  v.geaendert = jetzt();
+  return neu;
 }
 
 /* ---------- Sortieren ---------- */
