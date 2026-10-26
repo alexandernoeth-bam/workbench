@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.84.0</title>
+<title>CLIE 0.85.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1031,9 +1031,10 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 
 /* ---------- Palm-Modell (seit 0.80): To Do, Memo Pad, Agenda ---------- */
 .fuss:has(.pm-tabs){flex-wrap:wrap}
-.fuss:has(.pm-kzleiste){flex-wrap:wrap}
-.pm-kzleiste{display:flex;gap:6px;flex:1 0 100%;margin-top:2px}
-.pm-kzleiste .knopf{min-width:36px;text-align:center;font-weight:600}
+/* Seit 0.85: Haken ohne Browser-Blau — CLIE ist einfarbig */
+input[type=checkbox]{accent-color:var(--px)}
+.memo-zeile.pm.aus .tx{color:var(--px-mitte)}
+.memo-zeile.pm .pm-ausgebl{flex:0 0 auto;font-size:15.5px;color:var(--px-mitte)}
 .pm-tabs{display:flex;flex:1 0 100%;border:2px solid var(--px);margin-top:2px}
 .pm-tabs button{flex:1;text-align:center;padding:2px 0;font-size:18px}
 .pm-tabs button+button{border-left:2px solid var(--px)}
@@ -1123,7 +1124,7 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.84.0';
+var APP_VERSION = '0.85.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27573,7 +27574,7 @@ var KR_PFADE = [
    ============================================================ */
 
 cl.pm = { tab: 'alle', datum: 'heute', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
-          showF: null, mf: null, zuAlle: false, umst: null, vorlage: '', privat: 0, marke: '' };
+          showF: null, mf: null, zuAlle: false, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
 
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
 var PM_SHOW_KEY = 'clie-pm-show';
@@ -28397,6 +28398,7 @@ function pmMemos(sicht) {
     if (sicht === 'vorlagen') { return v; }
     if (v) { return false; }
     if (!sicht && pmKzAus().indexOf(pmKuerzel(s)) >= 0) { return false; }
+    if (!sicht && pmIstAusgeblendet(s) && !pmAusgeblZeigen()) { return false; }
     return (sicht === 'archiv') === pmArchiviert(s);
   });
   /* Seit 0.84: alphabetisch — nach Typ nur, wenn „Gruppiert“ an ist */
@@ -28419,30 +28421,79 @@ function pmKzAus() {
   return PM_KUERZEL.filter(function (x) { return k.indexOf(x) >= 0; }).join('');
 }
 
-function pmKzUm(k) {
-  if (PM_KUERZEL.indexOf(k) < 0) { return; }
-  var aus = pmKzAus();
-  aus = aus.indexOf(k) >= 0 ? aus.replace(k, '') : aus + k;
-  try { window.localStorage.setItem(PM_KZAUS_KEY, aus); } catch (e) { /* nur für jetzt */ }
-  var el = document.getElementById('inhalt');
-  if (el) { el.scrollTop = 0; }
-  zeichne();
-}
-
 function pmGruppiert() {
   try { return window.localStorage.getItem(PM_GRUPPE_KEY) === '1'; } catch (e) { return false; }
 }
 
-function pmGruppiertUm() {
-  try { window.localStorage.setItem(PM_GRUPPE_KEY, pmGruppiert() ? '0' : '1'); } catch (e) { /* nur für jetzt */ }
-  zeichne();
+/* Seit 0.85: Kürzel-Spalte zeigen (Standard) und ausgeblendete Memos zeigen (Standard: nein) */
+var PM_SPALTE_KEY = 'clie-memo-spalte';
+var PM_AUSGEBL_KEY = 'clie-memo-ausgebl';
+
+function pmSpalte() {
+  try { return window.localStorage.getItem(PM_SPALTE_KEY) !== '0'; } catch (e) { return true; }
 }
 
-function pmKzLeisteHtml() {
-  var aus = pmKzAus();
-  return '<div class="pm-kzleiste">' + PM_KUERZEL.map(function (k) {
-    return '<button type="button" class="knopf' + (aus.indexOf(k) < 0 ? ' voll' : '') + '" onclick="pmKzUm(\'' + k + '\')" aria-label="' + PM_GRUPPEN[k] + ' zeigen">' + k + '</button>';
-  }).join('') + '</div>';
+function pmAusgeblZeigen() {
+  try { return window.localStorage.getItem(PM_AUSGEBL_KEY) === '1'; } catch (e) { return false; }
+}
+
+function pmIstAusgeblendet(s) { return !!(s && s.__satz && s.__satz.ausgeblendet === true); }
+
+/* ---- Show… im Memo Pad (seit 0.85): Typen, Kürzel-Spalte, Gruppiert, Ausgeblendete ---- */
+
+function pmMShowAuf() {
+  cl.pm.mshow = { kzaus: pmKzAus(), spalte: pmSpalte(), gruppiert: pmGruppiert(), aus: pmAusgeblZeigen() };
+  cl.aufklapp = 'pmmshow';
+  aufklappNeu();
+}
+
+function pmMShowLesen() {
+  var f = cl.pm.mshow;
+  if (!f) { return null; }
+  [['spalte', 'pmMsSpalte'], ['gruppiert', 'pmMsGruppe'], ['aus', 'pmMsAus']].forEach(function (k) {
+    var el = document.getElementById(k[1]);
+    if (el && typeof el.checked === 'boolean') { f[k[0]] = el.checked; }
+  });
+  return f;
+}
+
+function pmMShowKz(k) {
+  var f = pmMShowLesen();
+  if (!f || PM_KUERZEL.indexOf(k) < 0) { return; }
+  f.kzaus = f.kzaus.indexOf(k) >= 0 ? f.kzaus.replace(k, '') : f.kzaus + k;
+  aufklappNeu();
+}
+
+function pmMShowHtml() {
+  var f = cl.pm.mshow;
+  if (!f) { return ''; }
+  var haken = function (id, an, text) { return '<label class="haken"><input id="' + id + '" type="checkbox"' + (an ? ' checked' : '') + '> ' + text + '</label>'; };
+  return '<div class="fenster"><div class="titel">Show</div><div class="rumpf">'
+    + '<label>Typen zeigen:</label><div class="wahlreihe pm-kz">' + PM_KUERZEL.map(function (k) {
+      return '<button type="button"' + (f.kzaus.indexOf(k) < 0 ? ' class="an"' : '') + ' onclick="pmMShowKz(\'' + k + '\')" aria-label="' + PM_GRUPPEN[k] + '">' + k + '</button>';
+    }).join('') + '</div>'
+    + haken('pmMsSpalte', f.spalte, 'Kürzel-Spalte zeigen')
+    + haken('pmMsGruppe', f.gruppiert, 'Gruppiert nach Typ')
+    + haken('pmMsAus', f.aus, 'Ausgeblendete zeigen')
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmMShowOk()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+}
+
+function pmMShowOk() {
+  var f = pmMShowLesen();
+  if (f) {
+    try {
+      window.localStorage.setItem(PM_KZAUS_KEY, PM_KUERZEL.filter(function (x) { return f.kzaus.indexOf(x) >= 0; }).join(''));
+      window.localStorage.setItem(PM_SPALTE_KEY, f.spalte ? '1' : '0');
+      window.localStorage.setItem(PM_GRUPPE_KEY, f.gruppiert ? '1' : '0');
+      window.localStorage.setItem(PM_AUSGEBL_KEY, f.aus ? '1' : '0');
+    } catch (e) { /* nur für jetzt */ }
+  }
+  cl.pm.mshow = null;
+  aufklappZu();
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
 }
 
 function pmMemoNeu() {
@@ -28467,8 +28518,10 @@ function pmMemoListeHtml() {
     var k = pmKuerzel(s);
     var kopf = (gruppe && k !== letzte) ? '<div class="pm-gr">' + PM_GRUPPEN[k] + '</div>' : '';
     letzte = k;
-    return kopf + prZeile(s, null, '<button type="button" class="memo-zeile pm' + (gew ? ' gewaehlt' : '') + '" onclick="pmMemoTipp(\'' + esc(s.id) + '\')">'
-      + (gruppe ? '' : '<span class="mz kz">' + k + '</span>') + '<span class="tx">' + esc(s.titel) + '</span></button>');
+    var aus = pmIstAusgeblendet(s);
+    return kopf + prZeile(s, null, '<button type="button" class="memo-zeile pm' + (gew ? ' gewaehlt' : '') + (aus ? ' aus' : '') + '" onclick="pmMemoTipp(\'' + esc(s.id) + '\')">'
+      + ((gruppe || !pmSpalte()) ? '' : '<span class="mz kz">' + k + '</span>') + '<span class="tx">' + esc(s.titel) + '</span>'
+      + (aus ? '<small class="pm-ausgebl">ausgebl.</small>' : '') + '</button>');
   }).join('');
 }
 
@@ -28590,8 +28643,8 @@ function pmMemoFussHtml() {
     if (sicht === 'vorlagen') { return '<button type="button" class="knopf" onclick="memoArtSetzen(\'alles\')">Fertig</button>'; }
     return '<button type="button" class="knopf" onclick="pmMemoNeu()">Neu</button>'
       + '<button type="button" class="knopf" onclick="memoArtSetzen(\'vorlagen\')">Vorlage…</button>'
-      + '<button type="button" class="knopf' + (pmGruppiert() ? ' voll' : '') + '" onclick="pmGruppiertUm()">Gruppiert</button>'
-      + pmKzLeisteHtml();
+      /* gefüllt, solange von der Standardsicht abgewichen wird: Typ aus oder Ausgeblendete an */
+      + '<button type="button" class="knopf' + ((pmKzAus() || pmAusgeblZeigen()) ? ' voll' : '') + '" onclick="pmMShowAuf()">Show…</button>';
   }
   if (cl.memo.schreiben) { return '<button type="button" class="knopf voll" onclick="pmSchreibenUm()">Fertig</button>'; }
   return '<button type="button" class="knopf" onclick="pmMemoZuListe()">Fertig</button>'
@@ -28882,7 +28935,7 @@ function pmSchreibenUm() {
 function pmMemoDetails() {
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
   if (!s) { return; }
-  cl.pm.mf = { id: s.id, titel: s.titel, k: pmKuerzel(s), bereich: clKategorieVon(s), privat: !!(s.__satz && s.__satz.privat) };
+  cl.pm.mf = { id: s.id, titel: s.titel, k: pmKuerzel(s), bereich: clKategorieVon(s), privat: !!(s.__satz && s.__satz.privat), ausgeblendet: pmIstAusgeblendet(s) };
   cl.aufklapp = 'pmmemo';
   aufklappNeu();
 }
@@ -28893,6 +28946,8 @@ function pmMemoFensterLesen() {
   var t = document.getElementById('pmMTitel');
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   katPrivatLesen('pmM', f);
+  var a = document.getElementById('pmMAus');
+  if (a && typeof a.checked === 'boolean') { f.ausgeblendet = a.checked; }
   return f;
 }
 
@@ -28926,7 +28981,8 @@ function pmMemoFensterHtml() {
     + '<label>Kürzel:</label><div class="wahlreihe pm-kz">' + PM_KUERZEL.map(function (k) {
       return '<button type="button"' + (f.k === k ? ' class="an"' : '') + (ckIstKorb(s) && k !== '–' ? ' disabled' : '') + ' onclick="pmKuerzelWahl(\'' + k + '\')">' + k + '</button>';
     }).join('') + '</div><p class="leise">P Projekt · Z Ziel · A Ablauf · – alles andere</p>'
-    + katPrivatHtml('pmM', f.bereich || '', f.privat);
+    + katPrivatHtml('pmM', f.bereich || '', f.privat)
+    + '<label class="haken"><input id="pmMAus" type="checkbox"' + (f.ausgeblendet ? ' checked' : '') + '> ausblenden <small class="leise">(nicht in der Liste)</small></label>';
   var auf = pmMemoAufgaben(s.id);
   var ter = Array.isArray(s.__satz.termine) ? s.__satz.termine.filter(function (t) { return t && t.id; }) : [];
   if (auf.length || ter.length) {
@@ -28951,6 +29007,7 @@ function pmMemoSpeichern() {
   if (!titel) { melde('Bitte einen Titel eingeben.', 'warn'); return; }
   s.titel = titel.slice(0, 200);
   katPrivatSchreiben(s.__satz, f);
+  if (f.ausgeblendet) { s.__satz.ausgeblendet = true; } else { delete s.__satz.ausgeblendet; }
   s.geaendert = jetzt();
   var n = pmKuerzelSetzen(s, f.k);
   spaeterSichern();
@@ -28984,7 +29041,7 @@ function pmKuerzelSetzen(s, k) {
   var ny = n.__satz;
   var ziel = kpSammlungVon(n);
   n.text = s.text;
-  ['bereich', 'privat', 'termine', 'archiv', 'ordnung', 'zusatz'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
+  ['bereich', 'privat', 'termine', 'archiv', 'ordnung', 'zusatz', 'ausgeblendet'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
   if (k === 'A') { ny.checkliste = 'lauf'; ny.art = 'aufgaben'; ny.gestartet = isoDatum(); }
   if (k === '–' && x.checkliste) { ny.checkliste = (x.checkliste === 'fertig') ? 'fertig' : 'lauf'; }
   if (pmArchiviert(s)) { ny.archiv = true; }
@@ -29304,6 +29361,11 @@ function pmAufklapp(el) {
   }
   if (a === 'pmumstellen') { el.innerHTML = pmUmstellenHtml(); return true; }
   if (a === 'pmzuordnen') { el.innerHTML = pmZuordnenHtml(); return true; }
+  if (a === 'pmmshow') {
+    if (el.innerHTML.indexOf('pmMsSpalte') >= 0) { return true; }
+    el.innerHTML = pmMShowHtml();
+    return true;
+  }
   return false;
 }
 
