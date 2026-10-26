@@ -259,7 +259,11 @@ console.log('\n1. Aufbau der Datei');
 const CL = ladeIn(SKRIPT, 'clie.html');
 if (CL) { ok('CLIE lässt sich außerhalb des Browsers auswerten'); }
 
+/* Seit 0.86 ist der Coach aus (CO_AN = false). Die bisherigen Coach-Prüfungen laufen mit eingeschaltetem
+   Coach weiter — die Funktionen bleiben; „aus“ prüft Kategorie 146. */
+const CO_AN_STD = CL ? CL.CO_AN : null;
 function frisch() {
+  CL.CO_AN = true;
   CL.DB = CL.leereDatenbank();
   CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false; CL.cl.memo.aktiv = true; CL.cl.rt.sicht = 'routinen'; CL.cl.gw.wahl = '';
   CL.termineNachTag = {};
@@ -5054,7 +5058,7 @@ function projekteTest() {
   const neu = S.DB.projekte[S.DB.projekte.length - 1];
   pruefe(neu.name === 'Terrassendach' && neu.start === S.isoDatum() && S.cl.pj.id === neu.id && S.cl.pj.reiter === 'aufgaben', 'Neu: Beginn heute, öffnet die Schritte');
   /* Start, Ordner, Symbol */
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('coach') >= 0 && S.clOrdnerVon('coach') === 'planung', 'Coach im Ordner Planung');
+  pruefe(S.CL_ORDNER.planung.apps.indexOf('coach') < 0, 'Coach seit 0.86 nicht mehr im Ordner Planung (aus)');
   pruefe(/<rect x="15" y="18" width="16" height="6"/.test(S.clSymbol('projekte')), 'Symbol „Zeitplan“ (drei versetzte Balken)');
   S.oeffne('uebersicht');
   pruefe(!/oeffne\('projekte'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()) && />Memo Pad<\/button>/.test(inhalt()), 'Übersicht seit 0.71: „Memo Pad“ statt Projekte und Notizen');
@@ -6874,7 +6878,8 @@ function startOrdnerTest() {
   /* „checklisten“ ist seit 0.61 die Listen-Ansicht von To Do — erreichbar über dessen ▼ */
   /* „kategorien“ seit 0.66.2 über das ▼ der Übersicht */
   /* „projekte“ und „ziele“ seit 0.71 über das Memo Pad */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele'];
+  /* „coach“ seit 0.86 aus — nur noch über den Link #coach erreichbar */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -6883,7 +6888,7 @@ function startOrdnerTest() {
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 3, 'Ordner am ▸ erkennbar');
   pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()), 'seit 0.72 Routines und SOS auf dem Start, Drive nicht');
-  [['planung', ['coach', 'ideen', 'kategorien']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
+  [['planung', ['kategorien', 'ideen']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
     pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === o && apps.every(id => new RegExp("ordnerWahl\\('" + id + "'\\)").test(h)) && /Schließen/.test(h), 'Ordner ' + o + ': ' + apps.join(', '));
@@ -9077,6 +9082,35 @@ function fehlerZeigenTest() {
 }
 
 
+function coachAusTest() {
+  console.log('\n146. Coach ausgeschaltet — Coaching im Gespräch statt in der App (0.86)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  pruefe(CO_AN_STD === false, 'Grundstellung: Coach aus');
+  S.CO_AN = false;
+  const heute = S.isoDatum();
+  S.pmNeueAufgabe({ titel: 'A', prio: 1, datum: heute });
+  S.pmNeueAufgabe({ titel: 'B', prio: 2, datum: heute });
+  S.pmNeueAufgabe({ titel: 'C', prio: 2, datum: heute });
+  S.oeffne('uebersicht');
+  pruefe(!/co-oben|co-zeile-still|Coach ·/.test(inhalt()), 'Startseite: keine Coach-Zeile und keine Fragen');
+  pruefe(S.coKalenderPlan('06:00', heute).length === 0, 'keine Coach-Erinnerungen im Kalender — noch kommende werden entfernt');
+  pruefe(!S.coVorabNoetig('P1 Wichtig', heute), 'keine Vorab-Nachfrage bei Neuem');
+  S.oeffne('aufgaben'); S.pmNeu('', '');
+  S.document.getElementById('pmTitel').value = 'Neu P1'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmPrioWahl(1);
+  S.document.getElementById('pmTitel').value = 'Neu P1'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmSpeichern();
+  pruefe(S.cl.aufklapp !== 'covorab' && S.DB.aufgaben.some(a => a.titel === 'Neu P1'), 'neue Aufgabe mit Priorität 1: gespeichert, ohne Nachfrage');
+  pruefe(/planung: \{ name: 'Planning', apps: \(CO_AN \? \[/.test(SKRIPT) && S.CL_ORDNER.planung.apps.indexOf('coach') < 0, 'nicht mehr im Ordner Planung');
+  S.localStorage.setItem('clie-morgengruss', '');
+  pruefe(typeof S.coMorgengrussHtml === 'function', 'der ruhige Morgengruß bleibt');
+  S.localStorage.setItem('clie-morgengruss', heute);
+  S.CO_AN = true;
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9220,6 +9254,7 @@ function fehlerZeigenTest() {
   try { zuordnenFilterTest(); } catch (e) { fail('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoSortTest(); } catch (e) { fail('0.84/0.85 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fehlerZeigenTest(); } catch (e) { fail('0.85.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { coachAusTest(); } catch (e) { fail('0.86 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.85.1</title>
+<title>CLIE 0.86.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1126,7 +1126,7 @@ input[type=checkbox]{accent-color:var(--px)}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.85.1';
+var APP_VERSION = '0.86.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -5817,7 +5817,7 @@ function terminSpeichern() {
       var dauer = (von && bis) ? clMinuten(bis) - clMinuten(von) : 0;
       /* Seit 0.80: aus einem Memo angelegt → das Memo kennt den Termin */
       if (!aendern && r && r.id) { pmTerminAngelegt(r.id, e.kalId, e.datum, String(e.koerper.summary || ''), von); }
-      if (!aendern && r && r.id && dauer >= 60) {
+      if (CO_AN && !aendern && r && r.id && dauer >= 60) {
         coVorabAuf({ art: 'termin', text: String(e.koerper.summary || 'Termin'), dauer: (dauer >= 120 ? Math.round(dauer / 30) / 2 + ' Std.' : dauer + ' Min.'), kalId: e.kalId, terminId: r.id, datum: e.datum });
       }
       return clTermineHolen(false);
@@ -7171,7 +7171,7 @@ function aufSpeichern() {
   spaeterSichern();
   aufklappZu();
   /* Größeres hinterfragt der Coach gleich (seit 0.33) */
-  if (f.modus === 'neu' && (coVorabNoetig(text, datum) || f.frist)) { coVorabAuf({ art: 'aufgabe', text: text, seite: seite.id, datum: datum, frist: f.frist || '' }); }
+  if (f.modus === 'neu' && (coVorabNoetig(text, datum) || (CO_AN && f.frist))) { coVorabAuf({ art: 'aufgabe', text: text, seite: seite.id, datum: datum, frist: f.frist || '' }); }
 }
 
 function aufLoeschen() {
@@ -20965,6 +20965,10 @@ function coKampagneFragen(nun, is, e) {
 var CO_ZEITEN = [['morgen', 'Morgen', '07:30'], ['mittag', 'Mittag (Halbzeit)', '12:30'], ['nachmittag', 'Nachmittag', '16:30'], ['abend', 'Abend (Rückblick)', '20:30']];
 var CO_VORLAUF = [15, 30, 45, 60, 90];
 var CO_PRAEFIX = 'Coach: ';
+/* Seit 0.86 aus: Alexander führt Coaching-Gespräche mit Claude statt mit dem App-Coach.
+   Aus heißt: keine Fragen, keine Vorab-Nachfrage, keine Kalender-Erinnerungen (heutige
+   künftige werden entfernt), nicht im Ordner Planung. Der ruhige Morgengruß bleibt. Daten bleiben. */
+var CO_AN = false;
 
 cl.co = { tag: '', ansicht: 'verlauf', vorab: null, kalZuletzt: 0, kalLaeuft: false, ids: [] };
 
@@ -22267,6 +22271,7 @@ function coAntwort(id, code, nr, nun, wert) {
 
 /* Größeres prüft der Coach: Prio 1/2, oder ein Tag mit schon drei offenen Aufgaben */
 function coVorabNoetig(text, datum) {
+  if (!CO_AN) { return false; }
   var p = kpPrio(text).p;
   if (p === 1 || p === 2) { return true; }
   if (datum && /^\d{4}-\d{2}-\d{2}$/.test(datum)) {
@@ -22366,6 +22371,8 @@ function coOffenEntscheiden(id, ja) {
    wenn sich der Tag ändert, und löscht, was nicht mehr nötig ist. */
 
 function coKalenderPlan(nun, is) {
+  /* Aus: nichts planen — coKalenderPlanen entfernt dann die noch kommenden Einträge */
+  if (!CO_AN) { return []; }
   var e = coEinst();
   var d = coTagDaten(is);
   var p = [];
@@ -22686,6 +22693,7 @@ function coZeileHtml() {
   /* Morgens zuerst nur der ruhige Satz (seit 0.56.1) */
   var gruss = coMorgengrussHtml();
   if (gruss) { return gruss; }
+  if (!CO_AN) { return ''; }
   var f = coAktuell();
   if (!f) {
     var nz = coNaechsteZeit(clUhrzeit());
@@ -24029,7 +24037,7 @@ var SP_PAUSE_MS = 60000;
 
 /* Ordner auf dem Start (seit 0.35, vorher nur „Spiele“) */
 var CL_ORDNER = {
-  planung: { name: 'Planning', apps: ['ideen', 'coach', 'leitfaden', 'kategorien'] },
+  planung: { name: 'Planning', apps: (CO_AN ? ['ideen', 'coach', 'leitfaden', 'kategorien'] : ['ideen', 'leitfaden', 'kategorien']) },
   lernen: { name: 'Learning', apps: ['lernkartei', 'drive'] },
   spiele: { name: 'Games', apps: ['sudoku', 'solitaer', 'stones', 'schach', 'invasion', 'minen', 'puzzle'] }
 };
