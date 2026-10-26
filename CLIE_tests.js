@@ -9111,6 +9111,21 @@ function coachAusTest() {
 }
 
 
+function leisteCssTest() {
+  console.log('\n147. Umschalter im Inhalt haben ihr Aussehen (Schach-Schule, Drive) (0.86.1)');
+  if (!CL) { return; }
+  /* Fehlerart: CSS beim Umbau entfernt, obwohl der Code die Klassen noch benutzt — Schalter standen als bloßer Text da */
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  ['.auf-leiste{', '.auf-leiste .schalter{', '.auf-leiste .schalter button{', '.auf-leiste .schalter button.an{'].forEach(k => pruefe(css.indexOf(k) >= 0, 'CSS vorhanden: ' + k));
+  const S = pmFrisch();
+  S.oeffne('schach');
+  pruefe(/class="auf-leiste"><div class="schalter">/.test(inhalt()) && /schBereich\('schule'\)">Schule/.test(inhalt()), 'Schach: Umschalter mit „Schule“');
+  /* Allgemein: jede Klasse, die der Code für Umschalter nutzt, hat eine Regel */
+  ['auf-leiste', 'schalter', 'pm-tabs', 'pm-gr', 'pm-sym', 'memo-zeile', 'wahlreihe'].forEach(k => pruefe(new RegExp('\\.' + k + '[\\s{.:,]').test(css), 'Klasse .' + k + ' hat CSS'));
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9255,6 +9270,7 @@ function coachAusTest() {
   try { memoSortTest(); } catch (e) { fail('0.84/0.85 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fehlerZeigenTest(); } catch (e) { fail('0.85.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coachAusTest(); } catch (e) { fail('0.86 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { leisteCssTest(); } catch (e) { fail('0.86.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
