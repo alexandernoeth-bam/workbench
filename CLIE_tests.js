@@ -9762,7 +9762,7 @@ function manifestTest() {
   S.oeffne('manifest');
   pruefe(S.cl.memo.schreiben === false && !/memoFeld/.test(inhalt()), 'Manifest öffnet in der Lesen-Ansicht, nicht im Schreiben');
   const h = inhalt();
-  pruefe((h.match(/class="ma-z"/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
+  pruefe((h.match(/<p style="margin:0">/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
   pruefe(/oeffne\('memo'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: Memo Pad… öffnet die Notiz zum Bearbeiten');
   /* Lesen statt Quelltext (0.96.2): Überschrift, Tabelle, Linie, Kursiv */
   S.DB.gedanken = S.DB.gedanken.filter(g => g.id !== 'mf1');
@@ -9770,6 +9770,27 @@ function manifestTest() {
   S.oeffne('manifest');
   const r = inhalt();
   pruefe(/<h2[^>]*>Regeln<\/h2>/.test(r) && /<table[^>]*><tr><th[^>]*>Nr\.<\/th>/.test(r) && /<i>Ruhe<\/i>/.test(r) && /<hr/.test(r) && !/\| ---|# Regeln|\*Ruhe/.test(r), 'Notiz wird gelesen: Überschrift, Tabelle, Linie, Kursiv — kein Quelltext');
+}
+
+function manifestSeitenTest() {
+  console.log('\n164. Manifest: Seiten nach der echten Höhe; ◀ ▶ und Wischen; Tabellenkopf auf jeder Seite (0.97.0)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  /* Die Seiten werden aus gemessenen Höhen gefüllt — geprüft an der reinen Rechenfunktion */
+  pruefe(JSON.stringify(S.manPacken([{ h: 30 }, { h: 30 }, { h: 30 }], 70)) === '[[0,1],[2]]', 'Seite voll bis zur Höhe, dann die nächste');
+  pruefe(JSON.stringify(S.manPacken([{ tab: 1, h: 10, kopfH: 20 }, { tab: 1, h: 10, kopfH: 20 }, { tab: 1, h: 10, kopfH: 20 }], 45)) === '[[0,1],[2]]', 'Tabelle: Kopfzeile wird auf der neuen Seite wieder gebraucht');
+  pruefe(JSON.stringify(S.manPacken([{ h: 30 }, { h: 100 }, { h: 10 }], 50)) === '[[0],[1],[2]]', 'Ein zu großes Stück steht allein auf einer Seite');
+  /* Ohne Layout (Test) passt alles auf eine Seite: keine Leiste */
+  S.__ablage = S.__ablage || {};
+  S.DB.gedanken = (S.DB.gedanken || []).filter(g => g.id !== 'mf3');
+  S.DB.gedanken.push({ id: 'mf3', titel: 'Manifest', text: 'Eins\nZwei\nDrei', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.oeffne('manifest');
+  pruefe(!/Seite \d+ von/.test(inhalt()) && (inhalt().match(/class="ma-z"|<p style="margin:0">/g) || []).length === 3, 'ohne Höhe: alles auf einer Seite, ohne Blätterleiste');
+  /* Blättern: nur innerhalb der Seitenzahl */
+  S.manBlaettern(1);
+  pruefe(S.cl.man.seite === 0, 'Blättern über die letzte Seite hinaus bleibt auf der letzten');
+  pruefe(/manBlaettern\(-1\)/.test(SKRIPT) && /manBlaettern\(dx < 0/.test(SKRIPT), 'Wischen im Manifest blättert ebenfalls');
+  pruefe(/window\.addEventListener\('resize'/.test(SKRIPT), 'Drehen oder Größenänderung rechnet die Seiten neu');
 }
 
 function syncWocheTest() {
@@ -10029,6 +10050,7 @@ function vlStummTest() {
   try { vlStummTest(); } catch (e) { fail('0.94.3 Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { syncWocheTest(); } catch (e) { fail('0.95.0 Sync/Woche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

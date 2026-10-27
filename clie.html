@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.96.4</title>
+<title>CLIE 0.97.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1195,7 +1195,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.96.4';
+var APP_VERSION = '0.97.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4464,7 +4464,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
-  else if (cl.app === 'manifest') { el.innerHTML = manifestHtml(); }
+  else if (cl.app === 'manifest') { el.innerHTML = manifestHtml(); manNachzeichnen(); }
   else if (cl.app === 'leitfaden') {
     /* Beim Tippen in Notiz oder Tabelle nicht neu zeichnen (seit 0.68) */
     if (document.activeElement && /^lf/.test(String(document.activeElement.id || '')) && el.innerHTML.indexOf('id="' + document.activeElement.id + '"') >= 0) { return; }
@@ -4800,7 +4800,7 @@ function oeffne(id) {
   if (id === 'ziele' && cl.app !== 'ziele') { cl.zi.id = ''; }
   if (id === 'kategorien' && cl.app !== 'kategorien') { cl.kat.id = ''; cl.kat.bearbeiten = false; }
   /* Das Manifest ist nur zum Lesen: ein Schreiben aus dem Memo Pad bleibt nicht hängen (seit 0.96.1) */
-  if (id === 'manifest' && cl.app !== 'manifest') { cl.memo.schreiben = false; }
+  if (id === 'manifest' && cl.app !== 'manifest') { cl.memo.schreiben = false; cl.man.seite = 0; }
   if (id === 'leitfaden' && cl.app !== 'leitfaden') { cl.lf.id = ''; cl.lf.offen = -1; }
   /* SOS merkt sich, woher es kam; Schritt 1 zählt gleich die 60 Sekunden (seit 0.72) */
   if (cl.app === 'sos' && id !== 'sos') { sosUhrStopp(); cl.sos.um = false; }
@@ -5657,7 +5657,7 @@ function clRoutineUm(id, is) {
 /* Wischen: links / rechts blättert Tag, Woche oder Monat */
 function wischAnfang(e) {
   var p = e && e.touches && e.touches[0];
-  wischStart = (p && cl.app === 'kalender' && !cl.aufklapp) ? { x: p.clientX, y: p.clientY } : null;
+  wischStart = (p && (cl.app === 'kalender' || cl.app === 'manifest') && !cl.aufklapp) ? { x: p.clientX, y: p.clientY } : null;
 }
 
 function wischEnde(e) {
@@ -5666,7 +5666,7 @@ function wischEnde(e) {
   var dx = p.clientX - wischStart.x;
   var dy = p.clientY - wischStart.y;
   wischStart = null;
-  if (Math.abs(dx) > 70 && Math.abs(dy) < 50) { clBlaettern(dx < 0 ? 1 : -1); }
+  if (Math.abs(dx) > 70 && Math.abs(dy) < 50) { if (cl.app === 'manifest') { manBlaettern(dx < 0 ? 1 : -1); } else { clBlaettern(dx < 0 ? 1 : -1); } }
 }
 
 /* ---- Gehe zu ---- */
@@ -27457,6 +27457,10 @@ function start() {
   window.addEventListener('focus', standZeichnen);
   window.addEventListener('focus', erneuerungPruefen);
   window.addEventListener('focus', versionBeiFokus);
+  /* Drehen oder Fenstergröße ändern: das Manifest rechnet seine Seiten neu (seit 0.97.0) */
+  window.addEventListener('resize', function () { if (cl.app === 'manifest') { inhaltZeichnen(); } });
+  /* Schriften geladen: die Höhen stimmen erst dann, also noch einmal rechnen (seit 0.97.0) */
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(function () { if (cl.app === 'manifest') { inhaltZeichnen(); } }); }
   /* Wieder online: was offen geblieben ist, jetzt senden (seit 0.95.0) */
   window.addEventListener('online', function () { if (lokalOffen) { abgleichPlanen(true); } });
   window.setInterval(minutenTakt, 30000);
@@ -27487,54 +27491,180 @@ function manifestInline(t) {
   return pmInlineHtml(t).replace(/\*([^*]+)\*/g, '<i>$1</i>');
 }
 
-/* Eine Tabelle aus „| a | b |“-Zeilen; die Trennzeile „| --- |“ entfällt (seit 0.96.2) */
-function manifestTabelle(zeilen) {
-  var reihen = zeilen.filter(function (z) { return !/^\|[\s|:-]*---[\s|:-]*\|$/.test(z); });
-  var zellen = function (z) { return z.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (x) { return x.trim(); }); };
-  var h = '<table style="border-collapse:collapse;width:100%;margin:6px 0">';
-  reihen.forEach(function (z, k) {
-    var tag = k === 0 ? 'th' : 'td';
-    h += '<tr>' + zellen(z).map(function (c) {
-      return '<' + tag + ' style="border:1px solid #888;padding:3px 5px;text-align:left;vertical-align:top">' + manifestInline(c) + '</' + tag + '>';
-    }).join('') + '</tr>';
-  });
-  return h + '</table>';
+/* ---- Manifest: Seiten nach der echten Höhe (seit 0.97.0) ----
+   Die Notiz wird in Stücke zerlegt (Absätze, Tabellenzeilen). Jedes Stück wird
+   gemessen; dann füllen die Stücke eine Seite bis zur Höhe des Bildschirms. */
+var MAN_BALKEN = 40;
+var MAN_ABSTAND = 6;
+cl.man = { seite: 0, puffer: 0, hoehe: 0 };
+
+function manKasten(inner) {
+  return '<div style="display:flow-root;margin-bottom:' + MAN_ABSTAND + 'px">' + inner + '</div>';
 }
 
-/* Die Notiz lesen, nicht als Quelltext zeigen: Überschriften, Tabellen, Linien, Listen, Zitate (seit 0.96.2) */
+function manTabelleHtml(kopf, zeilen) {
+  return manKasten('<table style="border-collapse:collapse;width:100%">' + kopf + zeilen + '</table>');
+}
+
+function manZeile(reihe, kopf) {
+  var tag = kopf ? 'th' : 'td';
+  var zellen = reihe.replace(/^\|/, '').replace(/\|$/, '').split('|');
+  return '<tr>' + zellen.map(function (c) {
+    return '<' + tag + ' style="border:1px solid #888;padding:3px 5px;text-align:left;vertical-align:top">' + manifestInline(c.trim()) + '</' + tag + '>';
+  }).join('') + '</tr>';
+}
+
+/* Eine Zeile der Notiz als Block: Überschrift, Linie, Liste, Zitat oder Absatz */
+function manZeileHtml(z) {
+  var t = z.trim();
+  if (/^#{1,3}\s/.test(t)) {
+    var stufe = t.match(/^#+/)[0].length;
+    var tag = stufe === 1 ? 'h2' : (stufe === 2 ? 'h3' : 'h4');
+    return '<' + tag + ' style="margin:4px 0;font-size:' + (stufe === 1 ? '20' : (stufe === 2 ? '18' : '16')) + 'px">' + manifestInline(t.replace(/^#+\s*/, '')) + '</' + tag + '>';
+  }
+  if (/^(---+|\*\*\*+)$/.test(t)) { return '<hr style="border:0;border-top:1px solid #888;margin:4px 0">'; }
+  if (/^[-*]\s+/.test(t)) { return '<p style="margin:0">• ' + manifestInline(t.replace(/^[-*]\s+/, '')) + '</p>'; }
+  if (/^>\s?/.test(t)) { return '<p style="margin:0 0 0 14px;font-style:italic">' + manifestInline(t.replace(/^>\s?/, '')) + '</p>'; }
+  return '<p style="margin:0">' + (t ? manifestInline(z) : '&nbsp;') + '</p>';
+}
+
+/* Die Notiz in Stücke: normale Zeilen, und Tabellenzeilen mit ihrer Kopfzeile (tab = Nummer der Tabelle) */
+function manItems(n) {
+  var zeilen = String(n.text || '').split('\n');
+  var items = [];
+  var tab = 0;
+  var i = 0;
+  while (i < zeilen.length) {
+    if (/^\s*\|.*\|\s*$/.test(zeilen[i])) {
+      var tz = [];
+      while (i < zeilen.length && /^\s*\|.*\|\s*$/.test(zeilen[i])) { tz.push(zeilen[i].trim()); i++; }
+      tab++;
+      var reihen = tz.filter(function (r) { return !/^\|[\s|:-]*---[\s|:-]*\|$/.test(r); });
+      if (!reihen.length) { continue; }
+      var kopf = manZeile(reihen[0], true);
+      if (reihen.length === 1) { items.push({ tab: tab, kopf: '', zeile: kopf }); }
+      for (var k = 1; k < reihen.length; k++) { items.push({ tab: tab, kopf: kopf, zeile: manZeile(reihen[k], false) }); }
+      continue;
+    }
+    items.push({ html: manZeileHtml(zeilen[i]) });
+    i++;
+  }
+  return items;
+}
+
+/* Höhe eines Stücks im Messfeld (inkl. Abstand) */
+function manMessen(html) {
+  var c = document.getElementById('manMess');
+  if (!c) { return 0; }
+  c.innerHTML = html;
+  var w = c.firstChild;
+  var h = w ? w.offsetHeight + MAN_ABSTAND : 0;
+  c.innerHTML = '';
+  return h;
+}
+
+/* Stücke in Seiten füllen. Eine Tabellen-Kopfzeile kommt auf jeder Seite einmal dazu. */
+function manPacken(items, verfuegbar) {
+  var seiten = [[]];
+  var belegt = 0;
+  var tabellen = {};
+  items.forEach(function (it, i) {
+    var kopf = (it.tab !== undefined && !tabellen[it.tab]) ? (it.kopfH || 0) : 0;
+    var bedarf = it.h + kopf;
+    if (seiten[seiten.length - 1].length && belegt + bedarf > verfuegbar) {
+      seiten.push([]);
+      belegt = 0;
+      tabellen = {};
+      kopf = it.tab !== undefined ? (it.kopfH || 0) : 0;
+      bedarf = it.h + kopf;
+    }
+    seiten[seiten.length - 1].push(i);
+    belegt += bedarf;
+    if (it.tab !== undefined) { tabellen[it.tab] = true; }
+  });
+  return seiten;
+}
+
+/* HTML einer Seite: Tabellenzeilen werden wieder zu einer Tabelle zusammengefasst */
+function manSeiteHtml(items, liste) {
+  var out = '';
+  var offen = null;
+  var schliessen = function () {
+    if (offen) { out += manTabelleHtml(offen.kopf, offen.zeilen); offen = null; }
+  };
+  liste.forEach(function (i) {
+    var it = items[i];
+    if (it.tab === undefined) {
+      schliessen();
+      out += manKasten(it.html);
+    } else {
+      if (!offen || offen.tab !== it.tab) { schliessen(); offen = { tab: it.tab, kopf: it.kopf, zeilen: '' }; }
+      offen.zeilen += it.zeile;
+    }
+  });
+  schliessen();
+  return out;
+}
+
+/* Die Fußzeile kommt nach der Seite und verkürzt sie: ändert sich die Höhe, wird einmal neu gerechnet (seit 0.97.0) */
+function manNachzeichnen() {
+  var naechster = window.requestAnimationFrame ? function (f) { window.requestAnimationFrame(f); } : function (f) { window.setTimeout(f, 16); };
+  naechster(function () {
+    var el = document.getElementById('inhalt');
+    if (cl.app !== 'manifest' || !el) { return; }
+    var innen = el.querySelector('.ma-inhalt');
+    /* Läuft eine Seite über, rechnet sie mit etwas mehr Abstand neu (Tabellenspalten sind erst im Ganzen bekannt) */
+    if (innen && innen.scrollHeight > innen.clientHeight + 1 && cl.man.puffer < 240) { cl.man.puffer += 24; inhaltZeichnen(); return; }
+    if (el.clientHeight !== cl.man.hoehe) { inhaltZeichnen(); }
+  });
+}
+
+function manBlaettern(richtung) {
+  cl.man.seite = (cl.man.seite || 0) + richtung;
+  inhaltZeichnen();
+}
+
 function manifestHtml() {
   var n = manifestNotiz();
   if (!n) {
     return '<div class="ma"><p class="leise">Noch kein Manifest. Lege im Memo Pad eine Notiz mit dem Titel „Manifest“ an, dann erscheint sie hier.</p></div>';
   }
-  var zeilen = String(n.text || '').split('\n');
-  var h = '<div class="ma">';
-  var i = 0;
-  while (i < zeilen.length) {
-    var z = zeilen[i];
-    var t = z.trim();
-    if (/^\|.*\|$/.test(t)) {
-      var tabelle = [];
-      while (i < zeilen.length && /^\s*\|.*\|\s*$/.test(zeilen[i])) { tabelle.push(zeilen[i].trim()); i++; }
-      h += manifestTabelle(tabelle);
-      continue;
-    }
-    if (/^#{1,3}\s/.test(t)) {
-      var stufe = t.match(/^#+/)[0].length;
-      var tag = stufe === 1 ? 'h2' : (stufe === 2 ? 'h3' : 'h4');
-      h += '<' + tag + ' style="margin:10px 0 4px;font-size:' + (stufe === 1 ? '20' : (stufe === 2 ? '18' : '16')) + 'px">' + manifestInline(t.replace(/^#+\s*/, '')) + '</' + tag + '>';
-    } else if (/^(---+|\*\*\*+)$/.test(t)) {
-      h += '<hr style="border:0;border-top:1px solid #888;margin:10px 0">';
-    } else if (/^[-*]\s+/.test(t)) {
-      h += '<p class="ma-z">• ' + manifestInline(t.replace(/^[-*]\s+/, '')) + '</p>';
-    } else if (/^>\s?/.test(t)) {
-      h += '<p class="ma-z" style="margin-left:14px;font-style:italic">' + manifestInline(t.replace(/^>\s?/, '')) + '</p>';
-    } else {
-      h += '<p class="ma-z">' + (t ? manifestInline(z) : '&nbsp;') + '</p>';
-    }
-    i++;
+  var el = document.getElementById('inhalt');
+  var breite = el ? el.clientWidth : 0;
+  var hoehe = el ? el.clientHeight : 0;
+  var mess = null;
+  if (el && breite > 40) {
+    mess = document.createElement('div');
+    mess.id = 'manMess';
+    /* Messung außerhalb der Seite, mit derselben Schrift — sonst stört der alte Inhalt (seit 0.97.0) */
+    var stil = window.getComputedStyle(el);
+    mess.style.cssText = 'position:fixed;visibility:hidden;left:-10000px;top:0;width:' + (breite - 24) + 'px;font-family:' + stil.fontFamily + ';font-size:' + stil.fontSize + ';line-height:' + stil.lineHeight;
+    document.body.appendChild(mess);
   }
-  return h + '</div>';
+  var items = manItems(n);
+  items.forEach(function (it) {
+    if (it.tab === undefined) { it.h = manMessen(manKasten(it.html)); }
+    else { it.h = manMessen(manTabelleHtml('', it.zeile)); it.kopfH = it.kopf ? manMessen(manTabelleHtml(it.kopf, '')) : 0; }
+  });
+  if (mess) { document.body.removeChild(mess); }
+  cl.man.hoehe = hoehe;
+  var geteilt = hoehe >= 160;
+  var seiten = manPacken(items, geteilt ? hoehe - 16 - MAN_BALKEN - cl.man.puffer : 1e9);
+  if (cl.man.seite >= seiten.length) { cl.man.seite = seiten.length - 1; }
+  if (cl.man.seite < 0) { cl.man.seite = 0; }
+  var s = cl.man.seite;
+  var stil = geteilt
+    ? ' style="height:' + hoehe + 'px;box-sizing:border-box;display:flex;flex-direction:column;padding:8px 12px;overflow:hidden"'
+    : ' style="padding:8px 12px"';
+  var knopf = 'style="font:inherit;background:transparent;border:1.5px solid #222;color:#222;padding:2px 12px"';
+  var leiste = '';
+  if (seiten.length > 1) {
+    leiste = '<div style="display:flex;justify-content:space-between;align-items:center;height:' + MAN_BALKEN + 'px;box-sizing:border-box;border-top:1px solid #888;font-size:14px">'
+      + '<button type="button" ' + knopf + ' onclick="manBlaettern(-1)" aria-label="zurück"' + (s === 0 ? ' disabled' : '') + '>◀</button>'
+      + '<span>Seite ' + (s + 1) + ' von ' + seiten.length + '</span>'
+      + '<button type="button" ' + knopf + ' onclick="manBlaettern(1)" aria-label="vor"' + (s >= seiten.length - 1 ? ' disabled' : '') + '>▶</button></div>';
+  }
+  return '<div class="ma"' + stil + '><div class="ma-inhalt" style="flex:1;min-height:0;overflow:hidden">' + manSeiteHtml(items, seiten[s] || []) + '</div>' + leiste + '</div>';
 }
 
 function manifestFussHtml() {
