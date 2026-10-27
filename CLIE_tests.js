@@ -349,6 +349,9 @@ if (CL) {
    ============================================================ */
 console.log('\n5. Termine holen');
 const warte = () => new Promise(r => setImmediate(r));
+/* Vorlesen: ein Satz, der wirklich gesprochen wurde — die Zeit läuft dabei weiter (seit 0.94.3) */
+let gesprochenVersatz = 0;
+function gesprochen(S, u) { if (u.onstart) { u.onstart(); } gesprochenVersatz += 5000; const v = gesprochenVersatz; S.jetzt = () => Date.now() + v; u.onend(); }
 async function terminTest() {
   if (!CL) { return; }
   frisch();
@@ -7712,13 +7715,13 @@ function vlMarkenTest() {
   /* Ein Stück anhören */
   S.vlMarkeHoeren(d.marken[0].id);
   pruefe(S.cl.vl.i === 0 && S.cl.vl.bis === 2 && S.cl.vl.laeuft, 'Stück startet am Anfang des Lesezeichens');
-  gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend();
+  gesprochen(S, gesagt[gesagt.length - 1]); gesprochen(S, gesagt[gesagt.length - 1]); gesprochen(S, gesagt[gesagt.length - 1]);
   pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 2, 'am Ende des Stücks wird angehalten');
   /* Alle anhören */
   S.vlMarkenAlle();
-  gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend();
+  gesprochen(S, gesagt[gesagt.length - 1]); gesprochen(S, gesagt[gesagt.length - 1]); gesprochen(S, gesagt[gesagt.length - 1]);
   pruefe(S.cl.vl.laeuft && S.cl.vl.i === 5 && S.cl.vl.bis === 7, '„Alle anhören“ springt zum nächsten Lesezeichen');
-  gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend(); gesagt[gesagt.length - 1].onend();
+  gesprochen(S, gesagt[gesagt.length - 1]); gesprochen(S, gesagt[gesagt.length - 1]); gesprochen(S, gesagt[gesagt.length - 1]);
   pruefe(!S.cl.vl.laeuft, 'nach dem letzten Lesezeichen Schluss');
   /* Neu ausgelesen: Satznummern verschoben */
   const neu = { saetze: ['Vorwort.', 'Noch etwas.'].concat(doc.saetze), seite: [1, 1].concat(doc.seite), absatz: [9, 9].concat(doc.absatz), kapitel: [], titel: 'T', seiten: 3 };
@@ -7990,25 +7993,25 @@ function vorlesenTest() {
   pruefe(S.cl.vl.ansicht === 'lesen' && inhalt().indexOf('vls0') >= 0 && inhalt().indexOf('vls3') < 0, 'Lesen zeigt die Sätze der aktuellen Seite');
   S.vlStarten();
   pruefe(gesagt.length === 1 && gesagt[0].text === 'Eins.' && gesagt[0].voice.voiceURI === 'martin' && gesagt[0].lang === 'de-DE', 'Vorlesen startet mit der gewählten deutschen Stimme');
-  gesagt[0].onend();
+  gesprochen(S, gesagt[0]);
   pruefe(S.cl.vl.i === 1 && gesagt[1].text === 'Zwei.', 'nach dem Satz geht es von selbst weiter');
   S.vlSchritt('absatz+');
   pruefe(S.cl.vl.i === 2 && gesagt[gesagt.length - 1].text === 'Drei.', 'Absatz vor springt an den nächsten Absatz und liest dort');
-  const alt = gesagt[gesagt.length - 2]; alt.onend();
+  const alt = gesagt[gesagt.length - 2]; gesprochen(S, alt);
   pruefe(S.cl.vl.i === 2, 'ein überholter Satz (nach Sprung) schiebt nicht weiter');
   S.vlAnhalten();
   const d1 = S.vlDokument(id);
   pruefe(!S.cl.vl.laeuft && d1.satz === 2 && d1.geraet && d1.zuletzt && d1.geaendert > 0, 'Anhalten merkt die Lesestelle in der Datenbank (mit Gerät und Zeit)');
   /* Kapitel-Schlaftimer */
   S.vlTimerWahl(-1); S.vlStarten();
-  gesagt[gesagt.length - 1].onend();
+  gesprochen(S, gesagt[gesagt.length - 1]);
   pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 3, 'Schlaftimer „Kapitel“ hält am Kapitelende an');
   /* Minuten-Schlaftimer */
   S.vlTimerWahl(15); S.vlStarten(); S.cl.vl.timerBis = 1;
-  gesagt[gesagt.length - 1].onend();
+  gesprochen(S, gesagt[gesagt.length - 1]);
   pruefe(!S.cl.vl.laeuft, 'Minuten-Schlaftimer hält nach Ablauf an');
   /* Ende */
-  S.vlTimerWahl(0); S.vlGehe(5); S.vlStarten(); gesagt[gesagt.length - 1].onend();
+  S.vlTimerWahl(0); S.vlGehe(5); S.vlStarten(); gesprochen(S, gesagt[gesagt.length - 1]);
   pruefe(!S.cl.vl.laeuft && S.vlDokument(id).fertig === true, 'am Ende: fertig und angehalten');
   /* Sperre */
   S.vlGehe(0); S.vlStarten(); S.vlSperren();
@@ -9735,6 +9738,51 @@ function typReihenfolgeTest() {
 }
 
 
+function vlStummTest() {
+  console.log('\n161. Vorlesen: stumme Sätze springen nicht ans Ende; ▶ nach dem Ende beginnt vorn (0.94.3)');
+  if (!CL) { return; }
+  /* Fehlerart: Der Browser beendet Sätze, ohne sie zu sprechen — das Vorlesen raste bis ans Ende und ▶ startete nur noch den letzten Satz */
+  frisch();
+  const S = CL;
+  const gesagt = [];
+  S.speechSynthesis = { getVoices() { return [{ name: 'Anna', lang: 'de-DE', voiceURI: 'anna' }]; }, speak(u) { gesagt.push(u); }, cancel() {} };
+  S.SpeechSynthesisUtterance = function (x) { this.text = x; };
+  const doc = { saetze: ['Eins.', 'Zwei.', 'Drei.', 'Vier.'], seite: [1, 1, 1, 1], absatz: [0, 0, 1, 1], kapitel: [], titel: 'T', seiten: 1 };
+  S.DB.vorlesen = [{ id: 'vl-s', titel: 'T', art: 'text', satz: 0, saetze: 4, seiten: 1, geaendert: 1 }];
+  S.oeffne('vorlesen'); S.vlOeffnen('vl-s', doc);
+  S.vlStarten();
+  /* Satz endet sofort — schneller, als er gesprochen werden kann (auch mit „onstart“) */
+  gesagt[gesagt.length - 1].onstart && gesagt[gesagt.length - 1].onstart();
+  gesagt[gesagt.length - 1].onend();
+  pruefe(S.cl.vl.i === 0 && S.cl.vl.laeuft && S.cl.vl.stumm === 1, 'stumm beendet: bleibt beim Satz, versucht es noch einmal');
+  S.vlSatzSprechen(); gesagt[gesagt.length - 1].onend();
+  S.vlSatzSprechen(); gesagt[gesagt.length - 1].onend();
+  pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 0 && /Sprachausgabe spricht nicht/.test(S.document.getElementById('toastText').textContent), 'dreimal stumm: angehalten, Hinweis — nicht ans Ende gesprungen');
+  /* Fehler der Sprachausgabe (so meldet Chrome eine fehlende Stimme) */
+  S.vlStarten();
+  gesagt[gesagt.length - 1].onerror({ error: 'synthesis-failed' });
+  pruefe(S.cl.vl.i === 0 && S.cl.vl.laeuft && S.cl.vl.stumm === 1, '„synthesis-failed“: nicht zum nächsten Satz, sondern noch einmal');
+  S.vlSatzSprechen(); gesagt[gesagt.length - 1].onerror({ error: 'synthesis-failed' });
+  S.vlSatzSprechen(); gesagt[gesagt.length - 1].onerror({ error: 'network' });
+  pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 0, 'dreimal Fehler: angehalten am selben Satz');
+  /* Normal gesprochen bis zum Ende */
+  S.vlStarten();
+  for (let n = 0; n < 4; n++) { gesprochen(S, gesagt[gesagt.length - 1]); }
+  pruefe(!S.cl.vl.laeuft && S.cl.vl.i === 3 && S.vlDokument('vl-s').fertig === true, 'gesprochen: bis zum Ende, fertig');
+  S.vlStarten();
+  pruefe(S.cl.vl.laeuft && S.cl.vl.i === 0 && gesagt[gesagt.length - 1].text === 'Eins.', '▶ nach dem Ende: beginnt wieder vorn');
+  S.vlAnhalten();
+  /* Wer selbst auf den letzten Satz geht, hört diesen */
+  S.vlGehe(3); S.vlStarten();
+  pruefe(S.cl.vl.i === 3 && gesagt[gesagt.length - 1].text === 'Vier.', 'selbst auf den letzten Satz gegangen: ▶ liest diesen');
+  S.vlAnhalten();
+  /* Ein Satz, der nach dem Start abgebrochen wird, zählt nicht als stumm */
+  pruefe(/var mindestens = \(120 \+ 8 \*/.test(SKRIPT) && /cl\.vl\.satzObj = u;/.test(SKRIPT), 'Satz wird festgehalten (Chrome), zu schnelles Ende wird erkannt');
+  delete S.speechSynthesis; delete S.SpeechSynthesisUtterance;
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9893,6 +9941,7 @@ function typReihenfolgeTest() {
   try { balkenVorlageTest(); } catch (e) { fail('0.93 Balken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { typTTest(); } catch (e) { fail('0.94 Typ T warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { typReihenfolgeTest(); } catch (e) { fail('0.94.1 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { vlStummTest(); } catch (e) { fail('0.94.3 Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
