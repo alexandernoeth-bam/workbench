@@ -9769,7 +9769,7 @@ function manifestTest() {
   S.DB.gedanken.push({ id: 'mf2', titel: 'Manifest', text: '# Regeln\n| Nr. | Regel |\n| --- | --- |\n| 1 | *Ruhe* |\n---\nText', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
   S.oeffne('manifest');
   const r = inhalt();
-  pruefe(/<h2[^>]*>Regeln<\/h2>/.test(r) && /<table[^>]*><tr><th[^>]*>Nr\.<\/th>/.test(r) && /<i>Ruhe<\/i>/.test(r) && /<hr/.test(r) && !/\| ---|# Regeln|\*Ruhe/.test(r), 'Notiz wird gelesen: Überschrift, Tabelle, Linie, Kursiv — kein Quelltext');
+  pruefe(/<h2[^>]*>Regeln<\/h2>/.test(r) && /<table[^>]*><tr><th[^>]*>Nr\.<\/th>/.test(r) && /<i>Ruhe<\/i>/.test(r) && !/<hr/.test(r) && !/\| ---|# Regeln|\*Ruhe/.test(r), 'Notiz wird gelesen: Überschrift, Tabelle, Kursiv — kein Quelltext, --- ist ein Seitenumbruch (0.97.1)');
 }
 
 function manifestSeitenTest() {
@@ -9791,6 +9791,15 @@ function manifestSeitenTest() {
   pruefe(S.cl.man.seite === 0, 'Blättern über die letzte Seite hinaus bleibt auf der letzten');
   pruefe(/manBlaettern\(-1\)/.test(SKRIPT) && /manBlaettern\(dx < 0/.test(SKRIPT), 'Wischen im Manifest blättert ebenfalls');
   pruefe(/window\.addEventListener\('resize'/.test(SKRIPT), 'Drehen oder Größenänderung rechnet die Seiten neu');
+  /* Schrift und harter Umbruch (0.97.1) */
+  pruefe(S.cl.man.zoom === 18 && S.MAN_STUFEN.indexOf(18) >= 0, 'Manifest: Standardschrift 18 px');
+  S.manZoom(1);
+  pruefe(S.cl.man.zoom === 20, 'A+ macht die Schrift größer, Stufe für Stufe');
+  S.manZoom(-5);
+  pruefe(S.cl.man.zoom === 14, 'A− bleibt an der kleinsten Stufe stehen');
+  S.cl.man.zoom = 18;
+  pruefe(JSON.stringify(S.manPacken([{ h: 10 }, { umbruch: true }, { h: 10 }], 100)) === '[[0],[2]]', '--- erzwingt einen Seitenumbruch');
+  pruefe(JSON.stringify(S.manPacken([{ umbruch: true }, { h: 10 }], 100)) === '[[1]]', 'ein Umbruch am Anfang macht keine leere Seite');
 }
 
 function syncWocheTest() {
