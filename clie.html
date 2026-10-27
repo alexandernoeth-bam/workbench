@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.1</title>
+<title>CLIE 0.97.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1195,7 +1195,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.1';
+var APP_VERSION = '0.97.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29433,13 +29433,29 @@ function pmMemoFussHtml() {
 /* ---- Schreiben: echte Knöpfe statt Zeichen ----
    Jede Zeile ist ein <div>. Die Art der Zeile steht in data-vor (genau der
    Anfang der Textzeile: „[] “, „[x] “, „- “, „## “ …), die Marke in data-m.
-   Was nicht bearbeitbar ist (Tabelle, Skizze, Trenner), steht in data-roh. */
+   Was nicht bearbeitbar ist (Skizze, Trenner), steht in data-roh.
+   Seit 0.97.2: Tabellenzeilen sind wieder bearbeitbare Textzeilen mit „|“;
+   Verweise und Links sind im Editor als Einheit (data-raw) erhalten. */
+
+/* Verweise [[…|Titel]], [Text](https://…) und blanke Links im Editor: atomar, der Originaltext bleibt in data-raw */
+function pmEdInhalt(t) {
+  var rest = String(t || '');
+  var re = /\[\[(projekt|ziel|flaeche|aufgabe|notiz):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]|\[([^\]]{1,200})\] ?\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  var h = '', pos = 0, m;
+  while ((m = re.exec(rest)) !== null) {
+    h += pmInlineHtml(rest.slice(pos, m.index));
+    var titel = m[1] ? (m[3] || m[2]) : (m[4] !== undefined ? m[4] : m[6]);
+    h += '<span class="pm-lnk" contenteditable="false" data-raw="' + esc(m[0]) + '" style="text-decoration:underline">' + esc(titel) + '</span>';
+    pos = m.index + m[0].length;
+  }
+  return h + pmInlineHtml(rest.slice(pos));
+}
 
 function pmEdZeileHtml(z) {
   var roh = function () { return '<div class="pm-roh" contenteditable="false" data-roh="' + esc(z) + '">' + esc(z) + '</div>'; };
-  if (/^\s*\|.*\|\s*$/.test(z) || HS_MUSTER.test(z) || /^\s*(---+|\*\*\*+)\s*$/.test(z)) { return roh(); }
+  if (HS_MUSTER.test(z) || /^\s*(---+|\*\*\*+)\s*$/.test(z)) { return roh(); }
   var einzug = function (e) { return e ? ' style="margin-left:' + Math.min(4, Math.floor(e.length / 2)) * 16 + 'px"' : ''; };
-  var inhalt = function (t) { return pmInlineHtml(t) || '<br>'; };
+  var inhalt = function (t) { return pmEdInhalt(t) || '<br>'; };
   var mid = pmMarke(z);
   var ohne = pmOhneMarke(z);
   var k = ohne.match(KP_KASTEN);
@@ -29490,6 +29506,8 @@ function pmEdInline(n) {
   if (n.nodeType !== 1) { return ''; }
   var tag = pmTag(n);
   if (tag === 'BR') { return '\n'; }
+  /* Verweis oder Link (seit 0.97.2): unverändert zurück in den Text */
+  if (pmAttr(n, 'data-raw') !== null) { return pmAttr(n, 'data-raw'); }
   if (pmAttr(n, 'contenteditable') === 'false') { return ''; }
   var innen = '';
   var k = n.childNodes || [];

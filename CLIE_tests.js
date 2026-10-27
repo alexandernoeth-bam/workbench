@@ -8720,7 +8720,7 @@ function palmEditorTest() {
   pruefe(/id="pmEditor" class="pm-editor" contenteditable="true"/.test(h) && !/\*\*|__|~~|\[\]|\[x\]|⟦|<textarea/.test(h.replace(/data-vor="[^"]*"/g, '').replace(/data-roh="[^"]*"/g, '')),
     'der Editor zeigt Text ohne Zeichen — Art und Marke stehen unsichtbar an der Zeile');
   pruefe(/<div class="pm-k" data-vor="\[\] " data-m="kabc123">eins<\/div>/.test(h) && /<div class="pm-k x" data-vor="\[x\] ">zwei<\/div>/.test(h) && /<div class="pm-p" data-vor="- ">Punkt mit <b>fett<\/b><\/div>/.test(h)
-    && /<div class="pm-roh" contenteditable="false" data-roh="\| a \| b \|">/.test(h) && /<u>unter<\/u> und <s>weg<\/s>/.test(h), 'Zeilen: Kästchen (mit Marke), Punkt, fett, unterstrichen, durchgestrichen; Tabelle unberührt');
+    && /<div class="pm-t">\| a \| b \|<\/div>/.test(h) && /<u>unter<\/u> und <s>weg<\/s>/.test(h), 'Zeilen: Kästchen (mit Marke), Punkt, fett, unterstrichen, durchgestrichen; Tabelle als bearbeitbare Zeile (0.97.2)');
   pruefe(/pmSchreibenUm\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'unten „Fertig“');
   /* Zurücklesen */
   const ed = dk('DIV', {}, [
@@ -9772,6 +9772,24 @@ function manifestTest() {
   pruefe(/<h2[^>]*>Regeln<\/h2>/.test(r) && /<table[^>]*><tr><th[^>]*>Nr\.<\/th>/.test(r) && /<i>Ruhe<\/i>/.test(r) && !/<hr/.test(r) && !/\| ---|# Regeln|\*Ruhe/.test(r), 'Notiz wird gelesen: Überschrift, Tabelle, Kursiv — kein Quelltext, --- ist ein Seitenumbruch (0.97.1)');
 }
 
+function verweisEditTest() {
+  console.log('\n166. Schreiben: Tabellenzeilen bleiben bearbeitbar; Verweise und Links sind im Editor als Einheit erhalten und kommen unverändert zurück (0.97.2)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const h = S.pmEditorHtml({ text: 'Siehe [[projekt:p1|Solar]] und [Web](https://example.com)\n| a | b |\n| 1 | 2 |' });
+  pruefe(!/pm-roh/.test(h) && /<div class="pm-t">\| a \| b \|<\/div>/.test(h), 'Tabellenzeilen sind im Schreiben bearbeitbar (kein pm-roh mehr)');
+  pruefe(/<span class="pm-lnk" contenteditable="false" data-raw="\[\[projekt:p1\|Solar\]\]"[^>]*>Solar<\/span>/.test(h), 'Verweis [[…|Titel]] wird als Einheit mit Titel gezeigt');
+  pruefe(/data-raw="\[Web\]\(https:\/\/example\.com\)"[^>]*>Web<\/span>/.test(h), 'Link [Text](URL) wird als Einheit mit Text gezeigt');
+  const ed = dk('DIV', {}, [
+    dk('DIV', { class: 'pm-t' }, [dt('Siehe '), dk('SPAN', { contenteditable: 'false', 'data-raw': '[[projekt:p1|Solar]]' }, [dt('Solar')]), dt(' und '), dk('SPAN', { contenteditable: 'false', 'data-raw': '[Web](https://example.com)' }, [dt('Web')])]),
+    dk('DIV', { class: 'pm-t' }, [dt('| a | b |')])
+  ]);
+  const t = S.pmEdLesen(ed);
+  pruefe(t === 'Siehe [[projekt:p1|Solar]] und [Web](https://example.com)\n| a | b |', 'Zurücklesen: Verweis und Link bleiben unverändert, Tabellenzeile bleibt Text — ' + JSON.stringify(t));
+  pruefe(S.pmEdInhalt('https://a.de/x').indexOf('data-raw="https://a.de/x"') >= 0, 'blanke Adresse wird im Editor als Einheit geführt');
+  pruefe(S.pmEdInhalt('**fett** Text') === S.pmInlineHtml('**fett** Text'), 'Text ohne Links bleibt wie bisher');
+}
+
 function manifestSeitenTest() {
   console.log('\n164. Manifest: Seiten nach der echten Höhe; ◀ ▶ und Wischen; Tabellenkopf auf jeder Seite (0.97.0)');
   if (!CL) { return; }
@@ -10060,6 +10078,7 @@ function vlStummTest() {
   try { syncWocheTest(); } catch (e) { fail('0.95.0 Sync/Woche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
