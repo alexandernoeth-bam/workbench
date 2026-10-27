@@ -405,7 +405,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 31, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45, SOS seit 0.72)');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 33, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45, SOS seit 0.72, Poker/Schafkopf seit 0.87)');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -7264,7 +7264,7 @@ function spieleSudokuTest() {
   pruefe(S.CL_BILD.spiele && S.CL_BILD.sudoku && S.CL_BILD.solitaer, 'Symbole für Spiele, Sudoku und Solitär');
   S.oeffne('spiele');
   const fen = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && /ordnerWahl\('invasion'\)/.test(fen) && /ordnerWahl\('minen'\)/.test(fen) && /ordnerWahl\('puzzle'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 7,
+  pruefe(S.cl.app === 'uebersicht' && S.cl.aufklapp === 'ordner' && S.cl.ordner === 'spiele' && /ordnerWahl\('sudoku'\)/.test(fen) && /ordnerWahl\('solitaer'\)/.test(fen) && /ordnerWahl\('stones'\)/.test(fen) && /ordnerWahl\('schach'\)/.test(fen) && /ordnerWahl\('invasion'\)/.test(fen) && /ordnerWahl\('minen'\)/.test(fen) && /ordnerWahl\('puzzle'\)/.test(fen) && /ordnerWahl\('poker'\)/.test(fen) && /ordnerWahl\('schafkopf'\)/.test(fen) && (fen.match(/class="sym"/g) || []).length === 9,
     'Spiele öffnet einen Ordner mit Sudoku, Solitär, Stones, Schach, Invasion, Minen und Puzzle (seit 0.35/0.45/0.69)');
   pruefe(/Sudoku: neues Rätsel/.test(fen) && /Solitaire:/.test(fen) && /Stones:/.test(fen), 'Fenster zeigt den Stand je Spiel');
   /* Erzeuger: eindeutig lösbar */
@@ -9126,6 +9126,145 @@ function leisteCssTest() {
 }
 
 
+function pokerTest() {
+  console.log('\n148. Poker — Texas Hold\'em gegen drei Gegner (0.87)');
+  if (!CL) { return; }
+  /* Fehlerarten: falsche Rangfolge der Blätter, Chips verschwinden oder entstehen (Töpfe, Nebentöpfe), Hand bleibt hängen */
+  const S = pmFrisch();
+  delete S.__ablage['clie-poker'];
+  S.cl.pk.s = null;
+  const k = (t) => t.split(' ').map(x => ({ w: ({ A: 14, K: 13, D: 12, B: 11 })[x.slice(0, -1)] || Number(x.slice(0, -1)), f: x.slice(-1) }));
+  const W = (t) => S.pkBestes(k(t));
+  pruefe(W('AP KP DP BP 10P 2H 3K')[0] === 8 && S.pkBlattName(W('AP KP DP BP 10P 2H 3K')) === 'Royal Flush', 'Royal Flush erkannt');
+  pruefe(W('AH 2K 3P 4T 5H 9K KP')[0] === 4 && W('AH 2K 3P 4T 5H 9K KP')[1] === 5, 'Straße A-2-3-4-5: das Ass zählt unten (hoch 5)');
+  pruefe(S.pkVergleich(W('KH KK KP 2T 2H 9K 7P'), W('AH 3H 5H 9H JH 2K 4P'.replace('JH', 'BH'))) > 0, 'Full House schlägt Flush');
+  pruefe(S.pkVergleich(W('AH AK 9P 9T 5H 3K 2P'), W('AP AT 9H 9K 4H 3T 2K')) > 0, 'Zwei Paare gleich: die Beikarte entscheidet');
+  pruefe(S.pkVergleich(W('AH AK 9P 9T 5H 3K 2P'), W('AP AT 9H 9K 5K 3T 2K')) === 0, 'gleiches Blatt mit Farbe ohne Belang: Unentschieden');
+  pruefe(S.pkBlattName(W('KH KK KP 7T 2H 9K 4P')) === 'Drilling Könige', 'Name auf Deutsch: „Drilling Könige“');
+  /* Nebentopf: Du all-in mit 100 und dem besten Blatt, Links und Mitte je 300 */
+  S.pkNeuesSpiel();
+  const st = S.cl.pk.s;
+  st.board = k('2H 7K 9P BT 4H');
+  st.deck = [];
+  st.spieler.forEach((p, i) => { p.raus = i === 3; p.chips = 0; p.gesamt = [100, 300, 300, 0][i]; p.einsatz = 0; });
+  st.spieler[0].karten = k('BH BK'); st.spieler[1].karten = k('9H 9K'); st.spieler[2].karten = k('3T 5T'); st.spieler[3].karten = k('AP AK');
+  S.pkShowdown(st);
+  pruefe(st.spieler[0].chips === 300 && st.spieler[1].chips === 400 && st.spieler[2].chips === 0, 'Nebentopf: Du gewinnst den Haupttopf (300), Links den Nebentopf (400)');
+  /* Viele Hände: Chips bleiben erhalten, nichts hängt */
+  const zufall = S.Math.random;
+  let x = 7;
+  S.Math.random = () => { x = (x * 9301 + 49297) % 233280; return x / 233280; };
+  S.pkNeuesSpiel();
+  let summeOk = true, haengt = false, haende = 0;
+  for (let n = 0; n < 300 && S.cl.pk.s.runde !== 'ende'; n++) {
+    const s2 = S.cl.pk.s;
+    const summe = s2.spieler.reduce((a, p) => a + p.chips + p.gesamt, 0);
+    if (summe !== 4000) { summeOk = false; break; }
+    if (s2.runde === 'showdown') { S.pkNaechsteHand(); haende++; continue; }
+    if (s2.amZug !== 0) { haengt = true; break; }
+    S.pkDu(n % 5 === 0 ? 'erhoehen' : 'mitgehen', s2.hoechst + 2 * s2.bb);
+  }
+  S.Math.random = zufall;
+  pruefe(summeOk, 'Chips bleiben erhalten (4000 im Spiel) über alle Hände');
+  pruefe(!haengt && haende > 5, 'Hände laufen durch, du bist dran oder die Hand ist aus (' + haende + ' Hände)');
+  /* Oberfläche */
+  S.pkNeuesSpiel();
+  S.oeffne('poker');
+  const s3 = S.cl.pk.s;
+  pruefe(/class="kt-k/.test(inhalt()) && /Pot \d+/.test(inhalt()), 'Tisch mit Karten und Pot');
+  const fuss = S.document.getElementById('fuss').innerHTML;
+  pruefe(s3.amZug !== 0 || (/pkDu\('passen'\)/.test(fuss) && /pkDu\('mitgehen'\)/.test(fuss)), 'Fuß: Passen und Checken/Mitgehen');
+  if (s3.amZug === 0) {
+    S.pkErhoehenAuf();
+    pruefe(S.cl.aufklapp === 'pkerhoehen' && /pkErhoehenSetzen\('pot'\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Erhöhen-Fenster mit ½ Pot, Pot, All-in');
+    S.aufklappZu();
+  }
+  pruefe(S.clApp('poker') && S.CL_BILD.poker && S.CL_ORDNER.spiele.apps.indexOf('poker') >= 0, 'Poker im Ordner Games mit Symbol');
+  pruefe(/Hand \d+ · \d+ Chips/.test(S.ordnerStandText('poker')), 'Stand im Ordner: Hand und Chips');
+  S.oeffne('uebersicht');
+}
+
+function schafkopfTest() {
+  console.log('\n149. Schafkopf — Rufspiel, Wenz, Solo (0.87)');
+  if (!CL) { return; }
+  /* Fehlerarten: falsche Trümpfe/Stiche, Regeln der Rufsau verletzt, Abrechnung geht nicht auf null auf */
+  const S = pmFrisch();
+  delete S.__ablage['clie-schafkopf']; delete S.__ablage['clie-schafkopf-tarif'];
+  S.cl.sk.s = null;
+  const K = (f, w) => ({ f: f, w: w });
+  const ruf = { art: 'ruf', farbe: 'G' }, wenz = { art: 'wenz', farbe: '' }, solo = { art: 'solo', farbe: 'G' };
+  pruefe(S.skIstTrumpf(K('H', 'A'), ruf) && S.skIstTrumpf(K('E', 'O'), ruf) && !S.skIstTrumpf(K('G', 'A'), ruf), 'Rufspiel: Ober, Unter und Herz sind Trumpf');
+  pruefe(S.skIstTrumpf(K('S', 'U'), wenz) && !S.skIstTrumpf(K('E', 'O'), wenz) && !S.skIstTrumpf(K('H', '7'), wenz), 'Wenz: nur die Unter');
+  pruefe(S.skIstTrumpf(K('G', '7'), solo) && !S.skIstTrumpf(K('H', 'A'), solo), 'Gras-Solo: Gras ist Trumpf, Herz nicht');
+  const st = (l, sp) => S.skStichSieger(l.map((c, i) => ({ wer: i, k: c })), sp);
+  pruefe(st([K('E', 'O'), K('G', 'O'), K('S', 'U'), K('H', 'A')], ruf) === 0 && st([K('S', 'U'), K('H', 'A'), K('G', 'O'), K('H', '10')], ruf) === 2, 'Trumpf-Reihenfolge: Eichel-Ober vor Gras-Ober vor Unter vor Herz');
+  pruefe(st([K('G', 'A'), K('G', '10'), K('H', '7'), K('G', 'K')], ruf) === 2, 'Farbe angespielt, ein Trumpf sticht');
+  pruefe(st([K('E', 'K'), K('E', 'O'), K('E', '9'), K('S', 'A')], wenz) === 0, 'Wenz: der Ober steht in der Farbe unter dem König');
+  /* Bedienen und Rufsau */
+  const s = { spiel: { art: 'ruf', farbe: 'G', spieler: 1 }, rufGespielt: false, stich: [], haende: [[K('G', 'A'), K('G', '9'), K('H', '7'), K('E', '8')]] };
+  pruefe(S.skErlaubt(s, 0).every(c => !(c.f === 'G' && c.w === '9')), 'Rufsau-Halter: andere Karte der Rufarbe nicht ausspielen (unter vier)');
+  s.stich = [{ wer: 1, k: K('G', '7') }];
+  pruefe(S.skErlaubt(s, 0).length === 1 && S.skErlaubt(s, 0)[0].w === 'A', 'Rufarbe angespielt: die Sau muss fallen');
+  s.stich = [{ wer: 1, k: K('S', '7') }];
+  pruefe(!S.skErlaubt(s, 0).some(c => c.f === 'G' && c.w === 'A'), 'Rufsau nicht schmieren (vor dem letzten Stich)');
+  s.stich = [{ wer: 1, k: K('E', 'O') }];
+  pruefe(S.skErlaubt(s, 0).length === 1 && S.skErlaubt(s, 0)[0].f === 'H', 'Trumpf angespielt: Trumpf zugeben');
+  pruefe(!S.skMoeglich([K('G', 'A'), K('G', '9'), K('S', '7')]).some(m => m.art === 'ruf' && m.farbe === 'G') && !S.skMoeglich([K('G', 'A'), K('S', '7')]).some(m => m.art === 'ruf' && m.farbe === 'E'),
+    'Rufen nur auf eine Sau, die man nicht hat, mit Karte der Farbe');
+  /* Laufende */
+  const l = { spiel: { art: 'ruf', farbe: 'G', spieler: 0 }, partner: 2, blatt0: [[K('E', 'O'), K('G', 'O')], [K('S', 'O')], [K('H', 'O'), K('E', 'U')], []] };
+  pruefe(S.skLaufende(l) === 3, 'Laufende: E-O, G-O beim Spieler, H-O beim Partner, S-O beim Gegner → drei');
+  l.blatt0 = [[K('E', 'O')], [K('G', 'O')], [K('H', 'O')], []];
+  pruefe(S.skLaufende(l) === 0, 'Laufende: nur der Eichel-Ober → zählt nicht (unter drei)');
+  l.blatt0 = [[K('E', 'O'), K('G', 'O')], [K('S', 'U')], [K('H', 'O'), K('S', 'O'), K('E', 'U')], []];
+  pruefe(S.skLaufende(l) === 5, 'Laufende: fünf Trümpfe in Folge bei Spieler und Partner');
+  /* Ganze Runden: 120 Augen, Abrechnung geht auf null auf */
+  const zufall = S.Math.random;
+  let x = 11;
+  S.Math.random = () => { x = (x * 9301 + 49297) % 233280; return x / 233280; };
+  S.skNeu(true);
+  let runden = 0, augenOk = true, nullOk = true, haengt = false, arten = {};
+  for (let n = 0; n < 2000 && runden < 30; n++) {
+    const z = S.cl.sk.s;
+    if (z.phase === 'ansage') { if (S.skReihe(z)[z.ansage.pos] !== 0) { haengt = true; break; } S.skAnsagen('weiter', ''); continue; }
+    if (z.phase === 'zusammen') { S.skWeiter(); continue; }
+    if (z.phase === 'abrechnung') {
+      arten[z.spiel.art] = true;
+      if (z.augen.reduce((a, b) => a + b, 0) !== 120) { augenOk = false; }
+      if (z.stand.reduce((a, b) => a + b, 0) !== 0) { nullOk = false; }
+      runden++; S.skNaechsteRunde(); continue;
+    }
+    if (z.stichFertig) { S.skWeiter(); continue; }
+    if (z.amZug !== 0) { haengt = true; break; }
+    const erlaubt = S.skErlaubt(z, 0);
+    S.cl.sk.wahl = z.haende[0].findIndex(c => S.skGleich(c, erlaubt[0]));
+    S.skAusspielen();
+  }
+  S.Math.random = zufall;
+  pruefe(!haengt && runden === 30, 'dreißig Runden laufen durch (' + runden + ')');
+  pruefe(augenOk, 'jede Runde: zusammen 120 Augen');
+  pruefe(nullOk, 'Stand aller vier zusammen bleibt null (Rufspiel 2:2, Solo/Wenz 3-fach)');
+  pruefe(Object.keys(arten).length >= 1, 'Gegner sagen Spiele an: ' + Object.keys(arten).join(', '));
+  /* Tarife */
+  S.document.getElementById('skTRuf').value = '20'; S.document.getElementById('skTSolo').value = 'x'; S.document.getElementById('skTZu').value = '5';
+  S.skTarifOk();
+  const t = S.skTarif();
+  pruefe(t.ruf === 20 && t.solo === 50 && t.zuschlag === 5, 'Tarife: Eingaben gespeichert, Ungültiges fällt auf den Standard');
+  /* Oberfläche */
+  S.skNeu(true);
+  S.oeffne('schafkopf');
+  pruefe(/class="kt-tisch"/.test(inhalt()) && (inhalt().match(/class="kt-k sk/g) || []).length >= 8 && /<svg class="kt-farbe"/.test(inhalt()), 'Tisch mit vier Plätzen und deinen acht Karten (Farben gezeichnet)');
+  pruefe(S.clApp('schafkopf') && S.CL_BILD.schafkopf && S.CL_ORDNER.spiele.apps.indexOf('schafkopf') >= 0, 'Schafkopf im Ordner Games mit Symbol');
+  if (S.cl.sk.s.phase === 'ansage') {
+    S.skAnsageOeffnen();
+    const af = S.document.getElementById('aufklapp').innerHTML;
+    pruefe(/Spielst du\?/.test(af) && /skAnsagen\('weiter'/.test(af) && (S.cl.sk.s.ansage.best || (/skAnsagen\('wenz'/.test(af) && /skAnsagen\('solo'/.test(af))), 'Ansage-Fenster: Weiter, dazu Wenz und Solo (wenn noch nichts Höheres angesagt ist)');
+    S.aufklappZu();
+  }
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9271,6 +9410,8 @@ function leisteCssTest() {
   try { fehlerZeigenTest(); } catch (e) { fail('0.85.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { coachAusTest(); } catch (e) { fail('0.86 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leisteCssTest(); } catch (e) { fail('0.86.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pokerTest(); } catch (e) { fail('0.87 Poker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { schafkopfTest(); } catch (e) { fail('0.87 Schafkopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
