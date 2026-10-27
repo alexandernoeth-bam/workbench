@@ -9746,6 +9746,7 @@ function manifestTest() {
   if (!CL) { return; }
   const S = pmFrisch();
   const q = SKRIPT;
+  pruefe(/M18 12L50 21L18 31Z/.test(S.CL_BILD.manifest), 'Symbol Manifest: Fahne');
   pruefe(S.clApp('manifest') && S.clApp('kategorien').raster === false, 'Categories raus vom Start, Manifest drauf');
   pruefe(/menueWahl\(\\'kategorien\\'\)/.test(q) && /if \(was === 'kategorien'\) \{ oeffne\('kategorien'\); return; \}/.test(q), 'Categories im Menü ≡');
   S.oeffne('uebersicht');
@@ -9756,7 +9757,10 @@ function manifestTest() {
   pruefe(/Noch kein Manifest/.test(inhalt()), 'ohne Notiz „Manifest“: Hinweis statt Fehler');
   /* Mit Notiz: Zeilen, Auszeichnung, keine Sterne */
   S.DB.gedanken.push({ id: 'mf1', titel: 'Manifest', text: 'Zeile **eins**\nZeile zwei', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  /* Aus dem Memo Pad kommend darf das Manifest nicht im Schreiben-Zustand öffnen (0.96.1) */
+  S.oeffne('memo'); S.cl.memo.schreiben = true;
   S.oeffne('manifest');
+  pruefe(S.cl.memo.schreiben === false && !/memoFeld/.test(inhalt()), 'Manifest öffnet in der Lesen-Ansicht, nicht im Schreiben');
   const h = inhalt();
   pruefe((h.match(/class="ma-z"/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
   pruefe(/oeffne\('memo'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: Memo Pad… öffnet die Notiz zum Bearbeiten');
