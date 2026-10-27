@@ -9427,12 +9427,14 @@ function geminiCoachTest() {
   S.window.open = (u, z) => { geoeffnet = u; ziel = z; return fenster; };
   const appVorher = S.cl.app;
   S.oeffne('gemini');
-  pruefe(geoeffnet === 'https://share.gemini.google/BCFbi3wWmZMl' && ziel === '_blank' && fenster.opener === null && S.cl.app === appVorher, 'Coach: öffnet den Gemini-Chat in neuem Fenster, CLIE bleibt, wo er war');
+  pruefe(geoeffnet === 'https://gemini.google.com/app/cf60dcb4506a19a6' && ziel === '_blank' && fenster.opener === null && S.cl.app === appVorher, 'Coach: öffnet den Gemini-Chat in neuem Fenster, CLIE bleibt, wo er war');
   S.window.open = () => null;
   S.oeffne('gemini');
   pruefe(/Gemini ließ sich nicht öffnen/.test(S.document.getElementById('toastText').textContent) && S.location.href === 'file:///test', 'blockiert: Hinweis auf Pop-ups, CLIE ersetzt sich nicht selbst');
   S.window.open = echt;
   pruefe(!/window\.open\([^)]*noopener/.test(SKRIPT), 'kein „noopener“ im Aufruf');
+  /* Fehlerart 0.94.2: ein geteilter Link (share.gemini.google / g.co) öffnet nie den laufenden Chat, sondern legt einen neuen an */
+  pruefe(/^https:\/\/gemini\.google\.com\/(app|gem)\/[A-Za-z0-9_-]+$/.test(S.CL_COACH_LINK), 'Coach-Link zeigt auf einen Chat oder Gem (gemini.google.com/app|gem/…), nicht auf einen geteilten Link');
   S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
   pruefe(/menueWahl\('drive'\)">Drive</.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: Drive');
   S.menueWahl('drive');
