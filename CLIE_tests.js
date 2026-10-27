@@ -9439,6 +9439,41 @@ function geminiCoachTest() {
 }
 
 
+function zeileImSchreibenTest() {
+  console.log('\n155. „Zeile → Aufgabe…“ auch beim Schreiben: die Zeile mit der Schreibmarke (0.91.1)');
+  if (!CL) { return; }
+  /* Fehlerart: Im Schreib-Modus galt die markierte Zeile nicht — Meldung „Erst eine Zeile … antippen“, obwohl die Schreibmarke in einer Kästchen-Zeile stand */
+  const S = pmFrisch();
+  S.DB.gedanken.push({ id: 'ze1', titel: 'E-Auto leasen 2027', text: 'Idee:\nSkoda\n\nNächste Aktionen:\n[] Wiedervorlage Auto Leasing', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.pmMemoOeffnen('ze1', '');
+  S.pmSchreibenUm();
+  pruefe(S.cl.memo.schreiben === true, 'Schreib-Modus an');
+  /* Ein Editor wie im Browser: eine Zeile je DIV */
+  const ed = S.document.getElementById('pmEditor');
+  const div = (vor, text) => { const d = { nodeType: 1, nodeName: 'DIV', parentNode: ed, childNodes: [{ nodeType: 3, nodeValue: text }], getAttribute(k) { return k === 'data-vor' ? vor : null; }, setAttribute() {} }; return d; };
+  ed.childNodes = [div('', 'Idee:'), div('', 'Skoda'), div('', ''), div('', 'Nächste Aktionen:'), div('[] ', 'Wiedervorlage Auto Leasing')];
+  const echt = S.window.getSelection;
+  S.window.getSelection = () => ({ anchorNode: ed.childNodes[4].childNodes[0] });
+  ed.childNodes[4].childNodes[0].parentNode = ed.childNodes[4];
+  pruefe(S.pmEdZeileNr() === 4, 'Schreibmarke in der 5. Zeile → Zeile 4');
+  S.pmEdMarkeMerken();
+  /* Klick ins Menü: die Auswahl ist weg — die gemerkte Zeile gilt */
+  S.window.getSelection = () => null;
+  pruefe(S.pmEdZeileNr() === 4, 'Auswahl verloren (Klick ins Menü): die gemerkte Zeile gilt');
+  S.pmZeileAlsAufgabe();
+  pruefe(S.cl.memo.schreiben === false && S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster && S.cl.pm.fenster.titel === 'Wiedervorlage Auto Leasing',
+    'Schreiben endet, das Fenster „Neue Aufgabe“ kommt mit dem Text der Zeile');
+  S.document.getElementById('pmTitel').value = 'Wiedervorlage Auto Leasing';
+  S.pmSpeichern();
+  const text = S.DB.gedanken.filter(g => g.id === 'ze1')[0].text;
+  pruefe(/\[\] Wiedervorlage Auto Leasing ⟦[A-Za-z0-9_-]+⟧$/.test(text) && S.DB.aufgaben.some(a => a.titel === 'Wiedervorlage Auto Leasing' && a.memo && a.memo.zeile),
+    'gespeichert: Aufgabe mit Verknüpfung, Marke an der Zeile');
+  S.window.getSelection = echt;
+  S.cl.pm.edZeile = null;
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9591,6 +9626,7 @@ function geminiCoachTest() {
   try { terminMemoTest(); } catch (e) { fail('0.90 Termin→Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { markenReparaturTest(); } catch (e) { fail('0.90.1 Marken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { geminiCoachTest(); } catch (e) { fail('0.91 Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { zeileImSchreibenTest(); } catch (e) { fail('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

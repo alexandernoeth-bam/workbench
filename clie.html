@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.91.0</title>
+<title>CLIE 0.91.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1191,7 +1191,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.91.0';
+var APP_VERSION = '0.91.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27782,7 +27782,7 @@ var KR_PFADE = [
    ============================================================ */
 
 cl.pm = { tab: 'alle', datum: 'heute', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
-          showF: null, mf: null, zuAlle: false, zuTermin: false, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
+          showF: null, mf: null, zuAlle: false, zuTermin: false, edZeile: null, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
 
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
 var PM_SHOW_KEY = 'clie-pm-show';
@@ -28904,7 +28904,7 @@ function pmEditorHtml(s) {
   };
   return '<div class="pm-leiste">' + knopf('fett', '<b>B</b>', 'fett') + knopf('unter', '<u>U</u>', 'unterstrichen') + knopf('durch', '<s>S</s>', 'durchgestrichen')
     + knopf('punkt', '•', 'Aufzählung') + knopf('kasten', '☐', 'Kästchen') + '</div>'
-    + '<div id="pmEditor" class="pm-editor" contenteditable="true" spellcheck="true" oninput="pmEdGetippt()" onkeydown="pmEdTaste(event)" onpaste="pmEdEinfuegen(event)">'
+    + '<div id="pmEditor" class="pm-editor" contenteditable="true" spellcheck="true" oninput="pmEdGetippt()" onkeyup="pmEdMarkeMerken()" onmouseup="pmEdMarkeMerken()" ontouchend="pmEdMarkeMerken()" onkeydown="pmEdTaste(event)" onpaste="pmEdEinfuegen(event)">'
     + String(s.text || '').split('\n').map(pmEdZeileHtml).join('') + '</div>';
 }
 
@@ -29012,6 +29012,26 @@ function pmEdGetippt() {
   s.text = t;
   s.geaendert = jetzt();
   spaeterSichern();
+}
+
+/* Seit 0.91.1: die Zeile mit der Schreibmarke merken — ein Klick ins Menü kann die Auswahl verlieren */
+function pmEdMarkeMerken() {
+  var sel = window.getSelection ? window.getSelection() : null;
+  var z = (sel && sel.anchorNode) ? pmEdZeileVon(sel.anchorNode) : null;
+  if (z) { cl.pm.edZeile = z; }
+}
+
+/* Nummer der Textzeile, in der die Schreibmarke steht (oder zuletzt stand) — sonst -1 */
+function pmEdZeileNr() {
+  var ed = document.getElementById('pmEditor');
+  if (!ed || !ed.childNodes) { return -1; }
+  var sel = window.getSelection ? window.getSelection() : null;
+  var z = (sel && sel.anchorNode) ? pmEdZeileVon(sel.anchorNode) : null;
+  if (!z && cl.pm.edZeile && cl.pm.edZeile.parentNode === ed) { z = cl.pm.edZeile; }
+  var k = Array.prototype.slice.call(ed.childNodes);
+  var i = z ? k.indexOf(z) : -1;
+  if (i <= 0) { return i; }
+  return pmEdLesen({ childNodes: k.slice(0, i) }).split('\n').length;
 }
 
 /* Die Zeile (direktes Kind des Editors), in der die Schreibmarke steht */
@@ -29441,11 +29461,18 @@ function pmMemoAlsAufgabe() {
 
 function pmZeileAlsAufgabe() {
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
+  /* Seit 0.91.1: beim Schreiben gilt die Zeile mit der Schreibmarke — das Schreiben endet dafür,
+     sonst ginge die neue Marke beim nächsten Tippen wieder verloren */
+  if (s && cl.memo.schreiben && !cl.memo.ausListe && !cl.memo.ausProjekt && !cl.memo.ausZiel) {
+    var nrEd = pmEdZeileNr();
+    pmSchreibenUm();
+    cl.pm.zeile = nrEd;
+  }
   var zeilen = s ? String(s.text || '').split('\n') : [];
   var nr = cl.pm.zeile;
   var z = (nr >= 0 && nr < zeilen.length) ? zeilen[nr] : '';
   var a = kpAufgabe(pmOhneMarke(z));
-  if (!s || !a) { melde('Erst eine Zeile mit Kästchen antippen, dann „Zeile → Aufgabe…“.', null); return; }
+  if (!s || !a) { melde('Erst in eine Zeile mit Kästchen tippen (die Schreibmarke dorthin setzen), dann „Zeile → Aufgabe…“.', null); return; }
   var mid = pmMarke(z);
   if (mid && pmAufgabeZurMarke(mid)) { pmDetails(mid); return; }
   pmNeu('', '');
