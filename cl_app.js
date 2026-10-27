@@ -52,7 +52,9 @@ var CL_APPS = [
   { id: 'sos', name: 'SOS', stufe: '', was: 'Die 3-Minuten-Selbstdistanzierung: Schritt für Schritt, mit stiller Uhr — der Plan kommt auf Papier.' },
   /* Seit 0.89: Raster 3×5 — Planning und Learning aufgelöst, ihre Apps liegen direkt auf dem Start */
   { id: 'ideen', name: 'Idea Lab', stufe: '', was: '' },
-  { id: 'kategorien', name: 'Categories', stufe: '', was: '' },
+  /* Seit 0.96: Categories im Menü ≡; auf dem Start steht das Manifest (Notiz „Manifest“ aus dem Memo Pad) */
+  { id: 'kategorien', name: 'Categories', stufe: '', was: '', raster: false },
+  { id: 'manifest', name: 'Manifest', stufe: '', was: 'Dein Manifest: die Notiz „Manifest“ aus dem Memo Pad, nur zum Lesen.' },
   { id: 'leitfaden', name: 'Guide', stufe: '', was: '' },
   { id: 'lernkartei', name: 'Flashcards', stufe: '', was: '' },
   /* Seit 0.91: Coach = der Coaching-Chat in Gemini (öffnet außen); Drive ins Menü ≡ */
@@ -86,6 +88,8 @@ var CL_APPS = [
 var CL_STRICH = 'stroke="#C9D3B7" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"';
 var CL_FUELL = 'fill="#C9D3B7"';
 var CL_BILD = {
+  /* Seit 0.96: Manifest — ein Blatt mit Zeilen */
+  manifest: '<path d="M20 14h24v36H20z" ' + CL_STRICH + '/><path d="M26 24h12M26 30h12M26 36h8" ' + CL_STRICH + '/>',
   kalender: '<rect x="18" y="20" width="28" height="26" rx="2" ' + CL_STRICH + '/><path d="M18 28h28" ' + CL_STRICH + '/><path d="M24 16v7M40 16v7" ' + CL_STRICH + '/>'
           + '<rect x="23" y="32" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="32" width="4" height="4" ' + CL_FUELL + '/><rect x="37" y="32" width="4" height="4" ' + CL_FUELL + '/>'
           + '<rect x="23" y="39" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="39" width="4" height="4" ' + CL_FUELL + '/>',
@@ -1073,6 +1077,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
+  else if (cl.app === 'manifest') { el.innerHTML = manifestHtml(); }
   else if (cl.app === 'leitfaden') {
     /* Beim Tippen in Notiz oder Tabelle nicht neu zeichnen (seit 0.68) */
     if (document.activeElement && /^lf/.test(String(document.activeElement.id || '')) && el.innerHTML.indexOf('id="' + document.activeElement.id + '"') >= 0) { return; }
@@ -1279,6 +1284,7 @@ function aufklappZeichnen() {
       + '<button type="button" class="sos-menue" onclick="menueWahl(\'sos\')">SOS…</button>'
       + '<button type="button" onclick="menueWahl(\'abgleich\')">HotSync…</button>'
       + '<button type="button" onclick="menueWahl(\'drive\')">Drive</button>'
+      + '<button type="button" onclick="menueWahl(\'kategorien\')">Categories</button>'
       + '<button type="button" onclick="menueWahl(\'version\')">Check for update</button>'
       + '<button type="button" onclick="menueWahl(\'termine\')">Fetch events</button>'
       + '<button type="button" onclick="menueWahl(\'einkauf\')">Link shopping list…</button>'
@@ -1336,6 +1342,7 @@ function fussZeichnen() {
         : (cl.app === 'sos') ? sosFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
+        : (cl.app === 'manifest') ? manifestFussHtml()
         : (cl.app === 'leitfaden') ? leitfadenFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
@@ -1499,6 +1506,7 @@ function menueWahl(was) {
   if (was === 'abgleich') { oeffne('abgleich'); return; }
   if (was === 'sos') { oeffne('sos'); return; }
   if (was === 'drive') { oeffne('drive'); return; }
+  if (was === 'kategorien') { oeffne('kategorien'); return; }
   if (was === 'termine') { aufklappZeichnen(); clTermineHolen(true); return; }
   if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
   if (was === 'einkauf') { cl.aufklapp = 'einkauf'; aufklappZeichnen(); return; }
@@ -24077,3 +24085,26 @@ function start() {
 }
 
 window.addEventListener('DOMContentLoaded', start);
+
+/* ---------- Manifest (seit 0.96): zeigt die Notiz „Manifest“ aus dem Memo Pad, nur zum Lesen ---------- */
+function manifestNotiz() {
+  var treffer = (DB.gedanken || []).filter(function (g) {
+    return g && typeof g === 'object' && String(g.titel || '').trim().toLowerCase() === 'manifest';
+  });
+  return treffer[0] || null;
+}
+
+function manifestHtml() {
+  var n = manifestNotiz();
+  if (!n) {
+    return '<div class="ma"><p class="leise">Noch kein Manifest. Lege im Memo Pad eine Notiz mit dem Titel „Manifest“ an, dann erscheint sie hier.</p></div>';
+  }
+  var zeilen = String(n.text || '').split('\n');
+  return '<div class="ma">' + zeilen.map(function (z) {
+    return '<p class="ma-z">' + (pmInlineHtml(z) || '&nbsp;') + '</p>';
+  }).join('') + '</div>';
+}
+
+function manifestFussHtml() {
+  return '<button type="button" class="knopf" onclick="oeffne(\'memo\')">Memo Pad…</button>';
+}

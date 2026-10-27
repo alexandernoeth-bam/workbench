@@ -408,7 +408,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 32, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 33, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -538,9 +538,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","kategorien","leitfaden","lernkartei","gemini","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","manifest","leitfaden","lernkartei","gemini","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
-    'Start 3×5 (seit 0.89): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Idea Lab, Categories, Guide / Flashcards, Coach, Games ▸ (Coach seit 0.91)');
+    'Start 3×5 (seit 0.89): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Idea Lab, Manifest, Guide / Flashcards, Coach, Games ▸ (Coach seit 0.91)');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2296,7 +2296,7 @@ function kategorienTest() {
   S.iwSpeichern({ id: 'iw-pv', titel: 'Speicher nachrüsten', stufe: 1, status: 'aktiv', bereich: k.id, varianten: [], meilensteine: [], schritte: [], wochen: [] });
   /* Gesamtsicht */
   S.oeffne('kategorien');
-  pruefe(S.clApp('kategorien').raster !== false && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
+  pruefe(S.clApp('kategorien').raster === false && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
   S.katOeffnen(k.id);
   const g = inhalt();
   pruefe(/To Do · offen/.test(g) && /Foto machen/.test(g) && /Listen/.test(g) && /Zählerschrank/.test(g) && /Projekte · Ziele/.test(g) && /PV-Anlage Haus/.test(g)
@@ -2631,7 +2631,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,kategorien,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
+  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,manifest,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -3140,7 +3140,7 @@ function katStattBerufTest() {
   S.oeffne('routinen'); S.rtNeu();
   pruefe(/id="rtKat"/.test(S.document.getElementById('aufklapp').innerHTML) && !/Beruf/.test(S.document.getElementById('aufklapp').innerHTML), 'Routine: Kategorie statt Beruf/Privat');
   S.aufklappZu();
-  pruefe(S.clApp('kategorien').raster !== false && !S.clOrdnerVon('kategorien'), 'App „Kategorien“ seit 0.89 direkt auf dem Start');
+  pruefe(S.clApp('kategorien').raster === false && !S.clOrdnerVon('kategorien'), 'App „Kategorien“ seit 0.96 im Menü ≡, nicht mehr auf dem Start');
   S.oeffne('uebersicht');
 }
 
@@ -3166,7 +3166,7 @@ function katUebersichtTest() {
   S.katSetzen(k.id);
   pruefe(S.cl.filter === k.id && S.cl.app === 'uebersicht' && /▼ PV-Anlage/.test(S.document.getElementById('katKnopf').textContent), 'Tipp: filtert, bleibt auf der Übersicht');
   S.katSetzen('alle');
-  pruefe(S.clApp('kategorien').raster !== false && typeof S.katVonUebersicht === 'undefined', 'App „Kategorien“ seit 0.89 direkt auf dem Start');
+  pruefe(S.clApp('kategorien').raster === false && typeof S.katVonUebersicht === 'undefined', 'App „Kategorien“ seit 0.96 im Menü ≡, nicht mehr auf dem Start');
   S.oeffne('uebersicht');
 }
 
@@ -9321,7 +9321,7 @@ function raster35Test() {
   const S = pmFrisch();
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
   pruefe(raster.length === 15 && raster.length % 3 === 0, 'Raster genau voll: 15 Felder in drei Spalten');
-  pruefe(['ideen', 'kategorien', 'leitfaden', 'lernkartei', 'gemini'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Categories, Guide, Flashcards, Coach direkt auf dem Start');
+  pruefe(['ideen', 'manifest', 'leitfaden', 'lernkartei', 'gemini'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Manifest, Guide, Flashcards, Coach direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
   Object.keys(S.CL_ORDNER).forEach(k => S.CL_ORDNER[k].apps.forEach(id => { if (!S.clApp(id) || raster.indexOf(id) >= 0) { fehlt.push(k + ':' + id); } }));
@@ -9741,6 +9741,27 @@ function typReihenfolgeTest() {
 }
 
 
+function manifestTest() {
+  console.log('\n163. Manifest: zeigt die Notiz „Manifest“ aus dem Memo Pad, nur zum Lesen; Categories im Menü (0.96.0)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const q = SKRIPT;
+  pruefe(S.clApp('manifest') && S.clApp('kategorien').raster === false, 'Categories raus vom Start, Manifest drauf');
+  pruefe(/menueWahl\(\\'kategorien\\'\)/.test(q) && /if \(was === 'kategorien'\) \{ oeffne\('kategorien'\); return; \}/.test(q), 'Categories im Menü ≡');
+  S.oeffne('uebersicht');
+  pruefe(/oeffne\('manifest'\)/.test(inhalt()) && !!S.CL_BILD.manifest, 'Manifest auf dem Start, mit eigenem Symbol');
+  /* Ohne Notiz: ein Hinweis, kein Fehler */
+  S.DB.gedanken = (S.DB.gedanken || []).filter(g => String(g.titel || '').trim().toLowerCase() !== 'manifest');
+  S.oeffne('manifest');
+  pruefe(/Noch kein Manifest/.test(inhalt()), 'ohne Notiz „Manifest“: Hinweis statt Fehler');
+  /* Mit Notiz: Zeilen, Auszeichnung, keine Sterne */
+  S.DB.gedanken.push({ id: 'mf1', titel: 'Manifest', text: 'Zeile **eins**\nZeile zwei', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.oeffne('manifest');
+  const h = inhalt();
+  pruefe((h.match(/class="ma-z"/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
+  pruefe(/oeffne\('memo'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: Memo Pad… öffnet die Notiz zum Bearbeiten');
+}
+
 function syncWocheTest() {
   console.log('\n162. Sync: sofort senden, beim Verlassen und Online; Stand vor dem Hochladen prüfen. To Do „Diese Woche“ (0.95.0)');
   if (!CL) { return; }
@@ -9997,6 +10018,7 @@ function vlStummTest() {
   try { typReihenfolgeTest(); } catch (e) { fail('0.94.1 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlStummTest(); } catch (e) { fail('0.94.3 Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { syncWocheTest(); } catch (e) { fail('0.95.0 Sync/Woche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
