@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.91.2</title>
+<title>CLIE 0.92.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1191,7 +1191,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.91.2';
+var APP_VERSION = '0.92.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -5743,7 +5743,7 @@ function terminNeu(is, zeit) {
   }
   var ende = clMinuten(z) + 60;
   var bis = ende >= 24 * 60 ? '23:59' : zwei(Math.floor(ende / 60)) + ':' + zwei(ende % 60);
-  cl.termin = { modus: 'neu', t: null, vorschlag: { titel: '', datum: d, von: z, bis: bis, ganztags: false, kalId: '', ort: '', notiz: '' } };
+  cl.termin = { modus: 'neu', t: null, vorschlag: { titel: '', datum: d, von: z, bis: bis, ganztags: false, kalId: '', ort: '', notiz: '', wdh: '', ende: 'nie', bisDatum: '', anzahl: 10 } };
   cl.aufklapp = 'termin';
   aufklappZeichnen();
   schreibKalenderHolen().then(function () {
@@ -5774,9 +5774,155 @@ function terminAendern() {
   schreibKalenderHolen().then(clTerminFensterNeu).catch(function () { return null; });
 }
 
+/* ---------- Serientermine (seit 0.92) ----------
+   Anlegen mit Wiederholung (RRULE bei Google), Ändern und Löschen
+   wahlweise nur dieses einen Termins oder der ganzen Serie. */
+var TERMIN_WT_KURZ = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+var TERMIN_WT_ADV = ['sonntags', 'montags', 'dienstags', 'mittwochs', 'donnerstags', 'freitags', 'samstags'];
+var TERMIN_WT_NAME = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+/* Der wievielte Wochentag im Monat (1–4, -1 = der letzte) */
+function terminWtNr(datum) {
+  var t = Number(String(datum).slice(8, 10)) || 1;
+  var tageImMonat = new Date(Number(datum.slice(0, 4)), Number(datum.slice(5, 7)), 0).getDate();
+  return t + 7 > tageImMonat ? -1 : Math.ceil(t / 7);
+}
+
+/* Die Wahlmöglichkeiten — die Texte nach dem Datum */
+function terminWdhWahl(datum, eigen) {
+  var d = /^\d{4}-\d{2}-\d{2}$/.test(String(datum)) ? datum : isoDatum();
+  var wt = new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))).getDay();
+  var nr = terminWtNr(d);
+  var l = [['', 'keine'], ['DAILY', 'täglich'], ['WERKTAGS', 'werktags (Mo–Fr)'], ['WEEKLY', 'wöchentlich – ' + TERMIN_WT_ADV[wt]],
+           ['WEEKLY2', 'alle 2 Wochen – ' + TERMIN_WT_ADV[wt]], ['MONTHLY', 'monatlich – am ' + Number(d.slice(8, 10)) + '.'],
+           ['MONTHLYPOS', 'monatlich – am ' + (nr < 0 ? 'letzten' : nr + '.') + ' ' + TERMIN_WT_NAME[wt]],
+           ['YEARLY', 'jährlich – am ' + Number(d.slice(8, 10)) + '.' + Number(d.slice(5, 7)) + '.']];
+  if (eigen) { l.push(['EIGEN', 'wie bisher (' + String(eigen).replace(/^RRULE:/, '').slice(0, 40) + ')']); }
+  return l;
+}
+
+/* Wahl → RRULE für Google */
+function terminRegel(wdh, datum, ende, bisDatum, anzahl, ganztags, eigen) {
+  if (!wdh) { return ''; }
+  if (wdh === 'EIGEN') { return eigen || ''; }
+  var wt = new Date(Number(datum.slice(0, 4)), Number(datum.slice(5, 7)) - 1, Number(datum.slice(8, 10))).getDay();
+  var r = { DAILY: 'FREQ=DAILY', WERKTAGS: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', WEEKLY: 'FREQ=WEEKLY;BYDAY=' + TERMIN_WT_KURZ[wt],
+            WEEKLY2: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=' + TERMIN_WT_KURZ[wt], MONTHLY: 'FREQ=MONTHLY;BYMONTHDAY=' + Number(datum.slice(8, 10)),
+            MONTHLYPOS: 'FREQ=MONTHLY;BYDAY=' + terminWtNr(datum) + TERMIN_WT_KURZ[wt], YEARLY: 'FREQ=YEARLY' }[wdh];
+  if (!r) { return ''; }
+  if (ende === 'bis' && /^\d{4}-\d{2}-\d{2}$/.test(String(bisDatum))) { r += ';UNTIL=' + bisDatum.replace(/-/g, '') + (ganztags ? '' : 'T235959Z'); }
+  if (ende === 'anzahl' && Number(anzahl) >= 1) { r += ';COUNT=' + Math.min(999, Math.round(Number(anzahl))); }
+  return 'RRULE:' + r;
+}
+
+/* RRULE von Google → Wahl im Fenster; Unbekanntes bleibt „wie bisher“ */
+function terminRegelLesen(rrule, datum) {
+  var aus = { wdh: '', ende: 'nie', bisDatum: '', anzahl: 10, eigen: '' };
+  var t = String(rrule || '').replace(/^RRULE:/, '');
+  if (!t) { return aus; }
+  var teile = {};
+  t.split(';').forEach(function (x) { var p = x.split('='); if (p.length === 2) { teile[p[0]] = p[1]; } });
+  if (teile.UNTIL) { aus.ende = 'bis'; aus.bisDatum = teile.UNTIL.slice(0, 4) + '-' + teile.UNTIL.slice(4, 6) + '-' + teile.UNTIL.slice(6, 8); }
+  if (teile.COUNT) { aus.ende = 'anzahl'; aus.anzahl = Number(teile.COUNT) || 10; }
+  var ohneEnde = Object.keys(teile).filter(function (k) { return k !== 'UNTIL' && k !== 'COUNT' && k !== 'WKST'; }).sort().map(function (k) { return k + '=' + teile[k]; }).join(';');
+  var probe = ['DAILY', 'WERKTAGS', 'WEEKLY', 'WEEKLY2', 'MONTHLY', 'MONTHLYPOS', 'YEARLY'].filter(function (w) {
+    var r = terminRegel(w, datum, 'nie', '', 0, false, '').replace(/^RRULE:/, '');
+    var rt = {};
+    r.split(';').forEach(function (x) { var p = x.split('='); rt[p[0]] = p[1]; });
+    return Object.keys(rt).sort().map(function (k) { return k + '=' + rt[k]; }).join(';') === ohneEnde;
+  })[0];
+  if (probe) { aus.wdh = probe; } else { aus.wdh = 'EIGEN'; aus.eigen = 'RRULE:' + t; }
+  return aus;
+}
+
+/* Die Felder „Wiederholung“ und „Endet“ — nur bei „Neu“ und „alle der Serie“ */
+function terminWdhHtml(v) {
+  var wahl = terminWdhWahl(v.datum, v.eigen);
+  var h = '<label for="terminWdh">Wiederholung:</label><select id="terminWdh" class="eingabe" onchange="terminWdhNeu()">'
+    + wahl.map(function (w) { return '<option value="' + w[0] + '"' + (w[0] === (v.wdh || '') ? ' selected' : '') + '>' + esc(w[1]) + '</option>'; }).join('') + '</select>';
+  if (!v.wdh || v.wdh === 'EIGEN') { return h; }
+  var k = function (was, text) { return '<button type="button"' + (v.ende === was ? ' class="an"' : '') + ' onclick="terminEndeWahl(\'' + was + '\')">' + text + '</button>'; };
+  h += '<label>Endet:</label><div class="wahlreihe">' + k('nie', 'nie') + k('bis', 'am Datum') + k('anzahl', 'nach Anzahl') + '</div>';
+  if (v.ende === 'bis') { h += '<input id="terminWdhBis" class="eingabe" type="date" aria-label="endet am" value="' + esc(v.bisDatum || '') + '">'; }
+  if (v.ende === 'anzahl') { h += '<div class="zeitpaar"><input id="terminWdhAnz" class="eingabe zahlfeld" type="number" min="1" max="999" inputmode="numeric" aria-label="Anzahl" value="' + esc(String(v.anzahl || 10)) + '"><span>Mal</span></div>'; }
+  return h;
+}
+
+/* Was im Fenster steht, in den Vorschlag — dann Wiederholung neu zeichnen */
+function terminWdhLesen() {
+  var v = cl.termin && cl.termin.vorschlag;
+  if (!v) { return null; }
+  var w = document.getElementById('terminWdh');
+  if (w && typeof w.value === 'string') { v.wdh = w.value; }
+  var d = clFeldWert('terminDatum');
+  if (d) { v.datum = d; }
+  var b = document.getElementById('terminWdhBis');
+  if (b && typeof b.value === 'string') { v.bisDatum = b.value; }
+  var n = document.getElementById('terminWdhAnz');
+  if (n && n.value !== undefined && n.value !== '') { v.anzahl = Number(n.value) || 10; }
+  return v;
+}
+
+function terminWdhNeu() {
+  var v = terminWdhLesen();
+  var el = document.getElementById('terminWdhFeld');
+  if (v && el) { el.innerHTML = terminWdhHtml(v); }
+}
+
+function terminEndeWahl(was) {
+  var v = terminWdhLesen();
+  if (!v) { return; }
+  v.ende = was;
+  if (was === 'bis' && !v.bisDatum) { v.bisDatum = tagePlus(v.datum, 90); }
+  terminWdhNeu();
+}
+
+/* Serientermin: erst fragen — nur dieser oder alle */
+function terminSerieFrage(was) {
+  if (!cl.termin || !cl.termin.t) { return; }
+  cl.termin.modus = 'serienfrage';
+  cl.termin.frage = was;
+  clTerminFensterNeu();
+}
+
+/* Alle Termine der Serie ändern: den Serien-Termin bei Google holen */
+function terminSerieAendern() {
+  var o = cl.termin;
+  var t = o && o.t;
+  if (!t || !t.serieId || !t.kalId) { return; }
+  if (!tokenGueltig()) { melde('Ändern geht nur mit Verbindung zu Google.', 'warn'); return; }
+  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(t.kalId) + '/events/' + encodeURIComponent(t.serieId);
+  return window.fetch(adresse, { headers: driveKopf() }).then(antwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (m) {
+      var st = (m && m.start) || {};
+      var en = (m && m.end) || {};
+      var ganz = !!st.date;
+      var datum = ganz ? st.date : String(st.dateTime || '').slice(0, 10);
+      var regel = ((m && m.recurrence) || []).filter(function (x) { return /^RRULE:/.test(x); })[0] || '';
+      var w = terminRegelLesen(regel, datum);
+      cl.termin = { modus: 'serie', t: t, tag: o.tag, serieId: t.serieId, rest: ((m && m.recurrence) || []).filter(function (x) { return !/^RRULE:/.test(x); }),
+        vorschlag: { titel: (m && m.summary) || t.titel, datum: datum, von: ganz ? '09:00' : String(st.dateTime || '').slice(11, 16),
+          bis: ganz ? '10:00' : String(en.dateTime || '').slice(11, 16), ganztags: ganz, kalId: t.kalId, ort: (m && m.location) || '',
+          notiz: (m && m.description) || '', privat: !!(m && (m.visibility === 'private' || m.visibility === 'confidential')),
+          wdh: w.wdh, ende: w.ende, bisDatum: w.bisDatum, anzahl: w.anzahl, eigen: w.eigen } };
+      cl.aufklapp = 'termin';
+      clTerminFensterNeu();
+    }).catch(clSchreibFehler);
+}
+
+/* Alle Termine der Serie löschen */
+function terminSerieLoeschenFragen() {
+  if (!cl.termin || !cl.termin.t) { return; }
+  cl.termin.modus = 'loeschen';
+  cl.termin.alle = true;
+  clTerminFensterNeu();
+}
+
 function terminLoeschenFragen() {
   if (!cl.termin || !cl.termin.t) { return; }
   cl.termin.modus = 'loeschen';
+  cl.termin.alle = false;
   clTerminFensterNeu();
 }
 
@@ -5809,15 +5955,27 @@ function terminFensterHtml() {
       /* Seit 0.90: einem Memo zuordnen — nur verknüpft, Google bleibt unverändert */
       + pmTerminMemoHtml(t)
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufklappZu()">OK</button>'
-      + (t.kalId ? '<button type="button" class="knopf" onclick="terminAendern()">Ändern</button>'
-                 + '<button type="button" class="knopf" onclick="terminLoeschenFragen()">Löschen…</button>' : '')
-      + '</div>' + (t.serieId ? '<p class="leise">Ein Serientermin: Ändern und Löschen gelten nur für diesen einen.</p>' : '')
+      + (t.kalId ? '<button type="button" class="knopf" onclick="' + (t.serieId ? 'terminSerieFrage(\'aendern\')' : 'terminAendern()') + '">Ändern</button>'
+                 + '<button type="button" class="knopf" onclick="' + (t.serieId ? 'terminSerieFrage(\'loeschen\')' : 'terminLoeschenFragen()') + '">Löschen…</button>' : '')
+      + '</div>' + (t.serieId ? '<p class="leise">Ein Serientermin: beim Ändern und Löschen wählst du, ob nur dieser oder alle.</p>' : '')
       + '</div></div>';
+  }
+  /* Seit 0.92: nur dieser oder alle der Serie */
+  if (o.modus === 'serienfrage' && t) {
+    var aendern = o.frage !== 'loeschen';
+    return '<div class="fenster"><div class="titel">Serientermin ' + (aendern ? 'ändern' : 'löschen') + '</div><div class="rumpf">'
+      + '<p>„' + esc(t.titel) + '“ ist Teil einer Serie.</p>'
+      + '<button type="button" class="wahl" onclick="' + (aendern ? 'terminAendern()' : 'terminLoeschenFragen()') + '"><b>Nur diesen Termin</b><br><small>'
+      + esc(clWt(o.tag) + ' ' + clKurzDatum(o.tag)) + ' — die übrigen bleiben</small></button>'
+      + '<button type="button" class="wahl" onclick="' + (aendern ? 'terminSerieAendern()' : 'terminSerieLoeschenFragen()') + '"><b>Alle Termine der Serie</b><br><small>'
+      + (aendern ? 'Titel, Zeit, Ort, Wiederholung für alle' : 'die ganze Serie aus dem Kalender') + '</small></button>'
+      + '<div class="knoepfe"><button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
   }
   if (o.modus === 'loeschen' && t) {
     return '<div class="fenster"><div class="titel">Termin löschen</div><div class="rumpf">'
-      + '<p>„' + esc(t.titel) + '“ am ' + esc(clKurzDatum(o.tag)) + ' wirklich aus dem Google-Kalender löschen?</p>'
-      + (t.serieId ? '<p class="leise">Nur dieser eine Termin der Serie.</p>' : '')
+      + (o.alle ? '<p>Alle Termine der Serie „' + esc(t.titel) + '“ wirklich aus dem Google-Kalender löschen?</p>'
+               : '<p>„' + esc(t.titel) + '“ am ' + esc(clKurzDatum(o.tag)) + ' wirklich aus dem Google-Kalender löschen?</p>'
+                 + (t.serieId ? '<p class="leise">Nur dieser eine Termin der Serie.</p>' : ''))
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="terminLoeschen()">Löschen</button>'
       + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
   }
@@ -5827,21 +5985,24 @@ function terminFensterHtml() {
         return '<option value="' + esc(k.id) + '"' + (k.id === v.kalId ? ' selected' : '') + '>' + esc(k.name) + '</option>';
       }).join('') + '</select>'
     : '<span class="leise" id="terminKalWarte">Kalender werden geholt …</span>';
-  return '<div class="fenster"><div class="titel">' + (o.modus === 'aendern' ? 'Termin ändern' : 'Neu') + '</div><div class="rumpf">'
+  var fest = o.modus === 'aendern' || o.modus === 'serie';
+  return '<div class="fenster"><div class="titel">' + (o.modus === 'serie' ? 'Alle Termine der Serie ändern' : (o.modus === 'aendern' ? 'Termin ändern' : 'Neu')) + '</div><div class="rumpf">'
     /* Seit 0.6: im Kalender auch eine Aufgabe anlegen */
     + (o.modus === 'neu' ? '<div class="wahlreihe"><button type="button" class="an">Termin</button><button type="button" onclick="aufgabeStatt()">Aufgabe</button></div>' : '')
     + '<label for="terminTitel">Titel:</label><input id="terminTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(v.titel) + '">'
-    + '<label for="terminDatum">Datum:</label><input id="terminDatum" class="eingabe" type="date" value="' + esc(v.datum) + '">'
+    + '<label for="terminDatum">' + (o.modus === 'serie' ? 'Beginn der Serie:' : 'Datum:') + '</label><input id="terminDatum" class="eingabe" type="date" value="' + esc(v.datum) + '"' + (o.modus === 'aendern' ? '' : ' onchange="terminWdhNeu()"') + '>'
     + '<div class="zeitpaar"><input id="terminVon" class="eingabe" type="time" value="' + esc(v.von) + '" aria-label="von">'
     + '<span>–</span><input id="terminBis" class="eingabe" type="time" value="' + esc(v.bis) + '" aria-label="bis"></div>'
     + '<label class="haken"><input id="terminGanz" type="checkbox"' + (v.ganztags ? ' checked' : '') + '> ganztägig</label>'
-    + '<label>Kalender:</label>' + (o.modus === 'aendern' ? '<div class="leise">' + esc(clKalenderName(v.kalId) || '—') + '</div>' : wahl)
+    /* Seit 0.92: Wiederholung bei „Neu“ und „alle der Serie“ */
+    + (o.modus === 'aendern' ? '' : '<div id="terminWdhFeld">' + terminWdhHtml(v) + '</div>')
+    + '<label>Kalender:</label>' + (fest ? '<div class="leise">' + esc(clKalenderName(v.kalId) || '—') + '</div>' : wahl)
     /* Seit 0.67: „privat“ = Googles Sichtbarkeit „Privat“ */
     + '<label class="haken"><input id="terminPrivat" type="checkbox"' + (v.privat ? ' checked' : '') + '> privat</label>'
     + '<label for="terminOrt">Ort:</label><input id="terminOrt" class="eingabe" type="text" autocomplete="off" value="' + esc(v.ort) + '">'
     + '<label for="terminNotiz">Notiz:</label><textarea id="terminNotiz" class="eingabe" rows="2" oninput="terminArtenNeu()">' + esc(v.notiz) + '</textarea>'
-    /* Seit 0.40: Arten für den Jahreskalender — als #Kürzel in der Notiz, mehrere möglich */
-    + '<label>Arten (Jahreskalender):</label><div id="terminArten" class="ja-chips klein">' + terminArtenHtml(v.titel, v.notiz) + '</div>'
+    /* Seit 0.40: Arten für den Jahreskalender — als #Kürzel in der Notiz; seit 0.92 als Auswahl, „Mehrere…“ für den seltenen Fall */
+    + '<label for="terminArtWahl">Art (Jahreskalender):</label><div id="terminArten">' + terminArtenHtml(v.titel, v.notiz) + '</div>'
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="terminSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
 }
@@ -5862,9 +6023,26 @@ function clFeldWert(id) {
 /* Arten im Termin-Fenster (seit 0.40): Titel und Notiz bestimmen, was an ist */
 function terminArtenHtml(titel, notiz) {
   var an = jaArtenAusText(String(titel || '') + ' ' + String(notiz || ''));
-  return jaArtenAlle().map(function (a) {
+  var mehr = an.length > 1 || !!(cl.termin && cl.termin.artenMehr);
+  var wahl = '<select id="terminArtWahl" class="eingabe" onchange="terminArtWahl(this.value)">'
+    + '<option value=""' + (!an.length && !mehr ? ' selected' : '') + '>– keine –</option>'
+    + (mehr ? '<option value="~" selected>' + esc(an.length ? 'Mehrere: ' + an.map(jaArtName).join(', ') : 'Mehrere…') + '</option>' : '')
+    + jaArtenAlle().map(function (a) { return '<option value="' + esc(a) + '"' + (!mehr && an[0] === a ? ' selected' : '') + '>' + esc(jaArtName(a)) + '</option>'; }).join('')
+    + (mehr ? '' : '<option value="*">Mehrere…</option>') + '</select>';
+  if (!mehr) { return wahl; }
+  return wahl + '<div class="ja-chips klein">' + jaArtenAlle().map(function (a) {
     return '<button type="button"' + (an.indexOf(a) >= 0 ? ' class="an"' : '') + ' onclick="terminArtUm(\'' + esc(a) + '\')"><i style="background:' + esc(jaArtFarbe(a)) + '"></i>' + esc(jaArtName(a)) + '</button>';
-  }).join('');
+  }).join('') + '</div>';
+}
+
+/* Auswahl: genau eine Art (die anderen heraus) — oder „Mehrere…“ zeigt die Knöpfe */
+function terminArtWahl(wert) {
+  if (wert === '~') { return; }
+  if (wert === '*') { if (cl.termin) { cl.termin.artenMehr = true; } terminArtenNeu(); return; }
+  if (cl.termin) { cl.termin.artenMehr = false; }
+  jaArtenAusText(clFeldWert('terminNotiz')).forEach(function (a) { if (a !== wert) { terminArtUm(a); } });
+  if (wert && jaArtenAusText(clFeldWert('terminNotiz')).indexOf(wert) < 0) { terminArtUm(wert); }
+  terminArtenNeu();
 }
 
 function terminArtenNeu() {
@@ -5897,7 +6075,8 @@ function terminAusFenster() {
   var von = clFeldWert('terminVon');
   var bis = clFeldWert('terminBis');
   var ganz = !!(document.getElementById('terminGanz') || {}).checked;
-  var kalId = (cl.termin && cl.termin.modus === 'aendern') ? cl.termin.vorschlag.kalId : clFeldWert('terminKal');
+  var modus = cl.termin ? cl.termin.modus : '';
+  var kalId = (modus === 'aendern' || modus === 'serie') ? cl.termin.vorschlag.kalId : clFeldWert('terminKal');
   if (!titel) { return { fehler: 'Bitte einen Titel eingeben.' }; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) { return { fehler: 'Bitte ein Datum wählen.' }; }
   if (!kalId) { return { fehler: 'Bitte einen Kalender wählen.' }; }
@@ -5913,6 +6092,14 @@ function terminAusFenster() {
     try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { zone = ''; }
     k.start = { dateTime: datum + 'T' + von + ':00', timeZone: zone || 'Europe/Berlin', date: null };
     k.end = { dateTime: datum + 'T' + bis + ':00', timeZone: zone || 'Europe/Berlin', date: null };
+  }
+  /* Seit 0.92: Wiederholung als RRULE — bei „alle der Serie“ auch „keine“ (dann ist es keine Serie mehr) */
+  if (modus === 'neu' || modus === 'serie') {
+    var v = terminWdhLesen() || {};
+    if (v.ende === 'bis' && v.wdh && v.wdh !== 'EIGEN' && !(v.bisDatum >= datum)) { return { fehler: 'Das Ende der Serie liegt vor dem Beginn.' }; }
+    var regel = terminRegel(v.wdh, datum, v.ende, v.bisDatum, v.anzahl, ganz, v.eigen);
+    if (regel) { k.recurrence = (modus === 'serie' ? (cl.termin.rest || []) : []).concat([regel]); }
+    else if (modus === 'serie') { k.recurrence = []; }
   }
   return { koerper: k, kalId: kalId, datum: datum };
 }
@@ -5935,11 +6122,12 @@ function terminSpeichern() {
   var e = terminAusFenster();
   if (e.fehler) { melde(e.fehler, 'warn'); return; }
   if (!tokenGueltig()) { melde('Keine Verbindung zu Google — der Termin wurde nicht gespeichert.', 'warn'); return; }
-  var aendern = cl.termin.modus === 'aendern' && cl.termin.t;
+  var serie = cl.termin.modus === 'serie' && cl.termin.serieId;
+  var aendern = (cl.termin.modus === 'aendern' && cl.termin.t) || serie;
   var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(e.kalId) + '/events'
-              + (aendern ? '/' + encodeURIComponent(cl.termin.t.id) : '');
+              + (serie ? '/' + encodeURIComponent(cl.termin.serieId) : (aendern ? '/' + encodeURIComponent(cl.termin.t.id) : ''));
   try { window.localStorage.setItem(KAL_ZULETZT_KEY, e.kalId); } catch (x) { /* egal */ }
-  melde(aendern ? 'Termin wird geändert …' : 'Termin wird angelegt …', null);
+  melde(serie ? 'Serie wird geändert …' : (aendern ? 'Termin wird geändert …' : 'Termin wird angelegt …'), null);
   return window.fetch(adresse, { method: aendern ? 'PATCH' : 'POST', headers: driveKopf({ 'Content-Type': 'application/json' }),
                                  body: JSON.stringify(e.koerper) })
     .then(antwortPruefen)
@@ -5947,7 +6135,7 @@ function terminSpeichern() {
     .then(function (r) {
       cl.termin = null;
       aufklappZu();
-      melde(aendern ? 'Termin geändert.' : 'Termin im Google-Kalender angelegt.', 'gut');
+      melde(serie ? 'Alle Termine der Serie geändert.' : (aendern ? 'Termin geändert.' : (e.koerper.recurrence ? 'Serie im Google-Kalender angelegt.' : 'Termin im Google-Kalender angelegt.')), 'gut');
       if (e.datum !== clKalDatum() && cl.kal.ansicht === 'tag') { cl.kal.datum = (e.datum === isoDatum()) ? '' : e.datum; }
       /* Ein Termin ab einer Stunde: der Coach fragt nach (seit 0.33) */
       var von = e.koerper.start && e.koerper.start.dateTime ? String(e.koerper.start.dateTime).slice(11, 16) : '';
@@ -5966,13 +6154,14 @@ function terminLoeschen() {
   var t = cl.termin && cl.termin.t;
   if (!t || !t.kalId) { return; }
   if (!tokenGueltig()) { melde('Löschen geht nur mit Verbindung zu Google.', 'warn'); return; }
-  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(t.kalId) + '/events/' + encodeURIComponent(t.id);
+  var alle = !!(cl.termin.alle && t.serieId);
+  var adresse = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(t.kalId) + '/events/' + encodeURIComponent(alle ? t.serieId : t.id);
   return window.fetch(adresse, { method: 'DELETE', headers: driveKopf() })
     .then(antwortPruefen)
     .then(function () {
       cl.termin = null;
       aufklappZu();
-      melde('Termin gelöscht.', 'gut');
+      melde(alle ? 'Alle Termine der Serie gelöscht.' : 'Termin gelöscht.', 'gut');
       return clTermineHolen(false);
     }).catch(clSchreibFehler);
 }

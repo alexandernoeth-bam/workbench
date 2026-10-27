@@ -5163,7 +5163,7 @@ function terminArtenTest() {
   S.cl.termin = { modus: 'neu', t: null, vorschlag: { titel: '', datum: S.isoDatum(), von: '10:00', bis: '11:00', ganztags: false, kalId: 'k', ort: '', notiz: '' } };
   S.cl.aufklapp = 'termin'; S.aufklappNeu();
   const f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Arten \(Jahreskalender\)/.test(f) && /terminArtUm\('besuche'\)/.test(f) && /terminArtUm\('geburtstag'\)/.test(f), 'Termin-Fenster: Arten als Knöpfe');
+  pruefe(/Art \(Jahreskalender\)/.test(f) && /<select id="terminArtWahl"/.test(f) && /<option value="besuche">Besuche/.test(f) && /<option value="\*">Mehrere…/.test(f), 'Termin-Fenster: Art als Auswahl, „Mehrere…“ für den seltenen Fall (seit 0.92)');
   const notiz = S.document.getElementById('terminNotiz');
   const titel = S.document.getElementById('terminTitel');
   titel.value = 'Brunch bei Sabine'; notiz.value = 'Bitte Kuchen mitbringen';
@@ -5175,7 +5175,7 @@ function terminArtenTest() {
   S.terminArtUm('besuche');
   pruefe(notiz.value === 'Bitte Kuchen mitbringen\n#Feier', 'Besuche aus: Kürzel heraus, Text bleibt');
   notiz.value = 'alt #Besuch'; S.terminArtenNeu();
-  pruefe(/class="an" onclick="terminArtUm\('besuche'\)"/.test(S.document.getElementById('terminArten').innerHTML), '#Besuch (Einzahl) gilt als Besuche');
+  pruefe(/<option value="besuche" selected>/.test(S.document.getElementById('terminArten').innerHTML), '#Besuch (Einzahl) gilt als Besuche (in der Auswahl gewählt)');
   S.terminArtUm('besuche');
   pruefe(notiz.value === 'alt', '… und lässt sich ebenso abschalten');
   titel.value = 'Urlaub #Urlaub'; notiz.value = '';
@@ -9495,6 +9495,109 @@ function auszeichnungVerschachteltTest() {
 }
 
 
+async function serienTerminTest() {
+  console.log('\n157. Serientermine anlegen, ändern, löschen; Art als Auswahl (0.92)');
+  if (!CL) { return; }
+  /* Fehlerarten: falsche RRULE (falscher Wochentag, Ende), „alle“ ändert nur einen Termin oder umgekehrt, Ausnahmen der Serie gehen verloren */
+  const S = pmFrisch();
+  const anfragen = [];
+  const master = { id: 's1', summary: 'Jour fixe', start: { dateTime: '2026-09-01T09:00:00+02:00' }, end: { dateTime: '2026-09-01T09:30:00+02:00' },
+                   location: 'Raum 3', description: '', recurrence: ['EXDATE;TZID=Europe/Berlin:20261013T090000', 'RRULE:FREQ=WEEKLY;BYDAY=TU'] };
+  S.fetch = function (adresse, o) {
+    anfragen.push({ adresse, o: o || {} });
+    if (/minAccessRole=writer/.test(adresse)) { return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve({ items: [{ id: 'buero@x', summary: 'Büro', primary: true }] }); } }); }
+    if (/events\/s1$/.test(adresse) && !(o && o.method)) { return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve(master); } }); }
+    return Promise.resolve({ ok: true, status: 200, url: adresse, json() { return Promise.resolve({ id: 'neu1', items: [] }); } });
+  };
+  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
+  const feld = (id, w) => { S.document.getElementById(id).value = w; };
+  /* Regeln */
+  const R = (w, e, b, n, g) => S.terminRegel(w, '2026-10-27', e || 'nie', b || '', n || 0, !!g, '');
+  pruefe(R('WEEKLY') === 'RRULE:FREQ=WEEKLY;BYDAY=TU' && R('WEEKLY2') === 'RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU' && R('WERKTAGS') === 'RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', 'wöchentlich, alle 2 Wochen, werktags — Wochentag aus dem Datum (Di)');
+  pruefe(R('MONTHLY') === 'RRULE:FREQ=MONTHLY;BYMONTHDAY=27' && R('MONTHLYPOS') === 'RRULE:FREQ=MONTHLY;BYDAY=-1TU' && S.terminRegel('MONTHLYPOS', '2026-10-13', 'nie', '', 0, false, '') === 'RRULE:FREQ=MONTHLY;BYDAY=2TU', 'monatlich am 27. / am letzten Dienstag / am 2. Dienstag');
+  pruefe(R('WEEKLY', 'bis', '2027-03-30') === 'RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20270330T235959Z' && R('YEARLY', 'bis', '2030-10-27', 0, true) === 'RRULE:FREQ=YEARLY;UNTIL=20301027' && R('DAILY', 'anzahl', '', 5) === 'RRULE:FREQ=DAILY;COUNT=5', 'Ende: am Datum (mit Uhrzeit / ganztägig) oder nach Anzahl');
+  pruefe(R('') === '', 'keine Wiederholung: keine Regel');
+  const L = S.terminRegelLesen('RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20270330T225959Z', '2026-09-01');
+  pruefe(L.wdh === 'WEEKLY' && L.ende === 'bis' && L.bisDatum === '2027-03-30', 'Regel von Google lesen: wöchentlich dienstags bis 30.03.2027');
+  const E = S.terminRegelLesen('RRULE:FREQ=WEEKLY;BYDAY=MO,WE', '2026-09-01');
+  pruefe(E.wdh === 'EIGEN' && E.eigen === 'RRULE:FREQ=WEEKLY;BYDAY=MO,WE' && S.terminRegel('EIGEN', '2026-09-01', 'nie', '', 0, false, E.eigen) === E.eigen, 'unbekannte Regel bleibt „wie bisher“ und geht unverändert zurück');
+  /* Neu mit Wiederholung */
+  const heute = '2026-10-27';
+  S.terminNeu(heute, '09:00');
+  await warte(); await warte();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/<select id="terminWdh"/.test(f) && /wöchentlich – dienstags/.test(f) && /monatlich – am letzten Dienstag/.test(f) && /jährlich – am 27\.10\./.test(f), 'Neu: Wiederholung mit Texten nach dem Datum');
+  feld('terminTitel', 'Jour fixe'); feld('terminDatum', heute); feld('terminVon', '09:00'); feld('terminBis', '09:30'); feld('terminKal', 'buero@x'); feld('terminOrt', ''); feld('terminNotiz', '');
+  S.document.getElementById('terminGanz').checked = false;
+  feld('terminWdh', 'WEEKLY');
+  S.terminWdhNeu();
+  pruefe(/terminEndeWahl\('bis'\)/.test(S.document.getElementById('terminWdhFeld').innerHTML), 'mit Wiederholung: „Endet: nie / am Datum / nach Anzahl“');
+  S.terminEndeWahl('bis');
+  feld('terminWdhBis', '2027-03-30');
+  await S.terminSpeichern();
+  const post = anfragen.filter(a => a.o.method === 'POST').pop();
+  const kp = post ? JSON.parse(post.o.body) : {};
+  pruefe(post && /calendars\/buero%40x\/events$/.test(post.adresse) && JSON.stringify(kp.recurrence) === '["RRULE:FREQ=WEEKLY;BYDAY=TU;UNTIL=20270330T235959Z"]' && kp.start.timeZone, 'POST mit RRULE, Zeitzone dabei');
+  feld('terminWdh', ''); feld('terminWdhBis', '');
+  /* Ein Termin der Serie: erst fragen */
+  const zeigeSerie = () => { S.termineNachTag[heute] = [{ id: 's1_20261027T070000Z', zeit: '09:00', bis: '09:30', titel: 'Jour fixe', kontext: 'beruflich', kalId: 'buero@x', serieId: 's1' }]; S.terminZeigen(heute, 's1_20261027T070000Z'); };
+  zeigeSerie();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/terminSerieFrage\('aendern'\)">Ändern/.test(f) && /terminSerieFrage\('loeschen'\)">Löschen/.test(f), 'Serientermin: Ändern und Löschen fragen erst');
+  S.terminSerieFrage('aendern');
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Nur diesen Termin/.test(f) && /Alle Termine der Serie/.test(f), 'Frage: nur diesen oder alle');
+  await S.terminSerieAendern();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.termin.modus === 'serie' && /Alle Termine der Serie ändern/.test(f) && /Beginn der Serie/.test(f) && /value="WEEKLY" selected/.test(f) && /value="Raum 3"/.test(f), 'alle: der Serien-Termin von Google, Wiederholung erkannt');
+  feld('terminTitel', 'Jour fixe Team'); feld('terminDatum', '2026-09-01'); feld('terminVon', '10:00'); feld('terminBis', '10:30'); feld('terminWdh', 'WEEKLY');
+  S.cl.termin.vorschlag.ende = 'nie';
+  await S.terminSpeichern();
+  const patch = anfragen.filter(a => a.o.method === 'PATCH').pop();
+  const kb = patch ? JSON.parse(patch.o.body) : {};
+  pruefe(patch && /events\/s1$/.test(patch.adresse) && kb.summary === 'Jour fixe Team' && kb.start.dateTime === '2026-09-01T10:00:00', 'PATCH an die Serie (nicht an den einzelnen Termin)');
+  pruefe(JSON.stringify(kb.recurrence) === '["EXDATE;TZID=Europe/Berlin:20261013T090000","RRULE:FREQ=WEEKLY;BYDAY=TU"]', 'Ausnahmen der Serie (EXDATE) bleiben erhalten');
+  /* Nur diesen ändern: wie bisher */
+  zeigeSerie();
+  S.terminSerieFrage('aendern');
+  S.terminAendern();
+  pruefe(S.cl.termin.modus === 'aendern' && !/id="terminWdh"/.test(S.document.getElementById('aufklapp').innerHTML), 'nur diesen: ohne Wiederholung');
+  feld('terminTitel', 'Jour fixe'); feld('terminDatum', heute); feld('terminVon', '09:00'); feld('terminBis', '09:30');
+  await S.terminSpeichern();
+  const p2 = anfragen.filter(a => a.o.method === 'PATCH').pop();
+  pruefe(/events\/s1_20261027T070000Z$/.test(p2.adresse) && !JSON.parse(p2.o.body).recurrence, '… PATCH an genau diesen Termin, ohne RRULE');
+  /* Alle löschen */
+  zeigeSerie();
+  S.terminSerieFrage('loeschen');
+  S.terminSerieLoeschenFragen();
+  pruefe(/Alle Termine der Serie „Jour fixe“ wirklich/.test(S.document.getElementById('aufklapp').innerHTML), 'alle löschen fragt nach');
+  await S.terminLoeschen();
+  pruefe(anfragen.some(a => a.o.method === 'DELETE' && /events\/s1$/.test(a.adresse)), 'DELETE an die Serie');
+  zeigeSerie();
+  S.terminSerieFrage('loeschen');
+  S.terminLoeschenFragen();
+  await S.terminLoeschen();
+  pruefe(anfragen.filter(a => a.o.method === 'DELETE').pop().adresse.endsWith('events/s1_20261027T070000Z'), 'nur diesen löschen: DELETE an genau diesen');
+  /* Art als Auswahl */
+  S.terminNeu(heute, '09:00'); await warte(); await warte();
+  feld('terminTitel', 'Kino'); feld('terminNotiz', 'mit Petra');
+  S.terminArtWahl('besuche');
+  pruefe(S.document.getElementById('terminNotiz').value === 'mit Petra\n#Besuche' && /<option value="besuche" selected>/.test(S.document.getElementById('terminArten').innerHTML), 'Art wählen: #Besuche in der Notiz, in der Auswahl gewählt');
+  S.terminArtWahl('feier');
+  pruefe(S.document.getElementById('terminNotiz').value === 'mit Petra\n#Feier', 'andere Art: ersetzt die erste');
+  S.terminArtWahl('');
+  pruefe(S.document.getElementById('terminNotiz').value === 'mit Petra', '„– keine –“: Kürzel heraus, Text bleibt');
+  S.terminArtWahl('*');
+  pruefe(/class="ja-chips klein"/.test(S.document.getElementById('terminArten').innerHTML) && /terminArtUm\('urlaub'\)/.test(S.document.getElementById('terminArten').innerHTML), '„Mehrere…“: die Knöpfe wie bisher');
+  S.terminArtUm('urlaub'); S.terminArtUm('dienstreise');
+  pruefe(/Mehrere: Urlaub, Dienstreise|Mehrere: Dienstreise, Urlaub/.test(S.document.getElementById('terminArten').innerHTML), 'zwei Arten: Auswahl zeigt „Mehrere: …“');
+  feld('terminNotiz', ''); feld('terminTitel', '');
+  S.aufklappZu();
+  S.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9649,6 +9752,7 @@ function auszeichnungVerschachteltTest() {
   try { geminiCoachTest(); } catch (e) { fail('0.91 Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zeileImSchreibenTest(); } catch (e) { fail('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { auszeichnungVerschachteltTest(); } catch (e) { fail('0.91.2 Auszeichnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { await serienTerminTest(); } catch (e) { fail('0.92 Serien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
