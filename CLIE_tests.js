@@ -9790,6 +9790,20 @@ function verweisEditTest() {
   pruefe(S.pmEdInhalt('**fett** Text') === S.pmInlineHtml('**fett** Text'), 'Text ohne Links bleibt wie bisher');
 }
 
+function schreibenKopfTest() {
+  console.log('\n168. Schreiben: ## der Überschrift bleibt sichtbar und bearbeitbar; Formatleiste klebt oben (0.97.4)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const h = S.pmEditorHtml({ text: '## Kopf\nText' });
+  pruefe(/<div class="pm-h">##&nbsp;Kopf<\/div>/.test(h), 'Überschrift: ## steht als Text in der Zeile');
+  const ed = dk('DIV', {}, [dk('DIV', { class: 'pm-h' }, [dt('## Kopf')]), dk('DIV', { class: 'pm-t' }, [dt('Text')])]);
+  pruefe(S.pmEdLesen(ed) === '## Kopf\nText', 'Zurücklesen: ## bleibt unverändert, auch wenn man sie ändert — ' + JSON.stringify(S.pmEdLesen(ed)));
+  const ed2 = dk('DIV', {}, [dk('DIV', { class: 'pm-h' }, [dt('### Kopf')])]);
+  pruefe(S.pmEdLesen(ed2) === '### Kopf', 'eine Stufe ändern (### statt ##) wird übernommen');
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  pruefe(/\.pm-leiste\{[^}]*position:sticky;top:0/.test(css), 'Formatleiste klebt oben im Schreib-Bereich (sticky)');
+}
+
 function manifestFussTest() {
   console.log('\n167. Manifest: Blättern in der Fußzeile mit langen Knöpfen, Seitenzahl dort; Tabellenzellen enger (0.97.3)');
   if (!CL) { return; }
@@ -10101,6 +10115,7 @@ function vlStummTest() {
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestFussTest(); } catch (e) { fail('0.97.3 Manifest-Fuß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { schreibenKopfTest(); } catch (e) { fail('0.97.4 Schreiben-Kopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
