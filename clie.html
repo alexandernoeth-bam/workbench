@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.94.3</title>
+<title>CLIE 0.95.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1195,7 +1195,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.94.3';
+var APP_VERSION = '0.95.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1215,7 +1215,7 @@ var SCOPES = 'https://www.googleapis.com/auth/drive.file '
 var GIS_URL   = 'https://accounts.google.com/gsi/client';
 var TOKEN_KEY = 'clie-zugriff';
 var ANMELDE_MERKER = 'clie-war-angemeldet';
-var ABGLEICH_VERZUG  = 4000;
+var ABGLEICH_VERZUG  = 2000;
 var ABGLEICH_MINDEST = 20000;
 var ABGLEICH_TAKT    = 30000;
 var DRIVE_DATEI = 'workbench.json';
@@ -2043,25 +2043,6 @@ function berichtText(b) {
         + b.entfernt + ' entfernt';
   if (b.konflikte.length) { t += ' · ' + b.konflikte.length + ' Konflikt(e)'; }
   return t;
-}
-
-function abgleichen() {
-  if (!tokenGueltig()) { return Promise.reject(new Error('Nicht angemeldet.')); }
-  bestandStempeln(DB);
-  return driveHerunterladen().then(function (text) {
-    var fremd = text ? textZuBestand(text) : null;
-    if (!fremd) {
-      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
-      return driveHochladen();
-    }
-    var ergebnis = zusammenfuehren(DB, fremd);
-    DB = ergebnis.db;
-    letzterBericht = ergebnis.bericht;
-    return speichern().then(function () { return driveHochladen(); });
-  }).then(function () {
-    letzterAbgleich = isoZeit();
-    return letzterBericht;
-  });
 }
 
 function abgleichPlanen(sofort) {
@@ -26998,29 +26979,37 @@ function clAbmelden() {
 
 /* ---------- Speichern und Abgleich ---------- */
 
+/* Zählt jede Änderung. Ein Abgleich, der gerade läuft, merkt daran, dass noch etwas zu senden ist (seit 0.95.0) */
+var sichernZaehler = 0;
+
 function spaeterSichern() {
   if (speicherUhr) { window.clearTimeout(speicherUhr); }
   lokalOffen = true;
+  sichernZaehler++;
   speicherUhr = window.setTimeout(function () {
     speicherUhr = null;
     speichern().then(function () {
       standZeichnen();
       abgleichPlanen(false);
     }).catch(function () { return null; });
-  }, 1500);
+  }, 500);
 }
 
 function abgleichStill() {
   abgleichUhr = null;
-  if (!tokenGueltig() || abgleichLaeuft) { return; }
+  if (!tokenGueltig()) { return; }
+  /* Läuft schon einer: danach nochmal, damit eine Änderung während des Laufs nicht liegen bleibt (seit 0.95.0) */
+  if (abgleichLaeuft) { abgleichPlanen(false); return; }
   abgleichLaeuft = true;
   zeichne();
   var vorher = clAbgleichVorher();
+  var zaehler = sichernZaehler;
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
-    lokalOffen = false;
     verbindungOk = true;
+    if (zaehler === sichernZaehler) { lokalOffen = false; }
+    else { abgleichPlanen(false); }
     if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
     clAbgleichNachher(vorher);
     abgleichLaeuft = false;
@@ -27029,6 +27018,63 @@ function abgleichStill() {
     abgleichFehler = f ? f.message : 'unbekannter Fehler';
     abgleichLaeuft = false;
     zeichne();
+  });
+}
+
+/* Beim Verlassen der App: was offen ist, sofort senden. iPadOS friert Timer im Hintergrund ein (seit 0.95.0) */
+function abgleichJetzt() {
+  if (speicherUhr) {
+    window.clearTimeout(speicherUhr);
+    speicherUhr = null;
+    speichern().catch(function () { return null; });
+  }
+  if (!lokalOffen || !tokenGueltig() || abgleichLaeuft) { return; }
+  if (abgleichUhr) { window.clearTimeout(abgleichUhr); abgleichUhr = null; }
+  abgleichStill();
+}
+
+/* Stand der Datei auf Drive: Zeit der letzten Änderung, leer solange es keine Datei gibt (seit 0.95.0) */
+function driveStandAbfragen() {
+  var los = driveDateiId ? Promise.resolve(driveDateiId)
+                         : driveSuchen().then(function (t) { return t ? t.id : null; });
+  return los.then(function (id) {
+    if (!id) { return ''; }
+    return window.fetch('https://www.googleapis.com/drive/v3/files/' + id + '?fields=modifiedTime', {
+      headers: driveKopf()
+    }).then(antwortPruefen)
+      .then(function (a) { return a.json(); })
+      .then(function (d) { return (d && d.modifiedTime) || ''; });
+  });
+}
+
+/* Abgleich (seit 0.95.0): Stand merken, holen, zusammenführen, Stand erneut prüfen. Hat ein anderes
+   Gerät inzwischen geschrieben, wird noch einmal geholt — so überschreibt das Hochladen nichts Neues. */
+function abgleichen(versuch) {
+  var n = versuch || 0;
+  if (!tokenGueltig()) { return Promise.reject(new Error('Nicht angemeldet.')); }
+  bestandStempeln(DB);
+  var gesehen = '';
+  return driveStandAbfragen().then(function (s) {
+    gesehen = s;
+    return driveHerunterladen();
+  }).then(function (text) {
+    var fremd = text ? textZuBestand(text) : null;
+    if (!fremd) {
+      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+      return null;
+    }
+    var ergebnis = zusammenfuehren(DB, fremd);
+    DB = ergebnis.db;
+    letzterBericht = ergebnis.bericht;
+    return speichern();
+  }).then(function () {
+    return driveStandAbfragen();
+  }).then(function (jetzt) {
+    if (jetzt !== gesehen && n < 2) { return abgleichen(n + 1); }
+    return driveHochladen().then(function () {
+      letzterAbgleich = isoZeit();
+      return letzterBericht;
+    });
   });
 }
 
@@ -27046,7 +27092,7 @@ function verbindungPruefen() {
 }
 
 function rueckkehrPruefen() {
-  if (document.hidden) { stoPause(); prVerlassen(); }
+  if (document.hidden) { stoPause(); prVerlassen(); abgleichJetzt(); }
   erneuerungPruefen();
   if (document.hidden) { return; }
   versionPruefen(false);
@@ -27397,6 +27443,8 @@ function start() {
   window.addEventListener('focus', standZeichnen);
   window.addEventListener('focus', erneuerungPruefen);
   window.addEventListener('focus', versionBeiFokus);
+  /* Wieder online: was offen geblieben ist, jetzt senden (seit 0.95.0) */
+  window.addEventListener('online', function () { if (lokalOffen) { abgleichPlanen(true); } });
   window.setInterval(minutenTakt, 30000);
   window.setInterval(spTakt, 1000);
   /* Aus einer Coach-Erinnerung im Kalender: gleich zum Coach (seit 0.33) */
@@ -28007,7 +28055,7 @@ var KR_PFADE = [
    Workbench noch auf die alte Art anlegt.
    ============================================================ */
 
-cl.pm = { tab: 'alle', datum: 'heute', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
+cl.pm = { tab: 'datum', datum: 'woche', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
           showF: null, mf: null, zuAlle: false, zuTermin: false, edZeile: null, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
 
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
@@ -28015,7 +28063,7 @@ var PM_SHOW_KEY = 'clie-pm-show';
 var PM_TAB_KEY = 'clie-pm-tab';
 var PM_SHOW_STD = { sort: 'prio', erl: false, faellig: false, datum: true, prio: true, kat: false };
 var PM_SORT = [['prio', 'Priorität, Datum'], ['datum', 'Datum, Priorität'], ['kat', 'Kategorie, Priorität'], ['abc', 'Alphabetisch']];
-var PM_DATUM = [['heute', 'Heute'], ['7', 'Nächste 7 Tage'], ['ueber', 'Überfällig'], ['alle', 'Alle mit Datum']];
+var PM_DATUM = [['woche', 'Diese Woche'], ['heute', 'Heute'], ['7', 'Nächste 7 Tage'], ['ueber', 'Überfällig'], ['alle', 'Alle mit Datum']];
 /* Seit 0.94: T = ToDo-Liste (nur Kennzeichen — die Kästchen bleiben im Memo).
    Seit 0.94.1 in dieser Reihenfolge — für Balken, Sortierung, Show… und Details */
 var PM_KUERZEL = ['T', 'A', 'P', 'Z', '–'];
@@ -28186,7 +28234,8 @@ function pmShow() {
 function pmTabLaden() {
   var t = '';
   try { t = window.localStorage.getItem(PM_TAB_KEY) || ''; } catch (e) { t = ''; }
-  cl.pm.tab = (t === 'datum' || t === 'kategorie') ? t : 'alle';
+  /* Seit 0.95.0 ist Datum der Start, danach Kategorie und Alle */
+  cl.pm.tab = (t === 'alle' || t === 'kategorie') ? t : 'datum';
 }
 
 function pmTab(t) {
@@ -28268,6 +28317,12 @@ function pmBannerHtml() {
     + '<button type="button" class="verweis" onclick="pmUmstellenFragen()">Umstellen…</button> zu Aufgaben.</div>';
 }
 
+/* Ende der laufenden Woche (Sonntag) für „Diese Woche“ (seit 0.95.0) */
+function pmWocheBis() {
+  var h = isoDatum();
+  return tagePlus(h, (7 - ausIso(h).getDay()) % 7);
+}
+
 function pmTodoHtml() {
   var h = pmBannerHtml();
   var show = pmShow();
@@ -28276,12 +28331,14 @@ function pmTodoHtml() {
   if (cl.pm.privat) { h += '<button type="button" class="pr-maske" onclick="prFreigeben()">— ' + cl.pm.privat + ' private —</button>'; }
   if (cl.pm.tab === 'datum') {
     var art = cl.pm.datum;
-    var bis = art === '7' ? tagePlus(heute, 7) : heute;
+    var bis = art === '7' ? tagePlus(heute, 7) : (art === 'woche' ? pmWocheBis() : heute);
     h += '<button type="button" class="pm-datwahl" onclick="pmDatumWahlAuf()">▼ ' + esc((PM_DATUM.filter(function (x) { return x[0] === art; })[0] || PM_DATUM[0])[1]) + '</button>';
     l = l.filter(function (a) {
       var d = pmDatum(a);
       if (a.wiederholung && pmIstDatum(cl.pm.frisch[a.id])) { d = cl.pm.frisch[a.id]; }
       if (!d) { return false; }
+      /* „Diese Woche“ zeigt Offenes bis Sonntag (dazu Überfälliges); Erledigtes bleibt ausgeblendet */
+      if (art === 'woche' && pmErledigtJetzt(a)) { return false; }
       if (art === 'ueber') { return d < heute; }
       if (art === 'alle') { return true; }
       return d <= bis;
@@ -28325,7 +28382,7 @@ function pmTodoFussHtml() {
   return '<button type="button" class="knopf" onclick="pmNeu(\'\',\'\')">Neu</button>'
     + '<button type="button" class="knopf" onclick="pmDetailsGewaehlt()">Details…</button>'
     + '<button type="button" class="knopf" onclick="pmShowAuf()">Show…</button>'
-    + '<div class="pm-tabs">' + [['alle', 'Alle'], ['datum', 'Datum'], ['kategorie', 'Kategorie']].map(function (t) {
+    + '<div class="pm-tabs">' + [['datum', 'Datum'], ['kategorie', 'Kategorie'], ['alle', 'Alle']].map(function (t) {
       return '<button type="button"' + (cl.pm.tab === t[0] ? ' class="an"' : '') + ' onclick="pmTab(\'' + t[0] + '\')">' + t[1] + '</button>';
     }).join('') + '</div>';
 }
@@ -28878,7 +28935,7 @@ function pmGruppiert() {
   try { return window.localStorage.getItem(PM_GRUPPE_KEY) !== '0'; } catch (e) { return true; }
 }
 
-/* Seit 0.93: bei mehreren Kategorien (▼ Alle, Privat, Arbeit) nach Kategorie oder nach Typ — Kategorie ist Standard */
+/* Seit 0.93: bei mehreren Kategorien (▼ Alle, Privat, Arbeit) nach Kategorie oder nach Typ — seit 0.95.0 ist Typ Standard */
 var PM_GRUPPE_ART_KEY = 'clie-memo-gruppe-art';
 
 function pmMehrereKat() {
@@ -28890,7 +28947,7 @@ function pmGruppeArt() {
   if (!pmMehrereKat() || pmMemoSicht()) { return 'typ'; }
   var w = '';
   try { w = window.localStorage.getItem(PM_GRUPPE_ART_KEY) || ''; } catch (e) { w = ''; }
-  return w === 'typ' ? 'typ' : 'kat';
+  return w === 'kat' ? 'kat' : 'typ';
 }
 
 function pmGruppeArtSetzen(w) {
@@ -29133,7 +29190,7 @@ function pmMemoFussHtml() {
       /* gefüllt, solange von der Standardsicht abgewichen wird: Typ aus oder Ausgeblendete an */
       + '<button type="button" class="knopf' + ((pmKzAus() || pmAusgeblZeigen()) ? ' voll' : '') + '" onclick="pmMShowAuf()">Show…</button>'
       /* Seit 0.93: bei mehreren Kategorien umschalten — Kategorie ist Standard */
-      + ((pmGruppiert() && pmMehrereKat()) ? '<div class="pm-tabs">' + [['kat', 'Kategorie'], ['typ', 'Typ']].map(function (t) {
+      + ((pmGruppiert() && pmMehrereKat()) ? '<div class="pm-tabs">' + [['typ', 'Typ'], ['kat', 'Kategorie']].map(function (t) {
           return '<button type="button"' + (pmGruppeArt() === t[0] ? ' class="an"' : '') + ' onclick="pmGruppeArtSetzen(\'' + t[0] + '\')">' + t[1] + '</button>';
         }).join('') + '</div>' : '');
   }

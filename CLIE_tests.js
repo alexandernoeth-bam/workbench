@@ -285,7 +285,7 @@ if (!WB_SKRIPT) {
   warn('workbench.html nicht gefunden — Vergleich übersprungen');
 } else {
   const WOERTLICH = ['zusammenfuehren', 'alsText', 'uebernehmen', 'speichern', 'laden', 'leereDatenbank',
-    'grabsteinSetzen', 'grabsteinZeit', 'grabsteineAufraeumen', 'textZuBestand', 'abgleichen', 'abgleichPlanen',
+    'grabsteinSetzen', 'grabsteinZeit', 'grabsteineAufraeumen', 'textZuBestand', 'abgleichPlanen',
     'driveSuchen', 'driveAnlegen', 'driveHochladen', 'driveHerunterladen', 'antwortPruefen',
     'tokenMerken', 'tokenGueltig', 'klientVorbereiten', 'anmelden', 'anmeldeVersuch', 'abmelden',
     'erneuerungPlanen', 'erneuerungPruefen', 'taktPruefen', 'klickErneuern', 'dateiWaehlen', 'opfsSchreiben', 'opfsLesen',
@@ -9010,6 +9010,7 @@ function memoSortTest() {
   if (!CL) { return; }
   const S = pmFrisch();
   ['clie-memo-kzaus', 'clie-memo-gruppiert', 'clie-memo-spalte', 'clie-memo-ausgebl'].forEach(k => delete S.__ablage[k]);
+  S.__ablage['clie-memo-gruppiert'] = '0';   /* seit 0.95 ist die Typ-Gruppierung Standard — dieser Test prüft die reine Reihenfolge */
   S.DB.projekte.push({ id: 'p1', name: 'OTS-Testumgebung', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 1, geaendert: 1 });
   S.DB.projekte.push({ id: 'p2', name: 'Einführung SMAX', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 });
   S.DB.ziele.push({ id: 'z1', name: 'Testautomatisierung 2027', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 3, geaendert: 1 });
@@ -9034,6 +9035,7 @@ function memoSortTest() {
   S.pmMemoZuListe();
   pruefe(!/Rollenmodell/.test(inhalt()) && /Jour fixe/.test(inhalt()), 'ausgeblendet: nicht in der Liste');
   pruefe(S.suchenHtml !== undefined, 'Find bleibt unberührt');
+  delete S.__ablage['clie-memo-gruppiert'];   /* Standard: Gruppiert an */
   /* Show… */
   S.pmMShowAuf();
   f = S.document.getElementById('aufklapp').innerHTML;
@@ -9621,12 +9623,13 @@ function balkenVorlageTest() {
   S.oeffne('memo'); S.memoArtSetzen('alles');
   let h = inhalt();
   const bal = () => (inhalt().match(/<div class="pm-bal">([^<]+)<small>(\d+)/g) || []).map(x => x.replace(/<div class="pm-bal">/, '').replace('<small>', ' '));
-  pruefe(bal().length >= 2 && bal()[bal().length - 1].indexOf('Nicht abgelegt') === 0 && bal().some(b => /^Haus.* 2$/.test(b)), 'Standard bei ▼ Alle: Balken nach Kategorie mit Anzahl, „Nicht abgelegt“ zuletzt — ' + bal().join(' · '));
-  pruefe(/class="mz kz">P</.test(h) && /class="mz kz">Z</.test(h), 'nach Kategorie: der Typ steht als Kürzel vorn');
+  pruefe(bal().join(' · ').indexOf('Projekte 2') === 0 && bal().some(b => b === 'Ziele 1') && !/class="mz kz"/.test(h), 'Standard (seit 0.95): Balken nach Typ mit Anzahl, ohne Kürzel-Spalte — ' + bal().join(' · '));
   let f = S.document.getElementById('fuss').innerHTML;
-  pruefe(/<button type="button" class="an" onclick="pmGruppeArtSetzen\('kat'\)">Kategorie<\/button><button type="button" onclick="pmGruppeArtSetzen\('typ'\)">Typ/.test(f), 'unten: Umschalter Kategorie (an) | Typ');
+  pruefe(/class="an" onclick="pmGruppeArtSetzen\('typ'\)">Typ<\/button><button type="button" onclick="pmGruppeArtSetzen\('kat'\)">Kategorie/.test(f), 'unten: Umschalter Typ (an) | Kategorie (seit 0.95)');
+  S.pmGruppeArtSetzen('kat');
+  pruefe(bal()[bal().length - 1].indexOf('Nicht abgelegt') === 0 && bal().some(b => /^Haus.* 2$/.test(b)) && /class="mz kz">P</.test(inhalt()) && S.__ablage['clie-memo-gruppe-art'] === 'kat', 'Kategorie: Balken mit Anzahl, „Nicht abgelegt“ zuletzt, Typ als Kürzel vorn — gemerkt');
   S.pmGruppeArtSetzen('typ');
-  pruefe(bal().join(' · ').indexOf('Projekte 2') === 0 && bal().some(b => b === 'Ziele 1') && !/class="mz kz"/.test(inhalt()) && S.__ablage['clie-memo-gruppe-art'] === 'typ', 'Typ: Balken Projekte 2 · Ziele 1 · …, ohne Kürzel-Spalte — gemerkt');
+  pruefe(bal().join(' · ').indexOf('Projekte 2') === 0 && !/class="mz kz"/.test(inhalt()) && S.__ablage['clie-memo-gruppe-art'] === 'typ', 'Typ: Balken Projekte 2 · Ziele 1 · …, ohne Kürzel-Spalte — gemerkt');
   S.pmGruppeArtSetzen('kat');
   S.katSetzen('kb-haus');
   pruefe(bal().join(' · ') === 'Projekte 1 · Ziele 1' && !/pmGruppeArtSetzen/.test(S.document.getElementById('fuss').innerHTML), 'eine Kategorie gewählt: Balken nach Typ, kein Umschalter');
@@ -9737,6 +9740,57 @@ function typReihenfolgeTest() {
   S.oeffne('uebersicht');
 }
 
+
+function syncWocheTest() {
+  console.log('\n162. Sync: sofort senden, beim Verlassen und Online; Stand vor dem Hochladen prüfen. To Do „Diese Woche“ (0.95.0)');
+  if (!CL) { return; }
+  /* Fehlerart 1: Änderungen blieben liegen — der Timer im Hintergrund war eingefroren, oder ein Abgleich lief gerade.
+     Fehlerart 2: Das Hochladen überschrieb, was ein anderes Gerät inzwischen geschrieben hatte. */
+  const S = pmFrisch();
+  const q = SKRIPT;
+  pruefe((q.match(/\nfunction abgleichen\(/g) || []).length === 1, 'abgleichen gibt es genau einmal (CLIE-Fassung, nicht mehr wörtlich aus der Workbench)');
+  pruefe(/var ABGLEICH_VERZUG\s*=\s*2000;/.test(q) && /function driveStandAbfragen\(\)/.test(q), 'Abgleich: Verzug 2 Sekunden; Stand von Drive wird abgefragt');
+  pruefe(/jetzt !== gesehen && n < 2/.test(q), 'vor dem Hochladen: hat sich der Stand geändert, wird neu zusammengeführt');
+  pruefe(/document\.hidden\) \{ stoPause\(\); prVerlassen\(\); abgleichJetzt\(\); \}/.test(q), 'beim Verlassen der App wird sofort gesendet');
+  pruefe(/addEventListener\('online', function \(\) \{ if \(lokalOffen\) \{ abgleichPlanen\(true\); \} \}\)/.test(q), 'wieder online: was offen ist, wird gesendet');
+  pruefe(/if \(abgleichLaeuft\) \{ abgleichPlanen\(false\); return; \}/.test(q), 'läuft schon ein Abgleich: danach nochmal, Änderung bleibt nicht liegen');
+  /* Verhalten: jede Änderung zählt und merkt sich, dass noch zu senden ist */
+  const vorher = S.sichernZaehler;
+  S.lokalOffen = false;
+  S.spaeterSichern();
+  pruefe(S.sichernZaehler === vorher + 1 && S.lokalOffen === true, 'Änderung zählt mit und merkt sich, dass noch zu senden ist');
+  S.lokalOffen = false;
+  const laeuft = S.abgleichLaeuft;
+  S.abgleichJetzt();
+  pruefe(S.abgleichLaeuft === laeuft && S.lokalOffen === false, 'Verlassen ohne offene Änderung: es wird nichts gesendet');
+  /* Diese Woche: Sonntag als Ende, Offenes und Überfälliges ja, Erledigtes und nächste Woche nicht */
+  const h = S.isoDatum();
+  const bis = S.pmWocheBis();
+  pruefe(bis >= h && S.tagePlus(h, 6) >= bis && S.ausIso(bis).getDay() === 0, 'Diese Woche endet am Sonntag (' + bis + ')');
+  const erl = S.pmNeueAufgabe({ titel: 'Schon erledigt', prio: 2, datum: h });
+  S.DB.aufgaben.filter(x => x.id === erl.id)[0].status = 'erledigt';
+  S.pmNeueAufgabe({ titel: 'Heute dran', prio: 2, datum: h });
+  S.pmNeueAufgabe({ titel: 'Am Sonntag fällig', prio: 2, datum: bis });
+  S.pmNeueAufgabe({ titel: 'Nächste Woche', prio: 2, datum: S.tagePlus(bis, 1) });
+  S.pmNeueAufgabe({ titel: 'Liegengeblieben', prio: 2, datum: S.tagePlus(h, -1) });
+  S.oeffne('aufgaben');
+  S.cl.pm.tab = 'datum'; S.cl.pm.datum = 'woche';
+  S.zeichne();
+  const t = (inhalt().match(/<span class="tt">([^<]+)/g) || []).map(x => x.replace(/.*>/, '').trim());
+  pruefe(['Heute dran', 'Am Sonntag fällig', 'Liegengeblieben'].every(x => t.indexOf(x) >= 0) && t.indexOf('Nächste Woche') < 0 && t.indexOf('Schon erledigt') < 0,
+    'Diese Woche: Offenes bis Sonntag und Überfälliges; Erledigtes und nächste Woche ausgeblendet — ' + t.join(' | '));
+  const f = S.document.getElementById('fuss').innerHTML;
+  pruefe(/pmTab\('datum'\)">Datum<\/button>.*pmTab\('kategorie'\)">Kategorie<\/button>.*pmTab\('alle'\)">Alle<\/button>/.test(f), 'To Do unten: Datum · Kategorie · Alle');
+  pruefe(/cl\.pm = \{ tab: 'datum', datum: 'woche'/.test(q) && /\['woche', 'Diese Woche'\]/.test(q), 'Start: Datum mit Filter „Diese Woche“');
+  /* Memo Pad: Typ ist Standard, Kategorie danach */
+  delete S.__ablage['clie-memo-gruppe-art'];
+  S.katSetzen('alle');
+  pruefe(S.pmGruppeArt() === 'typ', 'Memo Pad: Typ ist Standard');
+  S.pmGruppeArtSetzen('kat');
+  pruefe(S.pmGruppeArt() === 'kat', 'Memo Pad: Kategorie lässt sich wählen');
+  S.pmGruppeArtSetzen('typ');
+  pruefe(/\[\['typ', 'Typ'\], \['kat', 'Kategorie'\]\]/.test(q), 'Memo Pad: Reiter Typ vor Kategorie');
+}
 
 function vlStummTest() {
   console.log('\n161. Vorlesen: stumme Sätze springen nicht ans Ende; ▶ nach dem Ende beginnt vorn (0.94.3)');
@@ -9942,6 +9996,7 @@ function vlStummTest() {
   try { typTTest(); } catch (e) { fail('0.94 Typ T warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { typReihenfolgeTest(); } catch (e) { fail('0.94.1 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlStummTest(); } catch (e) { fail('0.94.3 Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { syncWocheTest(); } catch (e) { fail('0.95.0 Sync/Woche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
