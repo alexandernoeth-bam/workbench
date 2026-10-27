@@ -9265,6 +9265,47 @@ function schafkopfTest() {
 }
 
 
+function farbschemaTest() {
+  console.log('\n150. Farbschema: am Handy LCD-Grün, am PC und iPad die Workbench-Farben (0.88)');
+  if (!CL) { return; }
+  /* Fehlerarten: Schema greift am falschen Gerät; ein Symbol mit einer fest eingetragenen Farbe, die das Schema nicht umfärbt */
+  const S = pmFrisch();
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  pruefe(/html\.schema-wb\{--lcd:#F6F5F2;--lcd-hell:#FFFFFF;--px:#2E2C29/.test(css) && /html\.schema-wb \.reiter\{background:#8A0B22/.test(css), 'CSS: Papierweiß, Tinte, Weinrot im Reiter');
+  pruefe(/html\.schema-wb body\{font-family:"IBM Plex Sans"/.test(css) && /family=IBM\+Plex\+Sans/.test(QUELLE), 'Schrift IBM Plex Sans wie in der Workbench');
+  const alt = S.window.screen;
+  delete S.__ablage['clie-schema'];
+  S.window.screen = { width: 412, height: 915 };
+  pruefe(!S.clIstGrossesGeraet() && S.clSchemaSetzen() === false, 'Pixel (412 × 915): LCD-Grün');
+  S.window.screen = { width: 820, height: 1180 };
+  pruefe(S.clIstGrossesGeraet() && S.clSchemaSetzen() === true, 'iPad (820 × 1180): Workbench-Farben');
+  S.window.screen = { width: 1920, height: 1080 };
+  pruefe(S.clSchemaSetzen() === true, 'PC (1920 × 1080): Workbench-Farben');
+  S.clSchemaUm();
+  pruefe(S.clSchemaWahl() === 'lcd' && S.clSchemaSetzen() === false, 'Menü: fest auf LCD — auch am PC');
+  S.clSchemaUm();
+  S.window.screen = { width: 412, height: 915 };
+  pruefe(S.clSchemaWahl() === 'wb' && S.clSchemaSetzen() === true, 'Menü: fest auf Workbench — auch am Handy');
+  S.clSchemaUm();
+  pruefe(S.clSchemaWahl() === 'auto' && S.clSchemaSetzen() === false, 'Menü: zurück auf Auto');
+  S.window.screen = alt;
+  S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
+  pruefe(/menueWahl\('farben'\)">Colors: Auto/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡ zeigt „Colors: Auto“');
+  S.cl.aufklapp = ''; S.aufklappZeichnen();
+  /* Jede fest eingetragene Farbe in den Symbolen muss das Schema kennen */
+  const erlaubt = ['#3B4433', '#1C2116', '#C9D3B7'];
+  const fremd = [];
+  Object.keys(S.CL_BILD).forEach(k => (String(S.CL_BILD[k]).match(/(?:fill|stroke)="#[0-9A-Fa-f]{6}"/g) || []).forEach(m => {
+    const f = m.slice(m.indexOf('#'), -1);
+    if (erlaubt.indexOf(f) < 0 && fremd.indexOf(k + ' ' + f) < 0) { fremd.push(k + ' ' + f); }
+  }));
+  pruefe(!fremd.length, 'Symbole nur mit Farben, die das Schema umfärbt' + (fremd.length ? ': ' + fremd.join(', ') : ''));
+  const paare = [];
+  Object.keys(S.CL_BILD).forEach(k => (String(S.CL_BILD[k]).match(/(?:fill|stroke)="#[0-9A-Fa-f]{6}"/g) || []).forEach(m => { if (paare.indexOf(m) < 0) { paare.push(m); } }));
+  paare.forEach(m => pruefe(css.indexOf('html.schema-wb svg [' + m + ']') >= 0, 'CSS färbt ' + m + ' in den Symbolen um'));
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9412,6 +9453,7 @@ function schafkopfTest() {
   try { leisteCssTest(); } catch (e) { fail('0.86.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pokerTest(); } catch (e) { fail('0.87 Poker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schafkopfTest(); } catch (e) { fail('0.87 Schafkopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { farbschemaTest(); } catch (e) { fail('0.88 Farbschema warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

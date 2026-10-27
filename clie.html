@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.87.0</title>
+<title>CLIE 0.88.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="./clie-192.png?v=0474">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* Ziffern: Die Pixelschrift zeichnet 5 wie S und 2 wie Z — deshalb
    kommen 0–9 und der Doppelpunkt aus VT323 (SIL Open Font License),
@@ -1119,6 +1119,32 @@ input[type=checkbox]{accent-color:var(--px)}
 .pm-kz button:disabled{opacity:.4}
 .pm-verb{border-top:2px dotted var(--px-zart);margin-top:8px;padding-top:2px}
 .pm-verb .verweis{display:block;text-align:left;font-size:18px}
+
+/* Farbschema Workbench (seit 0.88) — PC und iPad; am Handy bleibt LCD-Grün */
+html.schema-wb{--lcd:#F6F5F2;--lcd-hell:#FFFFFF;--px:#2E2C29;--px-mitte:#645F58;--px-zart:#B9B4AB;--gehaeuse:#E4E1DA}
+html.schema-wb body{font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:auto}
+html.schema-wb .geraet{box-shadow:0 0 0 1px #D4D0C8}
+html.schema-wb .reiter{background:#8A0B22;color:#fff}
+html.schema-wb .kopf{border-bottom-color:#8A0B22}
+html.schema-wb .anmeldebanner{background:#19525A;color:#fff;border-bottom-color:#19525A}
+html.schema-wb .anmeldebanner button{border-color:#fff}
+html.schema-wb .knopf.voll{background:#8A0B22;border-color:#8A0B22;color:#fff}
+html.schema-wb .kat.an{background:#19525A;color:#fff}
+html.schema-wb .silk{border-top-color:#D4D0C8}
+/* Symbole: die Farben stehen im Code — CSS geht vor die Attribute */
+html.schema-wb svg [fill="#3B4433"]{fill:#19525A}
+html.schema-wb svg [stroke="#1C2116"]{stroke:#19525A}
+html.schema-wb svg [fill="#1C2116"]{fill:#19525A}
+html.schema-wb svg [fill="#C9D3B7"]{fill:#FFFFFF}
+html.schema-wb svg [stroke="#C9D3B7"]{stroke:#FFFFFF}
+html.schema-wb .sa-sym,html.schema-wb .sa-raster button{background:#19525A;color:#fff}
+html.schema-wb .wb-blk.s1{background:#19525A;color:#fff}
+html.schema-wb .wb-blk.s2{background:#8A0B22;color:#fff}
+html.schema-wb .wb-blk.s3{background:#D4D0C8;color:var(--px)}
+html.schema-wb .wb-sp.heute{background:rgba(138,11,34,.05)}
+html.schema-wb .ja-raster i.we{background:#E4E1DA}
+html.schema-wb .mi-feld button.zu{box-shadow:inset -2px -2px 0 var(--px-zart),inset 2px 2px 0 #fff}
+html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
 </style>
 </head>
 <body>
@@ -1163,7 +1189,7 @@ input[type=checkbox]{accent-color:var(--px)}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.87.0';
+var APP_VERSION = '0.88.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4680,6 +4706,7 @@ function aufklappZeichnen() {
           + '<button type="button" onclick="menueWahl(\'stoListe\')">High scores</button>' : '')
       + '<div class="trenn"></div>'
       + prMenueHtml() + '<div class="trenn"></div>'
+      + '<button type="button" onclick="menueWahl(\'farben\')">Colors: ' + CL_SCHEMA_NAME[clSchemaWahl()] + '</button>'
       + '<button type="button" onclick="menueWahl(\'statistik\')">Stats</button>'
       + '<button type="button" onclick="menueWahl(\'info\')">Info</button></div>';
   } else {
@@ -4864,6 +4891,7 @@ function menueWahl(was) {
   if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
   if (was === 'einkauf') { cl.aufklapp = 'einkauf'; aufklappZeichnen(); return; }
   if (was === 'statistik') { oeffne('statistik'); return; }
+  if (was === 'farben') { aufklappZeichnen(); clSchemaUm(); return; }
   if (was === 'anzeigen') { aufAnzeigenAuf(); return; }
   if (was === 'pjDetails') { pjDetails(); return; }
   if (was === 'alsVorlage') { memoAlsVorlage(); return; }
@@ -26993,7 +27021,45 @@ function rbAnbinden() {
   rbBald();
 }
 
+/* ---------- Farbschema (seit 0.88) ----------
+   Am Handy LCD-Grün, auf großen Bildschirmen (PC, iPad) die Farben der Workbench.
+   Erkannt an der kürzeren Bildschirmseite; im Menü ≡ fest wählbar. */
+var CL_SCHEMA_KEY = 'clie-schema';
+var CL_SCHEMA_NAME = { auto: 'Auto', lcd: 'LCD', wb: 'Workbench' };
+
+function clSchemaWahl() {
+  var w = '';
+  try { w = window.localStorage.getItem(CL_SCHEMA_KEY) || ''; } catch (e) { w = ''; }
+  return (w === 'lcd' || w === 'wb') ? w : 'auto';
+}
+
+/* Groß ist alles, dessen kürzere Bildschirmseite mindestens 600 Punkte hat — das iPad ja, das Pixel nicht */
+function clIstGrossesGeraet() {
+  var sc = window.screen || {};
+  return Math.min(Number(sc.width) || 0, Number(sc.height) || 0) >= 600;
+}
+
+function clSchemaSetzen() {
+  var w = clSchemaWahl();
+  var wb = w === 'wb' || (w === 'auto' && clIstGrossesGeraet());
+  var r = document.documentElement;
+  if (r && r.classList) { r.classList.toggle('schema-wb', wb); }
+  var meta = document.querySelector ? document.querySelector('meta[name="theme-color"]') : null;
+  if (meta && meta.setAttribute) { meta.setAttribute('content', wb ? '#8A0B22' : '#1C2116'); }
+  return wb;
+}
+
+function clSchemaUm() {
+  var folge = { auto: 'lcd', lcd: 'wb', wb: 'auto' };
+  var neu = folge[clSchemaWahl()];
+  try { window.localStorage.setItem(CL_SCHEMA_KEY, neu); } catch (e) { /* nur für jetzt */ }
+  clSchemaSetzen();
+  zeichne();
+  melde('Colors: ' + CL_SCHEMA_NAME[neu] + (neu === 'auto' ? ' (' + (clIstGrossesGeraet() ? 'Workbench' : 'LCD') + ' on this device)' : ''), null);
+}
+
 function start() {
+  try { clSchemaSetzen(); } catch (e) { /* Farben sind kein Grund, nicht zu starten */ }
   /* Seit 0.85.1: unerwartete Fehler zeigen statt still eine leere Seite zu lassen */
   window.addEventListener('error', function (ev) { clFehlerZeigen(ev && (ev.error || ev.message), 'Skript'); });
   window.addEventListener('unhandledrejection', function (ev) { clFehlerZeigen(ev && ev.reason, 'Ablauf'); });
