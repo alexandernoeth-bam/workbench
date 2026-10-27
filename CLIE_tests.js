@@ -538,9 +538,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","manifest","leitfaden","lernkartei","gemini","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["manifest","kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","leitfaden","lernkartei","gemini","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
-    'Start 3×5 (seit 0.89): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Idea Lab, Manifest, Guide / Flashcards, Coach, Games ▸ (Coach seit 0.91)');
+    'Start 3×5 (seit 0.89): Manifest (seit 0.96.3 erste App), Date Book, To Do List / Memo Pad, Collections, Shopping / Reader, Calc, Routines / SOS, Idea Lab, Guide / Flashcards, Coach, Games ▸ (Coach seit 0.91)');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2631,7 +2631,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,manifest,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
+  pruefe(raster.join(',') === 'manifest,kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -9746,7 +9746,7 @@ function manifestTest() {
   if (!CL) { return; }
   const S = pmFrisch();
   const q = SKRIPT;
-  pruefe(/M18 12L50 21L18 31Z/.test(S.CL_BILD.manifest), 'Symbol Manifest: Fahne');
+  pruefe(/M27 27L37 27L41 54H23Z/.test(S.CL_BILD.manifest), 'Symbol Manifest: Leuchtturm');
   pruefe(S.clApp('manifest') && S.clApp('kategorien').raster === false, 'Categories raus vom Start, Manifest drauf');
   pruefe(/menueWahl\(\\'kategorien\\'\)/.test(q) && /if \(was === 'kategorien'\) \{ oeffne\('kategorien'\); return; \}/.test(q), 'Categories im Menü ≡');
   S.oeffne('uebersicht');
@@ -9764,6 +9764,12 @@ function manifestTest() {
   const h = inhalt();
   pruefe((h.match(/class="ma-z"/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
   pruefe(/oeffne\('memo'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: Memo Pad… öffnet die Notiz zum Bearbeiten');
+  /* Lesen statt Quelltext (0.96.2): Überschrift, Tabelle, Linie, Kursiv */
+  S.DB.gedanken = S.DB.gedanken.filter(g => g.id !== 'mf1');
+  S.DB.gedanken.push({ id: 'mf2', titel: 'Manifest', text: '# Regeln\n| Nr. | Regel |\n| --- | --- |\n| 1 | *Ruhe* |\n---\nText', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.oeffne('manifest');
+  const r = inhalt();
+  pruefe(/<h2[^>]*>Regeln<\/h2>/.test(r) && /<table[^>]*><tr><th[^>]*>Nr\.<\/th>/.test(r) && /<i>Ruhe<\/i>/.test(r) && /<hr/.test(r) && !/\| ---|# Regeln|\*Ruhe/.test(r), 'Notiz wird gelesen: Überschrift, Tabelle, Linie, Kursiv — kein Quelltext');
 }
 
 function syncWocheTest() {
