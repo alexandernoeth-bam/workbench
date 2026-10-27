@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.90.1</title>
+<title>CLIE 0.91.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1191,7 +1191,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.90.1';
+var APP_VERSION = '0.91.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3453,7 +3453,9 @@ var CL_APPS = [
   { id: 'kategorien', name: 'Categories', stufe: '', was: '' },
   { id: 'leitfaden', name: 'Guide', stufe: '', was: '' },
   { id: 'lernkartei', name: 'Flashcards', stufe: '', was: '' },
-  { id: 'drive',    name: 'Drive',    stufe: '',    was: '' },
+  /* Seit 0.91: Coach = der Coaching-Chat in Gemini (öffnet außen); Drive ins Menü ≡ */
+  { id: 'gemini', name: 'Coach', stufe: '', was: '' },
+  { id: 'drive',    name: 'Drive',    stufe: '',    was: '', raster: false },
   { id: 'spiele', name: 'Games', stufe: '', was: '', ordner: true },
   /* Projekte und Ziele öffnen aus Memo Pad (seit 0.71) */
   { id: 'projekte', name: 'Memo Pad', stufe: '', was: '', raster: false },
@@ -3533,6 +3535,9 @@ var CL_BILD = {
   projekte: '<rect x="15" y="18" width="16" height="6" ' + CL_FUELL + '/><rect x="23" y="29" width="18" height="6" ' + CL_FUELL + '/>'
           + '<rect x="33" y="40" width="16" height="6" ' + CL_FUELL + '/><path d="M15 50h34" stroke="#C9D3B7" stroke-width="2" stroke-linecap="round"/>',
   /* Sprechblase mit Pfeil nach vorn (seit 0.33) */
+  /* Sprechblase mit Funkelstern: der Gemini-Coach (seit 0.91) */
+  gemini: '<path d="M14 19h28a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H28l-8 7v-7h-6a3 3 0 0 1-3-3V22a3 3 0 0 1 3-3z" ' + CL_STRICH + '/>'
+        + '<path d="M47 11c1 5 3 7 8 8-5 1-7 3-8 8-1-5-3-7-8-8 5-1 7-3 8-8z" ' + CL_FUELL + '/>',
   coach: '<path d="M16 18h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H30l-9 7v-7h-5a3 3 0 0 1-3-3V21a3 3 0 0 1 3-3z" ' + CL_STRICH + '/>'
        + '<path d="M23 30h14M33 25l5 5-5 5" ' + CL_STRICH + '/>',
   /* Spielkonsole, Sudoku-Gitter, zwei Karten (seit 0.32) */
@@ -4671,6 +4676,7 @@ function aufklappZeichnen() {
       + '<div class="menue-zeile"><span>CLIE ' + esc(APP_VERSION) + '</span></div>'
       + '<button type="button" class="sos-menue" onclick="menueWahl(\'sos\')">SOS…</button>'
       + '<button type="button" onclick="menueWahl(\'abgleich\')">HotSync…</button>'
+      + '<button type="button" onclick="menueWahl(\'drive\')">Drive</button>'
       + '<button type="button" onclick="menueWahl(\'version\')">Check for update</button>'
       + '<button type="button" onclick="menueWahl(\'termine\')">Fetch events</button>'
       + '<button type="button" onclick="menueWahl(\'einkauf\')">Link shopping list…</button>'
@@ -4783,6 +4789,8 @@ function clFehlerZeigen(e, wo) {
 function oeffne(id) {
   /* Einkauf ist keine eigene Seite: Es öffnet die Keep-Notiz. */
   if (id === 'einkauf') { einkaufOeffnen(); return; }
+  /* Der Coach ist keine eigene Seite: Er öffnet den Chat in Gemini (seit 0.91) */
+  if (id === 'gemini') { clCoachOeffnen(); return; }
   /* Ordner sind keine eigene Seite: ein Fenster mit ihren Apps (seit 0.35) */
   if (CL_ORDNER[id]) { ordnerAuf(id); return; }
   /* Stones pausiert, sobald die App gewechselt wird */
@@ -4888,6 +4896,7 @@ function menueWahl(was) {
   /* Seit 0.46 öffnet „Abgleich…“ nur die App — abgeglichen wird dort oder von selbst */
   if (was === 'abgleich') { oeffne('abgleich'); return; }
   if (was === 'sos') { oeffne('sos'); return; }
+  if (was === 'drive') { oeffne('drive'); return; }
   if (was === 'termine') { aufklappZeichnen(); clTermineHolen(true); return; }
   if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
   if (was === 'einkauf') { cl.aufklapp = 'einkauf'; aufklappZeichnen(); return; }
@@ -15029,6 +15038,20 @@ function einkaufOeffnen() {
     try { fenster.opener = null; } catch (e) { /* fremdes Fenster */ }
   } else {
     melde('Keep ließ sich nicht öffnen.\nBitte Pop-ups für CLIE erlauben.', 'warn');
+  }
+}
+
+/* ---------- Coach: Gemini-Chat (seit 0.91) ----------
+   Gemini lässt sich nicht in fremde Seiten einbetten — der CLIE öffnet
+   den laufenden Chat: am Pixel in der Gemini-App, am PC in einem neuen Tab. */
+var CL_COACH_LINK = 'https://share.gemini.google/BCFbi3wWmZMl';
+
+function clCoachOeffnen() {
+  var fenster = window.open(CL_COACH_LINK, '_blank');
+  if (fenster) {
+    try { fenster.opener = null; } catch (e) { /* fremdes Fenster */ }
+  } else {
+    melde('Gemini ließ sich nicht öffnen.\nBitte Pop-ups für CLIE erlauben.', 'warn');
   }
 }
 
