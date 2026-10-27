@@ -9053,9 +9053,9 @@ function memoSortTest() {
   S.__ablage['clie-memo-gruppe-art'] = 'typ';
   S.pmMShowOk();
   h = inhalt();
-  pruefe(/<div class="pm-bal">Projekte<small>/.test(h) && h.indexOf('>Projekte<') < h.indexOf('>Ziele<') && h.indexOf('>Ziele<') < h.indexOf('>Abläufe<') && h.indexOf('>Abläufe<') < h.indexOf('>Sonstiges<') && !/class="mz kz"/.test(h)
+  pruefe(/<div class="pm-bal">Projekte<small>/.test(h) && h.indexOf('>Abläufe<') < h.indexOf('>Projekte<') && h.indexOf('>Projekte<') < h.indexOf('>Ziele<') && h.indexOf('>Ziele<') < h.indexOf('>Sonstiges<') && !/class="mz kz"/.test(h)
     && h.indexOf('Einführung SMAX') < h.indexOf('OTS-Testumgebung') && !/Rollenmodell/.test(h) && /class="knopf" onclick="pmMShowAuf\(\)"/.test(S.document.getElementById('fuss').innerHTML),
-    'Gruppiert: Überschriften Projekte · Ziele · Abläufe · Sonstiges, darin alphabetisch; Standardsicht → Show… leer');
+    'Gruppiert: Überschriften (seit 0.94.1) Abläufe · Projekte · Ziele · Sonstiges, darin alphabetisch; Standardsicht → Show… leer');
   /* Kürzelwechsel nimmt „ausgeblendet“ mit */
   S.pmKuerzelSetzen(S.kpSeiteFinden('n2'), 'P');
   pruefe(S.DB.projekte.filter(p => p.id === 'n2')[0].ausgeblendet === true, 'Kürzel → P: „ausgeblendet“ zieht mit');
@@ -9689,7 +9689,7 @@ function typTTest() {
   S.pmKuerzelSetzen(seite('tt3'), 'T');
   S.oeffne('memo'); S.memoArtSetzen('alles'); S.pmGruppeArtSetzen('typ');
   const h = inhalt();
-  pruefe(/<div class="pm-bal">ToDo-Listen<small>2<\/small>/.test(h) && h.indexOf('>Abläufe<') < h.indexOf('>ToDo-Listen<') && h.indexOf('>ToDo-Listen<') < h.indexOf('Baumarkt') && h.indexOf('Baumarkt') < h.indexOf('Packen Borkum'), 'Balken „ToDo-Listen 2“ nach Abläufe, darin alphabetisch');
+  pruefe(/<div class="pm-bal">ToDo-Listen<small>2<\/small>/.test(h) && h.indexOf('>ToDo-Listen<') < h.indexOf('>Abläufe<') && h.indexOf('>ToDo-Listen<') < h.indexOf('Baumarkt') && h.indexOf('Baumarkt') < h.indexOf('Packen Borkum'), 'Balken „ToDo-Listen 2“ ganz oben (seit 0.94.1), darin alphabetisch');
   S.pmGruppeArtSetzen('kat');
   pruefe(/class="mz kz">T<\/span><span class="tx">Baumarkt Samstag/.test(inhalt()), 'nach Kategorie: Kürzel T vorn');
   S.pmMemoOeffnen('tt1', ''); S.pmMemoDetails();
@@ -9701,6 +9701,34 @@ function typTTest() {
   S.pmMShowKz('T'); S.pmMShowOk();
   pruefe(!/Baumarkt Samstag/.test(inhalt()) && S.__ablage['clie-memo-kzaus'] === 'T', 'T aus: ToDo-Listen verschwinden — gemerkt');
   delete S.__ablage['clie-memo-kzaus'];
+  S.oeffne('uebersicht');
+}
+
+
+function typReihenfolgeTest() {
+  console.log('\n160. Reihenfolge der Typen: ToDo-Listen · Abläufe · Projekte · Ziele · Sonstiges (0.94.1)');
+  if (!CL) { return; }
+  /* Fehlerart: Balken, Show… und Details in unterschiedlicher Reihenfolge */
+  const S = pmFrisch();
+  ['clie-memo-kzaus', 'clie-memo-gruppiert', 'clie-memo-gruppe-art'].forEach(k => delete S.__ablage[k]);
+  S.katSetzen('alle');
+  S.DB.gedanken.push({ id: 'r1', titel: 'Liste', text: '', kontext: 'privat', bereich: '', todoListe: true, ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'r2', titel: 'Ablauf', text: '[] a', kontext: 'privat', bereich: '', checkliste: 'lauf', art: 'aufgaben', ordnung: 2, geaendert: 1 });
+  S.DB.projekte.push({ id: 'r3', name: 'Projekt', flaeche: '', status: 'laufend', kontext: 'privat', bereich: '', ordnung: 3, geaendert: 1 });
+  S.DB.ziele.push({ id: 'r4', name: 'Ziel', flaeche: '', status: 'laufend', kontext: 'privat', bereich: '', ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'r5', titel: 'Notiz', text: 'x', kontext: 'privat', bereich: '', ordnung: 5, geaendert: 1 });
+  S.oeffne('memo'); S.memoArtSetzen('alles'); S.pmGruppeArtSetzen('typ');
+  const bal = (inhalt().match(/<div class="pm-bal">([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace('<', ''));
+  pruefe(bal.join(' · ') === 'ToDo-Listen · Abläufe · Projekte · Ziele · Sonstiges', 'Balken: ' + bal.join(' · '));
+  S.pmMShowAuf();
+  const kz = (S.document.getElementById('aufklapp').innerHTML.match(/pmMShowKz\('(.)'\)/g) || []).map(x => x.charAt(11));
+  pruefe(kz.join('') === 'TAPZ–', 'Show…: T A P Z –');
+  S.aufklappZu();
+  S.pmMemoOeffnen('r5', ''); S.pmMemoDetails();
+  const dk = (S.document.getElementById('aufklapp').innerHTML.match(/pmKuerzelWahl\('(.)'\)/g) || []).map(x => x.charAt(15));
+  pruefe(dk.join('') === 'TAPZ–V', 'Details: T A P Z – V');
+  S.aufklappZu();
+  S.pmGruppeArtSetzen('kat');
   S.oeffne('uebersicht');
 }
 
@@ -9862,6 +9890,7 @@ function typTTest() {
   try { await serienTerminTest(); } catch (e) { fail('0.92 Serien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { balkenVorlageTest(); } catch (e) { fail('0.93 Balken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { typTTest(); } catch (e) { fail('0.94 Typ T warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { typReihenfolgeTest(); } catch (e) { fail('0.94.1 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
