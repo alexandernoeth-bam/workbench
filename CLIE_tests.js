@@ -9474,6 +9474,27 @@ function zeileImSchreibenTest() {
 }
 
 
+function auszeichnungVerschachteltTest() {
+  console.log('\n156. Fett, unterstrichen, durchgestrichen verschachtelt — in jeder Reihenfolge (0.91.2)');
+  if (!CL) { return; }
+  /* Fehlerart: „__**Nächste Aktionen:**__“ zeigte die ** als Text — fett galt nur, wenn davor ein Leerzeichen stand */
+  const S = pmFrisch();
+  const f = (t) => S.pmInlineHtml(t);
+  pruefe(f('__**Nächste Aktionen:**__') === '<u><b>Nächste Aktionen:</b></u>', 'unterstrichen außen, fett innen');
+  pruefe(f('**__Idee:__**') === '<b><u>Idee:</u></b>', 'fett außen, unterstrichen innen');
+  pruefe(f('~~**x**~~') === '<s><b>x</b></s>' && f('**~~y~~**') === '<b><s>y</s></b>' && f('__~~z~~__') === '<u><s>z</s></u>', 'durchgestrichen in beiden Reihenfolgen');
+  pruefe(f('snake_case_name') === 'snake_case_name' && f('2*3*4') === '2*3*4' && f('a **b** c') === 'a <b>b</b> c', 'Unterstriche und Sternchen im Text bleiben Text');
+  /* So schreibt der Editor es, wenn erst unterstrichen und dann fett gesetzt wird */
+  const u = { nodeType: 1, nodeName: 'U', childNodes: [{ nodeType: 1, nodeName: 'B', childNodes: [{ nodeType: 3, nodeValue: 'Nächste Aktionen:' }], getAttribute() { return null; } }], getAttribute() { return null; } };
+  pruefe(S.pmEdInline(u) === '__**Nächste Aktionen:**__' && /<u><b>Nächste Aktionen:<\/b><\/u>/.test(f(S.pmEdInline(u))), 'Editor → Text → Ansicht: fett und unterstrichen ohne sichtbare Zeichen');
+  S.DB.gedanken.push({ id: 'au1', titel: 'Auszeichnung', text: '__**Nächste Aktionen:**__\n[] **wichtig** erledigen\nSiehe https://x.de/a__b__c und **__beides__**', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.pmMemoOeffnen('au1', '');
+  pruefe(!/\*\*/.test(inhalt()) && /<u><b>Nächste Aktionen:<\/b><\/u>/.test(inhalt()) && /<b>wichtig<\/b> erledigen/.test(inhalt()), 'Memo-Ansicht: keine ** zu sehen, auch in Kästchen-Zeilen');
+  pruefe(/<a href="https:\/\/x\.de\/a__b__c"/.test(inhalt()) && /<b><u>beides<\/u><\/b>/.test(inhalt()), 'Textzeile: Links bleiben heil, Verschachteltes wird ausgezeichnet');
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9627,6 +9648,7 @@ function zeileImSchreibenTest() {
   try { markenReparaturTest(); } catch (e) { fail('0.90.1 Marken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { geminiCoachTest(); } catch (e) { fail('0.91 Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zeileImSchreibenTest(); } catch (e) { fail('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { auszeichnungVerschachteltTest(); } catch (e) { fail('0.91.2 Auszeichnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

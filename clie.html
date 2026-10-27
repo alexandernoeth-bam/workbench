@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.91.1</title>
+<title>CLIE 0.91.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1191,7 +1191,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.91.1';
+var APP_VERSION = '0.91.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -7842,13 +7842,13 @@ function memoSeiteHtml(s, ohneAufgaben, ohneKopf) {
       return;
     }
     var m = z.match(/^\s*(#{1,3})\s+(.*)$/);
-    if (m) { h += '<div class="memo-h' + m[1].length + '">' + kpAuszeichnen(m[2]) + '</div>'; return; }
+    if (m) { h += '<div class="memo-h' + m[1].length + '">' + pmAuszeichnen(m[2]) + '</div>'; return; }
     if (/^\s*(---+|\*\*\*+)\s*$/.test(z)) { h += '<div class="memo-trenn"></div>'; return; }
     var p = z.match(/^(\s*)[-•*]\s+(.*)$/);
-    if (p) { h += '<div class="memo-punkt" style="padding-left:' + Math.min(4, Math.floor(p[1].length / 2)) * 16 + 'px">▪ ' + kpAuszeichnen(p[2]) + '</div>'; return; }
+    if (p) { h += '<div class="memo-punkt" style="padding-left:' + Math.min(4, Math.floor(p[1].length / 2)) * 16 + 'px">▪ ' + pmAuszeichnen(p[2]) + '</div>'; return; }
     var n = z.match(/^(\s*)(\d{1,3})[.)]\s+(.*)$/);
-    if (n) { h += '<div class="memo-punkt" style="padding-left:' + Math.min(4, Math.floor(n[1].length / 2)) * 16 + 'px"><span class="nr">' + n[2] + '.</span> ' + kpAuszeichnen(n[3]) + '</div>'; return; }
-    h += z.trim() ? '<div class="memo-text">' + kpAuszeichnen(z) + '</div>' : '<div class="memo-leer"></div>';
+    if (n) { h += '<div class="memo-punkt" style="padding-left:' + Math.min(4, Math.floor(n[1].length / 2)) * 16 + 'px"><span class="nr">' + n[2] + '.</span> ' + pmAuszeichnen(n[3]) + '</div>'; return; }
+    h += z.trim() ? '<div class="memo-text">' + pmAuszeichnen(z) + '</div>' : '<div class="memo-leer"></div>';
   });
   tabelleAus();
   /* Abgelegte Notizblätter (seit 0.65) */
@@ -7866,8 +7866,8 @@ function memoTabelleHtml(zeilen) {
   var kopf = (zeilen.length > 1 && trenn(zeilen[1])) ? zellen(zeilen[0]) : null;
   var reihen = zeilen.slice(kopf ? 2 : 0).filter(function (z) { return !trenn(z); }).map(zellen);
   return '<div class="memo-tabelle"><table>'
-    + (kopf ? '<tr>' + kopf.map(function (c) { return '<th>' + kpAuszeichnen(c) + '</th>'; }).join('') + '</tr>' : '')
-    + reihen.map(function (row) { return '<tr>' + row.map(function (c) { return '<td>' + kpAuszeichnen(c) + '</td>'; }).join('') + '</tr>'; }).join('')
+    + (kopf ? '<tr>' + kopf.map(function (c) { return '<th>' + pmAuszeichnen(c) + '</th>'; }).join('') + '</tr>' : '')
+    + reihen.map(function (row) { return '<tr>' + row.map(function (c) { return '<td>' + pmAuszeichnen(c) + '</td>'; }).join('') + '</tr>'; }).join('')
     + '</table></div>';
 }
 
@@ -28784,11 +28784,17 @@ function pmMemoZuListe() {
 }
 
 /* Inline: **fett**, __unterstrichen__, ~~durchgestrichen~~ — sonst nur Text */
-function pmInlineHtml(text) {
-  var t = esc(text);
-  t = t.replace(/(^|[\s(>])\*\*([^*\n\s](?:[^*\n]{0,398}[^*\n\s])?)\*\*(?=$|[\s.,;:!?)<])/g, '$1<b>$2</b>');
-  t = t.replace(/(^|[\s(>])__([^_\n\s](?:[^_\n]{0,398}[^_\n\s])?)__(?=$|[\s.,;:!?)<])/g, '$1<u>$2</u>');
-  t = t.replace(/(^|[\s(>])~~([^~\n\s](?:[^~\n]{0,398}[^~\n\s])?)~~(?=$|[\s.,;:!?)<])/g, '$1<s>$2</s>');
+function pmInlineHtml(text) { return pmAuszeichnungNach(esc(text)); }
+
+/* Text mit Verweisen und Links (kpAuszeichnen aus der Workbench) — dazu verschachtelte Auszeichnung (seit 0.91.2) */
+function pmAuszeichnen(text) { return pmAuszeichnungNach(kpAuszeichnen(text)); }
+
+/* **fett**, __unterstrichen__, ~~durchgestrichen~~ in schon maskiertem Text */
+function pmAuszeichnungNach(t) {
+  /* Seit 0.91.2: verschachtelt in jeder Reihenfolge (etwa __**fett unterstrichen**__) — die Zeichen der anderen Auszeichnungen gelten als Grenze */
+  t = t.replace(/(^|[\s(>_~])\*\*([^*\n\s](?:[^*\n]{0,398}[^*\n\s])?)\*\*(?=$|[\s.,;:!?)<_~])/g, '$1<b>$2</b>');
+  t = t.replace(/(^|[\s(>*~])__([^_\n\s](?:[^_\n]{0,398}[^_\n\s])?)__(?=$|[\s.,;:!?)<*~])/g, '$1<u>$2</u>');
+  t = t.replace(/(^|[\s(>*_])~~([^~\n\s](?:[^~\n]{0,398}[^~\n\s])?)~~(?=$|[\s.,;:!?)<*_])/g, '$1<s>$2</s>');
   return t;
 }
 
@@ -28826,7 +28832,7 @@ function pmMemoSeiteHtml(s) {
     if (p) { h += '<div class="memo-punkt" style="padding-left:' + Math.min(4, Math.floor(p[1].length / 2)) * 16 + 'px">• ' + pmInlineHtml(p[2]) + '</div>'; return; }
     var n = z.match(/^(\s*)(\d{1,3})[.)]\s+(.*)$/);
     if (n) { h += '<div class="memo-punkt" style="padding-left:' + Math.min(4, Math.floor(n[1].length / 2)) * 16 + 'px"><span class="nr">' + n[2] + '.</span> ' + pmInlineHtml(n[3]) + '</div>'; return; }
-    h += z.trim() ? '<div class="memo-text">' + kpAuszeichnen(z) + '</div>' : '<div class="memo-leer"></div>';
+    h += z.trim() ? '<div class="memo-text">' + pmAuszeichnen(z) + '</div>' : '<div class="memo-leer"></div>';
   });
   tabelleAus();
   return h + blaetter;
