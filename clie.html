@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.90.0</title>
+<title>CLIE 0.90.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1191,7 +1191,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.90.0';
+var APP_VERSION = '0.90.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4919,11 +4919,54 @@ function menueWahl(was) {
   melde('CLIE ' + APP_VERSION + '\nauf ' + DATEINAME + ' · Unterbau aus der Workbench', null);
 }
 
+/* ---------- Abgleich: gleichzeitig Geändertes melden (seit 0.90.1) ----------
+   Der Abgleich (Unterbau der Workbench) nimmt je Eintrag die jüngere Fassung.
+   Wurde ein Eintrag auf diesem Gerät seit dem letzten Abgleich geändert und
+   trotzdem durch die Fassung eines anderen Geräts ersetzt, ging die eigene
+   Änderung verloren — das sagt der CLIE jetzt. */
+var CL_ABGL_STAND_KEY = 'clie-abgleich-stand';
+var CL_ABGL_SAMMLUNGEN = ['gedanken', 'projekte', 'ziele', 'themen', 'aufgaben', 'sammlungen'];
+
+function clAbgleichStand() {
+  var n = 0;
+  try { n = Number(window.localStorage.getItem(CL_ABGL_STAND_KEY)) || 0; } catch (e) { n = 0; }
+  return n;
+}
+
+/* Vor dem Abgleich: was hier seit dem letzten Abgleich geändert wurde */
+function clAbgleichVorher() {
+  var stand = clAbgleichStand();
+  var l = [];
+  if (!stand) { return l; }
+  CL_ABGL_SAMMLUNGEN.forEach(function (sm) {
+    (Array.isArray(DB[sm]) ? DB[sm] : []).forEach(function (x) {
+      if (x && x.id && (x.geaendert || 0) > stand) { l.push({ s: sm, id: x.id, g: x.geaendert, titel: String(x.titel || x.name || '').slice(0, 60) }); }
+    });
+  });
+  return l;
+}
+
+/* Nach dem Abgleich: was davon durch ein anderes Gerät ersetzt wurde. Merkt den neuen Stand. */
+function clAbgleichNachher(vorher) {
+  var weg = (vorher || []).filter(function (v) {
+    var x = (Array.isArray(DB[v.s]) ? DB[v.s] : []).filter(function (y) { return y && y.id === v.id; })[0];
+    return x && (x.geaendert || 0) !== v.g;
+  });
+  try { window.localStorage.setItem(CL_ABGL_STAND_KEY, String(Date.now())); } catch (e) { /* nur für jetzt */ }
+  if (weg.length) {
+    melde('Auf zwei Geräten gleichzeitig geändert — die jüngere Fassung gilt:\n'
+      + weg.slice(0, 4).map(function (v) { return '„' + (v.titel || 'ohne Titel') + '“'; }).join(', ') + (weg.length > 4 ? ' und ' + (weg.length - 4) + ' weitere' : '')
+      + '\nVerknüpfte Aufgaben werden neu gesucht.', 'warn');
+  }
+  return weg;
+}
+
 function clAbgleichTipp() {
   if (!tokenGueltig()) { anmelden(false); return; }
   if (abgleichLaeuft) { return; }
   abgleichLaeuft = true;
   zeichne();
+  var vorher = clAbgleichVorher();
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
@@ -4931,6 +4974,7 @@ function clAbgleichTipp() {
     verbindungOk = true;
     melde('Abgleich fertig.\n' + berichtText(b), 'gut');
     pmNachpflegen();
+    clAbgleichNachher(vorher);
   }).catch(function (f) {
     abgleichFehler = f ? f.message : 'unbekannter Fehler';
     melde('Abgleich fehlgeschlagen.\n' + abgleichFehler, 'warn');
@@ -26722,12 +26766,14 @@ function abgleichStill() {
   if (!tokenGueltig() || abgleichLaeuft) { return; }
   abgleichLaeuft = true;
   zeichne();
+  var vorher = clAbgleichVorher();
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
     lokalOffen = false;
     verbindungOk = true;
     if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
+    clAbgleichNachher(vorher);
     abgleichLaeuft = false;
     zeichne();
   }).catch(function (f) {
@@ -29702,13 +29748,42 @@ function pmUmstellenKern(echt) {
 }
 
 /* Verbundene Zeilen: der Haken der Zeile gilt; fehlt die Zeile, bleibt nur das Memo */
+/* Seit 0.90.1: Fehlt die Marke (etwa weil ein älterer Stand eines anderen Geräts das Memo überschrieben hat),
+   sucht der CLIE die Kästchen-Zeile mit demselben Text und hängt die Marke wieder an. Gibt die Zeilennummer oder -1. */
+function pmMarkeWiederfinden(s, a) {
+  var gleich = function (x) { return String(x || '').replace(/\s+/g, ' ').trim(); };
+  var titel = gleich(pmTitel(a));
+  if (!s || !titel) { return -1; }
+  var zeilen = String(s.text || '').split('\n');
+  var i;
+  for (i = 0; i < zeilen.length; i++) {
+    if (pmMarke(zeilen[i])) { continue; }
+    var k = zeilen[i].match(KP_KASTEN);
+    if (!k) { continue; }
+    var text = gleich(k[3]);
+    if (text === titel || gleich(kpPrio(text).text) === titel) {
+      zeilen[i] = zeilen[i].replace(/\s+$/, '') + ' ⟦' + a.id + '⟧';
+      s.text = zeilen.join('\n');
+      s.geaendert = jetzt();
+      a.memo.zeile = a.id;
+      a.geaendert = jetzt();
+      return i;
+    }
+  }
+  return -1;
+}
+
 function pmMarkenPruefen() {
   var n = 0;
   (DB.aufgaben || []).forEach(function (a) {
-    if (!a || !a.memo || !a.memo.zeile) { return; }
+    if (!a || !a.memo) { return; }
+    /* Früher verlorene Zeile (zeile fehlt ganz — „Als Aufgabe…“ hat zeile '' und bleibt so): neu suchen */
+    if (a.memo.zeile === undefined) { if (pmMarkeWiederfinden(pmMemoVon(a), a) >= 0) { n++; } return; }
+    if (!a.memo.zeile) { return; }
     var s = pmMemoVon(a);
     if (!s) { delete a.memo; a.geaendert = jetzt(); n++; return; }
     var nr = pmZeileMitMarke(s, a.memo.zeile);
+    if (nr < 0) { nr = pmMarkeWiederfinden(s, a); }
     if (nr < 0) { delete a.memo.zeile; a.geaendert = jetzt(); n++; return; }
     var k = kpAufgabe(String(s.text || '').split('\n')[nr]);
     if (k && !a.wiederholung && k.erledigt !== (a.status === 'erledigt')) {

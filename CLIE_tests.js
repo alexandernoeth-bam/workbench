@@ -405,7 +405,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 31, 'fünfzehn Felder im Raster (3×5 seit 0.89), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 32, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -535,9 +535,9 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","kategorien","leitfaden","lernkartei","drive","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","kategorien","leitfaden","lernkartei","gemini","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
-    'Start 3×5 (seit 0.89): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Idea Lab, Categories, Guide / Flashcards, Drive, Games ▸');
+    'Start 3×5 (seit 0.89): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Idea Lab, Categories, Guide / Flashcards, Coach, Games ▸ (Coach seit 0.91)');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2628,7 +2628,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,kategorien,leitfaden,lernkartei,drive,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
+  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,kategorien,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -6879,7 +6879,8 @@ function startOrdnerTest() {
   /* „kategorien“ seit 0.66.2 über das ▼ der Übersicht */
   /* „projekte“ und „ziele“ seit 0.71 über das Memo Pad */
   /* „coach“ seit 0.86 aus — nur noch über den Link #coach erreichbar */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach'];
+  /* „drive“ seit 0.91 im Menü ≡ */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -6887,7 +6888,7 @@ function startOrdnerTest() {
   pruefe(raster.length === 15 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'seit 0.89 ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
-  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && /oeffne\('drive'\)/.test(inhalt()), 'Routines und SOS (seit 0.72), Drive (seit 0.89) auf dem Start');
+  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && /oeffne\('gemini'\)/.test(inhalt()), 'Routines und SOS (seit 0.72) und Coach (seit 0.91) auf dem Start, Drive im Menü');
   [['spiele', ['sudoku', 'poker']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
@@ -9313,7 +9314,7 @@ function raster35Test() {
   const S = pmFrisch();
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
   pruefe(raster.length === 15 && raster.length % 3 === 0, 'Raster genau voll: 15 Felder in drei Spalten');
-  pruefe(['ideen', 'kategorien', 'leitfaden', 'lernkartei', 'drive'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Categories, Guide, Flashcards, Drive direkt auf dem Start');
+  pruefe(['ideen', 'kategorien', 'leitfaden', 'lernkartei', 'gemini'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Categories, Guide, Flashcards, Coach direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
   Object.keys(S.CL_ORDNER).forEach(k => S.CL_ORDNER[k].apps.forEach(id => { if (!S.clApp(id) || raster.indexOf(id) >= 0) { fehlt.push(k + ':' + id); } }));
@@ -9370,6 +9371,70 @@ function terminMemoTest() {
   S.aufklappZu();
   /* Die Aufgaben-Zuordnung geht weiter wie bisher */
   pruefe(!S.cl.pm.zuTermin, 'Aufgaben-Zuordnung unberührt (kein Termin-Modus übrig)');
+  S.oeffne('uebersicht');
+}
+
+
+function markenReparaturTest() {
+  console.log('\n153. Verlorene Aufgaben-Zeilen im Memo wiederfinden; Hinweis bei gleichzeitig Geändertem (0.90.1)');
+  if (!CL) { return; }
+  /* Fehlerart: Ein älterer Stand eines anderen Geräts überschreibt das Memo, die Marken ⟦…⟧ fehlen — die Aufgabe verlor still ihre Zeile */
+  const S = pmFrisch();
+  S.DB.gedanken.push({ id: 'mr1', titel: 'Angebote Carport', text: 'Kopf\n[] Angebot einholen\n[x] Maße  prüfen\n[] Umbenannt jetzt\n[] Schon da ⟦tr9⟧', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  const auf = (id, titel, memo) => { const a = { id: id, titel: titel, status: 'offen', prio: 3, planung: '', memo: memo, geaendert: 1 }; S.DB.aufgaben.push(a); return a; };
+  const a1 = auf('tr1', 'Angebot einholen', { id: 'mr1' });
+  const a2 = auf('tr2', 'Maße prüfen', { id: 'mr1', zeile: 'tr2' });
+  const a3 = auf('tr3', 'Ganz anderer Text', { id: 'mr1', zeile: 'tr3' });
+  const a4 = auf('tr4', 'Angebote Carport', { id: 'mr1', zeile: '' });
+  S.pmMarkenPruefen();
+  const text = () => S.DB.gedanken.filter(g => g.id === 'mr1')[0].text;
+  pruefe(a1.memo.zeile === 'tr1' && /\[\] Angebot einholen ⟦tr1⟧/.test(text()), 'früher verlorene Zeile (zeile fehlt): Marke wieder angehängt');
+  pruefe(a2.memo.zeile === 'tr2' && /\[x\] Maße  prüfen ⟦tr2⟧/.test(text()) && a2.status === 'erledigt', 'Marke fehlt in der Zeile: wiedergefunden (Leerzeichen egal), Haken übernommen');
+  pruefe(a3.memo.zeile === undefined && a3.memo.id === 'mr1', 'Zeile umbenannt: bleibt ohne Zeile, das Memo bleibt');
+  pruefe(a4.memo.zeile === '' && !/⟦tr4⟧/.test(text()), '„Als Aufgabe…“ (ganzes Memo, zeile leer) bleibt unberührt');
+  pruefe((text().match(/⟦tr9⟧/g) || []).length === 1 && (text().match(/⟦/g) || []).length === 3, 'keine Zeile doppelt markiert');
+  /* Hinweis beim Abgleich */
+  delete S.__ablage['clie-abgleich-stand'];
+  pruefe(S.clAbgleichVorher().length === 0, 'ohne gemerkten Stand (erster Abgleich): kein Hinweis');
+  S.__ablage['clie-abgleich-stand'] = '1000';
+  S.DB.gedanken.push({ id: 'mr2', titel: 'Jour fixe', text: 'a', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 2000 });
+  S.DB.gedanken.push({ id: 'mr3', titel: 'Unverändert', text: 'b', kontext: 'privat', bereich: '', ordnung: 3, geaendert: 2500 });
+  S.DB.gedanken.push({ id: 'mr4', titel: 'Alt', text: 'c', kontext: 'privat', bereich: '', ordnung: 4, geaendert: 500 });
+  const vorher = S.clAbgleichVorher();
+  pruefe(vorher.some(v => v.id === 'mr2') && vorher.some(v => v.id === 'mr3') && !vorher.some(v => v.id === 'mr4'), 'vor dem Abgleich: nur seit dem letzten Abgleich Geändertes gemerkt');
+  /* Das andere Gerät gewinnt bei mr2 */
+  S.DB.gedanken.filter(g => g.id === 'mr2')[0].geaendert = 3000;
+  const weg = S.clAbgleichNachher(vorher);
+  pruefe(weg.length === 1 && weg[0].id === 'mr2' && /gleichzeitig geändert/.test(S.document.getElementById('toastText').textContent) && /„Jour fixe“/.test(S.document.getElementById('toastText').textContent),
+    'Hinweis: „Jour fixe“ auf zwei Geräten geändert — die jüngere Fassung gilt');
+  pruefe(Number(S.__ablage['clie-abgleich-stand']) > 1000, 'neuer Stand gemerkt');
+  pruefe(/var vorher = clAbgleichVorher\(\);\s*abgleichen\(\)/.test(SKRIPT) && (SKRIPT.match(/clAbgleichNachher\(vorher\);/g) || []).length === 2, 'beide Abgleich-Wege (Tipp und still) melden');
+}
+
+
+function geminiCoachTest() {
+  console.log('\n154. Coach öffnet den Gemini-Chat; Drive im Menü ≡ (0.91)');
+  if (!CL) { return; }
+  /* Fehlerarten: Coach ersetzt CLIE selbst (noopener → null) oder öffnet nichts; Drive nach dem Umzug nicht mehr erreichbar */
+  const S = pmFrisch();
+  const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  pruefe(raster.length === 15 && raster[13] === 'gemini' && S.clApp('gemini').name === 'Coach' && S.CL_BILD.gemini && S.clApp('drive').raster === false, 'Coach auf dem Platz von Drive, mit eigenem Symbol; Drive nicht mehr im Raster');
+  const echt = S.window.open;
+  let geoeffnet = null, ziel = null;
+  const fenster = { opener: 'x' };
+  S.window.open = (u, z) => { geoeffnet = u; ziel = z; return fenster; };
+  const appVorher = S.cl.app;
+  S.oeffne('gemini');
+  pruefe(geoeffnet === 'https://share.gemini.google/BCFbi3wWmZMl' && ziel === '_blank' && fenster.opener === null && S.cl.app === appVorher, 'Coach: öffnet den Gemini-Chat in neuem Fenster, CLIE bleibt, wo er war');
+  S.window.open = () => null;
+  S.oeffne('gemini');
+  pruefe(/Gemini ließ sich nicht öffnen/.test(S.document.getElementById('toastText').textContent) && S.location.href === 'file:///test', 'blockiert: Hinweis auf Pop-ups, CLIE ersetzt sich nicht selbst');
+  S.window.open = echt;
+  pruefe(!/window\.open\([^)]*noopener/.test(SKRIPT), 'kein „noopener“ im Aufruf');
+  S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
+  pruefe(/menueWahl\('drive'\)">Drive</.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: Drive');
+  S.menueWahl('drive');
+  pruefe(S.cl.app === 'drive', 'Drive öffnet aus dem Menü');
   S.oeffne('uebersicht');
 }
 
@@ -9524,6 +9589,8 @@ function terminMemoTest() {
   try { farbschemaTest(); } catch (e) { fail('0.88 Farbschema warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { raster35Test(); } catch (e) { fail('0.89 Raster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminMemoTest(); } catch (e) { fail('0.90 Termin→Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { markenReparaturTest(); } catch (e) { fail('0.90.1 Marken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { geminiCoachTest(); } catch (e) { fail('0.91 Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
