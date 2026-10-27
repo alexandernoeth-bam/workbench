@@ -9328,6 +9328,52 @@ function raster35Test() {
 }
 
 
+function terminMemoTest() {
+  console.log('\n152. Bestehenden Termin einem Memo zuordnen — nur verknüpft (0.90)');
+  if (!CL) { return; }
+  /* Fehlerart: ein Termin aus Google ließ sich keinem Memo zuordnen; Verknüpfung doppelt oder nicht lösbar */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.DB.gedanken.push({ id: 'tm1', titel: 'Lenkungskreis Vorbereitung', text: 'Punkte', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'tm2', titel: 'Urlaubsplanung', text: 'x', kontext: 'privat', bereich: '', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'tm3', titel: 'Alter Lenkungskreis', text: 'y', kontext: 'beruflich', bereich: 'kb-arbeit', archiv: true, archiviert: true, ordnung: 3, geaendert: 1 });
+  S.termineNachTag[heute] = [{ id: 'ev 7', zeit: '10:00', bis: '11:00', titel: 'Lenkungskreis', kontext: 'beruflich', kalId: 'buero@x', beschreibung: 'Raum 3' }];
+  S.terminZeigen(heute, 'ev 7');
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/<b>Memo:<\/b>/.test(f) && /pmTerminZuordnenAuf\(\)">Zuordnen…/.test(f), 'Termin-Fenster: „Memo: – Zuordnen…“');
+  S.pmTerminZuordnenAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'pmzuordnen' && /pmTerminZuordnen\('tm1'\)/.test(f) && !/'tm2'/.test(f) && !/'tm3'/.test(f) && /Auch Privates…/.test(f) && /bleibt, wie er ist/.test(f),
+    'Auswahl: berufliche Memos ohne Archiv, „Auch Privates…“, Hinweis: Google bleibt unverändert');
+  S.pmZuordnenAlle();
+  pruefe(/pmTerminZuordnen\('tm2'\)/.test(S.document.getElementById('aufklapp').innerHTML), '„Auch Privates…“ zeigt alle');
+  S.pmTerminZuordnen('tm1');
+  const tm = (id) => S.DB.gedanken.filter(g => g.id === id)[0];
+  pruefe(Array.isArray(tm('tm1').termine) && tm('tm1').termine.length === 1 && tm('tm1').termine[0].id === 'ev 7' && tm('tm1').termine[0].datum === heute && tm('tm1').termine[0].von === '10:00',
+    'im Memo verknüpft: Termin-Kennung, Tag und Uhrzeit');
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'termin' && /pmMemoOeffnen\('tm1'\)">Lenkungskreis Vorbereitung/.test(f) && /pmTerminLoesen\(\)">Lösen/.test(f), 'zurück im Termin: Memo mit Sprung dorthin und „Lösen“');
+  pruefe(S.cl.termin.t.beschreibung === 'Raum 3' && S.cl.termin.t.titel === 'Lenkungskreis', 'der Termin selbst bleibt unverändert');
+  /* Nochmal zuordnen: ein Termin gehört zu höchstens einem Memo */
+  S.pmTerminZuordnenAuf(); S.pmZuordnenAlle(); S.pmTerminZuordnen('tm2');
+  pruefe(tm('tm1').termine.length === 0 && tm('tm2').termine.length === 1, 'neu zugeordnet: aus dem alten Memo entfernt');
+  S.pmTerminLoesen();
+  pruefe(tm('tm2').termine.length === 0 && /pmTerminZuordnenAuf\(\)">Zuordnen…/.test(S.document.getElementById('aufklapp').innerHTML), 'Lösen: Verknüpfung weg, wieder „Zuordnen…“');
+  /* Abbrechen führt zurück in den Termin */
+  S.pmTerminZuordnenAuf(); S.pmZuordnenZurueck();
+  pruefe(S.cl.aufklapp === 'termin' && !S.cl.pm.zuTermin, 'Abbrechen: zurück ins Termin-Fenster');
+  /* Im Memo steht der Termin unter Details */
+  S.pmTerminZuordnenAuf(); S.pmTerminZuordnen('tm1');
+  S.aufklappZu();
+  S.pmMemoOeffnen('tm1', ''); S.pmMemoDetails();
+  pruefe(/<label>Termin:<\/label>/.test(S.document.getElementById('aufklapp').innerHTML) && /Lenkungskreis/.test(S.document.getElementById('aufklapp').innerHTML), 'Memo-Details zeigen den verknüpften Termin');
+  S.aufklappZu();
+  /* Die Aufgaben-Zuordnung geht weiter wie bisher */
+  pruefe(!S.cl.pm.zuTermin, 'Aufgaben-Zuordnung unberührt (kein Termin-Modus übrig)');
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9477,6 +9523,7 @@ function raster35Test() {
   try { schafkopfTest(); } catch (e) { fail('0.87 Schafkopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { farbschemaTest(); } catch (e) { fail('0.88 Farbschema warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { raster35Test(); } catch (e) { fail('0.89 Raster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { terminMemoTest(); } catch (e) { fail('0.90 Termin→Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

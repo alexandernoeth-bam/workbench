@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.89.0</title>
+<title>CLIE 0.90.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1116,6 +1116,7 @@ input[type=checkbox]{accent-color:var(--px)}
 .pm-editor .pm-roh{color:var(--px-mitte);font-size:16px;white-space:pre}
 .pm-det textarea.eingabe{resize:vertical;font:inherit}
 .pm-zeile{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.fenster .feld .pm-zeile{flex:1}
 .pm-kz button{min-width:38px;font-weight:700}
 .pm-kz button:disabled{opacity:.4}
 .pm-verb{border-top:2px dotted var(--px-zart);margin-top:8px;padding-top:2px}
@@ -1190,7 +1191,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.89.0';
+var APP_VERSION = '0.90.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -5752,6 +5753,8 @@ function terminFensterHtml() {
       + '<div class="feld"><b>Kalender:</b><span>' + esc(kal) + (t.privat ? ' · privat' : '') + '</span></div>'
       + (t.ort ? '<div class="feld"><b>Ort:</b><span>' + esc(t.ort) + '</span></div>' : '')
       + (t.beschreibung ? '<div class="feld"><b>Notiz:</b><span class="notiz-text">' + esc(String(t.beschreibung).slice(0, 300)) + '</span></div>' : '')
+      /* Seit 0.90: einem Memo zuordnen — nur verknüpft, Google bleibt unverändert */
+      + pmTerminMemoHtml(t)
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufklappZu()">OK</button>'
       + (t.kalId ? '<button type="button" class="knopf" onclick="terminAendern()">Ändern</button>'
                  + '<button type="button" class="knopf" onclick="terminLoeschenFragen()">Löschen…</button>' : '')
@@ -27710,7 +27713,7 @@ var KR_PFADE = [
    ============================================================ */
 
 cl.pm = { tab: 'alle', datum: 'heute', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
-          showF: null, mf: null, zuAlle: false, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
+          showF: null, mf: null, zuAlle: false, zuTermin: false, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
 
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
 var PM_SHOW_KEY = 'clie-pm-show';
@@ -28351,6 +28354,7 @@ function pmZuordnenAuf() {
   var f = pmFensterLesen();
   if (!f || !pmAufgabeFinden(f.id)) { return; }
   cl.pm.zuAlle = false;
+  cl.pm.zuTermin = false;
   cl.aufklapp = 'pmzuordnen';
   aufklappNeu();
 }
@@ -28361,13 +28365,15 @@ function pmZuordnenAlle() {
   aufklappNeu();
 }
 
+/* Seit 0.90 auch für einen bestehenden Termin: dann ist cl.pm.zuTermin an und cl.termin.t der Termin */
 function pmZuordnenHtml() {
+  var t = cl.pm.zuTermin && cl.termin ? cl.termin.t : null;
   var f = cl.pm.fenster;
-  var a = f ? pmAufgabeFinden(f.id) : null;
-  if (!a) { return ''; }
-  var kat = f.bereich || clKategorieVon(a);
-  /* Seit 0.83.1: kein Archiv; vorgefiltert nach Arbeit oder Privat — wie die Aufgabe */
-  var arbeit = clIstArbeit(kat);
+  var a = (!t && f) ? pmAufgabeFinden(f.id) : null;
+  if (!a && !t) { return ''; }
+  var kat = t ? '' : (f.bereich || clKategorieVon(a));
+  /* Seit 0.83.1: kein Archiv; vorgefiltert nach Arbeit oder Privat — wie die Aufgabe (der Termin: nach seinem Kalender) */
+  var arbeit = t ? t.kontext === 'beruflich' : clIstArbeit(kat);
   var alle = kpSeitenAlle().filter(function (s) {
     if (pmIstVorlage(s) || ckIstKorb(s) || pmArchiviert(s) || prPrivatVerborgen(s, null)) { return false; }
     return cl.pm.zuAlle || clIstArbeit(clKategorieVon(s)) === arbeit;
@@ -28377,15 +28383,22 @@ function pmZuordnenHtml() {
     return (rang(x) - rang(y)) || (PM_KUERZEL.indexOf(pmKuerzel(x)) - PM_KUERZEL.indexOf(pmKuerzel(y))) || String(x.titel).localeCompare(String(y.titel), 'de');
   });
   return '<div class="fenster"><div class="titel">Memo zuordnen</div><div class="rumpf">'
-    + '<p class="leise">„' + esc(pmTitel(a)) + '“ kommt als Kästchen-Zeile ans Ende des Memos — der Haken gilt dann in beiden.</p>'
+    + (t ? '<p class="leise">„' + esc(t.titel) + '“ wird mit dem ganzen Memo verknüpft — der Google-Termin bleibt, wie er ist.</p>'
+         : '<p class="leise">„' + esc(pmTitel(a)) + '“ kommt als Kästchen-Zeile ans Ende des Memos — der Haken gilt dann in beiden.</p>')
     + (alle.length ? alle.map(function (s) {
-      return '<button type="button" class="wahl" onclick="pmZuordnen(\'' + esc(s.id) + '\')"><b>' + pmKuerzel(s) + '</b> ' + esc(s.titel) + '</button>';
+      return '<button type="button" class="wahl" onclick="' + (t ? 'pmTerminZuordnen' : 'pmZuordnen') + '(\'' + esc(s.id) + '\')"><b>' + pmKuerzel(s) + '</b> ' + esc(s.titel) + '</button>';
     }).join('') : '<p class="leise">Kein passendes Memo.</p>')
     + '<div class="knoepfe">' + (cl.pm.zuAlle ? '' : '<button type="button" class="knopf" onclick="pmZuordnenAlle()">' + (arbeit ? 'Auch Privates…' : 'Auch Arbeit…') + '</button>')
     + '<button type="button" class="knopf" onclick="pmZuordnenZurueck()">Abbrechen</button></div></div></div>';
 }
 
 function pmZuordnenZurueck() {
+  if (cl.pm.zuTermin) {
+    cl.pm.zuTermin = false;
+    cl.aufklapp = cl.termin ? 'termin' : '';
+    aufklappNeu();
+    return;
+  }
   cl.aufklapp = cl.pm.fenster ? 'pmaufgabe' : '';
   aufklappNeu();
 }
@@ -29424,6 +29437,64 @@ function pmTerminAngelegt(id, kalId, datum, titel, von) {
   x.geaendert = jetzt();
   spaeterSichern();
   return true;
+}
+
+/* ---- Bestehenden Termin einem Memo zuordnen (seit 0.90) ----
+   Nur eine Verknüpfung im Memo (termine[]) — wie bei „Als Termin…“; Google bleibt unverändert. */
+
+/* Das Memo, mit dem der Termin verknüpft ist — oder null */
+function pmMemoZuTermin(id) {
+  if (!id) { return null; }
+  return kpSeitenAlle().filter(function (s) {
+    var l = s.__satz && Array.isArray(s.__satz.termine) ? s.__satz.termine : [];
+    return l.some(function (x) { return x && x.id === id; });
+  })[0] || null;
+}
+
+/* Zeile im Fenster „Termin“ */
+function pmTerminMemoHtml(t) {
+  if (!t || !t.id) { return ''; }
+  var s = pmMemoZuTermin(t.id);
+  return '<div class="feld"><b>Memo:</b><span class="pm-zeile">'
+    + (s ? '<button type="button" class="verweis" onclick="pmMemoOeffnen(\'' + esc(s.id) + '\')">' + esc(s.titel) + '</button>'
+         + '<button type="button" class="knopf" onclick="pmTerminLoesen()">Lösen</button>'
+         : '<span>–</span><button type="button" class="knopf" onclick="pmTerminZuordnenAuf()">Zuordnen…</button>')
+    + '</span></div>';
+}
+
+function pmTerminZuordnenAuf() {
+  if (!cl.termin || !cl.termin.t) { return; }
+  cl.pm.zuAlle = false;
+  cl.pm.zuTermin = true;
+  cl.aufklapp = 'pmzuordnen';
+  aufklappNeu();
+}
+
+function pmTerminZuordnen(memoId) {
+  var o = cl.termin;
+  var t = o ? o.t : null;
+  var s = kpSeiteFinden(memoId);
+  if (!t || !t.id || !s) { pmZuordnenZurueck(); return; }
+  /* Ein Termin gehört zu höchstens einem Memo */
+  var alt = pmMemoZuTermin(t.id);
+  if (alt) { alt.__satz.termine = alt.__satz.termine.filter(function (x) { return !x || x.id !== t.id; }); alt.__satz.geaendert = jetzt(); }
+  var x = s.__satz;
+  if (!Array.isArray(x.termine)) { x.termine = []; }
+  x.termine.push({ id: t.id, kalId: t.kalId || '', datum: o.tag || '', titel: String(t.titel || '').slice(0, 120), von: t.zeit || '' });
+  x.geaendert = jetzt();
+  spaeterSichern();
+  melde('Termin mit „' + s.titel + '“ verknüpft.', 'gut');
+  pmZuordnenZurueck();
+}
+
+function pmTerminLoesen() {
+  var t = cl.termin ? cl.termin.t : null;
+  var s = t ? pmMemoZuTermin(t.id) : null;
+  if (!s) { return; }
+  s.__satz.termine = s.__satz.termine.filter(function (x) { return !x || x.id !== t.id; });
+  s.__satz.geaendert = jetzt();
+  spaeterSichern();
+  aufklappNeu();
 }
 
 function pmTerminOeffnen(datum, id) {
