@@ -405,7 +405,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 33, 'zwölf Felder im Raster (3×4), Lesezeichen in der Leiste, der Rest in drei Ordnern (seit 0.38; Projekte seit 0.43, Ziele seit 0.44, Invasion seit 0.45, SOS seit 0.72, Poker/Schafkopf seit 0.87)');
+  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 31, 'fünfzehn Felder im Raster (3×5 seit 0.89), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -535,13 +535,13 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","planung","lernen","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","kategorien","leitfaden","lernkartei","drive","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
-    'Start 3×4 (seit 0.72): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Planning ▸, Learning ▸, Games ▸');
+    'Start 3×5 (seit 0.89): Date Book, To Do List, Memo Pad / Collections, Shopping, Reader / Calc, Routines, SOS / Idea Lab, Categories, Guide / Flashcards, Drive, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
+  pruefe(syms === 15, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/15)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -2293,7 +2293,7 @@ function kategorienTest() {
   S.iwSpeichern({ id: 'iw-pv', titel: 'Speicher nachrüsten', stufe: 1, status: 'aktiv', bereich: k.id, varianten: [], meilensteine: [], schritte: [], wochen: [] });
   /* Gesamtsicht */
   S.oeffne('kategorien');
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0 && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
+  pruefe(S.clApp('kategorien').raster !== false && /katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
   S.katOeffnen(k.id);
   const g = inhalt();
   pruefe(/To Do · offen/.test(g) && /Foto machen/.test(g) && /Listen/.test(g) && /Zählerschrank/.test(g) && /Projekte · Ziele/.test(g) && /PV-Anlage Haus/.test(g)
@@ -2628,7 +2628,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,planung,lernen,spiele', 'Start: zwölf Felder, Memo Pad an dritter Stelle, Routines und SOS (seit 0.72) statt Projekte und Ziele');
+  pruefe(raster.join(',') === 'kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,kategorien,leitfaden,lernkartei,drive,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -2906,8 +2906,8 @@ function leitfadenTest() {
   const S = CL;
   S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
   const heute = S.isoDatum();
-  pruefe(S.clApp('leitfaden') && S.clApp('leitfaden').raster === false && S.CL_ORDNER.planung.apps.indexOf('leitfaden') >= 0 && S.clApp('leitfaden').name === 'Guide' && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
-    'App „Guide“ (Leitfaden) seit 0.72 im Ordner Planning, Symbol Stufen');
+  pruefe(S.clApp('leitfaden') && S.clApp('leitfaden').raster !== false && !S.clOrdnerVon('leitfaden') && S.clApp('leitfaden').name === 'Guide' && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
+    'App „Guide“ (Leitfaden) seit 0.89 direkt auf dem Start, Symbol Stufen');
   pruefe(S.LF_ARTEN.length === 5 && S.LF_ARTEN.every(a => a.schritte.length === 5 && a.schritte.every(s => s[0] && s[1])) && S.LF_ARTEN[4].schritte[0][0] === 'Plan B',
     'fünf Verfahren mit je fünf Schritten (Name und Erklärung); Verhandlung beginnt mit Plan B');
   S.oeffne('leitfaden');
@@ -3137,7 +3137,7 @@ function katStattBerufTest() {
   S.oeffne('routinen'); S.rtNeu();
   pruefe(/id="rtKat"/.test(S.document.getElementById('aufklapp').innerHTML) && !/Beruf/.test(S.document.getElementById('aufklapp').innerHTML), 'Routine: Kategorie statt Beruf/Privat');
   S.aufklappZu();
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0, 'App „Kategorien“ im Ordner Planung');
+  pruefe(S.clApp('kategorien').raster !== false && !S.clOrdnerVon('kategorien'), 'App „Kategorien“ seit 0.89 direkt auf dem Start');
   S.oeffne('uebersicht');
 }
 
@@ -3163,7 +3163,7 @@ function katUebersichtTest() {
   S.katSetzen(k.id);
   pruefe(S.cl.filter === k.id && S.cl.app === 'uebersicht' && /▼ PV-Anlage/.test(S.document.getElementById('katKnopf').textContent), 'Tipp: filtert, bleibt auf der Übersicht');
   S.katSetzen('alle');
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('kategorien') >= 0 && typeof S.katVonUebersicht === 'undefined', 'App „Kategorien“ wieder im Ordner Planung');
+  pruefe(S.clApp('kategorien').raster !== false && typeof S.katVonUebersicht === 'undefined', 'App „Kategorien“ seit 0.89 direkt auf dem Start');
   S.oeffne('uebersicht');
 }
 
@@ -3510,7 +3510,7 @@ function sammlerTest() {
   pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
   S.aufklappZu();
   const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && S.CL_ORDNER.planung.apps.indexOf('ziele') < 0, 'Start: Ziele seit 0.71 im Memo Pad, weiter 12 Felder');
+  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 15 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 15 Felder (seit 0.89)');
   S.oeffne('uebersicht');
 }
 
@@ -4902,7 +4902,7 @@ function zieleTest() {
   S.DB.ziele.push({ id: 'z2', name: 'Gewicht 73 kg', kontext: 'privat', status: 'laufend', zieltermin: S.tagePlus(heute, 30), flaeche: '## Warum\nKnie entlasten\n[] Waage kaufen', ordnung: 2, geaendert: 1 });
   S.DB.ziele.push({ id: 'z3', name: 'Italienisch A2', kontext: 'privat', status: 'laufend', zieltermin: '', flaeche: '', ordnung: 3, geaendert: 1 });
   S.DB.ziele.push({ id: 'z4', name: 'Alter Vorsatz', kontext: 'privat', status: 'abgeschlossen', zieltermin: '2025-01-01', flaeche: '', ordnung: 4, geaendert: 1 });
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('ziele') < 0 && S.clApp('ziele').raster === false && S.clApp('ziele').name === 'Memo Pad', 'Ziele seit 0.71 im Memo Pad (nicht auf dem Start, nicht im Ordner)');
+  pruefe(!S.clOrdnerVon('ziele') && S.clApp('ziele').raster === false && S.clApp('ziele').name === 'Memo Pad', 'Ziele seit 0.71 im Memo Pad (nicht auf dem Start, nicht im Ordner)');
   pruefe(/2 laufen|3 laufen/.test(S.ordnerStandText('ziele')) && /nächstes in 30 Tage/.test(S.ordnerStandText('ziele')), 'Stand im Ordner: Anzahl und nächstes Ziel');
   S.oeffne('projekte');
   pruefe(!/Haus auf Stand|Gewicht/.test(inhalt()) && /Carport/.test(inhalt()), 'Projekte zeigt keine Ziele mehr');
@@ -5058,7 +5058,7 @@ function projekteTest() {
   const neu = S.DB.projekte[S.DB.projekte.length - 1];
   pruefe(neu.name === 'Terrassendach' && neu.start === S.isoDatum() && S.cl.pj.id === neu.id && S.cl.pj.reiter === 'aufgaben', 'Neu: Beginn heute, öffnet die Schritte');
   /* Start, Ordner, Symbol */
-  pruefe(S.CL_ORDNER.planung.apps.indexOf('coach') < 0, 'Coach seit 0.86 nicht mehr im Ordner Planung (aus)');
+  pruefe(!S.clOrdnerVon('coach') && S.clApp('coach').raster === false, 'Coach seit 0.86 aus: nicht auf dem Start, in keinem Ordner');
   pruefe(/<rect x="15" y="18" width="16" height="6"/.test(S.clSymbol('projekte')), 'Symbol „Zeitplan“ (drei versetzte Balken)');
   S.oeffne('uebersicht');
   pruefe(!/oeffne\('projekte'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()) && />Memo Pad<\/button>/.test(inhalt()), 'Übersicht seit 0.71: „Memo Pad“ statt Projekte und Notizen');
@@ -6884,11 +6884,11 @@ function startOrdnerTest() {
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
   pruefe(doppelt.length === 0, 'keine App doppelt (Raster und Ordner)');
-  pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).every(k => raster.indexOf(k) >= 0 && S.CL_BILD[k]), 'drei Ordner im Raster, mit eigenem Symbol');
+  pruefe(raster.length === 15 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'seit 0.89 ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
-  pruefe((inhalt().match(/class="ord">▸/g) || []).length === 3, 'Ordner am ▸ erkennbar');
-  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()), 'seit 0.72 Routines und SOS auf dem Start, Drive nicht');
-  [['planung', ['kategorien', 'ideen']], ['lernen', ['lernkartei', 'drive']]].forEach(([o, apps]) => {
+  pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
+  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && /oeffne\('drive'\)/.test(inhalt()), 'Routines und SOS (seit 0.72), Drive (seit 0.89) auf dem Start');
+  [['spiele', ['sudoku', 'poker']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
     pruefe(S.cl.aufklapp === 'ordner' && S.cl.ordner === o && apps.every(id => new RegExp("ordnerWahl\\('" + id + "'\\)").test(h)) && /Schließen/.test(h), 'Ordner ' + o + ': ' + apps.join(', '));
@@ -6899,8 +6899,8 @@ function startOrdnerTest() {
     S.clZurueck();
     pruefe(!S.cl.aufklapp, 'nochmal Zurück: Ordner zu');
   });
-  S.oeffne('planung');
-  pruefe(!/Routinen: /.test(S.document.getElementById('aufklapp').innerHTML) && /Idea Lab: \d+ in Umsetzung/.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
+  S.oeffne('spiele');
+  pruefe(/Poker: /.test(S.document.getElementById('aufklapp').innerHTML) && /Sudoku: /.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
   S.aufklappZu();
   pruefe(/oeffne\('rechner'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Rechner, Vorlesen und Memo direkt auf dem Start');
 }
@@ -7491,7 +7491,7 @@ function ideenTest() {
   const S = CL;
   const setz = (o) => Object.keys(o).forEach(k => { S.document.getElementById(k).value = o[k]; });
   const leer = (l) => l.forEach(k => { S.document.getElementById(k).value = ''; });
-  pruefe(S.clApp('ideen') && />Idea Lab</.test((S.oeffne('planung'), S.document.getElementById('aufklapp').innerHTML)) && S.CL_BILD.ideen, 'App „Idea Lab“ (Ideenwerkstatt) im Ordner Planning mit eigenem Symbol');
+  pruefe(S.clApp('ideen') && /oeffne\('ideen'\)">[\s\S]*?Idea Lab</.test((S.oeffne('uebersicht'), inhalt())) && S.CL_BILD.ideen, 'App „Idea Lab“ (Ideenwerkstatt) seit 0.89 direkt auf dem Start, mit eigenem Symbol');
   S.aufklappZu();
   pruefe(Array.isArray(S.DB.ideen) && /'ideen'[\],]/.test(QUELLE), 'Bereich „ideen“ kommt aus der Workbench (6.3.5)');
   S.oeffne('ideen');
@@ -9102,7 +9102,7 @@ function coachAusTest() {
   S.document.getElementById('pmTitel').value = 'Neu P1'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
   S.pmSpeichern();
   pruefe(S.cl.aufklapp !== 'covorab' && S.DB.aufgaben.some(a => a.titel === 'Neu P1'), 'neue Aufgabe mit Priorität 1: gespeichert, ohne Nachfrage');
-  pruefe(/planung: \{ name: 'Planning', apps: \(CO_AN \? \[/.test(SKRIPT) && S.CL_ORDNER.planung.apps.indexOf('coach') < 0, 'nicht mehr im Ordner Planung');
+  pruefe(!S.CL_ORDNER.planung && !S.clOrdnerVon('coach'), 'nicht mehr erreichbar (Ordner Planning seit 0.89 aufgelöst)');
   S.localStorage.setItem('clie-morgengruss', '');
   pruefe(typeof S.coMorgengrussHtml === 'function', 'der ruhige Morgengruß bleibt');
   S.localStorage.setItem('clie-morgengruss', heute);
@@ -9306,6 +9306,28 @@ function farbschemaTest() {
 }
 
 
+function raster35Test() {
+  console.log('\n151. Start als Raster 3×5: Planning und Learning aufgelöst, Games bleibt Ordner (0.89)');
+  if (!CL) { return; }
+  /* Fehlerarten: Raster nicht voll oder überzählig, eine App doppelt (Raster und Ordner) oder gar nicht erreichbar, Ordner zeigt auf eine App, die es nicht gibt */
+  const S = pmFrisch();
+  const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  pruefe(raster.length === 15 && raster.length % 3 === 0, 'Raster genau voll: 15 Felder in drei Spalten');
+  pruefe(['ideen', 'kategorien', 'leitfaden', 'lernkartei', 'drive'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Categories, Guide, Flashcards, Drive direkt auf dem Start');
+  pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
+  const fehlt = [];
+  Object.keys(S.CL_ORDNER).forEach(k => S.CL_ORDNER[k].apps.forEach(id => { if (!S.clApp(id) || raster.indexOf(id) >= 0) { fehlt.push(k + ':' + id); } }));
+  pruefe(!fehlt.length, 'jede App im Ordner gibt es und sie liegt nicht zusätzlich im Raster' + (fehlt.length ? ': ' + fehlt.join(', ') : ''));
+  pruefe(raster.every(id => S.CL_BILD[id]), 'jedes Feld hat ein Symbol');
+  S.oeffne('uebersicht');
+  pruefe((inhalt().match(/class="app"/g) || []).length === 15 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 15 Felder, eines davon Ordner (Games ▸)');
+  const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+  pruefe(/\.sym\{width:68px;height:68px/.test(css) && /\.sym svg\{width:68px;height:68px/.test(css) && /\.apps\{display:grid;grid-template-columns:repeat\(3,1fr\);gap:14px 4px/.test(css), 'kleinere Symbole (68 px) und engere Zeilen, damit fünf Reihen ohne Rollen passen');
+  S.oeffne('ideen'); S.clZurueck();
+  pruefe(S.cl.app === 'uebersicht' && !S.cl.aufklapp, 'Zurück aus Idea Lab: direkt auf den Start, kein Ordner');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9454,6 +9476,7 @@ function farbschemaTest() {
   try { pokerTest(); } catch (e) { fail('0.87 Poker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schafkopfTest(); } catch (e) { fail('0.87 Schafkopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { farbschemaTest(); } catch (e) { fail('0.88 Farbschema warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { raster35Test(); } catch (e) { fail('0.89 Raster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
