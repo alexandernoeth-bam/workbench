@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.92.0</title>
+<title>CLIE 0.93.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1085,6 +1085,10 @@ input[type=checkbox]{accent-color:var(--px)}
 .aufg.pm.erl .pd{color:var(--px-zart)}
 .pm-datwahl{border:2px solid var(--px);padding:0 8px;font-size:17px;margin:4px 0 2px}
 .pm-gr{font-size:15.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--px-mitte);margin:10px 0 0;border-bottom:1px solid var(--px-zart)}
+/* Seit 0.93: Balken für Typ (Memo Pad) und Kategorie (To Do, Memo Pad) */
+.pm-bal{display:flex;justify-content:space-between;align-items:center;background:var(--px);color:var(--lcd);font-weight:600;font-size:17px;padding:3px 8px;margin:10px 0 2px;border-radius:3px}
+.pm-bal small{font-weight:400;font-size:15.5px;opacity:.85}
+html.schema-wb .pm-bal{background:#19525A;color:#fff}
 .pm-banner{border:2px dashed var(--px);padding:5px 8px;margin:4px 0 8px;font-size:17px;line-height:1.35}
 .memo-zeile.pm .mz.kz{flex:0 0 22px;text-align:left;font-weight:700}
 .memo-zeile.pm.gewaehlt{background:var(--px);color:var(--lcd)}
@@ -1191,7 +1195,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.92.0';
+var APP_VERSION = '0.93.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -28273,7 +28277,8 @@ function pmTodoHtml() {
       nachKat[k].push(a);
     });
     folge.forEach(function (k) {
-      h += '<div class="pm-gr">' + esc(pmKatName(k)) + '</div>'
+      /* Seit 0.93: Kategorie als Balken mit Anzahl */
+      h += '<div class="pm-bal">' + esc(pmKatName(k)) + '<small>' + nachKat[k].length + '</small></div>'
         + pmSortieren(nachKat[k], show.sort === 'kat' ? 'prio' : show.sort).map(function (a) { return pmZeileHtml(a, { show: show, mitKat: false }); }).join('');
     });
     return h;
@@ -28809,8 +28814,12 @@ function pmMemos(sicht) {
     return (sicht === 'archiv') === pmArchiviert(s);
   });
   /* Seit 0.84: alphabetisch — nach Typ nur, wenn „Gruppiert“ an ist */
+  /* Seit 0.93 nach Kategorie (ohne Kategorie zuletzt) oder nach Typ — innerhalb alphabetisch */
+  var nachKat = pmGruppiert() && pmGruppeArt() === 'kat';
+  var katName = function (s) { var k = clKategorieVon(s); return k ? pmKatName(k) : '\uffff'; };
   return l.sort(function (a, b) {
-    return (pmGruppiert() ? PM_KUERZEL.indexOf(pmKuerzel(a)) - PM_KUERZEL.indexOf(pmKuerzel(b)) : 0) || String(a.titel).localeCompare(String(b.titel), 'de');
+    var g = !pmGruppiert() ? 0 : (nachKat ? katName(a).localeCompare(katName(b), 'de') : PM_KUERZEL.indexOf(pmKuerzel(a)) - PM_KUERZEL.indexOf(pmKuerzel(b)));
+    return g || String(a.titel).localeCompare(String(b.titel), 'de');
   });
 }
 
@@ -28828,8 +28837,31 @@ function pmKzAus() {
   return PM_KUERZEL.filter(function (x) { return k.indexOf(x) >= 0; }).join('');
 }
 
+/* Seit 0.93: Balken sind Standard („Gruppiert“ unter Show… schaltet sie ab) */
 function pmGruppiert() {
-  try { return window.localStorage.getItem(PM_GRUPPE_KEY) === '1'; } catch (e) { return false; }
+  try { return window.localStorage.getItem(PM_GRUPPE_KEY) !== '0'; } catch (e) { return true; }
+}
+
+/* Seit 0.93: bei mehreren Kategorien (▼ Alle, Privat, Arbeit) nach Kategorie oder nach Typ — Kategorie ist Standard */
+var PM_GRUPPE_ART_KEY = 'clie-memo-gruppe-art';
+
+function pmMehrereKat() {
+  var f = clFilter();
+  return f === 'alle' || f === CL_PRIVAT || f === CL_ARBEIT;
+}
+
+function pmGruppeArt() {
+  if (!pmMehrereKat() || pmMemoSicht()) { return 'typ'; }
+  var w = '';
+  try { w = window.localStorage.getItem(PM_GRUPPE_ART_KEY) || ''; } catch (e) { w = ''; }
+  return w === 'typ' ? 'typ' : 'kat';
+}
+
+function pmGruppeArtSetzen(w) {
+  try { window.localStorage.setItem(PM_GRUPPE_ART_KEY, w === 'typ' ? 'typ' : 'kat'); } catch (e) { /* nur für jetzt */ }
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
 }
 
 /* Seit 0.85: Kürzel-Spalte zeigen (Standard) und ausgeblendete Memos zeigen (Standard: nein) */
@@ -28880,7 +28912,7 @@ function pmMShowHtml() {
       return '<button type="button"' + (f.kzaus.indexOf(k) < 0 ? ' class="an"' : '') + ' onclick="pmMShowKz(\'' + k + '\')" aria-label="' + PM_GRUPPEN[k] + '">' + k + '</button>';
     }).join('') + '</div>'
     + haken('pmMsSpalte', f.spalte, 'Kürzel-Spalte zeigen')
-    + haken('pmMsGruppe', f.gruppiert, 'Gruppiert nach Typ')
+    + haken('pmMsGruppe', f.gruppiert, 'Gruppiert (Balken nach Typ oder Kategorie)')
     + haken('pmMsAus', f.aus, 'Ausgeblendete zeigen')
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmMShowOk()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
@@ -28919,15 +28951,21 @@ function pmMemoListeHtml() {
       : sicht === 'archiv' ? 'Das Archiv ist leer.' : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
   }
   var gruppe = pmGruppiert();
-  var letzte = '';
+  /* Seit 0.93: Balken mit Anzahl — nach Typ oder nach Kategorie */
+  var nachKat = gruppe && pmGruppeArt() === 'kat';
+  var schluessel = function (s) { return nachKat ? (clKategorieVon(s) || '') : pmKuerzel(s); };
+  var zahl = {};
+  l.forEach(function (s) { var g = schluessel(s); zahl[g] = (zahl[g] || 0) + 1; });
+  var letzte = null;
   return h + l.map(function (s) {
     var gew = sicht === 'archiv' && cl.pm.memoWahl === s.id;
     var k = pmKuerzel(s);
-    var kopf = (gruppe && k !== letzte) ? '<div class="pm-gr">' + PM_GRUPPEN[k] + '</div>' : '';
-    letzte = k;
+    var g = schluessel(s);
+    var kopf = (gruppe && g !== letzte) ? '<div class="pm-bal">' + esc(nachKat ? pmKatName(g) : PM_GRUPPEN[k]) + '<small>' + zahl[g] + '</small></div>' : '';
+    letzte = g;
     var aus = pmIstAusgeblendet(s);
     return kopf + prZeile(s, null, '<button type="button" class="memo-zeile pm' + (gew ? ' gewaehlt' : '') + (aus ? ' aus' : '') + '" onclick="pmMemoTipp(\'' + esc(s.id) + '\')">'
-      + ((gruppe || !pmSpalte()) ? '' : '<span class="mz kz">' + k + '</span>') + '<span class="tx">' + esc(s.titel) + '</span>'
+      + (((gruppe && !nachKat) || !pmSpalte()) ? '' : '<span class="mz kz">' + k + '</span>') + '<span class="tx">' + esc(s.titel) + '</span>'
       + (aus ? '<small class="pm-ausgebl">ausgebl.</small>' : '') + '</button>');
   }).join('');
 }
@@ -29057,7 +29095,11 @@ function pmMemoFussHtml() {
     return '<button type="button" class="knopf" onclick="pmMemoNeu()">Neu</button>'
       + '<button type="button" class="knopf" onclick="memoArtSetzen(\'vorlagen\')">Vorlage…</button>'
       /* gefüllt, solange von der Standardsicht abgewichen wird: Typ aus oder Ausgeblendete an */
-      + '<button type="button" class="knopf' + ((pmKzAus() || pmAusgeblZeigen()) ? ' voll' : '') + '" onclick="pmMShowAuf()">Show…</button>';
+      + '<button type="button" class="knopf' + ((pmKzAus() || pmAusgeblZeigen()) ? ' voll' : '') + '" onclick="pmMShowAuf()">Show…</button>'
+      /* Seit 0.93: bei mehreren Kategorien umschalten — Kategorie ist Standard */
+      + ((pmGruppiert() && pmMehrereKat()) ? '<div class="pm-tabs">' + [['kat', 'Kategorie'], ['typ', 'Typ']].map(function (t) {
+          return '<button type="button"' + (pmGruppeArt() === t[0] ? ' class="an"' : '') + ' onclick="pmGruppeArtSetzen(\'' + t[0] + '\')">' + t[1] + '</button>';
+        }).join('') + '</div>' : '');
   }
   if (cl.memo.schreiben) { return '<button type="button" class="knopf voll" onclick="pmSchreibenUm()">Fertig</button>'; }
   return '<button type="button" class="knopf" onclick="pmMemoZuListe()">Fertig</button>'
@@ -29368,7 +29410,7 @@ function pmSchreibenUm() {
 function pmMemoDetails() {
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
   if (!s) { return; }
-  cl.pm.mf = { id: s.id, titel: s.titel, k: pmKuerzel(s), bereich: clKategorieVon(s), privat: !!(s.__satz && s.__satz.privat), ausgeblendet: pmIstAusgeblendet(s) };
+  cl.pm.mf = { id: s.id, titel: s.titel, k: pmIstVorlage(s) ? 'V' : pmKuerzel(s), bereich: clKategorieVon(s), privat: !!(s.__satz && s.__satz.privat), ausgeblendet: pmIstAusgeblendet(s) };
   cl.aufklapp = 'pmmemo';
   aufklappNeu();
 }
@@ -29386,7 +29428,7 @@ function pmMemoFensterLesen() {
 
 function pmKuerzelWahl(k) {
   var f = pmMemoFensterLesen();
-  if (!f || PM_KUERZEL.indexOf(k) < 0) { return; }
+  if (!f || (PM_KUERZEL.indexOf(k) < 0 && k !== 'V')) { return; }
   f.k = k;
   aufklappNeu();
 }
@@ -29411,9 +29453,10 @@ function pmMemoFensterHtml() {
   }
   var h = '<div class="fenster"><div class="titel">Details</div><div class="rumpf">'
     + '<label for="pmMTitel">Titel:</label><input id="pmMTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(f.titel) + '">'
-    + '<label>Kürzel:</label><div class="wahlreihe pm-kz">' + PM_KUERZEL.map(function (k) {
+    /* Seit 0.93: V = Vorlage — nicht in der Liste, nur unter „Vorlage…“ */
+    + '<label>Kürzel:</label><div class="wahlreihe pm-kz">' + PM_KUERZEL.concat(['V']).map(function (k) {
       return '<button type="button"' + (f.k === k ? ' class="an"' : '') + (ckIstKorb(s) && k !== '–' ? ' disabled' : '') + ' onclick="pmKuerzelWahl(\'' + k + '\')">' + k + '</button>';
-    }).join('') + '</div><p class="leise">P Projekt · Z Ziel · A Ablauf · – alles andere</p>'
+    }).join('') + '</div><p class="leise">P Projekt · Z Ziel · A Ablauf · – alles andere · V Vorlage</p>'
     + katPrivatHtml('pmM', f.bereich || '', f.privat)
     + '<label class="haken"><input id="pmMAus" type="checkbox"' + (f.ausgeblendet ? ' checked' : '') + '> ausblenden <small class="leise">(nicht in der Liste)</small></label>';
   var auf = pmMemoAufgaben(s.id);
@@ -29442,7 +29485,11 @@ function pmMemoSpeichern() {
   katPrivatSchreiben(s.__satz, f);
   if (f.ausgeblendet) { s.__satz.ausgeblendet = true; } else { delete s.__satz.ausgeblendet; }
   s.geaendert = jetzt();
-  var n = pmKuerzelSetzen(s, f.k);
+  var warVorlage = pmIstVorlage(s);
+  var n = null;
+  if (f.k === 'V') { pmVorlageSetzen(s, true); }
+  else { pmVorlageSetzen(s, false); n = pmKuerzelSetzen(s, f.k); }
+  if (f.k === 'V' && !warVorlage) { melde('„' + s.titel + '“ ist jetzt eine Vorlage — zu finden unter „Vorlage…“.', 'gut'); }
   spaeterSichern();
   cl.pm.mf = null;
   aufklappZu();
@@ -29452,6 +29499,18 @@ function pmMemoSpeichern() {
 
 /* Kürzel ändern: zwischen Notiz/Ablauf in „gedanken“ wechselt nur die Art;
    zu Projekt oder Ziel zieht der Satz um — mit derselben Kennung. */
+/* Vorlage an/aus (seit 0.93: Kürzel V) — das Memo selbst, keine Kopie */
+function pmVorlageSetzen(s, an) {
+  var x = s && s.__satz;
+  if (!x || ckIstKorb(s) || pmIstVorlage(s) === !!an) { return; }
+  if (an) { x.istVorlage = true; }
+  else {
+    delete x.istVorlage;
+    if (x.checkliste === 'vorlage') { x.checkliste = 'lauf'; }
+  }
+  x.geaendert = jetzt();
+}
+
 function pmKuerzelSetzen(s, k) {
   if (!s || PM_KUERZEL.indexOf(k) < 0) { return s; }
   var alt = pmKuerzel(s);

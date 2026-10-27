@@ -8401,8 +8401,8 @@ function palmTodoTest() {
   /* Kategorie */
   S.pmTab('kategorie');
   h = inhalt();
-  pruefe(/<div class="pm-gr">Haus<\/div>/.test(h) && /<div class="pm-gr">Nicht abgelegt<\/div>/.test(h) && h.indexOf('>Haus<') < h.indexOf('>Nicht abgelegt<'),
-    'Kategorie: gruppiert nach Kategorie, „Nicht abgelegt“ zuletzt');
+  pruefe(/<div class="pm-bal">Haus<small>\d+<\/small><\/div>/.test(h) && /<div class="pm-bal">Nicht abgelegt<small>/.test(h) && h.indexOf('>Haus<') < h.indexOf('>Nicht abgelegt<'),
+    'Kategorie: gruppiert nach Kategorie als Balken mit Anzahl (seit 0.93), „Nicht abgelegt“ zuletzt');
   S.pmTab('alle');
   /* ▼ Kategorie oben rechts */
   S.katUm();
@@ -8536,6 +8536,7 @@ function palmMemoTest() {
   S.DB.gedanken.push({ id: 'g2', titel: 'DFÜ-Abruftest', text: '[] Build-Lauf kontrollieren', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', ordnung: 5, geaendert: 1 });
   S.DB.gedanken.push({ id: 'g3', titel: 'Bad renovieren', text: 'fertig', kontext: 'privat', bereich: haus, archiv: true, ordnung: 6, geaendert: 1 });
   S.DB.gedanken.push({ id: 'g4', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 7, geaendert: 1 });
+  S.__ablage['clie-memo-gruppiert'] = '0';
   S.oeffne('memo'); S.memoArtSetzen('alles');
   let h = inhalt();
   const titel = (h.match(/<span class="tx">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
@@ -9033,8 +9034,8 @@ function memoSortTest() {
   /* Show… */
   S.pmMShowAuf();
   f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'pmmshow' && ['P', 'Z', 'A', '–'].every(k => f.indexOf(`class="an" onclick="pmMShowKz('${k}')"`) >= 0) && /id="pmMsSpalte" type="checkbox" checked> Kürzel-Spalte zeigen/.test(f) && /id="pmMsGruppe" type="checkbox"> Gruppiert/.test(f) && /id="pmMsAus" type="checkbox"> Ausgeblendete zeigen/.test(f),
-    'Show…: Typen P · Z · A · – (an), Kürzel-Spalte zeigen (an), Gruppiert, Ausgeblendete zeigen');
+  pruefe(S.cl.aufklapp === 'pmmshow' && ['P', 'Z', 'A', '–'].every(k => f.indexOf(`class="an" onclick="pmMShowKz('${k}')"`) >= 0) && /id="pmMsSpalte" type="checkbox" checked> Kürzel-Spalte zeigen/.test(f) && /id="pmMsGruppe" type="checkbox" checked> Gruppiert/.test(f) && /id="pmMsAus" type="checkbox"> Ausgeblendete zeigen/.test(f),
+    'Show…: Typen P · Z · A · – (an), Kürzel-Spalte zeigen (an), Gruppiert (an, seit 0.93), Ausgeblendete zeigen');
   S.pmMShowKz('–');
   ['pmMsSpalte', 'pmMsGruppe', 'pmMsAus'].forEach(id => { S.document.getElementById(id).checked = (id === 'pmMsAus'); });
   S.pmMShowOk();
@@ -9049,9 +9050,10 @@ function memoSortTest() {
   pruefe(/memo-zeile pm aus/.test(h) && /Rollenmodell Notizen<\/span><small class="pm-ausgebl">ausgebl\.<\/small>/.test(h) && /class="mz kz"/.test(h), 'Ausgeblendete zeigen: grau mit „ausgebl.“');
   S.pmMShowAuf();
   ['pmMsSpalte', 'pmMsGruppe', 'pmMsAus'].forEach(id => { S.document.getElementById(id).checked = (id !== 'pmMsAus'); });
+  S.__ablage['clie-memo-gruppe-art'] = 'typ';
   S.pmMShowOk();
   h = inhalt();
-  pruefe(/<div class="pm-gr">Projekte<\/div>/.test(h) && h.indexOf('>Projekte<') < h.indexOf('>Ziele<') && h.indexOf('>Ziele<') < h.indexOf('>Abläufe<') && h.indexOf('>Abläufe<') < h.indexOf('>Sonstiges<') && !/class="mz kz"/.test(h)
+  pruefe(/<div class="pm-bal">Projekte<small>/.test(h) && h.indexOf('>Projekte<') < h.indexOf('>Ziele<') && h.indexOf('>Ziele<') < h.indexOf('>Abläufe<') && h.indexOf('>Abläufe<') < h.indexOf('>Sonstiges<') && !/class="mz kz"/.test(h)
     && h.indexOf('Einführung SMAX') < h.indexOf('OTS-Testumgebung') && !/Rollenmodell/.test(h) && /class="knopf" onclick="pmMShowAuf\(\)"/.test(S.document.getElementById('fuss').innerHTML),
     'Gruppiert: Überschriften Projekte · Ziele · Abläufe · Sonstiges, darin alphabetisch; Standardsicht → Show… leer');
   /* Kürzelwechsel nimmt „ausgeblendet“ mit */
@@ -9598,6 +9600,68 @@ async function serienTerminTest() {
 }
 
 
+function balkenVorlageTest() {
+  console.log('\n158. Memo Pad: Balken nach Kategorie (Standard) oder Typ; To Do: Kategorie als Balken; Kürzel V = Vorlage (0.93)');
+  if (!CL) { return; }
+  /* Fehlerarten: Gruppen falsch sortiert oder falsch gezählt, Umschalter in einer einzelnen Kategorie, Vorlage bleibt in der Liste oder kommt nicht zurück */
+  const S = pmFrisch();
+  ['clie-memo-kzaus', 'clie-memo-gruppiert', 'clie-memo-spalte', 'clie-memo-ausgebl', 'clie-memo-gruppe-art'].forEach(k => delete S.__ablage[k]);
+  S.katSetzen('alle');
+  S.DB.projekte.push({ id: 'bp1', name: 'Solar einbauen', flaeche: '', status: 'laufend', kontext: 'privat', bereich: 'kb-haus', ordnung: 1, geaendert: 1 });
+  S.DB.projekte.push({ id: 'bp2', name: 'SMAX einführen', flaeche: '', status: 'laufend', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 });
+  S.DB.ziele.push({ id: 'bz1', name: '78 kg', flaeche: '', status: 'laufend', kontext: 'privat', bereich: 'kb-haus', ordnung: 3, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'bn1', titel: 'Borkum Morgenroutine', text: 'x', kontext: 'privat', bereich: '', ordnung: 4, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'bn2', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', bereich: '', ordnung: 5, geaendert: 1 });
+  if (!S.kgAlle().some(k => k.id === 'kb-haus')) { S.DB.einstellungen.kategorien = (S.DB.einstellungen.kategorien || []).concat([{ id: 'kb-haus', name: 'Haus' }]); }
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  let h = inhalt();
+  const bal = () => (inhalt().match(/<div class="pm-bal">([^<]+)<small>(\d+)/g) || []).map(x => x.replace(/<div class="pm-bal">/, '').replace('<small>', ' '));
+  pruefe(bal().length >= 2 && bal()[bal().length - 1].indexOf('Nicht abgelegt') === 0 && bal().some(b => /^Haus.* 2$/.test(b)), 'Standard bei ▼ Alle: Balken nach Kategorie mit Anzahl, „Nicht abgelegt“ zuletzt — ' + bal().join(' · '));
+  pruefe(/class="mz kz">P</.test(h) && /class="mz kz">Z</.test(h), 'nach Kategorie: der Typ steht als Kürzel vorn');
+  let f = S.document.getElementById('fuss').innerHTML;
+  pruefe(/<button type="button" class="an" onclick="pmGruppeArtSetzen\('kat'\)">Kategorie<\/button><button type="button" onclick="pmGruppeArtSetzen\('typ'\)">Typ/.test(f), 'unten: Umschalter Kategorie (an) | Typ');
+  S.pmGruppeArtSetzen('typ');
+  pruefe(bal().join(' · ').indexOf('Projekte 2') === 0 && bal().some(b => b === 'Ziele 1') && !/class="mz kz"/.test(inhalt()) && S.__ablage['clie-memo-gruppe-art'] === 'typ', 'Typ: Balken Projekte 2 · Ziele 1 · …, ohne Kürzel-Spalte — gemerkt');
+  S.pmGruppeArtSetzen('kat');
+  S.katSetzen('kb-haus');
+  pruefe(bal().join(' · ') === 'Projekte 1 · Ziele 1' && !/pmGruppeArtSetzen/.test(S.document.getElementById('fuss').innerHTML), 'eine Kategorie gewählt: Balken nach Typ, kein Umschalter');
+  S.katSetzen('alle');
+  /* To Do: Reiter Kategorie */
+  S.pmNeueAufgabe({ titel: 'Zählerschrank klären', prio: 2, datum: '', zeit: '', bereich: 'kb-haus' });
+  S.pmNeueAufgabe({ titel: 'Angebot holen', prio: 3, datum: '', zeit: '', bereich: 'kb-haus' });
+  S.oeffne('aufgaben'); S.pmTab('kategorie');
+  pruefe(/<div class="pm-bal">Haus<small>2<\/small><\/div>/.test(inhalt()) || /<div class="pm-bal">[^<]+<small>\d+<\/small><\/div>/.test(inhalt()), 'To Do · Kategorie: Balken mit Anzahl');
+  S.pmTab('alle');
+  pruefe(!/pm-bal/.test(inhalt()), 'To Do · Alle bleibt ohne Balken (wie am Palm)');
+  /* Kürzel V */
+  S.oeffne('memo'); S.memoArtSetzen('alles');
+  S.pmMemoOeffnen('bn2', ''); S.pmMemoDetails();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/pmKuerzelWahl\('V'\)">V</.test(f) && /V Vorlage/.test(f), 'Details: Kürzel V mit Erklärung');
+  S.document.getElementById('pmMTitel').value = 'Packliste Urlaub'; S.document.getElementById('pmMKat').value = '';
+  S.pmKuerzelWahl('V');
+  S.pmMemoSpeichern();
+  const n = () => S.DB.gedanken.filter(g => g.id === 'bn2')[0];
+  pruefe(n().istVorlage === true && /jetzt eine Vorlage/.test(S.document.getElementById('toastText').textContent), 'V gespeichert: das Memo selbst ist jetzt Vorlage');
+  S.pmMemoZuListe();
+  pruefe(!/Packliste Urlaub/.test(inhalt()), 'nicht mehr in der Liste');
+  S.memoArtSetzen('vorlagen');
+  pruefe(/Packliste Urlaub/.test(inhalt()), 'unter „Vorlage…“ zu finden');
+  S.memoArtSetzen('alles');
+  S.pmMemoOeffnen('bn2', ''); S.pmMemoDetails();
+  pruefe(/class="an" onclick="pmKuerzelWahl\('V'\)"/.test(S.document.getElementById('aufklapp').innerHTML), 'Details einer Vorlage: V ist gewählt');
+  S.document.getElementById('pmMTitel').value = 'Packliste Urlaub'; S.document.getElementById('pmMKat').value = '';
+  S.pmKuerzelWahl('–'); S.pmMemoSpeichern();
+  S.pmMemoZuListe();
+  pruefe(!n().istVorlage && /Packliste Urlaub/.test(inhalt()), 'zurück auf –: wieder ein normales Memo in der Liste');
+  const ck = { titel: 'Reise-Check', text: '[] a', kontext: 'privat', id: 'bn3', checkliste: 'vorlage', ordnung: 6, geaendert: 1 };
+  S.DB.gedanken.push(ck);
+  S.pmVorlageSetzen(S.kpSeiteFinden('bn3'), false);
+  pruefe(ck.checkliste === 'lauf' && !S.pmIstVorlage(S.kpSeiteFinden('bn3')), 'alte Checklisten-Vorlage: zurück wird eine laufende Liste');
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9753,6 +9817,7 @@ async function serienTerminTest() {
   try { zeileImSchreibenTest(); } catch (e) { fail('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { auszeichnungVerschachteltTest(); } catch (e) { fail('0.91.2 Auszeichnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await serienTerminTest(); } catch (e) { fail('0.92 Serien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { balkenVorlageTest(); } catch (e) { fail('0.93 Balken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
