@@ -9763,7 +9763,7 @@ function manifestTest() {
   pruefe(S.cl.memo.schreiben === false && !/memoFeld/.test(inhalt()), 'Manifest öffnet in der Lesen-Ansicht, nicht im Schreiben');
   const h = inhalt();
   pruefe((h.match(/<p style="margin:0">/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
-  pruefe(/oeffne\('memo'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: Memo Pad… öffnet die Notiz zum Bearbeiten');
+  pruefe(/manZoom\(-1\)/.test(S.document.getElementById('fuss').innerHTML) && /manZoom\(1\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: A− und A+ (Schrift)');
   /* Lesen statt Quelltext (0.96.2): Überschrift, Tabelle, Linie, Kursiv */
   S.DB.gedanken = S.DB.gedanken.filter(g => g.id !== 'mf1');
   S.DB.gedanken.push({ id: 'mf2', titel: 'Manifest', text: '# Regeln\n| Nr. | Regel |\n| --- | --- |\n| 1 | *Ruhe* |\n---\nText', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
@@ -9788,6 +9788,28 @@ function verweisEditTest() {
   pruefe(t === 'Siehe [[projekt:p1|Solar]] und [Web](https://example.com)\n| a | b |', 'Zurücklesen: Verweis und Link bleiben unverändert, Tabellenzeile bleibt Text — ' + JSON.stringify(t));
   pruefe(S.pmEdInhalt('https://a.de/x').indexOf('data-raw="https://a.de/x"') >= 0, 'blanke Adresse wird im Editor als Einheit geführt');
   pruefe(S.pmEdInhalt('**fett** Text') === S.pmInlineHtml('**fett** Text'), 'Text ohne Links bleibt wie bisher');
+}
+
+function manifestFussTest() {
+  console.log('\n167. Manifest: Blättern in der Fußzeile mit langen Knöpfen, Seitenzahl dort; Tabellenzellen enger (0.97.3)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  S.DB.gedanken = (S.DB.gedanken || []).filter(g => g.id !== 'mf4');
+  S.DB.gedanken.push({ id: 'mf4', titel: 'Manifest', text: '| Nr. | Regel |\n| --- | --- |\n| 1 | Eins |\nText', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.oeffne('manifest');
+  pruefe(!/Seite \d+ von/.test(inhalt()), 'die Seitenleiste steht nicht mehr im Inhalt, sondern unten');
+  const fuss = S.document.getElementById('fuss').innerHTML;
+  pruefe(/manZoom\(-1\)/.test(fuss) && /manZoom\(1\)/.test(fuss), 'A− und A+ bleiben unten');
+  S.cl.man.anzahl = 3; S.cl.man.seite = 1;
+  const f = S.manifestFussHtml();
+  pruefe(/manBlaettern\(-1\)/.test(f) && /manBlaettern\(1\)/.test(f) && /Seite 2 von 3/.test(f), 'bei mehreren Seiten: ◀ Seite 2 von 3 ▶ unten');
+  pruefe(f.indexOf('flex:1;min-height:40px;font:inherit') >= 0, 'Blätter-Knöpfe lang: flex 1, mindestens 40 px hoch');
+  S.cl.man.seite = 0; S.cl.man.anzahl = 1;
+  pruefe(!/manBlaettern/.test(S.manifestFussHtml()), 'eine Seite: keine Blätter-Knöpfe');
+  S.cl.man.anzahl = 1;
+  const z = S.manZeile('| 1 | Eins |', false);
+  pruefe(z.indexOf('padding:1px 4px') >= 0 && z.indexOf('line-height:1.15') >= 0, 'Tabellenzellen enger (1 px, 4 px, Zeilenhöhe 1,15)');
+  pruefe(typeof S.manNeuZeichnen === 'function', 'Blättern, Schrift und Nachrechnen zeichnen die Fußzeile mit');
 }
 
 function manifestSeitenTest() {
@@ -10078,6 +10100,7 @@ function vlStummTest() {
   try { syncWocheTest(); } catch (e) { fail('0.95.0 Sync/Woche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { manifestFussTest(); } catch (e) { fail('0.97.3 Manifest-Fuß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
