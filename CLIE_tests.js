@@ -9662,6 +9662,49 @@ function balkenVorlageTest() {
 }
 
 
+function typTTest() {
+  console.log('\n159. Memo-Typ T (ToDo-Liste): Kennzeichen mit eigenem Balken (0.94)');
+  if (!CL) { return; }
+  /* Fehlerarten: T geht beim Wechsel verloren oder macht ein Memo zum Ablauf; Kästchen werden ungewollt Aufgaben; T fehlt in Show… oder im Balken */
+  const S = pmFrisch();
+  ['clie-memo-kzaus', 'clie-memo-gruppiert', 'clie-memo-spalte', 'clie-memo-ausgebl', 'clie-memo-gruppe-art'].forEach(k => delete S.__ablage[k]);
+  S.katSetzen('alle');
+  S.DB.gedanken.push({ id: 'tt1', titel: 'Baumarkt Samstag', text: '[] Silikon\n[] Dübel', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'tt2', titel: 'DFÜ-Abruftest', text: '[] a', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', ordnung: 2, geaendert: 1 });
+  S.DB.projekte.push({ id: 'tt3', name: 'Packen Borkum', flaeche: '', status: 'laufend', kontext: 'privat', bereich: '', ordnung: 3, geaendert: 1 });
+  const seite = id => S.kpSeiteFinden(id);
+  const aufgVorher = (S.DB.aufgaben || []).length;
+  S.pmKuerzelSetzen(seite('tt1'), 'T');
+  pruefe(S.pmKuerzel(seite('tt1')) === 'T' && S.DB.gedanken.filter(g => g.id === 'tt1')[0].todoListe === true, 'Memo → T: Kennzeichen gesetzt');
+  pruefe((S.DB.aufgaben || []).length === aufgVorher && S.DB.gedanken.filter(g => g.id === 'tt1')[0].text === '[] Silikon\n[] Dübel', 'Kästchen bleiben im Memo — keine Aufgaben im To Do');
+  S.pmKuerzelSetzen(seite('tt2'), 'T');
+  const a2 = S.DB.gedanken.filter(g => g.id === 'tt2')[0];
+  pruefe(S.pmKuerzel(seite('tt2')) === 'T' && a2.art !== 'aufgaben', 'Ablauf → T: kein Ablauf mehr');
+  S.pmKuerzelSetzen(seite('tt2'), 'A');
+  pruefe(S.pmKuerzel(seite('tt2')) === 'A' && !a2.todoListe, 'T → A: Kennzeichen weg');
+  const n3 = S.pmKuerzelSetzen(seite('tt3'), 'T');
+  pruefe(n3 && S.pmKuerzel(n3) === 'T' && !S.DB.projekte.some(p => p.id === 'tt3'), 'Projekt → T: wird ein Memo mit Kennzeichen');
+  S.pmKuerzelSetzen(seite('tt3'), '–');
+  pruefe(S.pmKuerzel(seite('tt3')) === '–' && !S.DB.gedanken.filter(g => g.id === 'tt3')[0].todoListe, 'T → –: Kennzeichen weg');
+  S.pmKuerzelSetzen(seite('tt3'), 'T');
+  S.oeffne('memo'); S.memoArtSetzen('alles'); S.pmGruppeArtSetzen('typ');
+  const h = inhalt();
+  pruefe(/<div class="pm-bal">ToDo-Listen<small>2<\/small>/.test(h) && h.indexOf('>Abläufe<') < h.indexOf('>ToDo-Listen<') && h.indexOf('>ToDo-Listen<') < h.indexOf('Baumarkt') && h.indexOf('Baumarkt') < h.indexOf('Packen Borkum'), 'Balken „ToDo-Listen 2“ nach Abläufe, darin alphabetisch');
+  S.pmGruppeArtSetzen('kat');
+  pruefe(/class="mz kz">T<\/span><span class="tx">Baumarkt Samstag/.test(inhalt()), 'nach Kategorie: Kürzel T vorn');
+  S.pmMemoOeffnen('tt1', ''); S.pmMemoDetails();
+  const f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/class="an" onclick="pmKuerzelWahl\('T'\)"/.test(f) && /T ToDo-Liste/.test(f), 'Details: T gewählt, mit Erklärung');
+  S.aufklappZu(); S.pmMemoZuListe();
+  S.pmMShowAuf();
+  pruefe(/onclick="pmMShowKz\('T'\)" aria-label="ToDo-Listen">T</.test(S.document.getElementById('aufklapp').innerHTML), 'Show…: T ein- und ausschaltbar');
+  S.pmMShowKz('T'); S.pmMShowOk();
+  pruefe(!/Baumarkt Samstag/.test(inhalt()) && S.__ablage['clie-memo-kzaus'] === 'T', 'T aus: ToDo-Listen verschwinden — gemerkt');
+  delete S.__ablage['clie-memo-kzaus'];
+  S.oeffne('uebersicht');
+}
+
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -9818,6 +9861,7 @@ function balkenVorlageTest() {
   try { auszeichnungVerschachteltTest(); } catch (e) { fail('0.91.2 Auszeichnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await serienTerminTest(); } catch (e) { fail('0.92 Serien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { balkenVorlageTest(); } catch (e) { fail('0.93 Balken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { typTTest(); } catch (e) { fail('0.94 Typ T warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

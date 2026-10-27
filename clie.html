@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.93.0</title>
+<title>CLIE 0.94.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1195,7 +1195,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.93.0';
+var APP_VERSION = '0.94.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27983,7 +27983,8 @@ var PM_TAB_KEY = 'clie-pm-tab';
 var PM_SHOW_STD = { sort: 'prio', erl: false, faellig: false, datum: true, prio: true, kat: false };
 var PM_SORT = [['prio', 'Priorität, Datum'], ['datum', 'Datum, Priorität'], ['kat', 'Kategorie, Priorität'], ['abc', 'Alphabetisch']];
 var PM_DATUM = [['heute', 'Heute'], ['7', 'Nächste 7 Tage'], ['ueber', 'Überfällig'], ['alle', 'Alle mit Datum']];
-var PM_KUERZEL = ['P', 'Z', 'A', '–'];
+/* Seit 0.94: T = ToDo-Liste (nur Kennzeichen — die Kästchen bleiben im Memo) */
+var PM_KUERZEL = ['P', 'Z', 'A', 'T', '–'];
 /* Das To-Do-Symbol im Kleinen: ein Blatt mit zwei Haken-Zeilen */
 var PM_TODO_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 1.5h11v13h-11z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
   + '<path d="M4.5 4.5h2.5v2.5h-2.5zM4.5 9.5h2.5v2.5h-2.5z" fill="none" stroke="currentColor" stroke-width="1.2"/>'
@@ -28784,6 +28785,7 @@ function pmKuerzel(s) {
   if (s.art === 'vorhaben') { return s.typ === 'ziel' ? 'Z' : 'P'; }
   var x = s.__satz || {};
   if (s.art === 'notiz' && x.checkliste && x.art === 'aufgaben') { return 'A'; }
+  if (s.art === 'notiz' && x.todoListe === true) { return 'T'; }
   return '–';
 }
 
@@ -28824,11 +28826,11 @@ function pmMemos(sicht) {
 }
 
 /* ---- Kürzel als Ausschalter und „Gruppiert“ (seit 0.84) ----
-   P · Z · A · – sind an; ein Tipp schaltet einen Typ aus, noch einer wieder an. */
+   P · Z · A · T · – sind an; ein Tipp schaltet einen Typ aus, noch einer wieder an. */
 
 var PM_KZAUS_KEY = 'clie-memo-kzaus';
 var PM_GRUPPE_KEY = 'clie-memo-gruppiert';
-var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', A: 'Abläufe', '–': 'Sonstiges' };
+var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', A: 'Abläufe', T: 'ToDo-Listen', '–': 'Sonstiges' };
 
 /* Die ausgeschalteten Kürzel, etwa „–“ oder „Z–“ */
 function pmKzAus() {
@@ -29456,7 +29458,7 @@ function pmMemoFensterHtml() {
     /* Seit 0.93: V = Vorlage — nicht in der Liste, nur unter „Vorlage…“ */
     + '<label>Kürzel:</label><div class="wahlreihe pm-kz">' + PM_KUERZEL.concat(['V']).map(function (k) {
       return '<button type="button"' + (f.k === k ? ' class="an"' : '') + (ckIstKorb(s) && k !== '–' ? ' disabled' : '') + ' onclick="pmKuerzelWahl(\'' + k + '\')">' + k + '</button>';
-    }).join('') + '</div><p class="leise">P Projekt · Z Ziel · A Ablauf · – alles andere · V Vorlage</p>'
+    }).join('') + '</div><p class="leise">P Projekt · Z Ziel · A Ablauf · T ToDo-Liste · – alles andere · V Vorlage</p>'
     + katPrivatHtml('pmM', f.bereich || '', f.privat)
     + '<label class="haken"><input id="pmMAus" type="checkbox"' + (f.ausgeblendet ? ' checked' : '') + '> ausblenden <small class="leise">(nicht in der Liste)</small></label>';
   var auf = pmMemoAufgaben(s.id);
@@ -29518,11 +29520,15 @@ function pmKuerzelSetzen(s, k) {
   /* Seit 0.80.1: auch eine alte Liste wird P, Z oder A (zieht um wie eine Notiz) — nur der Sammler nicht */
   if (ckIstKorb(s)) { melde('Der Sammler bleibt, wie er ist.', null); return s; }
   var x = s.__satz;
-  if (s.art === 'notiz' && (k === 'A' || k === '–')) {
+  if (s.art === 'notiz' && (k === 'A' || k === '–' || k === 'T')) {
     if (k === 'A') {
       if (!x.checkliste || x.checkliste === 'fertig') { x.checkliste = 'lauf'; x.gestartet = x.gestartet || isoDatum(); }
       x.art = 'aufgaben';
-    } else { delete x.art; }
+      delete x.todoListe;
+    } else if (k === 'T') {
+      if (x.art === 'aufgaben') { delete x.art; }
+      x.todoListe = true;
+    } else { delete x.art; delete x.todoListe; }
     x.geaendert = jetzt();
     return s;
   }
@@ -29535,6 +29541,7 @@ function pmKuerzelSetzen(s, k) {
   n.text = s.text;
   ['bereich', 'privat', 'termine', 'archiv', 'ordnung', 'zusatz', 'ausgeblendet'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
   if (k === 'A') { ny.checkliste = 'lauf'; ny.art = 'aufgaben'; ny.gestartet = isoDatum(); }
+  if (k === 'T') { ny.todoListe = true; }
   if (k === '–' && x.checkliste) { ny.checkliste = (x.checkliste === 'fertig') ? 'fertig' : 'lauf'; }
   if (pmArchiviert(s)) { ny.archiv = true; }
   DB[von] = (DB[von] || []).filter(function (y) { return y !== x; });
