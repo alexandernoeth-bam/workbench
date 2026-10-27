@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.94.2</title>
+<title>CLIE 0.94.3</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1195,7 +1195,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.94.2';
+var APP_VERSION = '0.94.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -18442,7 +18442,7 @@ var VL_ABKUERZUNGEN = ['z', 'B', 'd', 'h', 'u', 'a', 'usw', 'bzw', 'ca', 'Dr', '
   'Mrd', 'bspw', 'sog', 'ä', 'o', 'Abb', 'Tab', 'St', 'Hr', 'Fr', 'Jh', 'v', 'Chr', 'n', 'Std', 'Min', 'max', 'min', 'zzgl', 'Bd', 'Aufl', 'Hrsg',
   'f', 'ff', 'z.B', 'd.h', 'u.a', 'i', 'e', 'Mr', 'Mrs', 'Ms', 'vs', 'insb', 'allg', 'Tel', 'Str', 'gem', 'lt', 'rd', 'jew', 'al', 'Vgl', 'Ggf', 'Bzw'];
 
-cl.vl = { ansicht: 'liste', id: '', doc: null, i: 0, laeuft: false, fenster: '', gesperrt: false, gen: 0, laden: null,
+cl.vl = { ansicht: 'liste', id: '', doc: null, i: 0, laeuft: false, satzObj: null, stumm: 0, zuEnde: false, fenster: '', gesperrt: false, gen: 0, laden: null,
           timerBis: 0, timerKapitel: -1, wach: null, gemerkt: 0, ziel: '', bis: -1, runde: [], marke: null, druck: 0 };
 
 /* ---- Text aufbereiten (rein, ohne Browser — geprüft in den Tests) ---- */
@@ -19025,6 +19025,7 @@ function vlOeffnen(id, text) {
     vlMarkenAnpassen(d, t);
     cl.vl.i = Math.max(0, Math.min(t.saetze.length - 1, Number(d.satz) || 0));
     if (d.fertig) { cl.vl.i = 0; }
+    cl.vl.zuEnde = false;
     vlZeichnen();
     vlAktuellZeigen();
     return t;
@@ -19092,12 +19093,26 @@ function vlSprechen(text, fertig) {
   if (v) { u.voice = v; }
   u.rate = e.tempo;
   u.pitch = e.hoehe;
+  /* Seit 0.94.3: Endet ein Satz schneller, als man ihn sprechen kann (Browser ohne passende Stimme
+     melden Beginn und Ende sofort), meldet „fertig“ 'stumm' statt true — sonst raste das Vorlesen
+     ungehört bis ans Ende. Mindestens 120 ms plus 8 ms je Zeichen, geteilt durchs Tempo. */
+  var t0 = jetzt();
+  var mindestens = (120 + 8 * String(u.text || text || '').length) / Math.max(0.5, Number(e.tempo) || 1);
   if (fertig) {
-    u.onend = function () { fertig(true); };
-    u.onerror = function (x) { fertig(!(x && (x.error === 'interrupted' || x.error === 'canceled'))); };
+    u.onend = function () { fertig(jetzt() - t0 >= mindestens ? true : 'stumm'); };
+    /* Seit 0.94.3: ein Fehler der Sprachausgabe (etwa „synthesis-failed“, keine Stimme) ist kein gesprochener Satz —
+       früher ging es dann zum nächsten, und das Vorlesen sprang in Sekunden ans Ende */
+    u.onerror = function (x) { fertig((x && (x.error === 'interrupted' || x.error === 'canceled')) ? false : 'stumm'); };
   }
-  s.cancel();
-  s.speak(u);
+  /* Den Satz festhalten — sonst räumt Chrome ihn weg und „onend“ kommt nie */
+  cl.vl.satzObj = u;
+  if (s.speaking || s.pending) {
+    /* Abbrechen und sofort neu sprechen verschluckt Chrome manchmal: kurz warten */
+    s.cancel();
+    window.setTimeout(function () { if (cl.vl.satzObj === u) { s.speak(u); } }, 80);
+  } else {
+    s.speak(u);
+  }
   return true;
 }
 
@@ -19110,7 +19125,10 @@ function vlKapitelEnde(i) {
 
 function vlStarten() {
   if (!cl.vl.doc) { return; }
-  if (cl.vl.i >= cl.vl.doc.saetze.length) { cl.vl.i = 0; }
+  /* Seit 0.94.3: gerade zu Ende vorgelesen — ▶ beginnt wieder vorn */
+  if (cl.vl.i >= cl.vl.doc.saetze.length || (cl.vl.zuEnde && cl.vl.i >= cl.vl.doc.saetze.length - 1)) { cl.vl.i = 0; }
+  cl.vl.zuEnde = false;
+  cl.vl.stumm = 0;
   var e = vlEinstellungen();
   cl.vl.laeuft = true;
   cl.vl.timerBis = e.timer > 0 ? jetzt() + e.timer * 60000 : 0;
@@ -19128,6 +19146,18 @@ function vlSatzSprechen() {
   var ok = vlSprechen(cl.vl.doc.saetze[cl.vl.i], function (normal) {
     if (g !== cl.vl.gen || !cl.vl.laeuft) { return; }
     if (!normal) { vlAnhalten(); return; }
+    /* Seit 0.94.3: nicht gesprochen — denselben Satz noch einmal, beim dritten Mal anhalten (nicht weiterspringen) */
+    if (normal === 'stumm') {
+      cl.vl.stumm = (cl.vl.stumm || 0) + 1;
+      if (cl.vl.stumm >= 3) {
+        vlAnhalten();
+        melde('Die Sprachausgabe spricht nicht.\nBitte unter Menü ≡ „Voice…“ eine andere Stimme wählen und ▶ erneut tippen.', 'warn');
+        return;
+      }
+      window.setTimeout(vlSatzSprechen, 250);
+      return;
+    }
+    cl.vl.stumm = 0;
     vlNaechster();
   });
   if (!ok) { cl.vl.laeuft = false; vlZeichnen(); }
@@ -19143,6 +19173,7 @@ function vlNaechster() {
     vlStelleMerken(true);
     var d = vlDokument(cl.vl.id);
     if (d) { d.fertig = true; d.geaendert = jetzt(); spaeterSichern(); }
+    cl.vl.zuEnde = true;
     melde('Fertig vorgelesen.', 'gut');
     vlZeichnen();
     return;
@@ -19195,6 +19226,7 @@ function vlGehe(i) {
   var doc = cl.vl.doc;
   if (!doc) { return; }
   cl.vl.i = Math.max(0, Math.min(doc.saetze.length - 1, i));
+  cl.vl.zuEnde = false;
   vlStelleMerken(true);
   if (cl.vl.laeuft) { vlSatzSprechen(); }
   vlAktuellZeigen();
