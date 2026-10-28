@@ -9859,7 +9859,7 @@ function sammlungLetzteTest() {
   const menue = S.katFilterHtml('katSetzen');
   pruefe(menue.indexOf('>Alle<') < menue.indexOf('>Letzte<') && menue.indexOf('>Letzte<') < menue.indexOf('>Privat<'), 'Menü: Alle · Letzte · Privat');
   pruefe(/class="an"[^>]*><span>Letzte</.test(menue), 'Letzte ist markiert');
-  pruefe(S.saKatText() === 'Letzte', 'Kopf zeigt „Letzte“');
+  pruefe(S.saKatText() === null, 'Übersicht: ▼ öffnet das Kategorien-Menü, nicht das Filter-Menü einer Sammlung');
   S.katSetzen('privat');
   pruefe(!S.saLetztSicht(), 'Privat schaltet Letzte aus');
   S.katSetzen('letzte');
