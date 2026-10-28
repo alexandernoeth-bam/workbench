@@ -271,6 +271,9 @@ function frisch() {
   CL.kalenderListe = []; CL.kalenderLaeuft = false; CL.kalenderFehler = '';
   /* Morgengruß (0.56.1) in den übrigen Tests aus — sonst hinge das Ergebnis von der Uhrzeit ab */
   try { CL.localStorage.setItem('clie-morgengruss', CL.isoDatum()); } catch (e) { /* egal */ }
+  /* Seit 0.97.7 ist „Letzte“ Standard; die älteren Tests prüfen die Gruppen, also wie bisher Alle */
+  try { CL.localStorage.setItem('clie-sa-letzte', '0'); } catch (e) { /* egal */ }
+  CL.cl.sa.letzte = undefined;
 }
 function inhalt() { return CL.document.getElementById('inhalt').innerHTML; }
 
@@ -8352,6 +8355,8 @@ function pmFrisch() {
   const S = CL;
   S.cl.pm.frisch = {}; S.cl.pm.wahl = ''; S.cl.pm.tab = 'alle'; S.cl.pm.datum = 'heute'; S.cl.pm.fenster = null; S.cl.pm.zeile = -1; S.cl.pm.memoWahl = ''; S.cl.pm.terminFuer = ''; S.cl.pm.marke = '';
   delete S.__ablage['clie-pm-show']; delete S.__ablage['clie-pm-tab'];
+  /* Seit 0.97.7 ist „Letzte“ Standard; die älteren Tests prüfen die Gruppen, also wie bisher Alle */
+  S.__ablage['clie-sa-letzte'] = '0'; S.cl.sa.letzte = undefined;
   S.cl.memo.id = ''; S.cl.memo.schreiben = false;
   return S;
 }
@@ -9836,6 +9841,33 @@ function sammlungWahlTest() {
   S.DB.sammlungen = S.DB.sammlungen.filter(x => x.id !== 'wx');
 }
 
+function sammlungLetzteTest() {
+  console.log('\n171. Collections: Filter „Letzte“ zeigt die zehn zuletzt geänderten, ohne Kategorie, Standard; zwischen Alle und Privat (0.97.7)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  for (let i = 0; i < 12; i++) { S.DB.sammlungen.push({ id: 'lt' + i, name: 'Letzte ' + i, art: 'frei', felder: [], filter: [], geaendert: 1000 + i * 10 }); }
+  S.DB.datensaetze.push({ id: 'lte1', sammlung: 'lt0', werte: {}, geaendert: 99999 });
+  S.cl.app = 'sammlungen'; S.cl.sa.id = '';
+  /* Standard: ohne gespeicherte Wahl ist „Letzte“ gewählt */
+  delete S.__ablage['clie-sa-letzte']; S.cl.sa.letzte = undefined;
+  pruefe(S.saLetztSicht() === true, 'Standard ist „Letzte“');
+  S.saLetztSetzen(true);
+  const l = S.saLetzte();
+  pruefe(l.length === 10, 'genau zehn Sammlungen');
+  pruefe(l[0].id === 'lt0' && l[1].id === 'lt11', 'neueste Änderung oben — ein neuer Eintrag zählt für seine Sammlung');
+  pruefe(S.saLetzte().every(x => !x.vorlage), 'Vorlagen zählen nicht');
+  const menue = S.katFilterHtml('katSetzen');
+  pruefe(menue.indexOf('>Alle<') < menue.indexOf('>Letzte<') && menue.indexOf('>Letzte<') < menue.indexOf('>Privat<'), 'Menü: Alle · Letzte · Privat');
+  pruefe(/class="an"[^>]*><span>Letzte</.test(menue), 'Letzte ist markiert');
+  pruefe(S.saKatText() === 'Letzte', 'Kopf zeigt „Letzte“');
+  S.katSetzen('privat');
+  pruefe(!S.saLetztSicht(), 'Privat schaltet Letzte aus');
+  S.katSetzen('letzte');
+  pruefe(S.saLetztSicht() === true, 'Letzte wieder wählbar');
+  S.DB.sammlungen = S.DB.sammlungen.filter(x => !/^lt\d+$/.test(x.id));
+  S.DB.datensaetze = S.DB.datensaetze.filter(x => x.id !== 'lte1');
+}
+
 function janeinFilterTest() {
   console.log('\n169. Filter Ja/Nein: „falsch“ trifft nicht gesetzte und falsche Einträge, wie die Anzeige „nein“ zeigt (0.97.5)');
   if (!CL) { return; }
@@ -10164,6 +10196,7 @@ function vlStummTest() {
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestFussTest(); } catch (e) { fail('0.97.3 Manifest-Fuß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { sammlungLetzteTest(); } catch (e) { fail('0.97.7 Letzte warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungWahlTest(); } catch (e) { fail('0.97.6 Sammlung Auswahl warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { janeinFilterTest(); } catch (e) { fail('0.97.5 Ja/Nein-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schreibenKopfTest(); } catch (e) { fail('0.97.4 Schreiben-Kopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

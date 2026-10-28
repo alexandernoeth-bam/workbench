@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.6</title>
+<title>CLIE 0.97.7</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1198,7 +1198,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.6';
+var APP_VERSION = '0.97.7';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3640,7 +3640,9 @@ function clFilter() {
 }
 
 function katSetzen(f) {
+  if (cl.app === 'sammlungen' && f === 'letzte') { saLetztSetzen(true); cl.aufklapp = ''; zeichne(); return; }
   if (!clFilterGueltig(f)) { return; }
+  if (cl.app === 'sammlungen') { saLetztSetzen(false); }
   cl.filter = f;
   try { window.localStorage.setItem(CL_FILTER_KEY, f); } catch (e) { /* ohne Speicher eben nur für jetzt */ }
   cl.aufklapp = '';
@@ -3711,8 +3713,13 @@ function clKategorienUmstellen() {
 
 /* Die Kategorien für jedes ▼ — „Alle“ und die Liste */
 function katFilterHtml(aufruf, an) {
-  var f = (an === undefined) ? clFilter() : an;
-  return [{ id: 'alle', name: 'Alle' }, { id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' }].concat(kgAlle().map(function (b) {
+  /* Seit 0.97.7: bei Sammlungen gibt es „Letzte“ (zehn zuletzt geänderte) zwischen Alle und Privat */
+  var sa = cl.app === 'sammlungen' && aufruf === 'katSetzen';
+  var f = (an === undefined) ? ((sa && saLetztSicht()) ? 'letzte' : clFilter()) : an;
+  var basis = [{ id: 'alle', name: 'Alle' }];
+  if (sa) { basis.push({ id: 'letzte', name: 'Letzte', klein: 'zehn zuletzt geändert' }); }
+  basis.push({ id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' });
+  return basis.concat(kgAlle().map(function (b) {
     /* Seit 0.83: „Arbeit“ umfasst alle Arbeit-Kategorien */
     return (b.id === CL_ARBEIT && kgAlle().some(function (x) { return x.id !== CL_ARBEIT && clIstArbeit(x.id); })) ? { id: b.id, name: b.name, klein: 'mit allen Arbeit-…' } : b;
   })).map(function (b) {
@@ -12279,20 +12286,58 @@ function saKopfLoeschen() {
 
 /* ---- Zeichnen ---- */
 
+/* Seit 0.97.7: „Letzte“ — die zehn Sammlungen mit der neuesten Änderung, ohne Kategorie */
+var SA_LETZTE_ANZ = 10;
+var SA_LETZTE_KEY = 'clie-sa-letzte';
+
+function saLetztSicht() {
+  if (cl.sa.letzte === undefined) {
+    var v = null;
+    try { v = window.localStorage.getItem(SA_LETZTE_KEY); } catch (e) { v = null; }
+    cl.sa.letzte = (v !== '0');
+  }
+  return !!cl.sa.letzte;
+}
+
+function saLetztSetzen(an) {
+  cl.sa.letzte = !!an;
+  try { window.localStorage.setItem(SA_LETZTE_KEY, an ? '1' : '0'); } catch (e) { /* ohne Speicher gilt es eben nur jetzt */ }
+}
+
+/* Letzte Änderung einer Sammlung: das Neueste aus ihrem Stand und dem ihrer Einträge */
+function saLetzteAenderung(s) {
+  var t = Number(s.geaendert) || 0;
+  saSaetze(s).forEach(function (d) { t = Math.max(t, Number(d.geaendert) || 0); });
+  return t;
+}
+
+function saLetzte() {
+  return (DB.sammlungen || []).filter(function (s) { return s && !s.vorlage; }).sort(function (a, b) {
+    return saLetzteAenderung(b) - saLetzteAenderung(a) || String(a.name).localeCompare(String(b.name), 'de');
+  }).slice(0, SA_LETZTE_ANZ);
+}
+
 function saListeHtml() {
-  var alle = saAlle(false);
   var h = '';
   var hinweise = saHinweise();
-  saGruppenNamen().forEach(function (g) {
-    var l = alle.filter(function (s) { return saGruppeName(s) === g; });
-    if (!l.length) { return; }
-    h += '<div class="gruppe">' + esc(g) + '</div>';
-    l.forEach(function (s) {
-      h += prZeile(null, s, '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
-         + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
-         + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>');
+  var zeile = function (s) {
+    return prZeile(null, s, '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
+       + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
+       + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>');
+  };
+  var letzte = saLetztSicht();
+  var alle = letzte ? saLetzte() : saAlle(false);
+  if (letzte) {
+    /* „Letzte“: flach, neueste oben, ohne Kategorie-Überschriften (seit 0.97.7) */
+    alle.forEach(function (s) { h += zeile(s); });
+  } else {
+    saGruppenNamen().forEach(function (g) {
+      var l = alle.filter(function (s) { return saGruppeName(s) === g; });
+      if (!l.length) { return; }
+      h += '<div class="gruppe">' + esc(g) + '</div>';
+      l.forEach(function (s) { h += zeile(s); });
     });
-  });
+  }
   if (!alle.length) { h += '<p class="leise">Noch keine Sammlung — „Neu…“ tippen und eine Vorlage wählen.</p>'; }
   hinweise.forEach(function (x) {
     h += '<button type="button" class="sa-hinweis" onclick="saOeffnen(\'' + esc(x.s.id) + '\')">⚠ Abo „' + esc(x.name) + '“ — kündbar bis ' + esc(saDatumText(x.bis)) + '</button>';
@@ -12759,6 +12804,7 @@ function saReiter() {
 /* Der Text im ▼ oben rechts */
 function saKatText() {
   var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s && saLetztSicht()) { return 'Letzte'; }
   if (!s || cl.sa.ansicht !== 'tabelle') { return null; }
   var w = saFilterWahl(s);
   var t = 'Alle';
