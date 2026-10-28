@@ -9804,6 +9804,38 @@ function schreibenKopfTest() {
   pruefe(/\.pm-leiste\{[^}]*position:sticky;top:0/.test(css), 'Formatleiste klebt oben im Schreib-Bereich (sticky)');
 }
 
+function sammlungWahlTest() {
+  console.log('\n170. Collections: Auswählen über Kästchen und Massenlöschen; Zeichen-Spalte ohne Überschrift nur in der Tabelle (0.97.6)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  S.DB.sammlungen.push({ id: 'wx', name: 'Wahltest', art: 'frei', felder: [{ id: 't', name: 'Titel', typ: 'text', spalte: true }, { id: 'z', name: 'Ok', typ: 'auswahl', werte: ['✅', '⬜'], spalte: true, zeichen: true }], filter: [] });
+  S.DB.datensaetze.push({ id: 'wd1', sammlung: 'wx', werte: { t: 'Eins', z: '✅' } }, { id: 'wd2', sammlung: 'wx', werte: { t: 'Zwei', z: '⬜' } });
+  S.cl.app = 'sammlungen'; S.cl.sa.id = 'wx'; S.cl.sa.ansicht = 'tabelle'; S.cl.sa.waehlen = false; S.cl.sa.gewaehlt = {};
+  S.zeichne();
+  let h = inhalt();
+  pruefe(/<th class="zeichen"><\/th>/.test(h) && /<td class="zeichen">✅<\/td>/.test(h) && !/<th[^>]*>Ok</.test(h), 'Zeichen-Spalte: ohne Überschrift, das Zeichen selbst in der Zelle');
+  pruefe(!/sa-kas/.test(h) && /Auswählen/.test(S.document.getElementById('fuss').innerHTML), 'ohne Auswahl-Modus: keine Kästchen, „Auswählen“ unten');
+  S.saWahlUm();
+  h = inhalt();
+  pruefe(/<td class="sa-kas">☐<\/td>/.test(h) && /onclick="saWahlTippen\('wd1'\)"/.test(h), 'Auswahl-Modus: Kästchen vor jeder Zeile, Tippen wählt');
+  S.saWahlTippen('wd1');
+  pruefe(S.cl.sa.gewaehlt.wd1 === true && /<td class="sa-kas">☑<\/td>/.test(inhalt()), 'Tippen auf ein Kästchen wählt den Eintrag, das Zeichen wechselt');
+  S.saWahlAlle(true);
+  pruefe(Object.keys(S.cl.sa.gewaehlt).length === 2, '„Alle“ wählt alle sichtbaren Einträge');
+  S.saWahlAlle(false);
+  pruefe(S.saWahlAnzahl() === 0, '„Keine“ leert die Auswahl');
+  S.saWahlTippen('wd1');
+  S.saWahlLoeschenFragen();
+  pruefe(/wahl-loeschen/.test(String(S.cl.sa.fenster && S.cl.sa.fenster.modus)), 'Löschen… fragt zuerst nach');
+  S.saWahlLoeschen();
+  pruefe(!S.DB.datensaetze.some(d => d.id === 'wd1') && S.DB.datensaetze.some(d => d.id === 'wd2'), 'Massenlöschen entfernt nur die gewählten Einträge');
+  pruefe(S.cl.sa.waehlen === false && S.saWahlAnzahl() === 0, 'danach wieder normale Tabelle, Auswahl leer');
+  S.cl.sa.fenster = { modus: 'feld', id: 'z' };
+  pruefe(/id="saFeldZeichen"/.test(S.saFensterHtml()), 'Feld-Dialog: Schalter „nur als Zeichen“');
+  S.cl.sa.fenster = null;
+  S.DB.sammlungen = S.DB.sammlungen.filter(x => x.id !== 'wx');
+}
+
 function janeinFilterTest() {
   console.log('\n169. Filter Ja/Nein: „falsch“ trifft nicht gesetzte und falsche Einträge, wie die Anzeige „nein“ zeigt (0.97.5)');
   if (!CL) { return; }
@@ -10132,6 +10164,7 @@ function vlStummTest() {
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestFussTest(); } catch (e) { fail('0.97.3 Manifest-Fuß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { sammlungWahlTest(); } catch (e) { fail('0.97.6 Sammlung Auswahl warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { janeinFilterTest(); } catch (e) { fail('0.97.5 Ja/Nein-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schreibenKopfTest(); } catch (e) { fail('0.97.4 Schreiben-Kopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

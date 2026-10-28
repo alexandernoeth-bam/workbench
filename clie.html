@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.5</title>
+<title>CLIE 0.97.6</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -688,6 +688,9 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .sa-kw.sa-kw3 b{font-size:20px}
 .sa-tab .r{text-align:right}
 .sa-tab tr.sa-z{cursor:pointer}
+.sa-tab td.zeichen,.sa-tab th.zeichen{text-align:center;padding-left:0;padding-right:0;font-size:16px}
+.sa-tab td.sa-kas,.sa-tab th.sa-kas{text-align:center;padding:0 2px;font-size:16px}
+.sa-tab tr.sa-z.an{background:rgba(31,42,26,.12)}
 .sa-tab tr.sa-gr td{font-weight:600;border-bottom:2px solid var(--px-mitte);padding-top:8px}
 .sa-tab tr.sa-sum td{font-weight:600;border-top:2px solid var(--px);border-bottom:0}
 .sa-box{border:2px solid var(--px);margin:10px 0 4px;padding:3px 8px 6px}
@@ -1195,7 +1198,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.5';
+var APP_VERSION = '0.97.6';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -12341,6 +12344,13 @@ function saZeichenProZeile(spalten) {
 }
 
 function saSpaltenBreiten(s, sp, l) {
+  /* Zeichen-Spalten sind genau ein Zeichen breit (seit 0.97.6); der Rest teilt sich den Platz */
+  if (sp.some(function (f) { return f.zeichen; })) {
+    var ohne = sp.filter(function (f) { return !f.zeichen; });
+    var pr = saSpaltenBreiten(s, ohne, l);
+    var k = 0;
+    return sp.map(function (f) { return f.zeichen ? 'ZEICHEN' : pr[k++]; });
+  }
   var platz = saZeichenProZeile(sp.length);
   var bedarf = sp.map(function (f) {
     if (SA_BREITE_ZEICHEN[f.breite]) { return { hand: true, n: SA_BREITE_ZEICHEN[f.breite] }; }
@@ -12377,7 +12387,9 @@ function saSpaltenBreiten(s, sp, l) {
 }
 
 function saColgroup(breiten) {
-  return '<colgroup>' + breiten.map(function (b) { return '<col style="width:' + b + '%">'; }).join('') + '</colgroup>';
+  return '<colgroup>' + breiten.map(function (b) {
+    return b === 'ZEICHEN' ? '<col style="width:1.3em">' : '<col style="width:' + b + '%">';
+  }).join('') + '</colgroup>';
 }
 
 function saSportAlsSpalte(s) {
@@ -12389,13 +12401,14 @@ function saRechts(f) { return f.typ === 'betrag' || f.typ === 'zahl' || f.typ ==
 
 function saSummenZeile(s, sp, l, klasse, titel) {
   var werte = sp.map(function (f, i) {
+    if (f.zeichen) { return '<td class="zeichen"></td>'; }
     if (i === 0) { return '<td>' + esc(titel) + '</td>'; }
     var art = f.summe || '';
     if (f.id === '_mon') { art = ''; }
     var n = art ? saAuswerten(art, l.map(function (d) { return saRoh(s, d, f); })) : null;
     return '<td class="' + (saRechts(f) ? 'r' : '') + '">' + esc(saAuswertungText(f, art, n)) + '</td>';
   });
-  return '<tr class="' + klasse + '">' + werte.join('') + '</tr>';
+  return '<tr class="' + klasse + '">' + (cl.sa.waehlen ? '<td></td>' : '') + werte.join('') + '</tr>';
 }
 
 function saTabelleHtml(s) {
@@ -12403,13 +12416,16 @@ function saTabelleHtml(s) {
   var l = saGefiltert(s);
   var klasse = 'sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '');
   var cols = saColgroup(saSpaltenBreiten(s, sp, l));
+  if (cl.sa.waehlen) { cols = '<colgroup><col style="width:2.2em">' + cols.slice('<colgroup>'.length); }
   /* Seit 0.14: Überschrift und Kopfwerte stehen fest, nur die Einträge scrollen.
      Zwei Tabellen mit gleichen Spaltenbreiten — so bleibt alles bündig. */
   var h = '<div class="sa-fest">' + saKopfBereichHtml(s)
     + '<div class="sa-suche"><span aria-hidden="true">⌕</span><input id="saSuche" type="search" autocomplete="off" placeholder="Suchen"'
     + ' value="' + esc(cl.sa.suche || '') + '" oninput="saSucheSetzen(this.value)">'
     + (cl.sa.suche ? '<button type="button" onclick="saSucheLeeren()" aria-label="Suche leeren">✕</button>' : '') + '</div>'
-    + '<table class="' + klasse + ' sa-kopf">' + cols + '<tr>' + sp.map(function (f) {
+    + '<table class="' + klasse + ' sa-kopf">' + cols + '<tr>' + (cl.sa.waehlen ? '<th class="sa-kas"></th>' : '') + sp.map(function (f) {
+        /* Zeichen-Spalte: keine Überschrift, nicht sortierbar (seit 0.97.6) */
+        if (f.zeichen) { return '<th class="zeichen"></th>'; }
         /* Seit 0.47.1 sortiert ein Tipp auf die Überschrift, ein zweiter dreht um */
         var so = s.sort || {};
         var aktiv = saFeld(s, so.feld) ? so.feld : ((s.felder || [])[0] || {}).id;
@@ -12419,7 +12435,11 @@ function saTabelleHtml(s) {
       }).join('') + '</tr></table></div>'
     + '<table class="' + klasse + '">' + cols;
   var zeile = function (d) {
-    return '<tr class="sa-z" onclick="saEintrag(\'' + esc(d.id) + '\')">' + sp.map(function (f) {
+    var gew = !!(cl.sa.gewaehlt || {})[d.id];
+    var vorne = cl.sa.waehlen ? '<td class="sa-kas">' + (gew ? '☑' : '☐') + '</td>' : '';
+    var klick = cl.sa.waehlen ? 'saWahlTippen' : 'saEintrag';
+    return '<tr class="sa-z' + (gew ? ' an' : '') + '" onclick="' + klick + '(\'' + esc(d.id) + '\')">' + vorne + sp.map(function (f) {
+      if (f.zeichen) { return '<td class="zeichen">' + esc(saZelle(s, f, d)) + '</td>'; }
       if (f.typ === 'link' && saLinkGueltig((d.werte || {})[f.id])) {
         return '<td class=""><button type="button" class="sa-link" onclick="event.stopPropagation();saLinkOeffnen(\'' + esc(d.id) + '\',\'' + esc(f.id) + '\')">'
           + esc(saZelle(s, f, d)) + '</button></td>';
@@ -12711,8 +12731,15 @@ function sammlungenFussHtml() {
       + esc((SA_DIA_ZR.filter(function (x) { return x[0] === saDiaZr(s); })[0] || ['', ''])[1])
       + '<button type="button" onclick="saDiaZrUm(1)" aria-label="länger">▶</button></span>';
   }
+  if (cl.sa.waehlen) {
+    return '<button type="button" class="knopf" onclick="saWahlAlle(true)">Alle</button>'
+      + '<button type="button" class="knopf" onclick="saWahlAlle(false)">Keine</button>'
+      + '<button type="button" class="knopf gefahr" onclick="saWahlLoeschenFragen()">Löschen (' + saWahlAnzahl() + ')…</button>'
+      + '<button type="button" class="knopf voll" onclick="saWahlUm()">Fertig</button>';
+  }
   return '<button type="button" class="knopf" onclick="saZurListe()">Fertig</button>'
     + '<button type="button" class="knopf" onclick="saEintrag(\'\')">Neu</button>'
+    + '<button type="button" class="knopf" onclick="saWahlUm()">Auswählen</button>'
     + (s.gruppe && saFeld(s, s.gruppe) ? '<button type="button" class="knopf' + (s.gruppenAn ? ' voll' : '') + '" onclick="saGruppenUm()">Gruppen</button>' : '')
     /* Seit 0.47.1: Umschalten unten; sortiert wird über die Spaltenköpfe */
     + (saDiagramme(s).length ? '<button type="button" class="knopf" onclick="saAnsicht(\'diagramm\')">Diagramm</button>' : '');
@@ -12766,6 +12793,58 @@ function saZurListe() {
   cl.sa.id = '';
   cl.sa.suche = '';
   cl.sa.ansicht = 'tabelle';
+  cl.sa.waehlen = false;
+  cl.sa.gewaehlt = {};
+  zeichne();
+}
+
+/* ---- Auswählen und Massenlöschen (seit 0.97.6) ----
+   Über die Kästchen in der Tabelle; Auswahl gilt nur für diese Ansicht. */
+function saWahlUm() {
+  cl.sa.waehlen = !cl.sa.waehlen;
+  cl.sa.gewaehlt = {};
+  zeichne();
+}
+
+function saWahlTippen(id) {
+  var g = cl.sa.gewaehlt || {};
+  if (g[id]) { delete g[id]; } else { g[id] = true; }
+  cl.sa.gewaehlt = g;
+  zeichne();
+}
+
+/* Alle sichtbaren (also nach Suche und Filter) wählen, oder keine */
+function saWahlAlle(an) {
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s) { return; }
+  var g = {};
+  if (an) { saGefiltert(s).forEach(function (d) { g[d.id] = true; }); }
+  cl.sa.gewaehlt = g;
+  zeichne();
+}
+
+function saWahlAnzahl() { return Object.keys(cl.sa.gewaehlt || {}).length; }
+
+function saWahlLoeschenFragen() {
+  if (!saWahlAnzahl()) { melde('Bitte zuerst Einträge auswählen.', 'warn'); return; }
+  saFensterAuf({ modus: 'wahl-loeschen' });
+}
+
+function saWahlLoeschen() {
+  var ids = Object.keys(cl.sa.gewaehlt || {});
+  var n = 0;
+  ids.forEach(function (id) {
+    var d = saSatzFinden(id);
+    if (!d) { return; }
+    DB.datensaetze = (DB.datensaetze || []).filter(function (x) { return x !== d; });
+    grabsteinSetzen('datensaetze', d.id);
+    n++;
+  });
+  cl.sa.gewaehlt = {};
+  cl.sa.waehlen = false;
+  spaeterSichern();
+  aufklappZu();
+  melde(n + (n === 1 ? ' Eintrag gelöscht.' : ' Einträge gelöscht.'), null);
   zeichne();
 }
 
@@ -14056,6 +14135,7 @@ function saFensterHtml() {
       + '<label for="saFeldWerte">Werte (nur bei Auswahl, je Zeile einer):</label>'
       + '<textarea id="saFeldWerte" class="eingabe" rows="3">' + esc((x.werte || []).join('\n')) + '</textarea>'
       + '<label class="haken"><input id="saFeldSpalte" type="checkbox"' + (x.spalte ? ' checked' : '') + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' disabled' : '') + '> als Spalte in der Liste' + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' (schon ' + SA_SPALTEN_MAX + ')' : '') + '</label>'
+      + '<label class="haken"><input id="saFeldZeichen" type="checkbox"' + (x.zeichen ? ' checked' : '') + '> nur als Zeichen: Spalte ohne Überschrift, nur in der Tabelle (Auswahlfeld)</label>'
       + '<label for="saFeldBreite">Spaltenbreite:</label><select id="saFeldBreite" class="eingabe">' + SA_BREITEN.map(function (t) {
           return '<option value="' + t[0] + '"' + (t[0] === (x.breite || '') ? ' selected' : '') + '>' + t[1] + '</option>';
         }).join('') + '</select>'
@@ -14129,6 +14209,14 @@ function saFensterHtml() {
       + '<p class="leise">Der Zeitraum richtet sich nach dem ersten Datumsfeld, ohne Datumsfeld nach dem Anlegen.</p>'
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saKopfSpeichern()">OK</button>' + abbrechen
         + (kw ? '<button type="button" class="knopf" onclick="saKopfLoeschen()">Löschen</button>' : ''));
+  }
+
+  if (f.modus === 'wahl-loeschen') {
+    var nw = saWahlAnzahl();
+    return kopf(nw + (nw === 1 ? ' Eintrag' : ' Einträge') + ' löschen')
+      + '<p>' + nw + (nw === 1 ? ' ausgewählter Eintrag' : ' ausgewählte Einträge') + ' aus „' + esc(s.name) + '“ löschen? Gelöschte Einträge lassen sich wie einzelne wiederherstellen.</p>'
+      + saKnoepfe('<button type="button" class="knopf voll" onclick="saWahlLoeschen()">Löschen</button>'
+        + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>');
   }
 
   if (f.modus === 'feld-loeschen') {
@@ -14390,6 +14478,9 @@ function saFeldSpeichern() {
   var sp = document.getElementById('saFeldSpalte');
   var gr = document.getElementById('saFeldGruppe');
   fe.spalte = !!(sp && sp.checked);
+  var zc = document.getElementById('saFeldZeichen');
+  fe.zeichen = !!(zc && zc.checked && fe.typ === 'auswahl' && fe.spalte);
+  if (!fe.zeichen) { delete fe.zeichen; }
   var breite = String(saFeldWert('saFeldBreite') || '');
   if (SA_BREITE_ZEICHEN[breite]) { fe.breite = breite; } else { delete fe.breite; }
   var summe = saFeldWert('saFeldSumme');
