@@ -9804,6 +9804,23 @@ function schreibenKopfTest() {
   pruefe(/\.pm-leiste\{[^}]*position:sticky;top:0/.test(css), 'Formatleiste klebt oben im Schreib-Bereich (sticky)');
 }
 
+function janeinFilterTest() {
+  console.log('\n169. Filter Ja/Nein: „falsch“ trifft nicht gesetzte und falsche Einträge, wie die Anzeige „nein“ zeigt (0.97.5)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const s = { id: 'sx', felder: [{ id: 'u', name: 'umgesetzt', typ: 'janein' }], filter: [] };
+  const f = { feld: 'u', op: 'gleich', wert: 'falsch' };
+  pruefe(S.saJaNeinWert('falsch') === false && S.saJaNeinWert('wahr') === true && S.saJaNeinWert('Ja') === true && S.saJaNeinWert('vielleicht') === null, 'Begriffe: falsch/nein/false = nein, wahr/ja/true = ja');
+  const pruefeFeld = (werte, op, wert) => { const f2 = Object.assign({}, f, { op: op, wert: wert }); const sf = S.saFeld; return S.saPasst(s, { werte: werte }, f2); };
+  const orig = S.saFeld;
+  S.saFeld = () => ({ id: 'u', name: 'umgesetzt', typ: 'janein' });
+  pruefe(S.saPasst(s, { werte: {} }, { feld: 'u', op: 'gleich', wert: 'falsch' }), 'nicht gesetzt + ist „falsch“: trifft (Anzeige „nein“)');
+  pruefe(S.saPasst(s, { werte: { u: false } }, { feld: 'u', op: 'gleich', wert: 'falsch' }), 'gespeichert false + ist „falsch“: trifft');
+  pruefe(!S.saPasst(s, { werte: { u: true } }, { feld: 'u', op: 'gleich', wert: 'falsch' }), 'wahr + ist „falsch“: trifft nicht');
+  pruefe(S.saPasst(s, { werte: { u: true } }, { feld: 'u', op: 'ungleich', wert: 'falsch' }), 'wahr + ist nicht „falsch“: trifft');
+  S.saFeld = orig;
+}
+
 function manifestFussTest() {
   console.log('\n167. Manifest: Blättern in der Fußzeile mit langen Knöpfen, Seitenzahl dort; Tabellenzellen enger (0.97.3)');
   if (!CL) { return; }
@@ -10115,6 +10132,7 @@ function vlStummTest() {
   try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manifestFussTest(); } catch (e) { fail('0.97.3 Manifest-Fuß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { janeinFilterTest(); } catch (e) { fail('0.97.5 Ja/Nein-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schreibenKopfTest(); } catch (e) { fail('0.97.4 Schreiben-Kopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
