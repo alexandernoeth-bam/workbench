@@ -10114,6 +10114,12 @@ function wochenStatTest() {
   pruefe(/Wochenaufgabe privat/.test(S.pmWocheHtml()), 'DrillDown: die Liste zeigt die Aufgabe');
   S.pmWocheDrill('privat', 'aufgaben', 1);
   pruefe(S.cl.pm.wocheDrill === null, 'zweiter Tipp auf dieselbe Zahl schließt die Liste');
+  /* Seit 0.97.13: der Kopf-Filter (Privat) lässt die Statistik unberührt */
+  S.cl.filter = 'privat';
+  const nurPrivat = S.pmWocheStat(mo, 'erledigt');
+  pruefe(nurPrivat.beruflich.aufgaben.some(x => x.id === 'wsa2'), 'Filter Privat: Beruflich bleibt in der Statistik gefüllt');
+  pruefe(S.cl.filter === 'privat', 'der Filter wird nach der Auswertung wiederhergestellt');
+  S.cl.filter = 'alle';
   S.cl.pm.tab = 'datum';
   S.DB.aufgaben = S.DB.aufgaben.filter(x => !/^wsa|^wsr/.test(x.id));
   S.DB.gedanken = S.DB.gedanken.filter(x => x.id !== 'wsm1');

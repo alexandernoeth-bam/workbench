@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.12</title>
+<title>CLIE 0.97.13</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1211,7 +1211,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.12';
+var APP_VERSION = '0.97.13';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -28877,7 +28877,14 @@ function pmWocheStand() {
   return { montag: cl.pm.wocheMontag, modus: cl.pm.wocheModus };
 }
 
+/* Seit 0.97.13 zählt die Statistik beide Bereiche — der Kopf-Filter gilt hier nicht */
 function pmWocheStat(montag, modus) {
+  var merkeFilter = cl.filter;
+  cl.filter = 'alle';
+  try { return pmWocheStatRechnen(montag, modus); } finally { cl.filter = merkeFilter; }
+}
+
+function pmWocheStatRechnen(montag, modus) {
   var heute = isoDatum();
   var ende = tagePlus(montag, 6);
   var tage = [];
@@ -28895,7 +28902,7 @@ function pmWocheStat(montag, modus) {
   });
 
   (DB.aufgaben || []).forEach(function (a) {
-    if (!a || !a.id || !clPasst(a) || prPrivatVerborgen(null, a)) { return; }
+    if (!a || !a.id || prPrivatVerborgen(null, a)) { return; }
     var b = wsBereich(a);
     var p = pmPrio(a);
     if (a.wiederholung) {
@@ -28918,13 +28925,13 @@ function pmWocheStat(montag, modus) {
   if (modus === 'erledigt') {
     kpSeitenAlle().forEach(function (m) {
       var x = m && m.__satz;
-      if (!x || pmIstVorlage(m) || prPrivatVerborgen(m, null) || !clPasst(m)) { return; }
+      if (!x || pmIstVorlage(m) || prPrivatVerborgen(m, null)) { return; }
       var b = wsBereich(m);
       if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].memoNeu.push({ titel: String(m.titel || ''), tag: x.angelegt }); }
       if (pmIstDatum(x.archivAm) && x.archivAm >= montag && x.archivAm <= heute) { s[b].memoArch.push({ titel: String(m.titel || ''), tag: x.archivAm }); }
     });
     iwAlle().forEach(function (x) {
-      if (!clPasst(x) || prPrivatVerborgen(null, x)) { return; }
+      if (prPrivatVerborgen(null, x)) { return; }
       var b = wsBereich(x);
       if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].ideenNeu.push({ titel: String(x.titel || ''), tag: x.angelegt }); }
       if (pmIstDatum(x.fertigAm) && x.fertigAm >= montag && x.fertigAm <= heute) { s[b].ideenFertig.push({ titel: String(x.titel || ''), tag: x.fertigAm }); }
