@@ -10033,6 +10033,50 @@ function vlStummTest() {
 }
 
 
+function routineMemoTest() {
+  console.log('\n172. Routine im Memo: das Kästchen zeigt den heutigen Stand und schaltet ihn in beiden Richtungen um (0.97.9)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const wt = S.ausIso(heute).getDay();
+  S.DB.gedanken.push({ id: 'gr', titel: 'Verwaltung', text: '## Regelmäßig\n[] Blumen gießen ⟦rout1⟧', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'rout1', titel: 'Blumen gießen', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, kontext: 'privat', prio: 3, geaendert: 1, memo: { id: 'gr', zeile: 'rout1' } });
+  const r = S.pmAufgabeFinden('rout1');
+  const seite = S.DB.gedanken.filter(x => x.id === 'gr')[0];
+  pruefe(!S.istErledigtAn(r, heute), 'Startzustand: heute offen');
+  S.pmHaken('rout1');
+  pruefe(S.istErledigtAn(r, heute) && /\[x\] Blumen gießen/.test(seite.text), 'Aufgabe abhaken: der heutige Tag ist erledigt, das Memo-Kästchen folgt');
+  S.pmMemoHaken('gr', 1);
+  pruefe(!S.istErledigtAn(r, heute) && /\[\] Blumen gießen/.test(seite.text), 'Memo abhaken (zurück): der heutige Tag ist wieder offen, die Aufgabe folgt');
+  S.pmMemoHaken('gr', 1);
+  pruefe(S.istErledigtAn(r, heute) && /\[x\] Blumen gießen/.test(seite.text), 'Memo abhaken: der heutige Tag ist erledigt, die Routine zeigt es ebenfalls');
+  seite.text = '## Regelmäßig\n[] Blumen gießen ⟦rout1⟧';
+  S.pmMemoSeiteHtml(seite);
+  pruefe(/\[x\] Blumen gießen/.test(seite.text), 'Anzeige: ein Memo, dessen Kästchen nicht zur Routine passt, wird beim Öffnen angeglichen');
+  S.pmHaken('rout1');
+  pruefe(!S.istErledigtAn(r, heute) && r.wiederholung && S.pmAufgabeFinden('rout1') === r, 'Aufgabe zurück: die Routine ist heute wieder offen');
+  S.DB.gedanken = S.DB.gedanken.filter(x => x.id !== 'gr');
+  S.DB.aufgaben = S.DB.aufgaben.filter(x => x.id !== 'rout1');
+}
+
+function ideeLoeschenTest() {
+  console.log('\n173. Ideenwerkstatt: eine Idee lässt sich löschen — erst Nachfrage, dann Löschen, mit Grabstein (0.97.10)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  S.DB.ideen = S.DB.ideen || [];
+  S.DB.ideen.push({ id: 'idloe1', titel: 'Testidee zum Löschen', stufe: 1, geaendert: 1 });
+  S.oeffne('ideen');
+  S.iwOeffnen('idloe1');
+  pruefe(/iwLoeschen\(\)/.test(S.ideenFussHtml()) && />Löschen</.test(S.ideenFussHtml()), 'Stufen-Ansicht: der Löschen-Knopf ist da');
+  S.iwLoeschen();
+  pruefe(!!S.iwFinden('idloe1') && /Wirklich löschen/.test(S.ideenFussHtml()), 'erster Tipp: nur die Nachfrage, die Idee bleibt');
+  S.iwLoeschen();
+  pruefe(!S.iwFinden('idloe1') && !S.DB.ideen.some(x => x.id === 'idloe1'), 'zweiter Tipp: die Idee ist aus der Ideenwerkstatt entfernt');
+  pruefe(S.DB.grabsteine.some(g => g.s === 'ideen' && g.id === 'idloe1'), 'ein Grabstein hält die Löschung beim Abgleich fest');
+  pruefe(S.cl.iw.ansicht === 'liste', 'danach wieder in der Liste');
+  S.DB.grabsteine = S.DB.grabsteine.filter(g => g.id !== 'idloe1');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10201,6 +10245,8 @@ function vlStummTest() {
   try { janeinFilterTest(); } catch (e) { fail('0.97.5 Ja/Nein-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schreibenKopfTest(); } catch (e) { fail('0.97.4 Schreiben-Kopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { routineMemoTest(); } catch (e) { fail('0.97.9 Routine im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { ideeLoeschenTest(); } catch (e) { fail('0.97.10 Ideen löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

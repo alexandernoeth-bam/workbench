@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.8</title>
+<title>CLIE 0.97.10</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1198,7 +1198,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.8';
+var APP_VERSION = '0.97.10';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -23922,6 +23922,7 @@ function iwOeffnen(id) {
   var x = iwFinden(id);
   if (!x) { return; }
   cl.iw.id = id;
+  cl.iw.loeschId = '';
   cl.iw.stufe = Math.max(1, Math.min(6, Number(x.stufe) || 1));
   if (x.status === 'spaeter' && x.wiedervorlage && x.wiedervorlage <= isoDatum()) { cl.iw.stufe = 4; }
   cl.iw.ansicht = 'stufe';
@@ -24023,6 +24024,7 @@ function iwZurueck() {
 
 function iwZurListe() {
   iwLesen();
+  cl.iw.loeschId = '';
   cl.iw.ansicht = 'liste';
   cl.iw.fenster = '';
   iwZeichnen();
@@ -24084,6 +24086,22 @@ function iwEintragWeg(art, id) {
   iwLesen();
   x[art] = (x[art] || []).filter(function (y) { return y.id !== id; });
   iwSpeichern(x);
+  iwZeichnen();
+}
+
+/* Eine Idee löschen: erster Tipp fragt nach, zweiter Tipp löscht (Grabstein für den Abgleich) */
+function iwLoeschen() {
+  var x = iwFinden(cl.iw.id);
+  if (!x) { return; }
+  if (cl.iw.loeschId !== x.id) { cl.iw.loeschId = x.id; iwZeichnen(); return; }
+  var i = DB.ideen.indexOf(x);
+  if (i >= 0) { DB.ideen.splice(i, 1); }
+  grabsteinSetzen('ideen', x.id);
+  cl.iw.loeschId = '';
+  cl.iw.id = '';
+  cl.iw.ansicht = 'liste';
+  cl.iw.fenster = '';
+  spaeterSichern();
   iwZeichnen();
 }
 
@@ -24310,11 +24328,12 @@ function ideenFussHtml() {
   var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
   if (cl.iw.ansicht === 'stufe') {
     var s = cl.iw.stufe;
+    var gesp = iwFinden(cl.iw.id) ? k(cl.iw.loeschId === cl.iw.id ? 'Wirklich löschen?' : 'Löschen', 'iwLoeschen()') : '';
     if (s === 6) {
       var x = iwFinden(cl.iw.id);
-      return (x && iwNaechsterSchritt(x) ? k('✓ Schritt erledigt', 'iwNaechsterErledigt()', true) : '') + k('Planen', 'iwStufeZeigen(5)') + k('Fertig', 'iwZurListe()');
+      return (x && iwNaechsterSchritt(x) ? k('✓ Schritt erledigt', 'iwNaechsterErledigt()', true) : '') + k('Planen', 'iwStufeZeigen(5)') + k('Fertig', 'iwZurListe()') + gesp;
     }
-    return k('◀', 'iwZurueck()') + k(s === 4 ? 'Entscheiden ▶' : (s === 5 ? 'Umsetzen ▶' : 'Weiter ▶'), 'iwWeiter()', true) + k('Speichern', 'iwZurListe()');
+    return k('◀', 'iwZurueck()') + k(s === 4 ? 'Entscheiden ▶' : (s === 5 ? 'Umsetzen ▶' : 'Weiter ▶'), 'iwWeiter()', true) + k('Speichern', 'iwZurListe()') + gesp;
   }
   return k('+ Idee', 'iwNeu()', true) + k(cl.iw.alle ? 'Nur offene' : 'Abgeschlossene', 'iwAlleUm()');
 }
@@ -28557,6 +28576,19 @@ function pmAufgabeZurMarke(mid) {
   return (a && a.memo && a.memo.zeile === mid) ? a : null;
 }
 
+/* Der heutige Termin einer Routine — wenn sie heute fällig oder heute erledigt ist */
+function pmRoutineHeute(a) {
+  var h = isoDatum();
+  return (aufgabeFaelligAn(a, h) || istErledigtAn(a, h)) ? h : '';
+}
+
+/* Ein Memo zeigt bei seinen Routinen den Stand von heute */
+function pmRoutinenAngleichen(s) {
+  (DB.aufgaben || []).forEach(function (a) {
+    if (a && a.wiederholung && a.memo && a.memo.id === s.id) { pmZeileAngleichen(a); }
+  });
+}
+
 /* Haken der Aufgabe → Haken der Zeile */
 function pmZeileAngleichen(a) {
   var s = pmMemoVon(a);
@@ -28564,7 +28596,7 @@ function pmZeileAngleichen(a) {
   var nr = pmZeileMitMarke(s, a.memo.zeile);
   if (nr < 0) { return false; }
   var k = kpAufgabe(String(s.text || '').split('\n')[nr]);
-  var soll = a.status === 'erledigt';
+  var soll = a.wiederholung ? istErledigtAn(a, isoDatum()) : a.status === 'erledigt';
   if (!k || k.erledigt === soll) { return false; }
   return kpKastenSetzen(s, nr, soll);
 }
@@ -28574,11 +28606,12 @@ function pmHaken(id, tag) {
   var a = pmAufgabeFinden(id);
   if (!a) { return; }
   if (a.wiederholung) {
-    var d = pmIstDatum(tag) ? tag : (pmIstDatum(cl.pm.frisch[id]) ? cl.pm.frisch[id] : rtDiesmalTag(a));
+    var d = pmIstDatum(tag) ? tag : (pmIstDatum(cl.pm.frisch[id]) ? cl.pm.frisch[id] : (pmRoutineHeute(a) || rtDiesmalTag(a)));
     if (!d) { return; }
     var jetztErl = !istErledigtAn(a, d);
     wiederholungSetzen(a, d, jetztErl);
     if (!pmIstDatum(tag)) { if (jetztErl) { cl.pm.frisch[id] = d; } else { delete cl.pm.frisch[id]; } }
+    if (d === isoDatum()) { pmZeileAngleichen(a); }
   } else {
     if (a.status === 'erledigt') { a.status = 'offen'; a.erledigtAm = null; }
     else { a.status = 'erledigt'; a.erledigtAm = isoDatum(); }
@@ -28597,7 +28630,12 @@ function pmMemoHaken(seiteId, nr) {
   var z = String(s.text || '').split('\n')[nr] || '';
   var a = pmAufgabeZurMarke(pmMarke(z));
   var k = kpAufgabe(z);
-  if (a && k && !a.wiederholung) {
+  if (a && k && a.wiederholung) {
+    /* Routine: der Haken gilt für heute — wie in der Aufgabe */
+    var h = isoDatum();
+    if (istErledigtAn(a, h) !== !!k.erledigt) { wiederholungSetzen(a, h, !!k.erledigt); }
+    a.geaendert = jetzt();
+  } else if (a && k) {
     a.status = k.erledigt ? 'erledigt' : 'offen';
     a.erledigtAm = k.erledigt ? isoDatum() : null;
     a.geaendert = jetzt();
@@ -29506,6 +29544,7 @@ function pmAuszeichnungNach(t) {
 
 function pmMemoSeiteHtml(s) {
   if (prPrivatVerborgen(s, null)) { return '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
+  pmRoutinenAngleichen(s);
   if (cl.memo.schreiben) { return pmEditorHtml(s); }
   var zeilen = String(s.text || '').split('\n');
   var blaetter = nbAnhaengeHtml('seite', s.id);
