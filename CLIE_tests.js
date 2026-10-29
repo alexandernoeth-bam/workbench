@@ -8726,7 +8726,7 @@ function palmEditorTest() {
     'Leiste: genau B · U · S · • · ☐');
   pruefe(/id="pmEditor" class="pm-editor" contenteditable="true"/.test(h) && !/\*\*|__|~~|\[\]|\[x\]|⟦|<textarea/.test(h.replace(/data-vor="[^"]*"/g, '').replace(/data-roh="[^"]*"/g, '')),
     'der Editor zeigt Text ohne Zeichen — Art und Marke stehen unsichtbar an der Zeile');
-  pruefe(/<div class="pm-k" data-vor="\[\] " data-m="kabc123">eins<\/div>/.test(h) && /<div class="pm-k x" data-vor="\[x\] ">zwei<\/div>/.test(h) && /<div class="pm-p" data-vor="- ">Punkt mit <b>fett<\/b><\/div>/.test(h)
+  pruefe(/<div class="pm-k" data-vor="\[\] " data-m="kabc123">eins[\u200B\u200C]*<\/div>/.test(h) && /<div class="pm-k x" data-vor="\[x\] ">zwei<\/div>/.test(h) && /<div class="pm-p" data-vor="- ">Punkt mit <b>fett<\/b><\/div>/.test(h)
     && /<div class="pm-t">\| a \| b \|<\/div>/.test(h) && /<u>unter<\/u> und <s>weg<\/s>/.test(h), 'Zeilen: Kästchen (mit Marke), Punkt, fett, unterstrichen, durchgestrichen; Tabelle als bearbeitbare Zeile (0.97.2)');
   pruefe(/pmSchreibenUm\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML), 'unten „Fertig“');
   /* Zurücklesen */
@@ -10176,6 +10176,30 @@ function terminEndeTest() {
   pruefe(S.saPlanVorschlag(sa, { id: 'z2', werte: { dt: vergangen } }).datum === '', 'Sammlung mit vergangenem Datum: kein Vorschlag');
 }
 
+function memoMarkeTest() {
+  console.log('\n178. Memo: eine Aufgabenzeile bleibt verknüpft, auch beim Ausschneiden und Einfügen; verlorene Marke wird über den Titel wiederhergestellt (0.97.15)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const kod = S.pmMarkeKodieren('aufg1234');
+  const zurueck = S.pmMarkeAusZeile('[] Titel' + kod);
+  pruefe(zurueck.mid === 'aufg1234' && zurueck.z === '[] Titel', 'Kodierung: Marke hin und zurück unverändert');
+  const html = S.pmEdZeileHtml('[] Titel ⟦aufg1234⟧');
+  pruefe(!/⟦/.test(html) && /data-m="aufg1234"/.test(html), 'Anzeige: keine sichtbare Marke, Zeile bleibt verknüpft');
+  /* Zeilen als Knoten nachgebildet: die Testumgebung kann kein childNodes */
+  const knoten = (attr, kinder) => ({ nodeType: 1, nodeName: 'DIV', getAttribute: k => (attr[k] !== undefined ? attr[k] : null), childNodes: kinder });
+  const text = x => ({ nodeType: 3, nodeValue: x });
+  const kod2 = S.pmMarkeKodieren('aufg1234');
+  pruefe(S.pmEdLesen({ childNodes: [knoten({ 'data-vor': '[] ' }, [text('Titel' + kod2)])] }) === '[] Titel ⟦aufg1234⟧', 'Ausschneiden und Einfügen: ohne data-m bleibt die Marke im Text');
+  pruefe(S.pmEdLesen({ childNodes: [knoten({ 'data-vor': '[] ' }, [text('Titel' + kod2)]), knoten({ 'data-vor': '[] ' }, [text('Titel' + kod2)])] }) === '[] Titel ⟦aufg1234⟧\n[] Titel', 'Kopie: nur das erste Vorkommen bleibt verknüpft');
+  S.DB.gedanken.push({ id: 'pg178', titel: 'Heilen', text: '## X\n[] Anderer\n[] Titel', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'aufg1234', titel: 'Titel', status: 'offen', wiederholung: null, kontext: 'privat', prio: 3, geaendert: 1, memo: { id: 'pg178', zeile: 'aufg1234' } });
+  const seite = S.DB.gedanken.filter(x => x.id === 'pg178')[0];
+  const geheilt = S.pmZeilenHeilen(seite, seite.text);
+  pruefe(geheilt === '## X\n[] Anderer\n[] Titel ⟦aufg1234⟧', 'verlorene Marke: die Zeile mit gleichem Titel wird wieder verbunden');
+  S.DB.gedanken = S.DB.gedanken.filter(x => x.id !== 'pg178');
+  S.DB.aufgaben = S.DB.aufgaben.filter(x => x.id !== 'aufg1234');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10349,6 +10373,7 @@ function terminEndeTest() {
   try { wochenStatTest(); } catch (e) { fail('0.97.11 Wochenstatistik warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { syncServerVorrangTest(); } catch (e) { fail('0.97.12 Sync-Vorrang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminEndeTest(); } catch (e) { fail('0.97.14 Termin-Ende warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { memoMarkeTest(); } catch (e) { fail('0.97.15 Memo-Marke warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

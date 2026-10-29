@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.14</title>
+<title>CLIE 0.97.15</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1211,7 +1211,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.14';
+var APP_VERSION = '0.97.15';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29891,6 +29891,51 @@ function pmEdInhalt(t) {
   return h + pmInlineHtml(rest.slice(pos));
 }
 
+/* Seit 0.97.15: die Marke einer Aufgabe steckt unsichtbar im Zeilentext (Nullbreiten-Zeichen).
+   So kommt sie beim Ausschneiden und Einfügen mit. */
+function pmMarkeKodieren(mid) {
+  var r = '';
+  String(mid || '').split('').forEach(function (c) {
+    var code = c.charCodeAt(0);
+    var b;
+    for (b = 7; b >= 0; b--) { r += ((code >> b) & 1) ? '\u200C' : '\u200B'; }
+  });
+  return r;
+}
+
+/* Gibt Zeile ohne Kodierung und die gefundene Marke zurück */
+function pmMarkeAusZeile(z) {
+  var treffer = String(z || '').match(/[\u200B\u200C]+/g);
+  if (!treffer) { return { z: String(z || ''), mid: '' }; }
+  var bits = treffer.join('').split('');
+  var mid = '';
+  var i;
+  for (i = 0; i + 8 <= bits.length; i += 8) {
+    var code = 0;
+    var b;
+    for (b = 0; b < 8; b++) { code = (code << 1) | (bits[i + b] === '\u200C' ? 1 : 0); }
+    mid += String.fromCharCode(code);
+  }
+  return { z: String(z || '').replace(/[\u200B\u200C]+/g, ''), mid: /^[A-Za-z0-9_-]{4,40}$/.test(mid) ? mid : '' };
+}
+
+/* Nach dem Speichern: fehlt die Marke einer verknüpften Aufgabe, wird die Zeile mit gleichem Titel gesucht und verbunden */
+function pmZeilenHeilen(s, t) {
+  var zeilen = String(t || '').split('\n');
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.memo || a.memo.id !== s.id || !a.memo.zeile) { return; }
+    if (zeilen.some(function (z) { return pmMarke(z) === a.memo.zeile; })) { return; }
+    var nr = -1;
+    zeilen.forEach(function (z, i) {
+      if (nr >= 0 || pmMarke(z)) { return; }
+      var k = kpAufgabe(z);
+      if (k && String(k.text || '').trim() === String(a.titel || '').trim()) { nr = i; }
+    });
+    if (nr >= 0) { zeilen[nr] = zeilen[nr].replace(/\s+$/, '') + ' ⟦' + a.memo.zeile + '⟧'; }
+  });
+  return zeilen.join('\n');
+}
+
 function pmEdZeileHtml(z) {
   var roh = function () { return '<div class="pm-roh" contenteditable="false" data-roh="' + esc(z) + '">' + esc(z) + '</div>'; };
   if (HS_MUSTER.test(z) || /^\s*(---+|\*\*\*+)\s*$/.test(z)) { return roh(); }
@@ -29901,7 +29946,9 @@ function pmEdZeileHtml(z) {
   var k = ohne.match(KP_KASTEN);
   if (k) {
     var st = (k[2] === 'x' || k[2] === 'X') ? 'x' : (k[2] === '-' ? '-' : '');
-    return '<div class="pm-k' + (st ? ' x' : '') + '" data-vor="' + esc(k[1] + '[' + st + '] ') + '"' + (mid ? ' data-m="' + esc(mid) + '"' : '') + einzug(k[1]) + '>' + inhalt(k[3]) + '</div>';
+    var c = inhalt(k[3]);
+    c = (mid && c === '<br>') ? pmMarkeKodieren(mid) + c : (mid ? c + pmMarkeKodieren(mid) : c);
+    return '<div class="pm-k' + (st ? ' x' : '') + '" data-vor="' + esc(k[1] + '[' + st + '] ') + '"' + (mid ? ' data-m="' + esc(mid) + '"' : '') + einzug(k[1]) + '>' + c + '</div>';
   }
   var p = z.match(/^(\s*)[-•*]\s+(.*)$/);
   if (p) { return '<div class="pm-p" data-vor="' + esc(p[1] + '- ') + '"' + einzug(p[1]) + '>' + inhalt(p[2]) + '</div>'; }
@@ -29984,9 +30031,15 @@ function pmEdLesen(root) {
   var zeilen = [];
   var marken = {};
   var lauf = null;
+  /* Eine Zeile übernehmen: eine kodierte Marke wird zur Verknüpfung (nur beim ersten Vorkommen) */
+  var rein = function (z) {
+    var e = pmMarkeAusZeile(z);
+    if (e.mid && !marken[e.mid]) { marken[e.mid] = true; return e.z.replace(/\s+$/, '') + ' ⟦' + e.mid + '⟧'; }
+    return e.z;
+  };
   var ausLauf = function () {
     if (lauf === null) { return; }
-    lauf.replace(/\n$/, '').split('\n').forEach(function (t) { zeilen.push(t); });
+    lauf.replace(/\n$/, '').split('\n').forEach(function (t) { zeilen.push(rein(t)); });
     lauf = null;
   };
   var k = (root && root.childNodes) || [];
@@ -29997,7 +30050,7 @@ function pmEdLesen(root) {
     if (n.nodeType === 1 && (tag === 'DIV' || tag === 'P')) {
       ausLauf();
       var roh = pmAttr(n, 'data-roh');
-      if (roh !== null) { zeilen.push(roh); continue; }
+      if (roh !== null) { zeilen.push(rein(roh)); continue; }
       var vor = pmAttr(n, 'data-vor') || '';
       var m = pmAttr(n, 'data-m') || '';
       var innen = '';
@@ -30009,7 +30062,7 @@ function pmEdLesen(root) {
       var istKasten = /^\s*\[[ xX-]?\]\s*$/.test(vor);
       teile.forEach(function (t, nr) {
         var v = nr ? pmVorWeiter(vor) : vor;
-        var z = v + t;
+        var z = rein(v + t);
         if (!nr && istKasten && m && !marken[m]) { marken[m] = true; z = z.replace(/\s+$/, '') + ' ⟦' + m + '⟧'; }
         zeilen.push(z);
       });
@@ -30025,7 +30078,7 @@ function pmEdGetippt() {
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
   var el = document.getElementById('pmEditor');
   if (!s || !el || !el.childNodes) { return; }
-  var t = pmEdLesen(el);
+  var t = pmZeilenHeilen(s, pmEdLesen(el));
   if (t === String(s.text || '')) { return; }
   s.text = t;
   s.geaendert = jetzt();
