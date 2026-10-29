@@ -10153,6 +10153,29 @@ function syncServerVorrangTest() {
   pruefe(/mehrfach während des Abgleichs/.test(S.abgleichen.toString()), 'nach zwei Wiederholungen wird nicht blind hochgeladen');
 }
 
+function terminEndeTest() {
+  console.log('\n177. Termin: ändert sich die Startzeit, rückt die Endezeit um die Dauer mit; Sammlungs-Datum als Vorschlag (0.97.14)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const alt = S.document.body.innerHTML;
+  S.document.body.innerHTML += '<input id="terminVon" type="time" value="09:00"><input id="terminBis" type="time" value="10:30">';
+  const von = S.document.getElementById('terminVon');
+  const bis = S.document.getElementById('terminBis');
+  von.value = '09:00'; bis.value = '10:30';
+  S.terminVonFokus();
+  von.value = '14:00'; S.terminVonGeaendert();
+  pruefe(bis.value === '15:30', 'Start 14:00 bei 90 Min. Dauer: Ende 15:30');
+  S.terminVonFokus();
+  von.value = '23:30'; S.terminVonGeaendert();
+  pruefe(bis.value === '23:59', 'Ende wird am Tagesende begrenzt (23:59)');
+  S.document.body.innerHTML = alt;
+  const sa = { id: 'tsam', name: 'Termintest', art: 'frei', felder: [{ id: 'dt', name: 'Datum', typ: 'datum' }], filter: [], rollen: {} };
+  const zukunft = S.tagePlus(S.isoDatum(), 3);
+  const vergangen = S.tagePlus(S.isoDatum(), -3);
+  pruefe(S.saPlanVorschlag(sa, { id: 'z1', werte: { dt: zukunft } }).datum === zukunft, 'Sammlung mit künftigem Datum: Vorschlag übernimmt es');
+  pruefe(S.saPlanVorschlag(sa, { id: 'z2', werte: { dt: vergangen } }).datum === '', 'Sammlung mit vergangenem Datum: kein Vorschlag');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10325,6 +10348,7 @@ function syncServerVorrangTest() {
   try { ideeLoeschenTest(); } catch (e) { fail('0.97.10 Ideen löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { wochenStatTest(); } catch (e) { fail('0.97.11 Wochenstatistik warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { syncServerVorrangTest(); } catch (e) { fail('0.97.12 Sync-Vorrang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { terminEndeTest(); } catch (e) { fail('0.97.14 Termin-Ende warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
