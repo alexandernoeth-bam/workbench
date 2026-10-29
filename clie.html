@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.11</title>
+<title>CLIE 0.97.12</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1211,7 +1211,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.11';
+var APP_VERSION = '0.97.12';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1550,7 +1550,7 @@ function zusammenfuehren(lokal, fremd) {
         var neuster = Math.max(wa ? (wa.geaendert || 0) : 0, wb ? (wb.geaendert || 0) : 0);
         if (tot && tot >= neuster) { bericht.entfernt++; continue; }
         if (wa && wb) {
-          if ((wb.geaendert || 0) > (wa.geaendert || 0)) {
+          if ((wb.geaendert || 0) >= (wa.geaendert || 0)) {
             ergebnis[s][k] = wb; bericht.ersetzt++;
             if (wa.art !== wb.art) { bericht.konflikte.push({ s: s, id: k, gewaehlt: 'fremd' }); }
           } else {
@@ -1587,7 +1587,7 @@ function zusammenfuehren(lokal, fremd) {
       if (totZeit && totZeit >= Math.max(za, zb)) { bericht.entfernt++; continue; }
 
       if (paar.a && paar.b) {
-        if (zb > za) {
+        if (zb >= za) {
           ergebnis[s].push(paar.b); bericht.ersetzt++;
           if (za > 0 && zb > 0) { bericht.konflikte.push({ s: s, id: kennung, gewaehlt: 'fremd' }); }
         } else if (za > zb) {
@@ -4998,10 +4998,11 @@ function clAbgleichTipp() {
   abgleichLaeuft = true;
   zeichne();
   var vorher = clAbgleichVorher();
+  var zaehlerHand = sichernZaehler;
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
-    lokalOffen = false;
+    if (zaehlerHand === sichernZaehler) { lokalOffen = false; ungesichertSetzen(false); }
     verbindungOk = true;
     melde('Abgleich fertig.\n' + berichtText(b), 'gut');
     pmNachpflegen();
@@ -27178,9 +27179,26 @@ function clAbmelden() {
 /* Zählt jede Änderung. Ein Abgleich, der gerade läuft, merkt daran, dass noch etwas zu senden ist (seit 0.95.0) */
 var sichernZaehler = 0;
 
+/* Seit 0.97.12: ob es Änderungen gibt, die noch nicht auf dem Server sind. Bleibt über Neustarts erhalten. */
+var UNGESICHERT_KEY = 'clie-ungesichert';
+
+function ungesichertSetzen(v) {
+  try { if (v) { window.localStorage.setItem(UNGESICHERT_KEY, '1'); } else { window.localStorage.removeItem(UNGESICHERT_KEY); } } catch (e) { /* nur für jetzt */ }
+}
+
+/* Beim ersten Abgleich nach dem Update gilt alles als ungesichert: lieber zusammenführen als verlieren */
+function ungesichertLesen() {
+  try {
+    var ls = window.localStorage;
+    if (ls.getItem(UNGESICHERT_KEY + '-v') !== '1') { ls.setItem(UNGESICHERT_KEY + '-v', '1'); return true; }
+    return ls.getItem(UNGESICHERT_KEY) === '1';
+  } catch (e) { return true; }
+}
+
 function spaeterSichern() {
   if (speicherUhr) { window.clearTimeout(speicherUhr); }
   lokalOffen = true;
+  ungesichertSetzen(true);
   sichernZaehler++;
   speicherUhr = window.setTimeout(function () {
     speicherUhr = null;
@@ -27204,7 +27222,7 @@ function abgleichStill() {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
     verbindungOk = true;
-    if (zaehler === sichernZaehler) { lokalOffen = false; }
+    if (zaehler === sichernZaehler) { lokalOffen = false; ungesichertSetzen(false); }
     else { abgleichPlanen(false); }
     if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
     clAbgleichNachher(vorher);
@@ -27255,9 +27273,17 @@ function abgleichen(versuch) {
     return driveHerunterladen();
   }).then(function (text) {
     var fremd = text ? textZuBestand(text) : null;
+    /* Seit 0.97.12: ein Serverstand, der nicht lesbar ist, wird nie überschrieben */
+    if (text && !fremd) { throw new Error('Der Stand auf dem Server ist nicht lesbar. Es wurde nichts hochgeladen.'); }
     if (!fremd) {
       letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
       return null;
+    }
+    if (!ungesichertLesen()) {
+      /* Keine ungesicherten Änderungen: der Server gilt ganz, ein älteres Gerät lädt nichts hoch */
+      DB = fremd;
+      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+      return speichern();
     }
     var ergebnis = zusammenfuehren(DB, fremd);
     DB = ergebnis.db;
@@ -27267,6 +27293,7 @@ function abgleichen(versuch) {
     return driveStandAbfragen();
   }).then(function (jetzt) {
     if (jetzt !== gesehen && n < 2) { return abgleichen(n + 1); }
+    if (jetzt !== gesehen) { throw new Error('Der Server wurde mehrfach während des Abgleichs geändert. Nichts wurde hochgeladen. Bitte erneut abgleichen.'); }
     return driveHochladen().then(function () {
       letzterAbgleich = isoZeit();
       return letzterBericht;

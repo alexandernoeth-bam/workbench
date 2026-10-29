@@ -297,7 +297,9 @@ if (!WB_SKRIPT) {
     'kalenderListeHolen', 'kalenderGewaehlt', 'kalenderKontext',
     'merkeTermin', 'praktischGanztags', 'titelOhneArt', 'terminKontextUeber', 'termineFuerTag',
     'aufgabeFaelligAn', 'faelligAn', 'istErledigtAn', 'wiederholungSetzen', 'aufgabeZeitAn', 'wochenIndex', 'monatsIndex', 'monatsende'];
+  /* Seit 0.97.12 bewusst abweichend: zusammenfuehren (Gleichstand gilt der Server, Build-Anpassung) */
   const abweichend = WOERTLICH.filter(n => {
+    if (n === 'zusammenfuehren') { return false; }
     const a = funktionText(SKRIPT, n), b = funktionText(WB_SKRIPT, n);
     return !a || !b || a !== b;
   });
@@ -9420,7 +9422,7 @@ function markenReparaturTest() {
   pruefe(weg.length === 1 && weg[0].id === 'mr2' && /gleichzeitig geändert/.test(S.document.getElementById('toastText').textContent) && /„Jour fixe“/.test(S.document.getElementById('toastText').textContent),
     'Hinweis: „Jour fixe“ auf zwei Geräten geändert — die jüngere Fassung gilt');
   pruefe(Number(S.__ablage['clie-abgleich-stand']) > 1000, 'neuer Stand gemerkt');
-  pruefe(/var vorher = clAbgleichVorher\(\);\s*abgleichen\(\)/.test(SKRIPT) && (SKRIPT.match(/clAbgleichNachher\(vorher\);/g) || []).length === 2, 'beide Abgleich-Wege (Tipp und still) melden');
+  pruefe(/var vorher = clAbgleichVorher\(\);[\s\S]{0,80}abgleichen\(\)/.test(SKRIPT) && (SKRIPT.match(/clAbgleichNachher\(vorher\);/g) || []).length === 2, 'beide Abgleich-Wege (Tipp und still) melden');
 }
 
 
@@ -10118,6 +10120,33 @@ function wochenStatTest() {
   S.DB.ideen = S.DB.ideen.filter(x => x.id !== 'wsi1');
 }
 
+function syncServerVorrangTest() {
+  console.log('\n175. Sync: der Server gilt — bei gleichem Stand, bei älterem lokalen Stand und ohne ungesicherte Änderungen (0.97.12)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const lok = S.leereDatenbank();
+  const fre = S.leereDatenbank();
+  lok.aufgaben.push({ id: 'syn1', titel: 'Gleich', status: 'offen', geaendert: 500, kontext: 'privat' });
+  fre.aufgaben.push({ id: 'syn1', titel: 'Gleich', status: 'erledigt', geaendert: 500, kontext: 'privat' });
+  let e = S.zusammenfuehren(lok, fre);
+  pruefe(e.db.aufgaben.filter(x => x.id === 'syn1')[0].status === 'erledigt', 'gleicher Stand: der Server gewinnt');
+  const lok2 = S.leereDatenbank();
+  const fre2 = S.leereDatenbank();
+  lok2.aufgaben.push({ id: 'syn2', titel: 'Alt', status: 'offen', geaendert: 100, kontext: 'privat' });
+  fre2.aufgaben.push({ id: 'syn2', titel: 'Neu', status: 'erledigt', geaendert: 200, kontext: 'privat' });
+  e = S.zusammenfuehren(lok2, fre2);
+  pruefe(e.db.aufgaben.filter(x => x.id === 'syn2')[0].status === 'erledigt', 'älterer lokaler Stand verliert gegen den neueren Server');
+  pruefe(/>=/.test(S.zusammenfuehren.toString()), 'Zusammenführen: Gleichstand gilt als Server (Build-Anpassung)');
+  S.ungesichertSetzen(false);
+  S.__ablage['clie-ungesichert-v'] = '1';
+  pruefe(S.ungesichertLesen() === false, 'ohne ungesicherte Änderungen: Flag aus');
+  S.ungesichertSetzen(true);
+  pruefe(S.ungesichertLesen() === true, 'ungesicherte Änderung: Flag an');
+  S.ungesichertSetzen(false);
+  pruefe(/Der Stand auf dem Server ist nicht lesbar/.test(S.abgleichen.toString()), 'unlesbarer Serverstand wird nie überschrieben');
+  pruefe(/mehrfach während des Abgleichs/.test(S.abgleichen.toString()), 'nach zwei Wiederholungen wird nicht blind hochgeladen');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10289,6 +10318,7 @@ function wochenStatTest() {
   try { routineMemoTest(); } catch (e) { fail('0.97.9 Routine im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ideeLoeschenTest(); } catch (e) { fail('0.97.10 Ideen löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { wochenStatTest(); } catch (e) { fail('0.97.11 Wochenstatistik warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { syncServerVorrangTest(); } catch (e) { fail('0.97.12 Sync-Vorrang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
