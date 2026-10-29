@@ -10077,6 +10077,47 @@ function ideeLoeschenTest() {
   S.DB.grabsteine = S.DB.grabsteine.filter(g => g.id !== 'idloe1');
 }
 
+function wochenStatTest() {
+  console.log('\n174. Wochenstatistik: Zeit und Anzahl je Bereich, Erledigt und Vorschau, DrillDown (0.97.11)');
+  if (!CL) { return; }
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const mo = S.wsMontagVon(heute);
+  pruefe(S.ausIso(mo).getDay() === 1, 'Woche beginnt am Montag');
+  pruefe(S.wsMinuten('09:00', '10:30') === 90 && S.wsMinuten('10:00', '09:00') === 0 && S.wsMinuten('', '') === 0, 'Dauer: Ende minus Beginn, sonst 0');
+  pruefe(S.wsStdText(380) === '6 h 20', 'Stunden-Anzeige: 6 h 20');
+  const wt = S.ausIso(heute).getDay();
+  S.DB.aufgaben.push({ id: 'wsa1', titel: 'Wochenaufgabe privat', status: 'erledigt', erledigtAm: heute, prio: 1, kontext: 'privat', wiederholung: null, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'wsa2', titel: 'Wochenaufgabe beruflich', status: 'erledigt', erledigtAm: heute, prio: 2, kontext: 'beruflich', wiederholung: null, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'wsa3', titel: 'Wochenplan', status: 'offen', planung: heute, prio: 4, kontext: 'privat', wiederholung: null, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'wsr1', titel: 'Wochenroutine', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, kontext: 'privat', prio: 3, geaendert: 1, erledigtTage: [heute], zuletztErledigt: heute });
+  S.DB.gedanken.push({ id: 'wsm1', titel: 'Wochenmemo', text: '', kontext: 'privat', angelegt: heute, archivAm: heute, ordnung: 1, geaendert: 1 });
+  S.DB.ideen = S.DB.ideen || [];
+  S.DB.ideen.push({ id: 'wsi1', titel: 'Wochenidee', stufe: 1, status: 'fertig', angelegt: heute, fertigAm: heute, geaendert: 1 });
+  const st = S.pmWocheStat(mo, 'erledigt');
+  pruefe(st.privat.aufgaben.some(x => x.id === 'wsa1') && !st.privat.aufgaben.some(x => x.id === 'wsa2'), 'erledigte Aufgabe landet im richtigen Bereich');
+  pruefe(st.beruflich.aufgaben.some(x => x.id === 'wsa2'), 'berufliche Aufgabe im Bereich Beruflich');
+  pruefe(st.privat.routinen.some(x => x.id === 'wsr1' && x.prio === 3), 'erledigter Routinen-Tag mit seiner Priorität');
+  pruefe(st.privat.memoNeu.some(x => x.titel === 'Wochenmemo') && st.privat.memoArch.some(x => x.titel === 'Wochenmemo'), 'Memo Pad: neu und archiviert');
+  pruefe(st.privat.ideenNeu.some(x => x.titel === 'Wochenidee') && st.privat.ideenFertig.some(x => x.titel === 'Wochenidee'), 'Ideen: neu und abgeschlossen');
+  pruefe(!st.privat.aufgaben.some(x => x.id === 'wsa3'), 'offene, geplante Aufgabe fehlt im Erledigt-Modus');
+  const vor = S.pmWocheStat(mo, 'vorschau');
+  pruefe(vor.privat.aufgaben.some(x => x.id === 'wsa3' && x.prio === 4), 'Vorschau: geplante offene Aufgabe mit Priorität');
+  pruefe(!vor.privat.memoNeu.length && !vor.privat.ideenNeu.length, 'Vorschau zählt Memo Pad und Ideen nicht');
+  S.cl.pm.tab = 'woche'; S.cl.pm.wocheMontag = mo; S.cl.pm.wocheModus = 'erledigt'; S.cl.pm.wocheDrill = null;
+  const html = S.pmWocheHtml();
+  pruefe(/Privat/.test(html) && /Beruflich/.test(html) && />Erledigt</.test(html) && />Vorschau</.test(html), 'Ansicht: Bereiche und Umschalter Erledigt/Vorschau');
+  pruefe(/pmWocheNav\(-7\)/.test(html) && /pmWocheNav\(7\)/.test(html), 'Ansicht: Wochenblättern');
+  S.pmWocheDrill('privat', 'aufgaben', 1);
+  pruefe(/Wochenaufgabe privat/.test(S.pmWocheHtml()), 'DrillDown: die Liste zeigt die Aufgabe');
+  S.pmWocheDrill('privat', 'aufgaben', 1);
+  pruefe(S.cl.pm.wocheDrill === null, 'zweiter Tipp auf dieselbe Zahl schließt die Liste');
+  S.cl.pm.tab = 'datum';
+  S.DB.aufgaben = S.DB.aufgaben.filter(x => !/^wsa|^wsr/.test(x.id));
+  S.DB.gedanken = S.DB.gedanken.filter(x => x.id !== 'wsm1');
+  S.DB.ideen = S.DB.ideen.filter(x => x.id !== 'wsi1');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10247,6 +10288,7 @@ function ideeLoeschenTest() {
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { routineMemoTest(); } catch (e) { fail('0.97.9 Routine im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ideeLoeschenTest(); } catch (e) { fail('0.97.10 Ideen löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { wochenStatTest(); } catch (e) { fail('0.97.11 Wochenstatistik warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

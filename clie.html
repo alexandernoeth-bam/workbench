@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.10</title>
+<title>CLIE 0.97.11</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1154,6 +1154,19 @@ html.schema-wb .wb-sp.heute{background:rgba(138,11,34,.05)}
 html.schema-wb .ja-raster i.we{background:#E4E1DA}
 html.schema-wb .mi-feld button.zu{box-shadow:inset -2px -2px 0 var(--px-zart),inset 2px 2px 0 #fff}
 html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
+/* Wochenstatistik (seit 0.97.11) */
+.pm-woche { padding: 2px 0; }
+.pm-wreihe { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
+.pm-wtitel { text-align: center; font-size: 16px; }
+.pm-wtitel small { display: block; opacity: .7; font-size: 16px; }
+.pm-wmodus { display: flex; gap: 4px; justify-content: center; margin-bottom: 6px; }
+.pm-wbereich, .pm-wliste { border: 1px solid currentColor; border-radius: 4px; padding: 4px 6px; margin: 6px 0; }
+.pm-wkopf { font-size: 17px; border-bottom: 1px solid currentColor; margin-bottom: 2px; }
+.pm-wzeile { display: flex; justify-content: space-between; gap: 6px; font-size: 16px; padding: 1px 0; }
+.pm-wbereich table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.pm-wbereich th, .pm-wbereich td { text-align: right; padding: 1px 4px; font-weight: normal; }
+.pm-wbereich th:first-child, .pm-wbereich td:first-child { text-align: left; }
+.pm-tipp { background: none; border: 0; border-bottom: 1px dashed currentColor; font: inherit; color: inherit; padding: 0; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -1198,7 +1211,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.10';
+var APP_VERSION = '0.97.11';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -8353,6 +8366,7 @@ function memoSpeichern() {
     var s = kpSeiteAnlegen(art, titel, f.kontext, f.art === 'ziel' ? 'ziel' : '');
     if (!s) { melde('Das Memo ließ sich nicht anlegen.', 'warn'); return; }
     katPrivatSchreiben(s.__satz, f);
+    s.__satz.angelegt = isoDatum();
     spaeterSichern();
     aufklappZu();
     cl.memo.id = s.id;
@@ -28659,11 +28673,11 @@ function pmTabLaden() {
   var t = '';
   try { t = window.localStorage.getItem(PM_TAB_KEY) || ''; } catch (e) { t = ''; }
   /* Seit 0.95.0 ist Datum der Start, danach Kategorie und Alle */
-  cl.pm.tab = (t === 'alle' || t === 'kategorie') ? t : 'datum';
+  cl.pm.tab = (t === 'alle' || t === 'kategorie' || t === 'woche') ? t : 'datum';
 }
 
 function pmTab(t) {
-  if (['alle', 'datum', 'kategorie'].indexOf(t) < 0) { return; }
+  if (['alle', 'datum', 'kategorie', 'woche'].indexOf(t) < 0) { return; }
   cl.pm.tab = t;
   try { window.localStorage.setItem(PM_TAB_KEY, t); } catch (e) { /* nur für jetzt */ }
   var el = document.getElementById('inhalt');
@@ -28749,6 +28763,7 @@ function pmWocheBis() {
 
 function pmTodoHtml() {
   var h = pmBannerHtml();
+  if (cl.pm.tab === 'woche') { return h + pmWocheHtml(); }
   var show = pmShow();
   var heute = isoDatum();
   var l = pmTodoAlle();
@@ -28802,11 +28817,185 @@ function pmTodoHtml() {
   return h + pmSortieren(l, show.sort).map(function (a) { return pmZeileHtml(a, { show: show }); }).join('');
 }
 
+/* ---------- Wochenstatistik (seit 0.97.11) ----------
+   Zeit und Anzahl je Bereich (Privat/Beruflich): Termine nach Dauer, Aufgaben
+   und Routinen nach Priorität, Memo Pad und Ideen nach Anlage und Abschluss.
+   „erledigt“ zählt bis heute, „Vorschau“ den Plan der Woche. */
+
+function wsMontagVon(is) {
+  return tagePlus(is, -((ausIso(is).getDay() + 6) % 7));
+}
+
+function wsBereich(o) { return clIstArbeit(clKategorieVon(o)) ? 'beruflich' : 'privat'; }
+
+function wsMinuten(von, bis) {
+  if (!pmIstZeit(von) || !pmIstZeit(bis)) { return 0; }
+  var a = von.split(':');
+  var b = bis.split(':');
+  var m = (Number(b[0]) * 60 + Number(b[1])) - (Number(a[0]) * 60 + Number(a[1]));
+  return m > 0 ? m : 0;
+}
+
+function wsStdText(min) {
+  return Math.floor(min / 60) + ' h ' + (min % 60 < 10 ? '0' : '') + (min % 60);
+}
+
+function wsLeer() {
+  return { termine: [], aufgaben: [], routinen: [], memoNeu: [], memoArch: [], ideenNeu: [], ideenFertig: [] };
+}
+
+function pmWocheStand() {
+  if (!pmIstDatum(cl.pm.wocheMontag)) { cl.pm.wocheMontag = wsMontagVon(isoDatum()); }
+  if (cl.pm.wocheModus !== 'vorschau') { cl.pm.wocheModus = 'erledigt'; }
+  return { montag: cl.pm.wocheMontag, modus: cl.pm.wocheModus };
+}
+
+function pmWocheStat(montag, modus) {
+  var heute = isoDatum();
+  var ende = tagePlus(montag, 6);
+  var tage = [];
+  var i;
+  for (i = 0; i < 7; i++) { tage.push(tagePlus(montag, i)); }
+  var im = function (d) { return d >= montag && d <= ende && (modus === 'vorschau' || d <= heute); };
+  var s = { privat: wsLeer(), beruflich: wsLeer() };
+  var im2 = function (d) { return d >= montag && d <= ende; };
+
+  tage.forEach(function (d) {
+    if (!im(d)) { return; }
+    (clTermineAm(d).zeit || []).forEach(function (x) {
+      s[wsBereich(x)].termine.push({ titel: String(x.titel || ''), tag: d, zeit: x.zeit || '', min: wsMinuten(x.zeit, x.bis) });
+    });
+  });
+
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.id || !clPasst(a) || prPrivatVerborgen(null, a)) { return; }
+    var b = wsBereich(a);
+    var p = pmPrio(a);
+    if (a.wiederholung) {
+      tage.forEach(function (d) {
+        if (!im(d)) { return; }
+        if (modus === 'erledigt' && istErledigtAn(a, d)) { s[b].routinen.push({ id: a.id, titel: pmTitel(a), tag: d, prio: p }); }
+        if (modus === 'vorschau' && !a.pausiert && aufgabeFaelligAn(a, d) && !istErledigtAn(a, d)) { s[b].routinen.push({ id: a.id, titel: pmTitel(a), tag: d, prio: p }); }
+      });
+      return;
+    }
+    if (modus === 'erledigt') {
+      if (a.status === 'erledigt' && pmIstDatum(a.erledigtAm) && a.erledigtAm >= montag && a.erledigtAm <= heute && a.erledigtAm <= ende) {
+        s[b].aufgaben.push({ id: a.id, titel: pmTitel(a), tag: a.erledigtAm, prio: p });
+      }
+    } else if (a.status !== 'erledigt' && pmIstDatum(pmDatum(a)) && im2(pmDatum(a))) {
+      s[b].aufgaben.push({ id: a.id, titel: pmTitel(a), tag: pmDatum(a), prio: p });
+    }
+  });
+
+  if (modus === 'erledigt') {
+    kpSeitenAlle().forEach(function (m) {
+      var x = m && m.__satz;
+      if (!x || pmIstVorlage(m) || prPrivatVerborgen(m, null) || !clPasst(m)) { return; }
+      var b = wsBereich(m);
+      if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].memoNeu.push({ titel: String(m.titel || ''), tag: x.angelegt }); }
+      if (pmIstDatum(x.archivAm) && x.archivAm >= montag && x.archivAm <= heute) { s[b].memoArch.push({ titel: String(m.titel || ''), tag: x.archivAm }); }
+    });
+    iwAlle().forEach(function (x) {
+      if (!clPasst(x) || prPrivatVerborgen(null, x)) { return; }
+      var b = wsBereich(x);
+      if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].ideenNeu.push({ titel: String(x.titel || ''), tag: x.angelegt }); }
+      if (pmIstDatum(x.fertigAm) && x.fertigAm >= montag && x.fertigAm <= heute) { s[b].ideenFertig.push({ titel: String(x.titel || ''), tag: x.fertigAm }); }
+    });
+  }
+  return s;
+}
+
+function pmWocheNav(n) {
+  cl.pm.wocheMontag = tagePlus(pmWocheStand().montag, n);
+  cl.pm.wocheDrill = null;
+  zeichne();
+}
+
+function pmWocheModusSetzen(m) {
+  cl.pm.wocheModus = m === 'vorschau' ? 'vorschau' : 'erledigt';
+  cl.pm.wocheDrill = null;
+  zeichne();
+}
+
+/* Antippen einer Zahl: die Liste darunter; zweiter Tipp auf dieselbe Zahl schließt sie */
+function pmWocheDrill(b, art, p) {
+  var neu = { b: b, art: art, p: p === undefined ? null : p };
+  var alt = cl.pm.wocheDrill;
+  var gleich = alt && alt.b === neu.b && alt.art === neu.art && alt.p === neu.p;
+  cl.pm.wocheDrill = gleich ? null : neu;
+  zeichne();
+}
+
+function pmWocheZahl(b, art, p, liste) {
+  var n = liste.length;
+  if (!n) { return '0'; }
+  return '<button type="button" class="pm-tipp" onclick="pmWocheDrill(\'' + b + '\',\'' + art + '\',' + (p === undefined ? 'null' : p) + ')">' + n + '</button>';
+}
+
+function pmWocheBereichHtml(b, d, st, modus) {
+  var namen = { privat: 'Privat', beruflich: 'Beruflich' };
+  var min = d.termine.reduce(function (sum, x) { return sum + x.min; }, 0);
+  var h = '<div class="pm-wbereich"><div class="pm-wkopf">' + namen[b] + '</div>';
+  h += '<div class="pm-wzeile"><span>Termine</span><span>' + (d.termine.length ? '<button type="button" class="pm-tipp" onclick="pmWocheDrill(\'' + b + '\',\'termine\',null)">' + wsStdText(min) + ' · ' + d.termine.length + '</button>' : '0') + '</span></div>';
+  if (modus === 'erledigt') {
+    h += '<div class="pm-wzeile"><span>Memo Pad · neu / archiviert</span><span>' + pmWocheZahl(b, 'memoNeu', undefined, d.memoNeu) + ' / ' + pmWocheZahl(b, 'memoArch', undefined, d.memoArch) + '</span></div>';
+    h += '<div class="pm-wzeile"><span>Ideen · neu / abgeschlossen</span><span>' + pmWocheZahl(b, 'ideenNeu', undefined, d.ideenNeu) + ' / ' + pmWocheZahl(b, 'ideenFertig', undefined, d.ideenFertig) + '</span></div>';
+  }
+  h += '<table><tr><th>Priorität</th><th>Aufgaben</th><th>Routinen</th></tr>';
+  var p;
+  for (p = 1; p <= 5; p++) {
+    var pa = d.aufgaben.filter(function (x) { return x.prio === p; });
+    var pr = d.routinen.filter(function (x) { return x.prio === p; });
+    h += '<tr><td>' + p + (p === 1 ? ' · wichtig' : (p === 5 ? ' · unwichtig' : '')) + '</td><td>' + pmWocheZahl(b, 'aufgaben', p, pa) + '</td><td>' + pmWocheZahl(b, 'routinen', p, pr) + '</td></tr>';
+  }
+  h += '</table></div>';
+  return h;
+}
+
+function pmWocheListeHtml(st) {
+  var dr = cl.pm.wocheDrill;
+  var d = st[dr.b];
+  var art = dr.art;
+  var l = [];
+  if (art === 'termine') { l = d.termine.map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) + ' ' + x.zeit + ' · ' + wsStdText(x.min) }; }); }
+  if (art === 'aufgaben' || art === 'routinen') {
+    l = d[art].filter(function (x) { return dr.p === null || x.prio === dr.p; }).map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) + ' · Prio ' + x.prio }; });
+  }
+  if (art === 'memoNeu' || art === 'memoArch' || art === 'ideenNeu' || art === 'ideenFertig') {
+    l = d[art].map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) }; });
+  }
+  var h = '<div class="pm-wliste"><div class="pm-wkopf">' + (dr.b === 'privat' ? 'Privat' : 'Beruflich') + ' · ' + esc(wsArtName(art)) + (dr.p ? ' · Priorität ' + dr.p : '') + '</div>';
+  if (!l.length) { h += '<p class="leise">Keine Einträge.</p>'; }
+  h += l.map(function (x) { return '<div class="pm-wzeile"><span>' + esc(x.t) + '</span><span class="leise">' + esc(x.r) + '</span></div>'; }).join('');
+  return h + '</div>';
+}
+
+function wsArtName(art) {
+  return { termine: 'Termine', aufgaben: 'Aufgaben', routinen: 'Routinen', memoNeu: 'Memo Pad neu', memoArch: 'Memo Pad archiviert', ideenNeu: 'Ideen neu', ideenFertig: 'Ideen abgeschlossen' }[art] || art;
+}
+
+function pmWocheHtml() {
+  var w = pmWocheStand();
+  var st = pmWocheStat(w.montag, w.modus);
+  var h = '<div class="pm-woche">';
+  h += '<div class="pm-wreihe"><button type="button" class="knopf" onclick="pmWocheNav(-7)" aria-label="Vorige Woche">◀</button>'
+    + '<div class="pm-wtitel">' + esc(clKurzDatum(w.montag)) + ' – ' + esc(clKurzDatum(tagePlus(w.montag, 6))) + '<small>' + (w.modus === 'vorschau' ? 'Vorschau' : 'erledigt') + '</small></div>'
+    + '<button type="button" class="knopf" onclick="pmWocheNav(7)" aria-label="Nächste Woche">▶</button></div>';
+  h += '<div class="pm-wmodus"><button type="button"' + (w.modus === 'erledigt' ? ' class="an"' : '') + ' onclick="pmWocheModusSetzen(\'erledigt\')">Erledigt</button>'
+    + '<button type="button"' + (w.modus === 'vorschau' ? ' class="an"' : '') + ' onclick="pmWocheModusSetzen(\'vorschau\')">Vorschau</button></div>';
+  h += pmWocheBereichHtml('privat', st.privat, st, w.modus);
+  h += pmWocheBereichHtml('beruflich', st.beruflich, st, w.modus);
+  if (cl.pm.wocheDrill) { h += pmWocheListeHtml(st); }
+  h += '<p class="leise">Unterstrichene Zahlen öffnen die Liste. Termine zählen nur als Zeit, Memo Pad und Ideen nur als Anzahl.</p></div>';
+  return h;
+}
+
 function pmTodoFussHtml() {
   return '<button type="button" class="knopf" onclick="pmNeu(\'\',\'\')">Neu</button>'
     + '<button type="button" class="knopf" onclick="pmDetailsGewaehlt()">Details…</button>'
     + '<button type="button" class="knopf" onclick="pmShowAuf()">Show…</button>'
-    + '<div class="pm-tabs">' + [['datum', 'Datum'], ['kategorie', 'Kategorie'], ['alle', 'Alle']].map(function (t) {
+    + '<div class="pm-tabs">' + [['datum', 'Datum'], ['kategorie', 'Kategorie'], ['alle', 'Alle'], ['woche', 'Woche']].map(function (t) {
       return '<button type="button"' + (cl.pm.tab === t[0] ? ' class="an"' : '') + ' onclick="pmTab(\'' + t[0] + '\')">' + t[1] + '</button>';
     }).join('') + '</div>';
 }
@@ -30131,6 +30320,7 @@ function pmArchivUm(id) {
     melde('„' + s.titel + '“ zurückgeholt.', 'gut');
   } else {
     x.archiv = true;
+    x.archivAm = isoDatum();
     melde('„' + s.titel + '“ archiviert.', null);
   }
   x.geaendert = jetzt();
