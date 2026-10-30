@@ -10257,6 +10257,13 @@ function fokusRasterTest() {
   pruefe((h.match(/class="app"/g) || []).length === 15, 'im Raster bleiben 15 Kacheln');
 }
 
+function terminErinnerungTest() {
+  console.log('\n181. Termin: wird mit dem Standard des Kalenders angelegt, damit Google eine Erinnerung setzt (0.98.2)');
+  if (!CL) { return; }
+  pruefe(/reminders: \{ useDefault: true \} \};/.test(QUELLE) && /function terminAusFenster\(/.test(SKRIPT), 'Termin-Körper setzt reminders.useDefault = true');
+  pruefe(/return \{ koerper: k, kalId: kalId, datum: datum \};/.test(SKRIPT), 'der Körper mit Erinnerung wird unverändert zurückgegeben');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10433,6 +10440,7 @@ function fokusRasterTest() {
   try { memoMarkeTest(); } catch (e) { fail('0.97.15 Memo-Marke warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fokusTimerTest(); } catch (e) { fail('0.98.0 Fokus-Timer warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fokusRasterTest(); } catch (e) { fail('0.98.1 Fokus-Kachel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { terminErinnerungTest(); } catch (e) { fail('0.98.2 Termin-Erinnerung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
