@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.97.15</title>
+<title>CLIE 0.98.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1167,6 +1167,13 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
 .pm-wbereich th, .pm-wbereich td { text-align: right; padding: 1px 4px; font-weight: normal; }
 .pm-wbereich th:first-child, .pm-wbereich td:first-child { text-align: left; }
 .pm-tipp { background: none; border: 0; border-bottom: 1px dashed currentColor; font: inherit; color: inherit; padding: 0; cursor: pointer; }
+.fk-overlay { position: fixed; right: 8px; bottom: 74px; z-index: 60; width: 150px; background: var(--lcd, #c9d3b0); color: var(--ink, #1f2a1a); border: 2px solid var(--ink, #1f2a1a); border-radius: 6px; padding: 4px 6px; box-shadow: 0 4px 10px rgba(0,0,0,.35); font-family: "VT323", "Courier New", monospace; }
+.fk-overlay .fk-kopf { display: flex; justify-content: space-between; font-size: 16px; }
+.fk-overlay .fk-zeit { font-size: 34px; text-align: center; line-height: 1.1; }
+.fk-overlay .fk-reihe { display: flex; gap: 4px; justify-content: center; }
+.fk-overlay button { font: inherit; font-size: 16px; background: none; color: inherit; border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; cursor: pointer; }
+.fk-start { display: flex; justify-content: center; margin: 4px 0; }
+.fk-gross { font-size: 56px; text-align: center; }
 </style>
 </head>
 <body>
@@ -1211,7 +1218,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.97.15';
+var APP_VERSION = '0.98.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4351,7 +4358,7 @@ function clApp(id) {
 
 function uebersichtHtml() {
   /* Oben spricht der Coach (seit 0.33) */
-  var h = coZeileHtml() + '<div class="apps">';
+  var h = coZeileHtml() + '<div class="fk-start"><button type="button" class="knopf" onclick="fkStartenAuf()">⏱ Fokus</button></div><div class="apps">';
   CL_APPS.filter(function (a) { return a.raster !== false; }).forEach(function (a) {
     h += '<button type="button" class="app" onclick="oeffne(\'' + a.id + '\')">'
        + '<span class="sym">' + clSymbol(a.id) +  (a.ordner ? '<span class="ord">▸</span>' : '') + '</span>'
@@ -4570,6 +4577,166 @@ function uhrZeichnen() {
 }
 
 /* Kategorie- und Menüliste: wie die Aufklapplisten des Palm. */
+/* ---------- Fokus-Timer (seit 0.98.0) ----------
+   Fest: zählt von einer Dauer herunter, Ende ist eine Uhrzeit (überlebt Schlaf und Neustart).
+   Flexibel: Stoppuhr, läuft bis „Fertig“. Der Zustand liegt je Gerät in localStorage. */
+var FK_KEY = 'clie-fokus';
+var fkUhr = null;
+var fkWahl = { modus: 'fest', min: 25 };
+
+function fkLesen() {
+  try { var w = JSON.parse(window.localStorage.getItem(FK_KEY) || 'null'); return (w && typeof w === 'object') ? w : null; } catch (e) { return null; }
+}
+
+function fkSchreiben(z) {
+  try { if (z) { window.localStorage.setItem(FK_KEY, JSON.stringify(z)); } else { window.localStorage.removeItem(FK_KEY); } } catch (e) { /* nur für jetzt */ }
+}
+
+/* Ein neuer Timer. Fest: min Minuten ab jetzt. */
+function fkNeu(modus, min, jetzt) {
+  if (modus === 'fest') { return { modus: 'fest', laufend: true, ende: jetzt + min * 60000, rest: 0 }; }
+  return { modus: 'flex', laufend: true, start: jetzt, verbraucht: 0 };
+}
+
+/* Restzeit bei fest, verstrichene Zeit bei flexibel (in ms) */
+function fkRestMs(z, jetzt) {
+  if (!z) { return 0; }
+  if (z.modus === 'fest') { return z.laufend ? Math.max(0, z.ende - jetzt) : Math.max(0, z.rest || 0); }
+  return (z.verbraucht || 0) + (z.laufend ? Math.max(0, jetzt - z.start) : 0);
+}
+
+/* Pause und Weiter */
+function fkPauseUm(z, jetzt) {
+  var n = Object.assign({}, z);
+  if (z.modus === 'fest') {
+    if (z.laufend) { n.rest = Math.max(0, z.ende - jetzt); n.laufend = false; }
+    else { n.ende = jetzt + (z.rest || 0); n.laufend = true; }
+  } else if (z.laufend) { n.verbraucht = fkRestMs(z, jetzt); n.laufend = false; }
+  else { n.start = jetzt; n.laufend = true; }
+  return n;
+}
+
+/* Fünf Minuten dazu: beim festen Timer verlängern */
+function fkPlus5Um(z) {
+  var n = Object.assign({}, z);
+  if (z.modus !== 'fest') { return n; }
+  if (z.laufend) { n.ende = z.ende + 300000; } else { n.rest = (z.rest || 0) + 300000; }
+  return n;
+}
+
+function fkZeit(ms) {
+  var s = Math.floor(Math.max(0, ms) / 1000);
+  return zwei(Math.floor(s / 60)) + ':' + zwei(s % 60);
+}
+
+/* Titel des Fensters: die Taskleiste zeigt die Restzeit */
+function fkTitelText(z, jetzt) {
+  if (!z) { return ''; }
+  if (z.modus === 'fest' && z.laufend === false && (z.rest || 0) <= 0) { return '⏱ Fertig · Fokus'; }
+  if (z.modus === 'fest' && z.laufend && z.ende - jetzt <= 0) { return '⏱ Fertig · Fokus'; }
+  return '⏱ ' + fkZeit(fkRestMs(z, jetzt)) + (z.laufend ? '' : ' (Pause)') + ' · Fokus';
+}
+
+function fkStarten(modus, min) {
+  var z = fkNeu(modus, min, Date.now());
+  fkSchreiben(z);
+  if (cl.aufklapp === 'fokus') { aufklappZu(); }
+  fkTakt();
+  zeichne();
+}
+
+function fkPause() {
+  var z = fkLesen();
+  if (!z) { return; }
+  fkSchreiben(fkPauseUm(z, Date.now()));
+  fkTakt();
+  zeichne();
+}
+
+function fkPlus5() {
+  var z = fkLesen();
+  if (!z) { return; }
+  fkSchreiben(fkPlus5Um(z));
+  fkTakt();
+  zeichne();
+}
+
+function fkFertig() {
+  fkSchreiben(null);
+  fkTakt();
+  zeichne();
+}
+
+function fkOverlayZeichnen() {
+  var z = fkLesen();
+  var el = document.getElementById('fkOverlay');
+  if (!z) { if (el) { el.parentNode.removeChild(el); } return; }
+  if (!el) {
+    if (!document.body) { return; }
+    el = document.createElement('div');
+    el.id = 'fkOverlay';
+    el.className = 'fk-overlay';
+    document.body.appendChild(el);
+  }
+  var jetzt = Date.now();
+  var ende = z.modus === 'fest' && z.laufend === true && z.ende - jetzt <= 0;
+  var zeit = ende ? 'Ende' : fkZeit(fkRestMs(z, jetzt));
+  el.innerHTML = '<div class="fk-kopf"><b>Fokus' + (z.modus === 'fest' ? '' : ' · flex') + '</b>' + (z.laufend ? '' : '<span>Pause</span>') + '</div>'
+    + '<div class="fk-zeit">' + zeit + '</div>'
+    + '<div class="fk-reihe"><button type="button" onclick="fkPause()">' + (z.laufend ? 'Pause' : 'Weiter') + '</button>'
+    + (z.modus === 'fest' ? '<button type="button" onclick="fkPlus5()">+5</button>' : '')
+    + '<button type="button" onclick="fkFertig()">Fertig</button></div>';
+}
+
+/* Ein Takt pro Sekunde, solange ein Timer läuft; Titel und Overlay folgen */
+function fkTakt() {
+  if (fkUhr) { window.clearInterval(fkUhr); fkUhr = null; }
+  var z = fkLesen();
+  var titel = function () {
+    var t = fkTitelText(fkLesen(), Date.now());
+    document.title = t || ('CLIE ' + APP_VERSION);
+  };
+  fkOverlayZeichnen();
+  titel();
+  if (z && z.laufend) {
+    fkUhr = window.setInterval(function () {
+      fkOverlayZeichnen();
+      titel();
+      var jetzt = fkLesen();
+      if (jetzt && jetzt.modus === 'fest' && jetzt.laufend && jetzt.ende - Date.now() <= 0) { window.clearInterval(fkUhr); fkUhr = null; }
+    }, 1000);
+  }
+}
+
+function fkStartenAuf() {
+  cl.aufklapp = 'fokus';
+  aufklappNeu();
+}
+
+function fkWahlSetzen(modus) { fkWahl.modus = modus === 'flex' ? 'flex' : 'fest'; aufklappNeu(); }
+function fkMinutenSetzen(m) { fkWahl.min = Math.max(1, Math.min(600, Math.round(Number(m)) || 25)); aufklappNeu(); }
+
+function fkFensterHtml() {
+  var z = fkLesen();
+  var k = function (t, a, an) { return '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="' + a + '">' + t + '</button>'; };
+  if (z) {
+    return '<div class="fenster"><div class="titel">Fokus</div><div class="rumpf">'
+      + '<div class="fk-gross">' + fkZeit(fkRestMs(z, Date.now())) + '</div>'
+      + '<div class="leise">' + (z.modus === 'fest' ? 'Fest' : 'Flexibel') + (z.laufend ? '' : ' · Pause') + '</div>'
+      + '<div class="wahlreihe">' + k(z.laufend ? 'Pause' : 'Weiter', 'fkPause()', true) + (z.modus === 'fest' ? k('+5 Min.', 'fkPlus5()') : '') + k('Fertig', 'fkFertig()') + '</div>'
+      + '<div class="knoepfe">' + k('Schließen', 'aufklappZu()') + '</div>'
+      + '</div></div>';
+  }
+  return '<div class="fenster"><div class="titel">Fokus starten</div><div class="rumpf">'
+    + '<div class="wahlreihe">' + k('Fest', 'fkWahlSetzen(\'fest\')', fkWahl.modus === 'fest') + k('Flexibel', 'fkWahlSetzen(\'flex\')', fkWahl.modus === 'flex') + '</div>'
+    + (fkWahl.modus === 'fest'
+      ? '<div class="wahlreihe">' + [15, 25, 45, 60].map(function (m) { return k(String(m), 'fkMinutenSetzen(' + m + ')', fkWahl.min === m); }).join('') + '</div>'
+        + '<label for="fkMin">Eigene Zeit (Minuten):</label><input id="fkMin" class="eingabe" type="number" min="1" max="600" value="' + fkWahl.min + '" onchange="fkMinutenSetzen(this.value)">'
+      : '<div class="leise">Läuft als Stoppuhr, bis du „Fertig“ tippst.</div>')
+    + '<div class="knoepfe">' + k('Starten', 'fkStarten(\'' + fkWahl.modus + '\',' + fkWahl.min + ')', true) + k('Abbrechen', 'aufklappZu()') + '</div>'
+    + '</div></div>';
+}
+
 function aufklappZeichnen() {
   var el = document.getElementById('aufklapp');
   var schleier = document.getElementById('schleier');
@@ -4600,6 +4767,8 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'memo') {
     if (el.innerHTML.indexOf('memoTitel') >= 0) { return; }
     el.innerHTML = memoFensterHtml();
+  } else if (cl.aufklapp === 'fokus') {
+    el.innerHTML = fkFensterHtml();
   } else if (cl.aufklapp === 'routine') {
     if (el.innerHTML.indexOf('rtName') >= 0 || el.innerHTML.indexOf('rtZu') >= 0) { return; }
     el.innerHTML = rtFensterHtml();
@@ -4787,7 +4956,7 @@ function zeichne() {
   [clBreiteSetzen, kopfZeichnen, inhaltZeichnen, fussZeichnen, aufklappZeichnen, standZeichnen].forEach(function (teil) {
     try { teil(); } catch (e) { clFehlerZeigen(e, teil.name); }
   });
-  document.title = 'CLIE ' + APP_VERSION;
+  document.title = fkTitelText(fkLesen(), Date.now()) || ('CLIE ' + APP_VERSION);
 }
 
 /* Seit 0.85.1: Fehler sichtbar machen — in der Seite und als Meldung, mit Ort */
@@ -27927,6 +28096,9 @@ function manZoom(richtung) {
   cl.man.puffer = 0;
   manNeuZeichnen();
 }
+
+/* Timer nach dem Laden wieder aufnehmen */
+if (document.readyState === 'complete') { fkTakt(); } else { window.addEventListener('load', fkTakt); }
 
 /* ---------- Schachschule: Inhalte (seit 0.22) ----------
 

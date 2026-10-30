@@ -230,7 +230,7 @@ console.log('\n1. Aufbau der Datei');
   const titel = (QUELLE.match(/<title>CLIE ([\d.]+)<\/title>/) || [])[1];
   pruefe(version && version === titel, 'Version steht gleich im Titel und in APP_VERSION (' + version + ')');
   pruefe(/<div class="fassung">CLIE v' \+ esc\(APP_VERSION\)/.test(SKRIPT) && /oeffne\(\\'statistik\\'\)"><u>Statistik<\/u>/.test(SKRIPT), 'die Übersicht zeigt die Version im Hauptfenster (seit 0.7.1 mit Weg zur Statistik)');
-  pruefe(/document\.title = 'CLIE ' \+ APP_VERSION/.test(SKRIPT), 'der Fenstertitel trägt die Version');
+  pruefe(/document\.title = fkTitelText\(fkLesen\(\), Date\.now\(\)\) \|\| \('CLIE ' \+ APP_VERSION\)/.test(SKRIPT), 'der Fenstertitel trägt die Version (ohne Timer) oder die Restzeit (0.98.0)');
   pruefe(!/@media/.test(QUELLE), 'keine @media-Regeln');
   const fns = [...SKRIPT.matchAll(/\nfunction (\w+)\s*\(/g)].map(m => m[1]);
   const doppelt = [...new Set(fns.filter((f, i) => fns.indexOf(f) !== i))];
@@ -10200,6 +10200,46 @@ function memoMarkeTest() {
   S.DB.aufgaben = S.DB.aufgaben.filter(x => x.id !== 'aufg1234');
 }
 
+function fokusTimerTest() {
+  console.log('\n179. Fokus-Timer: Restzeit, Pause, +5 Min., Titel mit Restzeit (0.98.0)');
+  if (!CL) { return; }
+  const S = CL;
+  const J = 1000000;
+  /* fest: 25 Minuten ab J */
+  let z = S.fkNeu('fest', 25, J);
+  pruefe(z.modus === 'fest' && z.laufend === true && z.ende === J + 25 * 60000, 'fest: Ende = Start + Minuten');
+  pruefe(S.fkRestMs(z, J) === 25 * 60000, 'fest: Restzeit am Anfang = volle Dauer');
+  pruefe(S.fkRestMs(z, J + 60000) === 24 * 60000, 'fest: nach einer Minute bleiben 24 Minuten');
+  pruefe(S.fkRestMs(z, J + 99999999) === 0, 'fest: nach Ablauf nie negativ');
+  /* Pause friert die Restzeit ein, Weiter setzt das Ende neu */
+  const p = S.fkPauseUm(z, J + 60000);
+  pruefe(p.laufend === false && p.rest === 24 * 60000, 'fest Pause: Restzeit eingefroren');
+  pruefe(S.fkRestMs(p, J + 5 * 60000) === 24 * 60000, 'fest Pause: Zeit vergeht während der Pause nicht');
+  const w = S.fkPauseUm(p, J + 5 * 60000);
+  pruefe(w.laufend === true && S.fkRestMs(w, J + 5 * 60000) === 24 * 60000, 'fest Weiter: Restzeit bleibt nach der Pause');
+  /* +5 Min. */
+  const f = S.fkPlus5Um(z);
+  pruefe(S.fkRestMs(f, J) === 30 * 60000, 'fest +5 Min.: laufend verlängert');
+  const fp = S.fkPlus5Um(p);
+  pruefe(fp.rest === 29 * 60000, 'fest +5 Min. in der Pause: Restzeit verlängert');
+  /* flexibel: Stoppuhr mit Pause */
+  let y = S.fkNeu('flex', 0, J);
+  pruefe(y.modus === 'flex' && S.fkRestMs(y, J + 90000) === 90000, 'flex: zählt hoch');
+  const yp = S.fkPauseUm(y, J + 90000);
+  pruefe(yp.laufend === false && S.fkRestMs(yp, J + 500000) === 90000, 'flex Pause: angehalten');
+  const yw = S.fkPauseUm(yp, J + 500000);
+  pruefe(S.fkRestMs(yw, J + 510000) === 100000, 'flex Weiter: zählt von der Pause weiter');
+  pruefe(S.fkPlus5Um(y).laufend === true && S.fkRestMs(S.fkPlus5Um(y), J) === 0, 'flex: +5 Min. ändert nichts');
+  /* Zeitformat und Titel */
+  pruefe(S.fkZeit(754000) === '12:34' && S.fkZeit(0) === '00:00', 'Zeitformat mm:ss');
+  pruefe(S.fkTitelText(z, J + 60000) === '⏱ 24:00 · Fokus', 'Titel zeigt Restzeit');
+  pruefe(S.fkTitelText(p, J + 60000).indexOf('(Pause)') > 0, 'Titel markiert Pause');
+  pruefe(S.fkTitelText(z, z.ende + 1000) === '⏱ Fertig · Fokus', 'Titel nach Ablauf: Fertig');
+  pruefe(S.fkTitelText(null, J) === '', 'Titel ohne Timer leer');
+  /* Ende der Eingaben: Ursprungszustand nicht verändert */
+  pruefe(z.laufend === true && z.ende === J + 25 * 60000, 'fkPauseUm/fkPlus5Um verändern das Original nicht');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10374,6 +10414,7 @@ function memoMarkeTest() {
   try { syncServerVorrangTest(); } catch (e) { fail('0.97.12 Sync-Vorrang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminEndeTest(); } catch (e) { fail('0.97.14 Termin-Ende warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoMarkeTest(); } catch (e) { fail('0.97.15 Memo-Marke warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { fokusTimerTest(); } catch (e) { fail('0.98.0 Fokus-Timer warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
