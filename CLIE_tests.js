@@ -413,7 +413,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 33, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 34, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -543,7 +543,7 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["manifest","kalender","aufgaben","memo","sammlungen","einkauf","vorlesen","rechner","routinen","sos","ideen","leitfaden","lernkartei","gemini","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["manifest","kalender","aufgaben","memo","sammlungen","fokus","einkauf","vorlesen","rechner","routinen","ideen","leitfaden","lernkartei","gemini","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false,
     'Start 3×5 (seit 0.89): Manifest (seit 0.96.3 erste App), Date Book, To Do List / Memo Pad, Collections, Shopping / Reader, Calc, Routines / SOS, Idea Lab, Guide / Flashcards, Coach, Games ▸ (Coach seit 0.91)');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
@@ -2338,8 +2338,8 @@ function sosTest() {
   if (!CL) { return; }
   frisch();
   const S = CL;
-  pruefe(S.clApp('sos') && S.clApp('sos').raster !== false && S.clApp('sos').name === 'SOS' && /<circle cx="32" cy="32" r="20"[^>]*\/><text[^>]*>SOS<\/text>/.test(S.clSymbol('sos')),
-    'SOS auf dem Start, Symbol: „SOS“ im Ring');
+  pruefe(S.clApp('sos') && S.clApp('sos').raster === false && S.clApp('sos').name === 'SOS' && /<circle cx="32" cy="32" r="20"[^>]*\/><text[^>]*>SOS<\/text>/.test(S.clSymbol('sos')),
+    'SOS seit 0.98.1 nicht mehr im Raster, nur im Menü; Symbol: „SOS“ im Ring');
   /* aus To Do über das Menü */
   S.oeffne('aufgaben'); S.menueUm();
   const m = S.document.getElementById('aufklapp').innerHTML;
@@ -2636,7 +2636,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'manifest,kalender,aufgaben,memo,sammlungen,einkauf,vorlesen,rechner,routinen,sos,ideen,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Memo Pad an dritter Stelle, Routines und SOS statt Projekte und Ziele');
+  pruefe(raster.join(',') === 'manifest,kalender,aufgaben,memo,sammlungen,fokus,einkauf,vorlesen,rechner,routinen,ideen,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Fokus an Shoppings Stelle seit 0.98.1, SOS nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -6888,7 +6888,8 @@ function startOrdnerTest() {
   /* „projekte“ und „ziele“ seit 0.71 über das Memo Pad */
   /* „coach“ seit 0.86 aus — nur noch über den Link #coach erreichbar */
   /* „drive“ seit 0.91 im Menü ≡ */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive'];
+  /* „sos“ seit 0.98.1 nur noch im Menü ≡ */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -6896,7 +6897,7 @@ function startOrdnerTest() {
   pruefe(raster.length === 15 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'seit 0.89 ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
-  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && /oeffne\('sos'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && /oeffne\('gemini'\)/.test(inhalt()), 'Routines und SOS (seit 0.72) und Coach (seit 0.91) auf dem Start, Drive im Menü');
+  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && !/oeffne\('sos'\)/.test(inhalt()) && /oeffne\('fokus'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && /oeffne\('gemini'\)/.test(inhalt()), 'Routines (seit 0.72) und Coach (seit 0.91) auf dem Start, Fokus statt SOS (seit 0.98.1), Drive im Menü');
   [['spiele', ['sudoku', 'poker']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
@@ -10240,6 +10241,22 @@ function fokusTimerTest() {
   pruefe(z.laufend === true && z.ende === J + 25 * 60000, 'fkPauseUm/fkPlus5Um verändern das Original nicht');
 }
 
+function fokusRasterTest() {
+  console.log('\n180. Startbildschirm: Fokus steht an Shoppings Stelle, SOS nur noch im Menü, kein Knopf oben (0.98.1)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const ids = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
+  pruefe(ids.indexOf('fokus') === ids.indexOf('einkauf') - 1, 'Fokus steht direkt vor Shopping, also an dessen Stelle');
+  pruefe(ids.indexOf('sos') < 0 && S.CL_APPS.some(a => a.id === 'sos' && a.raster === false), 'SOS ist aus dem Raster genommen');
+  pruefe(/if \(was === 'sos'\) \{ oeffne\('sos'\); return; \}/.test(QUELLE), 'SOS bleibt über das Menü erreichbar');
+  pruefe(/if \(id === 'fokus'\) \{ fkStartenAuf\(\); return; \}/.test(QUELLE), 'Öffnen der Kachel startet den Fokus-Dialog');
+  pruefe(typeof S.CL_BILD.fokus === 'string' && S.CL_BILD.fokus.length > 40, 'Fokus hat ein eigenes Bildzeichen');
+  const h = S.uebersichtHtml();
+  pruefe(/onclick="oeffne\('fokus'\)"/.test(h) && !/fk-start/.test(QUELLE), 'kein Knopf oben mehr; die Kachel steht im Raster');
+  pruefe((h.match(/class="app"/g) || []).length === 15, 'im Raster bleiben 15 Kacheln');
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10415,6 +10432,7 @@ function fokusTimerTest() {
   try { terminEndeTest(); } catch (e) { fail('0.97.14 Termin-Ende warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoMarkeTest(); } catch (e) { fail('0.97.15 Memo-Marke warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fokusTimerTest(); } catch (e) { fail('0.98.0 Fokus-Timer warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { fokusRasterTest(); } catch (e) { fail('0.98.1 Fokus-Kachel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

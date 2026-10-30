@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.98.0</title>
+<title>CLIE 0.98.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1172,7 +1172,6 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
 .fk-overlay .fk-zeit { font-size: 34px; text-align: center; line-height: 1.1; }
 .fk-overlay .fk-reihe { display: flex; gap: 4px; justify-content: center; }
 .fk-overlay button { font: inherit; font-size: 16px; background: none; color: inherit; border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; cursor: pointer; }
-.fk-start { display: flex; justify-content: center; margin: 4px 0; }
 .fk-gross { font-size: 56px; text-align: center; }
 </style>
 </head>
@@ -1218,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.98.0';
+var APP_VERSION = '0.98.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3452,12 +3451,14 @@ var CL_APPS = [
   /* Seit 0.71: Notizen, Projekte, Abläufe, Checklisten und Ziele in einer App wie das Memo Pad */
   { id: 'memo',     name: 'Memo Pad',  stufe: '',    was: 'Alles Geschriebene und Geplante wie das Memo Pad am Palm — oben rechts die Art.' },
   { id: 'sammlungen', name: 'Collections', stufe: '', was: '' },
+  /* Seit 0.98.1: Fokus steht im Raster an Shoppings Stelle; Öffnen startet den Fokus-Dialog */
+  { id: 'fokus', name: 'Fokus', stufe: '', was: 'Der Fokus-Timer: fest mit Uhrzeit-Ende oder flexibel als Stoppuhr, mit Overlay.' },
   { id: 'einkauf',  name: 'Shopping',  stufe: '',    was: '' },
   { id: 'vorlesen', name: 'Reader', stufe: '', was: '' },
   { id: 'rechner',  name: 'Calc',  stufe: '',    was: '' },
   { id: 'routinen', name: 'Routines', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.' },
   /* Seit 0.72: SOS auf dem Start, Guide im Ordner Planning */
-  { id: 'sos', name: 'SOS', stufe: '', was: 'Die 3-Minuten-Selbstdistanzierung: Schritt für Schritt, mit stiller Uhr — der Plan kommt auf Papier.' },
+  { id: 'sos', name: 'SOS', raster: false, stufe: '', was: 'Die 3-Minuten-Selbstdistanzierung: Schritt für Schritt, mit stiller Uhr — der Plan kommt auf Papier.' },
   /* Seit 0.89: Raster 3×5 — Planning und Learning aufgelöst, ihre Apps liegen direkt auf dem Start */
   { id: 'ideen', name: 'Idea Lab', stufe: '', was: '' },
   /* Seit 0.96: Categories im Menü ≡; auf dem Start steht das Manifest (Notiz „Manifest“ aus dem Memo Pad) */
@@ -3515,6 +3516,8 @@ var CL_BILD = {
             + '<rect x="15" y="27" width="34" height="21" rx="2" fill="#3B4433" stroke="#C9D3B7" stroke-width="3" stroke-linejoin="round"/>'
             + '<path d="M27 35h10" ' + CL_STRICH + '/>',
   routinen: '<path d="M44 26a13 13 0 1 0 1.5 11" ' + CL_STRICH + '/><path d="M45 17v9.5h-9.5" ' + CL_STRICH + '/><path d="M32 25v8l5 3" ' + CL_STRICH + '/>',
+  /* Seit 0.98.1: Fokus — eine Stoppuhr */
+  fokus: '<circle cx="32" cy="36" r="14" ' + CL_STRICH + '/><path d="M32 36V28M27 17h10M32 17v5M46 24l3-3" ' + CL_STRICH + '/>',
   einkauf: '<path d="M15 21h6l5 18h18l4-13H24" ' + CL_STRICH + '/><circle cx="28" cy="45" r="2.8" ' + CL_FUELL + '/><circle cx="41" cy="45" r="2.8" ' + CL_FUELL + '/>'
          + '<path d="M29 30h14" stroke="#C9D3B7" stroke-width="2" stroke-linecap="round"/>',
   rechner: '<rect x="20" y="14" width="24" height="36" rx="3" ' + CL_STRICH + '/><rect x="24" y="18" width="16" height="7" ' + CL_FUELL + '/>'
@@ -4358,7 +4361,7 @@ function clApp(id) {
 
 function uebersichtHtml() {
   /* Oben spricht der Coach (seit 0.33) */
-  var h = coZeileHtml() + '<div class="fk-start"><button type="button" class="knopf" onclick="fkStartenAuf()">⏱ Fokus</button></div><div class="apps">';
+  var h = coZeileHtml() + '<div class="apps">';
   CL_APPS.filter(function (a) { return a.raster !== false; }).forEach(function (a) {
     h += '<button type="button" class="app" onclick="oeffne(\'' + a.id + '\')">'
        + '<span class="sym">' + clSymbol(a.id) +  (a.ordner ? '<span class="ord">▸</span>' : '') + '</span>'
@@ -4977,6 +4980,8 @@ function clFehlerZeigen(e, wo) {
 function oeffne(id) {
   /* Einkauf ist keine eigene Seite: Es öffnet die Keep-Notiz. */
   if (id === 'einkauf') { einkaufOeffnen(); return; }
+  /* Fokus ist kein Blatt, sondern der Dialog (seit 0.98.1) */
+  if (id === 'fokus') { fkStartenAuf(); return; }
   /* Der Coach ist keine eigene Seite: Er öffnet den Chat in Gemini (seit 0.91) */
   if (id === 'gemini') { clCoachOeffnen(); return; }
   /* Ordner sind keine eigene Seite: ein Fenster mit ihren Apps (seit 0.35) */
