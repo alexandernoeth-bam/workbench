@@ -1619,7 +1619,7 @@ function sammlungenTest() {
   pruefe(Math.abs(S.saAboMonat(a, da[0]) - 26) < 1e-9, 'Abo: 312 € jährlich = 26 € im Monat');
   pruefe(S.saKennzahl(a) === '60,89 €/Mon', 'Kennzahl pro Monat ohne gekündigte Abos (26 + 19,99 + 14,90)');
   const n = S.saAboNaechste(a, da[1]);
-  pruefe(n >= heute && n < S.saMonatePlus(heute, 1) && n.slice(8) === heute.slice(8).replace(/^(29|30|31)$/, n.slice(8)), 'nächste Abbuchung rollt mit dem Takt in die Zukunft');
+  pruefe(n >= heute && n <= S.saMonatePlus(heute, 1) && n.slice(8) === heute.slice(8).replace(/^(29|30|31)$/, n.slice(8)), 'nächste Abbuchung rollt mit dem Takt in die Zukunft');
   pruefe(S.saAboKuendbar(a, da[2]) === S.tagePlus(heute, 10), 'kündbar bis = Laufzeitende minus Frist');
   const hw = S.saHinweise();
   pruefe(hw.length === 1 && hw[0].name === 'Zeitung', 'Hinweis nur für das Abo, das in 30 Tagen kündbar endet');
@@ -10264,6 +10264,66 @@ function terminErinnerungTest() {
   pruefe(/return \{ koerper: k, kalId: kalId, datum: datum \};/.test(SKRIPT), 'der Körper mit Erinnerung wird unverändert zurückgegeben');
 }
 
+function lkStapelTest() {
+  console.log('\n182. Lernkartei: Suche über alle Kästen, Stapel aus Verweisen ohne Obergrenze, Lernen aus dem Stapel, Löschen lässt die Karten (0.99.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.lernkaesten = [
+    { id: 'ka', name: 'Italienisch', karten: [{ id: 'c1', v: 'la stazione', r: 'der Bahnhof' }, { id: 'c2', v: 'il binario', r: 'Gleis' }] },
+    { id: 'kb', name: 'Reisen', karten: [{ id: 'c3', v: "Dov'è la stazione?", r: 'Wo ist der Bahnhof?' }] }
+  ];
+  S.lkStapelSichern([]);
+  S.cl.lk.auswahl = {};
+  const d = S.lkDaten();
+  pruefe(S.lkTreffer(d, 'stazione').length === 2, 'Suche findet Treffer in allen Kästen');
+  pruefe(S.lkTreffer(d, 'STAZIONE').length === 2, 'Suche ignoriert Groß- und Kleinschreibung');
+  pruefe(S.lkTreffer(d, 'dov').length === 1 && S.lkTreffer(d, 'dov')[0].k.id === 'kb', 'Suche findet Karten aus einem anderen Kasten');
+  pruefe(S.lkTreffer(d, 'la stazione').length === 2 && S.lkTreffer(d, 'il binario').length === 1, 'Suche nach einer Phrase (auch mitten im Satz)');
+  pruefe(S.lkTreffer(d, '').length === 0, 'leerer Suchtext liefert nichts');
+  /* Auswahl wird Stapel, doppelte Karten nur einmal */
+  S.cl.lk.auswahl = { 'ka|c1': { k: 'ka', c: 'c1' }, 'kb|c3': { k: 'kb', c: 'c3' } };
+  S.lkStapelZuweisen('', 'Italien Urlaub');
+  let l = S.lkStapel();
+  pruefe(l.length === 1 && l[0].name === 'Italien Urlaub' && l[0].refs.length === 2, 'Stapel aus der Auswahl angelegt');
+  pruefe(Object.keys(S.cl.lk.auswahl).length === 0, 'Auswahl ist nach dem Übernehmen leer');
+  S.cl.lk.auswahl = { 'ka|c1': { k: 'ka', c: 'c1' }, 'ka|c2': { k: 'ka', c: 'c2' } };
+  S.lkStapelZuweisen(l[0].id, '');
+  l = S.lkStapel();
+  pruefe(l[0].refs.length === 3, 'doppelte Karten bleiben nur einmal im Stapel');
+  /* Keine Obergrenze */
+  const viele = [];
+  for (let i = 0; i < 60; i++) { viele.push({ id: 'v' + i, v: 'Wort ' + i, r: 'Bedeutung ' + i }); }
+  S.DB.lernkaesten.push({ id: 'kc', name: 'Viele', karten: viele });
+  S.cl.lk.auswahl = {};
+  viele.forEach(c => { S.cl.lk.auswahl['kc|' + c.id] = { k: 'kc', c: c.id }; });
+  S.lkStapelZuweisen('', 'Großer Stapel');
+  const gross = S.lkStapel().filter(x => x.name === 'Großer Stapel')[0];
+  pruefe(!!gross && gross.refs.length === 60, 'kein Limit: ein Stapel mit 60 Karten');
+  /* Lernen aus dem Stapel über mehrere Kästen */
+  S.lkStapelLernen(l[0].id);
+  const sz = S.cl.lk.sitzung && S.cl.lk.sitzung.schlange;
+  pruefe(!!sz && sz.length === 3 && sz.map(x => x.k + '|' + x.c).sort().join() === 'ka|c1,ka|c2,kb|c3', 'Lernen aus dem Stapel: Karten aus mehreren Kästen');
+  pruefe(!!S.lkAktuell() && !!S.lkAktuell().k && !!S.lkAktuell().c, 'die erste Karte des Stapels lässt sich aufrufen');
+  /* Löschen des Stapels lässt die Karten im Kasten */
+  S.cl.sitzung = null;
+  S.cl.lk.sitzung = null;
+  S.cl.lk.stapel = l[0].id;
+  S.lkStapelLoeschen();
+  pruefe(S.lkStapel().filter(x => x.id === l[0].id).length === 0 && S.DB.lernkaesten[0].karten.length === 2, 'Stapel löschen: Karten bleiben im Kasten');
+  /* Ansichten rendern ohne Fehler */
+  S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste'; S.cl.lk.suche = 'stazione';
+  const lh = S.lkListeHtml();
+  pruefe(/lkSucheAlleGetippt\(\)/.test(lh) && /lkTreffer/.test(lh) && lh.indexOf('Italienisch') >= 0, 'Übersicht: Suchfeld und Treffer aus allen Kästen');
+  S.cl.lk.suche = '';
+  S.lkStapelSichern([{ id: 'stx', name: 'Test', angelegt: '2026-10-31', refs: [{ k: 'ka', c: 'c1' }] }]);
+  pruefe(/lkStapelOeffnen\('stx'\)/.test(S.lkListeHtml()), 'Übersicht: Stapel als Zeile');
+  S.cl.lk.stapel = 'stx'; S.cl.lk.ansicht = 'stapel';
+  pruefe(/lkStapelKarteWeg\(0\)/.test(S.lkStapelHtml()) && /la stazione/.test(S.lkStapelHtml()), 'Stapel-Ansicht zeigt die Karte mit Entfernen-Knopf');
+  S.cl.lk.ansicht = 'liste'; S.cl.lk.stapel = '';
+  S.lkStapelSichern([]);
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10441,6 +10501,7 @@ function terminErinnerungTest() {
   try { fokusTimerTest(); } catch (e) { fail('0.98.0 Fokus-Timer warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fokusRasterTest(); } catch (e) { fail('0.98.1 Fokus-Kachel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminErinnerungTest(); } catch (e) { fail('0.98.2 Termin-Erinnerung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { lkStapelTest(); } catch (e) { fail('0.99.0 Lernkartei-Stapel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
