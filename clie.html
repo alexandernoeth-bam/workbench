@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.99.0</title>
+<title>CLIE 0.99.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.99.0';
+var APP_VERSION = '0.99.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -17936,7 +17936,7 @@ var LK_PAKETE_KEY = 'clie-lernkartei-pakete';
 var LK_INTERVALL = [0, 1, 2, 4, 8, 16];
 var LK_RICHTUNGEN = [['vor', 'Vorder → Rück'], ['rueck', 'Rück → Vorder'], ['gemischt', 'Gemischt']];
 
-cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '', rolle: null, stapel: '', auswahl: {} };
+cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '', rolle: null, stapel: '', auswahl: {}, bereich: '', hinzu: '' };
 
 var lkPaketeZwischen = { roh: null, daten: {} };
 
@@ -18297,6 +18297,8 @@ function lkFensterZu() {
 function lkKastenOeffnen(id) {
   cl.lk.rolle = null;
   cl.lk.suche = '';
+  cl.lk.bereich = '';
+  cl.lk.hinzu = '';
   cl.lk.id = id;
   cl.lk.ansicht = 'kasten';
   cl.lk.fenster = '';
@@ -18521,8 +18523,9 @@ function lkFaecherHtml(k) {
 function lkListeHtml() {
   var d = lkDaten();
   var q = String(cl.lk.suche || '');
-  return '<div class="su-feld"><span>⌕</span><input id="lkSuche" type="search" autocomplete="off" placeholder="In allen Karten suchen …" value="' + esc(q) + '" oninput="lkSucheAlleGetippt()"></div>'
-    + '<div id="lkTreffer">' + (suNorm(q) ? lkTrefferHtml(d, q) : lkKastenListeHtml(d) + lkStapelListeHtml()) + '</div>';
+  return '<div class="knoepfe"><button type="button" class="knopf" onclick="lkFensterAuf(\'stapelneu\')">+ Stapel</button></div>'
+    + '<div class="su-feld"><span>⌕</span><input id="lkSuche" type="search" autocomplete="off" placeholder="In allen Karten suchen …" value="' + esc(q) + '" oninput="lkSucheAlleGetippt()"></div>'
+    + '<div id="lkTreffer">' + (lkSuchNorm(q) ? lkTrefferHtml(d, q) : lkKastenListeHtml(d) + lkStapelListeHtml()) + '</div>';
 }
 
 function lkKastenListeHtml(d) {
@@ -18655,6 +18658,10 @@ function lkFensterHtml() {
       + '<label for="lkStapelName">Oder neuer Stapel:</label><input id="lkStapelName" class="eingabe" type="text" autocomplete="off" value="">'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkStapelZuweisen(\'\', document.getElementById(\'lkStapelName\').value)">Neu anlegen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
   }
+  if (f === 'stapelneu') {
+    return kopf('Neuer Stapel') + '<label for="lkStapelNeuName">Name:</label><input id="lkStapelNeuName" class="eingabe" type="text" autocomplete="off" value="">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkStapelNeuOk()">Anlegen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
   if (f === 'stapelloeschen') {
     var st = lkStapelFinden(lkStapel(), cl.lk.stapel);
     return kopf('Stapel löschen') + '<p>Der Stapel „' + esc(st ? st.name : '') + '“ wird gelöscht. Die Karten bleiben in ihren Kästen und behalten ihren Lernstand.</p>'
@@ -18712,28 +18719,42 @@ function lkStapelFinden(l, id) {
   return l.filter(function (x) { return x.id === id; })[0] || null;
 }
 
-/* Alle Karten aller Kästen, die den Suchtext enthalten (Groß-/Kleinschreibung egal) */
-function lkTreffer(d, q) {
-  var n = suNorm(q || '');
+/* Suchtext: Groß-/Kleinschreibung, Umlaute, Formatierung (**) und Leerzeichen/Zeilenumbrüche egal (seit 0.99.1) */
+function lkSuchNorm(t) {
+  return suNorm(t).replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/* Alle Karten (oder nur eines Kastens), die den Suchtext enthalten */
+function lkTreffer(d, q, bereich) {
+  var n = lkSuchNorm(q || '');
   var out = [];
   if (!n) { return out; }
   d.kaesten.forEach(function (k) {
+    if (bereich && k.id !== bereich) { return; }
     k.karten.forEach(function (c) {
-      if (suNorm(c.v + ' ' + c.r + ' ' + (c.w || '')).indexOf(n) >= 0) { out.push({ k: k, c: c }); }
+      if (lkSuchNorm(c.v + ' ' + c.r + ' ' + (c.w || '')).indexOf(n) >= 0) { out.push({ k: k, c: c }); }
     });
   });
   return out;
 }
 
+/* Schalter: Alle oder ein Kasten (seit 0.99.1) */
+function lkBereichSetzen(id) {
+  cl.lk.bereich = id || '';
+  lkZeichnen();
+}
+
 function lkTrefferHtml(d, q) {
-  var t = lkTreffer(d, q);
+  var t = lkTreffer(d, q, cl.lk.bereich);
+  var chips = '<div class="lk-chips">' + '<button type="button" class="knopf' + (cl.lk.bereich ? '' : ' voll') + '" onclick="lkBereichSetzen(\'\')">Alle</button>'
+    + d.kaesten.map(function (k) { return '<button type="button" class="knopf' + (cl.lk.bereich === k.id ? ' voll' : '') + '" onclick="lkBereichSetzen(\'' + esc(k.id) + '\')">' + esc(k.name) + '</button>'; }).join('') + '</div>';
   var rows = t.slice(0, 300).map(function (x) {
     var an = !!cl.lk.auswahl[x.k.id + '|' + x.c.id];
     return '<button type="button" class="lk-karte-zeile' + (an ? ' an' : '') + '" onclick="lkAuswahlUmschalten(\'' + esc(x.k.id) + '\',\'' + esc(x.c.id) + '\')"><span>'
       + (an ? '☑ ' : '☐ ') + esc(x.c.v)
       + '<small>' + esc(x.k.name) + ' · ' + esc(String(x.c.w || x.c.r || '').split('\n')[0].replace(/\*\*/g, '').slice(0, 60)) + '</small></span><b>' + (x.c.fach ? 'F' + x.c.fach : 'neu') + '</b></button>';
   }).join('');
-  return rows + (t.length > 300 ? '<p class="leise">… und ' + (t.length - 300) + ' weitere — die Suche grenzt ein.</p>' : '')
+  return chips + rows + (t.length > 300 ? '<p class="leise">… und ' + (t.length - 300) + ' weitere — die Suche grenzt ein.</p>' : '')
     + (t.length ? '' : '<p class="leise">Keine Karte gefunden.</p>');
 }
 
@@ -18743,7 +18764,7 @@ function lkSucheAlleGetippt() {
   var ziel = document.getElementById('lkTreffer');
   if (!ziel) { return; }
   var d = lkDaten();
-  ziel.innerHTML = suNorm(cl.lk.suche) ? lkTrefferHtml(d, cl.lk.suche) : lkKastenListeHtml(d) + lkStapelListeHtml();
+  ziel.innerHTML = lkSuchNorm(cl.lk.suche) ? lkTrefferHtml(d, cl.lk.suche) : lkKastenListeHtml(d) + lkStapelListeHtml();
 }
 
 function lkAuswahlUmschalten(k, c) {
@@ -18754,6 +18775,47 @@ function lkAuswahlUmschalten(k, c) {
 
 function lkAuswahlAnzahl() {
   return Object.keys(cl.lk.auswahl).length;
+}
+
+/* Leerer Stapel mit Namen; Rückgabe: Kennung (seit 0.99.2) */
+function lkStapelNeu(name) {
+  var n = String(name || '').trim();
+  if (!n) { melde('Bitte einen Namen für den Stapel eingeben.', 'warn'); return ''; }
+  var l = lkStapel();
+  var s = { id: neueKennung(), name: n.slice(0, 80), angelegt: isoDatum(), refs: [] };
+  l.push(s);
+  if (!lkStapelSichern(l)) { return ''; }
+  cl.lk.fenster = '';
+  cl.lk.auswahl = {};
+  cl.lk.hinzu = '';
+  cl.lk.stapel = s.id;
+  cl.lk.ansicht = 'stapel';
+  melde('Stapel „' + s.name + '“ angelegt.', 'gut');
+  lkZeichnen();
+  return s.id;
+}
+
+function lkStapelNeuOk() {
+  var f = document.getElementById('lkStapelNeuName');
+  lkStapelNeu(f ? f.value : '');
+}
+
+/* Karten hinzufügen: die Übersicht wird Auswahlfläche für diesen Stapel (seit 0.99.2) */
+function lkKartenHinzu() {
+  cl.lk.hinzu = cl.lk.stapel;
+  cl.lk.ansicht = 'liste';
+  cl.lk.suche = '';
+  cl.lk.bereich = '';
+  cl.lk.auswahl = {};
+  lkZeichnen();
+}
+
+function lkHinzuEnde() {
+  cl.lk.hinzu = '';
+  cl.lk.auswahl = {};
+  cl.lk.suche = '';
+  cl.lk.ansicht = cl.lk.stapel ? 'stapel' : 'liste';
+  lkZeichnen();
 }
 
 /* Die Auswahl wird Verweise in einen vorhandenen oder neuen Stapel; doppelte nur einmal */
@@ -18776,6 +18838,7 @@ function lkStapelZuweisen(stapelId, neuerName) {
   if (!lkStapelSichern(l)) { return; }
   cl.lk.auswahl = {};
   cl.lk.fenster = '';
+  cl.lk.hinzu = '';
   cl.lk.stapel = s.id;
   cl.lk.ansicht = 'stapel';
   melde(n + ' Karte' + (n === 1 ? '' : 'n') + ' in „' + s.name + '“.', 'gut');
@@ -18803,6 +18866,7 @@ function lkStapelListeHtml() {
 }
 
 function lkStapelOeffnen(id) {
+  cl.lk.bereich = '';
   cl.lk.stapel = id;
   cl.lk.ansicht = 'stapel';
   cl.lk.fenster = '';
@@ -18893,7 +18957,11 @@ function lernkarteiFussHtml() {
       + k('Einfügen', 'lkFensterAuf(\'einfuegen\')') + k('Details…', 'lkFensterAuf(\'details\')');
   }
   if (v === 'karten') { return k('+ Karte', 'lkKarteOeffnen(\'\')') + k('Fertig', 'lkEbeneHoch()'); }
-  if (v === 'stapel') { return k('Lernen', 'lkStapelLernen(\'' + esc(cl.lk.stapel) + '\')', true) + k('Löschen…', 'lkFensterAuf(\'stapelloeschen\')') + k('Zurück', 'lkEbeneHoch()'); }
+  if (v === 'stapel') { return k('Lernen', 'lkStapelLernen(\'' + esc(cl.lk.stapel) + '\')', true) + k('+ Karten', 'lkKartenHinzu()') + k('Löschen…', 'lkFensterAuf(\'stapelloeschen\')') + k('Zurück', 'lkEbeneHoch()'); }
+  if (v === 'liste' && cl.lk.hinzu) {
+    var hs = lkStapelFinden(lkStapel(), cl.lk.hinzu);
+    return k('Zu „' + esc(hs ? hs.name : '') + '“ (' + lkAuswahlAnzahl() + ')', 'lkStapelZuweisen(\'' + esc(cl.lk.hinzu) + '\', \'\')', true) + k('Abbrechen', 'lkHinzuEnde()');
+  }
   var an = lkAuswahlAnzahl();
   return k('Lernen (' + lkAlleHeute() + ')', 'lkLernen(\'\')', true) + (an ? k('In Stapel (' + an + ')', 'lkFensterAuf(\'stapelwahl\')') : k('Neu…', 'lkNeuOeffnen()'));
 }
@@ -18912,6 +18980,7 @@ function lkKartenZeigen() {
 /* Eine Ebene zurück — true, wenn etwas getan wurde */
 function lkEbeneHoch() {
   if (cl.lk.fenster) { lkFensterZu(); return true; }
+  if (cl.lk.hinzu && cl.lk.ansicht === 'liste') { lkHinzuEnde(); return true; }
   if (cl.lk.ansicht === 'lernen') { cl.lk.sitzung = null; cl.lk.ansicht = cl.lk.id ? 'kasten' : (cl.lk.stapel ? 'stapel' : 'liste'); lkZeichnen(); return true; }
   if (cl.lk.ansicht === 'stapel') { cl.lk.stapel = ''; cl.lk.ansicht = 'liste'; lkZeichnen(); return true; }
   if (cl.lk.ansicht === 'karten') { cl.lk.ansicht = 'kasten'; lkZeichnen(); return true; }
@@ -18968,6 +19037,7 @@ function lkWechseln(id) {
   cl.lk.sitzung = null;
   cl.lk.fenster = '';
   cl.lk.suche = '';
+  cl.lk.bereich = '';
   cl.lk.stapel = '';
   var d = lkDaten();
   if (id && lkKasten(d, id)) { cl.lk.id = id; cl.lk.ansicht = 'kasten'; }

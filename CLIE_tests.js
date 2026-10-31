@@ -10324,6 +10324,61 @@ function lkStapelTest() {
   S.lkStapelSichern([]);
 }
 
+function lkBereichTest() {
+  console.log('\n183. Lernkartei: Suche ignoriert Formatierung und Zeilenumbrüche, lässt sich auf einen Kasten begrenzen (0.99.1)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.lernkaesten = [
+    { id: 'ka', name: 'Italienisch', karten: [{ id: 'c1', v: 'buongiorno', r: '**guten\n  Morgen**\nGuten Tag' }] },
+    { id: 'kb', name: 'Reisen', karten: [{ id: 'c2', v: 'salve', r: '**hallo / guten\nTag**' }] }
+  ];
+  S.cl.lk.bereich = '';
+  const d = S.lkDaten();
+  pruefe(S.lkTreffer(d, 'guten Tag').length === 2, 'Suche findet „guten Tag“ auch bei Zeilenumbruch und ** im Text');
+  pruefe(S.lkTreffer(d, 'guten Tag', 'ka').length === 1 && S.lkTreffer(d, 'guten Tag', 'ka')[0].k.id === 'ka', 'Bereich: nur im Kasten Italienisch');
+  pruefe(S.lkTreffer(d, 'guten Tag', 'kb').length === 1 && S.lkTreffer(d, 'guten Tag', 'kb')[0].c.id === 'c2', 'Bereich: nur im Kasten Reisen');
+  pruefe(S.lkTreffer(d, 'guten Tag', 'gibtsnicht').length === 0, 'unbekannter Bereich liefert nichts');
+  S.cl.lk.bereich = 'ka';
+  const h = S.lkTrefferHtml(d, 'guten Tag');
+  pruefe(/lkBereichSetzen\('ka'\)/.test(h) && /lkBereichSetzen\(''\)/.test(h) && (h.match(/class="lk-karte-zeile/g) || []).length === 1, 'Schalter für Alle und jeden Kasten; Treffer nur aus dem gewählten Kasten');
+  S.lkBereichSetzen('');
+  pruefe(S.cl.lk.bereich === '', 'Bereich „Alle“ hebt die Einschränkung auf');
+  S.cl.lk.suche = ''; S.cl.lk.bereich = '';
+}
+
+function lkStapelNeuTest() {
+  console.log('\n184. Lernkartei: neuer leerer Stapel über „+ Stapel“, „Karten hinzufügen“ in der Stapel-Ansicht (0.99.2)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.lernkaesten = [{ id: 'ka', name: 'Italienisch', karten: [{ id: 'c1', v: 'la stazione', r: 'der Bahnhof' }, { id: 'c2', v: 'il binario', r: 'Gleis' }] }];
+  S.lkStapelSichern([]);
+  S.cl.lk.auswahl = {}; S.cl.lk.hinzu = ''; S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste';
+  pruefe(/lkFensterAuf\(\\'stapelneu\\'\)|lkFensterAuf\('stapelneu'\)/.test(S.lkListeHtml()), 'Übersicht: „+ Stapel“ ist immer sichtbar');
+  const leer = S.lkStapelNeu('');
+  pruefe(leer === '' && S.lkStapel().length === 0, 'ohne Namen wird kein Stapel angelegt');
+  const id = S.lkStapelNeu('Italien Urlaub');
+  const st = S.lkStapel().filter(x => x.id === id)[0];
+  pruefe(!!st && st.name === 'Italien Urlaub' && st.refs.length === 0, 'leerer Stapel mit Namen angelegt');
+  pruefe(S.cl.lk.stapel === id && S.cl.lk.ansicht === 'stapel', 'nach dem Anlegen steht man im Stapel');
+  pruefe(/lkKartenHinzu\(\)/.test(S.lernkarteiFussHtml()), 'Stapel-Ansicht: „+ Karten“ vorhanden');
+  /* Karten hinzufügen */
+  S.lkKartenHinzu();
+  pruefe(S.cl.lk.hinzu === id && S.cl.lk.ansicht === 'liste', 'Karten hinzufügen: Übersicht im Hinzufügen-Modus');
+  pruefe(/lkStapelZuweisen\('[^']+', ''\)/.test(S.lernkarteiFussHtml()) && /lkHinzuEnde\(\)/.test(S.lernkarteiFussHtml()), 'Fußleiste: „Zu …“ und „Abbrechen“');
+  S.cl.lk.auswahl = { 'ka|c1': { k: 'ka', c: 'c1' }, 'ka|c2': { k: 'ka', c: 'c2' } };
+  S.lkStapelZuweisen(id, '');
+  const st2 = S.lkStapel().filter(x => x.id === id)[0];
+  pruefe(st2.refs.length === 2 && S.cl.lk.hinzu === '' && S.cl.lk.ansicht === 'stapel', 'Karten landen im Stapel und der Modus endet');
+  /* Zurück aus dem Hinzufügen-Modus */
+  S.lkKartenHinzu();
+  S.lkEbeneHoch();
+  pruefe(S.cl.lk.hinzu === '' && S.cl.lk.ansicht === 'stapel', 'Zurück beendet den Hinzufügen-Modus und zeigt den Stapel');
+  S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste';
+  S.lkStapelSichern([]);
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10502,6 +10557,8 @@ function lkStapelTest() {
   try { fokusRasterTest(); } catch (e) { fail('0.98.1 Fokus-Kachel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminErinnerungTest(); } catch (e) { fail('0.98.2 Termin-Erinnerung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelTest(); } catch (e) { fail('0.99.0 Lernkartei-Stapel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { lkBereichTest(); } catch (e) { fail('0.99.1 Lernkartei-Bereich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { lkStapelNeuTest(); } catch (e) { fail('0.99.2 Lernkartei-Stapel anlegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
