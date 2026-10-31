@@ -300,6 +300,8 @@ if (!WB_SKRIPT) {
   /* Seit 0.97.12 bewusst abweichend: zusammenfuehren (Gleichstand gilt der Server, Build-Anpassung) */
   const abweichend = WOERTLICH.filter(n => {
     if (n === 'zusammenfuehren') { return false; }
+    /* Seit 0.100.0 bewusst abweichend: leereDatenbank kennt die Stapel der Lernkartei (bauen.py) */
+    if (n === 'leereDatenbank') { return false; }
     const a = funktionText(SKRIPT, n), b = funktionText(WB_SKRIPT, n);
     return !a || !b || a !== b;
   });
@@ -314,7 +316,8 @@ if (!WB_SKRIPT) {
   pruefe(kern.length > 30 && kernAb.length === 0, 'der Aktivitäten-Kern (' + kern.length + ' Funktionen) gleicht der Workbench'
     + (kernAb.length ? ' — abweichend: ' + kernAb.join(', ') : ''));
   const samm = (s) => (s.match(/var SAMMLUNGEN = \[[\s\S]*?\];/) || [''])[0];
-  pruefe(samm(SKRIPT) && samm(SKRIPT) === samm(WB_SKRIPT), 'dieselben Sammlungen wie die Workbench — beim Abgleich geht nichts verloren');
+  /* Seit 0.100.0: CLIE ergänzt „lernstapel“ (bauen.py) — alles andere bleibt wie in der Workbench */
+  pruefe(samm(SKRIPT) && samm(SKRIPT).replace("'lernstapel',", '') === samm(WB_SKRIPT), 'dieselben Sammlungen wie die Workbench (plus Lernstapel) — beim Abgleich geht nichts verloren');
   const wb = (n) => (WB_SKRIPT.match(new RegExp("var " + n + "\\s*=\\s*'([^']*)';")) || [])[1];
   const cl = (n) => (SKRIPT.match(new RegExp("var " + n + "\\s*=\\s*'([^']*)';")) || [])[1];
   pruefe(cl('CLIENT_ID') === wb('CLIENT_ID') && cl('DRIVE_DATEI') === wb('DRIVE_DATEI'),
@@ -10379,6 +10382,64 @@ function lkStapelNeuTest() {
   S.lkStapelSichern([]);
 }
 
+function lkStapelFensterTest() {
+  console.log('\n185. Lernkartei: das Stapel-Fenster zeigt vorhandene Stapel oder den Hinweis, dass keiner da ist; Kästen-Schalter sind beschriftet (0.99.3)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.lkStapelSichern([]);
+  S.cl.lk.fenster = 'stapelwahl';
+  pruefe(/Noch kein Stapel auf diesem Gerät/.test(S.lkFensterHtml()), 'ohne Stapel: Hinweis statt Liste');
+  const id = S.lkStapelNeu('Test-Stapel');
+  S.cl.lk.fenster = 'stapelwahl';
+  const h = S.lkFensterHtml();
+  pruefe(/Vorhandene Stapel/.test(h) && h.indexOf('lkStapelZuweisen(\'' + id + '\')') >= 0, 'mit Stapel: Überschrift und Knopf des Stapels');
+  S.cl.lk.fenster = ''; S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste';
+  S.lkStapelSichern([]);
+  S.cl.lk.suche = 'x';
+  pruefe(/Bereich \(Kästen\)/.test(S.lkTrefferHtml(S.lkDaten(), 'x')), 'Kästen-Schalter sind als Bereich beschriftet');
+  S.cl.lk.suche = '';
+}
+
+function lkStapelAbgleichTest() {
+  console.log('\n186. Lernkartei: Stapel liegen in der Datenbank und reisen mit dem Abgleich; Löschvermerk; alte Gerätespeicherung wird übernommen; Stapel oben in der Übersicht (0.100.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.lernkaesten = [{ id: 'ka', name: 'Italienisch', karten: [{ id: 'c1', v: 'la stazione', r: 'der Bahnhof' }] }];
+  S.lkStapelSichern([]);
+  pruefe(S.SAMMLUNGEN.indexOf('lernstapel') >= 0 && Array.isArray(S.leereDatenbank().lernstapel), 'Abgleich und leere Datenbank kennen die Stapel');
+  const id = S.lkStapelNeu('Italien Urlaub');
+  pruefe(Array.isArray(S.DB.lernstapel) && S.DB.lernstapel.length === 1 && typeof S.DB.lernstapel[0].geaendert === 'number', 'Stapel steht in der Datenbank mit Zeitstempel');
+  const kopie = S.lkStapel();
+  kopie[0].name = 'verändert';
+  pruefe(S.lkStapel()[0].name === 'Italien Urlaub', 'lkStapel liefert eine Kopie; Änderungen wirken nur über Sichern');
+  S.cl.lk.auswahl = { 'ka|c1': { k: 'ka', c: 'c1' } };
+  S.lkStapelZuweisen(id, '');
+  pruefe(S.DB.lernstapel[0].refs.length === 1, 'Karte wird im Stapel in der Datenbank gespeichert');
+  S.lkStapelLoeschen ? null : null;
+  S.cl.lk.stapel = id;
+  S.lkStapelLoeschen();
+  pruefe(S.DB.lernstapel.length === 0 && S.DB.grabsteine.some(g => g.s === 'lernstapel' && g.id === id), 'gelöschter Stapel bekommt einen Löschvermerk');
+  pruefe(S.DB.lernkaesten[0].karten.length === 1, 'Karten bleiben im Kasten');
+  /* alte Gerätespeicherung wird übernommen und danach entfernt */
+  const altKey = S.LK_STAPEL_KEY;
+  S.__ablage[altKey] = JSON.stringify([{ id: 'alt1', name: 'Alt', angelegt: '2026-10-01', refs: [{ k: 'ka', c: 'c1' }] }]);
+  const nach = S.lkStapel();
+  pruefe(nach.some(x => x.id === 'alt1') && S.DB.lernstapel.some(x => x.id === 'alt1') && !S.__ablage[altKey], 'alte Gerätespeicherung wird in die Datenbank übernommen');
+  /* Übersicht: Stapel oben, Lernen-Knopf, Kästen eingeklappt */
+  S.cl.lk.kastenAuf = false;
+  const h = S.lkListeHtml();
+  pruefe(h.indexOf('lkStapelLernen(\'alt1\')') >= 0 && h.indexOf('lkStapelOeffnen(\'alt1\')') >= 0, 'Übersicht: Stapel mit Lernen-Knopf');
+  pruefe(h.indexOf('lkStapelListeHtml') < 0 && h.indexOf('lkKastenAblageUmschalten()') >= 0 && h.indexOf('lkKastenListeHtml') < 0 && h.indexOf('Italienisch') < 0, 'Kästen sind eingeklappt, nur die Ablage-Zeile steht da');
+  pruefe(h.indexOf('lkStapelLernen') < h.indexOf('lkKastenAblageUmschalten'), 'Stapel stehen über der Ablage');
+  S.cl.lk.kastenAuf = true;
+  pruefe(S.lkListeHtml().indexOf('Italienisch') >= 0, 'aufgeklappt: die Kästen erscheinen');
+  S.cl.lk.kastenAuf = false;
+  S.lkStapelSichern([]);
+  S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10559,6 +10620,8 @@ function lkStapelNeuTest() {
   try { lkStapelTest(); } catch (e) { fail('0.99.0 Lernkartei-Stapel warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkBereichTest(); } catch (e) { fail('0.99.1 Lernkartei-Bereich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelNeuTest(); } catch (e) { fail('0.99.2 Lernkartei-Stapel anlegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { lkStapelFensterTest(); } catch (e) { fail('0.99.3 Lernkartei-Stapel-Fenster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { lkStapelAbgleichTest(); } catch (e) { fail('0.100.0 Lernkartei-Stapel im Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
