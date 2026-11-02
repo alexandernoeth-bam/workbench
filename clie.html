@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.105.1</title>
+<title>CLIE 0.105.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.105.1';
+var APP_VERSION = '0.105.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29508,6 +29508,18 @@ function pmRangTauschen(id, richtung) {
   zeichne();
 }
 
+/* Auslassen und Verlegen an der Aufgabe (seit 0.105.2). Es öffnet dasselbe Fenster wie
+   „Nur diesmal…“ in Routines — die Logik gibt es damit weiter nur einmal. */
+function pmRoutineDiesmal() {
+  var f = cl.pm.fenster;
+  var a = (f && f.id) ? pmAufgabeFinden(f.id) : null;
+  if (!a || !a.wiederholung) { melde('Das ist keine Routine.', 'warn'); return; }
+  cl.pm.fenster = null;
+  cl.rt.fenster = { modus: 'diesmal', id: a.id };
+  cl.aufklapp = 'routine';
+  aufklappNeu();
+}
+
 function pmListenWahlAuf() {
   cl.aufklapp = (cl.aufklapp === 'pmliste') ? '' : 'pmliste';
   aufklappNeu();
@@ -30242,6 +30254,9 @@ function pmFensterHtml() {
   if (a && a.wiederholung) {
     x += '<label>Wiederholung:</label><div class="pm-zeile"><span>' + esc(kpFrequenz(a.wiederholung)) + (pmDatum(a) ? ' · nächste ' + esc(pmDatumText(pmDatum(a))) : '') + '</span>'
       + '<button type="button" class="knopf" onclick="pmWiederholung()">Ändern…</button></div>'
+      /* Seit 0.105.2 auch hier: die einzelne Ausführung auslassen oder verlegen (0.105.2) */
+      + '<div class="pm-zeile"><span class="leise">Nur diese Ausführung</span>'
+      + '<button type="button" class="knopf" onclick="pmRoutineDiesmal()">Auslassen / Verlegen…</button></div>'
       + '<label for="pmZeit">Erinnerung (Uhrzeit):</label><input id="pmZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '">';
   } else {
     x += '<label>Fällig:</label><div class="wahlreihe">'

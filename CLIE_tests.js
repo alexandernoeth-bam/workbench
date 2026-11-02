@@ -11088,6 +11088,46 @@ function clDriveKennungTest() {
   S.driveDateiId = ''; S.driveStand = '';
 }
 
+/* Fehlertyp: dieselbe Sache zweimal gebaut. Auslassen und Verlegen gibt es in Routines
+   schon — an der Aufgabe darf nur das vorhandene Fenster geöffnet werden, nicht eine
+   zweite Umsetzung derselben Logik daneben. */
+function pmRoutineDiesmalTest() {
+  console.log('\n202. To Do: eine Routine lässt sich an der Aufgabe auslassen und verlegen (0.105.2)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const heute = S.isoDatum();
+  const wt = S.ausIso(heute).getDay();
+  const a = S.pmNeueAufgabe({ titel: 'Müll rausstellen', prio: 3 });
+  a.wiederholung = { takt: 'woche', intervall: 1, tage: [wt], tag: 1 };
+  a.ab = heute;
+
+  S.pmDetails(a.id);
+  const w = S.pmFensterHtml();
+  pruefe(w.indexOf('pmRoutineDiesmal()') >= 0, 'das Aufgabenfenster bietet „Auslassen / Verlegen…“');
+  pruefe(w.indexOf('Nur diese Ausführung') >= 0, 'mit der Beschriftung, dass nur diese Ausführung gemeint ist');
+
+  S.pmRoutineDiesmal();
+  pruefe(S.cl.aufklapp === 'routine' && S.cl.rt.fenster && S.cl.rt.fenster.modus === 'diesmal' && S.cl.rt.fenster.id === a.id,
+    'es öffnet das vorhandene Fenster aus Routines, keine zweite Umsetzung');
+  const r = S.rtFensterHtml();
+  pruefe(r.indexOf('rtAuslassen(') >= 0 && r.indexOf('rtVerlegen(') >= 0, 'darin stehen Auslassen und Verlegen');
+
+  /* auslassen wirkt */
+  const tag = S.rtDiesmalTag(a);
+  pruefe(!!tag, 'es gibt eine offene Ausführung');
+  S.rtAuslassen(tag);
+  pruefe((a.ausfallTage || []).indexOf(tag) >= 0 && !S.aufgabeFaelligAn(a, tag), 'ausgelassen: an diesem Tag nicht mehr fällig');
+  pruefe(!!a.wiederholung, 'die Regel bleibt bestehen');
+
+  /* eine gewöhnliche Aufgabe bietet das nicht an */
+  const b = S.pmNeueAufgabe({ titel: 'Einmalig', prio: 3 });
+  S.pmDetails(b.id);
+  pruefe(S.pmFensterHtml().indexOf('pmRoutineDiesmal()') < 0, 'eine Aufgabe ohne Wiederholung bietet es nicht an');
+
+  S.cl.pm.fenster = null; S.cl.rt.fenster = null; S.cl.aufklapp = ''; S.cl.pm.wahl = ''; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11285,6 +11325,7 @@ function clDriveKennungTest() {
   try { pmListenNichtImMemoTest(); } catch (e) { fail('0.104.5 Listen nicht im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
