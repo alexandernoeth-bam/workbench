@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.103.0</title>
+<title>CLIE 0.103.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.103.0';
+var APP_VERSION = '0.103.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3633,8 +3633,15 @@ function bestandStempeln(db) {
    CLIE leitet es aus der Kategorie ab: Arbeit → beruflich, sonst privat. */
 
 var CL_ARBEIT = 'kb-arbeit';
-/* Seit 0.71.3: Filter „Privat“ = alles außer Arbeit (keine echte Kategorie) */
+/* Seit 0.71.3: Filter „Privat“ = alles außer Arbeit. Seit 0.103.2 ist „Privat“ wie
+   „Arbeit“ auch eine echte, vergebbare Kategorie mit fester Kennung — und gleichzeitig
+   der Sammelfilter für alles Private. Der alte Wert bleibt als Altlast gültig. */
 var CL_PRIVAT = 'privat';
+var CL_PRIVAT_KAT = 'kb-privat';
+
+function clIstPrivatFilter(f) {
+  return f === CL_PRIVAT || f === CL_PRIVAT_KAT;
+}
 
 /* Seit 0.82: Arbeit ist „Arbeit“ und jede Kategorie, deren Name mit „Arbeit“ beginnt
    (etwa „Arbeit – OnPremis QS“) — nicht aber „Arbeitszimmer“. */
@@ -3660,6 +3667,8 @@ function clFilterLaden() {
 
 /* Der Filter, wie er gerade gilt — eine gelöschte Kategorie gilt als „alle“ */
 function clFilter() {
+  /* Der alte Wert „privat“ meint seit 0.103.2 die Kategorie Privat */
+  if (cl.filter === CL_PRIVAT) { return CL_PRIVAT_KAT; }
   return (cl.filter && cl.filter !== 'alle' && clFilterGueltig(cl.filter)) ? cl.filter : 'alle';
 }
 
@@ -3697,7 +3706,7 @@ function clPasst(o) {
   if (!o) { return false; }
   var f = clFilter();
   if (f === 'alle' || ckIstKorb(o)) { return true; }
-  if (f === CL_PRIVAT) { return !clIstArbeit(clKategorieVon(o)); }
+  if (clIstPrivatFilter(f)) { return !clIstArbeit(clKategorieVon(o)); }
   /* Seit 0.83: „Arbeit“ ist der Sammelfilter für alle Arbeit-Kategorien — wie „Privat“ für den Rest */
   if (f === CL_ARBEIT) { return clIstArbeit(clKategorieVon(o)); }
   return clKategorieVon(o) === f;
@@ -3716,12 +3725,23 @@ function clPasstKontext(k) {
 }
 
 /* Neues bekommt die Kategorie des ▼ — und den passenden Kontext */
-function clNeuBereich() { var f = clFilter(); return (f === 'alle' || f === CL_PRIVAT) ? '' : f; }
+function clNeuBereich() { var f = clFilter(); return (f === 'alle') ? '' : f; }
 function clNeuKontext() { return clIstArbeit(clFilter()) ? 'beruflich' : 'privat'; }
 
 /* Einmal und nach jedem Laden: Berufliches ohne Kategorie → Arbeit */
+/* „Privat“ als echte Kategorie — feste Kennung, damit zwei Geräte dieselbe anlegen */
+function clPrivatKategorie() {
+  krAnfangen();
+  var da = krFinden(CL_PRIVAT_KAT);
+  if (da) { return da; }
+  var rang = krBereiche(true, true).reduce(function (m, b) { return Math.max(m, Number(b.rang) || 0); }, 0) + 1;
+  return krSpeichern({ id: CL_PRIVAT_KAT, typ: 'bereich', name: 'Privat', rang: rang, nurKategorie: true, aus: false });
+}
+
 function clKategorienUmstellen() {
   var n = 0;
+  /* Die Kategorie Privat anlegen, aber nicht als Umstellung zählen (0.103.2) */
+  clPrivatKategorie();
   var um = function (o) {
     if (o && o.kontext === 'beruflich' && !o.bereich) { o.bereich = CL_ARBEIT; o.geaendert = jetzt(); n++; }
   };
@@ -3742,8 +3762,9 @@ function katFilterHtml(aufruf, an) {
   var f = (an === undefined) ? ((sa && saLetztSicht()) ? 'letzte' : clFilter()) : an;
   var basis = [{ id: 'alle', name: 'Alle' }];
   if (sa) { basis.push({ id: 'letzte', name: 'Letzte', klein: 'zehn zuletzt geändert' }); }
-  basis.push({ id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' });
-  return basis.concat(kgAlle().map(function (b) {
+  /* Seit 0.103.2 steht hier die echte Kategorie Privat — sie sammelt zugleich alles Private */
+  basis.push({ id: CL_PRIVAT_KAT, name: 'Privat', klein: 'mit allen privaten' });
+  return basis.concat(kgAlle().filter(function (b) { return b.id !== CL_PRIVAT_KAT; }).map(function (b) {
     /* Seit 0.83: „Arbeit“ umfasst alle Arbeit-Kategorien */
     return (b.id === CL_ARBEIT && kgAlle().some(function (x) { return x.id !== CL_ARBEIT && clIstArbeit(x.id); })) ? { id: b.id, name: b.name, klein: 'mit allen Arbeit-…' } : b;
   })).map(function (b) {
@@ -29948,7 +29969,8 @@ function pmShowOk() {
 function pmNeu(datum, zeit) {
   var d = pmIstDatum(datum) ? datum : ((cl.app === 'aufgaben' && cl.pm.tab === 'datum' && cl.pm.datum !== 'ueber') ? isoDatum() : '');
   cl.pm.fenster = { modus: 'neu', id: '', titel: '', prio: 3, bereich: clNeuBereich(), privat: false, datum: d,
-                    zeit: pmIstZeit(zeit) ? zeit : '', notiz: '', memo: null, kontext: clNeuKontext() };
+                    zeit: pmIstZeit(zeit) ? zeit : '', notiz: '', memo: null, kontext: clNeuKontext(),
+                    liste: pmListeNeuZiel({}) };
   cl.aufklapp = 'pmaufgabe';
   aufklappNeu();
   var t = document.getElementById('pmTitel');
@@ -29961,7 +29983,8 @@ function pmDetails(id) {
   cl.pm.wahl = a.wiederholung ? cl.pm.wahl : id;
   cl.pm.fenster = { modus: 'details', id: a.id, titel: a.titel || '', prio: pmPrio(a), bereich: clKategorieVon(a), privat: !!a.privat,
                     datum: a.wiederholung ? '' : pmDatum(a), zeit: a.uhrzeit || '', notiz: a.beschreibung || '',
-                    memo: a.memo ? { id: a.memo.id, zeile: a.memo.zeile || '' } : null };
+                    memo: a.memo ? { id: a.memo.id, zeile: a.memo.zeile || '' } : null,
+                    liste: pmListeIdVon(a) };
   cl.aufklapp = 'pmaufgabe';
   aufklappNeu();
 }
@@ -29974,6 +29997,7 @@ function pmFensterLesen() {
   var d = wert('pmDatum'); if (d !== null) { f.datum = d; }
   var z = wert('pmZeit'); if (z !== null) { f.zeit = z; }
   var n = wert('pmNotiz'); if (n !== null) { f.notiz = n; }
+  var l = wert('pmListe'); if (l !== null && pmListeSatz(l)) { f.liste = l; }
   katPrivatLesen('pm', f);
   return f;
 }
@@ -30013,8 +30037,22 @@ function pmFensterHtml() {
     + '<label for="pmTitel">Titel:</label><textarea id="pmTitel" class="eingabe" rows="2" autocomplete="off">' + esc(f.titel) + '</textarea>'
     + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (p) {
       return '<button type="button"' + (f.prio === p ? ' class="an"' : '') + ' onclick="pmPrioWahl(' + p + ')">' + p + '</button>';
-    }).join('') + '</div>'
-    + katPrivatHtml('pm', f.bereich || '', f.privat);
+    }).join('') + '</div>';
+  /* Seit 0.103.1: die Liste ist Pflicht und steht im Fenster — so wandert eine Aufgabe
+     von einer Liste in die andere. Hat die Liste eine Kategorie, gilt sie und ist hier
+     nur noch zu lesen; im Sammler wählst du sie weiter selbst. */
+  var lWahl = pmListeSatz(f.liste) ? f.liste : CK_KORB_ID;
+  x += '<label for="pmListe">Liste:</label><select id="pmListe" class="eingabe">'
+    + pmListen().map(function (t) {
+      return '<option value="' + esc(t.id) + '"' + (lWahl === t.id ? ' selected' : '') + '>' + esc(pmListeName(t.id)) + '</option>';
+    }).join('') + '</select>';
+  var lBereich = String((pmListeSatz(lWahl) || {}).bereich || '');
+  if (lBereich) {
+    x += '<label>Kategorie:</label><div class="pm-zeile"><span>' + esc(kgName(lBereich)) + '</span><span class="leise">von der Liste</span></div>'
+      + '<label class="haken"><input id="pmPrivat" type="checkbox"' + (f.privat ? ' checked' : '') + '> privat</label>';
+  } else {
+    x += katPrivatHtml('pm', f.bereich || '', f.privat);
+  }
   if (a && a.wiederholung) {
     x += '<label>Wiederholung:</label><div class="pm-zeile"><span>' + esc(kpFrequenz(a.wiederholung)) + (pmDatum(a) ? ' · nächste ' + esc(pmDatumText(pmDatum(a))) : '') + '</span>'
       + '<button type="button" class="knopf" onclick="pmWiederholung()">Ändern…</button></div>'
@@ -30051,7 +30089,7 @@ function pmUebernehmen() {
   var a = f.id ? pmAufgabeFinden(f.id) : null;
   if (!a) {
     a = pmNeueAufgabe({ titel: titel, prio: f.prio, bereich: f.bereich, privat: f.privat, datum: f.datum, zeit: f.zeit, notiz: f.notiz,
-                        memo: f.memo, kontext: f.kontext });
+                        memo: f.memo, kontext: f.kontext, liste: f.liste });
     if (f.memoZeile) { pmMarkeSetzen(f.memoZeile.id, f.memoZeile.nr, f.memoZeile.text, a); }
     f.id = a.id;
     f.modus = 'details';
@@ -30062,6 +30100,9 @@ function pmUebernehmen() {
   a.prio = f.prio;
   a.beschreibung = String(f.notiz || '');
   katPrivatSchreiben(a, { bereich: f.bereich || '', privat: !!f.privat });
+  /* Die Liste zuletzt: sie entscheidet über die Kategorie (0.103.1) */
+  if (pmListeSatz(f.liste)) { a.themaId = f.liste; }
+  pmKatAusListe(a);
   if (a.wiederholung) { a.uhrzeit = f.zeit || ''; }
   else {
     a.planung = f.datum || 'backlog';
@@ -30410,7 +30451,7 @@ var PM_GRUPPE_ART_KEY = 'clie-memo-gruppe-art';
 
 function pmMehrereKat() {
   var f = clFilter();
-  return f === 'alle' || f === CL_PRIVAT || f === CL_ARBEIT;
+  return f === 'alle' || clIstPrivatFilter(f) || f === CL_ARBEIT;
 }
 
 function pmGruppeArt() {

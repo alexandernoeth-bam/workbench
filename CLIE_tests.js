@@ -2511,8 +2511,9 @@ function filterPrivatTest() {
   pruefe(/Dachrinne/.test(h) && /Zettel/.test(h) && !/Ablage/.test(h), 'Privat: andere Kategorien und ohne Kategorie ja, Arbeit nicht');
   pruefe(/▼ Privat/.test(S.document.getElementById('katKnopf').textContent) && S.localStorage.getItem('clie-filter') === 'privat', 'oben „▼ Privat“, gemerkt');
   S.cl.filter = 'alle'; S.clFilterLaden();
-  pruefe(S.clFilter() === 'privat', 'nach Neustart weiter „Privat“');
-  pruefe(S.clNeuBereich() === '' && S.clNeuKontext() === 'privat', 'Neues: ohne Kategorie, Kontext privat');
+  /* Seit 0.103.2: der gemerkte Wert „privat“ meint die echte Kategorie Privat */
+  pruefe(S.clFilter() === S.CL_PRIVAT_KAT, 'nach Neustart weiter „Privat“');
+  pruefe(S.clNeuBereich() === S.CL_PRIVAT_KAT && S.clNeuKontext() === 'privat', 'Neues bekommt die Kategorie Privat, Kontext privat');
   pruefe(S.clPasstKontext('privat') && !S.clPasstKontext('beruflich'), 'Google-Termine: nur private');
   S.oeffne('memo'); S.memoArtSetzen('alles');
   pruefe(/Nur Kategorie „Privat“/.test(inhalt()), 'Memo Pad zeigt den Hinweis „Nur Kategorie „Privat““');
@@ -3169,8 +3170,9 @@ function katUebersichtTest() {
   S.oeffne('uebersicht');
   S.katUm();
   const h = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('alle'\)/.test(h) && /katSetzen\('kb-arbeit'\)/.test(h) && new RegExp("katSetzen\\('" + k.id + "'\\)").test(h) && !/Beruf/.test(h) && /katSetzen\('privat'\)"><span>Privat<\/span><small>ohne Arbeit/.test(h),
-    '▼ auf der Übersicht: Alle, Privat (ohne Arbeit) und die Kategorien — kein Beruf');
+  /* Seit 0.103.2 ist Privat eine echte Kategorie und sammelt zugleich alles Private */
+  pruefe(S.cl.aufklapp === 'kat' && /katSetzen\('alle'\)/.test(h) && /katSetzen\('kb-arbeit'\)/.test(h) && new RegExp("katSetzen\\('" + k.id + "'\\)").test(h) && !/Beruf/.test(h) && /katSetzen\('kb-privat'\)"><span>Privat<\/span><small>mit allen privaten/.test(h),
+    '▼ auf der Übersicht: Alle, Privat (sammelt alles Private) und die Kategorien — kein Beruf');
   S.katSetzen(k.id);
   pruefe(S.cl.filter === k.id && S.cl.app === 'uebersicht' && /▼ PV-Anlage/.test(S.document.getElementById('katKnopf').textContent), 'Tipp: filtert, bleibt auf der Übersicht');
   S.katSetzen('alle');
@@ -10693,6 +10695,91 @@ function pmKatVonListeTest() {
 
 function katSetzenFuer(S, a, bereich) { S.katPrivatSchreiben(a, { bereich: bereich }); }
 
+/* Fehlertyp: eine Aufgabe sitzt in ihrer Liste fest. Seit 0.103.1 steht die Liste im
+   Aufgabenfenster; beim Wechsel muss die Kategorie mitwandern, sonst behauptet die
+   Aufgabe eine Kategorie, die ihre neue Liste gar nicht hat. */
+function pmAufgabeVerschiebenTest() {
+  console.log('\n192. To Do: eine Aufgabe lässt sich im Fenster in eine andere Liste schieben, die Kategorie wandert mit (0.103.1)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const kat = S.ckBereiche()[0];
+  const kat2 = S.ckBereiche()[1];
+  if (!kat || !kat2) { warn('keine zwei Kategorien vorhanden — Prüfung übersprungen'); return; }
+
+  const t1 = S.pmListeAnlegen('la', 'Haus', { kontext: 'privat' });
+  const t2 = S.pmListeAnlegen('lb', 'Arbeit QS', { kontext: 'privat' });
+  t1.bereich = kat.id;
+  t2.bereich = kat2.id;
+  S.ckKorb(true);
+
+  const a = S.pmNeueAufgabe({ titel: 'Silikon erneuern', prio: 2, liste: 'la' });
+  pruefe(a.themaId === 'la' && a.bereich === kat.id, 'die Aufgabe sitzt in der ersten Liste');
+
+  S.pmDetails(a.id);
+  pruefe(S.cl.pm.fenster.liste === 'la', 'das Fenster kennt die Liste');
+  const w = S.pmFensterHtml();
+  pruefe(w.indexOf('id="pmListe"') >= 0, 'das Fenster hat ein Feld für die Liste');
+  pruefe(w.indexOf('von der Liste') >= 0 && w.indexOf('id="pmKat"') < 0, 'bei einer Liste mit Kategorie ist diese nur zu lesen');
+
+  /* umhängen */
+  S.document.getElementById('pmTitel').value = 'Silikon erneuern';
+  S.document.getElementById('pmListe').value = 'lb';
+  S.pmUebernehmen();
+  pruefe(a.themaId === 'lb', 'die Aufgabe liegt in der neuen Liste');
+  pruefe(a.bereich === kat2.id, 'ihre Kategorie ist die der neuen Liste');
+
+  /* im Sammler wählt man die Kategorie weiter selbst */
+  S.document.getElementById('pmListe').value = S.CK_KORB_ID;
+  S.pmUebernehmen();
+  pruefe(a.themaId === S.CK_KORB_ID, 'die Aufgabe liegt im Sammler');
+  S.pmDetails(a.id);
+  pruefe(S.pmFensterHtml().indexOf('id="pmKat"') >= 0, 'im Sammler erscheint die Kategoriewahl wieder');
+
+  S.document.getElementById('pmListe').value = '';
+  S.cl.pm.fenster = null; S.cl.pm.wahl = ''; S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: „Privat“ war nur ein Filter und ließ sich nicht vergeben. Seit 0.103.2 ist
+   es eine echte Kategorie wie Arbeit — und sammelt gleichzeitig alles Private. Dabei darf
+   sie nicht doppelt im ▼ stehen und der alte gemerkte Filterwert muss weiter greifen. */
+function clPrivatKategorieTest() {
+  console.log('\n193. Kategorien: „Privat“ ist eine echte Kategorie und zugleich der Sammelfilter für alles Private (0.103.2)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.clKategorienUmstellen();
+
+  pruefe(!!S.krFinden(S.CL_PRIVAT_KAT), 'die Kategorie Privat gibt es');
+  pruefe(S.kgName(S.CL_PRIVAT_KAT) === 'Privat', 'sie heißt Privat');
+  pruefe(S.kgAlle().some(b => b.id === S.CL_PRIVAT_KAT), 'sie steht in der Kategorienliste und ist damit vergebbar');
+  pruefe(!S.clIstArbeit(S.CL_PRIVAT_KAT), 'sie zählt nicht als Arbeit');
+  S.clKategorienUmstellen();
+  pruefe(S.krBereiche(true, true).filter(b => b.id === S.CL_PRIVAT_KAT).length === 1, 'ein zweiter Lauf legt sie nicht noch einmal an');
+
+  /* im ▼ genau einmal, ganz oben, mit Hinweis */
+  const h = S.katFilterHtml('katSetzen', 'alle');
+  const treffer = h.split('Privat').length - 1;
+  pruefe(treffer === 1, 'im ▼ steht Privat genau einmal');
+  pruefe(h.indexOf('mit allen privaten') >= 0, 'mit dem Hinweis, dass sie alles Private sammelt');
+  pruefe(h.indexOf('>Privat<') < h.indexOf('>Gesundheit<') || h.indexOf('>Gesundheit<') < 0, 'Privat steht vor den übrigen Kategorien');
+
+  /* Sammelfilter: alles, was nicht Arbeit ist */
+  const arbeit = { bereich: S.CL_ARBEIT };
+  const gesund = { bereich: 'kb-gesundheit' };
+  const priv = { bereich: S.CL_PRIVAT_KAT };
+  S.cl.filter = S.CL_PRIVAT_KAT;
+  pruefe(S.clPasst(priv) && S.clPasst(gesund) && !S.clPasst(arbeit), 'der Filter Privat sammelt alle privaten Kategorien');
+  pruefe(S.clNeuBereich() === S.CL_PRIVAT_KAT, 'Neues bekommt unter diesem Filter die Kategorie Privat');
+
+  /* der alte gemerkte Wert greift weiter */
+  S.cl.filter = S.CL_PRIVAT;
+  pruefe(S.clFilter() === S.CL_PRIVAT_KAT, 'der alte Wert „privat“ meint die neue Kategorie');
+  pruefe(S.clPasst(gesund) && !S.clPasst(arbeit), 'und filtert unverändert');
+
+  S.cl.filter = 'alle';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10880,6 +10967,8 @@ function katSetzenFuer(S, a, bereich) { S.katPrivatSchreiben(a, { bereich: berei
   try { pmListePflegenTest(); } catch (e) { fail('0.102.2 Listen pflegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmNotizenAufraeumenTest(); } catch (e) { fail('0.102.3 Notizen aufräumen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmKatVonListeTest(); } catch (e) { fail('0.103.0 Kategorie von der Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmAufgabeVerschiebenTest(); } catch (e) { fail('0.103.1 Aufgabe verschieben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { clPrivatKategorieTest(); } catch (e) { fail('0.103.2 Kategorie Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
