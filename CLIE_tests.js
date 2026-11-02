@@ -10815,8 +10815,10 @@ function mpArtenAufraeumenTest() {
   pruefe(ch.text.split('\n')[0] === 'Typ: Checkliste' && /\[ \] Regenjacke/.test(ch.text), 'Typ-Zeile oben, die Kästchen bleiben');
   pruefe(S.memoArtVon(S.kpSeiteFinden('ch')) === 'notiz', 'sie zählt als Notiz');
 
+  /* Seit 0.104.2: Vorlagen bleiben Vorlagen, sonst verlieren sie Stichtag und Abstände */
   const vo = S.DB.gedanken.filter(g => g.id === 'vo')[0];
-  pruefe(vo && vo.istVorlage === true && !vo.checkliste, 'die Vorlage bleibt, als Notiz-Vorlage');
+  pruefe(vo && vo.checkliste === 'vorlage' && !vo.istVorlage, 'die Vorlage bleibt unangetastet eine Vorlage');
+  pruefe(vo.text.indexOf('Typ:') < 0, 'eine Vorlage bekommt keine Typ-Zeile');
 
   pruefe(S.DB.projekte[0].flaeche.split('\n')[0] === 'Typ: Projekt', 'das Projekt trägt seine Typ-Zeile');
   pruefe(S.DB.ziele[0].flaeche.split('\n')[0] === 'Typ: Ziel', 'das Ziel trägt seine Typ-Zeile');
@@ -10876,6 +10878,39 @@ function pmListeBleibtGeloeschtTest() {
   pruefe(S.pmRoutinenListeId('privat') === S.CK_KORB_ID, 'nach dem Löschen fallen Routinen auf den Sammler zurück');
 
   S.cl.cls.id = ''; S.DB.einstellungen.palm = false; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: eine Umwandlung nimmt einem Datensatz seine Funktion, nicht seinen Inhalt —
+   das sieht nach Datenverlust aus und ist schwerer zu bemerken. 0.104.0 machte aus
+   Checklisten-Vorlagen Notiz-Vorlagen; damit waren Stichtag und die Abstände @+1 09:00
+   wirkungslos. Die Reparatur muss genau diese Fälle treffen und sonst nichts. */
+function mpVorlagenZurueckTest() {
+  console.log('\n196. Memo Pad: aus Versehen umgewandelte Vorlagen werden wieder zu Vorlagen (0.104.2)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* so sah eine Vorlage nach 0.104.0 aus */
+  S.DB.gedanken.push({ id: 'kaputt', titel: 'DFÜ-Abruftest', text: 'Typ: Checkliste\n[ ] Abruf starten @+1 09:00\n[ ] Protokoll prüfen\n', kontext: 'beruflich', istVorlage: true, ordnung: 1, geaendert: 1 });
+  /* eine echte Notiz-Vorlage darf nicht angefasst werden */
+  S.DB.gedanken.push({ id: 'echt', titel: 'Besprechungsnotiz', text: 'Teilnehmer:\nThemen:\n', kontext: 'privat', istVorlage: true, ordnung: 2, geaendert: 1 });
+  /* eine umgewandelte Checkliste, die keine Vorlage war, bleibt Notiz */
+  S.DB.gedanken.push({ id: 'notiz', titel: 'Packliste', text: 'Typ: Checkliste\n[ ] Regenjacke\n', kontext: 'privat', ordnung: 3, geaendert: 1 });
+
+  pruefe(S.mpVorlagenZurueck() === 1, 'genau eine Vorlage wird repariert');
+  const k = S.DB.gedanken.filter(g => g.id === 'kaputt')[0];
+  pruefe(k.checkliste === 'vorlage' && !k.istVorlage, 'sie ist wieder eine Checklisten-Vorlage');
+  pruefe(k.text.split('\n')[0] === '[ ] Abruf starten @+1 09:00', 'die Typ-Zeile ist weg, der Inhalt steht unverändert da');
+  pruefe(!!S.clsAbstand('Abruf starten @+1 09:00'), 'der Abstand @+1 09:00 wirkt wieder');
+  pruefe(S.memoVorlagen().some(x => x.s.id === 'kaputt'), 'sie steht wieder unter den Vorlagen');
+
+  const e = S.DB.gedanken.filter(g => g.id === 'echt')[0];
+  pruefe(e.istVorlage === true && !e.checkliste && e.text === 'Teilnehmer:\nThemen:\n', 'eine echte Notiz-Vorlage bleibt unberührt');
+  const no = S.DB.gedanken.filter(g => g.id === 'notiz')[0];
+  pruefe(!no.checkliste && no.text.split('\n')[0] === 'Typ: Checkliste', 'eine umgewandelte Checkliste ohne Vorlage bleibt Notiz');
+
+  pruefe(S.mpVorlagenZurueck() === 0, 'ein zweiter Lauf ändert nichts');
+  S.cl.app = 'uebersicht';
 }
 
 (async function () {
@@ -11069,6 +11104,7 @@ function pmListeBleibtGeloeschtTest() {
   try { clPrivatKategorieTest(); } catch (e) { fail('0.103.2 Kategorie Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpArtenAufraeumenTest(); } catch (e) { fail('0.104.0 Memo Pad zurückbauen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmListeBleibtGeloeschtTest(); } catch (e) { fail('0.104.1 gelöschte Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { mpVorlagenZurueckTest(); } catch (e) { fail('0.104.2 Vorlagen zurück warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

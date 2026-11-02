@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.104.1</title>
+<title>CLIE 0.104.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.104.1';
+var APP_VERSION = '0.104.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29365,8 +29365,29 @@ function mpTypZeile(text, typ) {
   return 'Typ: ' + typ + '\n' + String(text || '');
 }
 
-function mpArtenAufraeumen() {
+/* Repariert, was 0.104.0 an Vorlagen verdorben hat: sie wurden zu Notiz-Vorlagen und
+   verloren damit Stichtag und Abstände. Sicher erkennbar sind sie an der Typ-Zeile, die
+   dieselbe Fassung eingefügt hat — die kommt sonst nirgends vor (0.104.2). */
+function mpVorlagenZurueck() {
   var n = 0;
+  (DB.gedanken || []).forEach(function (g) {
+    if (!g || g.checkliste || g.istVorlage !== true) { return; }
+    var zeilen = String(g.text || '').split('\n');
+    var i = 0;
+    while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+    if (i >= zeilen.length || !/^\s*Typ\s*:\s*Checkliste\s*$/i.test(zeilen[i])) { return; }
+    zeilen.splice(i, 1);
+    g.text = zeilen.join('\n');
+    g.checkliste = 'vorlage';
+    delete g.istVorlage;
+    g.geaendert = jetzt();
+    n++;
+  });
+  return n;
+}
+
+function mpArtenAufraeumen() {
+  var n = mpVorlagenZurueck();
   /* 1. Abläufe löschen */
   var weg = {};
   (DB.gedanken || []).forEach(function (g) {
@@ -29381,10 +29402,10 @@ function mpArtenAufraeumen() {
     ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
     n += ids.length;
   }
-  /* 2. Checklisten werden Notizen, ihre Vorlagen werden Notiz-Vorlagen */
+  /* 2. Checklisten werden Notizen — Vorlagen aber nicht: als schlichte Notiz verlören
+     sie Stichtag und Abstände (@+1 09:00), also genau das, wofür sie da sind (0.104.2) */
   (DB.gedanken || []).forEach(function (g) {
-    if (!g || !g.checkliste) { return; }
-    if (g.checkliste === 'vorlage') { g.istVorlage = true; }
+    if (!g || !g.checkliste || g.checkliste === 'vorlage') { return; }
     delete g.checkliste;
     delete g.art;
     var t = mpTypZeile(g.text, 'Checkliste');
