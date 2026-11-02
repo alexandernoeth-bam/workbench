@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.103.2</title>
+<title>CLIE 0.104.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.103.2';
+var APP_VERSION = '0.104.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -8022,11 +8022,13 @@ function memoNotizen() {
    Zustand „vorlage“, alles andere mit dem Feld „istVorlage“ („vorlage“ ist an
    gestarteten Checklisten die Kennung ihrer Vorlage). */
 
-var MEMO_ARTEN = [['alles', 'Alle'], ['notizen', 'Notizen'], ['projekte', 'Projekte'], ['ablaeufe', 'Abläufe'], ['checklisten', 'Checklisten'], ['ziele', 'Ziele']];
+/* Seit 0.104.0 ohne Abläufe und Checklisten: Abläufe sind Listen im To Do,
+   Checklisten sind schlichte Notizen mit Kästchen-Zeilen */
+var MEMO_ARTEN = [['alles', 'Alle'], ['notizen', 'Notizen'], ['projekte', 'Projekte'], ['ziele', 'Ziele']];
 var MEMO_SICHT_KEY = 'clie-memo-sicht';
 /* Seit 0.71.2: „Show active“ im ▼ — nur Laufendes (Ruhendes und Abgeschlossenes aus) */
 var MEMO_AKTIV_KEY = 'clie-memo-aktiv';
-var MEMO_ZEICHEN = { notiz: '✎', projekt: '◎', ablauf: '⇢', checkliste: '☑', ziel: '◇' };
+var MEMO_ZEICHEN = { notiz: '✎', projekt: '◎', ziel: '◇' };
 
 function memoIstVorlage(s) { return !!(s && s.__satz && s.__satz.istVorlage === true); }
 
@@ -8038,9 +8040,10 @@ function memoEintraege(sicht) {
     if (!clPasst(s) || memoIstVorlage(s)) { return; }
     if (s.art === 'notiz' && !aufIstCheckliste(s)) { dazu('notiz', s, false); return; }
     if (s.art === 'vorhaben') { dazu(s.typ === 'ziel' ? 'ziel' : 'projekt', s, s.zustand === 'erledigt'); return; }
-    if (aufIstCheckliste(s) && ckZustand(s) !== 'vorlage') { dazu(ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste', s, ckZustand(s) === 'fertig'); }
+    /* Seit 0.104.0 stehen Checklisten und Abläufe nicht mehr im Memo Pad — sie werden
+       beim Start umgewandelt und erscheinen danach als Notizen */
   });
-  var art = { notizen: 'notiz', projekte: 'projekt', ablaeufe: 'ablauf', checklisten: 'checkliste', ziele: 'ziel' }[sicht];
+  var art = { notizen: 'notiz', projekte: 'projekt', ziele: 'ziel' }[sicht];
   var l = art ? aus.filter(function (x) { return x.art === art; }) : aus;
   var rang = function (x) { return Number(x.s.__satz && x.s.__satz.ordnung) || 0; };
   return l.sort(function (a, b) {
@@ -8118,12 +8121,13 @@ function memoEintragOeffnen(id) {
 
 function memoArtName(s) {
   if (s && aufIstCheckliste(s) && ckZustand(s) === 'vorlage') { return 'Vorlage'; }
-  return { notiz: 'Notiz', projekt: 'Projekt', ablauf: 'Ablauf', checkliste: 'Checkliste', ziel: 'Ziel' }[memoArtVon(s)] || '';
+  return { notiz: 'Notiz', projekt: 'Projekt', ziel: 'Ziel' }[memoArtVon(s)] || '';
 }
 
+/* Seit 0.104.0 nur noch drei Arten — was vor dem Zurückbauen noch eine Checkliste
+   war, zählt hier als Notiz */
 function memoArtVon(s) {
   if (!s) { return ''; }
-  if (aufIstCheckliste(s)) { return ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste'; }
   if (s.art === 'vorhaben') { return s.typ === 'ziel' ? 'ziel' : 'projekt'; }
   return s.art === 'notiz' ? 'notiz' : '';
 }
@@ -8205,7 +8209,7 @@ function memoVorlageBearbeiten() {
 
 function memoNeuHtml() {
   return '<div class="fenster"><div class="titel">Neu</div><div class="rumpf">'
-    + [['notiz', '✎ Notiz'], ['projekt', '◎ Projekt'], ['ablauf', '⇢ Ablauf'], ['checkliste', '☑ Checkliste'], ['ziel', '◇ Ziel']].map(function (a) {
+    + [['notiz', '✎ Notiz'], ['projekt', '◎ Projekt'], ['ziel', '◇ Ziel']].map(function (a) {
       return '<button type="button" class="wahl" onclick="memoNeuArt(\'' + a[0] + '\')">' + a[1] + '</button>';
     }).join('')
     + '<button type="button" class="wahl" onclick="memoArtSetzen(\'vorlagen\')">Aus Vorlage …</button>'
@@ -8216,14 +8220,6 @@ function memoNeuArt(art) {
   cl.aufklapp = '';
   if (art === 'projekt') { pjNeu(); return; }
   if (art === 'ziel') { ziNeu(); return; }
-  if (art === 'ablauf' || art === 'checkliste') {
-    clsAnlegen('einmalig', '');
-    var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-    if (g && art === 'checkliste') { delete g.art; g.titel = 'Checkliste ' + clKurzDatum(isoDatum()); }
-    if (g && art === 'ablauf') { g.titel = 'Ablauf ' + clKurzDatum(isoDatum()); }
-    if (g) { var f = cl.cls.fenster; if (f && f.titel !== undefined) { f.titel = g.titel; f.art = g.art || 'abhaken'; } aufklappNeu(); }
-    return;
-  }
   cl.memo.fenster = { modus: 'neu', art: 'notiz', titel: '', kontext: clNeuKontext(), bereich: clNeuBereich(), privat: false };
   cl.aufklapp = 'memo';
   aufklappNeu();
@@ -29328,6 +29324,68 @@ function pmListenKatNachziehen() {
   return n;
 }
 
+/* ---------- Memo Pad zurückbauen (seit 0.104.0) ----------
+   Abläufe sind jetzt Listen im To Do und verschwinden hier; ihre Punkte leben als
+   Aufgaben in ihren Listen weiter. Checklisten werden schlichte Notizen mit
+   Kästchen-Zeilen, ihre Vorlagen bleiben als Notiz-Vorlagen. Projekte, Ziele und die
+   umgewandelten Checklisten tragen ihren Typ als erste Zeile im Text — bei den
+   Checklisten ist das nach der Umwandlung das Einzige, was ihn noch verrät. */
+var MP_TYP = /^\s*Typ\s*:\s*(.+?)\s*$/i;
+
+/* Gibt den neuen Text oder null, wenn die Zeile schon richtig dasteht */
+function mpTypZeile(text, typ) {
+  var zeilen = String(text || '').split('\n');
+  var i = 0;
+  while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+  var m = (i < zeilen.length) ? zeilen[i].match(MP_TYP) : null;
+  if (m) {
+    if (m[1] === typ) { return null; }
+    zeilen[i] = 'Typ: ' + typ;
+    return zeilen.join('\n');
+  }
+  return 'Typ: ' + typ + '\n' + String(text || '');
+}
+
+function mpArtenAufraeumen() {
+  var n = 0;
+  /* 1. Abläufe löschen */
+  var weg = {};
+  (DB.gedanken || []).forEach(function (g) {
+    if (g && g.id && g.checkliste && g.checkliste !== 'vorlage' && g.art === 'aufgaben') { weg[g.id] = true; }
+  });
+  var ids = Object.keys(weg);
+  if (ids.length) {
+    (DB.aufgaben || []).forEach(function (a) {
+      if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+    });
+    DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
+    ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
+    n += ids.length;
+  }
+  /* 2. Checklisten werden Notizen, ihre Vorlagen werden Notiz-Vorlagen */
+  (DB.gedanken || []).forEach(function (g) {
+    if (!g || !g.checkliste) { return; }
+    if (g.checkliste === 'vorlage') { g.istVorlage = true; }
+    delete g.checkliste;
+    delete g.art;
+    var t = mpTypZeile(g.text, 'Checkliste');
+    if (t !== null) { g.text = t; }
+    g.geaendert = jetzt();
+    n++;
+  });
+  /* 3. Projekte und Ziele bekommen ihre Typ-Zeile */
+  [['projekte', 'Projekt'], ['ziele', 'Ziel']].forEach(function (p) {
+    (DB[p[0]] || []).forEach(function (x) {
+      var t = x ? mpTypZeile(x.flaeche, p[1]) : null;
+      if (t === null || !x) { return; }
+      x.flaeche = t;
+      x.geaendert = jetzt();
+      n++;
+    });
+  });
+  return n;
+}
+
 function pmListenWahlAuf() {
   cl.aufklapp = (cl.aufklapp === 'pmliste') ? '' : 'pmliste';
   aufklappNeu();
@@ -31826,7 +31884,8 @@ function pmNachpflegen() {
   /* Erst den Listen ihre Kategorie geben, dann sie an die Aufgaben weiterreichen */
   z += pmListenKatNachziehen();
   z += pmKatenAngleichen();
-  /* Erst die Listen füllen, dann die leer gewordenen Notizen räumen — nie umgekehrt */
+  /* Erst die Listen füllen, dann das Memo Pad zurückbauen, dann räumen — nie umgekehrt */
+  z += mpArtenAufraeumen();
   var raus = pmNotizenAufraeumen();
   if (raus) { melde(raus + (raus === 1 ? ' Notiz' : ' Notizen') + ' aufgeräumt — die Aufgaben liegen in ihren Listen.', null); }
   z += raus;

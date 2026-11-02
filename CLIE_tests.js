@@ -1294,8 +1294,9 @@ function checklistenTest() {
   CL.clsAbschliessen();
   pruefe(lauf.checkliste === 'fertig' && lauf.abgeschlossen === CL.isoDatum() && CL.cl.cls.id === '', 'abgeschlossen: ins Archiv');
   CL.cl.memo.aktiv = false;
-  CL.memoArtSetzen('checklisten');
-  pruefe(CL.cl.app === 'memo' && /Abgeschlossene…<\/span><small>1/.test(inhalt()), 'danach Memo Pad; „Abgeschlossene…“ zählt sie (0.71)');
+  /* Seit 0.104.0 gibt es die Sicht „Checklisten“ nicht mehr — Checklisten werden Notizen */
+  CL.memoArtSetzen('alles');
+  pruefe(CL.cl.app === 'memo' && CL.MEMO_ARTEN.every(a => a[0] !== 'checklisten' && a[0] !== 'ablaeufe'), 'danach Memo Pad; die Sichten Checklisten und Abläufe gibt es nicht mehr');
 
   /* Neu: aus einem Memo, als Kopie, leer */
   CL.clsNeu();
@@ -2705,7 +2706,10 @@ function memoPadTest() {
   /* Neu */
   S.oeffne('memo'); S.memoArtSetzen('alles'); S.memoNeu();
   const nh = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'memoneu' && ['notiz', 'projekt', 'ablauf', 'checkliste', 'ziel'].every(a => nh.indexOf("memoNeuArt('" + a + "')") >= 0) && /Aus Vorlage/.test(nh), 'Neu in „Alle“: erst die Art wählen, auch aus Vorlage');
+  /* Seit 0.104.0 nur noch drei Arten — Abläufe sind Listen im To Do, Checklisten sind Notizen */
+  pruefe(S.cl.aufklapp === 'memoneu' && ['notiz', 'projekt', 'ziel'].every(a => nh.indexOf("memoNeuArt('" + a + "')") >= 0)
+    && nh.indexOf("memoNeuArt('ablauf')") < 0 && nh.indexOf("memoNeuArt('checkliste')") < 0 && /Aus Vorlage/.test(nh),
+    'Neu in „Alle“: erst die Art wählen (Notiz, Projekt, Ziel), auch aus Vorlage');
   S.aufklappZu();
   /* Menü englisch, sonst deutsch */
   S.oeffne('uebersicht'); S.menueUm();
@@ -8799,15 +8803,17 @@ function palmUmstellungTest() {
   pruefe(A('Anwendungen aufrufen').planung === morgen && /⟦/.test(g2.text.split('\n')[1]) && !A('Ohne Datum') && !/⟦/.test(g2.text.split('\n')[2]), '⚑ Frist → Datum; Zeilen ohne Tag bleiben einfach Text');
   pruefe(A('Freie Zeile').planung === heute && !/Freie Zeile|Lampe|Build/.test(S.kpTagFinden(heute).text) && /Notiz bleibt/.test(S.kpTagFinden(heute).text) && !S.kpTagFinden(heute).eintraege.length,
     'Tag: freie Zeile → Aufgabe; Eingeplantes ausgeplant; Text bleibt');
+  /* Seit 0.104.0 löscht das Nachpflegen die Abläufe — ihre Punkte leben als Aufgaben weiter */
+  S.pmNachpflegen();
+  pruefe(!S.DB.gedanken.some(x => x && x.id === 'g2') && !!A('Build-Lauf kontrollieren'), 'der Ablauf ist weg, seine Aufgaben bleiben (0.104.0)');
   pruefe(S.pmUmstellenKern(true).memo === 0 && S.pmNachpflegen() === 0 && S.DB.aufgaben.length === 6 && !S.DB.themen.filter(x => x.id === 'th')[0].archiv, 'ein zweiter Lauf ändert nichts');
   /* Die Workbench legt noch auf die alte Art an */
   S.DB.themen[0].text += '\n[] Aus der Workbench';
-  S.kpPlanenKern(S.kpSeiteFinden('g2'), 1, 'h', S.tagePlus(heute, 2));
   S.DB.themen.push({ id: 'tn', name: 'Büro', kontext: 'beruflich', bereich: 'kb-arbeit', text: '[] Ablage', ordnung: 9, geaendert: 1 });
   const n = S.pmNachpflegen();
   const tn = S.DB.themen.filter(x => x.id === 'tn')[0];
-  pruefe(n >= 2 && A('Aus der Workbench') && A('Anwendungen aufrufen').planung === S.tagePlus(heute, 2) && !A('Ablage') && !tn.archiv && tn.text === '[] Ablage',
-    'Nachpflegen: Sammler-Zeile und neu Eingeplantes (Datum an die Aufgabe) — eine neue Liste bleibt, wie sie ist (seit 0.81) — ' + n);
+  pruefe(n >= 1 && A('Aus der Workbench') && !A('Ablage') && !tn.archiv && tn.text === '[] Ablage',
+    'Nachpflegen: Sammler-Zeile wird Aufgabe — eine neue Liste bleibt, wie sie ist (seit 0.81) — ' + n);
   pruefe(/try \{ pmNachpflegen\(\); \} catch \(e\) \{ clFehlerZeigen\(e, 'pmNachpflegen'\); \}   \/\* Palm-Modell/.test(SKRIPT) && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);\n    pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
   /* Memo Pad danach */
   S.oeffne('memo'); S.memoArtSetzen('alles');
@@ -10780,6 +10786,56 @@ function clPrivatKategorieTest() {
   S.cl.filter = 'alle';
 }
 
+/* Fehlertyp: eine entfernte Art hängt irgendwo nach — im Neu-Fenster, in den Sichten
+   oder in den Daten. Und: die Typ-Zeile wird bei jedem Start erneut eingefügt, bis der
+   Text voller „Typ:“-Zeilen steht. Beides muss der Test fangen. */
+function mpArtenAufraeumenTest() {
+  console.log('\n194. Memo Pad: Abläufe gelöscht, Checklisten werden Notizen, Typ-Zeile im Text (0.104.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.einstellungen.palm = true;
+
+  S.DB.gedanken.push({ id: 'ab', titel: 'Fenster-Wartung', text: '[ ] Angebot\n', kontext: 'privat', ordnung: 1, checkliste: 'lauf', art: 'aufgaben', geaendert: 1 });
+  S.DB.gedanken.push({ id: 'ch', titel: 'Packliste Borkum', text: '[ ] Regenjacke\n[x] Laufschuhe\n', kontext: 'privat', ordnung: 2, checkliste: 'lauf', geaendert: 1 });
+  S.DB.gedanken.push({ id: 'vo', titel: 'Vorlage Packen', text: '[ ] Zahnbürste\n', kontext: 'privat', ordnung: 3, checkliste: 'vorlage', geaendert: 1 });
+  S.DB.gedanken.push({ id: 'no', titel: 'Einfach Notiz', text: 'nur Text\n', kontext: 'privat', ordnung: 4, geaendert: 1 });
+  S.DB.projekte.push({ id: 'pr', name: 'Carport', flaeche: 'Angebote vergleichen\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.ziele.push({ id: 'zi', name: 'Marathon', flaeche: 'unter 4 Stunden\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  const aAb = S.pmNeueAufgabe({ titel: 'Angebot', prio: 2, memo: { id: 'ab', zeile: '' } });
+
+  S.mpArtenAufraeumen();
+
+  pruefe(!S.DB.gedanken.some(g => g.id === 'ab'), 'der Ablauf ist gelöscht');
+  pruefe(!aAb.memo && aAb.themaId === 'cl-memo-ab', 'seine Aufgabe bleibt in ihrer Liste, ohne Memo-Verbindung');
+  pruefe(S.DB.grabsteine.some(g => g.s === 'gedanken' && g.id === 'ab'), 'der gelöschte Ablauf bekommt einen Löschvermerk');
+
+  const ch = S.DB.gedanken.filter(g => g.id === 'ch')[0];
+  pruefe(ch && !ch.checkliste && !ch.art, 'die Checkliste ist jetzt eine schlichte Notiz');
+  pruefe(ch.text.split('\n')[0] === 'Typ: Checkliste' && /\[ \] Regenjacke/.test(ch.text), 'Typ-Zeile oben, die Kästchen bleiben');
+  pruefe(S.memoArtVon(S.kpSeiteFinden('ch')) === 'notiz', 'sie zählt als Notiz');
+
+  const vo = S.DB.gedanken.filter(g => g.id === 'vo')[0];
+  pruefe(vo && vo.istVorlage === true && !vo.checkliste, 'die Vorlage bleibt, als Notiz-Vorlage');
+
+  pruefe(S.DB.projekte[0].flaeche.split('\n')[0] === 'Typ: Projekt', 'das Projekt trägt seine Typ-Zeile');
+  pruefe(S.DB.ziele[0].flaeche.split('\n')[0] === 'Typ: Ziel', 'das Ziel trägt seine Typ-Zeile');
+  pruefe(S.DB.gedanken.filter(g => g.id === 'no')[0].text === 'nur Text\n', 'eine schlichte Notiz bleibt unberührt');
+
+  /* nicht bei jedem Start erneut */
+  pruefe(S.mpArtenAufraeumen() === 0, 'ein zweiter Lauf ändert nichts');
+  pruefe(S.DB.projekte[0].flaeche.split('\n').filter(z => /^Typ:/.test(z)).length === 1, 'die Typ-Zeile steht genau einmal da');
+
+  /* die Arten sind auch aus der Oberfläche raus */
+  pruefe(S.MEMO_ARTEN.every(a => a[0] !== 'ablaeufe' && a[0] !== 'checklisten'), 'die Sichten Abläufe und Checklisten gibt es nicht mehr');
+  pruefe(!S.MEMO_ZEICHEN.ablauf && !S.MEMO_ZEICHEN.checkliste, 'ihre Zeichen auch nicht');
+  const nh = S.memoNeuHtml();
+  pruefe(nh.indexOf("memoNeuArt('ablauf')") < 0 && nh.indexOf("memoNeuArt('checkliste')") < 0 && nh.indexOf("memoNeuArt('notiz')") >= 0, 'Neu bietet sie nicht mehr an');
+
+  S.DB.einstellungen.palm = false;
+  S.cl.memo.sicht = 'alles'; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10969,6 +11025,7 @@ function clPrivatKategorieTest() {
   try { pmKatVonListeTest(); } catch (e) { fail('0.103.0 Kategorie von der Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmAufgabeVerschiebenTest(); } catch (e) { fail('0.103.1 Aufgabe verschieben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clPrivatKategorieTest(); } catch (e) { fail('0.103.2 Kategorie Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { mpArtenAufraeumenTest(); } catch (e) { fail('0.104.0 Memo Pad zurückbauen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
