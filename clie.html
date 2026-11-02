@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.104.5</title>
+<title>CLIE 0.105.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.104.5';
+var APP_VERSION = '0.105.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29457,6 +29457,41 @@ function mpArtenAufraeumen() {
   return n;
 }
 
+/* ---------- Reihenfolge in einer Liste (seit 0.105.0) ----------
+   Der Rang steht als Zahl an der Aufgabe und gilt nur in der geöffneten Liste. Wer noch
+   keinen hat, steht hinten — so rutscht eine neue Aufgabe ans Ende statt nach vorn. */
+function pmRang(a) {
+  var r = Number(a && a.rang);
+  return (isFinite(r) && r > 0) ? r : 9999;
+}
+
+function pmListeSortiert(l) {
+  return l.slice().sort(function (a, b) {
+    return (pmRang(a) - pmRang(b)) || pmTitel(a).localeCompare(pmTitel(b), 'de');
+  });
+}
+
+function pmRangTauschen(id, richtung) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  var lid = pmListeIdVon(a);
+  var l = pmListeSortiert(pmTodoAlle().filter(function (x) { return pmListeIdVon(x) === lid; }));
+  var i = -1;
+  l.forEach(function (x, n) { if (x.id === id) { i = n; } });
+  var j = i + (richtung < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= l.length) { return; }
+  var h = l[i];
+  l[i] = l[j];
+  l[j] = h;
+  /* Alle neu durchzählen — sonst bliebe ein Teil der Liste ohne feste Reihenfolge */
+  var z = jetzt();
+  l.forEach(function (x, n) {
+    if (Number(x.rang) !== n + 1) { x.rang = n + 1; x.geaendert = z; }
+  });
+  spaeterSichern();
+  zeichne();
+}
+
 function pmListenWahlAuf() {
   cl.aufklapp = (cl.aufklapp === 'pmliste') ? '' : 'pmliste';
   aufklappNeu();
@@ -29702,6 +29737,11 @@ function pmZeileHtml(a, opt) {
   var sym = '';
   if (pmIstZeit(a.uhrzeit)) { sym += '<span class="pm-sym" aria-label="Erinnerung">◉' + (o.zeit ? ' ' + esc(clZeitText(a.uhrzeit)) : '') + '</span>'; }
   if (a.wiederholung) { sym += '<span class="pm-sym" aria-label="Wiederholung">↻</span>'; }
+  /* In der offenen Liste bekommt die angetippte Aufgabe Pfeile zum Verschieben (0.105.0) */
+  if (o.rang && gew) {
+    sym += '<button type="button" class="pm-sym" onclick="pmRangTauschen(\'' + id + '\',-1)" aria-label="Nach oben">▲</button>'
+      + '<button type="button" class="pm-sym" onclick="pmRangTauschen(\'' + id + '\',1)" aria-label="Nach unten">▼</button>';
+  }
   if (a.memo && a.memo.id) { sym += '<button type="button" class="pm-sym" onclick="pmMemoVonAufgabe(\'' + id + '\')" aria-label="Memo öffnen">▤</button>'; }
   else if (String(a.beschreibung || '').trim()) { sym += '<button type="button" class="pm-sym" onclick="pmDetails(\'' + id + '\')" aria-label="Notiz">▤</button>'; }
   var datum = '';
@@ -29776,7 +29816,8 @@ function pmTodoHtml() {
     if (cl.pm.liste) {
       l = l.filter(function (a) { return pmListeIdVon(a) === cl.pm.liste; });
       if (!l.length) { return h + '<p class="leise">Diese Liste ist leer — „Neu“ tippen.</p>'; }
-      return h + pmSortieren(l, show.sort).map(function (a) { return pmZeileHtml(a, { show: show }); }).join('');
+      /* In der offenen Liste gilt die eigene Reihenfolge, nicht die Sortierung aus Show (0.105.0) */
+      return h + pmListeSortiert(l).map(function (a) { return pmZeileHtml(a, { show: show, rang: true }); }).join('');
     }
     if (!l.length) { return h + '<p class="leise">' + (show.faellig ? 'Nichts fällig.' : 'Keine Aufgaben — „Neu“ tippen.') + '</p>'; }
     var nachListe = {};

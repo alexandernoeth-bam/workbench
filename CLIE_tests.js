@@ -11015,6 +11015,49 @@ function pmListenNichtImMemoTest() {
   S.cl.pm.mf = null; S.cl.pm.memoWahl = ''; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: die Reihenfolge in einer Liste lässt sich nicht bestimmen, oder sie gilt
+   plötzlich auch dort, wo nach Datum und Priorität sortiert wird. Und: eine neue Aufgabe
+   ohne Rang springt an den Anfang, statt sich hinten anzustellen. */
+function pmReihenfolgeTest() {
+  console.log('\n200. To Do: die Reihenfolge innerhalb einer Liste lässt sich mit ▲ ▼ ändern (0.105.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.pmListeAnlegen('lr', 'Fenster-Wartung', { kontext: 'privat' });
+  const a = S.pmNeueAufgabe({ titel: 'Angebot einholen', prio: 1, liste: 'lr' });
+  const b = S.pmNeueAufgabe({ titel: 'Auftrag erteilen', prio: 3, liste: 'lr' });
+  const c = S.pmNeueAufgabe({ titel: 'Termin zusagen', prio: 3, liste: 'lr' });
+  const folge = () => S.pmListeSortiert(S.pmTodoAlle().filter(x => S.pmListeIdVon(x) === 'lr')).map(x => x.titel);
+
+  pruefe(folge().join(' | ') === 'Angebot einholen | Auftrag erteilen | Termin zusagen', 'ohne Rang alphabetisch');
+
+  S.pmRangTauschen(c.id, -1);
+  pruefe(folge().join(' | ') === 'Angebot einholen | Termin zusagen | Auftrag erteilen', 'nach oben verschoben');
+  pruefe([a, b, c].every(x => Number(x.rang) >= 1), 'alle bekommen dabei einen festen Rang');
+
+  S.pmRangTauschen(c.id, 1);
+  pruefe(folge().join(' | ') === 'Angebot einholen | Auftrag erteilen | Termin zusagen', 'und wieder zurück');
+  S.pmRangTauschen(a.id, -1);
+  pruefe(folge()[0] === 'Angebot einholen', 'am oberen Rand passiert nichts');
+  S.pmRangTauschen(c.id, 1);
+  pruefe(folge()[2] === 'Termin zusagen', 'am unteren Rand auch nicht');
+
+  /* eine neue Aufgabe stellt sich hinten an */
+  const d = S.pmNeueAufgabe({ titel: 'AAA zuletzt angelegt', prio: 3, liste: 'lr' });
+  pruefe(folge()[3] === 'AAA zuletzt angelegt', 'eine neue Aufgabe steht am Ende, nicht vorn');
+
+  /* die Pfeile erscheinen nur an der angetippten Aufgabe in der offenen Liste */
+  S.cl.pm.tab = 'liste'; S.cl.pm.liste = 'lr'; S.cl.pm.wahl = b.id;
+  const h = S.pmTodoHtml();
+  pruefe(h.indexOf("pmRangTauschen('" + b.id + "',-1)") >= 0, 'die angetippte Aufgabe hat die Pfeile');
+  pruefe(h.indexOf("pmRangTauschen('" + a.id + "'") < 0, 'die anderen nicht');
+  pruefe(h.indexOf(d.titel) > h.indexOf(a.titel), 'die Liste erscheint in der eigenen Reihenfolge');
+  S.cl.pm.liste = '';
+  pruefe(S.pmTodoHtml().indexOf('pmRangTauschen(') < 0, 'ohne offene Liste gibt es keine Pfeile');
+
+  S.cl.pm.wahl = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11210,6 +11253,7 @@ function pmListenNichtImMemoTest() {
   try { clAbgleichReihenfolgeTest(); } catch (e) { fail('0.104.3 Abgleich-Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpTypErkennenTest(); } catch (e) { fail('0.104.4 Typ-Erkennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmListenNichtImMemoTest(); } catch (e) { fail('0.104.5 Listen nicht im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
