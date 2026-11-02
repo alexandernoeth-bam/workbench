@@ -10639,6 +10639,60 @@ function pmNotizenAufraeumenTest() {
   S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: Aufgabe und Liste behaupten verschiedene Kategorien. Seit 0.103.0 gilt die
+   der Liste — außer im Sammler, wo lose Aufgaben aus allen Bereichen liegen und ihre
+   eigene behalten müssen, sonst verlören sie sie beim Aufräumen. */
+function pmKatVonListeTest() {
+  console.log('\n191. To Do: die Aufgabe erbt die Kategorie ihrer Liste, jede Liste braucht eine, der Sammler nicht (0.103.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const kat = S.ckBereiche()[0];
+  const kat2 = S.ckBereiche()[1];
+  if (!kat || !kat2) { warn('keine zwei Kategorien vorhanden — Prüfung übersprungen'); return; }
+
+  const t = S.pmListeAnlegen('l7', 'Reparaturen', { kontext: 'privat' });
+  t.bereich = kat.id;
+  const a = S.pmNeueAufgabe({ titel: 'Silikon', prio: 2, liste: 'l7', bereich: kat2.id });
+  pruefe(a.bereich === kat.id, 'die neue Aufgabe erbt die Kategorie der Liste, nicht die mitgegebene');
+
+  /* Ändert die Liste ihre Kategorie, ziehen die Aufgaben mit */
+  t.bereich = kat2.id;
+  pruefe(S.pmKatenAngleichen() === 1, 'eine Aufgabe wird angeglichen');
+  pruefe(a.bereich === kat2.id, 'die Aufgabe folgt der Liste');
+  pruefe(S.pmKatenAngleichen() === 0, 'ein zweiter Lauf ändert nichts');
+
+  /* Der Sammler hat keine Kategorie und nimmt den Aufgaben keine weg */
+  S.ckKorb(true);
+  const lose = S.pmNeueAufgabe({ titel: 'Lose', prio: 3, bereich: kat.id });
+  pruefe(lose.themaId === S.CK_KORB_ID && lose.bereich === kat.id, 'eine lose Aufgabe behält ihre eigene Kategorie');
+  S.pmKatenAngleichen();
+  pruefe(lose.bereich === kat.id, 'der Sammler nimmt ihr die Kategorie nicht weg');
+
+  /* Eine Liste ohne Kategorie bekommt die häufigste ihrer Aufgaben */
+  const t2 = S.pmListeAnlegen('l8', 'Geerbt', { kontext: 'privat' });
+  const b1 = S.pmNeueAufgabe({ titel: 'A', prio: 3, liste: 'l8' });
+  const b2 = S.pmNeueAufgabe({ titel: 'B', prio: 3, liste: 'l8' });
+  katSetzenFuer(S, b1, kat2.id); katSetzenFuer(S, b2, kat2.id);
+  pruefe(S.pmListenKatNachziehen() >= 1, 'eine Liste ohne Kategorie wird nachgezogen');
+  pruefe(t2.bereich === kat2.id, 'sie bekommt die häufigste Kategorie ihrer Aufgaben');
+
+  /* Speichern ohne Kategorie wird abgelehnt */
+  S.cl.cls.id = 'l7';
+  S.clsDetails();
+  S.document.getElementById('clsTitel').value = 'Reparaturen';
+  /* das Feld der Attrappe trägt noch einen Wert aus einem früheren Test */
+  S.document.getElementById('clsKat').value = '';
+  S.cl.cls.fenster.titel = 'Reparaturen';
+  S.cl.cls.fenster.bereich = '';
+  S.clsSpeichern();
+  pruefe(S.pmListeSatz('l7').bereich === kat2.id, 'eine Liste lässt sich nicht ohne Kategorie speichern');
+
+  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
+}
+
+function katSetzenFuer(S, a, bereich) { S.katPrivatSchreiben(a, { bereich: bereich }); }
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10825,6 +10879,7 @@ function pmNotizenAufraeumenTest() {
   try { pmListenNachziehenTest(); } catch (e) { fail('0.102.1 Listen nachziehen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmListePflegenTest(); } catch (e) { fail('0.102.2 Listen pflegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmNotizenAufraeumenTest(); } catch (e) { fail('0.102.3 Notizen aufräumen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmKatVonListeTest(); } catch (e) { fail('0.103.0 Kategorie von der Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.102.3</title>
+<title>CLIE 0.103.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.102.3';
+var APP_VERSION = '0.103.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -11466,6 +11466,8 @@ function clsSpeichern() {
   var titel = String(f.titel || '').trim();
   if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
   if (f.stern && !g.stern && ckSterne() >= 3) { melde('Höchstens drei Checklisten sind gleichzeitig ★ wesentlich.', 'warn'); return; }
+  /* Seit 0.103.0: jede Liste braucht eine Kategorie, denn ihre Aufgaben erben sie */
+  if (ckIstListe(s) && !ckBereichName(f.bereich)) { melde('Bitte der Liste eine Kategorie geben.', 'warn'); return; }
   s.titel = titel.slice(0, 200);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { g.kontext = f.kontext; }
   if (ckBereichName(f.bereich)) { g.bereich = f.bereich; } else { delete g.bereich; }
@@ -11479,6 +11481,8 @@ function clsSpeichern() {
   if (ckZustand(s) !== 'vorlage' && f.zustand !== ckZustand(s)) { ckZustandSetzen(s, f.zustand); }
   if (f.stern && ckZustand(s) === 'lauf') { g.stern = true; } else { delete g.stern; }
   g.geaendert = jetzt();
+  /* Die Kategorie der Liste gilt auch für ihre Aufgaben (0.103.0) */
+  if (ckIstListe(s)) { pmKatenAngleichen(); }
   spaeterSichern();
   aufklappZu();
 }
@@ -29256,6 +29260,53 @@ function pmNotizenAufraeumen() {
   return ids.length;
 }
 
+/* ---------- Die Kategorie kommt von der Liste (seit 0.103.0) ----------
+   Eine Aufgabe erbt die Kategorie ihrer Liste, und jede Liste braucht eine — sonst wäre
+   die Kategorie der Aufgabe eine Frage ohne Antwort. Einzige Ausnahme ist der Sammler:
+   dort liegen lose Aufgaben aus allen Bereichen, also behalten sie ihre eigene. */
+function pmKatAusListe(a) {
+  if (!a) { return false; }
+  var t = pmListeSatz(pmListeIdVon(a));
+  var b = t ? String(t.bereich || '') : '';
+  if (!b || String(a.bereich || '') === b) { return false; }
+  katPrivatSchreiben(a, { bereich: b });
+  a.geaendert = jetzt();
+  return true;
+}
+
+function pmKatenAngleichen() {
+  var n = 0;
+  (DB.aufgaben || []).forEach(function (a) { if (a && a.id && pmKatAusListe(a)) { n++; } });
+  return n;
+}
+
+/* Listen ohne Kategorie bekommen die häufigste ihrer Aufgaben — raten ist hier besser
+   als die Aufgaben ihre Kategorie zu kosten */
+function pmListenKatNachziehen() {
+  var zahl = {};
+  (DB.aufgaben || []).forEach(function (a) {
+    var b = a ? String(a.bereich || '') : '';
+    if (!a || !a.id || !b) { return; }
+    var lid = pmListeIdVon(a);
+    if (!zahl[lid]) { zahl[lid] = {}; }
+    zahl[lid][b] = (zahl[lid][b] || 0) + 1;
+  });
+  var n = 0;
+  (DB.themen || []).forEach(function (t) {
+    if (!t || !t.id || t.bereich || t.id === CK_KORB_ID) { return; }
+    var z = zahl[t.id];
+    if (!z) { return; }
+    var best = '';
+    Object.keys(z).forEach(function (b) { if (!best || z[b] > z[best]) { best = b; } });
+    if (!best || !kgName(best)) { return; }
+    t.bereich = best;
+    t.kontext = clIstArbeit(best) ? 'beruflich' : 'privat';
+    t.geaendert = jetzt();
+    n++;
+  });
+  return n;
+}
+
 function pmListenWahlAuf() {
   cl.aufklapp = (cl.aufklapp === 'pmliste') ? '' : 'pmliste';
   aufklappNeu();
@@ -29326,6 +29377,8 @@ function pmNeueAufgabe(f) {
   if (f.memo && f.memo.id) { a.memo = { id: f.memo.id }; if (f.memo.zeile) { a.memo.zeile = f.memo.zeile; } }
   if (!Array.isArray(DB.aufgaben)) { DB.aufgaben = []; }
   DB.aufgaben.push(a);
+  /* Seit 0.103.0 gilt die Kategorie der Liste, nicht die mitgegebene */
+  pmKatAusListe(a);
   return a;
 }
 
@@ -31729,6 +31782,9 @@ function pmNachpflegen() {
   if (!pmAn()) { return 0; }
   var n = pmUmstellenKern(true);
   var z = n.listenPunkte + n.sammler + n.memo + n.frei + n.listen + pmMarkenPruefen() + pmListenNachziehen();
+  /* Erst den Listen ihre Kategorie geben, dann sie an die Aufgaben weiterreichen */
+  z += pmListenKatNachziehen();
+  z += pmKatenAngleichen();
   /* Erst die Listen füllen, dann die leer gewordenen Notizen räumen — nie umgekehrt */
   var raus = pmNotizenAufraeumen();
   if (raus) { melde(raus + (raus === 1 ? ' Notiz' : ' Notizen') + ' aufgeräumt — die Aufgaben liegen in ihren Listen.', null); }
