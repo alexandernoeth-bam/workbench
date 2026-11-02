@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.104.2</title>
+<title>CLIE 0.104.4</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.104.2';
+var APP_VERSION = '0.104.4';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -5201,8 +5201,10 @@ function clAbgleichTipp() {
     if (zaehlerHand === sichernZaehler) { lokalOffen = false; ungesichertSetzen(false); }
     verbindungOk = true;
     melde('Abgleich fertig.\n' + berichtText(b), 'gut');
-    pmNachpflegen();
+    /* Erst prüfen, was der Abgleich geändert hat, dann nachpflegen (0.104.3):
+       sonst hält die Prüfung unsere eigene Nacharbeit für ein zweites Gerät */
     clAbgleichNachher(vorher);
+    pmNachpflegen();
   }).catch(function (f) {
     abgleichFehler = f ? f.message : 'unbekannter Fehler';
     melde('Abgleich fehlgeschlagen.\n' + abgleichFehler, 'warn');
@@ -27814,8 +27816,9 @@ function abgleichStill() {
     verbindungOk = true;
     if (zaehler === sichernZaehler) { lokalOffen = false; ungesichertSetzen(false); }
     else { abgleichPlanen(false); }
-    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
+    /* Erst prüfen, was der Abgleich geändert hat, dann nachpflegen (0.104.3) */
     clAbgleichNachher(vorher);
+    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
     abgleichLaeuft = false;
     zeichne();
   }).catch(function (f) {
@@ -29106,7 +29109,9 @@ var PM_SORT = [['prio', 'Priorität, Datum'], ['datum', 'Datum, Priorität'], ['
 var PM_DATUM = [['woche', 'Diese Woche'], ['heute', 'Heute'], ['7', 'Nächste 7 Tage'], ['ueber', 'Überfällig'], ['alle', 'Alle mit Datum']];
 /* Seit 0.94: T = ToDo-Liste (nur Kennzeichen — die Kästchen bleiben im Memo).
    Seit 0.94.1 in dieser Reihenfolge — für Balken, Sortierung, Show… und Details */
-var PM_KUERZEL = ['T', 'A', 'P', 'Z', '–'];
+/* Seit 0.104.4 ohne „A“ (Abläufe gibt es nicht mehr), dafür „C“ für Checklisten —
+   die erkennt CLIE an der Typ-Zeile im Text */
+var PM_KUERZEL = ['T', 'C', 'P', 'Z', '–'];
 /* Das To-Do-Symbol im Kleinen: ein Blatt mit zwei Haken-Zeilen */
 var PM_TODO_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 1.5h11v13h-11z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
   + '<path d="M4.5 4.5h2.5v2.5h-2.5zM4.5 9.5h2.5v2.5h-2.5z" fill="none" stroke="currentColor" stroke-width="1.2"/>'
@@ -29350,6 +29355,32 @@ function pmListenKatNachziehen() {
    umgewandelten Checklisten tragen ihren Typ als erste Zeile im Text — bei den
    Checklisten ist das nach der Umwandlung das Einzige, was ihn noch verrät. */
 var MP_TYP = /^\s*Typ\s*:\s*(.+?)\s*$/i;
+
+/* Der Typ, wie er im Text steht — '' wenn keine Typ-Zeile oben steht (0.104.4) */
+function mpTypVon(s) {
+  var zeilen = String((s && s.text) || '').split('\n');
+  var i = 0;
+  while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+  var m = (i < zeilen.length) ? zeilen[i].match(MP_TYP) : null;
+  return m ? m[1] : '';
+}
+
+/* Setzt die Typ-Zeile oder nimmt sie weg (0.104.4) */
+function mpTypSetzen(s, typ) {
+  if (!s) { return; }
+  if (typ) {
+    var t = mpTypZeile(s.text, typ);
+    if (t !== null) { s.text = t; }
+    return;
+  }
+  var zeilen = String(s.text || '').split('\n');
+  var i = 0;
+  while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+  if (i < zeilen.length && MP_TYP.test(zeilen[i])) {
+    zeilen.splice(i, 1);
+    s.text = zeilen.join('\n');
+  }
+}
 
 /* Gibt den neuen Text oder null, wenn die Zeile schon richtig dasteht */
 function mpTypZeile(text, typ) {
@@ -30484,8 +30515,9 @@ function pmKuerzel(s) {
   if (!s) { return '–'; }
   if (s.art === 'vorhaben') { return s.typ === 'ziel' ? 'Z' : 'P'; }
   var x = s.__satz || {};
-  if (s.art === 'notiz' && x.checkliste && x.art === 'aufgaben') { return 'A'; }
   if (s.art === 'notiz' && x.todoListe === true) { return 'T'; }
+  /* Seit 0.104.4 steht der Typ als Zeile im Text, nicht mehr als Feld am Satz */
+  if (s.art === 'notiz' && mpTypVon(s) === 'Checkliste') { return 'C'; }
   return '–';
 }
 
@@ -30530,7 +30562,7 @@ function pmMemos(sicht) {
 
 var PM_KZAUS_KEY = 'clie-memo-kzaus';
 var PM_GRUPPE_KEY = 'clie-memo-gruppiert';
-var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', A: 'Abläufe', T: 'ToDo-Listen', '–': 'Sonstiges' };
+var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', C: 'Checklisten', T: 'ToDo-Listen', '–': 'Sonstiges' };
 
 /* Die ausgeschalteten Kürzel, etwa „–“ oder „Z–“ */
 function pmKzAus() {
@@ -31290,18 +31322,21 @@ function pmKuerzelSetzen(s, k) {
   if (!s || PM_KUERZEL.indexOf(k) < 0) { return s; }
   var alt = pmKuerzel(s);
   if (alt === k) { return s; }
-  /* Seit 0.80.1: auch eine alte Liste wird P, Z oder A (zieht um wie eine Notiz) — nur der Sammler nicht */
+  /* Seit 0.80.1: auch eine alte Liste wird P, Z oder C (zieht um wie eine Notiz) — nur der Sammler nicht */
   if (ckIstKorb(s)) { melde('Der Sammler bleibt, wie er ist.', null); return s; }
   var x = s.__satz;
-  if (s.art === 'notiz' && (k === 'A' || k === '–' || k === 'T')) {
-    if (k === 'A') {
-      if (!x.checkliste || x.checkliste === 'fertig') { x.checkliste = 'lauf'; x.gestartet = x.gestartet || isoDatum(); }
-      x.art = 'aufgaben';
+  if (s.art === 'notiz' && (k === 'C' || k === '–' || k === 'T')) {
+    /* Seit 0.104.4 steht der Typ im Text — „C“ setzt die Zeile, die anderen nehmen sie weg */
+    if (k === 'C') {
       delete x.todoListe;
+      mpTypSetzen(s, 'Checkliste');
     } else if (k === 'T') {
-      if (x.art === 'aufgaben') { delete x.art; }
       x.todoListe = true;
-    } else { delete x.art; delete x.todoListe; }
+      mpTypSetzen(s, '');
+    } else {
+      delete x.todoListe;
+      mpTypSetzen(s, '');
+    }
     x.geaendert = jetzt();
     return s;
   }
@@ -31313,9 +31348,10 @@ function pmKuerzelSetzen(s, k) {
   var ziel = kpSammlungVon(n);
   n.text = s.text;
   ['bereich', 'privat', 'termine', 'archiv', 'ordnung', 'zusatz', 'ausgeblendet'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
-  if (k === 'A') { ny.checkliste = 'lauf'; ny.art = 'aufgaben'; ny.gestartet = isoDatum(); }
   if (k === 'T') { ny.todoListe = true; }
   if (k === '–' && x.checkliste) { ny.checkliste = (x.checkliste === 'fertig') ? 'fertig' : 'lauf'; }
+  /* Seit 0.104.4: der Typ reist als Zeile im Text mit, nicht als Feld */
+  mpTypSetzen(n, k === 'C' ? 'Checkliste' : (k === 'P' ? 'Projekt' : (k === 'Z' ? 'Ziel' : '')));
   if (pmArchiviert(s)) { ny.archiv = true; }
   DB[von] = (DB[von] || []).filter(function (y) { return y !== x; });
   grabsteinSetzen(von, x.id);
@@ -31420,8 +31456,9 @@ function pmKopieren(s, titel, vorlage) {
   var ny = n.__satz;
   n.text = memoTextLeer(pmOhneMarken(s.text));
   katPrivatSchreiben(ny, { bereich: x.bereich || '', privat: !!x.privat });
-  if (k === 'A') { ny.art = 'aufgaben'; }
-  if (k === 'A' || (s.art === 'notiz' && x.checkliste)) { ny.checkliste = vorlage ? 'vorlage' : 'lauf'; }
+  if (s.art === 'notiz' && x.checkliste) { ny.checkliste = vorlage ? 'vorlage' : 'lauf'; }
+  /* Seit 0.104.4: der Typ reist als Zeile im Text mit */
+  mpTypSetzen(n, k === 'C' ? 'Checkliste' : (k === 'P' ? 'Projekt' : (k === 'Z' ? 'Ziel' : '')));
   if (vorlage) { ny.istVorlage = true; if (n.art === 'vorhaben') { n.zustand = 'ruht'; } }
   else {
     delete ny.istVorlage;

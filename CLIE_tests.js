@@ -8543,7 +8543,7 @@ function palmDetailsTest() {
 }
 
 function palmMemoTest() {
-  console.log('\n134. Memo Pad: Kürzel P · Z · A · –, Vorlagen, Archiv, Details (0.80)');
+  console.log('\n134. Memo Pad: Kürzel P · Z · C · –, Vorlagen, Archiv, Details (0.80, Typen seit 0.104.4)');
   if (!CL) { return; }
   const S = pmFrisch();
   const heute = S.isoDatum();
@@ -8553,7 +8553,7 @@ function palmMemoTest() {
   S.DB.projekte.push({ id: 'p2', name: 'Carport', flaeche: '', status: 'laufend', kontext: 'privat', bereich: haus, ordnung: 2, geaendert: 1 });
   S.DB.ziele.push({ id: 'z1', name: 'Haus auf Stand bringen 2026', flaeche: '', status: 'laufend', kontext: 'privat', bereich: haus, ordnung: 3, geaendert: 1 });
   S.DB.gedanken.push({ id: 'g1', titel: 'Reparaturliste', text: '## Innen\n[] Tür Bad quietscht\n[x] Rauchmelder Batterie\n- Leiter vom Nachbarn leihen\n**Material**: Silikon', kontext: 'privat', bereich: haus, ordnung: 4, geaendert: 1 });
-  S.DB.gedanken.push({ id: 'g2', titel: 'DFÜ-Abruftest', text: '[] Build-Lauf kontrollieren', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', ordnung: 5, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'g2', titel: 'DFÜ-Abruftest', text: 'Typ: Checkliste\n[] Build-Lauf kontrollieren', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 5, geaendert: 1 });
   S.DB.gedanken.push({ id: 'g3', titel: 'Bad renovieren', text: 'fertig', kontext: 'privat', bereich: haus, archiv: true, ordnung: 6, geaendert: 1 });
   S.DB.gedanken.push({ id: 'g4', titel: 'Packliste', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 7, geaendert: 1 });
   S.__ablage['clie-memo-gruppiert'] = '0';
@@ -8561,7 +8561,7 @@ function palmMemoTest() {
   let h = inhalt();
   const titel = (h.match(/<span class="tx">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
   const kz = (h.match(/<span class="mz kz">([^<]+)/g) || []).map(x => x.replace(/.*>/, ''));
-  pruefe(titel.join(' | ') === 'Carport | DFÜ-Abruftest | Haus auf Stand bringen 2026 | Keller umbauen | Reparaturliste' && kz.join('') === 'PAZP–',
+  pruefe(titel.join(' | ') === 'Carport | DFÜ-Abruftest | Haus auf Stand bringen 2026 | Keller umbauen | Reparaturliste' && kz.join('') === 'PCZP–',
     'Liste: Kürzel als eigene Spalte, alphabetisch (seit 0.84) — ' + titel.join(' | '));
   pruefe(!/Bad renovieren|Packliste/.test(h) && !/<small/.test(h) && !/◎|☑|⇢|✎|◇/.test(h) && !/class="mz nr"/.test(h), 'ohne Archiv und Vorlagen; keine Zeichen, keine Zahlen');
   S.katSetzen(haus);
@@ -8598,14 +8598,14 @@ function palmMemoTest() {
   /* Details: Kürzel */
   S.pmMemoDetails();
   dd = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'pmmemo' && /pmKuerzelWahl\('P'\)/.test(dd) && /pmKuerzelWahl\('A'\)/.test(dd) && /class="an" onclick="pmKuerzelWahl\('–'\)"/.test(dd) && /id="pmMKat"/.test(dd), 'Details: Titel, Kürzel P · Z · A · – (an: –), Kategorie, privat');
+  pruefe(S.cl.aufklapp === 'pmmemo' && /pmKuerzelWahl\('P'\)/.test(dd) && /pmKuerzelWahl\('C'\)/.test(dd) && /class="an" onclick="pmKuerzelWahl\('–'\)"/.test(dd) && /id="pmMKat"/.test(dd), 'Details: Titel, Kürzel P · Z · C · – (an: –), Kategorie, privat');
   S.document.getElementById('pmMTitel').value = 'Reparaturliste';
   S.document.getElementById('pmMKat').value = haus;
-  S.pmKuerzelWahl('A');
+  S.pmKuerzelWahl('C');
   S.document.getElementById('pmMTitel').value = 'Reparaturliste';
   S.pmMemoSpeichern();
   const g1 = S.DB.gedanken.filter(g => g.id === 'g1')[0];
-  pruefe(g1.checkliste === 'lauf' && g1.art === 'aufgaben' && S.pmKuerzel(S.kpSeiteFinden('g1')) === 'A', 'Kürzel A: die Notiz wird Ablauf (bleibt in „gedanken“)');
+  pruefe(S.pmKuerzel(S.kpSeiteFinden('g1')) === 'C' && /^Typ: Checkliste/.test(g1.text), 'Kürzel C: die Notiz wird Checkliste, der Typ steht im Text (0.104.4)');
   S.pmMemoDetails(); S.document.getElementById('pmMTitel').value = 'Reparaturliste'; S.pmKuerzelWahl('P'); S.document.getElementById('pmMTitel').value = 'Reparaturliste'; S.pmMemoSpeichern();
   const p = S.DB.projekte.filter(x => x.id === 'g1')[0];
   pruefe(p && p.name === 'Reparaturliste' && /Tür Bad/.test(p.flaeche) && p.bereich === haus && !S.DB.gedanken.some(g => g.id === 'g1') && S.DB.grabsteine.some(g => g.s === 'gedanken' && g.id === 'g1') && S.cl.memo.id === 'g1',
@@ -8814,7 +8814,9 @@ function palmUmstellungTest() {
   const tn = S.DB.themen.filter(x => x.id === 'tn')[0];
   pruefe(n >= 1 && A('Aus der Workbench') && !A('Ablage') && !tn.archiv && tn.text === '[] Ablage',
     'Nachpflegen: Sammler-Zeile wird Aufgabe — eine neue Liste bleibt, wie sie ist (seit 0.81) — ' + n);
-  pruefe(/try \{ pmNachpflegen\(\); \} catch \(e\) \{ clFehlerZeigen\(e, 'pmNachpflegen'\); \}   \/\* Palm-Modell/.test(SKRIPT) && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);\n    pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
+  /* Seit 0.104.3 steht die Konfliktprüfung dazwischen — nachgepflegt wird weiterhin */
+  pruefe(/try \{ pmNachpflegen\(\); \} catch \(e\) \{ clFehlerZeigen\(e, 'pmNachpflegen'\); \}   \/\* Palm-Modell/.test(SKRIPT)
+    && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);[\s\S]{0,260}?pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
   /* Memo Pad danach */
   S.oeffne('memo'); S.memoArtSetzen('alles');
   pruefe(/>Haus</.test(inhalt()) && /Büro/.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: Listen stehen als Memos (–) in der Liste, der leere Sammler nicht');
@@ -9058,8 +9060,8 @@ function memoSortTest() {
   /* Show… */
   S.pmMShowAuf();
   f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'pmmshow' && ['P', 'Z', 'A', '–'].every(k => f.indexOf(`class="an" onclick="pmMShowKz('${k}')"`) >= 0) && /id="pmMsSpalte" type="checkbox" checked> Kürzel-Spalte zeigen/.test(f) && /id="pmMsGruppe" type="checkbox" checked> Gruppiert/.test(f) && /id="pmMsAus" type="checkbox"> Ausgeblendete zeigen/.test(f),
-    'Show…: Typen P · Z · A · – (an), Kürzel-Spalte zeigen (an), Gruppiert (an, seit 0.93), Ausgeblendete zeigen');
+  pruefe(S.cl.aufklapp === 'pmmshow' && ['P', 'Z', 'C', '–'].every(k => f.indexOf(`class="an" onclick="pmMShowKz('${k}')"`) >= 0) && /id="pmMsSpalte" type="checkbox" checked> Kürzel-Spalte zeigen/.test(f) && /id="pmMsGruppe" type="checkbox" checked> Gruppiert/.test(f) && /id="pmMsAus" type="checkbox"> Ausgeblendete zeigen/.test(f),
+    'Show…: Typen P · Z · C · – (an), Kürzel-Spalte zeigen (an), Gruppiert (an, seit 0.93), Ausgeblendete zeigen');
   S.pmMShowKz('–');
   ['pmMsSpalte', 'pmMsGruppe', 'pmMsAus'].forEach(id => { S.document.getElementById(id).checked = (id === 'pmMsAus'); });
   S.pmMShowOk();
@@ -9697,7 +9699,7 @@ function typTTest() {
   ['clie-memo-kzaus', 'clie-memo-gruppiert', 'clie-memo-spalte', 'clie-memo-ausgebl', 'clie-memo-gruppe-art'].forEach(k => delete S.__ablage[k]);
   S.katSetzen('alle');
   S.DB.gedanken.push({ id: 'tt1', titel: 'Baumarkt Samstag', text: '[] Silikon\n[] Dübel', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
-  S.DB.gedanken.push({ id: 'tt2', titel: 'DFÜ-Abruftest', text: '[] a', kontext: 'beruflich', bereich: 'kb-arbeit', checkliste: 'lauf', art: 'aufgaben', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'tt2', titel: 'DFÜ-Abruftest', text: 'Typ: Checkliste\n[] a', kontext: 'beruflich', bereich: 'kb-arbeit', ordnung: 2, geaendert: 1 });
   S.DB.projekte.push({ id: 'tt3', name: 'Packen Borkum', flaeche: '', status: 'laufend', kontext: 'privat', bereich: '', ordnung: 3, geaendert: 1 });
   const seite = id => S.kpSeiteFinden(id);
   const aufgVorher = (S.DB.aufgaben || []).length;
@@ -9706,9 +9708,9 @@ function typTTest() {
   pruefe((S.DB.aufgaben || []).length === aufgVorher && S.DB.gedanken.filter(g => g.id === 'tt1')[0].text === '[] Silikon\n[] Dübel', 'Kästchen bleiben im Memo — keine Aufgaben im To Do');
   S.pmKuerzelSetzen(seite('tt2'), 'T');
   const a2 = S.DB.gedanken.filter(g => g.id === 'tt2')[0];
-  pruefe(S.pmKuerzel(seite('tt2')) === 'T' && a2.art !== 'aufgaben', 'Ablauf → T: kein Ablauf mehr');
-  S.pmKuerzelSetzen(seite('tt2'), 'A');
-  pruefe(S.pmKuerzel(seite('tt2')) === 'A' && !a2.todoListe, 'T → A: Kennzeichen weg');
+  pruefe(S.pmKuerzel(seite('tt2')) === 'T' && !/Typ:/.test(a2.text), 'Checkliste → T: die Typ-Zeile ist weg (0.104.4)');
+  S.pmKuerzelSetzen(seite('tt2'), 'C');
+  pruefe(S.pmKuerzel(seite('tt2')) === 'C' && !a2.todoListe && /^Typ: Checkliste/.test(a2.text), 'T → C: Typ-Zeile wieder da, Kennzeichen weg');
   const n3 = S.pmKuerzelSetzen(seite('tt3'), 'T');
   pruefe(n3 && S.pmKuerzel(n3) === 'T' && !S.DB.projekte.some(p => p.id === 'tt3'), 'Projekt → T: wird ein Memo mit Kennzeichen');
   S.pmKuerzelSetzen(seite('tt3'), '–');
@@ -9716,7 +9718,7 @@ function typTTest() {
   S.pmKuerzelSetzen(seite('tt3'), 'T');
   S.oeffne('memo'); S.memoArtSetzen('alles'); S.pmGruppeArtSetzen('typ');
   const h = inhalt();
-  pruefe(/<div class="pm-bal">ToDo-Listen<small>2<\/small>/.test(h) && h.indexOf('>ToDo-Listen<') < h.indexOf('>Abläufe<') && h.indexOf('>ToDo-Listen<') < h.indexOf('Baumarkt') && h.indexOf('Baumarkt') < h.indexOf('Packen Borkum'), 'Balken „ToDo-Listen 2“ ganz oben (seit 0.94.1), darin alphabetisch');
+  pruefe(/<div class="pm-bal">ToDo-Listen<small>2<\/small>/.test(h) && h.indexOf('>ToDo-Listen<') < h.indexOf('>Checklisten<') && h.indexOf('>ToDo-Listen<') < h.indexOf('Baumarkt') && h.indexOf('Baumarkt') < h.indexOf('Packen Borkum'), 'Balken „ToDo-Listen 2“ ganz oben (seit 0.94.1), darin alphabetisch');
   S.pmGruppeArtSetzen('kat');
   pruefe(/class="mz kz">T<\/span><span class="tx">Baumarkt Samstag/.test(inhalt()), 'nach Kategorie: Kürzel T vorn');
   S.pmMemoOeffnen('tt1', ''); S.pmMemoDetails();
@@ -9733,27 +9735,27 @@ function typTTest() {
 
 
 function typReihenfolgeTest() {
-  console.log('\n160. Reihenfolge der Typen: ToDo-Listen · Abläufe · Projekte · Ziele · Sonstiges (0.94.1)');
+  console.log('\n160. Reihenfolge der Typen: ToDo-Listen · Checklisten · Projekte · Ziele · Sonstiges (0.94.1, Typen seit 0.104.4)');
   if (!CL) { return; }
   /* Fehlerart: Balken, Show… und Details in unterschiedlicher Reihenfolge */
   const S = pmFrisch();
   ['clie-memo-kzaus', 'clie-memo-gruppiert', 'clie-memo-gruppe-art'].forEach(k => delete S.__ablage[k]);
   S.katSetzen('alle');
   S.DB.gedanken.push({ id: 'r1', titel: 'Liste', text: '', kontext: 'privat', bereich: '', todoListe: true, ordnung: 1, geaendert: 1 });
-  S.DB.gedanken.push({ id: 'r2', titel: 'Ablauf', text: '[] a', kontext: 'privat', bereich: '', checkliste: 'lauf', art: 'aufgaben', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'r2', titel: 'Checkliste', text: 'Typ: Checkliste\n[] a', kontext: 'privat', bereich: '', ordnung: 2, geaendert: 1 });
   S.DB.projekte.push({ id: 'r3', name: 'Projekt', flaeche: '', status: 'laufend', kontext: 'privat', bereich: '', ordnung: 3, geaendert: 1 });
   S.DB.ziele.push({ id: 'r4', name: 'Ziel', flaeche: '', status: 'laufend', kontext: 'privat', bereich: '', ordnung: 4, geaendert: 1 });
   S.DB.gedanken.push({ id: 'r5', titel: 'Notiz', text: 'x', kontext: 'privat', bereich: '', ordnung: 5, geaendert: 1 });
   S.oeffne('memo'); S.memoArtSetzen('alles'); S.pmGruppeArtSetzen('typ');
   const bal = (inhalt().match(/<div class="pm-bal">([^<]+)</g) || []).map(x => x.replace(/.*>/, '').replace('<', ''));
-  pruefe(bal.join(' · ') === 'ToDo-Listen · Abläufe · Projekte · Ziele · Sonstiges', 'Balken: ' + bal.join(' · '));
+  pruefe(bal.join(' · ') === 'ToDo-Listen · Checklisten · Projekte · Ziele · Sonstiges', 'Balken: ' + bal.join(' · '));
   S.pmMShowAuf();
   const kz = (S.document.getElementById('aufklapp').innerHTML.match(/pmMShowKz\('(.)'\)/g) || []).map(x => x.charAt(11));
-  pruefe(kz.join('') === 'TAPZ–', 'Show…: T A P Z –');
+  pruefe(kz.join('') === 'TCPZ–', 'Show…: T C P Z –');
   S.aufklappZu();
   S.pmMemoOeffnen('r5', ''); S.pmMemoDetails();
   const dk = (S.document.getElementById('aufklapp').innerHTML.match(/pmKuerzelWahl\('(.)'\)/g) || []).map(x => x.charAt(15));
-  pruefe(dk.join('') === 'TAPZ–V', 'Details: T A P Z – V');
+  pruefe(dk.join('') === 'TCPZ–V', 'Details: T C P Z – V');
   S.aufklappZu();
   S.pmGruppeArtSetzen('kat');
   S.oeffne('uebersicht');
@@ -10913,6 +10915,75 @@ function mpVorlagenZurueckTest() {
   S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: die Anwendung hält ihre eigene Nacharbeit für die Änderung eines zweiten
+   Geräts. Das Nachpflegen lief vor der Konfliktprüfung, also meldete jeder Durchlauf
+   „Auf zwei Geräten gleichzeitig geändert“ — bei jedem Tippen im Memo. Die Prüfung muss
+   sehen, was der Abgleich geändert hat, nicht was danach passiert. */
+function clAbgleichReihenfolgeTest() {
+  console.log('\n197. Abgleich: erst die Konfliktprüfung, dann das Nachpflegen — keine falschen Konfliktmeldungen (0.104.3)');
+  if (!CL) { return; }
+  const S = CL;
+
+  const stellen = SKRIPT.split('clAbgleichNachher(vorher);');
+  pruefe(stellen.length === 3, 'die Konfliktprüfung steht an genau zwei Stellen');
+  stellen.slice(0, 2).forEach(function (vor, i) {
+    const davor = vor.slice(-400);
+    pruefe(davor.indexOf('pmNachpflegen()') < 0, 'Stelle ' + (i + 1) + ': das Nachpflegen läuft nicht davor');
+  });
+  pruefe(/clAbgleichNachher\(vorher\);\s*\n\s*pmNachpflegen\(\);/.test(SKRIPT)
+    || /clAbgleichNachher\(vorher\);[\s\S]{0,200}?pmNachpflegen\(\);/.test(SKRIPT), 'das Nachpflegen folgt danach');
+
+  /* und die Prüfung selbst meldet nur, was sich wirklich geändert hat */
+  frisch();
+  S.DB.gedanken.push({ id: 'm1', titel: 'Packliste', text: 'a\n', kontext: 'privat', ordnung: 1, geaendert: 1000 });
+  const vorher = [{ s: 'gedanken', id: 'm1', g: 1000, titel: 'Packliste' }];
+  pruefe(S.clAbgleichNachher(vorher).length === 0, 'unverändert: keine Meldung');
+  S.DB.gedanken[0].geaendert = 2000;
+  pruefe(S.clAbgleichNachher(vorher).length === 1, 'wirklich ersetzt: eine Meldung');
+
+  S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: die Typ-Zeile steht nur als Text da und bedeutet nichts — dann ist eine
+   Checkliste nach dem Zurückbauen nicht mehr als solche erkennbar, und der Show-Dialog
+   bietet weiter eine Art an, die es nicht mehr gibt. */
+function mpTypErkennenTest() {
+  console.log('\n198. Memo Pad: die Typ-Zeile bestimmt den Typ, Show kennt T · C · P · Z · – (0.104.4)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  S.DB.gedanken.push({ id: 'c9', titel: 'Packliste', text: 'Typ: Checkliste\n[ ] Regenjacke\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'n9', titel: 'Gedanke', text: 'nur Text\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 't9', titel: 'Baumarkt', text: '[] Silikon\n', kontext: 'privat', todoListe: true, ordnung: 3, geaendert: 1 });
+
+  pruefe(S.mpTypVon(S.kpSeiteFinden('c9')) === 'Checkliste', 'die Typ-Zeile wird gelesen');
+  pruefe(S.pmKuerzel(S.kpSeiteFinden('c9')) === 'C', 'daraus wird das Kürzel C');
+  pruefe(S.pmKuerzel(S.kpSeiteFinden('n9')) === '–', 'eine Notiz ohne Typ-Zeile bleibt Sonstiges');
+  pruefe(S.pmKuerzel(S.kpSeiteFinden('t9')) === 'T', 'eine ToDo-Liste bleibt T');
+  pruefe(S.PM_GRUPPEN.C === 'Checklisten' && S.PM_GRUPPEN.A === undefined, 'die Gruppe heißt Checklisten, Abläufe gibt es nicht mehr');
+
+  /* Typ umschalten schreibt die Zeile, nicht ein Feld */
+  const s = S.kpSeiteFinden('n9');
+  S.pmKuerzelSetzen(s, 'C');
+  const n9 = S.DB.gedanken.filter(g => g.id === 'n9')[0];
+  pruefe(/^Typ: Checkliste/.test(n9.text) && !n9.checkliste, 'C setzen schreibt die Typ-Zeile, kein Feld am Satz');
+  pruefe(S.pmKuerzel(S.kpSeiteFinden('n9')) === 'C', 'und wird sofort erkannt');
+  S.pmKuerzelSetzen(S.kpSeiteFinden('n9'), '–');
+  pruefe(!/Typ:/.test(S.DB.gedanken.filter(g => g.id === 'n9')[0].text) && S.pmKuerzel(S.kpSeiteFinden('n9')) === '–', 'auf – zurück nimmt die Zeile wieder weg');
+  pruefe(S.DB.gedanken.filter(g => g.id === 'n9')[0].text.indexOf('nur Text') === 0, 'der übrige Text bleibt unberührt');
+
+  /* der Show-Dialog */
+  S.oeffne('memo');
+  S.pmMShowAuf();
+  const f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(f.indexOf("pmMShowKz('C')") >= 0 && f.indexOf("pmMShowKz('A')") < 0, 'Show bietet C an, A nicht mehr');
+  pruefe(f.indexOf('aria-label="Checklisten"') >= 0, 'mit der Beschriftung Checklisten');
+  S.aufklappZu();
+
+  S.cl.pm.mshow = null; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11105,6 +11176,8 @@ function mpVorlagenZurueckTest() {
   try { mpArtenAufraeumenTest(); } catch (e) { fail('0.104.0 Memo Pad zurückbauen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmListeBleibtGeloeschtTest(); } catch (e) { fail('0.104.1 gelöschte Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpVorlagenZurueckTest(); } catch (e) { fail('0.104.2 Vorlagen zurück warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { clAbgleichReihenfolgeTest(); } catch (e) { fail('0.104.3 Abgleich-Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { mpTypErkennenTest(); } catch (e) { fail('0.104.4 Typ-Erkennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
