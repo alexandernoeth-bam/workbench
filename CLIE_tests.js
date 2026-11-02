@@ -11058,6 +11058,36 @@ function pmReihenfolgeTest() {
   S.cl.pm.wahl = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: die App rennt bis zum Abmelden gegen dieselbe Wand. Der Unterbau merkt sich
+   die Drive-Kennung für die ganze Sitzung; darf er die Datei plötzlich nicht mehr
+   beschreiben, hilft weder Umbenennen noch Papierkorb — nur ein Neustart. Nach 403/404
+   muss die Kennung fallen, damit der nächste Versuch neu sucht. */
+function clDriveKennungTest() {
+  console.log('\n201. Abgleich: nach 403 wird die gemerkte Datei-Kennung verworfen (0.105.1)');
+  if (!CL) { return; }
+  const S = CL;
+
+  S.driveDateiId = 'alte-kennung'; S.driveStand = '2026-11-02T15:00:00Z';
+  pruefe(S.clDriveKennungVerwerfen({ message: 'Drive verweigert den Zugriff (403). …' }) === true, 'ein 403 verwirft die Kennung');
+  pruefe(S.driveDateiId === '' && S.driveStand === '', 'Kennung und Stand sind leer');
+
+  S.driveDateiId = 'alte-kennung';
+  pruefe(S.clDriveKennungVerwerfen({ message: 'Drive antwortete mit 404: nicht gefunden' }) === true && S.driveDateiId === '', 'ein 404 ebenfalls');
+
+  S.driveDateiId = 'alte-kennung';
+  pruefe(S.clDriveKennungVerwerfen({ message: 'Netzwerkfehler' }) === false && S.driveDateiId === 'alte-kennung', 'andere Fehler lassen sie stehen');
+  pruefe(S.clDriveKennungVerwerfen(null) === false, 'ohne Fehlerobjekt passiert nichts');
+
+  S.driveDateiId = '';
+  pruefe(S.clDriveKennungVerwerfen({ message: '403' }) === false, 'ohne gemerkte Kennung gibt es nichts zu verwerfen');
+
+  /* und der Unterbau bleibt unangetastet */
+  pruefe(/function driveHochladen\(\) \{\s*var text = alsText\(\);\s*var los = driveDateiId \? Promise\.resolve\(driveDateiId\)/.test(SKRIPT),
+    'driveHochladen selbst ist unverändert — es muss wörtlich der Workbench entsprechen');
+
+  S.driveDateiId = ''; S.driveStand = '';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11254,6 +11284,7 @@ function pmReihenfolgeTest() {
   try { mpTypErkennenTest(); } catch (e) { fail('0.104.4 Typ-Erkennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmListenNichtImMemoTest(); } catch (e) { fail('0.104.5 Listen nicht im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
