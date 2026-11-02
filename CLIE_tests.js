@@ -10460,7 +10460,8 @@ function todoListenBildschirmTest() {
   pruefe(kurz.length === lang.length, 'das ▼ ist mit 40 Listen genauso lang wie mit einer');
   pruefe(lang.indexOf('Reparaturen Haus') < 0 && lang.indexOf('Liste 40') < 0, 'im ▼ steht keine einzelne Liste mehr');
   pruefe(lang.indexOf('todoListen()') >= 0 && lang.indexOf('Sammler') >= 0 && lang.indexOf('todoRoutinen()') >= 0, 'das ▼ hat Listen…, Sammler und Routinen');
-  pruefe(S.aufFussHtml().indexOf('todoListen()') >= 0, 'die Tagesansicht hat den Knopf Listen');
+  /* Die To-Do-Leiste ist pmTodoFussHtml aus cl_palm.js — aufFussHtml wird nicht benutzt (0.101.1) */
+  pruefe(S.pmTodoFussHtml().indexOf('todoListen()') >= 0, 'die To-Do-Leiste hat den Knopf Listen');
 
   /* der Bildschirm selbst */
   S.cl.app = 'checklisten'; S.cl.cls.id = ''; S.cl.cls.sicht = ''; S.cl.cls.suche = ''; S.cl.cls.mehr = false;
