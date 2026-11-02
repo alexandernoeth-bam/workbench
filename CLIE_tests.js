@@ -10836,6 +10836,48 @@ function mpArtenAufraeumenTest() {
   S.cl.memo.sicht = 'alles'; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: ein gelöschter Datensatz kommt zurück. Weil die Kennung einer abgeleiteten
+   Liste aus ihrer Quelle stammt, legte das Nachpflegen sie nach dem Löschen mit frischem
+   Zeitstempel neu an — jünger als ihr eigener Löschvermerk. Der Abgleich hielt sie dann
+   für eine Neuanlage und meldete einen Konflikt. Der Löschvermerk muss gelten. */
+function pmListeBleibtGeloeschtTest() {
+  console.log('\n195. To Do: eine gelöschte Liste wird nicht wieder angelegt — kein Wiederauferstehen, kein Konflikt (0.104.1)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.einstellungen.palm = true;
+  S.ckKorb(true);
+
+  S.DB.gedanken.push({ id: 'g5', titel: 'Keller', text: 'Text\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  const a = S.pmNeueAufgabe({ titel: 'Regale', prio: 3, memo: { id: 'g5', zeile: '' } });
+  pruefe(a.themaId === 'cl-memo-g5', 'die Aufgabe liegt in der abgeleiteten Liste');
+
+  /* Liste löschen, wie es clsLoeschen tut */
+  S.cl.cls.id = 'cl-memo-g5';
+  S.clsLoeschen();
+  pruefe(!S.pmListeSatz('cl-memo-g5') && a.themaId === S.CK_KORB_ID, 'die Liste ist weg, die Aufgabe im Sammler');
+  pruefe(S.DB.grabsteine.some(g => g.s === 'themen' && g.id === 'cl-memo-g5'), 'mit Löschvermerk');
+
+  /* und bleibt weg, auch wenn die Aufgabe wieder auf sie zeigt */
+  a.themaId = 'cl-memo-g5';
+  S.pmListenNachziehen();
+  pruefe(!S.pmListeSatz('cl-memo-g5'), 'das Nachpflegen legt sie nicht wieder an');
+  pruefe(a.themaId === S.CK_KORB_ID, 'die Aufgabe landet stattdessen im Sammler');
+  pruefe(S.pmListeFuerMemo(S.kpSeiteFinden('g5')) === null, 'auch direkt lässt sie sich nicht neu anlegen');
+
+  /* eine neue Aufgabe aus derselben Notiz ebenfalls in den Sammler */
+  const b = S.pmNeueAufgabe({ titel: 'Noch was', prio: 3, memo: { id: 'g5', zeile: '' } });
+  pruefe(b.themaId === S.CK_KORB_ID, 'eine neue Aufgabe aus der Notiz geht in den Sammler');
+
+  /* dasselbe für die Routinen-Liste */
+  S.cl.cls.id = S.pmRoutinenListeId('privat');
+  pruefe(S.cl.cls.id === S.PM_ROUTINEN_ID, 'die Routinen-Liste entsteht');
+  S.clsLoeschen();
+  pruefe(S.pmRoutinenListeId('privat') === S.CK_KORB_ID, 'nach dem Löschen fallen Routinen auf den Sammler zurück');
+
+  S.cl.cls.id = ''; S.DB.einstellungen.palm = false; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11026,6 +11068,7 @@ function mpArtenAufraeumenTest() {
   try { pmAufgabeVerschiebenTest(); } catch (e) { fail('0.103.1 Aufgabe verschieben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clPrivatKategorieTest(); } catch (e) { fail('0.103.2 Kategorie Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpArtenAufraeumenTest(); } catch (e) { fail('0.104.0 Memo Pad zurückbauen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListeBleibtGeloeschtTest(); } catch (e) { fail('0.104.1 gelöschte Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
