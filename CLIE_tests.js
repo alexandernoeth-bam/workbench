@@ -10502,6 +10502,50 @@ function todoListenReiterTest() {
   S.cl.filter = 'alle'; S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: eine Aufgabe landet in der falschen Liste, weil ihre Herkunft nicht beachtet
+   wird — Memo-Aufgaben in den Sammler geschüttet, Routinen gleich mit. Und: zwei Geräte
+   legen für dieselbe Quelle zwei Listen an, weil die Kennung zufällig vergeben wird. */
+function pmListenNachziehenTest() {
+  console.log('\n188. To Do: je Memo-Notiz eine Liste, Routinen in der Liste „Routinen“, Kennung aus der Quelle (0.102.1)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.einstellungen.palm = true;
+
+  /* eine Notiz mit zwei verbundenen Aufgaben */
+  S.DB.gedanken.push({ id: 'g1', titel: 'Carport', text: '[ ] Angebote einholen\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  const a1 = S.pmNeueAufgabe({ titel: 'Angebote einholen', prio: 1, memo: { id: 'g1', zeile: '' } });
+  const a2 = S.pmNeueAufgabe({ titel: 'Statik sortieren', prio: 2, memo: { id: 'g1', zeile: '' } });
+  pruefe(a1.themaId === 'cl-memo-g1' && a2.themaId === a1.themaId, 'neue Aufgaben einer Notiz landen in deren Liste');
+  pruefe(S.pmListeName('cl-memo-g1') === 'Carport', 'die Liste heißt wie die Notiz');
+  pruefe(S.DB.themen.filter(t => t.id === 'cl-memo-g1').length === 1, 'nur eine Liste je Notiz');
+
+  /* Kennung aus der Quelle: ein zweiter Durchlauf legt nichts Neues an */
+  const vorher = S.DB.themen.length;
+  S.pmListeFuerMemo(S.kpSeiteFinden('g1'));
+  pruefe(S.DB.themen.length === vorher, 'ein zweiter Durchlauf legt keine zweite Liste an');
+
+  /* alte Aufgaben ohne Liste werden nachgezogen */
+  const alt = S.pmNeueAufgabe({ titel: 'Alt ohne Liste', prio: 3 });
+  alt.themaId = null;
+  const altMemo = S.pmNeueAufgabe({ titel: 'Alt aus Notiz', prio: 3, memo: { id: 'g1', zeile: '' } });
+  altMemo.themaId = null;
+  const rt = S.pmNeueAufgabe({ titel: 'Müll rausstellen', prio: 3 });
+  rt.themaId = null;
+  rt.wiederholung = { takt: 'woche', intervall: 1, tage: [1], tag: 1 };
+  pruefe(S.pmListenNachziehen() === 3, 'drei Aufgaben ohne Liste werden nachgezogen');
+  pruefe(alt.themaId === S.CK_KORB_ID, 'ohne Herkunft in den Sammler');
+  pruefe(altMemo.themaId === 'cl-memo-g1', 'aus einer Notiz in deren Liste');
+  pruefe(rt.themaId === S.PM_ROUTINEN_ID && S.pmListeName(S.PM_ROUTINEN_ID) === 'Routinen', 'eine Routine in die Liste Routinen');
+  pruefe(S.pmListenNachziehen() === 0, 'ein zweiter Lauf ändert nichts mehr');
+
+  /* keine Aufgabe bleibt ohne Liste */
+  pruefe((S.DB.aufgaben || []).every(a => S.pmListeSatz(a.themaId)), 'nach dem Nachziehen hat jede Aufgabe eine Liste');
+
+  S.DB.einstellungen.palm = false;
+  S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10685,6 +10729,7 @@ function todoListenReiterTest() {
   try { lkStapelFensterTest(); } catch (e) { fail('0.99.3 Lernkartei-Stapel-Fenster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelAbgleichTest(); } catch (e) { fail('0.100.0 Lernkartei-Stapel im Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todoListenReiterTest(); } catch (e) { fail('0.102.0 Reiter Listen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListenNachziehenTest(); } catch (e) { fail('0.102.1 Listen nachziehen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

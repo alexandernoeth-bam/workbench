@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.102.0</title>
+<title>CLIE 0.102.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.102.0';
+var APP_VERSION = '0.102.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -15251,7 +15251,9 @@ function rtSpeichern() {
   var a = f.id ? rtFinden(f.id) : null;
   if (!a) {
     /* Dieselbe Gestalt wie eine neue Routine in der Workbench */
-    a = { id: neueKennung(), titel: '', beschreibung: '', kontext: f.kontext, themaId: null, projektId: null, frist: '',
+    /* Seit 0.102.1 liegen Routinen in der festen Liste „Routinen“, nicht im Sammler */
+    a = { id: neueKennung(), titel: '', beschreibung: '', kontext: f.kontext,
+          themaId: pmListeAnlegen(PM_ROUTINEN_ID, 'Routinen', { kontext: f.kontext }).id, projektId: null, frist: '',
           planung: 'backlog', uhrzeit: '', art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
           zuletztErledigt: null, ablaufSchritt: null, ab: '', geaendert: jetzt() };
     if (!Array.isArray(DB.aufgaben)) { DB.aufgaben = []; }
@@ -29149,6 +29151,64 @@ function pmListen() {
   });
 }
 
+/* ---------- Listen nachziehen (seit 0.102.1) ----------
+   Aufgaben aus einer Memo-Notiz bekommen eine Liste je Notiz, Routinen die feste Liste
+   „Routinen“, alles andere den Sammler. Die Kennung der Liste wird aus der Kennung ihrer
+   Quelle abgeleitet: so legen zwei Geräte dieselbe Liste an und der Abgleich führt sie
+   zusammen, statt sie zu verdoppeln. */
+var PM_ROUTINEN_ID = 'cl-routinen';
+
+function pmListeAnlegen(id, name, muster) {
+  var t = pmListeSatz(id);
+  if (t) { return t; }
+  if (!Array.isArray(DB.themen)) { DB.themen = []; }
+  var m = muster || {};
+  t = { id: id, name: String(name || 'Liste').trim().slice(0, 200) || 'Liste',
+        kontext: (m.kontext === 'beruflich') ? 'beruflich' : 'privat',
+        text: '', ordnung: kpNaechsterRang(), geaendert: jetzt() };
+  if (m.bereich) { t.bereich = m.bereich; }
+  DB.themen.push(t);
+  return t;
+}
+
+function pmListeFuerMemo(s) {
+  return pmListeAnlegen('cl-memo-' + s.id, String(s.titel || 'Notiz'),
+    { kontext: s.kontext, bereich: (s.__satz || {}).bereich });
+}
+
+/* Die Liste einer neuen Aufgabe: gewählt, sonst die offene Liste, sonst die Liste der
+   Notiz, aus der sie stammt, sonst der Sammler */
+function pmListeNeuZiel(f) {
+  var g = f || {};
+  if (g.liste && pmListeSatz(g.liste)) { return g.liste; }
+  if (cl.pm.tab === 'liste' && pmListeSatz(cl.pm.liste)) { return cl.pm.liste; }
+  if (g.memo && g.memo.id) {
+    var s = kpSeiteFinden(g.memo.id);
+    if (s) { return pmListeFuerMemo(s).id; }
+  }
+  ckKorb(true);
+  return CK_KORB_ID;
+}
+
+function pmListenNachziehen() {
+  var n = 0;
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.id || pmListeSatz(a.themaId)) { return; }
+    var ziel = '';
+    if (a.wiederholung) {
+      ziel = pmListeAnlegen(PM_ROUTINEN_ID, 'Routinen', { kontext: a.kontext, bereich: a.bereich }).id;
+    } else if (a.memo && a.memo.id) {
+      var s = pmMemoVon(a);
+      if (s) { ziel = pmListeFuerMemo(s).id; }
+    }
+    if (!ziel) { ckKorb(true); ziel = CK_KORB_ID; }
+    a.themaId = ziel;
+    a.geaendert = jetzt();
+    n++;
+  });
+  return n;
+}
+
 function pmListenWahlAuf() {
   cl.aufklapp = (cl.aufklapp === 'pmliste') ? '' : 'pmliste';
   aufklappNeu();
@@ -29186,8 +29246,9 @@ function pmKatRang(a) {
 /* Eine neue Aufgabe — dieselbe Gestalt wie in der Workbench */
 function pmNeueAufgabe(f) {
   var a = { id: neueKennung(), titel: String(f.titel || '').trim().slice(0, 300), beschreibung: String(f.notiz || ''), kontext: 'privat',
-            /* Seit 0.102.0 Pflicht: die Liste. Vorbelegt ist die offene Liste, sonst der Sammler. */
-            themaId: pmListeIdVon({ themaId: f.liste || (cl.pm.tab === 'liste' ? cl.pm.liste : '') }),
+            /* Seit 0.102.0 Pflicht: die Liste. Vorbelegt ist die offene Liste, sonst die
+               Liste der Memo-Notiz, aus der die Aufgabe stammt, sonst der Sammler. */
+            themaId: pmListeNeuZiel(f),
             projektId: null, frist: '', planung: pmIstDatum(f.datum) ? f.datum : 'backlog',
             uhrzeit: pmIstZeit(f.zeit) && pmIstDatum(f.datum) ? f.zeit : '', art: 'haupt', wiederholung: null, status: 'offen',
             erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null, ab: '', prio: (f.prio >= 1 && f.prio <= 5) ? f.prio : 3,
@@ -31597,7 +31658,7 @@ function pmUmstellen() {
 function pmNachpflegen() {
   if (!pmAn()) { return 0; }
   var n = pmUmstellenKern(true);
-  var z = n.listenPunkte + n.sammler + n.memo + n.frei + n.listen + pmMarkenPruefen();
+  var z = n.listenPunkte + n.sammler + n.memo + n.frei + n.listen + pmMarkenPruefen() + pmListenNachziehen();
   if (z) { spaeterSichern(); }
   return z;
 }
