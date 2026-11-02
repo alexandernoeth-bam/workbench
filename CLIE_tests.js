@@ -10440,63 +10440,66 @@ function lkStapelAbgleichTest() {
   S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste';
 }
 
-/* Fehlertyp: ein Menü, das mit den Daten mitwächst. Das ▼ im To Do listete bis 0.100.0
-   alle laufenden Listen auf und sprang bei vierzig. Der Kernsatz ist deshalb: die Länge
-   des Menüs darf sich nicht ändern, wenn Listen dazukommen. */
-function todoListenBildschirmTest() {
-  console.log('\n187. To Do: das ▼ bleibt kurz, die Listen haben einen eigenen Bildschirm mit Schaltern, Suche und „Weitere“ (0.101.0)');
+/* Fehlertyp 1: ein Menü, das mit den Daten mitwächst — das ▼ im To Do listete bis 0.100.0
+   alle laufenden Listen auf und sprang bei vierzig.
+   Fehlertyp 2: eine Aufgabe ohne Liste. Seit 0.102.0 hat jede Aufgabe eine, notfalls den
+   Sammler; auch eine Liste, die es nicht mehr gibt, darf keine heimatlose Aufgabe erzeugen. */
+function todoListenReiterTest() {
+  console.log('\n187. To Do: kurzes ▼, Reiter „Listen“ mit Listenauswahl, und keine Aufgabe ohne Liste (0.102.0)');
   if (!CL) { return; }
   const S = CL;
   frisch();
 
-  const liste = (id, name) => { S.DB.themen.push({ id: id, name: name, kontext: 'privat', text: '[ ] etwas\n', ordnung: 1, geaendert: 1000 }); };
+  const liste = (id, name) => { S.DB.themen.push({ id: id, name: name, kontext: 'privat', text: '', ordnung: 1, geaendert: 1000 }); };
   liste('l1', 'Reparaturen Haus');
   const kurz = S.listeAufklappHtml();
-
-  /* der eigentliche Regressionsschutz */
   let i;
   for (i = 2; i <= 40; i++) { liste('l' + i, 'Liste ' + i); }
-  const lang = S.listeAufklappHtml();
-  pruefe(kurz.length === lang.length, 'das ▼ ist mit 40 Listen genauso lang wie mit einer');
-  pruefe(lang.indexOf('Reparaturen Haus') < 0 && lang.indexOf('Liste 40') < 0, 'im ▼ steht keine einzelne Liste mehr');
-  pruefe(lang.indexOf('todoListen()') >= 0 && lang.indexOf('Sammler') >= 0 && lang.indexOf('todoRoutinen()') >= 0, 'das ▼ hat Listen…, Sammler und Routinen');
-  /* Die To-Do-Leiste ist pmTodoFussHtml aus cl_palm.js — aufFussHtml wird nicht benutzt (0.101.1) */
-  pruefe(S.pmTodoFussHtml().indexOf('todoListen()') >= 0, 'die To-Do-Leiste hat den Knopf Listen');
+  pruefe(kurz.length === S.listeAufklappHtml().length, 'das ▼ ist mit 40 Listen genauso lang wie mit einer');
+  pruefe(S.listeAufklappHtml().indexOf('Liste 40') < 0, 'im ▼ steht keine einzelne Liste');
 
-  /* der Bildschirm selbst */
-  S.cl.app = 'checklisten'; S.cl.cls.id = ''; S.cl.cls.sicht = ''; S.cl.cls.suche = ''; S.cl.cls.mehr = false;
-  const b = S.checklistenListeHtml();
-  pruefe(b.indexOf("todoSicht('')") >= 0 && b.indexOf("todoSicht('ruht')") >= 0 && b.indexOf("todoSicht('fertig')") >= 0, 'drei Schalter: Laufend, Ruhend, Abgeschlossen');
-  pruefe(b.indexOf('id="ckSuche"') >= 0 && b.indexOf('id="ckTreffer"') >= 0, 'Suchfeld und Trefferbereich sind da');
-  pruefe(b.indexOf('Zuletzt benutzt') >= 0 && b.indexOf('ckListenMehrUm()') >= 0, 'zuletzt benutzt oben, der Rest hinter Weitere');
-  pruefe(b.indexOf('Liste 40') < 0, 'eingeklappt stehen nicht alle 40 Listen da');
-  S.cl.cls.mehr = true;
-  pruefe(S.checklistenListeHtml().indexOf('Liste 40') >= 0, 'aufgeklappt erscheinen alle');
-  S.cl.cls.mehr = false;
+  /* Der Reiter */
+  pruefe(S.pmTodoFussHtml().indexOf("pmTab('liste')") >= 0, 'die To-Do-Leiste hat den Reiter Listen');
+  S.pmTab('liste');
+  pruefe(S.cl.pm.tab === 'liste', 'der Reiter lässt sich wählen');
 
-  /* Abläufe stehen neben den Listen, nicht mehr nur im Memo Pad */
-  const g = S.clsNeuerSatz('lauf', 'Fenster-Wartung', '[ ] Angebot einholen\n');
-  g.art = 'aufgaben';
-  g.geaendert = 9000;
-  pruefe(S.ckListenAlle().some(s => s.id === g.id), 'ein Ablauf erscheint im Listen-Bildschirm');
-  pruefe(S.ckZeileHtml(S.kpSeiteFinden(g.id)).indexOf('⇢') >= 0, 'der Ablauf ist mit ⇢ gekennzeichnet');
+  /* Keine Aufgabe ohne Liste */
+  const ohne = S.pmNeueAufgabe({ titel: 'Heimatlos', prio: 3 });
+  pruefe(ohne.themaId === S.CK_KORB_ID, 'eine neue Aufgabe ohne Wahl landet im Sammler');
+  S.cl.pm.liste = 'l1';
+  const mit = S.pmNeueAufgabe({ titel: 'In der Liste', prio: 2 });
+  pruefe(mit.themaId === 'l1', 'bei offener Liste wird diese vorbelegt');
+  mit.themaId = 'gibtesnichtmehr';
+  pruefe(S.pmListeIdVon(mit) === S.CK_KORB_ID, 'eine gelöschte Liste fällt auf den Sammler zurück');
+  pruefe(S.pmListeName(S.CK_KORB_ID) === 'Sammler', 'der Sammler heißt Sammler');
+  mit.themaId = 'l1';
 
-  /* Suche, umlauttolerant */
-  S.cl.cls.suche = 'fenster-wärtung';
-  pruefe(S.ckListenTreffer(S.ckListenAlle()).length === 0, 'die Suche findet keinen falsch geschriebenen Namen');
-  S.cl.cls.suche = 'FENSTER';
-  const tr = S.ckListenTreffer(S.ckListenAlle());
-  pruefe(tr.length === 1 && tr[0].id === g.id, 'die Suche findet unabhängig von Groß- und Kleinschreibung');
-  pruefe(S.ckListenInhaltHtml().indexOf('Zuletzt benutzt') < 0, 'beim Suchen gibt es keine Gruppierung');
-  S.cl.cls.suche = 'gibtesnicht';
-  pruefe(S.ckListenInhaltHtml().indexOf('Kein Treffer') >= 0, 'ohne Treffer ein Hinweis');
+  /* Die Listenauswahl */
+  const w = S.pmListenWahlHtml();
+  pruefe(w.indexOf("pmListenWahl('')") >= 0 && w.indexOf('Alle Listen') >= 0, 'die Auswahl hat „Alle Listen“');
+  pruefe(w.indexOf("pmListenWahl('l1')") >= 0 && w.indexOf('Reparaturen Haus') >= 0, 'die Auswahl führt die Listen');
+  pruefe(w.indexOf('Sammler') < w.indexOf('Reparaturen Haus'), 'der Sammler steht oben');
 
-  /* der Sammler bleibt im ▼ und nicht im Bildschirm */
-  S.cl.cls.suche = '';
-  S.ckKorb(true);
-  pruefe(!S.ckListenAlle().some(s => S.ckIstKorb(s)), 'der Sammler steht nicht im Listen-Bildschirm');
+  /* Ohne Wahl: alle Aufgaben, nach Listen gruppiert */
+  S.cl.pm.liste = '';
+  const alle = S.pmTodoHtml();
+  pruefe(alle.indexOf('pmListenWahlAuf()') >= 0, 'oben steht die Listenauswahl');
+  pruefe(alle.indexOf('Heimatlos') >= 0 && alle.indexOf('In der Liste') >= 0, 'ohne Wahl stehen alle Aufgaben da');
+  /* gezielt die Gruppenköpfe, denn „Sammler“ steht auch im Umstellen-Banner darüber */
+  pruefe(alle.indexOf('pm-bal">Reparaturen Haus') >= 0 && alle.indexOf('pm-bal">Reparaturen Haus') < alle.indexOf('pm-bal">Sammler'), 'der Sammler steht als Gruppe unten');
 
-  S.cl.app = 'uebersicht'; S.cl.cls.id = ''; S.cl.cls.sicht = ''; S.cl.cls.suche = ''; S.cl.cls.mehr = false;
+  /* Mit Wahl: nur deren Aufgaben */
+  S.pmListenWahl('l1');
+  const eine = S.pmTodoHtml();
+  pruefe(eine.indexOf('In der Liste') >= 0 && eine.indexOf('Heimatlos') < 0, 'mit Wahl nur die Aufgaben dieser Liste');
+
+  /* Die Kategorie schneidet die Auswahl — das ersetzt Schalter und Suchfeld */
+  S.DB.themen.filter(x => x.id === 'l1')[0].kontext = 'beruflich';
+  S.cl.filter = 'privat';
+  pruefe(!S.pmListen().some(x => x.id === 'l1'), 'die Kategorie blendet fremde Listen aus der Auswahl aus');
+  pruefe(S.pmListen().some(x => x.id === S.CK_KORB_ID), 'der Sammler bleibt in jeder Kategorie');
+
+  S.cl.filter = 'alle'; S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
 }
 
 (async function () {
@@ -10681,7 +10684,7 @@ function todoListenBildschirmTest() {
   try { lkStapelNeuTest(); } catch (e) { fail('0.99.2 Lernkartei-Stapel anlegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelFensterTest(); } catch (e) { fail('0.99.3 Lernkartei-Stapel-Fenster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelAbgleichTest(); } catch (e) { fail('0.100.0 Lernkartei-Stapel im Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { todoListenBildschirmTest(); } catch (e) { fail('0.101.0 Listen-Bildschirm warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { todoListenReiterTest(); } catch (e) { fail('0.102.0 Reiter Listen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
