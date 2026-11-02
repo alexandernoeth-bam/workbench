@@ -10440,6 +10440,64 @@ function lkStapelAbgleichTest() {
   S.cl.lk.stapel = ''; S.cl.lk.ansicht = 'liste';
 }
 
+/* Fehlertyp: ein Menü, das mit den Daten mitwächst. Das ▼ im To Do listete bis 0.100.0
+   alle laufenden Listen auf und sprang bei vierzig. Der Kernsatz ist deshalb: die Länge
+   des Menüs darf sich nicht ändern, wenn Listen dazukommen. */
+function todoListenBildschirmTest() {
+  console.log('\n187. To Do: das ▼ bleibt kurz, die Listen haben einen eigenen Bildschirm mit Schaltern, Suche und „Weitere“ (0.101.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  const liste = (id, name) => { S.DB.themen.push({ id: id, name: name, kontext: 'privat', text: '[ ] etwas\n', ordnung: 1, geaendert: 1000 }); };
+  liste('l1', 'Reparaturen Haus');
+  const kurz = S.listeAufklappHtml();
+
+  /* der eigentliche Regressionsschutz */
+  let i;
+  for (i = 2; i <= 40; i++) { liste('l' + i, 'Liste ' + i); }
+  const lang = S.listeAufklappHtml();
+  pruefe(kurz.length === lang.length, 'das ▼ ist mit 40 Listen genauso lang wie mit einer');
+  pruefe(lang.indexOf('Reparaturen Haus') < 0 && lang.indexOf('Liste 40') < 0, 'im ▼ steht keine einzelne Liste mehr');
+  pruefe(lang.indexOf('todoListen()') >= 0 && lang.indexOf('Sammler') >= 0 && lang.indexOf('todoRoutinen()') >= 0, 'das ▼ hat Listen…, Sammler und Routinen');
+  pruefe(S.aufFussHtml().indexOf('todoListen()') >= 0, 'die Tagesansicht hat den Knopf Listen');
+
+  /* der Bildschirm selbst */
+  S.cl.app = 'checklisten'; S.cl.cls.id = ''; S.cl.cls.sicht = ''; S.cl.cls.suche = ''; S.cl.cls.mehr = false;
+  const b = S.checklistenListeHtml();
+  pruefe(b.indexOf("todoSicht('')") >= 0 && b.indexOf("todoSicht('ruht')") >= 0 && b.indexOf("todoSicht('fertig')") >= 0, 'drei Schalter: Laufend, Ruhend, Abgeschlossen');
+  pruefe(b.indexOf('id="ckSuche"') >= 0 && b.indexOf('id="ckTreffer"') >= 0, 'Suchfeld und Trefferbereich sind da');
+  pruefe(b.indexOf('Zuletzt benutzt') >= 0 && b.indexOf('ckListenMehrUm()') >= 0, 'zuletzt benutzt oben, der Rest hinter Weitere');
+  pruefe(b.indexOf('Liste 40') < 0, 'eingeklappt stehen nicht alle 40 Listen da');
+  S.cl.cls.mehr = true;
+  pruefe(S.checklistenListeHtml().indexOf('Liste 40') >= 0, 'aufgeklappt erscheinen alle');
+  S.cl.cls.mehr = false;
+
+  /* Abläufe stehen neben den Listen, nicht mehr nur im Memo Pad */
+  const g = S.clsNeuerSatz('lauf', 'Fenster-Wartung', '[ ] Angebot einholen\n');
+  g.art = 'aufgaben';
+  g.geaendert = 9000;
+  pruefe(S.ckListenAlle().some(s => s.id === g.id), 'ein Ablauf erscheint im Listen-Bildschirm');
+  pruefe(S.ckZeileHtml(S.kpSeiteFinden(g.id)).indexOf('⇢') >= 0, 'der Ablauf ist mit ⇢ gekennzeichnet');
+
+  /* Suche, umlauttolerant */
+  S.cl.cls.suche = 'fenster-wärtung';
+  pruefe(S.ckListenTreffer(S.ckListenAlle()).length === 0, 'die Suche findet keinen falsch geschriebenen Namen');
+  S.cl.cls.suche = 'FENSTER';
+  const tr = S.ckListenTreffer(S.ckListenAlle());
+  pruefe(tr.length === 1 && tr[0].id === g.id, 'die Suche findet unabhängig von Groß- und Kleinschreibung');
+  pruefe(S.ckListenInhaltHtml().indexOf('Zuletzt benutzt') < 0, 'beim Suchen gibt es keine Gruppierung');
+  S.cl.cls.suche = 'gibtesnicht';
+  pruefe(S.ckListenInhaltHtml().indexOf('Kein Treffer') >= 0, 'ohne Treffer ein Hinweis');
+
+  /* der Sammler bleibt im ▼ und nicht im Bildschirm */
+  S.cl.cls.suche = '';
+  S.ckKorb(true);
+  pruefe(!S.ckListenAlle().some(s => S.ckIstKorb(s)), 'der Sammler steht nicht im Listen-Bildschirm');
+
+  S.cl.app = 'uebersicht'; S.cl.cls.id = ''; S.cl.cls.sicht = ''; S.cl.cls.suche = ''; S.cl.cls.mehr = false;
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10622,6 +10680,7 @@ function lkStapelAbgleichTest() {
   try { lkStapelNeuTest(); } catch (e) { fail('0.99.2 Lernkartei-Stapel anlegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelFensterTest(); } catch (e) { fail('0.99.3 Lernkartei-Stapel-Fenster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelAbgleichTest(); } catch (e) { fail('0.100.0 Lernkartei-Stapel im Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { todoListenBildschirmTest(); } catch (e) { fail('0.101.0 Listen-Bildschirm warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

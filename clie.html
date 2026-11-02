@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.100.0</title>
+<title>CLIE 0.101.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1217,7 +1217,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.100.0';
+var APP_VERSION = '0.101.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -7386,6 +7386,8 @@ function aufEinplanenWeg() {
 
 function aufFussHtml() {
   return '<button type="button" class="knopf" onclick="aufNeu()">Neu</button>'
+    /* Seit 0.101.0 die Tür zum Listen-Bildschirm — im ▼ stehen die Listen nicht mehr */
+    + '<button type="button" class="knopf" onclick="todoListen()">Listen</button>'
     + '<button type="button" class="knopf" onclick="aufDetailsGewaehlt()">Details…</button>';
 }
 
@@ -10541,7 +10543,7 @@ function seiteOeffnen(id) {
    Der Text folgt derselben Schreibweise wie überall: [] Punkt, ## Überschrift.
    So gehen Checklisten ohne Umbau der Workbench durch den Abgleich. */
 
-cl.cls = { id: '', schreiben: false, fenster: null, sicht: '' };
+cl.cls = { id: '', schreiben: false, fenster: null, sicht: '', suche: '', mehr: false };
 
 function clsAlle(art) {
   return kpNachRang((DB.gedanken || []).filter(function (g) {
@@ -10814,8 +10816,9 @@ function ckZeileHtml(s) {
   var x = s.__satz;
   var z = ckZustand(s);
   var st = clsStand(s);
+  /* Seit 0.101.0 stehen Listen und Abläufe im selben Bildschirm — ⇢ zeigt den Ablauf an */
   return '<button type="button" class="cls-zeile ' + (z === 'fertig' ? 'erl' : 'lauf') + '" onclick="clsOeffnen(\'' + esc(s.id) + '\')"><span class="tx">'
-    + (x.stern && z === 'lauf' ? '★ ' : '') + esc(s.titel) + '</span>'
+    + (x.stern && z === 'lauf' ? '★ ' : '') + (ckIstListe(s) ? '' : '⇢ ') + esc(s.titel) + '</span>'
     + (x.geweckt === isoDatum() && z === 'lauf' ? '<span class="cls-geweckt">geweckt</span>' : '')
     + '<span class="cls-zahl">' + (st.alle ? st.fertig + '/' + st.alle : '–') + '</span></button>';
 }
@@ -10829,15 +10832,71 @@ function ckImBereich(s) {
    ohne Wahl die laufenden Listen */
 var TODO_SICHTEN = { ruht: 'Ruhende', fertig: 'Fertige' };
 
-function checklistenListeHtml() {
-  var sicht = cl.cls.sicht;
-  var z = TODO_SICHTEN[sicht] ? sicht : 'lauf';
-  var l = ckAlle().filter(ckImBereich).filter(function (s) { return ckIstListe(s) && ckZustand(s) === z && !ckIstKorb(s); });
+/* Der Listen-Bildschirm (seit 0.101.0). Drei Schnitte gegen die Menge, damit die Auswahl
+   auch bei vierzig Listen nicht springt: der Stand, die Kategorie oben im ▼ und die Suche.
+   Listen und Abläufe stehen hier zusammen — ein Ablauf ist eine Liste mit Reihenfolge. */
+var TODO_STAENDE = [['', 'Laufend'], ['ruht', 'Ruhend'], ['fertig', 'Abgeschlossen']];
+var TODO_ZULETZT = 3;
+
+function ckListenStand() {
+  return TODO_SICHTEN[cl.cls.sicht] ? cl.cls.sicht : 'lauf';
+}
+
+function ckListenAlle() {
+  var z = ckListenStand();
+  return ckAlle().filter(ckImBereich).filter(function (s) {
+    if (ckIstKorb(s)) { return false; }
+    if (!ckIstListe(s) && ckArt(s) !== 'aufgaben') { return false; }
+    return ckZustand(s) === z;
+  });
+}
+
+function ckListenTreffer(l) {
+  var q = suNorm(String(cl.cls.suche || '').trim());
+  if (!q) { return l; }
+  return l.filter(function (s) { return suNorm(String(s.titel || '')).indexOf(q) >= 0; });
+}
+
+function ckListenInhaltHtml() {
+  var alle = ckListenAlle();
+  var l = ckListenTreffer(alle);
   if (!l.length) {
-    return '<p class="leise">' + ({ lauf: 'Keine laufende Liste', ruht: 'Keine ruhende Liste', fertig: 'Keine fertige Liste' }[z])
-      + (clFilter() !== 'alle' ? ' in „' + esc(katName(cl.filter)) + '“' : '') + '.</p>';
+    var leer = { lauf: 'Keine laufende Liste', ruht: 'Keine ruhende Liste', fertig: 'Keine abgeschlossene Liste' }[ckListenStand()];
+    return '<p class="leise">' + (suNorm(String(cl.cls.suche || '').trim())
+      ? 'Kein Treffer für „' + esc(cl.cls.suche) + '“'
+      : leer + (clFilter() !== 'alle' ? ' in „' + esc(katName(cl.filter)) + '“' : '')) + '.</p>';
   }
-  return l.map(ckZeileHtml).join('');
+  /* Beim Suchen und bei wenigen Listen hilft die Gruppierung nicht */
+  if (cl.cls.mehr || suNorm(String(cl.cls.suche || '').trim()) || l.length <= TODO_ZULETZT + 1) {
+    return l.map(ckZeileHtml).join('');
+  }
+  var nach = l.slice().sort(function (a, b) { return ((b.__satz || {}).geaendert || 0) - ((a.__satz || {}).geaendert || 0); });
+  var oben = nach.slice(0, TODO_ZULETZT);
+  return '<div class="gruppe">Zuletzt benutzt</div>' + oben.map(ckZeileHtml).join('')
+    + '<button type="button" class="gruppe klapp" onclick="ckListenMehrUm()">› Weitere · ' + (l.length - oben.length) + '</button>';
+}
+
+function ckListenMehrUm() {
+  cl.cls.mehr = !cl.cls.mehr;
+  zeichne();
+}
+
+function ckListenSucheGetippt() {
+  var el = document.getElementById('ckSuche');
+  cl.cls.suche = el ? el.value : '';
+  cl.cls.mehr = false;
+  var ziel = document.getElementById('ckTreffer');
+  /* Nur die Treffer neu zeichnen, sonst verliert das Feld den Fokus */
+  if (ziel) { ziel.innerHTML = ckListenInhaltHtml(); return; }
+  zeichne();
+}
+
+function checklistenListeHtml() {
+  return '<div class="knoepfe">' + TODO_STAENDE.map(function (p) {
+    return '<button type="button" class="knopf' + ((cl.cls.sicht || '') === p[0] ? ' voll' : '') + '" onclick="todoSicht(\'' + p[0] + '\')">' + p[1] + '</button>';
+  }).join('') + '</div>'
+    + '<div class="su-feld"><span>⌕</span><input id="ckSuche" type="search" autocomplete="off" placeholder="Liste suchen …" value="' + esc(cl.cls.suche || '') + '" oninput="ckListenSucheGetippt()"></div>'
+    + '<div id="ckTreffer">' + ckListenInhaltHtml() + '</div>';
 }
 
 /* Eine Checkliste oder Vorlage anzeigen */
@@ -11006,14 +11065,27 @@ function todoListe(id) {
   clsOeffnen(id);
 }
 
+/* Seit 0.101.0 auch mit leerem w: das sind die laufenden Listen, der erste der drei Schalter */
 function todoSicht(w) {
-  if (!TODO_SICHTEN[w]) { return; }
+  if (w && !TODO_SICHTEN[w]) { return; }
   if (cl.app !== 'checklisten') { oeffne('checklisten'); }
   cl.cls.id = '';
   cl.cls.sicht = w;
   cl.cls.schreiben = false;
+  cl.cls.mehr = false;
   cl.aufklapp = '';
   zeichne();
+}
+
+/* Die Tür zum Listen-Bildschirm aus der Tagesansicht und aus dem ▼ */
+function todoListen() {
+  cl.cls.suche = '';
+  todoSicht('');
+}
+
+function todoRoutinen() {
+  cl.aufklapp = '';
+  oeffne('routinen');
 }
 
 function todoNeueListe() {
@@ -11021,36 +11093,18 @@ function todoNeueListe() {
   clsNeu();
 }
 
-/* Laufende Listen nach Lebensbereich; ☑ = Liste zum Abhaken */
-function todoWahlZeile(s, an) {
-  var st = clsStand(s);
-  return prZeile(s, null, '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="todoListe(\'' + esc(s.id) + '\')"><span>'
-    + (ckArt(s) === 'abhaken' ? '☑ ' : '') + esc(s.titel) + '</span><small>' + st.fertig + '/' + st.alle + '</small></button>');
-}
-
+/* Seit 0.101.0 kurz und fest: die Listen stehen nicht mehr hier, sondern haben einen
+   eigenen Bildschirm. Sonst wächst dieses Menü mit jeder Liste mit und springt bei vierzig. */
 function listeAufklappHtml() {
   var offen = cl.app === 'checklisten' ? cl.cls.id : '';
-  var alle = ckAlle().filter(ckImBereich);
   var korb = ckKorb(false);
-  /* Seit 0.71 nur Listen — Abläufe und Checklisten stehen im Memo Pad */
-  var lauf = alle.filter(function (s) { return ckIstListe(s) && ckZustand(s) === 'lauf' && !ckIstKorb(s); });
-  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
+  return '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
     + katFilterHtml('todoKategorie', cl.app === 'aufgaben' ? clFilter() : '-')
     + '<div class="trenn"></div>'
-    + '<button type="button"' + (korb && offen === korb.id ? ' class="an"' : '') + ' onclick="todoListe(\'' + CK_KORB_ID + '\')"><span>Sammler</span><small>' + (korb ? kpOffeneZahl(korb) : 0) + '</small></button>';
-  var gezeigt = {};
-  ckBereiche().forEach(function (b) {
-    var l = lauf.filter(function (s) { return (s.__satz || {}).bereich === b.id; });
-    if (!l.length) { return; }
-    /* nach Bereich sortiert, ohne Überschriften (seit 0.62) */
-    h += l.map(function (s) { gezeigt[s.id] = true; return todoWahlZeile(s, s.id === offen); }).join('');
-  });
-  h += lauf.filter(function (s) { return !gezeigt[s.id]; }).map(function (s) { return todoWahlZeile(s, s.id === offen); }).join('');
-  var zahl = function (z) { return alle.filter(function (s) { return ckIstListe(s) && ckZustand(s) === z && !ckIstKorb(s); }).length; };
-  var sicht = function (w, n) {
-    return '<button type="button" class="leise' + (cl.app === 'checklisten' && !offen && cl.cls.sicht === w ? ' an' : '') + '" onclick="todoSicht(\'' + w + '\')"><span>' + TODO_SICHTEN[w] + '…</span><small>' + n + '</small></button>';
-  };
-  return h + '<div class="trenn"></div>' + sicht('ruht', zahl('ruht')) + sicht('fertig', zahl('fertig'))
+    + '<button type="button"' + (korb && offen === korb.id ? ' class="an"' : '') + ' onclick="todoListe(\'' + CK_KORB_ID + '\')"><span>Sammler</span><small>' + (korb ? kpOffeneZahl(korb) : 0) + '</small></button>'
+    + '<button type="button" onclick="todoRoutinen()"><span>Routinen</span></button>'
+    + '<div class="trenn"></div>'
+    + '<button type="button" class="leise' + (cl.app === 'checklisten' && !offen ? ' an' : '') + '" onclick="todoListen()"><span>Listen…</span></button>'
     + '<button type="button" class="leise" onclick="todoNeueListe()"><span>+ Neue Liste…</span></button>'
     + '<div class="trenn"></div><button type="button" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '■' : '▢') + ' Erledigte zeigen</button></div>';
 }
