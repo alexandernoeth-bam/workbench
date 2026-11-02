@@ -10546,6 +10546,99 @@ function pmListenNachziehenTest() {
   S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: eine Liste lässt sich anlegen, aber nicht mehr pflegen — kein Umbenennen,
+   kein Löschen, keine Kategorie, kein Archiv. Und beim Löschen bleiben Aufgaben heimatlos
+   zurück oder die Wahl zeigt auf eine Liste, die es nicht mehr gibt. */
+function pmListePflegenTest() {
+  console.log('\n189. To Do: Listen umbenennen, einer Kategorie zuordnen, archivieren und löschen (0.102.2)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  const w0 = (S.cl.pm.liste = '', S.pmListenWahlHtml());
+  pruefe(w0.indexOf('pmListeNeu()') >= 0, 'die Auswahl hat „+ Neue Liste…“');
+  pruefe(w0.indexOf('pmListeBearbeiten()') < 0, 'ohne gewählte Liste kein „Liste bearbeiten…“');
+
+  const t = S.pmListeAnlegen('l9', 'Reparaturen', { kontext: 'privat' });
+  S.cl.pm.liste = 'l9';
+  pruefe(S.pmListenWahlHtml().indexOf('pmListeBearbeiten()') >= 0, 'mit gewählter Liste erscheint „Liste bearbeiten…“');
+
+  /* Umbenennen und Kategorie über das vorhandene Fenster */
+  S.cl.app = 'aufgaben';
+  S.pmListeBearbeiten();
+  pruefe(S.cl.cls.id === 'l9' && S.cl.cls.fenster && S.cl.cls.fenster.modus === 'details', 'das Fenster öffnet sich für die Liste');
+  pruefe(S.cl.cls.fenster.titel === 'Reparaturen', 'der Name steht im Fenster');
+  /* wie beim Tippen: der Name steht im Feld, nicht nur im Zustand */
+  S.document.getElementById('clsTitel').value = 'Reparaturen Haus';
+  S.cl.cls.fenster.titel = 'Reparaturen Haus';
+  S.clsSpeichern();
+  pruefe(S.pmListeName('l9') === 'Reparaturen Haus', 'der neue Name ist gespeichert');
+
+  /* Archivieren nimmt sie aus der Auswahl, löscht sie aber nicht */
+  S.pmListeBearbeiten();
+  S.cl.cls.fenster.zustand = 'fertig';
+  S.clsSpeichern();
+  pruefe(!!t.abgeschlossen, 'archiviert heißt abgeschlossen');
+  pruefe(!S.pmListen().some(x => x.id === 'l9'), 'eine archivierte Liste steht nicht mehr in der Auswahl');
+  pruefe(S.pmListeSatz('l9') === t, 'archiviert ist nicht gelöscht');
+
+  /* Löschen: die Aufgaben wandern in den Sammler, die Wahl wird zurückgesetzt */
+  const a = S.pmNeueAufgabe({ titel: 'Silikon erneuern', prio: 2, liste: 'l9' });
+  pruefe(a.themaId === 'l9', 'die Aufgabe hängt an der Liste');
+  S.cl.cls.id = 'l9'; S.cl.pm.liste = 'l9';
+  S.clsLoeschen();
+  pruefe(!S.pmListeSatz('l9'), 'die Liste ist weg');
+  pruefe(a.themaId === S.CK_KORB_ID, 'ihre Aufgaben liegen im Sammler');
+  pruefe(S.DB.grabsteine.some(g => g.s === 'themen' && g.id === 'l9'), 'die gelöschte Liste bekommt einen Löschvermerk');
+  pruefe(S.cl.pm.liste === '', 'die Wahl zeigt nicht mehr auf die gelöschte Liste');
+
+  /* Der Sammler bleibt */
+  S.ckKorb(true);
+  S.cl.cls.id = S.CK_KORB_ID;
+  S.clsLoeschen();
+  pruefe(!!S.pmListeSatz(S.CK_KORB_ID), 'der Sammler lässt sich nicht löschen');
+
+  S.cl.cls.id = ''; S.cl.cls.fenster = null; S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: ein Aufräumen, das zu viel mitnimmt. Gelöscht werden darf nur die schlichte
+   Notiz, die ihre Liste schon hat — niemals ein Projekt, ein Ziel oder eine Checkliste,
+   und niemals eine Notiz, zu der gar keine Liste entstanden ist. */
+function pmNotizenAufraeumenTest() {
+  console.log('\n190. To Do: verwaiste Notizen werden aufgeräumt, Projekte, Ziele und Checklisten nicht (0.102.3)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  S.DB.gedanken.push({ id: 'n1', titel: 'Keller', text: 'Vorher noch etwas Fließtext.\n[ ] Regale ausräumen ⟦x⟧\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'n2', titel: 'Ohne Liste', text: 'nur ein Gedanke\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'c1', titel: 'Packliste Borkum', text: '[ ] Regenjacke\n', kontext: 'privat', ordnung: 3, checkliste: 'lauf', geaendert: 1 });
+  S.DB.projekte.push({ id: 'p1', name: 'Carport', flaeche: '[ ] Angebote\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.DB.ziele.push({ id: 'z1', name: 'Marathon', flaeche: '[ ] Trainingsplan\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+
+  const aN = S.pmNeueAufgabe({ titel: 'Regale ausräumen', prio: 3, memo: { id: 'n1', zeile: '' } });
+  const aC = S.pmNeueAufgabe({ titel: 'Regenjacke', prio: 3, memo: { id: 'c1', zeile: '' } });
+  const aP = S.pmNeueAufgabe({ titel: 'Angebote', prio: 1, memo: { id: 'p1', zeile: '' } });
+  const aZ = S.pmNeueAufgabe({ titel: 'Trainingsplan', prio: 2, memo: { id: 'z1', zeile: '' } });
+
+  pruefe(aN.themaId === 'cl-memo-n1' && aP.themaId === 'cl-memo-p1', 'für Notiz und Projekt entsteht je eine Liste');
+
+  const raus = S.pmNotizenAufraeumen();
+  pruefe(raus === 1, 'genau eine Notiz wird aufgeräumt');
+  pruefe(!S.DB.gedanken.some(g => g.id === 'n1'), 'die schlichte Notiz ist gelöscht, auch mit Fließtext');
+  pruefe(!aN.memo, 'die Verbindung zur Notiz ist entfernt');
+  pruefe(aN.themaId === 'cl-memo-n1' && S.pmListeName('cl-memo-n1') === 'Keller', 'ihre Aufgabe bleibt in der Liste „Keller“');
+  pruefe(S.DB.grabsteine.some(g => g.s === 'gedanken' && g.id === 'n1'), 'die gelöschte Notiz bekommt einen Löschvermerk');
+
+  pruefe(S.DB.gedanken.some(g => g.id === 'n2'), 'eine Notiz ohne eigene Liste bleibt');
+  pruefe(S.DB.gedanken.some(g => g.id === 'c1') && !!aC.memo, 'die Checkliste bleibt samt Verbindung');
+  pruefe(S.DB.projekte.some(g => g.id === 'p1') && !!aP.memo, 'das Projekt bleibt samt Verbindung');
+  pruefe(S.DB.ziele.some(g => g.id === 'z1') && !!aZ.memo, 'das Ziel bleibt samt Verbindung');
+  pruefe(S.pmNotizenAufraeumen() === 0, 'ein zweiter Lauf räumt nichts mehr weg');
+
+  S.cl.pm.liste = ''; S.cl.pm.tab = 'datum'; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -10730,6 +10823,8 @@ function pmListenNachziehenTest() {
   try { lkStapelAbgleichTest(); } catch (e) { fail('0.100.0 Lernkartei-Stapel im Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todoListenReiterTest(); } catch (e) { fail('0.102.0 Reiter Listen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmListenNachziehenTest(); } catch (e) { fail('0.102.1 Listen nachziehen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListePflegenTest(); } catch (e) { fail('0.102.2 Listen pflegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmNotizenAufraeumenTest(); } catch (e) { fail('0.102.3 Notizen aufräumen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
