@@ -5892,7 +5892,7 @@ function listeTextTest() {
   pruefe(S.cl.app === 'checklisten' && S.cl.cls.id === 'lh' && !S.cl.memo.schreiben, 'Zurück-Taste führt ebenfalls zur Liste');
   S.listeAlsText();
   S.oeffne('uebersicht'); S.oeffne('memo');
-  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch nichts|memo-zeile/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
+  pruefe(!S.cl.memo.ausListe && !S.cl.memo.id && /Noch nichts|memo-zeile|Noch kein Memo/.test(inhalt()), 'später im Memo: normale Übersicht, keine Liste');
   S.oeffne('uebersicht');
 }
 
@@ -8819,7 +8819,10 @@ function palmUmstellungTest() {
     && /melde\('Abgleich fertig\.\\n' \+ berichtText\(b\), 'gut'\);[\s\S]{0,260}?pmNachpflegen\(\);/.test(SKRIPT), 'nachgepflegt wird nach dem Laden und nach jedem Abgleich');
   /* Memo Pad danach */
   S.oeffne('memo'); S.memoArtSetzen('alles');
-  pruefe(/>Haus</.test(inhalt()) && /Büro/.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: Listen stehen als Memos (–) in der Liste, der leere Sammler nicht');
+  /* Seit 0.104.5: To-Do-Listen stehen nicht mehr im Memo Pad — „Löschen“ dort hätte
+     sonst die Liste selbst gelöscht, obwohl nur der Memo-Eintrag gemeint war */
+  pruefe(!/>Haus</.test(inhalt()) && !/Büro/.test(inhalt()) && !/Sammler/.test(inhalt()), 'Memo Pad: To-Do-Listen stehen nicht mehr in der Liste');
+  pruefe(S.DB.themen.some(x => x.id === 'th') && S.DB.themen.some(x => x.id === 'tn'), 'die Listen selbst bleiben unangetastet');
   S.memoArtSetzen('archiv');
   pruefe(!/>Haus</.test(inhalt()) && /Alt/.test(inhalt()), 'im Archiv nur Abgeschlossenes');
   S.memoArtSetzen('alles');
@@ -8929,9 +8932,9 @@ function palmZuordnenTest() {
   th.archiv = true; th.abgeschlossen = true;
   S.oeffne('memo'); S.memoArtSetzen('archiv');
   S.pmMemoTipp('th'); S.pmArchivUm('');
-  pruefe(!th.archiv && !th.abgeschlossen, 'Zurückholen: auch eine archivierte Liste kommt zurück ins Memo Pad');
+  pruefe(!th.archiv && !th.abgeschlossen, 'Zurückholen: auch eine archivierte Liste lässt sich zurückholen');
   S.memoArtSetzen('alles');
-  pruefe(/>Haus</.test(inhalt()), '… und steht wieder in der Liste');
+  pruefe(!/>Haus</.test(inhalt()) && S.DB.themen.some(x => x.id === 'th'), '… steht aber nicht im Memo Pad, sondern im To Do (0.104.5)');
   S.oeffne('uebersicht');
 }
 
@@ -10984,6 +10987,34 @@ function mpTypErkennenTest() {
   S.cl.pm.mshow = null; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: zwei Apps zeigen denselben Datensatz, und „Löschen“ in der einen löscht ihn
+   für beide. To-Do-Listen standen im Memo Pad, weil sie technisch Seiten sind — wer dort
+   aufräumte, verlor seine Liste samt Zuordnung der Aufgaben. Das darf nicht wieder gehen. */
+function pmListenNichtImMemoTest() {
+  console.log('\n199. Memo Pad: To-Do-Listen stehen nicht im Memo Pad und lassen sich dort nicht löschen (0.104.5)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.DB.themen.push({ id: 'lx', name: 'Reparaturen Haus', kontext: 'privat', text: '', ordnung: 1, geaendert: 1 });
+  S.ckKorb(true);
+  S.DB.gedanken.push({ id: 'gx', titel: 'Ein Gedanke', text: 'Text\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  const a = S.pmNeueAufgabe({ titel: 'Silikon', prio: 2, liste: 'lx' });
+
+  const l = S.pmMemos('');
+  pruefe(!l.some(s => s.id === 'lx'), 'die Liste steht nicht im Memo Pad');
+  pruefe(!l.some(s => S.ckIstKorb(s)), 'der Sammler auch nicht');
+  pruefe(l.some(s => s.id === 'gx'), 'eine Notiz steht weiter da');
+  pruefe(!S.pmMemos('archiv').some(s => s.id === 'lx') && !S.pmMemos('vorlagen').some(s => s.id === 'lx'), 'auch nicht im Archiv und unter Vorlagen');
+
+  /* und sie überlebt ein Aufräumen im Memo Pad */
+  S.cl.pm.mf = { id: 'gx', modus: 'loeschen' };
+  S.pmMemoLoeschen();
+  pruefe(!S.DB.gedanken.some(g => g.id === 'gx'), 'die Notiz lässt sich löschen');
+  pruefe(S.pmListeSatz('lx') && a.themaId === 'lx', 'die Liste und ihre Aufgabe bleiben davon unberührt');
+
+  S.cl.pm.mf = null; S.cl.pm.memoWahl = ''; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11178,6 +11209,7 @@ function mpTypErkennenTest() {
   try { mpVorlagenZurueckTest(); } catch (e) { fail('0.104.2 Vorlagen zurück warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clAbgleichReihenfolgeTest(); } catch (e) { fail('0.104.3 Abgleich-Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpTypErkennenTest(); } catch (e) { fail('0.104.4 Typ-Erkennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListenNichtImMemoTest(); } catch (e) { fail('0.104.5 Listen nicht im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
