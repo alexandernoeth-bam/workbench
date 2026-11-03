@@ -11199,6 +11199,112 @@ function manPflichtTest() {
   S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0; S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: ein Overlay, das nicht kommt, zu oft kommt oder nicht weiterführt. Dazu der
+   Tageszähler: ein Tag daneben und „Tag 12 von 56“ ist falsch, und er darf vor dem Start
+   und nach Tag 56 gar nichts zeigen. Außerdem muss ein fälliger Coach-Termin mit dem
+   gelesenen Manifest erledigt sein, sonst kommt die Sperre zweimal hintereinander. */
+function upTest() {
+  console.log('\n204. Umprogrammierung: 56 Tage, drei Mal am Tag drei Regeln, dann das Manifest (0.107.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const echtIso = S.isoDatum;
+  const falschesHeute = (is) => { S.isoDatum = (d) => (d ? echtIso(d) : is); };
+
+  /* Der Tageszähler */
+  pruefe(S.upTag('2026-11-04') === 1, 'der 04.11. ist Tag 1');
+  pruefe(S.upTag('2026-11-15') === 12, 'der 15.11. ist Tag 12');
+  pruefe(S.upTag('2026-12-29') === 56, 'der 29.12. ist Tag 56');
+  pruefe(S.upTag('2026-11-03') === 0, 'vor dem Start läuft nichts');
+  pruefe(S.upTag('2026-12-30') === 0, 'nach Tag 56 läuft nichts');
+
+  /* Die Zeitfenster — drei am Tag */
+  pruefe(S.upFenster('07:30') === 'frueh' && S.upFenster('12:00') === 'mittag' && S.upFenster('20:15') === 'abend', 'drei Fenster am Tag: früh, mittag, abend');
+  pruefe(S.upFenster('10:59') === 'frueh' && S.upFenster('11:00') === 'mittag' && S.upFenster('15:59') === 'mittag' && S.upFenster('16:00') === 'abend', 'die Grenzen liegen bei 11 und 16 Uhr');
+  pruefe(S.upMarke('2026-11-15', '09:00') !== S.upMarke('2026-11-15', '13:00'), 'jedes Fenster hat seine eigene Marke');
+  pruefe(S.upMarke('2026-11-15', '09:00') !== S.upMarke('2026-11-16', '09:00'), 'und jeder Tag seine eigene');
+
+  /* Die Regeln aus der Notiz */
+  S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Typ: Notiz\nEins\n\n- Zwei\nDrei\nVier\nFünf\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  const alle = S.upRegeln();
+  pruefe(alle.length === 5 && alle[0] === 'Eins' && alle[1] === 'Zwei', 'eine Regel je Zeile, ohne Leerzeilen, Striche und Typ-Zeile');
+  pruefe(S.upTagesRegeln(1, alle).join('|') === 'Eins|Zwei|Drei', 'Tag 1 zeigt die ersten drei');
+  pruefe(S.upTagesRegeln(2, alle).join('|') === 'Vier|Fünf|Eins', 'Tag 2 macht weiter und läuft um');
+  pruefe(S.upTagesRegeln(0, alle).length === 0, 'außerhalb der 56 Tage gibt es keine');
+  pruefe(S.upTagesRegeln(3, ['A']).join('|') === 'A', 'eine kurze Notiz wird nicht aufgefüllt');
+
+  /* Das Overlay beim Öffnen */
+  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  falschesHeute('2026-11-15');
+  pruefe(S.upPruefen() === true, 'am Tag 12 kommt das Overlay');
+  const marke = S.cl.up.marke;
+  pruefe(S.cl.aufklapp === 'umprog' && S.cl.up.tag === 12, 'als Fenster, mit dem Tageszähler');
+  const h = S.upHtml();
+  pruefe(h.indexOf('Tag 12 von 56') >= 0, 'die Kopfzeile nennt Tag und Ziel');
+  pruefe(h.indexOf('Neue Gewohnheiten mit neuen Regeln') >= 0, 'die Überschrift steht darunter');
+  pruefe(S.cl.up.regeln.length === 3, 'drei Regeln stehen darin');
+  pruefe(h.indexOf('weiter zum Manifest') >= 0, 'und der Hinweis, was danach kommt');
+  pruefe(S.upPruefen() === false, 'ein zweites Mal im selben Fenster kommt es nicht');
+
+  /* Direkt weiter ins Manifest, gesperrt */
+  const heute = '2026-11-15';
+  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
+  const nun = S.clMinuten(S.clUhrzeit());
+  const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+  S.termineNachTag = { [heute]: [{ id: 'ev9', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 10)), kalId: 'kal-coach' }] };
+  pruefe(!!S.manPflichtTermin(), 'ein Coach-Termin wäre gerade fällig');
+  S.upFertig();
+  pruefe(S.cl.app === 'manifest' && !S.cl.aufklapp, 'nach dem Overlay kommt das Manifest');
+  pruefe(S.cl.man.pflicht === marke, 'und zwar als Pflichtlektüre');
+  S.cl.man.frei = false; S.cl.man.seite = 0; S.cl.man.anzahl = 3;
+  pruefe(S.manGesperrt() === true, 'gesperrt wie beim Coach-Termin');
+  S.oeffne('kalender');
+  pruefe(S.cl.app === 'manifest', 'eine andere App lässt sich nicht öffnen');
+
+  /* Fertig: die Marke ist gelesen und der fällige Coach-Termin gleich mit */
+  S.manifestHtml();
+  S.manPflichtFertig();
+  pruefe(S.cl.app === 'uebersicht' && !S.cl.man.pflicht, 'Fertig führt hinaus');
+  pruefe(S.DB.einstellungen.manifestGelesen[marke] === heute, 'die Marke steht in der Datenbank, gilt also auf allen Geräten');
+  pruefe(S.manGelesen().ev9 === heute, 'der fällige Coach-Termin ist damit erledigt');
+  pruefe(S.manPflichtTermin() === null && S.manPflichtPruefen() === false, 'er löst also nicht noch einmal aus');
+  pruefe(S.upPruefen() === false, 'und das Overlay kommt im selben Fenster auch nicht wieder');
+
+  /* Ein Coach-Termin, der erst später dran ist, bleibt stehen */
+  S.termineNachTag = { [heute]: [{ id: 'ev10', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 120)), kalId: 'kal-coach' }] };
+  pruefe(!S.manGelesen().ev10, 'ein Termin, der erst später dran ist, wird nicht mit abgehakt');
+
+  /* Außerhalb der 56 Tage und ohne Notiz passiert nichts */
+  falschesHeute('2026-12-30');
+  pruefe(S.upPruefen() === false, 'nach Tag 56 kommt kein Overlay mehr');
+  falschesHeute('2026-11-03');
+  pruefe(S.upPruefen() === false, 'vor dem 04.11. auch nicht');
+  falschesHeute('2026-11-16');
+  S.DB.gedanken = S.DB.gedanken.filter((g) => g.titel !== 'Umprogrammierung');
+  pruefe(S.upPruefen() === false, 'ohne die Notiz „Umprogrammierung“ bleibt es still');
+
+  /* Ohne Manifest-Notiz schließt das Overlay einfach */
+  frisch();
+  S.cl.up.an = false; S.cl.man.pflicht = ''; S.cl.man.frei = true;
+  falschesHeute('2026-11-20');
+  S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Eins\nZwei\nDrei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  pruefe(S.upPruefen() === true && S.upHtml().indexOf('antippen zum Schließen') >= 0, 'ohne Manifest-Notiz schließt das Overlay nur');
+  S.upFertig();
+  pruefe(!S.cl.aufklapp && !S.cl.man.pflicht, 'und sperrt nichts');
+  pruefe(S.upPruefen() === false, 'abgehakt ist es trotzdem');
+
+  /* Die Wächter in der Quelle */
+  pruefe(SKRIPT.indexOf("cl.aufklapp === 'umprog'") >= 0, 'das Overlay hängt im Aufklapp');
+  pruefe(/function aufklappZu\(\)\s*\{[\s\S]{0,200}umprog'\s*\)\s*\{\s*upFertig\(\)/.test(SKRIPT), 'das Antippen führt weiter, nicht ab');
+  pruefe(SKRIPT.split('function upPruefen(').length === 2, 'upPruefen gibt es genau einmal');
+  pruefe(SKRIPT.split('function upFertig(').length === 2, 'upFertig gibt es genau einmal');
+  pruefe(/upPruefen\(\);[\s\S]{0,400}?clTermineHolen\(false\)\.then\([\s\S]{0,120}manPflichtPruefen/.test(SKRIPT), 'beim Start kommt die Umprogrammierung vor der Pflichtlektüre');
+
+  S.isoDatum = echtIso;
+  S.cl.up.an = false; S.cl.up.marke = ''; S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
+  S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11398,6 +11504,7 @@ function manPflichtTest() {
   try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manPflichtTest(); } catch (e) { fail('0.106.0 Pflichtlektüre warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { upTest(); } catch (e) { fail('0.107.0 Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.106.0</title>
+<title>CLIE 0.107.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -716,6 +716,11 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
 .fenster .rumpf{padding:10px 12px;font-size:20px}
+.up-fenster{top:50%;transform:translateY(-50%);max-height:calc(100% - 110px)}
+.up-fenster .up-kopf{font-size:17px;color:var(--px-mitte);text-align:center;border-bottom:2px dotted var(--px-zart);padding-bottom:6px;margin-bottom:10px}
+.up-fenster .up-regel{line-height:1.35;margin-bottom:11px;padding-left:15px;text-indent:-15px}
+.up-fenster .up-regel::before{content:"› "}
+.up-fenster .up-fuss{font-size:16px;color:var(--px-mitte);text-align:right;border-top:2px dotted var(--px-zart);padding-top:5px}
 .eingabe{display:block;width:100%;font:inherit;font-size:17.5px;color:var(--px);background:var(--lcd-hell);border:0;border-bottom:2px dotted var(--px);padding:6px 4px;margin:6px 0 4px}
 .eingabe:focus{outline:2px solid var(--px)}
 .fenster label{display:block;margin-top:6px;color:var(--px-mitte);font-size:17.5px}
@@ -1219,7 +1224,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.106.0';
+var APP_VERSION = '0.107.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4796,6 +4801,8 @@ function aufklappZeichnen() {
     el.innerHTML = memoFensterHtml();
   } else if (cl.aufklapp === 'fokus') {
     el.innerHTML = fkFensterHtml();
+  } else if (cl.aufklapp === 'umprog') {
+    el.innerHTML = upHtml();
   } else if (cl.aufklapp === 'routine') {
     if (el.innerHTML.indexOf('rtName') >= 0 || el.innerHTML.indexOf('rtZu') >= 0) { return; }
     el.innerHTML = rtFensterHtml();
@@ -5103,6 +5110,8 @@ function menueUm() {
 }
 
 function aufklappZu() {
+  /* Umprogrammierung: antippen heißt weiter, nicht abbrechen (0.107.0) */
+  if (cl.aufklapp === 'umprog') { upFertig(); return; }
   cl.aufklapp = '';
   cl.termin = null;
   cl.auf.fenster = null;
@@ -27943,6 +27952,8 @@ function rueckkehrPruefen() {
   pmNachpflegen();
   ckWecken();
   zeichne();
+  /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
+  try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
   if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
   clTermineHolen(false).then(function () { try { manPflichtPruefen(); } catch (e) { return null; } });
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
@@ -28275,6 +28286,8 @@ function start() {
     try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
     ckWecken();
     zeichne();
+    /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
+    try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
     /* Die Pflichtlektüre braucht die Termine — erst holen, dann prüfen (0.106.0) */
     if (tokenGueltig()) {
       abgleichPlanen(true);
@@ -28401,10 +28414,132 @@ function manGesperrt() {
 
 function manPflichtFertig() {
   if (!cl.man.pflicht) { return; }
-  manGelesenSetzen(cl.man.pflicht);
+  var war = String(cl.man.pflicht);
+  manGelesenSetzen(war);
   cl.man.pflicht = '';
   cl.man.frei = true;
+  /* Aus der Umprogrammierung heraus gelesen: ein fälliger Coach-Termin ist damit erledigt (0.107.0) */
+  if (war.indexOf('up-') === 0) { upCoachAbhaken(); }
   oeffne('uebersicht');
+}
+
+/* ---------- Umprogrammierung (seit 0.107.0) ----------
+   56 Tage, drei Mal am Tag: beim ersten Öffnen in einem Zeitfenster zeigt CLIE fünf
+   Sekunden lang drei Regeln aus der Notiz „Umprogrammierung“ und geht dann direkt ins
+   Manifest — gesperrt wie die Pflichtlektüre. Ein Coach-Termin, der gerade fällig wäre,
+   gilt damit als gelesen. Gemerkt wird je Tag und Fenster, über die workbench.json,
+   damit dasselbe Fenster nicht auf jedem Gerät noch einmal kommt. */
+var UP_START = '2026-11-04';
+var UP_TAGE = 56;
+var UP_JE_TAG = 3;             /* Regeln je Tag */
+var UP_SEKUNDEN = 5;
+var UP_FENSTER = [[0, 'frueh'], [11, 'mittag'], [16, 'abend']];
+cl.up = { an: false, tag: 0, marke: '', regeln: [], uhr: null };
+
+function upNotiz() {
+  var treffer = (DB.gedanken || []).filter(function (g) {
+    return g && typeof g === 'object' && String(g.titel || '').trim().toLowerCase() === 'umprogrammierung';
+  });
+  return treffer[0] || null;
+}
+
+/* Eine Regel je Zeile; Leerzeilen, Striche und die Typ-Zeile fallen weg */
+function upRegeln() {
+  var n = upNotiz();
+  if (!n) { return []; }
+  return String(n.text || '').split('\n').map(function (z) {
+    return String(z).replace(/^\s*[-•*]\s+/, '').trim();
+  }).filter(function (z) { return z && !MP_TYP.test(z); });
+}
+
+/* Tag 1 ist der Starttag; außerhalb der 56 Tage kommt 0 */
+function upTag(is) {
+  var a = Date.parse(UP_START + 'T00:00:00');
+  var b = Date.parse((is || isoDatum()) + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) { return 0; }
+  var n = Math.round((b - a) / 86400000) + 1;
+  return (n >= 1 && n <= UP_TAGE) ? n : 0;
+}
+
+/* Das Zeitfenster, in dem wir gerade stehen */
+function upFenster(zeit) {
+  var m = clMinuten(zeit || clUhrzeit());
+  var name = UP_FENSTER[0][1];
+  UP_FENSTER.forEach(function (f) { if (m >= f[0] * 60) { name = f[1]; } });
+  return name;
+}
+
+function upMarke(is, zeit) {
+  return 'up-' + (is || isoDatum()) + '-' + upFenster(zeit);
+}
+
+/* Die Regeln des Tages — der Reihe nach durch die Notiz, Tag für Tag weiter */
+function upTagesRegeln(tag, alle) {
+  var liste = alle || upRegeln();
+  if (!liste.length || !tag) { return []; }
+  var anz = Math.min(UP_JE_TAG, liste.length);
+  var start = ((tag - 1) * anz) % liste.length;
+  var raus = [];
+  for (var i = 0; i < anz; i++) { raus.push(liste[(start + i) % liste.length]); }
+  return raus;
+}
+
+function upPruefen() {
+  if (cl.up.an || cl.man.pflicht) { return false; }
+  var tag = upTag();
+  if (!tag) { return false; }
+  var regeln = upTagesRegeln(tag);
+  if (!regeln.length) { return false; }
+  var marke = upMarke();
+  if (manGelesen()[marke]) { return false; }
+  cl.up.an = true;
+  cl.up.tag = tag;
+  cl.up.marke = marke;
+  cl.up.regeln = regeln;
+  cl.aufklapp = 'umprog';
+  zeichne();
+  upUhrStellen();
+  return true;
+}
+
+function upUhrStellen() {
+  if (cl.up.uhr) { clearTimeout(cl.up.uhr); }
+  cl.up.uhr = setTimeout(function () { cl.up.uhr = null; upFertig(); }, UP_SEKUNDEN * 1000);
+}
+
+function upHtml() {
+  return '<div class="fenster up-fenster" onclick="upFertig()"><div class="titel">Tag ' + cl.up.tag + ' von ' + UP_TAGE + '</div><div class="rumpf">'
+    + '<div class="up-kopf">Neue Gewohnheiten mit neuen Regeln</div>'
+    + cl.up.regeln.map(function (r) { return '<div class="up-regel">' + manifestInline(r) + '</div>'; }).join('')
+    + '<div class="up-fuss">' + (manifestNotiz() ? 'weiter zum Manifest' : 'antippen zum Schließen') + '</div>'
+    + '</div></div>';
+}
+
+/* Weiter: das Overlay schließt und das Manifest kommt direkt hinterher */
+function upFertig() {
+  if (!cl.up.an) { return; }
+  if (cl.up.uhr) { clearTimeout(cl.up.uhr); cl.up.uhr = null; }
+  var marke = cl.up.marke;
+  cl.up.an = false;
+  cl.aufklapp = '';
+  if (manifestNotiz()) {
+    cl.man.pflicht = marke;
+    cl.man.frei = false;
+    cl.man.seite = 0;
+    oeffne('manifest');
+    return;
+  }
+  manGelesenSetzen(marke);
+  zeichne();
+}
+
+/* Was gerade fällig wäre, ist mit dem Manifest gelesen — höchstens eine Handvoll am Tag */
+function upCoachAbhaken() {
+  for (var i = 0; i < 20; i++) {
+    var t = manPflichtTermin();
+    if (!t) { return; }
+    manGelesenSetzen(t.id);
+  }
 }
 var MAN_STUFEN = [14, 16, 18, 20, 22, 24];
 
