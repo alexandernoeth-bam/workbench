@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.107.0</title>
+<title>CLIE 0.107.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1224,7 +1224,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.107.0';
+var APP_VERSION = '0.107.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27955,7 +27955,7 @@ function rueckkehrPruefen() {
   /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
   try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
   if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
-  clTermineHolen(false).then(function () { try { manPflichtPruefen(); } catch (e) { return null; } });
+  clTermineHolen(false).then(manCoachHolen).then(function () { try { manPflichtPruefen(); } catch (e) { return null; } });
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
   abgleichPlanen(true);
 }
@@ -28292,7 +28292,7 @@ function start() {
     if (tokenGueltig()) {
       abgleichPlanen(true);
       verbindungPruefen();
-      clTermineHolen(false).then(function () { try { manPflichtPruefen(); } catch (e) { clFehlerZeigen(e, 'manPflichtPruefen'); } });
+      clTermineHolen(false).then(manCoachHolen).then(function () { try { manPflichtPruefen(); } catch (e) { clFehlerZeigen(e, 'manPflichtPruefen'); } });
       hsHolen(true);
     }
     taktStarten();
@@ -28379,15 +28379,63 @@ function manIstCoachKalender(id) {
   return String(clKalenderName(id) || '').toLowerCase().indexOf('coach') >= 0;
 }
 
+/* ---- Die Coach-Termine holt sich die Pflichtlektüre selbst (0.107.1) ----
+   Der Kern wirft Coach-Einträge beim Einsortieren weg (istCoachTermin), damit sie
+   nirgends auftauchen — in termineNachTag stehen sie deshalb nie. Für die Sperre
+   brauchen wir sie aber. Also ein eigener, kleiner Abruf: nur heute, nur Beginn und
+   Kennung, und das Ergebnis bleibt in einer eigenen Liste, die sonst niemand liest. */
+var coachTermine = [];
+var coachStand = '';
+
+function manCoachKalender() {
+  return kalenderListe.filter(function (k) { return k && k.id && manIstCoachKalender(k.id); });
+}
+
+function manCoachHolen() {
+  if (!tokenGueltig()) { return Promise.resolve(false); }
+  var vorbereitung = kalenderListe.length ? Promise.resolve(true) : kalenderListeHolen();
+  return vorbereitung.then(function () {
+    var kalender = manCoachKalender();
+    if (!kalender.length) { coachTermine = []; return false; }
+    var heute = isoDatum();
+    var von = tagePlus(heute, -1);
+    var bis = tagePlus(heute, 1);
+    var neu = [];
+    var reihe = Promise.resolve(true);
+    kalender.forEach(function (kal) {
+      var adresse = 'https://www.googleapis.com/calendar/v3/calendars/'
+        + encodeURIComponent(kal.id) + '/events'
+        + '?singleEvents=true&orderBy=startTime&maxResults=100'
+        + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
+        + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
+        + '&fields=' + encodeURIComponent('items(id,summary,status,start)');
+      reihe = reihe.then(function () {
+        return window.fetch(adresse, { headers: driveKopf() })
+          .then(antwortPruefen)
+          .then(function (a) { return a.json(); })
+          .then(function (d) {
+            ((d && d.items) ? d.items : []).forEach(function (e) {
+              /* Ganztägige haben kein dateTime und lösen nicht aus */
+              if (!e || !e.id || e.status === 'cancelled' || !e.start || !e.start.dateTime) { return; }
+              if (tagAusEintrag(e.start.dateTime) !== heute) { return; }
+              neu.push({ id: e.id, titel: e.summary || '', zeit: zeitAusEintrag(e.start.dateTime), kalId: kal.id });
+            });
+            return true;
+          })
+          .catch(function () { return true; });   /* ein stummer Kalender darf die Sperre nicht sprengen */
+      });
+    });
+    return reihe.then(function () { coachTermine = neu; coachStand = heute; return true; });
+  }).catch(function () { return false; });
+}
+
 /* Der fällige Termin — der späteste, dessen Stunde noch läuft */
 function manPflichtTermin() {
-  var heute = isoDatum();
   var nun = clMinuten(clUhrzeit());
   var gelesen = manGelesen();
   var treffer = null;
-  (termineNachTag[heute] || []).forEach(function (t) {
-    if (!t || !t.id || t.ganztags || !manIstCoachKalender(t.kalId)) { return; }
-    if (gelesen[t.id]) { return; }
+  (coachTermine || []).forEach(function (t) {
+    if (!t || !t.id || gelesen[t.id]) { return; }
     var m = clMinuten(t.zeit);
     if (m < 0 || nun < m || nun > m + MAN_FENSTER_MIN) { return; }
     if (!treffer || clMinuten(treffer.zeit) < m) { treffer = t; }

@@ -11144,25 +11144,24 @@ function manPflichtTest() {
   const zeit = m => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
 
   /* fällig: vor einer halben Stunde begonnen */
-  S.termineNachTag = { [heute]: [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }] };
+  S.coachTermine = [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }];
   pruefe(!!S.manPflichtTermin(), 'ein Termin aus dem Coach-Kalender in der letzten Stunde ist fällig');
 
-  /* nicht fällig: anderer Kalender, zu alt, noch nicht dran, ganztägig */
-  S.termineNachTag = { [heute]: [{ id: 'ev2', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-privat' }] };
-  pruefe(!S.manPflichtTermin(), 'ein Termin aus einem anderen Kalender zählt nicht');
-  S.termineNachTag = { [heute]: [{ id: 'ev3', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 90)), kalId: 'kal-coach' }] };
-  pruefe(!S.manPflichtTermin(), 'nach einer Stunde ist das Fenster zu');
-  S.termineNachTag = { [heute]: [{ id: 'ev4', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 30)), kalId: 'kal-coach' }] };
-  pruefe(!S.manPflichtTermin(), 'vor dem Beginn passiert nichts');
-  S.termineNachTag = { [heute]: [{ id: 'ev5', titel: 'Manifest', ganztags: true, kalId: 'kal-coach' }] };
-  pruefe(!S.manPflichtTermin(), 'ganztägige Termine lösen nicht aus');
+  /* 0.107.1: die normale Terminliste ist NICHT die Quelle — der Kern wirft Coach-Einträge
+     beim Einsortieren weg (istCoachTermin), dort stehen sie also nie. */
+  S.coachTermine = [];
+  S.termineNachTag = { [heute]: [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }] };
+  pruefe(!S.manPflichtTermin(), 'aus der normalen Terminliste kommt nichts');
+  S.termineNachTag = {};
 
-  /* der gestrige Termin bleibt gestern — kein Nachholen über die Tagesgrenze */
-  S.termineNachTag = { [S.tagePlus(heute, -1)]: [{ id: 'ev6', titel: 'Manifest', zeit: '07:00', kalId: 'kal-coach' }] };
-  pruefe(!S.manPflichtTermin(), 'ein Termin von gestern wird nicht nachgeholt');
+  /* nicht fällig: zu alt, noch nicht dran */
+  S.coachTermine = [{ id: 'ev3', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 90)), kalId: 'kal-coach' }];
+  pruefe(!S.manPflichtTermin(), 'nach einer Stunde ist das Fenster zu');
+  S.coachTermine = [{ id: 'ev4', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 30)), kalId: 'kal-coach' }];
+  pruefe(!S.manPflichtTermin(), 'vor dem Beginn passiert nichts');
 
   /* Sperre */
-  S.termineNachTag = { [heute]: [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }] };
+  S.coachTermine = [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }];
   pruefe(S.manPflichtPruefen() === true && S.cl.app === 'manifest', 'die Prüfung öffnet das Manifest');
   pruefe(S.cl.man.pflicht === 'ev1', 'der Termin ist als Pflicht vermerkt');
   /* Im Testrahmen hat der Bildschirm keine Höhe, also passt alles auf eine Seite und die
@@ -11196,7 +11195,7 @@ function manPflichtTest() {
   /* der Sprung aus der Erinnerung */
   pruefe(/location\.wi hash[\s\S]{0,40}#manifest/.test('') || SKRIPT.indexOf("=== '#manifest') { oeffne('manifest'); }") >= 0, 'der Link #manifest öffnet das Manifest');
 
-  S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0; S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
+  S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0; S.termineNachTag = {}; S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
 }
 
 /* Fehlertyp: ein Overlay, das nicht kommt, zu oft kommt oder nicht weiterführt. Dazu der
@@ -11251,7 +11250,7 @@ function upTest() {
   S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
   const nun = S.clMinuten(S.clUhrzeit());
   const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
-  S.termineNachTag = { [heute]: [{ id: 'ev9', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 10)), kalId: 'kal-coach' }] };
+  S.coachTermine = [{ id: 'ev9', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 10)), kalId: 'kal-coach' }];
   pruefe(!!S.manPflichtTermin(), 'ein Coach-Termin wäre gerade fällig');
   S.upFertig();
   pruefe(S.cl.app === 'manifest' && !S.cl.aufklapp, 'nach dem Overlay kommt das Manifest');
@@ -11271,7 +11270,7 @@ function upTest() {
   pruefe(S.upPruefen() === false, 'und das Overlay kommt im selben Fenster auch nicht wieder');
 
   /* Ein Coach-Termin, der erst später dran ist, bleibt stehen */
-  S.termineNachTag = { [heute]: [{ id: 'ev10', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 120)), kalId: 'kal-coach' }] };
+  S.coachTermine = [{ id: 'ev10', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 120)), kalId: 'kal-coach' }];
   pruefe(!S.manGelesen().ev10, 'ein Termin, der erst später dran ist, wird nicht mit abgehakt');
 
   /* Außerhalb der 56 Tage und ohne Notiz passiert nichts */
@@ -11302,7 +11301,89 @@ function upTest() {
 
   S.isoDatum = echtIso;
   S.cl.up.an = false; S.cl.up.marke = ''; S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
-  S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
+  S.termineNachTag = {}; S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: eine Sperre, die ihre Termine aus einem Topf liest, in den sie nie gelangen.
+   Genau das war 0.106.0: der Kern wirft Coach-Einträge beim Einsortieren weg, damit sie
+   nirgends auftauchen — die Pflichtlektüre suchte sie aber dort. Der Test geht deshalb
+   den echten Weg: Antwort von Google rein, coachTermine raus. */
+function manCoachHolenTest() {
+  console.log('\n205. Manifest: die Coach-Termine holt sich die Pflichtlektüre selbst (0.107.1)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const heute = S.isoDatum();
+
+  /* Die Regel des Kerns, an der alles hing */
+  pruefe(S.istCoachTermin('Manifest', 'Coach') === true, 'der Kern wirft alles aus einem Kalender „Coach“ weg');
+  pruefe(S.istCoachTermin('Coach: Rückblick', 'Privat') === true, 'und jeden Titel, der mit „Coach:“ beginnt');
+  pruefe(S.istCoachTermin('Manifest', 'Coach Manifest') === false, 'ein Kalender mit Zusatz im Namen bleibt erhalten');
+
+  /* Welche Kalender die Pflichtlektüre abfragt */
+  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }, { id: 'kal-c2', name: 'CLIE Coach' }, { id: 'kal-privat', name: 'Privat' }];
+  const ausgewaehlt = S.manCoachKalender().map((k) => k.id).join(',');
+  pruefe(ausgewaehlt === 'kal-coach,kal-c2', 'abgefragt wird jeder Kalender, in dessen Namen „coach“ steht');
+
+  /* Der echte Weg: Antwort von Google → coachTermine */
+  const echtFetch = S.window.fetch;
+  const echtToken = S.tokenGueltig;
+  let adressen = [];
+  S.tokenGueltig = () => true;
+  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
+  S.window.fetch = (adresse) => {
+    adressen.push(String(adresse));
+    return Promise.resolve({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ items: [
+        { id: 'g1', summary: 'Manifest', start: { dateTime: heute + 'T23:00:00+01:00' } },
+        { id: 'g2', summary: 'Abgesagt', status: 'cancelled', start: { dateTime: heute + 'T07:00:00+01:00' } },
+        { id: 'g3', summary: 'Ganztägig', start: { date: heute } },
+        { id: 'g4', summary: 'Morgen', start: { dateTime: S.tagePlus(heute, 1) + 'T07:00:00+01:00' } }
+      ] })
+    });
+  };
+
+  return S.manCoachHolen().then(() => {
+    pruefe(adressen.length === 1 && adressen[0].indexOf(encodeURIComponent('kal-coach')) >= 0, 'der Coach-Kalender wird einmal abgefragt');
+    pruefe(adressen[0].indexOf('singleEvents=true') >= 0, 'Serien werden dabei aufgelöst');
+    const ids = S.coachTermine.map((t) => t.id).join(',');
+    pruefe(ids === 'g1', 'nur der heutige Termin mit Uhrzeit landet in der Liste');
+    pruefe(S.coachTermine[0].zeit === '23:00' && S.coachTermine[0].kalId === 'kal-coach', 'mit Beginn und Kalenderkennung');
+
+    /* Und damit löst die Sperre aus — ohne dass in termineNachTag irgendetwas steht */
+    pruefe(Object.keys(S.termineNachTag).length === 0, 'in der normalen Terminliste steht dabei nichts');
+    const nun = S.clMinuten(S.clUhrzeit());
+    const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+    S.coachTermine = [{ id: 'g1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 5)), kalId: 'kal-coach' }];
+    S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Eins\nZwei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+    pruefe(S.manPflichtPruefen() === true && S.cl.app === 'manifest', 'und die Pflichtlektüre öffnet');
+
+    /* Ein stummer Kalender darf die Sperre nicht sprengen */
+    S.window.fetch = () => Promise.reject(new Error('kein Netz'));
+    return S.manCoachHolen();
+  }).then((wert) => {
+    pruefe(wert === true && Array.isArray(S.coachTermine), 'ein Abruffehler wirft die Sperre nicht um');
+
+    /* Ohne Coach-Kalender gar kein Abruf */
+    S.kalenderListe = [{ id: 'kal-privat', name: 'Privat' }];
+    let gerufen = 0;
+    S.window.fetch = () => { gerufen++; return Promise.reject(new Error('darf nicht')); };
+    return S.manCoachHolen().then(() => {
+      pruefe(gerufen === 0 && S.coachTermine.length === 0, 'ohne Coach-Kalender wird gar nicht erst abgefragt');
+
+      /* Die Wächter in der Quelle */
+      pruefe(SKRIPT.split('function manCoachHolen(').length === 2, 'manCoachHolen gibt es genau einmal');
+      pruefe(/function manPflichtTermin\(\)[\s\S]{0,400}coachTermine/.test(SKRIPT), 'manPflichtTermin liest coachTermine');
+      pruefe(!/function manPflichtTermin\(\)[\s\S]{0,400}termineNachTag/.test(SKRIPT), 'und eben nicht termineNachTag');
+      pruefe(/clTermineHolen\(false\)\.then\(manCoachHolen\)/.test(SKRIPT), 'geholt wird im Anschluss an die normalen Termine');
+
+      S.window.fetch = echtFetch;
+      S.tokenGueltig = echtToken;
+      S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
+      S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
+    });
+  });
 }
 
 (async function () {
@@ -11505,6 +11586,7 @@ function upTest() {
   try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { manPflichtTest(); } catch (e) { fail('0.106.0 Pflichtlektüre warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { upTest(); } catch (e) { fail('0.107.0 Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { await manCoachHolenTest(); } catch (e) { fail('0.107.1 Coach-Termine holen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
