@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.105.2</title>
+<title>CLIE 0.106.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -63,6 +63,8 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .silk button{color:var(--px-mitte);font-size:16px;padding:2px 0}
 .silk button b{display:block;font-size:28px;line-height:1.05;color:var(--px)}
 .silk button:disabled b{color:var(--px-zart)}
+/* Pflichtlektüre (seit 0.106.0): die Leiste sieht stumm aus, solange sie es ist */
+.silk.stumm button,.silk.stumm button b{color:var(--px-zart)}
 /* Die einzige Zahl: an „Heute“ — auf der Übersicht und unten (seit 0.9) */
 .silk button{position:relative}
 /* Suchen (seit 0.10) */
@@ -1217,7 +1219,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.105.2';
+var APP_VERSION = '0.106.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4981,6 +4983,9 @@ function zeichne() {
   [clBreiteSetzen, kopfZeichnen, inhaltZeichnen, fussZeichnen, aufklappZeichnen, standZeichnen].forEach(function (teil) {
     try { teil(); } catch (e) { clFehlerZeigen(e, teil.name); }
   });
+  /* Pflichtlektüre: die Leiste sieht stumm aus, solange sie es ist (0.106.0) */
+  var leiste = document.querySelector('.silk');
+  if (leiste) { leiste.className = manGesperrt() ? 'silk stumm' : 'silk'; }
   document.title = fkTitelText(fkLesen(), Date.now()) || ('CLIE ' + APP_VERSION);
 }
 
@@ -5000,6 +5005,11 @@ function clFehlerZeigen(e, wo) {
 /* ---------- Bedienen ---------- */
 
 function oeffne(id) {
+  /* Pflichtlektüre: bis zur letzten Seite führt kein Weg hinaus (0.106.0) */
+  if (manGesperrt() && id !== 'manifest') {
+    melde('Noch nicht durch — das Manifest schließt, wenn du bis zur letzten Seite gelesen hast.', null);
+    return;
+  }
   /* Einkauf ist keine eigene Seite: Es öffnet die Keep-Notiz. */
   if (id === 'einkauf') { einkaufOeffnen(); return; }
   /* Fokus ist kein Blatt, sondern der Dialog (seit 0.98.1) */
@@ -5082,6 +5092,7 @@ function katUm() {
 }
 
 function menueUm() {
+  if (manGesperrt()) { melde('Noch nicht durch — erst bis zur letzten Seite lesen.', null); return; }
   cl.aufklapp = (cl.aufklapp === 'menue') ? '' : 'menue';
   kopfZeichnen();
   aufklappZeichnen();
@@ -27933,7 +27944,7 @@ function rueckkehrPruefen() {
   ckWecken();
   zeichne();
   if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
-  clTermineHolen(false);
+  clTermineHolen(false).then(function () { try { manPflichtPruefen(); } catch (e) { return null; } });
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
   abgleichPlanen(true);
 }
@@ -28050,6 +28061,8 @@ function zurueckScharf() {
 
 /* Ein Schritt zurück. Ergebnis: true, wenn CLIE etwas getan hat. */
 function clZurueck() {
+  /* Pflichtlektüre: die Zurück-Taste führt nicht heraus (0.106.0) */
+  if (manGesperrt()) { return true; }
   if (cl.aufklapp) { aufklappZu(); return true; }
   if (cl.app === 'sammlungen' && cl.sa.id) {
     if (cl.sa.ansicht !== 'tabelle') { saAnsicht('tabelle'); } else { saZurListe(); }
@@ -28262,7 +28275,13 @@ function start() {
     try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
     ckWecken();
     zeichne();
-    if (tokenGueltig()) { abgleichPlanen(true); verbindungPruefen(); clTermineHolen(false); hsHolen(true); }
+    /* Die Pflichtlektüre braucht die Termine — erst holen, dann prüfen (0.106.0) */
+    if (tokenGueltig()) {
+      abgleichPlanen(true);
+      verbindungPruefen();
+      clTermineHolen(false).then(function () { try { manPflichtPruefen(); } catch (e) { clFehlerZeigen(e, 'manPflichtPruefen'); } });
+      hsHolen(true);
+    }
     taktStarten();
     verbindungTaktStarten();
     clKalenderTaktStarten();
@@ -28285,6 +28304,8 @@ function start() {
   window.setInterval(spTakt, 1000);
   /* Aus einer Coach-Erinnerung im Kalender: gleich zum Coach (seit 0.33) */
   if (String((window.location && window.location.hash) || '') === '#coach') { oeffne('coach'); }
+  /* … oder gleich zum Manifest (seit 0.106.0) */
+  if (String((window.location && window.location.hash) || '') === '#manifest') { oeffne('manifest'); }
   var inhalt = document.getElementById('inhalt');
   if (inhalt) {
     inhalt.addEventListener('touchstart', wischAnfang, { passive: true });
@@ -28313,7 +28334,78 @@ function manifestInline(t) {
    Die Notiz wird in Stücke zerlegt (Absätze, Tabellenzeilen). Jedes Stück wird
    gemessen; dann füllen die Stücke eine Seite bis zur Höhe des Bildschirms. */
 var MAN_ABSTAND = 6;
-cl.man = { seite: 0, puffer: 0, hoehe: 0, zoom: 18, anzahl: 1 };
+cl.man = { seite: 0, puffer: 0, hoehe: 0, zoom: 18, anzahl: 1, pflicht: '', frei: true };
+
+/* ---------- Pflichtlektüre (seit 0.106.0) ----------
+   Steht im Kalender „Coach“ ein Termin an, zeigt CLIE beim Öffnen das Manifest und gibt
+   die Bedienung erst frei, wenn bis zur letzten Seite geblättert wurde. Das Fenster ist
+   der Beginn bis eine Stunde danach, nur am selben Tag — wer das verpasst, verpasst es.
+   Gelesen wird je Termin gemerkt und über die workbench.json abgeglichen, damit es nicht
+   auf jedem Gerät noch einmal kommt. */
+var MAN_FENSTER_MIN = 60;
+var MAN_MERK_TAGE = 14;
+
+function manGelesen() {
+  var e = DB.einstellungen || {};
+  return (e.manifestGelesen && typeof e.manifestGelesen === 'object') ? e.manifestGelesen : {};
+}
+
+function manGelesenSetzen(id) {
+  if (!id) { return; }
+  if (!DB.einstellungen) { DB.einstellungen = leereDatenbank().einstellungen; }
+  var g = manGelesen();
+  g[id] = isoDatum();
+  /* Alte Vermerke wegräumen, sonst wächst die Einstellung endlos */
+  var grenze = tagePlus(isoDatum(), -MAN_MERK_TAGE);
+  Object.keys(g).forEach(function (k) { if (String(g[k]) < grenze) { delete g[k]; } });
+  DB.einstellungen.manifestGelesen = g;
+  spaeterSichern();
+}
+
+function manIstCoachKalender(id) {
+  return String(clKalenderName(id) || '').toLowerCase().indexOf('coach') >= 0;
+}
+
+/* Der fällige Termin — der späteste, dessen Stunde noch läuft */
+function manPflichtTermin() {
+  var heute = isoDatum();
+  var nun = clMinuten(clUhrzeit());
+  var gelesen = manGelesen();
+  var treffer = null;
+  (termineNachTag[heute] || []).forEach(function (t) {
+    if (!t || !t.id || t.ganztags || !manIstCoachKalender(t.kalId)) { return; }
+    if (gelesen[t.id]) { return; }
+    var m = clMinuten(t.zeit);
+    if (m < 0 || nun < m || nun > m + MAN_FENSTER_MIN) { return; }
+    if (!treffer || clMinuten(treffer.zeit) < m) { treffer = t; }
+  });
+  return treffer;
+}
+
+function manPflichtPruefen() {
+  if (cl.man.pflicht || !manifestNotiz()) { return false; }
+  var t = manPflichtTermin();
+  if (!t) { return false; }
+  cl.man.pflicht = t.id;
+  cl.man.frei = false;
+  cl.man.seite = 0;
+  cl.aufklapp = '';
+  oeffne('manifest');
+  return true;
+}
+
+/* Gesperrt? Alles außer Blättern und Schriftgröße bleibt still */
+function manGesperrt() {
+  return !!cl.man.pflicht && !cl.man.frei;
+}
+
+function manPflichtFertig() {
+  if (!cl.man.pflicht) { return; }
+  manGelesenSetzen(cl.man.pflicht);
+  cl.man.pflicht = '';
+  cl.man.frei = true;
+  oeffne('uebersicht');
+}
 var MAN_STUFEN = [14, 16, 18, 20, 22, 24];
 
 function manKasten(inner) {
@@ -28479,6 +28571,8 @@ function manifestHtml() {
   if (cl.man.seite < 0) { cl.man.seite = 0; }
   var s = cl.man.seite;
   cl.man.anzahl = seiten.length;
+  /* Letzte Seite erreicht: die Sperre fällt (0.106.0) */
+  if (cl.man.pflicht && s >= seiten.length - 1) { cl.man.frei = true; }
   var stil = geteilt
     ? ' style="height:' + hoehe + 'px;box-sizing:border-box;display:flex;flex-direction:column;padding:8px 12px;overflow:hidden"'
     : ' style="padding:8px 12px"';
@@ -28497,7 +28591,9 @@ function manifestFussHtml() {
     : '';
   return blaettern
     + '<button type="button" class="knopf" onclick="manZoom(-1)" aria-label="kleiner">A−</button>'
-    + '<button type="button" class="knopf" onclick="manZoom(1)" aria-label="größer">A+</button>';
+    + '<button type="button" class="knopf" onclick="manZoom(1)" aria-label="größer">A+</button>'
+    /* Pflichtlektüre: „Fertig“ erst, wenn die letzte Seite erreicht war (0.106.0) */
+    + (cl.man.pflicht && cl.man.frei ? '<button type="button" class="knopf voll" onclick="manPflichtFertig()">Fertig</button>' : '');
 }
 
 /* Inhalt und Fußzeile gemeinsam neu zeichnen: die Fußzeile zeigt die Seitenzahl (seit 0.97.3) */

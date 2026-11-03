@@ -11128,6 +11128,77 @@ function pmRoutineDiesmalTest() {
   S.cl.pm.fenster = null; S.cl.rt.fenster = null; S.cl.aufklapp = ''; S.cl.pm.wahl = ''; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: eine Sperre, die nicht sperrt — oder eine, die nicht wieder aufgeht. Beides
+   wäre schlimm: im ersten Fall ist die Pflichtlektüre wirkungslos, im zweiten sitzt man
+   fest. Dazu: das Fenster darf nicht über den Tag hinausreichen, und gelesen muss über
+   den Abgleich gelten, sonst kommt es auf jedem Gerät noch einmal. */
+function manPflichtTest() {
+  console.log('\n203. Manifest: Pflichtlektüre aus dem Coach-Kalender, gesperrt bis zur letzten Seite (0.106.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const heute = S.isoDatum();
+  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }, { id: 'kal-privat', name: 'Privat' }];
+  const nun = S.clMinuten(S.clUhrzeit());
+  const zeit = m => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+
+  /* fällig: vor einer halben Stunde begonnen */
+  S.termineNachTag = { [heute]: [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }] };
+  pruefe(!!S.manPflichtTermin(), 'ein Termin aus dem Coach-Kalender in der letzten Stunde ist fällig');
+
+  /* nicht fällig: anderer Kalender, zu alt, noch nicht dran, ganztägig */
+  S.termineNachTag = { [heute]: [{ id: 'ev2', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-privat' }] };
+  pruefe(!S.manPflichtTermin(), 'ein Termin aus einem anderen Kalender zählt nicht');
+  S.termineNachTag = { [heute]: [{ id: 'ev3', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 90)), kalId: 'kal-coach' }] };
+  pruefe(!S.manPflichtTermin(), 'nach einer Stunde ist das Fenster zu');
+  S.termineNachTag = { [heute]: [{ id: 'ev4', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 30)), kalId: 'kal-coach' }] };
+  pruefe(!S.manPflichtTermin(), 'vor dem Beginn passiert nichts');
+  S.termineNachTag = { [heute]: [{ id: 'ev5', titel: 'Manifest', ganztags: true, kalId: 'kal-coach' }] };
+  pruefe(!S.manPflichtTermin(), 'ganztägige Termine lösen nicht aus');
+
+  /* der gestrige Termin bleibt gestern — kein Nachholen über die Tagesgrenze */
+  S.termineNachTag = { [S.tagePlus(heute, -1)]: [{ id: 'ev6', titel: 'Manifest', zeit: '07:00', kalId: 'kal-coach' }] };
+  pruefe(!S.manPflichtTermin(), 'ein Termin von gestern wird nicht nachgeholt');
+
+  /* Sperre */
+  S.termineNachTag = { [heute]: [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }] };
+  pruefe(S.manPflichtPruefen() === true && S.cl.app === 'manifest', 'die Prüfung öffnet das Manifest');
+  pruefe(S.cl.man.pflicht === 'ev1', 'der Termin ist als Pflicht vermerkt');
+  /* Im Testrahmen hat der Bildschirm keine Höhe, also passt alles auf eine Seite und die
+     Sperre fällt sofort. Für die Wächter wird der mehrseitige Fall von Hand gesetzt. */
+  S.cl.man.frei = false; S.cl.man.seite = 0; S.cl.man.anzahl = 3;
+  pruefe(S.manGesperrt() === true, 'und sperrt');
+  S.oeffne('kalender');
+  pruefe(S.cl.app === 'manifest', 'eine andere App lässt sich nicht öffnen');
+  S.menueUm();
+  pruefe(S.cl.aufklapp !== 'menue', 'das Menü öffnet nicht');
+  pruefe(S.clZurueck() === true && S.cl.app === 'manifest', 'die Zurück-Taste führt nicht heraus');
+
+  /* Freigabe auf der letzten Seite */
+  pruefe(S.manifestFussHtml().indexOf('manPflichtFertig()') < 0, 'vorher gibt es kein „Fertig“');
+  S.manifestHtml();
+  pruefe(S.cl.man.frei === true && S.manGesperrt() === false, 'auf der letzten Seite fällt die Sperre');
+  pruefe(S.manifestFussHtml().indexOf('manPflichtFertig()') >= 0, 'und „Fertig“ erscheint');
+  S.manPflichtFertig();
+  pruefe(S.cl.app === 'uebersicht' && !S.cl.man.pflicht, 'Fertig führt hinaus');
+
+  /* gelesen gilt kontoweit und kommt nicht wieder */
+  pruefe(S.manGelesen().ev1 === heute, 'der Termin ist als gelesen vermerkt');
+  pruefe(S.DB.einstellungen.manifestGelesen.ev1 === heute, 'und zwar in der Datenbank, also auf allen Geräten');
+  pruefe(S.manPflichtTermin() === null && S.manPflichtPruefen() === false, 'derselbe Termin löst nicht noch einmal aus');
+
+  /* ohne Manifest-Notiz passiert gar nichts */
+  S.DB.gedanken = [];
+  S.DB.einstellungen.manifestGelesen = {};
+  pruefe(S.manPflichtPruefen() === false, 'ohne Manifest-Notiz wird nichts gesperrt');
+
+  /* der Sprung aus der Erinnerung */
+  pruefe(/location\.wi hash[\s\S]{0,40}#manifest/.test('') || SKRIPT.indexOf("=== '#manifest') { oeffne('manifest'); }") >= 0, 'der Link #manifest öffnet das Manifest');
+
+  S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0; S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -11326,6 +11397,7 @@ function pmRoutineDiesmalTest() {
   try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { manPflichtTest(); } catch (e) { fail('0.106.0 Pflichtlektüre warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
