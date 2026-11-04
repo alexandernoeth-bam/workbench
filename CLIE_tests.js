@@ -11467,7 +11467,16 @@ function upSichtTest() {
   h = inhalt();
   pruefe(/Erst das Wichtige, dann das Laute<small>Vor dem ersten Blick/.test(h), 'die Beschreibung steht klein unter der Regel');
   pruefe(h.indexOf('%') < 0 && h.indexOf('gw-schritt') < 0, 'keine Prozentzahl und keine Unterpunkte');
+  /* 0.108.2: eine lange Beschreibung darf die Liste nicht zur Wand machen */
   S.cl.gw.wahl = '';
+  S.inhaltZeichnen();
+  h = inhalt();
+  pruefe(/Erst das Wichtige, dann das Laute/.test(h), 'in der Liste steht die Regel');
+  pruefe(h.indexOf('Vor dem ersten Blick') < 0, 'die Beschreibung bleibt weg, bis die Regel angetippt wird');
+  g.beschreibung = 'Sehr langer Text. '.repeat(20);
+  S.inhaltZeichnen();
+  pruefe(inhalt().indexOf('Sehr langer Text') < 0, 'auch eine sehr lange Beschreibung bläht die Zeile nicht auf');
+  g.beschreibung = 'Vor dem ersten Blick in den Posteingang.';
   S.inhaltZeichnen();
 
   /* Das Nachziehen alter Gewohnheiten */

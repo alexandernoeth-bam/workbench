@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.108.1</title>
+<title>CLIE 0.108.2</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -731,10 +731,13 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .up-raster button.heute{background:var(--lcd);border:2px solid var(--px);font-weight:600}
 .up-raster button.aus{opacity:.35}
 .up-raster button.notiz{text-decoration:underline}
-/* Regeln sind Sätze, keine Handgriffe: lieber umbrechen als abschneiden (0.108.1) */
-.gw-zeile .gw-tx{white-space:normal;line-height:1.2}
-.gw-zeile .gw-tx small{display:block;font-size:16px;color:var(--px-mitte);line-height:1.25;white-space:normal;margin-top:2px}
-.gw-zeile.gewaehlt .gw-tx{padding:2px 4px}
+/* Regeln sind Sätze: umbrechen statt abschneiden, aber höchstens zwei Zeilen — die
+   Beschreibung bleibt weg, bis die Regel angetippt wird (0.108.1, Zeilen 0.108.2) */
+.gw-zeile{align-items:flex-start}
+.gw-zeile .k,.gw-zeile .gw-punkte{margin-top:4px}
+.gw-zeile .gw-tx{white-space:normal;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.gw-zeile.gewaehlt .gw-tx{display:block;padding:2px 4px}
+.gw-zeile .gw-tx small{display:block;font-size:16px;color:var(--px-mitte);line-height:1.25;white-space:normal;margin-top:3px}
 .up-fenster{top:50%;transform:translateY(-50%);max-height:calc(100% - 110px)}
 .up-fenster .up-kopf{font-size:17px;color:var(--px-mitte);text-align:center;border-bottom:2px dotted var(--px-zart);padding-bottom:6px;margin-bottom:10px}
 .up-fenster .up-regel{line-height:1.35;margin-bottom:11px;padding-left:15px;text-indent:-15px}
@@ -1243,7 +1246,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.108.1';
+var APP_VERSION = '0.108.2';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -15564,11 +15567,12 @@ function gwTitel(g) {
 
 function gwZeileHtml(g, mitHaken) {
   var heute = isoDatum();
-  /* Titel groß, Beschreibung klein darunter (0.108.1) */
-  return '<div class="gw-zeile' + (cl.gw.wahl === g.id ? ' gewaehlt' : '') + '">'
+  /* In der Liste steht nur die Regel; die Beschreibung erscheint erst beim Antippen (0.108.2) */
+  var gewaehlt = cl.gw.wahl === g.id;
+  return '<div class="gw-zeile' + (gewaehlt ? ' gewaehlt' : '') + '">'
     + (mitHaken ? clKastenHtml(gwGeschafft(g, heute), 'gwTagUm(\'' + esc(g.id) + '\',\'' + heute + '\')') : '')
     + '<button type="button" class="tx gw-tx" onclick="gwTippen(\'' + esc(g.id) + '\')">' + esc(gwTitel(g))
-    + (g.beschreibung ? '<small>' + esc(g.beschreibung) + '</small>' : '') + '</button>'
+    + (gewaehlt && g.beschreibung ? '<small>' + esc(g.beschreibung) + '</small>' : '') + '</button>'
     + (mitHaken ? gwPunkteHtml(g) : '') + '</div>';
 }
 
