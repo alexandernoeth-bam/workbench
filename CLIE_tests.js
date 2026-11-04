@@ -2449,10 +2449,10 @@ function gewohnheitenTest() {
   S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
   pruefe(!/Tisch abräumen/.test(inhalt()), 'nicht im Tagesplan');
   /* Obergrenze */
-  for (let i = 0; i < 4; i++) { S.DB.kurs.push({ id: 'gw-x' + i, typ: 'gewohnheit', wenn: 'w', dann: 'Handgriff ' + i, zustand: 'ueben', tage: [], angelegt: heute, rang: 2 + i, kontext: 'privat' }); }
+  for (let i = 0; i < 7; i++) { S.DB.kurs.push({ id: 'gw-x' + i, typ: 'gewohnheit', wenn: 'w', dann: 'Handgriff ' + i, zustand: 'ueben', tage: [], angelegt: heute, rang: 2 + i, kontext: 'privat' }); }
   S.oeffne('routinen');
   S.gwNeu();
-  pruefe(S.cl.aufklapp !== 'gewohnheit' && /Höchstens 5/.test(S.document.getElementById('toastText').textContent), 'die sechste wird abgelehnt: erst eine verinnerlichen');
+  pruefe(S.cl.aufklapp !== 'gewohnheit' && /Höchstens 8/.test(S.document.getElementById('toastText').textContent), 'die neunte wird abgelehnt: erst eine verinnerlichen');
   /* Details: verinnerlichen */
   S.gwTippen(g.id);
   pruefe(/gw-zeile gewaehlt/.test(inhalt()), 'antippen wählt');
@@ -2464,8 +2464,8 @@ function gewohnheitenTest() {
   pruefe(g.zustand === 'sitzt' && g.sitztSeit === heute && !/Tisch abräumen/.test(inhalt()), 'verinnerlicht: aus der Übungsliste');
   S.rtSichtSetzen('sitzt');
   pruefe(/Tisch abräumen/.test(inhalt()) && !/Handgriff/.test(inhalt()) && !/gw-punkte/.test(inhalt()), 'unter „Verinnerlicht…“ — ohne Haken und Punkte');
-  /* zurück zum Üben, wenn schon fünf geübt werden: abgelehnt */
-  S.DB.kurs.push({ id: 'gw-y', typ: 'gewohnheit', wenn: 'w', dann: 'Fünfte', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
+  /* zurück zum Üben, wenn schon acht geübt werden: abgelehnt */
+  S.DB.kurs.push({ id: 'gw-y', typ: 'gewohnheit', wenn: 'w', dann: 'Achte', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
   S.gwDetails(g.id); S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen';
   S.gwWahl('ueben'); S.gwSpeichern();
   pruefe(g.zustand === 'sitzt' && S.cl.aufklapp === 'gewohnheit', 'zurück zum Üben nur, wenn Platz ist');
@@ -11200,41 +11200,51 @@ function manPflichtTest() {
 
 /* Fehlertyp: ein Overlay, das nicht kommt, zu oft kommt oder nicht weiterführt. Dazu der
    Tageszähler: ein Tag daneben und „Tag 12 von 56“ ist falsch, und er darf vor dem Start
-   und nach Tag 56 gar nichts zeigen. Außerdem muss ein fälliger Coach-Termin mit dem
-   gelesenen Manifest erledigt sein, sonst kommt die Sperre zweimal hintereinander. */
+   und nach dem letzten Tag gar nichts zeigen. Außerdem muss ein fälliger Coach-Termin mit
+   dem gelesenen Manifest erledigt sein, sonst kommt die Sperre zweimal hintereinander.
+   Seit 0.108.0 kommen alle Zahlen aus dem Programm — der Test setzt sie deshalb dort. */
 function upTest() {
-  console.log('\n204. Umprogrammierung: 56 Tage, drei Mal am Tag drei Regeln, dann das Manifest (0.107.0)');
+  console.log('\n204. Umprogrammierung: Programm über 56 Tage, drei Anzeigen am Tag, dann das Manifest (0.107.0, Programm seit 0.108.0)');
   if (!CL) { return; }
   const S = CL;
   frisch();
   const echtIso = S.isoDatum;
   const falschesHeute = (is) => { S.isoDatum = (d) => (d ? echtIso(d) : is); };
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  const p = { id: 'up-t', typ: 'umprog', name: 'Umprogrammierung', beginn: '2026-11-04', tage: 56, jeTag: 3,
+              fenster: 3, sekunden: 5, notiz: 'Umprogrammierung', manifest: true, kalender: 'coach',
+              kalFenster: 60, notizen: {}, angelegt: '2026-11-04' };
+  S.DB.kurs.push(p);
 
   /* Der Tageszähler */
-  pruefe(S.upTag('2026-11-04') === 1, 'der 04.11. ist Tag 1');
-  pruefe(S.upTag('2026-11-15') === 12, 'der 15.11. ist Tag 12');
-  pruefe(S.upTag('2026-12-29') === 56, 'der 29.12. ist Tag 56');
-  pruefe(S.upTag('2026-11-03') === 0, 'vor dem Start läuft nichts');
-  pruefe(S.upTag('2026-12-30') === 0, 'nach Tag 56 läuft nichts');
+  pruefe(S.upTagVon(p, '2026-11-04') === 1, 'der 04.11. ist Tag 1');
+  pruefe(S.upTagVon(p, '2026-11-15') === 12, 'der 15.11. ist Tag 12');
+  pruefe(S.upTagVon(p, '2026-12-29') === 56, 'der 29.12. ist Tag 56');
+  pruefe(S.upTagVon(p, '2026-11-03') === 0, 'vor dem Start läuft nichts');
+  pruefe(S.upTagVon(p, '2026-12-30') === 0, 'nach Tag 56 läuft nichts');
+  pruefe(S.upTagVon({ beginn: '2026-11-04', tage: 14 }, '2026-11-20') === 0, 'die Dauer kommt aus dem Programm, nicht aus dem Code');
 
-  /* Die Zeitfenster — drei am Tag */
-  pruefe(S.upFenster('07:30') === 'frueh' && S.upFenster('12:00') === 'mittag' && S.upFenster('20:15') === 'abend', 'drei Fenster am Tag: früh, mittag, abend');
-  pruefe(S.upFenster('10:59') === 'frueh' && S.upFenster('11:00') === 'mittag' && S.upFenster('15:59') === 'mittag' && S.upFenster('16:00') === 'abend', 'die Grenzen liegen bei 11 und 16 Uhr');
-  pruefe(S.upMarke('2026-11-15', '09:00') !== S.upMarke('2026-11-15', '13:00'), 'jedes Fenster hat seine eigene Marke');
-  pruefe(S.upMarke('2026-11-15', '09:00') !== S.upMarke('2026-11-16', '09:00'), 'und jeder Tag seine eigene');
+  /* Die Zeitfenster */
+  pruefe(S.upFenster('07:30', p) === 'frueh' && S.upFenster('12:00', p) === 'mittag' && S.upFenster('20:15', p) === 'abend', 'drei Fenster am Tag: früh, mittag, abend');
+  pruefe(S.upFenster('10:59', p) === 'frueh' && S.upFenster('11:00', p) === 'mittag' && S.upFenster('15:59', p) === 'mittag' && S.upFenster('16:00', p) === 'abend', 'die Grenzen liegen bei 11 und 16 Uhr');
+  pruefe(S.upFensterListe({ fenster: 1 }).length === 1 && S.upFensterListe({ fenster: 4 }).length === 4, 'eine bis vier Anzeigen am Tag sind einstellbar');
+  pruefe(S.upMarke('2026-11-15', '09:00', p) !== S.upMarke('2026-11-15', '13:00', p), 'jedes Fenster hat seine eigene Marke');
+  pruefe(S.upMarke('2026-11-15', '09:00', p) !== S.upMarke('2026-11-16', '09:00', p), 'und jeder Tag seine eigene');
 
   /* Die Regeln aus der Notiz */
   S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Typ: Notiz\nEins\n\n- Zwei\nDrei\nVier\nFünf\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
-  const alle = S.upRegeln();
+  const alle = S.upRegeln(p);
   pruefe(alle.length === 5 && alle[0] === 'Eins' && alle[1] === 'Zwei', 'eine Regel je Zeile, ohne Leerzeilen, Striche und Typ-Zeile');
-  pruefe(S.upTagesRegeln(1, alle).join('|') === 'Eins|Zwei|Drei', 'Tag 1 zeigt die ersten drei');
-  pruefe(S.upTagesRegeln(2, alle).join('|') === 'Vier|Fünf|Eins', 'Tag 2 macht weiter und läuft um');
-  pruefe(S.upTagesRegeln(0, alle).length === 0, 'außerhalb der 56 Tage gibt es keine');
-  pruefe(S.upTagesRegeln(3, ['A']).join('|') === 'A', 'eine kurze Notiz wird nicht aufgefüllt');
+  pruefe(S.upTagesRegeln(1, alle, p).join('|') === 'Eins|Zwei|Drei', 'Tag 1 zeigt die ersten drei');
+  pruefe(S.upTagesRegeln(2, alle, p).join('|') === 'Vier|Fünf|Eins', 'Tag 2 macht weiter und läuft um');
+  pruefe(S.upTagesRegeln(1, alle, { jeTag: 2 }).join('|') === 'Eins|Zwei', 'die Zahl der Regeln kommt aus dem Programm');
+  pruefe(S.upTagesRegeln(0, alle, p).length === 0, 'außerhalb der Laufzeit gibt es keine');
+  pruefe(S.upRegeln({ notiz: 'Gibt es nicht' }).length === 0, 'welche Notiz gilt, steht ebenfalls im Programm');
 
   /* Das Overlay beim Öffnen */
   S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
   falschesHeute('2026-11-15');
+  pruefe(S.upAktiv() === p, 'an diesem Tag läuft das Programm');
   pruefe(S.upPruefen() === true, 'am Tag 12 kommt das Overlay');
   const marke = S.cl.up.marke;
   pruefe(S.cl.aufklapp === 'umprog' && S.cl.up.tag === 12, 'als Fenster, mit dem Tageszähler');
@@ -11244,6 +11254,7 @@ function upTest() {
   pruefe(S.cl.up.regeln.length === 3, 'drei Regeln stehen darin');
   pruefe(h.indexOf('weiter zum Manifest') >= 0, 'und der Hinweis, was danach kommt');
   pruefe(S.upPruefen() === false, 'ein zweites Mal im selben Fenster kommt es nicht');
+  pruefe(S.upGelesenAm('2026-11-15', p).join(',') === 'false,false,false', 'gelesen ist noch keines der drei Fenster');
 
   /* Direkt weiter ins Manifest, gesperrt */
   const heute = '2026-11-15';
@@ -11268,22 +11279,25 @@ function upTest() {
   pruefe(S.manGelesen().ev9 === heute, 'der fällige Coach-Termin ist damit erledigt');
   pruefe(S.manPflichtTermin() === null && S.manPflichtPruefen() === false, 'er löst also nicht noch einmal aus');
   pruefe(S.upPruefen() === false, 'und das Overlay kommt im selben Fenster auch nicht wieder');
+  pruefe(S.upGelesenAm(heute, p).filter((x) => x).length === 1, 'ein Fenster des Tages gilt als gelesen');
 
   /* Ein Coach-Termin, der erst später dran ist, bleibt stehen */
   S.coachTermine = [{ id: 'ev10', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 120)), kalId: 'kal-coach' }];
   pruefe(!S.manGelesen().ev10, 'ein Termin, der erst später dran ist, wird nicht mit abgehakt');
 
-  /* Außerhalb der 56 Tage und ohne Notiz passiert nichts */
+  /* Außerhalb der Laufzeit und ohne Notiz passiert nichts */
   falschesHeute('2026-12-30');
-  pruefe(S.upPruefen() === false, 'nach Tag 56 kommt kein Overlay mehr');
+  pruefe(S.upAktiv() === null && S.upPruefen() === false, 'nach Tag 56 kommt kein Overlay mehr');
   falschesHeute('2026-11-03');
   pruefe(S.upPruefen() === false, 'vor dem 04.11. auch nicht');
   falschesHeute('2026-11-16');
   S.DB.gedanken = S.DB.gedanken.filter((g) => g.titel !== 'Umprogrammierung');
-  pruefe(S.upPruefen() === false, 'ohne die Notiz „Umprogrammierung“ bleibt es still');
+  pruefe(S.upPruefen() === false, 'ohne die Notiz mit den Regeln bleibt es still');
 
   /* Ohne Manifest-Notiz schließt das Overlay einfach */
-  frisch();
+  S.DB.gedanken = [];
+  S.DB.kurs = [p];
+  S.DB.einstellungen.manifestGelesen = {};
   S.cl.up.an = false; S.cl.man.pflicht = ''; S.cl.man.frei = true;
   falschesHeute('2026-11-20');
   S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Eins\nZwei\nDrei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
@@ -11292,16 +11306,28 @@ function upTest() {
   pruefe(!S.cl.aufklapp && !S.cl.man.pflicht, 'und sperrt nichts');
   pruefe(S.upPruefen() === false, 'abgehakt ist es trotzdem');
 
+  /* Kein Programm: gar nichts */
+  S.DB.kurs = [];
+  S.DB.einstellungen.manifestGelesen = {};
+  S.cl.up.an = false;
+  pruefe(S.upAktiv() === null && S.upPruefen() === false, 'ohne Programm kommt kein Overlay');
+
+  /* Das Nachziehen aus 0.107 */
+  const neu = S.upNachziehen();
+  pruefe(!!neu && neu.beginn === '2026-11-04' && neu.tage === 56, 'wer schon eine Notiz hat, bekommt sein Programm nachgezogen');
+  pruefe(S.upNachziehen() === null, 'ein zweites Mal legt es nichts an');
+
   /* Die Wächter in der Quelle */
   pruefe(SKRIPT.indexOf("cl.aufklapp === 'umprog'") >= 0, 'das Overlay hängt im Aufklapp');
   pruefe(/function aufklappZu\(\)\s*\{[\s\S]{0,200}umprog'\s*\)\s*\{\s*upFertig\(\)/.test(SKRIPT), 'das Antippen führt weiter, nicht ab');
   pruefe(SKRIPT.split('function upPruefen(').length === 2, 'upPruefen gibt es genau einmal');
   pruefe(SKRIPT.split('function upFertig(').length === 2, 'upFertig gibt es genau einmal');
   pruefe(/upPruefen\(\);[\s\S]{0,400}?clTermineHolen\(false\)\.then\([\s\S]{0,120}manPflichtPruefen/.test(SKRIPT), 'beim Start kommt die Umprogrammierung vor der Pflichtlektüre');
+  pruefe(SKRIPT.indexOf('var UP_START') < 0 && SKRIPT.indexOf('var MAN_FENSTER_MIN') < 0, 'die festen Zahlen aus 0.107 stehen nicht mehr im Code');
 
   S.isoDatum = echtIso;
-  S.cl.up.an = false; S.cl.up.marke = ''; S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
-  S.termineNachTag = {}; S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
+  S.cl.up.an = false; S.cl.up.marke = ''; S.cl.up.wahl = ''; S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
+  S.DB.kurs = []; S.termineNachTag = {}; S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
 }
 
 /* Fehlertyp: eine Sperre, die ihre Termine aus einem Topf liest, in den sie nie gelangen.
@@ -11384,6 +11410,154 @@ function manCoachHolenTest() {
       S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
     });
   });
+}
+
+/* Fehlertyp: eine Dokumentation, die nicht dokumentiert. Konkret: Unterpunkte, die den
+   Tag fälschlich als geschafft zählen (oder nie), eine Prozentzahl statt der Kette, eine
+   Tagesnotiz, die am falschen Ort landet oder für beliebige Tage schreibbar ist, und
+   Einstellungen, die zwar gespeichert werden, aber nirgends wirken. */
+function upSichtTest() {
+  console.log('\n206. Routines: die Sicht Umprogrammierung mit Gewohnheiten, Unterpunkten und Tagesnotiz (0.108.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const echtIso = S.isoDatum;
+  const heute = '2026-11-15';
+  S.isoDatum = (d) => (d ? echtIso(d) : heute);
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  const p = { id: 'up-s', typ: 'umprog', name: 'Umprogrammierung', beginn: '2026-11-04', tage: 56, jeTag: 3,
+              fenster: 3, sekunden: 5, notiz: 'Umprogrammierung', manifest: true, kalender: 'coach',
+              kalFenster: 60, notizen: {}, angelegt: '2026-11-04' };
+  S.DB.kurs.push(p);
+  S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Eins\nZwei\nDrei\nVier\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
+
+  /* Die Sicht */
+  S.oeffne('routinen');
+  S.rtSichtSetzen('umprog');
+  pruefe(S.cl.rt.sicht === 'umprog', 'die vierte Sicht lässt sich wählen');
+  let h = inhalt();
+  pruefe(/Tag 12 von 56/.test(h), 'sie nennt den Tag im Programm');
+  pruefe(/up-balken/.test(h) && /up-raster/.test(h), 'mit Balken und Verlauf');
+  pruefe(/Heute gelesen/.test(h) && /Eins|Zwei|Drei|Vier/.test(h), 'und den Regeln des Tages');
+  pruefe(/Umprogrammierung/.test(S.rtWahlHtml()) && S.rtWahlHtml().indexOf('Tag 12') >= 0, 'im ▼ steht sie mit dem Tageszähler');
+
+  /* Neu hängt die Gewohnheit ans Programm, mit Unterpunkten */
+  S.gwNeu();
+  pruefe(S.cl.gw.fenster && S.cl.gw.fenster.programm === p.id, '„Neu“ hängt die Gewohnheit an das Programm');
+  S.document.getElementById('gwWenn').value = 'morgens';
+  S.document.getElementById('gwDann').value = 'Laufen';
+  S.document.getElementById('gwS0').value = 'Schuhe an';
+  S.document.getElementById('gwS1').value = '20 Minuten';
+  S.document.getElementById('gwS2').value = '';
+  S.gwSpeichern();
+  const g = S.gwAlle('ueben', p.id)[0];
+  pruefe(!!g && S.gwSchritte(g).length === 2, 'sie wird mit zwei Unterpunkten gespeichert');
+  pruefe(S.gwAlle('ueben', 'anderes').length === 0, 'und zählt nur zu ihrem eigenen Programm');
+
+  /* ● ◐ ○ statt Prozent */
+  pruefe(S.gwStand(g, heute) === 'leer' && S.gwZeichen('leer') === '○', 'nichts abgehakt: ○');
+  S.gwSchrittUm(g.id, 's1', heute);
+  pruefe(S.gwStand(g, heute) === 'halb' && S.gwZeichen('halb') === '◐', 'ein Unterpunkt: ◐');
+  pruefe(g.tage.indexOf(heute) < 0, 'halb zählt nicht als geschafft');
+  S.gwSchrittUm(g.id, 's2', heute);
+  pruefe(S.gwStand(g, heute) === 'voll' && S.gwZeichen('voll') === '●' && g.tage.indexOf(heute) >= 0, 'alle Unterpunkte: ● und der Tag gilt');
+  S.gwTagUm(g.id, heute);
+  pruefe(S.gwStand(g, heute) === 'leer' && g.tage.indexOf(heute) < 0, 'der große Haken setzt alle zurück');
+  S.gwTagUm(g.id, heute);
+  pruefe(S.gwStand(g, heute) === 'voll', 'und setzt sie wieder alle');
+  S.gwSchrittUm(g.id, 's1', '2026-11-05');
+  pruefe(S.gwStand(g, '2026-11-05') === 'leer', 'ältere Tage lassen sich nicht nachträglich abhaken');
+
+  /* Die Unterpunkte stehen unter der angetippten Gewohnheit */
+  S.cl.gw.wahl = g.id;
+  S.inhaltZeichnen();
+  h = inhalt();
+  pruefe(/Schuhe an/.test(h) && /gw-schritt/.test(h), 'die Unterpunkte erscheinen unter der gewählten Gewohnheit');
+  pruefe(h.indexOf('%') < 0, 'nirgends eine Prozentzahl');
+  S.cl.gw.wahl = '';
+  S.inhaltZeichnen();
+  pruefe(inhalt().indexOf('Schuhe an') < 0, 'sonst bleibt die Liste schmal');
+
+  /* Der Verlauf */
+  pruefe(S.upTagStand(p, heute) === 'voll', 'ein Tag mit allem abgehakt ist voll');
+  pruefe(S.upTagStand(p, '2026-11-05') === 'leer', 'ein Tag ohne alles ist leer');
+
+  /* Die Tagesnotiz */
+  S.upTagOeffnen(heute);
+  pruefe(S.cl.aufklapp === 'uptag' && S.cl.up.tagF.schreiben === true, 'heute lässt sich eine Notiz schreiben');
+  S.document.getElementById('upTagText').value = 'Lief gut.';
+  S.upTagSichern();
+  pruefe(p.notizen[heute] === 'Lief gut.', 'sie hängt am Programm, nicht am Gerät');
+  S.upTagOeffnen('2026-11-14');
+  pruefe(S.cl.up.tagF.schreiben === true, 'gestern geht auch noch');
+  S.upTagOeffnen('2026-11-05');
+  pruefe(S.cl.up.tagF.schreiben === false && S.upTagHtml().indexOf('upTagSichern') < 0, 'ältere Tage nur zum Lesen');
+  S.aufklappZu();
+  S.inhaltZeichnen();
+  pruefe(/class="[a-z]* ?notiz"/.test(inhalt()) && S.upRasterHtml(p, 12, 56).indexOf('notiz') >= 0, 'ein Tag mit Notiz ist im Verlauf erkennbar');
+
+  /* Die Einstellungen */
+  S.upEinstellungen();
+  pruefe(S.cl.aufklapp === 'umprogramm', '„Programm…“ öffnet die Einstellungen');
+  S.document.getElementById('upName').value = 'Umprogrammierung';
+  S.document.getElementById('upBeginn').value = '2026-11-04';
+  S.document.getElementById('upNotizT').value = 'Umprogrammierung';
+  S.document.getElementById('upDauer').value = '30';
+  S.document.getElementById('upJeTag').value = '2';
+  S.document.getElementById('upSek').value = '8';
+  S.document.getElementById('upKal').value = 'coach';
+  S.document.getElementById('upKalF').value = '60';
+  S.upWahl('fenster', 4);
+  S.upSpeichern();
+  pruefe(p.tage === 30 && p.jeTag === 2 && p.fenster === 4 && p.sekunden === 8, 'Dauer, Regeln, Anzeigen und Dauer landen im Datensatz');
+  pruefe(S.upFensterListe(p).length === 4 && S.upTagesRegeln(1, null, p).length === 2, 'und wirken sofort');
+  pruefe(S.upTagVon(p, '2026-12-29') === 0, 'die kürzere Laufzeit gilt');
+
+  /* Pflichtlektüre abschalten */
+  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Eins\nZwei\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
+  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
+  const nun = S.clMinuten(S.clUhrzeit());
+  const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+  S.coachTermine = [{ id: 'ev-s', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 10)), kalId: 'kal-coach' }];
+  pruefe(S.manPflichtPruefen() === true, 'mit eingeschalteter Pflichtlektüre sperrt der Coach-Termin');
+  S.cl.man.pflicht = ''; S.cl.man.frei = true;
+  S.upEinstellungen(); S.upWahl('manifest', false); S.upSpeichern();
+  pruefe(p.manifest === false && S.upManifestAn(p) === false, 'die Pflichtlektüre lässt sich abschalten');
+  pruefe(S.manPflichtPruefen() === false, 'dann löst auch ein Coach-Termin nichts aus');
+
+  /* Kalenderwort und Fensterlänge */
+  S.upEinstellungen();
+  S.upWahl('manifest', true);
+  S.document.getElementById('upKal').value = 'Trainer';
+  S.document.getElementById('upKalF').value = '90';
+  S.upSpeichern();
+  pruefe(S.upKalenderWort() === 'trainer' && S.upKalFenster() === 90, 'Kalenderwort und Fensterlänge kommen aus dem Programm');
+  S.kalenderListe = [{ id: 'k1', name: 'Mein Trainer' }, { id: 'k2', name: 'Coach' }];
+  pruefe(S.manIstCoachKalender('k1') === true && S.manIstCoachKalender('k2') === false, 'und steuern, welcher Kalender zählt');
+
+  /* Zwei Programme nebeneinander */
+  const p2 = { id: 'up-s2', typ: 'umprog', name: 'Zweites', beginn: '2027-01-05', tage: 28, jeTag: 3, fenster: 3,
+               sekunden: 5, notiz: 'Umprogrammierung', manifest: true, kalender: 'coach', kalFenster: 60, notizen: {}, angelegt: heute };
+  S.DB.kurs.push(p2);
+  pruefe(S.upProgramme().length === 2 && S.upAktiv() === p, 'zwei Programme stehen nebeneinander, es läuft das passende');
+  S.isoDatum = (d) => (d ? echtIso(d) : '2027-01-10');
+  pruefe(S.upAktiv() === p2, 'im Januar läuft das zweite');
+
+  /* Löschen */
+  S.isoDatum = (d) => (d ? echtIso(d) : heute);
+  S.upEinstellungen(); S.upLoeschenFragen(); S.upLoeschen();
+  pruefe(!S.upFinden(p.id) && !!S.gwFinden(g.id), 'das Programm lässt sich löschen, die Gewohnheit bleibt');
+
+  /* Die Wächter in der Quelle */
+  pruefe(SKRIPT.split('function upSichtHtml(').length === 2, 'upSichtHtml gibt es genau einmal');
+  pruefe(SKRIPT.split('function gwStand(').length === 2, 'gwStand gibt es genau einmal');
+  pruefe(SKRIPT.indexOf('var GW_MAX = 8;') >= 0, 'die Obergrenze der Gewohnheiten steht bei acht');
+  pruefe(/RT_SICHTEN = \[\['umprog'/.test(SKRIPT), 'die Sicht ist im Vorrat der Reiter angemeldet');
+
+  S.isoDatum = echtIso;
+  S.DB.kurs = []; S.cl.rt.sicht = 'routinen'; S.cl.gw.wahl = ''; S.cl.up.wahl = '';
+  S.cl.man.pflicht = ''; S.cl.man.frei = true;
+  S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
 }
 
 (async function () {
@@ -11587,6 +11761,7 @@ function manCoachHolenTest() {
   try { manPflichtTest(); } catch (e) { fail('0.106.0 Pflichtlektüre warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { upTest(); } catch (e) { fail('0.107.0 Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await manCoachHolenTest(); } catch (e) { fail('0.107.1 Coach-Termine holen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { upSichtTest(); } catch (e) { fail('0.108.0 Sicht Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

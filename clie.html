@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.107.1</title>
+<title>CLIE 0.108.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -716,6 +716,23 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
 .fenster .rumpf{padding:10px 12px;font-size:20px}
+.up-titel{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:2px solid var(--px);padding-bottom:3px}
+.up-titel span{font-size:17px;color:var(--px-mitte)}
+.up-balken{display:flex;gap:1px;margin:7px 0 4px}
+.up-balken i{flex:1;height:12px;background:var(--px-zart);border:1px solid var(--px-zart)}
+.up-balken i.voll{background:var(--px);border-color:var(--px)}
+.up-balken i.halb{background:var(--lcd);border-color:var(--px)}
+.up-balken i.heute{background:var(--lcd);border:2px solid var(--px)}
+.up-raster{display:grid;grid-template-columns:repeat(14,1fr);gap:3px;margin-top:4px}
+.up-raster button{font:inherit;font-size:15.5px;padding:3px 0;text-align:center;background:var(--px-zart);border:1px solid var(--px-zart);color:var(--px)}
+.up-raster button.voll{background:var(--px);color:var(--lcd);border-color:var(--px)}
+.up-raster button.halb{background:var(--lcd);border-color:var(--px)}
+.up-raster button.leer{background:var(--lcd);border-color:var(--px-zart)}
+.up-raster button.heute{background:var(--lcd);border:2px solid var(--px);font-weight:600}
+.up-raster button.aus{opacity:.35}
+.up-raster button.notiz{text-decoration:underline}
+.gw-schritt{display:flex;align-items:center;gap:8px;padding:2px 0 2px 26px;font-size:18px;color:var(--px-mitte)}
+.gw-schritt .tx{flex:1;text-align:left}
 .up-fenster{top:50%;transform:translateY(-50%);max-height:calc(100% - 110px)}
 .up-fenster .up-kopf{font-size:17px;color:var(--px-mitte);text-align:center;border-bottom:2px dotted var(--px-zart);padding-bottom:6px;margin-bottom:10px}
 .up-fenster .up-regel{line-height:1.35;margin-bottom:11px;padding-left:15px;text-indent:-15px}
@@ -1224,7 +1241,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.107.1';
+var APP_VERSION = '0.108.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4803,6 +4820,10 @@ function aufklappZeichnen() {
     el.innerHTML = fkFensterHtml();
   } else if (cl.aufklapp === 'umprog') {
     el.innerHTML = upHtml();
+  } else if (cl.aufklapp === 'umprogramm') {
+    el.innerHTML = upFensterHtml();
+  } else if (cl.aufklapp === 'uptag') {
+    el.innerHTML = upTagHtml();
   } else if (cl.aufklapp === 'routine') {
     if (el.innerHTML.indexOf('rtName') >= 0 || el.innerHTML.indexOf('rtZu') >= 0) { return; }
     el.innerHTML = rtFensterHtml();
@@ -5119,6 +5140,8 @@ function aufklappZu() {
   cl.cls.fenster = null;
   cl.rt.fenster = null;
   cl.gw.fenster = null;
+  cl.up.fenster = null;
+  cl.up.tagF = null;
   cl.lf.fenster = null;
   cl.auf.ep = null;
   cl.auf.anzF = null;
@@ -15151,6 +15174,7 @@ function rtDiesmalTag(a) {
 }
 
 function routinenHtml() {
+  if (cl.rt.sicht === 'umprog') { return upSichtHtml(); }
   if (cl.rt.sicht === 'gewohnheiten' || cl.rt.sicht === 'sitzt') { return gwListeHtml(); }
   var heute = isoDatum();
   var alle = rtAlle();
@@ -15184,7 +15208,8 @@ function routinenHtml() {
 }
 
 function routinenFussHtml() {
-  /* Seit 0.72: im ▼ auch Gewohnheiten */
+  /* Seit 0.72: im ▼ auch Gewohnheiten, seit 0.108.0 die Umprogrammierung */
+  if (cl.rt.sicht === 'umprog') { return upFussHtml(); }
   if (cl.rt.sicht === 'gewohnheiten' || cl.rt.sicht === 'sitzt') { return gwFussHtml(); }
   return '<button type="button" class="knopf" onclick="rtNeu()">Neu</button>'
     + '<button type="button" class="knopf" onclick="rtDetailsGewaehlt()">Details…</button>'
@@ -15404,10 +15429,10 @@ function rtVerlegen(von) {
    wandert unter „Verinnerlicht…“. Die Sätze liegen wie die Leitfäden
    im Bereich „kurs“ der workbench.json, mit „typ“: gewohnheit. */
 
-var GW_MAX = 5;
+var GW_MAX = 8;   /* seit 0.108.0: acht statt fünf, für das Programm */
 var GW_TAGE_MAX = 70;
 var RT_SICHT_KEY = 'clie-rt-sicht';
-var RT_SICHTEN = [['routinen', 'Routinen'], ['gewohnheiten', 'Gewohnheiten'], ['sitzt', 'Verinnerlicht']];
+var RT_SICHTEN = [['umprog', 'Umprogrammierung'], ['routinen', 'Routinen'], ['gewohnheiten', 'Gewohnheiten'], ['sitzt', 'Verinnerlicht']];
 
 function rtSichtLaden() {
   var s = '';
@@ -15436,18 +15461,24 @@ function rtWahlHtml() {
   var knopf = function (s, text, zahl) {
     return '<button type="button"' + (cl.rt.sicht === s ? ' class="an"' : '') + ' onclick="rtSichtSetzen(\'' + s + '\')"><span>' + text + '</span><small>' + zahl + '</small></button>';
   };
+  /* Seit 0.108.0: Was gerade läuft, steht oben — ein beendetes Programm rutscht ans Ende */
+  var p = upAktiv();
+  var up = knopf('umprog', 'Umprogrammierung', p ? 'Tag ' + upTagVon(p, isoDatum()) : (upProgramme().length ? 'beendet' : '—'));
   return '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
+    + (p ? up + '<div class="trenn"></div>' : '')
     + knopf('routinen', 'Routinen', rtAlle().filter(function (a) { return !a.pausiert; }).length)
     + knopf('gewohnheiten', 'Gewohnheiten', gwAlle('ueben').length)
     + '<div class="trenn"></div>' + knopf('sitzt', 'Verinnerlicht…', gwAlle('sitzt').length)
+    + (p ? '' : '<div class="trenn"></div>' + up)
     + '<div class="trenn"></div>' + katFilterHtml('katSetzen') + '</div>';
 }
 
 cl.gw = { wahl: '', fenster: null };
 
 /* zustand: 'ueben' oder 'sitzt' */
-function gwAlle(zustand) {
+function gwAlle(zustand, programm) {
   return krAlle('gewohnheit').filter(function (g) {
+    if (programm && String(g.programm || '') !== String(programm)) { return false; }
     return clPasst(g) && (!zustand || (g.zustand === 'sitzt' ? 'sitzt' : 'ueben') === zustand);
   }).sort(function (a, b) { return (Number(a.rang) || 0) - (Number(b.rang) || 0) || String(a.angelegt || '').localeCompare(String(b.angelegt || '')); });
 }
@@ -15466,16 +15497,95 @@ function gwGeschafft(g, tag) {
   return !!(g && Array.isArray(g.tage) && g.tage.indexOf(tag) >= 0);
 }
 
+/* ---- Unterpunkte (seit 0.108.0) ----
+   Eine Gewohnheit darf bis zu drei Unterpunkte haben. Der Tagespunkt fasst sie zusammen:
+   ● alle, ◐ einige, ○ keiner. Keine Prozentzahl — eine Kette liest man, man rechnet sie
+   nicht. Was mehr als drei Schritte braucht, ist eine Routine oder eine Liste. */
+function gwSchritte(g) {
+  return (g && Array.isArray(g.schritte)) ? g.schritte.filter(function (s) { return s && s.id && s.text; }) : [];
+}
+
+function gwSchrittGeschafft(g, sid, tag) {
+  var m = (g && g.schrittTage && typeof g.schrittTage === 'object') ? g.schrittTage : {};
+  return !!(Array.isArray(m[sid]) && m[sid].indexOf(tag) >= 0);
+}
+
+/* 'voll' | 'halb' | 'leer' */
+function gwStand(g, tag) {
+  var s = gwSchritte(g);
+  if (!s.length) { return gwGeschafft(g, tag) ? 'voll' : 'leer'; }
+  var n = s.filter(function (x) { return gwSchrittGeschafft(g, x.id, tag); }).length;
+  return n === 0 ? 'leer' : (n === s.length ? 'voll' : 'halb');
+}
+
+function gwZeichen(stand) {
+  return stand === 'voll' ? '●' : (stand === 'halb' ? '◐' : '○');
+}
+
+function gwTagErlaubt(tag) {
+  var heute = isoDatum();
+  return tag === heute || tag === tagePlus(heute, -1);
+}
+
+/* Der Tag gilt als geschafft, sobald alle Unterpunkte stehen */
+function gwTageAngleichen(g, tag) {
+  if (!Array.isArray(g.tage)) { g.tage = []; }
+  var voll = gwStand(g, tag) === 'voll';
+  var i = g.tage.indexOf(tag);
+  if (voll && i < 0) { g.tage.push(tag); }
+  if (!voll && i >= 0) { g.tage.splice(i, 1); }
+  g.tage.sort();
+}
+
+function gwAufraeumen(g) {
+  var grenze = tagePlus(isoDatum(), -GW_TAGE_MAX);
+  if (Array.isArray(g.tage)) { g.tage = g.tage.filter(function (t) { return t >= grenze; }).sort(); }
+  var m = g.schrittTage;
+  if (m && typeof m === 'object') {
+    Object.keys(m).forEach(function (k) {
+      m[k] = (Array.isArray(m[k]) ? m[k] : []).filter(function (t) { return t >= grenze; }).sort();
+      if (!m[k].length) { delete m[k]; }
+    });
+  }
+}
+
+function gwSchrittUm(id, sid, tag) {
+  var g = gwFinden(id);
+  if (!g || !sid || !gwTagErlaubt(tag)) { return; }
+  if (!g.schrittTage || typeof g.schrittTage !== 'object') { g.schrittTage = {}; }
+  if (!Array.isArray(g.schrittTage[sid])) { g.schrittTage[sid] = []; }
+  var l = g.schrittTage[sid];
+  var i = l.indexOf(tag);
+  if (i >= 0) { l.splice(i, 1); } else { l.push(tag); }
+  gwTageAngleichen(g, tag);
+  gwAufraeumen(g);
+  krSpeichern(g);
+  inhaltZeichnen();
+}
+
 /* Abhaken: heute und gestern — ältere Tage nicht */
 function gwTagUm(id, tag) {
   var g = gwFinden(id);
-  var heute = isoDatum();
-  if (!g || (tag !== heute && tag !== tagePlus(heute, -1))) { return; }
+  if (!g || !gwTagErlaubt(tag)) { return; }
   if (!Array.isArray(g.tage)) { g.tage = []; }
-  var i = g.tage.indexOf(tag);
-  if (i >= 0) { g.tage.splice(i, 1); } else { g.tage.push(tag); }
-  var grenze = tagePlus(heute, -GW_TAGE_MAX);
-  g.tage = g.tage.filter(function (t) { return t >= grenze; }).sort();
+  var schritte = gwSchritte(g);
+  if (schritte.length) {
+    /* Mit Unterpunkten setzt der große Haken alle auf einmal — oder keinen (0.108.0) */
+    var an = gwStand(g, tag) !== 'voll';
+    if (!g.schrittTage || typeof g.schrittTage !== 'object') { g.schrittTage = {}; }
+    schritte.forEach(function (s) {
+      if (!Array.isArray(g.schrittTage[s.id])) { g.schrittTage[s.id] = []; }
+      var l = g.schrittTage[s.id];
+      var k = l.indexOf(tag);
+      if (an && k < 0) { l.push(tag); }
+      if (!an && k >= 0) { l.splice(k, 1); }
+    });
+    gwTageAngleichen(g, tag);
+  } else {
+    var i = g.tage.indexOf(tag);
+    if (i >= 0) { g.tage.splice(i, 1); } else { g.tage.push(tag); }
+  }
+  gwAufraeumen(g);
   krSpeichern(g);
   inhaltZeichnen();
 }
@@ -15488,7 +15598,7 @@ function gwPunkteHtml(g) {
   var i;
   for (i = 6; i >= 0; i--) {
     var t = tagePlus(heute, -i);
-    var p = gwGeschafft(g, t) ? '●' : '○';
+    var p = gwZeichen(gwStand(g, t));
     h += (t === gestern)
       ? '<button type="button" class="gw-p gestern" onclick="gwTagUm(\'' + esc(g.id) + '\',\'' + t + '\')" aria-label="gestern ' + (p === '●' ? 'geschafft' : 'nicht geschafft') + '">' + p + '</button>'
       : '<span class="gw-p">' + p + '</span>';
@@ -15498,10 +15608,19 @@ function gwPunkteHtml(g) {
 
 function gwZeileHtml(g, mitHaken) {
   var heute = isoDatum();
-  return '<div class="gw-zeile' + (cl.gw.wahl === g.id ? ' gewaehlt' : '') + '">'
-    + (mitHaken ? clKastenHtml(gwGeschafft(g, heute), 'gwTagUm(\'' + esc(g.id) + '\',\'' + heute + '\')') : '')
+  var h = '<div class="gw-zeile' + (cl.gw.wahl === g.id ? ' gewaehlt' : '') + '">'
+    + (mitHaken ? clKastenHtml(gwStand(g, heute) === 'voll', 'gwTagUm(\'' + esc(g.id) + '\',\'' + heute + '\')') : '')
     + '<button type="button" class="tx" onclick="gwTippen(\'' + esc(g.id) + '\')"><small>' + esc(g.wenn || '') + '</small>' + esc(g.dann || '') + '</button>'
     + (mitHaken ? gwPunkteHtml(g) : '') + '</div>';
+  /* Unterpunkte nur bei der angetippten Gewohnheit — sonst wird die Liste zur Wand (0.108.0) */
+  var s = gwSchritte(g);
+  if (mitHaken && s.length && cl.gw.wahl === g.id) {
+    h += s.map(function (x) {
+      return '<div class="gw-schritt">' + clKastenHtml(gwSchrittGeschafft(g, x.id, heute), 'gwSchrittUm(\'' + esc(g.id) + '\',\'' + esc(x.id) + '\',\'' + heute + '\')')
+        + '<span class="tx">' + esc(x.text) + '</span></div>';
+    }).join('');
+  }
+  return h;
 }
 
 function gwListeHtml() {
@@ -15537,7 +15656,9 @@ function gwDetailsGewaehlt() {
 
 function gwNeu() {
   if (gwUebenZahl() >= GW_MAX) { melde('Höchstens ' + GW_MAX + ' Gewohnheiten gleichzeitig — erst eine verinnerlichen.', 'warn'); return; }
-  cl.gw.fenster = { modus: 'neu', id: '', wenn: '', dann: '', bereich: clNeuBereich(), zustand: 'ueben' };
+  var p = (cl.rt.sicht === 'umprog') ? upGezeigt() : null;
+  cl.gw.fenster = { modus: 'neu', id: '', wenn: '', dann: '', bereich: clNeuBereich(), zustand: 'ueben',
+                    programm: p ? p.id : '', schritte: ['', '', ''] };
   cl.aufklapp = 'gewohnheit';
   aufklappNeu();
 }
@@ -15545,8 +15666,11 @@ function gwNeu() {
 function gwDetails(id) {
   var g = gwFinden(id);
   if (!g) { return; }
+  var s = gwSchritte(g).map(function (x) { return x.text; });
+  while (s.length < UP_SCHRITTE_MAX) { s.push(''); }
   cl.gw.wahl = id;
-  cl.gw.fenster = { modus: 'details', id: g.id, wenn: g.wenn || '', dann: g.dann || '', bereich: clKategorieVon(g), zustand: g.zustand === 'sitzt' ? 'sitzt' : 'ueben' };
+  cl.gw.fenster = { modus: 'details', id: g.id, wenn: g.wenn || '', dann: g.dann || '', bereich: clKategorieVon(g),
+                    zustand: g.zustand === 'sitzt' ? 'sitzt' : 'ueben', programm: String(g.programm || ''), schritte: s };
   cl.aufklapp = 'gewohnheit';
   aufklappNeu();
 }
@@ -15558,8 +15682,21 @@ function gwFensterLesen() {
   var d = document.getElementById('gwDann');
   if (w && typeof w.value === 'string') { f.wenn = w.value; }
   if (d && typeof d.value === 'string') { f.dann = d.value; }
+  if (!Array.isArray(f.schritte)) { f.schritte = ['', '', '']; }
+  var i;
+  for (i = 0; i < UP_SCHRITTE_MAX; i++) {
+    var e = document.getElementById('gwS' + i);
+    if (e && typeof e.value === 'string') { f.schritte[i] = e.value; }
+  }
   katPrivatLesen('gw', f);
   return f;
+}
+
+function gwProgrammWahl(id) {
+  var f = gwFensterLesen();
+  if (!f) { return; }
+  f.programm = String(id || '');
+  aufklappNeu();
 }
 
 function gwWahl(wert) {
@@ -15582,6 +15719,8 @@ function gwFensterHtml() {
     + '<label for="gwWenn">Wenn … (Auslöser):</label><input id="gwWenn" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="nach dem Essen" value="' + esc(f.wenn) + '">'
     + '<label for="gwDann">… dann (unter 5 Minuten):</label><input id="gwDann" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="Tisch abräumen" value="' + esc(f.dann) + '">'
     + katPrivatHtml('gw', f.bereich || '', false, true)
+    + gwSchritteHtml(f)
+    + gwProgrammHtml(f)
     + (f.modus === 'neu' ? '' : '<label>Zustand:</label><div class="wahlreihe">'
       + '<button type="button"' + (f.zustand === 'ueben' ? ' class="an"' : '') + ' onclick="gwWahl(\'ueben\')">Übe ich</button>'
       + '<button type="button"' + (f.zustand === 'sitzt' ? ' class="an"' : '') + ' onclick="gwWahl(\'sitzt\')">Verinnerlicht</button></div>'
@@ -15589,6 +15728,27 @@ function gwFensterHtml() {
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="gwSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
     + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="gwLoeschenFragen()">Löschen…</button>') + '</div></div></div>';
+}
+
+/* Bis zu drei Unterpunkte — mehr gehört in eine Routine oder eine Liste (0.108.0) */
+function gwSchritteHtml(f) {
+  var s = Array.isArray(f.schritte) ? f.schritte : [];
+  var h = '<label>Unterpunkte (frei lassen = keine):</label>';
+  var i;
+  for (i = 0; i < UP_SCHRITTE_MAX; i++) {
+    h += '<input id="gwS' + i + '" class="eingabe" type="text" maxlength="60" autocomplete="off" placeholder="' + (i + 1) + '." value="' + esc(String(s[i] || '')) + '">';
+  }
+  return h;
+}
+
+function gwProgrammHtml(f) {
+  var l = upProgramme();
+  if (!l.length) { return ''; }
+  var k = function (id, text) {
+    return '<button type="button"' + (String(f.programm || '') === id ? ' class="an"' : '') + ' onclick="gwProgrammWahl(\'' + esc(id) + '\')">' + esc(text) + '</button>';
+  };
+  return '<label>Gehört zu:</label><div class="wahlreihe">' + k('', 'Keinem')
+    + l.map(function (p) { return k(p.id, p.name || 'Programm'); }).join('') + '</div>';
 }
 
 function gwSpeichern() {
@@ -15609,6 +15769,16 @@ function gwSpeichern() {
   }
   g.wenn = wenn.slice(0, 80);
   g.dann = dann.slice(0, 80);
+  /* Unterpunkte: die Kennung hängt am Platz, damit abgehakte Tage eine Änderung überleben */
+  var schritte = [];
+  (Array.isArray(f.schritte) ? f.schritte : []).forEach(function (t, i) {
+    var text = String(t || '').trim();
+    if (text && i < UP_SCHRITTE_MAX) { schritte.push({ id: 's' + (i + 1), text: text.slice(0, 60) }); }
+  });
+  g.schritte = schritte;
+  if (!schritte.length) { delete g.schrittTage; }
+  g.programm = String(f.programm || '');
+  if (!g.programm) { delete g.programm; }
   if (f.zustand === 'sitzt' && g.zustand !== 'sitzt') { g.sitztSeit = isoDatum(); }
   if (f.zustand !== 'sitzt') { delete g.sitztSeit; }
   g.zustand = f.zustand === 'sitzt' ? 'sitzt' : 'ueben';
@@ -28284,6 +28454,7 @@ function start() {
     ckKorb(false);   /* benennt einen alten „Korb“ in „Sammler“ um (0.62) */
     clKategorienUmstellen();   /* Beruf → Kategorie Arbeit (0.67) */
     try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
+    try { upNachziehen(); } catch (e) { clFehlerZeigen(e, 'upNachziehen'); }   /* Umprogrammierung aus 0.107 in ein Programm (0.108.0) */
     ckWecken();
     zeichne();
     /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
@@ -28355,7 +28526,7 @@ cl.man = { seite: 0, puffer: 0, hoehe: 0, zoom: 18, anzahl: 1, pflicht: '', frei
    der Beginn bis eine Stunde danach, nur am selben Tag — wer das verpasst, verpasst es.
    Gelesen wird je Termin gemerkt und über die workbench.json abgeglichen, damit es nicht
    auf jedem Gerät noch einmal kommt. */
-var MAN_FENSTER_MIN = 60;
+/* Fensterlänge und Kalenderwort kommen seit 0.108.0 aus dem Programm (upKalFenster, upKalenderWort) */
 var MAN_MERK_TAGE = 14;
 
 function manGelesen() {
@@ -28376,7 +28547,7 @@ function manGelesenSetzen(id) {
 }
 
 function manIstCoachKalender(id) {
-  return String(clKalenderName(id) || '').toLowerCase().indexOf('coach') >= 0;
+  return String(clKalenderName(id) || '').toLowerCase().indexOf(upKalenderWort()) >= 0;
 }
 
 /* ---- Die Coach-Termine holt sich die Pflichtlektüre selbst (0.107.1) ----
@@ -28437,14 +28608,14 @@ function manPflichtTermin() {
   (coachTermine || []).forEach(function (t) {
     if (!t || !t.id || gelesen[t.id]) { return; }
     var m = clMinuten(t.zeit);
-    if (m < 0 || nun < m || nun > m + MAN_FENSTER_MIN) { return; }
+    if (m < 0 || nun < m || nun > m + upKalFenster()) { return; }
     if (!treffer || clMinuten(treffer.zeit) < m) { treffer = t; }
   });
   return treffer;
 }
 
 function manPflichtPruefen() {
-  if (cl.man.pflicht || !manifestNotiz()) { return false; }
+  if (cl.man.pflicht || !manifestNotiz() || !upManifestAn()) { return false; }
   var t = manPflichtTermin();
   if (!t) { return false; }
   cl.man.pflicht = t.id;
@@ -28471,95 +28642,172 @@ function manPflichtFertig() {
   oeffne('uebersicht');
 }
 
-/* ---------- Umprogrammierung (seit 0.107.0) ----------
-   56 Tage, drei Mal am Tag: beim ersten Öffnen in einem Zeitfenster zeigt CLIE fünf
-   Sekunden lang drei Regeln aus der Notiz „Umprogrammierung“ und geht dann direkt ins
-   Manifest — gesperrt wie die Pflichtlektüre. Ein Coach-Termin, der gerade fällig wäre,
-   gilt damit als gelesen. Gemerkt wird je Tag und Fenster, über die workbench.json,
-   damit dasselbe Fenster nicht auf jedem Gerät noch einmal kommt. */
-var UP_START = '2026-11-04';
-var UP_TAGE = 56;
-var UP_JE_TAG = 3;             /* Regeln je Tag */
-var UP_SEKUNDEN = 5;
-var UP_FENSTER = [[0, 'frueh'], [11, 'mittag'], [16, 'abend']];
-cl.up = { an: false, tag: 0, marke: '', regeln: [], uhr: null };
+/* ---------- Umprogrammierung (seit 0.107.0, ab 0.108.0 als Programm) ----------
+   Ein Programm läuft über eine gewählte Zahl von Tagen. Beim ersten Öffnen in einem
+   Zeitfenster zeigt CLIE für ein paar Sekunden die Regeln des Tages aus einer Notiz im
+   Memo Pad und geht dann ins Manifest — gesperrt wie die Pflichtlektüre. Ein Coach-Termin,
+   der gerade fällig wäre, gilt damit als gelesen. Gemerkt wird je Tag und Fenster über die
+   workbench.json, damit dasselbe Fenster nicht auf jedem Gerät noch einmal kommt.
+   Die Zahlen stehen seit 0.108.0 im Datensatz (typ 'umprog') und nicht mehr im Code;
+   mehrere Programme dürfen nebeneinander stehen, gelaufene bleiben als Rückblick. */
+var UP_TAGE_VOR = 56;          /* Vorgabe für ein neues Programm */
+var UP_JE_TAG_VOR = 3;
+var UP_FENSTER_VOR = 3;
+var UP_SEKUNDEN_VOR = 5;
+var UP_NOTIZ_VOR = 'Umprogrammierung';
+var UP_KAL_VOR = 'coach';
+var UP_KAL_FENSTER_VOR = 60;
+var UP_SCHRITTE_MAX = 3;       /* Unterpunkte je Gewohnheit */
+/* Die Fenster heißen innen kurz und außen lesbar */
+var UP_FENSTER_NAME = { tag: 'ganztags', frueh: 'früh', mittag: 'mittag', spaet: 'spät', nachmittag: 'nachm.', abend: 'abend' };
+/* Die Zeitfenster je Zahl der Anzeigen: Beginn in Stunden und Name */
+var UP_FENSTER_SATZ = {
+  1: [[0, 'tag']],
+  2: [[0, 'frueh'], [14, 'spaet']],
+  3: [[0, 'frueh'], [11, 'mittag'], [16, 'abend']],
+  4: [[0, 'frueh'], [11, 'mittag'], [15, 'nachmittag'], [19, 'abend']]
+};
+cl.up = { an: false, tag: 0, marke: '', regeln: [], uhr: null, programm: '', wahl: '', fenster: null, tagF: null };
 
-function upNotiz() {
+function upProgramme() {
+  return krAlle('umprog').sort(function (a, b) { return String(a.beginn || '').localeCompare(String(b.beginn || '')); });
+}
+
+function upFinden(id) {
+  var x = krFinden(id);
+  return (x && x.typ === 'umprog') ? x : null;
+}
+
+function upZahl(wert, vor, klein, gross) {
+  var n = Math.round(Number(wert));
+  if (!(n === n) || n < klein || n > gross) { return vor; }
+  return n;
+}
+
+/* Tag 1 ist der Starttag; außerhalb der Laufzeit kommt 0 */
+function upTagVon(p, is) {
+  if (!p || !p.beginn) { return 0; }
+  var a = Date.parse(String(p.beginn) + 'T00:00:00');
+  var b = Date.parse((is || isoDatum()) + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) { return 0; }
+  var n = Math.round((b - a) / 86400000) + 1;
+  return (n >= 1 && n <= upDauer(p)) ? n : 0;
+}
+
+function upDauer(p) {
+  return upZahl(p && p.tage, UP_TAGE_VOR, 1, 999);
+}
+
+/* Das Programm, das an diesem Tag läuft — bei mehreren das zuletzt begonnene */
+function upAktiv(is) {
+  var heute = is || isoDatum();
+  var treffer = null;
+  upProgramme().forEach(function (p) {
+    if (upTagVon(p, heute) > 0 && (!treffer || String(p.beginn) > String(treffer.beginn))) { treffer = p; }
+  });
+  return treffer;
+}
+
+/* Für die Sicht: das laufende, sonst das zuletzt begonnene */
+function upGezeigt() {
+  if (cl.up.wahl) { var g = upFinden(cl.up.wahl); if (g) { return g; } }
+  var l = upProgramme();
+  return upAktiv() || (l.length ? l[l.length - 1] : null);
+}
+
+function upTag(is) {
+  return upTagVon(upAktiv(is), is);
+}
+
+function upNotizTitel(p) {
+  return String((p && p.notiz) || UP_NOTIZ_VOR).trim().toLowerCase();
+}
+
+function upNotiz(p) {
+  var titel = upNotizTitel(p);
   var treffer = (DB.gedanken || []).filter(function (g) {
-    return g && typeof g === 'object' && String(g.titel || '').trim().toLowerCase() === 'umprogrammierung';
+    return g && typeof g === 'object' && String(g.titel || '').trim().toLowerCase() === titel;
   });
   return treffer[0] || null;
 }
 
 /* Eine Regel je Zeile; Leerzeilen, Striche und die Typ-Zeile fallen weg */
-function upRegeln() {
-  var n = upNotiz();
+function upRegeln(p) {
+  var n = upNotiz(p);
   if (!n) { return []; }
   return String(n.text || '').split('\n').map(function (z) {
     return String(z).replace(/^\s*[-•*]\s+/, '').trim();
   }).filter(function (z) { return z && !MP_TYP.test(z); });
 }
 
-/* Tag 1 ist der Starttag; außerhalb der 56 Tage kommt 0 */
-function upTag(is) {
-  var a = Date.parse(UP_START + 'T00:00:00');
-  var b = Date.parse((is || isoDatum()) + 'T00:00:00');
-  if (isNaN(a) || isNaN(b)) { return 0; }
-  var n = Math.round((b - a) / 86400000) + 1;
-  return (n >= 1 && n <= UP_TAGE) ? n : 0;
+function upFensterListe(p) {
+  return UP_FENSTER_SATZ[upZahl(p && p.fenster, UP_FENSTER_VOR, 1, 4)] || UP_FENSTER_SATZ[UP_FENSTER_VOR];
 }
 
 /* Das Zeitfenster, in dem wir gerade stehen */
-function upFenster(zeit) {
+function upFenster(zeit, p) {
+  var liste = upFensterListe(p);
   var m = clMinuten(zeit || clUhrzeit());
-  var name = UP_FENSTER[0][1];
-  UP_FENSTER.forEach(function (f) { if (m >= f[0] * 60) { name = f[1]; } });
+  var name = liste[0][1];
+  liste.forEach(function (f) { if (m >= f[0] * 60) { name = f[1]; } });
   return name;
 }
 
-function upMarke(is, zeit) {
-  return 'up-' + (is || isoDatum()) + '-' + upFenster(zeit);
+function upMarke(is, zeit, p) {
+  return 'up-' + (is || isoDatum()) + '-' + upFenster(zeit, p);
 }
 
 /* Die Regeln des Tages — der Reihe nach durch die Notiz, Tag für Tag weiter */
-function upTagesRegeln(tag, alle) {
-  var liste = alle || upRegeln();
+function upTagesRegeln(tag, alle, p) {
+  var liste = alle || upRegeln(p);
   if (!liste.length || !tag) { return []; }
-  var anz = Math.min(UP_JE_TAG, liste.length);
+  var anz = Math.min(upZahl(p && p.jeTag, UP_JE_TAG_VOR, 1, 9), liste.length);
   var start = ((tag - 1) * anz) % liste.length;
   var raus = [];
   for (var i = 0; i < anz; i++) { raus.push(liste[(start + i) % liste.length]); }
   return raus;
 }
 
+/* Welche Fenster des Tages schon gelesen sind */
+function upGelesenAm(is, p) {
+  var gelesen = manGelesen();
+  return upFensterListe(p).map(function (f) { return !!gelesen['up-' + is + '-' + f[1]]; });
+}
+
 function upPruefen() {
   if (cl.up.an || cl.man.pflicht) { return false; }
-  var tag = upTag();
+  var p = upAktiv();
+  if (!p) { return false; }
+  var tag = upTagVon(p, isoDatum());
   if (!tag) { return false; }
-  var regeln = upTagesRegeln(tag);
+  var regeln = upTagesRegeln(tag, null, p);
   if (!regeln.length) { return false; }
-  var marke = upMarke();
+  var marke = upMarke(null, null, p);
   if (manGelesen()[marke]) { return false; }
   cl.up.an = true;
   cl.up.tag = tag;
   cl.up.marke = marke;
   cl.up.regeln = regeln;
+  cl.up.programm = p.id;
   cl.aufklapp = 'umprog';
   zeichne();
-  upUhrStellen();
+  upUhrStellen(p);
   return true;
 }
 
-function upUhrStellen() {
+function upUhrStellen(p) {
   if (cl.up.uhr) { clearTimeout(cl.up.uhr); }
-  cl.up.uhr = setTimeout(function () { cl.up.uhr = null; upFertig(); }, UP_SEKUNDEN * 1000);
+  var s = upZahl(p && p.sekunden, UP_SEKUNDEN_VOR, 2, 60);
+  cl.up.uhr = setTimeout(function () { cl.up.uhr = null; upFertig(); }, s * 1000);
 }
 
 function upHtml() {
-  return '<div class="fenster up-fenster" onclick="upFertig()"><div class="titel">Tag ' + cl.up.tag + ' von ' + UP_TAGE + '</div><div class="rumpf">'
+  var p = upFinden(cl.up.programm);
+  var mitManifest = upManifestAn(p) && manifestNotiz();
+  return '<div class="fenster up-fenster" onclick="upFertig()"><div class="titel">Tag ' + cl.up.tag + ' von ' + upDauer(p) + '</div><div class="rumpf">'
     + '<div class="up-kopf">Neue Gewohnheiten mit neuen Regeln</div>'
     + cl.up.regeln.map(function (r) { return '<div class="up-regel">' + manifestInline(r) + '</div>'; }).join('')
-    + '<div class="up-fuss">' + (manifestNotiz() ? 'weiter zum Manifest' : 'antippen zum Schließen') + '</div>'
+    + '<div class="up-fuss">' + (mitManifest ? 'weiter zum Manifest' : 'antippen zum Schließen') + '</div>'
     + '</div></div>';
 }
 
@@ -28568,9 +28816,10 @@ function upFertig() {
   if (!cl.up.an) { return; }
   if (cl.up.uhr) { clearTimeout(cl.up.uhr); cl.up.uhr = null; }
   var marke = cl.up.marke;
+  var p = upFinden(cl.up.programm);
   cl.up.an = false;
   cl.aufklapp = '';
-  if (manifestNotiz()) {
+  if (upManifestAn(p) && manifestNotiz()) {
     cl.man.pflicht = marke;
     cl.man.frei = false;
     cl.man.seite = 0;
@@ -28588,6 +28837,276 @@ function upCoachAbhaken() {
     if (!t) { return; }
     manGelesenSetzen(t.id);
   }
+}
+
+/* ---- Einstellungen, die früher im Code standen (0.108.0) ---- */
+function upManifestAn(p) {
+  var q = p || upAktiv();
+  return q ? q.manifest !== false : true;
+}
+
+function upKalenderWort() {
+  var p = upAktiv();
+  return String((p && p.kalender) || UP_KAL_VOR).trim().toLowerCase() || UP_KAL_VOR;
+}
+
+function upKalFenster() {
+  var p = upAktiv();
+  return upZahl(p && p.kalFenster, UP_KAL_FENSTER_VOR, 5, 720);
+}
+
+/* ---- Die Sicht in Routines (0.108.0) ---- */
+
+/* Wie weit ein Tag im Programm gekommen ist — gemessen an den Gewohnheiten */
+function upTagStand(p, is) {
+  var l = gwAlle('ueben', p && p.id);
+  if (!p || !l.length) { return 'leer'; }
+  var voll = 0;
+  var teil = 0;
+  l.forEach(function (g) {
+    var s = gwStand(g, is);
+    if (s === 'voll') { voll++; } else if (s === 'halb') { teil++; }
+  });
+  if (voll === l.length) { return 'voll'; }
+  return (voll || teil) ? 'halb' : 'leer';
+}
+
+function upTagNotizText(p, is) {
+  var n = (p && p.notizen && typeof p.notizen === 'object') ? p.notizen : {};
+  return String(n[is] || '');
+}
+
+function upBalkenHtml(p, tag, dauer) {
+  var h = '';
+  var i;
+  for (i = 1; i <= dauer; i++) {
+    var is = tagePlus(p.beginn, i - 1);
+    var k = (i === tag) ? 'heute' : upTagStand(p, is);
+    h += '<i class="' + k + '"></i>';
+  }
+  return '<div class="up-balken">' + h + '</div>';
+}
+
+function upRasterHtml(p, tag, dauer) {
+  var h = '<div class="gruppe">Verlauf</div><div class="up-raster">';
+  var i;
+  for (i = 1; i <= dauer; i++) {
+    var is = tagePlus(p.beginn, i - 1);
+    var kuenftig = is > isoDatum();
+    var k = (i === tag) ? 'heute' : (kuenftig ? 'aus' : upTagStand(p, is));
+    h += '<button type="button" class="' + k + (upTagNotizText(p, is) ? ' notiz' : '')
+      + '" onclick="upTagOeffnen(\'' + is + '\')">' + i + '</button>';
+  }
+  return h + '</div><p class="leise">■ alles geschafft · ◨ teils · □ nichts · Punkt = Notiz. Einen Tag antippen: Notiz lesen, heute und gestern auch schreiben.</p>';
+}
+
+function upSichtHtml() {
+  if (!upProgramme().length) {
+    return '<p class="leise">Noch kein Programm — „Neu“ tippen. Die Regeln stehen in einer Notiz im Memo Pad, eine Regel je Zeile; der Titel der Notiz wird im Programm eingetragen.</p>';
+  }
+  var p = upGezeigt();
+  var heute = isoDatum();
+  var dauer = upDauer(p);
+  var tag = upTagVon(p, heute);
+  var ende = tagePlus(p.beginn, dauer - 1);
+  var h = '<div class="up-titel"><b>' + (tag ? 'Tag ' + tag + ' von ' + dauer : esc(p.name || 'Programm')) + '</b>'
+    + '<span>' + (tag ? 'bis ' + esc(clKurzDatum(ende)) : esc(clKurzDatum(p.beginn)) + ' – ' + esc(clKurzDatum(ende))) + '</span></div>';
+  h += upBalkenHtml(p, tag, dauer);
+  h += '<div class="leise">Neue Gewohnheiten mit neuen Regeln</div>';
+
+  if (tag) {
+    var fenster = upFensterListe(p);
+    var gelesen = upGelesenAm(heute, p);
+    h += '<div class="block"><div class="gruppe">Heute gelesen · '
+      + fenster.map(function (f, i) { return (gelesen[i] ? '●' : '○') + ' ' + esc(UP_FENSTER_NAME[f[1]] || f[1]); }).join(' &nbsp; ') + '</div>';
+    var regeln = upTagesRegeln(tag, null, p);
+    h += regeln.length ? regeln.map(function (r) { return '<div class="up-regel">' + manifestInline(r) + '</div>'; }).join('')
+      : '<p class="leise">Keine Regeln — die Notiz „' + esc(p.notiz || UP_NOTIZ_VOR) + '“ fehlt oder ist leer.</p>';
+    h += '</div>';
+  }
+
+  var l = gwAlle('ueben', p.id);
+  h += '<div class="block"><div class="gruppe">Gewohnheiten im Programm</div>';
+  h += l.length ? l.map(function (g) { return gwZeileHtml(g, true); }).join('')
+    : '<p class="leise">Noch keine — „Neu“ tippen. Sie gehört dann zu diesem Programm.</p>';
+  h += '</div>';
+
+  h += '<div class="block">' + upRasterHtml(p, tag, dauer) + '</div>';
+  return h;
+}
+
+function upFussHtml() {
+  if (!upProgramme().length) {
+    return '<button type="button" class="knopf" onclick="upNeu()">Neu</button>';
+  }
+  return '<button type="button" class="knopf" onclick="gwNeu()">Neu</button>'
+    + '<button type="button" class="knopf" onclick="gwDetailsGewaehlt()">Details…</button>'
+    + '<button type="button" class="knopf" onclick="upEinstellungen()">Programm…</button>';
+}
+
+/* ---- Die Tagesnotiz ---- */
+function upTagOeffnen(is) {
+  var p = upGezeigt();
+  if (!p) { return; }
+  cl.up.tagF = { tag: is, text: upTagNotizText(p, is), schreiben: gwTagErlaubt(is) };
+  cl.aufklapp = 'uptag';
+  aufklappNeu();
+}
+
+function upTagHtml() {
+  var f = cl.up.tagF;
+  var p = upGezeigt();
+  if (!f || !p) { return ''; }
+  var nr = upTagVon(p, f.tag) || '–';
+  return '<div class="fenster"><div class="titel">Tag ' + nr + ' · ' + esc(clWt(f.tag) + ' ' + clKurzDatum(f.tag)) + '</div><div class="rumpf">'
+    + (f.schreiben
+      ? '<label for="upTagText">Wie ist der Tag gelaufen?</label>'
+        + '<textarea id="upTagText" class="eingabe" rows="3" maxlength="300">' + esc(f.text) + '</textarea>'
+        + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="upTagSichern()">OK</button>'
+        + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
+      : (f.text ? '<p>' + esc(f.text).replace(/\n/g, '<br>') + '</p>' : '<p class="leise">Keine Notiz.</p>')
+        + '<p class="leise">Schreiben geht nur für heute und gestern.</p>'
+        + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufklappZu()">Schließen</button></div>')
+    + '</div></div>';
+}
+
+function upTagSichern() {
+  var f = cl.up.tagF;
+  var p = upGezeigt();
+  if (!f || !p || !f.schreiben) { aufklappZu(); return; }
+  var e = document.getElementById('upTagText');
+  var text = (e && typeof e.value === 'string') ? e.value.trim().slice(0, 300) : f.text;
+  if (!p.notizen || typeof p.notizen !== 'object') { p.notizen = {}; }
+  if (text) { p.notizen[f.tag] = text; } else { delete p.notizen[f.tag]; }
+  krSpeichern(p);
+  aufklappZu();
+}
+
+/* ---- Einstellungen ---- */
+function upNeu() {
+  cl.up.fenster = { modus: 'neu', id: '', name: 'Umprogrammierung', beginn: isoDatum(), tage: UP_TAGE_VOR,
+                    jeTag: UP_JE_TAG_VOR, fenster: UP_FENSTER_VOR, sekunden: UP_SEKUNDEN_VOR, notiz: UP_NOTIZ_VOR,
+                    manifest: true, kalender: UP_KAL_VOR, kalFenster: UP_KAL_FENSTER_VOR };
+  cl.aufklapp = 'umprogramm';
+  aufklappNeu();
+}
+
+function upEinstellungen() {
+  var p = upGezeigt();
+  if (!p) { upNeu(); return; }
+  cl.up.fenster = { modus: 'details', id: p.id, name: p.name || 'Umprogrammierung', beginn: p.beginn || isoDatum(),
+                    tage: upDauer(p), jeTag: upZahl(p.jeTag, UP_JE_TAG_VOR, 1, 9), fenster: upZahl(p.fenster, UP_FENSTER_VOR, 1, 4),
+                    sekunden: upZahl(p.sekunden, UP_SEKUNDEN_VOR, 2, 60), notiz: p.notiz || UP_NOTIZ_VOR,
+                    manifest: p.manifest !== false, kalender: p.kalender || UP_KAL_VOR,
+                    kalFenster: upZahl(p.kalFenster, UP_KAL_FENSTER_VOR, 5, 720) };
+  cl.aufklapp = 'umprogramm';
+  aufklappNeu();
+}
+
+function upFensterLesen() {
+  var f = cl.up.fenster;
+  if (!f) { return null; }
+  [['upName', 'name'], ['upBeginn', 'beginn'], ['upNotizT', 'notiz'], ['upKal', 'kalender']].forEach(function (x) {
+    var e = document.getElementById(x[0]);
+    if (e && typeof e.value === 'string') { f[x[1]] = e.value; }
+  });
+  [['upDauer', 'tage'], ['upJeTag', 'jeTag'], ['upSek', 'sekunden'], ['upKalF', 'kalFenster']].forEach(function (x) {
+    var e = document.getElementById(x[0]);
+    if (e && typeof e.value === 'string') { f[x[1]] = e.value; }
+  });
+  return f;
+}
+
+function upWahl(feld, wert) {
+  var f = upFensterLesen();
+  if (!f) { return; }
+  if (feld === 'fenster') { f.fenster = upZahl(wert, UP_FENSTER_VOR, 1, 4); }
+  if (feld === 'manifest') { f.manifest = !!wert; }
+  aufklappNeu();
+}
+
+function upFensterHtml() {
+  var f = cl.up.fenster;
+  if (!f) { return ''; }
+  if (f.modus === 'loeschen') {
+    return '<div class="fenster"><div class="titel">Programm löschen</div><div class="rumpf">'
+      + '<p>„' + esc(f.name) + '“ wirklich löschen? Die Tagesnotizen verschwinden mit. Die Gewohnheiten bleiben, sie gehören dann zu keinem Programm mehr.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="upLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="upEinstellungen()">Abbrechen</button></div></div></div>';
+  }
+  var k = function (feld, wert, text, an) {
+    return '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="upWahl(\'' + feld + '\',' + wert + ')">' + text + '</button>';
+  };
+  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neues Programm' : 'Umprogrammierung') + '</div><div class="rumpf">'
+    + '<label for="upName">Name:</label><input id="upName" class="eingabe" type="text" maxlength="40" autocomplete="off" value="' + esc(f.name) + '">'
+    + '<label for="upBeginn">Beginn:</label><input id="upBeginn" class="eingabe" type="date" value="' + esc(f.beginn) + '">'
+    + '<label for="upDauer">Dauer (Tage):</label><input id="upDauer" class="eingabe" type="number" min="1" max="999" value="' + esc(String(f.tage)) + '">'
+    + '<label for="upNotizT">Notiz mit den Regeln:</label><input id="upNotizT" class="eingabe" type="text" maxlength="60" autocomplete="off" value="' + esc(f.notiz) + '">'
+    + '<label for="upJeTag">Regeln je Tag:</label><input id="upJeTag" class="eingabe" type="number" min="1" max="9" value="' + esc(String(f.jeTag)) + '">'
+    + '<label>Anzeigen je Tag:</label><div class="wahlreihe">'
+    + [1, 2, 3, 4].map(function (n) { return k('fenster', n, String(n), f.fenster === n); }).join('') + '</div>'
+    + '<label for="upSek">Anzeigedauer (Sekunden):</label><input id="upSek" class="eingabe" type="number" min="2" max="60" value="' + esc(String(f.sekunden)) + '">'
+    + '<label>Manifest als Pflichtlektüre:</label><div class="wahlreihe">'
+    + k('manifest', 'true', 'An', f.manifest) + k('manifest', 'false', 'Aus', !f.manifest) + '</div>'
+    + (f.manifest
+      ? '<label for="upKal">Aus dem Kalender (Namensteil):</label><input id="upKal" class="eingabe" type="text" maxlength="40" autocomplete="off" value="' + esc(f.kalender) + '">'
+        + '<label for="upKalF">Fenster nach dem Termin (Minuten):</label><input id="upKalF" class="eingabe" type="number" min="5" max="720" value="' + esc(String(f.kalFenster)) + '">'
+      : '<p class="leise">Ohne Pflichtlektüre zeigt CLIE nur das Overlay; Coach-Termine lösen nichts aus.</p>')
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="upSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="upLoeschenFragen()">Löschen…</button>') + '</div></div></div>';
+}
+
+function upSpeichern() {
+  var f = upFensterLesen();
+  if (!f) { aufklappZu(); return; }
+  var beginn = String(f.beginn || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(beginn)) { melde('Bitte ein Startdatum wählen.', 'warn'); return; }
+  var notiz = String(f.notiz || '').trim();
+  if (!notiz) { melde('Bitte den Titel der Notiz mit den Regeln eintragen.', 'warn'); return; }
+  var p = f.id ? upFinden(f.id) : null;
+  if (!p) { p = { id: 'up-' + neueKennung(), typ: 'umprog', notizen: {}, angelegt: isoDatum() }; }
+  p.name = String(f.name || 'Umprogrammierung').trim().slice(0, 40) || 'Umprogrammierung';
+  p.beginn = beginn;
+  p.tage = upZahl(f.tage, UP_TAGE_VOR, 1, 999);
+  p.jeTag = upZahl(f.jeTag, UP_JE_TAG_VOR, 1, 9);
+  p.fenster = upZahl(f.fenster, UP_FENSTER_VOR, 1, 4);
+  p.sekunden = upZahl(f.sekunden, UP_SEKUNDEN_VOR, 2, 60);
+  p.notiz = notiz.slice(0, 60);
+  p.manifest = !!f.manifest;
+  p.kalender = String(f.kalender || UP_KAL_VOR).trim().slice(0, 40) || UP_KAL_VOR;
+  p.kalFenster = upZahl(f.kalFenster, UP_KAL_FENSTER_VOR, 5, 720);
+  krSpeichern(p);
+  cl.up.wahl = p.id;
+  aufklappZu();
+}
+
+function upLoeschenFragen() {
+  var f = upFensterLesen();
+  if (!f || !f.id) { return; }
+  f.modus = 'loeschen';
+  aufklappNeu();
+}
+
+function upLoeschen() {
+  var f = cl.up.fenster;
+  if (!f || !upFinden(f.id)) { aufklappZu(); return; }
+  krLoeschen(f.id);
+  if (cl.up.wahl === f.id) { cl.up.wahl = ''; }
+  aufklappZu();
+  melde('Programm gelöscht.', null);
+}
+
+/* Beim Laden: wer schon eine Notiz „Umprogrammierung“ hat, bekommt sein Programm (0.108.0) */
+function upNachziehen() {
+  if (upProgramme().length) { return null; }
+  if (!upNotiz(null)) { return null; }
+  return krSpeichern({
+    id: 'up-' + neueKennung(), typ: 'umprog', name: 'Umprogrammierung',
+    beginn: '2026-11-04', tage: UP_TAGE_VOR, jeTag: UP_JE_TAG_VOR, fenster: UP_FENSTER_VOR,
+    sekunden: UP_SEKUNDEN_VOR, notiz: UP_NOTIZ_VOR, manifest: true,
+    kalender: UP_KAL_VOR, kalFenster: UP_KAL_FENSTER_VOR, notizen: {}, angelegt: isoDatum()
+  });
 }
 var MAN_STUFEN = [14, 16, 18, 20, 22, 24];
 
