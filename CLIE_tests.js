@@ -416,7 +416,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 33, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91; Manifest seit 0.109.0 im Leuchtturm), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 33, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91; Manifest seit 0.109.0 in Roots), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -443,7 +443,7 @@ function bedienTest() {
   if (!CL) { return; }
   frisch();
   CL.oeffne('routinen');
-  pruefe(CL.document.getElementById('reiter').textContent === 'Leuchtturm' && !/kommt mit CLIE/.test(inhalt()),
+  pruefe(CL.document.getElementById('reiter').textContent === 'Roots' && !/kommt mit CLIE/.test(inhalt()),
     'seit 0.5 sind alle Apps fertig — keine zeigt mehr „kommt mit …“');
   CL.oeffne('gibtsnicht');
   pruefe(CL.cl.app === 'uebersicht' && CL.document.getElementById('reiter').textContent === 'Home', 'Unbekanntes führt zur Übersicht (Reiter „Home“, seit 0.71)');
@@ -548,7 +548,7 @@ function palmTest() {
   const h = inhalt();
   pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","memo","sammlungen","fokus","einkauf","vorlesen","rechner","ideen","kategorien","leitfaden","lernkartei","gemini","spiele"]'
     && !CL.clApp('heute') && CL.clApp('coach').raster === false && !CL.clApp('manifest'),
-    'Start 3×5 (seit 0.89): Leuchtturm (seit 0.109.0 erste App, mit dem Manifest darin), Date Book, To Do List / Memo Pad, Collections, Fokus / Shopping, Reader, Calc / Idea Lab, Categories, Guide / Flashcards, Coach, Games ▸');
+    'Start 3×5 (seit 0.89): Roots (seit 0.109.0 erste App, mit dem Manifest darin), Date Book, To Do List / Memo Pad, Collections, Fokus / Shopping, Reader, Calc / Idea Lab, Categories, Guide / Flashcards, Coach, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -9347,7 +9347,7 @@ function raster35Test() {
   const S = pmFrisch();
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
   pruefe(raster.length === 15 && raster.length % 3 === 0, 'Raster genau voll: 15 Felder in drei Spalten');
-  pruefe(['ideen', 'routinen', 'leitfaden', 'lernkartei', 'gemini'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Leuchtturm, Guide, Flashcards, Coach direkt auf dem Start');
+  pruefe(['ideen', 'routinen', 'leitfaden', 'lernkartei', 'gemini'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Roots, Guide, Flashcards, Coach direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
   Object.keys(S.CL_ORDNER).forEach(k => S.CL_ORDNER[k].apps.forEach(id => { if (!S.clApp(id) || raster.indexOf(id) >= 0) { fehlt.push(k + ':' + id); } }));
@@ -9772,11 +9772,11 @@ function manifestTest() {
   if (!CL) { return; }
   const S = pmFrisch();
   const q = SKRIPT;
-  pruefe(/M27 27L37 27L41 54H23Z/.test(S.CL_BILD.routinen) && !S.CL_BILD.manifest, 'Symbol Leuchtturm: der Leuchtturm des Manifests, jetzt für die ganze App');
-  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Leuchtturm' && S.clApp('kategorien').raster !== false, '0.109.0: Manifest keine eigene App mehr, Categories wieder auf dem Start');
+  pruefe(/M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen) && !S.CL_BILD.manifest && !/stroke-linecap="round"/.test(S.CL_BILD.routinen), 'Symbol Roots: zwei gekreuzte Bänder mit geraden Schnittkanten (0.109.2)');
+  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots' && S.clApp('kategorien').raster !== false, '0.109.0: Manifest keine eigene App mehr, Categories wieder auf dem Start');
   pruefe(/menueWahl\(\\'kategorien\\'\)/.test(q) && /if \(was === 'kategorien'\) \{ oeffne\('kategorien'\); return; \}/.test(q), 'Categories im Menü ≡');
   S.oeffne('uebersicht');
-  pruefe(/oeffne\('routinen'\)/.test(inhalt()) && !!S.CL_BILD.routinen, 'Leuchtturm auf dem Start, mit eigenem Symbol');
+  pruefe(/oeffne\('routinen'\)/.test(inhalt()) && !!S.CL_BILD.routinen, 'Roots auf dem Start, mit eigenem Symbol');
   /* Ohne Notiz: ein Hinweis, kein Fehler */
   S.DB.gedanken = (S.DB.gedanken || []).filter(g => String(g.titel || '').trim().toLowerCase() !== 'manifest');
   S.oeffne('manifest');
@@ -11580,17 +11580,17 @@ function upSichtTest() {
    Pflichtlektüre, die nun eine Sicht sperren muss statt einer App. Dazu das Raster, das
    mit einer App weniger ein Loch bekäme. */
 function leuchtturmTest() {
-  console.log('\n207. Leuchtturm: Manifest und Routines zusammengelegt, alte Wege führen weiter hin (0.109.0)');
+  console.log('\n207. Roots: Manifest und Routines zusammengelegt, alte Wege führen weiter hin (0.109.0, Name seit 0.109.1)');
   if (!CL) { return; }
   const S = CL;
   frisch();
   S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
 
   /* Aus zwei Apps ist eine geworden */
-  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Leuchtturm', 'das Manifest ist keine eigene App mehr');
+  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'das Manifest ist keine eigene App mehr');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
-  pruefe(raster.length === 15 && raster[0].id === 'routinen', 'der Leuchtturm steht als erste App, das Raster bleibt voll');
-  pruefe(!S.CL_BILD.manifest && /M27 27L37 27L41 54H23Z/.test(S.CL_BILD.routinen), 'und trägt den Leuchtturm des Manifests als Symbol');
+  pruefe(raster.length === 15 && raster[0].id === 'routinen', 'Roots steht als erste App, das Raster bleibt voll');
+  pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
   /* Der alte Weg führt in die Sicht */
   S.oeffne('manifest');
@@ -11831,7 +11831,7 @@ function leuchtturmTest() {
   try { upTest(); } catch (e) { fail('0.107.0 Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await manCoachHolenTest(); } catch (e) { fail('0.107.1 Coach-Termine holen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { upSichtTest(); } catch (e) { fail('0.108.0 Sicht Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { leuchtturmTest(); } catch (e) { fail('0.109.0 Leuchtturm warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { leuchtturmTest(); } catch (e) { fail('0.109.0 Roots warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
