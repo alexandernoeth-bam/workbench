@@ -2418,21 +2418,23 @@ function gewohnheitenTest() {
     && /Verinnerlicht…/.test(dd) && /katSetzen\('alle'\)/.test(dd), '▼: Routinen · Gewohnheiten · Verinnerlicht…, darunter die Kategorien');
   S.rtSichtSetzen('gewohnheiten');
   pruefe(S.cl.rt.sicht === 'gewohnheiten' && S.localStorage.getItem('clie-rt-sicht') === 'gewohnheiten' && /▼ Gewohnheiten/.test(S.document.getElementById('katKnopf').textContent)
-    && /Noch keine Gewohnheit/.test(inhalt()) && /gwNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML), 'Gewohnheiten: leer mit Hinweis, unten Neu · Details…, gemerkt');
+    && /Noch keine Regel/.test(inhalt()) && /gwNeu\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML), 'Gewohnheiten: leer mit Hinweis, unten Neu · Details…, gemerkt');
   /* Neu */
   S.gwNeu();
   let fh = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'gewohnheit' && /id="gwWenn"/.test(fh) && /id="gwDann"/.test(fh) && /id="gwKat"/.test(fh) && !/gwWahl\(/.test(fh), 'Neu: Wenn …, … dann, Kategorie — noch kein Zustand');
-  S.document.getElementById('gwWenn').value = ''; S.document.getElementById('gwDann').value = '';
+  pruefe(S.cl.aufklapp === 'gewohnheit' && /id="gwTitel"/.test(fh) && /id="gwBesch"/.test(fh) && /id="gwKat"/.test(fh) && !/gwWahl\(/.test(fh), 'Neu: Regel, Beschreibung, Kategorie — noch kein Zustand');
+  pruefe(!/id="gwWenn"/.test(fh) && !/id="gwDann"/.test(fh) && !/gwS0/.test(fh), '0.108.1: kein Wenn-dann und keine Unterpunkte mehr');
+  S.document.getElementById('gwTitel').value = ''; S.document.getElementById('gwBesch').value = '';
   S.gwSpeichern();
-  pruefe(S.cl.aufklapp === 'gewohnheit' && S.gwUebenZahl() === 0, 'ohne „dann“ wird nichts gespeichert');
-  S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen'; S.document.getElementById('gwKat').value = 'kb-haus';
+  pruefe(S.cl.aufklapp === 'gewohnheit' && S.gwUebenZahl() === 0, 'ohne Regel wird nichts gespeichert');
+  S.document.getElementById('gwTitel').value = 'Tisch abräumen'; S.document.getElementById('gwBesch').value = 'nach dem Essen'; S.document.getElementById('gwKat').value = 'kb-haus';
   S.gwSpeichern();
   const g = S.DB.kurs.filter(x => x.typ === 'gewohnheit')[0];
-  pruefe(g && g.wenn === 'nach dem Essen' && g.dann === 'Tisch abräumen' && g.zustand === 'ueben' && g.bereich === 'kb-haus' && /^gw-/.test(g.id) && Array.isArray(g.tage),
+  pruefe(g && g.titel === 'Tisch abräumen' && g.beschreibung === 'nach dem Essen' && g.zustand === 'ueben' && g.bereich === 'kb-haus' && /^gw-/.test(g.id) && Array.isArray(g.tage),
     'gespeichert im Bereich „kurs“ (typ gewohnheit), mit Kategorie');
+  pruefe(!('wenn' in g) && !('dann' in g), 'die alten Felder bleiben weg');
   let h = inhalt();
-  pruefe(/<small>nach dem Essen<\/small>Tisch abräumen/.test(h) && (h.match(/class="gw-p[ "]/g) || []).length === 7, 'Zeile: oben der Auslöser, darunter die Handlung, rechts sieben Punkte');
+  pruefe(/Tisch abräumen<small>nach dem Essen<\/small>/.test(h) && (h.match(/class="gw-p[ "]/g) || []).length === 7, 'Zeile: Regel groß, Beschreibung klein darunter, rechts sieben Punkte');
   /* Abhaken heute, gestern nachtragen, Älteres nicht */
   S.gwTagUm(g.id, heute);
   S.gwTagUm(g.id, gestern);
@@ -2449,7 +2451,7 @@ function gewohnheitenTest() {
   S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
   pruefe(!/Tisch abräumen/.test(inhalt()), 'nicht im Tagesplan');
   /* Obergrenze */
-  for (let i = 0; i < 7; i++) { S.DB.kurs.push({ id: 'gw-x' + i, typ: 'gewohnheit', wenn: 'w', dann: 'Handgriff ' + i, zustand: 'ueben', tage: [], angelegt: heute, rang: 2 + i, kontext: 'privat' }); }
+  for (let i = 0; i < 7; i++) { S.DB.kurs.push({ id: 'gw-x' + i, typ: 'gewohnheit', titel: 'Handgriff ' + i, beschreibung: 'w', zustand: 'ueben', tage: [], angelegt: heute, rang: 2 + i, kontext: 'privat' }); }
   S.oeffne('routinen');
   S.gwNeu();
   pruefe(S.cl.aufklapp !== 'gewohnheit' && /Höchstens 8/.test(S.document.getElementById('toastText').textContent), 'die neunte wird abgelehnt: erst eine verinnerlichen');
@@ -2459,14 +2461,14 @@ function gewohnheitenTest() {
   S.gwDetailsGewaehlt();
   fh = S.document.getElementById('aufklapp').innerHTML;
   pruefe(/gwWahl\('ueben'\)/.test(fh) && /gwWahl\('sitzt'\)/.test(fh) && /gwLoeschenFragen\(\)/.test(fh), 'Details: Zustand Übe ich / Verinnerlicht, Löschen…');
-  S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen';
+  S.document.getElementById('gwTitel').value = 'Tisch abräumen'; S.document.getElementById('gwBesch').value = 'nach dem Essen';
   S.gwWahl('sitzt'); S.gwSpeichern();
   pruefe(g.zustand === 'sitzt' && g.sitztSeit === heute && !/Tisch abräumen/.test(inhalt()), 'verinnerlicht: aus der Übungsliste');
   S.rtSichtSetzen('sitzt');
   pruefe(/Tisch abräumen/.test(inhalt()) && !/Handgriff/.test(inhalt()) && !/gw-punkte/.test(inhalt()), 'unter „Verinnerlicht…“ — ohne Haken und Punkte');
   /* zurück zum Üben, wenn schon acht geübt werden: abgelehnt */
-  S.DB.kurs.push({ id: 'gw-y', typ: 'gewohnheit', wenn: 'w', dann: 'Achte', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
-  S.gwDetails(g.id); S.document.getElementById('gwWenn').value = 'nach dem Essen'; S.document.getElementById('gwDann').value = 'Tisch abräumen';
+  S.DB.kurs.push({ id: 'gw-y', typ: 'gewohnheit', titel: 'Achte', beschreibung: 'w', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
+  S.gwDetails(g.id); S.document.getElementById('gwTitel').value = 'Tisch abräumen'; S.document.getElementById('gwBesch').value = 'nach dem Essen';
   S.gwWahl('ueben'); S.gwSpeichern();
   pruefe(g.zustand === 'sitzt' && S.cl.aufklapp === 'gewohnheit', 'zurück zum Üben nur, wenn Platz ist');
   S.aufklappZu();
@@ -11441,42 +11443,40 @@ function upSichtTest() {
   pruefe(/Heute gelesen/.test(h) && /Eins|Zwei|Drei|Vier/.test(h), 'und den Regeln des Tages');
   pruefe(/Umprogrammierung/.test(S.rtWahlHtml()) && S.rtWahlHtml().indexOf('Tag 12') >= 0, 'im ▼ steht sie mit dem Tageszähler');
 
-  /* Neu hängt die Gewohnheit ans Programm, mit Unterpunkten */
+  /* Neu hängt die Regel ans Programm — Titel und Beschreibung, kein Wenn-dann (0.108.1) */
   S.gwNeu();
-  pruefe(S.cl.gw.fenster && S.cl.gw.fenster.programm === p.id, '„Neu“ hängt die Gewohnheit an das Programm');
-  S.document.getElementById('gwWenn').value = 'morgens';
-  S.document.getElementById('gwDann').value = 'Laufen';
-  S.document.getElementById('gwS0').value = 'Schuhe an';
-  S.document.getElementById('gwS1').value = '20 Minuten';
-  S.document.getElementById('gwS2').value = '';
+  pruefe(S.cl.gw.fenster && S.cl.gw.fenster.programm === p.id, '„Neu“ hängt die Regel an das Programm');
+  S.document.getElementById('gwTitel').value = 'Erst das Wichtige, dann das Laute';
+  S.document.getElementById('gwBesch').value = 'Vor dem ersten Blick in den Posteingang.';
   S.gwSpeichern();
   const g = S.gwAlle('ueben', p.id)[0];
-  pruefe(!!g && S.gwSchritte(g).length === 2, 'sie wird mit zwei Unterpunkten gespeichert');
+  pruefe(!!g && g.titel === 'Erst das Wichtige, dann das Laute' && g.beschreibung === 'Vor dem ersten Blick in den Posteingang.', 'sie wird mit Titel und Beschreibung gespeichert');
+  pruefe(!('wenn' in g) && !('dann' in g) && !('schritte' in g), 'ohne Wenn-dann und ohne Unterpunkte');
   pruefe(S.gwAlle('ueben', 'anderes').length === 0, 'und zählt nur zu ihrem eigenen Programm');
 
-  /* ● ◐ ○ statt Prozent */
-  pruefe(S.gwStand(g, heute) === 'leer' && S.gwZeichen('leer') === '○', 'nichts abgehakt: ○');
-  S.gwSchrittUm(g.id, 's1', heute);
-  pruefe(S.gwStand(g, heute) === 'halb' && S.gwZeichen('halb') === '◐', 'ein Unterpunkt: ◐');
-  pruefe(g.tage.indexOf(heute) < 0, 'halb zählt nicht als geschafft');
-  S.gwSchrittUm(g.id, 's2', heute);
-  pruefe(S.gwStand(g, heute) === 'voll' && S.gwZeichen('voll') === '●' && g.tage.indexOf(heute) >= 0, 'alle Unterpunkte: ● und der Tag gilt');
+  /* Die Kette bleibt binär */
+  pruefe(S.gwGeschafft(g, heute) === false, 'noch nicht abgehakt');
   S.gwTagUm(g.id, heute);
-  pruefe(S.gwStand(g, heute) === 'leer' && g.tage.indexOf(heute) < 0, 'der große Haken setzt alle zurück');
-  S.gwTagUm(g.id, heute);
-  pruefe(S.gwStand(g, heute) === 'voll', 'und setzt sie wieder alle');
-  S.gwSchrittUm(g.id, 's1', '2026-11-05');
-  pruefe(S.gwStand(g, '2026-11-05') === 'leer', 'ältere Tage lassen sich nicht nachträglich abhaken');
+  pruefe(S.gwGeschafft(g, heute) === true && g.tage.indexOf(heute) >= 0, 'abgehakt: der Tag steht in der Kette');
+  S.gwTagUm(g.id, '2026-11-05');
+  pruefe(g.tage.indexOf('2026-11-05') < 0, 'ältere Tage lassen sich nicht nachträglich abhaken');
 
-  /* Die Unterpunkte stehen unter der angetippten Gewohnheit */
+  /* Titel groß, Beschreibung klein darunter — und nirgends eine Prozentzahl */
   S.cl.gw.wahl = g.id;
   S.inhaltZeichnen();
   h = inhalt();
-  pruefe(/Schuhe an/.test(h) && /gw-schritt/.test(h), 'die Unterpunkte erscheinen unter der gewählten Gewohnheit');
-  pruefe(h.indexOf('%') < 0, 'nirgends eine Prozentzahl');
+  pruefe(/Erst das Wichtige, dann das Laute<small>Vor dem ersten Blick/.test(h), 'die Beschreibung steht klein unter der Regel');
+  pruefe(h.indexOf('%') < 0 && h.indexOf('gw-schritt') < 0, 'keine Prozentzahl und keine Unterpunkte');
   S.cl.gw.wahl = '';
   S.inhaltZeichnen();
-  pruefe(inhalt().indexOf('Schuhe an') < 0, 'sonst bleibt die Liste schmal');
+
+  /* Das Nachziehen alter Gewohnheiten */
+  S.DB.kurs.push({ id: 'gw-alt', typ: 'gewohnheit', wenn: 'nach dem Essen', dann: 'Tisch abräumen', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
+  pruefe(S.gwNachziehen() === 1, 'eine alte Gewohnheit wird umgezogen');
+  const alt = S.gwFinden('gw-alt');
+  pruefe(alt.titel === 'Tisch abräumen' && alt.beschreibung === 'nach dem Essen', 'aus „dann“ wird der Titel, aus „wenn“ die Beschreibung');
+  pruefe(!('wenn' in alt) && !('dann' in alt) && S.gwNachziehen() === 0, 'die alten Felder sind weg und bleiben es');
+  S.DB.kurs = S.DB.kurs.filter((x) => x.id !== 'gw-alt');
 
   /* Der Verlauf */
   pruefe(S.upTagStand(p, heute) === 'voll', 'ein Tag mit allem abgehakt ist voll');
@@ -11550,7 +11550,9 @@ function upSichtTest() {
 
   /* Die Wächter in der Quelle */
   pruefe(SKRIPT.split('function upSichtHtml(').length === 2, 'upSichtHtml gibt es genau einmal');
-  pruefe(SKRIPT.split('function gwStand(').length === 2, 'gwStand gibt es genau einmal');
+  pruefe(SKRIPT.split('function gwNachziehen(').length === 2, 'gwNachziehen gibt es genau einmal');
+  pruefe(SKRIPT.indexOf('function gwSchritte(') < 0 && SKRIPT.indexOf('gwSchrittUm') < 0 && SKRIPT.indexOf('UP_SCHRITTE_MAX') < 0, '0.108.1: die Unterpunkte sind restlos zurückgebaut');
+  pruefe(SKRIPT.indexOf('gwWenn') < 0 && SKRIPT.indexOf('gwDann') < 0, 'und das Wenn-dann-Fenster ebenso');
   pruefe(SKRIPT.indexOf('var GW_MAX = 8;') >= 0, 'die Obergrenze der Gewohnheiten steht bei acht');
   pruefe(/RT_SICHTEN = \[\['umprog'/.test(SKRIPT), 'die Sicht ist im Vorrat der Reiter angemeldet');
 

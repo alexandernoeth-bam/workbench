@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.108.0</title>
+<title>CLIE 0.108.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -731,8 +731,10 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .up-raster button.heute{background:var(--lcd);border:2px solid var(--px);font-weight:600}
 .up-raster button.aus{opacity:.35}
 .up-raster button.notiz{text-decoration:underline}
-.gw-schritt{display:flex;align-items:center;gap:8px;padding:2px 0 2px 26px;font-size:18px;color:var(--px-mitte)}
-.gw-schritt .tx{flex:1;text-align:left}
+/* Regeln sind Sätze, keine Handgriffe: lieber umbrechen als abschneiden (0.108.1) */
+.gw-zeile .gw-tx{white-space:normal;line-height:1.2}
+.gw-zeile .gw-tx small{display:block;font-size:16px;color:var(--px-mitte);line-height:1.25;white-space:normal;margin-top:2px}
+.gw-zeile.gewaehlt .gw-tx{padding:2px 4px}
 .up-fenster{top:50%;transform:translateY(-50%);max-height:calc(100% - 110px)}
 .up-fenster .up-kopf{font-size:17px;color:var(--px-mitte);text-align:center;border-bottom:2px dotted var(--px-zart);padding-bottom:6px;margin-bottom:10px}
 .up-fenster .up-regel{line-height:1.35;margin-bottom:11px;padding-left:15px;text-indent:-15px}
@@ -1241,7 +1243,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.108.0';
+var APP_VERSION = '0.108.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4832,7 +4834,7 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'rtwahl') {
     el.innerHTML = rtWahlHtml();
   } else if (cl.aufklapp === 'gewohnheit') {
-    if (el.innerHTML.indexOf('gwWenn') >= 0) { return; }
+    if (el.innerHTML.indexOf('gwTitel') >= 0) { return; }
     el.innerHTML = gwFensterHtml();
   } else if (cl.aufklapp === 'handschrift') {
     el.innerHTML = hsFensterHtml();
@@ -15497,70 +15499,35 @@ function gwGeschafft(g, tag) {
   return !!(g && Array.isArray(g.tage) && g.tage.indexOf(tag) >= 0);
 }
 
-/* ---- Unterpunkte (seit 0.108.0) ----
-   Eine Gewohnheit darf bis zu drei Unterpunkte haben. Der Tagespunkt fasst sie zusammen:
-   ● alle, ◐ einige, ○ keiner. Keine Prozentzahl — eine Kette liest man, man rechnet sie
-   nicht. Was mehr als drei Schritte braucht, ist eine Routine oder eine Liste. */
-function gwSchritte(g) {
-  return (g && Array.isArray(g.schritte)) ? g.schritte.filter(function (s) { return s && s.id && s.text; }) : [];
-}
-
-function gwSchrittGeschafft(g, sid, tag) {
-  var m = (g && g.schrittTage && typeof g.schrittTage === 'object') ? g.schrittTage : {};
-  return !!(Array.isArray(m[sid]) && m[sid].indexOf(tag) >= 0);
-}
-
-/* 'voll' | 'halb' | 'leer' */
-function gwStand(g, tag) {
-  var s = gwSchritte(g);
-  if (!s.length) { return gwGeschafft(g, tag) ? 'voll' : 'leer'; }
-  var n = s.filter(function (x) { return gwSchrittGeschafft(g, x.id, tag); }).length;
-  return n === 0 ? 'leer' : (n === s.length ? 'voll' : 'halb');
-}
-
-function gwZeichen(stand) {
-  return stand === 'voll' ? '●' : (stand === 'halb' ? '◐' : '○');
-}
-
 function gwTagErlaubt(tag) {
   var heute = isoDatum();
   return tag === heute || tag === tagePlus(heute, -1);
 }
 
-/* Der Tag gilt als geschafft, sobald alle Unterpunkte stehen */
-function gwTageAngleichen(g, tag) {
-  if (!Array.isArray(g.tage)) { g.tage = []; }
-  var voll = gwStand(g, tag) === 'voll';
-  var i = g.tage.indexOf(tag);
-  if (voll && i < 0) { g.tage.push(tag); }
-  if (!voll && i >= 0) { g.tage.splice(i, 1); }
-  g.tage.sort();
-}
-
 function gwAufraeumen(g) {
   var grenze = tagePlus(isoDatum(), -GW_TAGE_MAX);
   if (Array.isArray(g.tage)) { g.tage = g.tage.filter(function (t) { return t >= grenze; }).sort(); }
-  var m = g.schrittTage;
-  if (m && typeof m === 'object') {
-    Object.keys(m).forEach(function (k) {
-      m[k] = (Array.isArray(m[k]) ? m[k] : []).filter(function (t) { return t >= grenze; }).sort();
-      if (!m[k].length) { delete m[k]; }
-    });
-  }
 }
 
-function gwSchrittUm(id, sid, tag) {
-  var g = gwFinden(id);
-  if (!g || !sid || !gwTagErlaubt(tag)) { return; }
-  if (!g.schrittTage || typeof g.schrittTage !== 'object') { g.schrittTage = {}; }
-  if (!Array.isArray(g.schrittTage[sid])) { g.schrittTage[sid] = []; }
-  var l = g.schrittTage[sid];
-  var i = l.indexOf(tag);
-  if (i >= 0) { l.splice(i, 1); } else { l.push(tag); }
-  gwTageAngleichen(g, tag);
-  gwAufraeumen(g);
-  krSpeichern(g);
-  inhaltZeichnen();
+/* ---- Titel und Beschreibung statt „Wenn … dann …“ (0.108.1) ----
+   Die Gewohnheiten sind die neuen Regeln aus dem Manifest, keine Handgriffe im
+   Wenn-dann-Muster. Alte Datensätze werden einmalig umgezogen: aus „dann“ wird der
+   Titel, das „wenn“ wandert vorn in die Beschreibung, damit nichts verlorengeht. */
+function gwNachziehen() {
+  var n = 0;
+  krAlle('gewohnheit').forEach(function (g) {
+    if (!g || (!g.wenn && !g.dann)) { return; }
+    var titel = String(g.titel || g.dann || '').trim();
+    var besch = String(g.beschreibung || '').trim();
+    var wenn = String(g.wenn || '').trim();
+    g.titel = (titel || 'Regel').slice(0, 80);
+    g.beschreibung = (wenn ? (besch ? wenn + ' — ' + besch : wenn) : besch).slice(0, 200);
+    delete g.wenn;
+    delete g.dann;
+    krSpeichern(g);
+    n++;
+  });
+  return n;
 }
 
 /* Abhaken: heute und gestern — ältere Tage nicht */
@@ -15568,23 +15535,8 @@ function gwTagUm(id, tag) {
   var g = gwFinden(id);
   if (!g || !gwTagErlaubt(tag)) { return; }
   if (!Array.isArray(g.tage)) { g.tage = []; }
-  var schritte = gwSchritte(g);
-  if (schritte.length) {
-    /* Mit Unterpunkten setzt der große Haken alle auf einmal — oder keinen (0.108.0) */
-    var an = gwStand(g, tag) !== 'voll';
-    if (!g.schrittTage || typeof g.schrittTage !== 'object') { g.schrittTage = {}; }
-    schritte.forEach(function (s) {
-      if (!Array.isArray(g.schrittTage[s.id])) { g.schrittTage[s.id] = []; }
-      var l = g.schrittTage[s.id];
-      var k = l.indexOf(tag);
-      if (an && k < 0) { l.push(tag); }
-      if (!an && k >= 0) { l.splice(k, 1); }
-    });
-    gwTageAngleichen(g, tag);
-  } else {
-    var i = g.tage.indexOf(tag);
-    if (i >= 0) { g.tage.splice(i, 1); } else { g.tage.push(tag); }
-  }
+  var i = g.tage.indexOf(tag);
+  if (i >= 0) { g.tage.splice(i, 1); } else { g.tage.push(tag); }
   gwAufraeumen(g);
   krSpeichern(g);
   inhaltZeichnen();
@@ -15598,7 +15550,7 @@ function gwPunkteHtml(g) {
   var i;
   for (i = 6; i >= 0; i--) {
     var t = tagePlus(heute, -i);
-    var p = gwZeichen(gwStand(g, t));
+    var p = gwGeschafft(g, t) ? '●' : '○';
     h += (t === gestern)
       ? '<button type="button" class="gw-p gestern" onclick="gwTagUm(\'' + esc(g.id) + '\',\'' + t + '\')" aria-label="gestern ' + (p === '●' ? 'geschafft' : 'nicht geschafft') + '">' + p + '</button>'
       : '<span class="gw-p">' + p + '</span>';
@@ -15606,21 +15558,18 @@ function gwPunkteHtml(g) {
   return '<span class="gw-punkte">' + h + '</span>';
 }
 
+function gwTitel(g) {
+  return String((g && (g.titel || g.dann)) || '').trim();
+}
+
 function gwZeileHtml(g, mitHaken) {
   var heute = isoDatum();
-  var h = '<div class="gw-zeile' + (cl.gw.wahl === g.id ? ' gewaehlt' : '') + '">'
-    + (mitHaken ? clKastenHtml(gwStand(g, heute) === 'voll', 'gwTagUm(\'' + esc(g.id) + '\',\'' + heute + '\')') : '')
-    + '<button type="button" class="tx" onclick="gwTippen(\'' + esc(g.id) + '\')"><small>' + esc(g.wenn || '') + '</small>' + esc(g.dann || '') + '</button>'
+  /* Titel groß, Beschreibung klein darunter (0.108.1) */
+  return '<div class="gw-zeile' + (cl.gw.wahl === g.id ? ' gewaehlt' : '') + '">'
+    + (mitHaken ? clKastenHtml(gwGeschafft(g, heute), 'gwTagUm(\'' + esc(g.id) + '\',\'' + heute + '\')') : '')
+    + '<button type="button" class="tx gw-tx" onclick="gwTippen(\'' + esc(g.id) + '\')">' + esc(gwTitel(g))
+    + (g.beschreibung ? '<small>' + esc(g.beschreibung) + '</small>' : '') + '</button>'
     + (mitHaken ? gwPunkteHtml(g) : '') + '</div>';
-  /* Unterpunkte nur bei der angetippten Gewohnheit — sonst wird die Liste zur Wand (0.108.0) */
-  var s = gwSchritte(g);
-  if (mitHaken && s.length && cl.gw.wahl === g.id) {
-    h += s.map(function (x) {
-      return '<div class="gw-schritt">' + clKastenHtml(gwSchrittGeschafft(g, x.id, heute), 'gwSchrittUm(\'' + esc(g.id) + '\',\'' + esc(x.id) + '\',\'' + heute + '\')')
-        + '<span class="tx">' + esc(x.text) + '</span></div>';
-    }).join('');
-  }
-  return h;
 }
 
 function gwListeHtml() {
@@ -15633,7 +15582,7 @@ function gwListeHtml() {
   }
   var l = gwAlle('ueben');
   var h = '<div class="gw-kopf"><span>Heute · ' + esc(clWt(heute) + ' ' + clKurzDatum(heute)) + '</span><span>7 Tage</span></div>';
-  if (!l.length) { return h + '<p class="leise">Noch keine Gewohnheit — „Neu“ tippen. Muster: Wenn … (Auslöser), dann … (unter 5 Minuten).</p>'; }
+  if (!l.length) { return h + '<p class="leise">Noch keine Regel — „Neu“ tippen. Ein Titel, darunter in einem Satz, was er im Alltag heißt.</p>'; }
   return h + l.map(function (g) { return gwZeileHtml(g, true); }).join('')
     + '<p class="leise">Abends in einem Rutsch abhaken. Keine Erinnerung, kein Tagesplan, kein To Do. Gestern lässt sich am Punkt nachtragen. Höchstens ' + GW_MAX + '.</p>';
 }
@@ -15657,8 +15606,8 @@ function gwDetailsGewaehlt() {
 function gwNeu() {
   if (gwUebenZahl() >= GW_MAX) { melde('Höchstens ' + GW_MAX + ' Gewohnheiten gleichzeitig — erst eine verinnerlichen.', 'warn'); return; }
   var p = (cl.rt.sicht === 'umprog') ? upGezeigt() : null;
-  cl.gw.fenster = { modus: 'neu', id: '', wenn: '', dann: '', bereich: clNeuBereich(), zustand: 'ueben',
-                    programm: p ? p.id : '', schritte: ['', '', ''] };
+  cl.gw.fenster = { modus: 'neu', id: '', titel: '', beschreibung: '', bereich: clNeuBereich(), zustand: 'ueben',
+                    programm: p ? p.id : '' };
   cl.aufklapp = 'gewohnheit';
   aufklappNeu();
 }
@@ -15666,11 +15615,10 @@ function gwNeu() {
 function gwDetails(id) {
   var g = gwFinden(id);
   if (!g) { return; }
-  var s = gwSchritte(g).map(function (x) { return x.text; });
-  while (s.length < UP_SCHRITTE_MAX) { s.push(''); }
   cl.gw.wahl = id;
-  cl.gw.fenster = { modus: 'details', id: g.id, wenn: g.wenn || '', dann: g.dann || '', bereich: clKategorieVon(g),
-                    zustand: g.zustand === 'sitzt' ? 'sitzt' : 'ueben', programm: String(g.programm || ''), schritte: s };
+  cl.gw.fenster = { modus: 'details', id: g.id, titel: gwTitel(g), beschreibung: String(g.beschreibung || ''),
+                    bereich: clKategorieVon(g), zustand: g.zustand === 'sitzt' ? 'sitzt' : 'ueben',
+                    programm: String(g.programm || '') };
   cl.aufklapp = 'gewohnheit';
   aufklappNeu();
 }
@@ -15678,16 +15626,10 @@ function gwDetails(id) {
 function gwFensterLesen() {
   var f = cl.gw.fenster;
   if (!f) { return null; }
-  var w = document.getElementById('gwWenn');
-  var d = document.getElementById('gwDann');
-  if (w && typeof w.value === 'string') { f.wenn = w.value; }
-  if (d && typeof d.value === 'string') { f.dann = d.value; }
-  if (!Array.isArray(f.schritte)) { f.schritte = ['', '', '']; }
-  var i;
-  for (i = 0; i < UP_SCHRITTE_MAX; i++) {
-    var e = document.getElementById('gwS' + i);
-    if (e && typeof e.value === 'string') { f.schritte[i] = e.value; }
-  }
+  var t = document.getElementById('gwTitel');
+  var b = document.getElementById('gwBesch');
+  if (t && typeof t.value === 'string') { f.titel = t.value; }
+  if (b && typeof b.value === 'string') { f.beschreibung = b.value; }
   katPrivatLesen('gw', f);
   return f;
 }
@@ -15711,15 +15653,14 @@ function gwFensterHtml() {
   if (!f) { return ''; }
   if (f.modus === 'loeschen') {
     return '<div class="fenster"><div class="titel">Gewohnheit löschen</div><div class="rumpf">'
-      + '<p>„' + esc(f.dann) + '“ wirklich löschen? Auch die abgehakten Tage verschwinden.</p>'
+      + '<p>„' + esc(f.titel) + '“ wirklich löschen? Auch die abgehakten Tage verschwinden.</p>'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="gwLoeschen()">Löschen</button>'
       + '<button type="button" class="knopf" onclick="gwDetails(\'' + esc(f.id) + '\')">Abbrechen</button></div></div></div>';
   }
   return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neue Gewohnheit' : 'Gewohnheit') + '</div><div class="rumpf">'
-    + '<label for="gwWenn">Wenn … (Auslöser):</label><input id="gwWenn" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="nach dem Essen" value="' + esc(f.wenn) + '">'
-    + '<label for="gwDann">… dann (unter 5 Minuten):</label><input id="gwDann" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="Tisch abräumen" value="' + esc(f.dann) + '">'
+    + '<label for="gwTitel">Regel:</label><input id="gwTitel" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="Erst das Wichtige, dann das Laute" value="' + esc(f.titel) + '">'
+    + '<label for="gwBesch">Beschreibung:</label><textarea id="gwBesch" class="eingabe" rows="2" maxlength="200" placeholder="Was das im Alltag heißt">' + esc(f.beschreibung) + '</textarea>'
     + katPrivatHtml('gw', f.bereich || '', false, true)
-    + gwSchritteHtml(f)
     + gwProgrammHtml(f)
     + (f.modus === 'neu' ? '' : '<label>Zustand:</label><div class="wahlreihe">'
       + '<button type="button"' + (f.zustand === 'ueben' ? ' class="an"' : '') + ' onclick="gwWahl(\'ueben\')">Übe ich</button>'
@@ -15728,17 +15669,6 @@ function gwFensterHtml() {
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="gwSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
     + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="gwLoeschenFragen()">Löschen…</button>') + '</div></div></div>';
-}
-
-/* Bis zu drei Unterpunkte — mehr gehört in eine Routine oder eine Liste (0.108.0) */
-function gwSchritteHtml(f) {
-  var s = Array.isArray(f.schritte) ? f.schritte : [];
-  var h = '<label>Unterpunkte (frei lassen = keine):</label>';
-  var i;
-  for (i = 0; i < UP_SCHRITTE_MAX; i++) {
-    h += '<input id="gwS' + i + '" class="eingabe" type="text" maxlength="60" autocomplete="off" placeholder="' + (i + 1) + '." value="' + esc(String(s[i] || '')) + '">';
-  }
-  return h;
 }
 
 function gwProgrammHtml(f) {
@@ -15754,9 +15684,9 @@ function gwProgrammHtml(f) {
 function gwSpeichern() {
   var f = gwFensterLesen();
   if (!f) { aufklappZu(); return; }
-  var wenn = String(f.wenn || '').trim();
-  var dann = String(f.dann || '').trim();
-  if (!dann) { melde('Bitte eintragen, was du dann tust.', 'warn'); return; }
+  var titel = String(f.titel || '').trim();
+  var beschreibung = String(f.beschreibung || '').trim();
+  if (!titel) { melde('Bitte die Regel eintragen.', 'warn'); return; }
   var g = f.id ? gwFinden(f.id) : null;
   var warSitzt = g ? g.zustand === 'sitzt' : true;
   if (f.zustand !== 'sitzt' && warSitzt && gwUebenZahl() >= GW_MAX) {
@@ -15764,19 +15694,13 @@ function gwSpeichern() {
     return;
   }
   if (!g) {
-    g = { id: 'gw-' + neueKennung(), typ: 'gewohnheit', wenn: '', dann: '', zustand: 'ueben', tage: [], angelegt: isoDatum(),
+    g = { id: 'gw-' + neueKennung(), typ: 'gewohnheit', titel: '', beschreibung: '', zustand: 'ueben', tage: [], angelegt: isoDatum(),
           rang: krAlle('gewohnheit').length + 1, kontext: 'privat' };
   }
-  g.wenn = wenn.slice(0, 80);
-  g.dann = dann.slice(0, 80);
-  /* Unterpunkte: die Kennung hängt am Platz, damit abgehakte Tage eine Änderung überleben */
-  var schritte = [];
-  (Array.isArray(f.schritte) ? f.schritte : []).forEach(function (t, i) {
-    var text = String(t || '').trim();
-    if (text && i < UP_SCHRITTE_MAX) { schritte.push({ id: 's' + (i + 1), text: text.slice(0, 60) }); }
-  });
-  g.schritte = schritte;
-  if (!schritte.length) { delete g.schrittTage; }
+  g.titel = titel.slice(0, 80);
+  g.beschreibung = beschreibung.slice(0, 200);
+  delete g.wenn;
+  delete g.dann;
   g.programm = String(f.programm || '');
   if (!g.programm) { delete g.programm; }
   if (f.zustand === 'sitzt' && g.zustand !== 'sitzt') { g.sitztSeit = isoDatum(); }
@@ -28455,6 +28379,7 @@ function start() {
     clKategorienUmstellen();   /* Beruf → Kategorie Arbeit (0.67) */
     try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
     try { upNachziehen(); } catch (e) { clFehlerZeigen(e, 'upNachziehen'); }   /* Umprogrammierung aus 0.107 in ein Programm (0.108.0) */
+    try { gwNachziehen(); } catch (e) { clFehlerZeigen(e, 'gwNachziehen'); }   /* Gewohnheiten: Wenn-dann zu Titel und Beschreibung (0.108.1) */
     ckWecken();
     zeichne();
     /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
@@ -28657,7 +28582,6 @@ var UP_SEKUNDEN_VOR = 5;
 var UP_NOTIZ_VOR = 'Umprogrammierung';
 var UP_KAL_VOR = 'coach';
 var UP_KAL_FENSTER_VOR = 60;
-var UP_SCHRITTE_MAX = 3;       /* Unterpunkte je Gewohnheit */
 /* Die Fenster heißen innen kurz und außen lesbar */
 var UP_FENSTER_NAME = { tag: 'ganztags', frueh: 'früh', mittag: 'mittag', spaet: 'spät', nachmittag: 'nachm.', abend: 'abend' };
 /* Die Zeitfenster je Zahl der Anzeigen: Beginn in Stunden und Name */
@@ -28862,13 +28786,9 @@ function upTagStand(p, is) {
   var l = gwAlle('ueben', p && p.id);
   if (!p || !l.length) { return 'leer'; }
   var voll = 0;
-  var teil = 0;
-  l.forEach(function (g) {
-    var s = gwStand(g, is);
-    if (s === 'voll') { voll++; } else if (s === 'halb') { teil++; }
-  });
+  l.forEach(function (g) { if (gwGeschafft(g, is)) { voll++; } });
   if (voll === l.length) { return 'voll'; }
-  return (voll || teil) ? 'halb' : 'leer';
+  return voll ? 'halb' : 'leer';
 }
 
 function upTagNotizText(p, is) {
