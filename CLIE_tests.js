@@ -11575,6 +11575,196 @@ function upSichtTest() {
   S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: eine Struktur wird über vorhandene Daten gelegt — und reißt sie mit, wenn
+   man sie wieder entfernt. Beim Löschen eines Notizbuchs dürfen die Seiten NICHT
+   verschwinden, sie gehören danach in den Sammler. Dazu der zweite Fehlertyp dieser
+   Sorte: ein Verweis auf einen gelöschten Abschnitt, der die Seite unsichtbar macht. */
+function notizbuchTest() {
+  console.log('\n208. Memo Pad: Notizbücher, Abschnitte und der Sammler (0.110.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  const seite = (id, titel, abschnitt) => {
+    const s = { id: id, titel: titel, text: 'Text', kontext: 'privat', ordnung: 1, geaendert: 1 };
+    if (abschnitt) { s.abschnitt = abschnitt; }
+    S.DB.gedanken.push(s);
+    return s;
+  };
+  S.DB.kurs.push({ id: 'bu-a', typ: 'buch', name: 'Arbeit', angelegt: '2026-11-09' });
+  S.DB.kurs.push({ id: 'bu-p', typ: 'buch', name: 'Privat', angelegt: '2026-11-09' });
+  S.DB.kurs.push({ id: 'ab-1', typ: 'abschnitt', buch: 'bu-a', name: 'Projekte', angelegt: '2026-11-09' });
+  S.DB.kurs.push({ id: 'ab-2', typ: 'abschnitt', buch: 'bu-a', name: 'Protokolle', angelegt: '2026-11-09' });
+  S.DB.kurs.push({ id: 'ab-3', typ: 'abschnitt', buch: 'bu-p', name: 'Haus', angelegt: '2026-11-09' });
+  seite('s1', 'Migration', 'ab-1');
+  seite('s2', 'Workshop', 'ab-1');
+  seite('s3', 'Protokoll 04.11.', 'ab-2');
+  seite('s4', 'Heizung', 'ab-3');
+  seite('s5', 'Lose Notiz', '');
+
+  /* Die Struktur */
+  pruefe(S.buBuecher().map((b) => b.name).join(',') === 'Arbeit,Privat', 'Notizbücher stehen alphabetisch');
+  pruefe(S.buAbschnitte('bu-a').map((a) => a.name).join(',') === 'Projekte,Protokolle', 'Abschnitte gehören zu ihrem Buch');
+  pruefe(S.buAbschnitte('bu-p').length === 1, 'und nur zu ihrem');
+  pruefe(S.buSeitenZahl('ab-1') === 2 && S.buBuchZahl('bu-a') === 3, 'Seiten werden je Abschnitt und je Buch gezählt');
+  pruefe(S.buBuchZahl(S.BU_SAMMLER) === 1, 'die Seite ohne Abschnitt liegt im Sammler');
+
+  /* Filtern */
+  S.oeffne('memo');
+  S.buWaehlen('', '');
+  pruefe(S.pmMemos('').length === 5, 'Alle Notizen zeigt alles');
+  S.buWaehlen('bu-a', '');
+  pruefe(S.pmMemos('').map((s) => s.id).sort().join(',') === 's1,s2,s3', 'ein Notizbuch zeigt alle seine Abschnitte');
+  S.buWaehlen('bu-a', 'ab-2');
+  pruefe(S.pmMemos('').map((s) => s.id).join(',') === 's3', 'ein Abschnitt zeigt nur seine Seiten');
+  S.buWaehlen(S.BU_SAMMLER, '');
+  pruefe(S.pmMemos('').map((s) => s.id).join(',') === 's5', 'der Sammler zeigt die Seiten ohne Abschnitt');
+  pruefe(S.cl.bu.abschnitt === '', 'der Sammler hat keine Abschnitte');
+
+  /* Die Brotkrumen */
+  S.buWaehlen('bu-a', 'ab-1');
+  const k = S.buKrumeHtml();
+  pruefe(/Arbeit ▾/.test(k) && /Projekte ▾/.test(k), 'die Brotkrumen nennen Buch und Abschnitt');
+  S.buWaehlen('', '');
+  pruefe(/Alle Notizen ▾/.test(S.buKrumeHtml()) && S.buKrumeHtml().indexOf('▸') < 0, 'bei Alle Notizen steht nur eine Krume');
+
+  /* Anlegen und umbenennen */
+  S.buWaehlen('bu-a', '');
+  S.buNeu('abschnitt');
+  S.document.getElementById('buName').value = 'Ideen';
+  S.buSpeichern();
+  const neu = S.buAbschnitte('bu-a').filter((a) => a.name === 'Ideen')[0];
+  pruefe(!!neu && neu.buch === 'bu-a' && S.cl.bu.abschnitt === neu.id, 'ein neuer Abschnitt landet im offenen Buch und wird gewählt');
+  S.buDetails(neu.id, 'abschnitt');
+  S.document.getElementById('buName').value = 'Einfälle';
+  S.buSpeichern();
+  pruefe(S.buName(neu.id, 'abschnitt') === 'Einfälle', 'umbenennen geht');
+
+  /* Eine neue Seite landet im offenen Abschnitt */
+  S.buWaehlen('bu-a', 'ab-2');
+  S.memoNeuArt('notiz');
+  S.document.getElementById('memoTitel').value = 'Frisch';
+  S.memoSpeichern();
+  const frischS = S.kpSeitenAlle().filter((s) => s.titel === 'Frisch')[0];
+  pruefe(!!frischS && S.buSeiteAbschnitt(frischS) === 'ab-2', 'eine neue Seite landet dort, wo du stehst');
+
+  /* Verschieben */
+  S.cl.memo.id = 's5';
+  S.buSeiteZu('ab-3');
+  pruefe(S.buSeiteAbschnitt(S.kpSeiteFinden('s5')) === 'ab-3' && S.buSeiteBuch(S.kpSeiteFinden('s5')) === 'bu-p', 'eine Seite lässt sich einsortieren');
+  S.buSeiteZu('');
+  pruefe(!S.buSeiteAbschnitt(S.kpSeiteFinden('s5')) && S.buSeiteBuch(S.kpSeiteFinden('s5')) === S.BU_SAMMLER, 'und zurück in den Sammler legen');
+
+  /* Löschen: die Seiten müssen bleiben */
+  const vorher = S.kpSeitenAlle().length;
+  S.buWaehlen('bu-a', '');
+  S.buDetails('bu-a', 'buch');
+  S.buLoeschenFragen();
+  S.buLoeschen();
+  pruefe(!S.buFinden('bu-a', 'buch') && !S.buFinden('ab-1', 'abschnitt') && !S.buFinden('ab-2', 'abschnitt'), 'mit dem Buch gehen seine Abschnitte');
+  pruefe(S.kpSeitenAlle().length === vorher, 'aber keine einzige Seite verschwindet');
+  pruefe(!!S.kpSeiteFinden('s1') && !!S.kpSeiteFinden('s3'), 'die Seiten gibt es weiter');
+  pruefe(S.buSeiteBuch(S.kpSeiteFinden('s1')) === S.BU_SAMMLER, 'sie stehen danach im Sammler');
+  S.buWaehlen(S.BU_SAMMLER, '');
+  pruefe(S.pmMemos('').length >= 4, 'und sind dort auch zu sehen — kein Verweis ins Leere');
+  pruefe(S.cl.bu.buch === S.BU_SAMMLER, 'die Sicht fällt nicht auf ein gelöschtes Buch zurück');
+
+  /* Archiv und Vorlagen bleiben vom Filter unberührt */
+  S.buWaehlen('bu-p', 'ab-3');
+  S.DB.gedanken.push({ id: 's9', titel: 'Alte Seite', text: 'x', kontext: 'privat', ordnung: 9, geaendert: 1, archiv: true });
+  pruefe(S.pmMemos('archiv').map((s) => s.id).indexOf('s9') >= 0, 'das Archiv zeigt alles, egal welches Notizbuch offen ist');
+
+  /* Die Wächter in der Quelle */
+  pruefe(SKRIPT.split('function buPasst(').length === 2, 'buPasst gibt es genau einmal');
+  pruefe(/function buLoeschen\(\)[\s\S]{0,400}krLoeschen/.test(SKRIPT) && !/function buLoeschen\(\)[\s\S]{0,400}kpSeiteLoeschen/.test(SKRIPT), 'buLoeschen rührt keine Seite an');
+
+  S.cl.bu.buch = ''; S.cl.bu.abschnitt = ''; S.cl.memo.id = ''; S.DB.kurs = []; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: Inhalte, die in einer eigenen Datei liegen sollen, landen trotzdem in der
+   workbench.json — und damit auf Google Drive. Für ein Notizbuch vom Firmen-PC ist das
+   genau das, was nicht passieren darf. Der Test prüft deshalb nicht nur, dass die Sätze
+   sichtbar sind, sondern vor allem, dass sie im gespeicherten Text NICHT vorkommen. */
+function externTest() {
+  console.log('\n209. Notizbuch in eigener Datei: sichtbar in CLIE, abwesend in der workbench.json (0.112.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  S.DB.kurs.push({ id: 'bu-f', typ: 'buch', name: 'Firma', ablage: 'datei', angelegt: '2026-11-09' });
+  S.DB.kurs.push({ id: 'bu-h', typ: 'buch', name: 'Haus', angelegt: '2026-11-09' });
+  S.DB.kurs.push({ id: 'ab-h', typ: 'abschnitt', buch: 'bu-h', name: 'Heizung', angelegt: '2026-11-09' });
+  S.DB.gedanken.push({ id: 's-h', titel: 'Wartung', text: 'normal', kontext: 'privat', ordnung: 1, geaendert: 1, abschnitt: 'ab-h' });
+  const exAb = { id: 'ab-f', typ: 'abschnitt', buch: 'bu-f', name: 'Projekte', angelegt: '2026-11-09' };
+  const exSe = { id: 's-f', titel: 'Vertrauliches', text: 'GEHEIMNIS-MARKE', kontext: 'beruflich', ordnung: 1, geaendert: 1, abschnitt: 'ab-f' };
+  S.exDaten['bu-f'] = { abschnitte: [exAb], seiten: [exSe], stand: '' };
+
+  /* Sichtbar wie ein normaler Satz */
+  pruefe(S.krAlle('abschnitt').map((a) => a.id).sort().join(',') === 'ab-f,ab-h', 'externe Abschnitte stehen in krAlle');
+  pruefe(!!S.krFinden('ab-f'), 'und lassen sich finden');
+  pruefe(S.kpSeitenAlle().some((s) => s.id === 's-f'), 'externe Seiten stehen in kpSeitenAlle');
+  pruefe(!!S.kpSeiteFinden('s-f'), 'und lassen sich öffnen');
+  pruefe(S.buSeiteBuch(S.kpSeiteFinden('s-f')) === 'bu-f', 'sie gehören zum richtigen Notizbuch');
+
+  /* Aber nicht in der Datenbank */
+  pruefe((S.DB.gedanken || []).every((g) => g.id !== 's-f'), 'die externe Seite steht nicht in DB.gedanken');
+  pruefe((S.DB.kurs || []).every((x) => x.id !== 'ab-f'), 'der externe Abschnitt steht nicht in DB.kurs');
+  const text = S.alsText();
+  pruefe(text.indexOf('GEHEIMNIS-MARKE') < 0 && text.indexOf('"s-f"') < 0, 'im gespeicherten Text kommt die externe Seite NICHT vor');
+  pruefe(text.indexOf('"ab-f"') < 0, 'der externe Abschnitt ebenso wenig');
+  pruefe(text.indexOf('"bu-f"') >= 0, 'das Notizbuch selbst bleibt in der workbench.json — sonst wüsste kein Gerät davon');
+  pruefe(text.indexOf('normal') >= 0, 'die normale Seite steht weiter drin');
+
+  /* Filtern und anzeigen */
+  S.oeffne('memo');
+  S.buWaehlen('bu-f', 'ab-f');
+  pruefe(S.pmMemos('').map((s) => s.id).join(',') === 's-f', 'das externe Notizbuch zeigt seine Seiten');
+
+  /* Eine neue Seite landet in der Datei, nicht in der Datenbank */
+  const vorherDb = S.DB.gedanken.length;
+  S.memoNeuArt('notiz');
+  S.document.getElementById('memoTitel').value = 'Frisch extern';
+  S.memoSpeichern();
+  pruefe(S.DB.gedanken.length === vorherDb, 'eine neue Seite im externen Buch vergrößert DB.gedanken nicht');
+  pruefe(S.exDaten['bu-f'].seiten.some((s) => s.titel === 'Frisch extern'), 'sie steht in den Daten der Datei');
+  pruefe(S.exSchmutzig['bu-f'] === true, 'und die Datei gilt als zu sichern');
+
+  /* Der Dateiinhalt */
+  const roh = S.exInhalt('bu-f');
+  const d = JSON.parse(roh);
+  pruefe(d.art === 'clie-notizbuch' && d.buch === 'bu-f' && d.name === 'Firma', 'die Datei nennt Art, Buch und Namen');
+  pruefe(d.abschnitte.length === 1 && d.seiten.length === 2, 'Abschnitte und Seiten stehen darin');
+  pruefe(roh.indexOf('GEHEIMNIS-MARKE') >= 0, 'der Inhalt landet in der Datei');
+
+  /* Fremde Dateien werden abgewiesen */
+  pruefe(S.exUebernehmen('bu-f', '{"art":"etwas anderes"}') === false, 'eine fremde Datei wird nicht übernommen');
+  pruefe(S.exUebernehmen('bu-f', 'kein json') === false, 'kaputter Text ebenso wenig');
+  pruefe(S.exDaten['bu-f'].seiten.length === 2, 'und die geöffneten Daten bleiben unberührt');
+
+  /* Löschen nimmt die Seite aus der Datei, nicht aus der Datenbank */
+  const grabVor = (S.DB.grabsteine || []).length;
+  S.cl.memo.id = 's-f';
+  S.memoLoeschen();
+  pruefe(!S.exDaten['bu-f'].seiten.some((s) => s.id === 's-f'), 'die Seite ist aus der Datei heraus');
+  pruefe((S.DB.grabsteine || []).length === grabVor, 'dafür entsteht kein Grabstein in der workbench.json');
+
+  /* Ein Notizbuch, dessen Datei hier nicht offen ist */
+  delete S.exDaten['bu-f'];
+  pruefe(S.exIstExtern('bu-f') === true && S.exOffen('bu-f') === false, 'das Buch bleibt bekannt, ist aber zu');
+  pruefe(S.krAlle('abschnitt').map((a) => a.id).join(',') === 'ab-h', 'seine Abschnitte sind dann nicht da');
+  pruefe(/öffnen…/.test(S.buBuchWahlHtml()), 'die Auswahl bietet das Öffnen an');
+  S.buWaehlen('', '');
+  pruefe(S.pmMemos('').every((s) => s.id !== 's-f'), 'und seine Seiten tauchen nirgends auf');
+
+  /* Die Wächter in der Quelle */
+  pruefe(SKRIPT.indexOf('function alsText()') >= 0 && !/function alsText\(\)[\s\S]{0,300}exDaten/.test(SKRIPT), 'alsText bleibt unangetastet — die Hülle sitzt außen');
+  pruefe(/kpSeitenAlle = function/.test(SKRIPT) && /spaeterSichern = function/.test(SKRIPT), 'die beiden Kernfunktionen bekommen eine Hülle, keine Änderung');
+  pruefe(SKRIPT.split('function exUmstellen(').length === 2, 'exUmstellen gibt es genau einmal');
+
+  S.exDaten = {}; S.exSchmutzig = {}; S.cl.bu.buch = ''; S.cl.bu.abschnitt = '';
+  S.cl.memo.id = ''; S.DB.kurs = []; S.cl.app = 'uebersicht';
+}
+
 /* Fehlertyp: zwei Apps werden zusammengelegt — und ein alter Weg führt danach ins Leere.
    Hier sind das `oeffne('manifest')`, der Link #manifest aus den Kalendereinträgen und die
    Pflichtlektüre, die nun eine Sicht sperren muss statt einer App. Dazu das Raster, das
@@ -11832,6 +12022,8 @@ function leuchtturmTest() {
   try { await manCoachHolenTest(); } catch (e) { fail('0.107.1 Coach-Termine holen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { upSichtTest(); } catch (e) { fail('0.108.0 Sicht Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leuchtturmTest(); } catch (e) { fail('0.109.0 Roots warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { notizbuchTest(); } catch (e) { fail('0.110.0 Notizbuch warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { externTest(); } catch (e) { fail('0.112.0 Eigene Datei warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
