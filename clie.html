@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.117.0</title>
+<title>CLIE 0.118.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -1267,7 +1267,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.117.0';
+var APP_VERSION = '0.118.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -28939,15 +28939,10 @@ function clSchemaWahl() {
   return (w === 'lcd' || w === 'wb') ? w : 'auto';
 }
 
-/* Groß ist alles, dessen kürzere Bildschirmseite mindestens 600 Punkte hat — das iPad ja, das Pixel nicht */
-function clIstGrossesGeraet() {
-  var sc = window.screen || {};
-  return Math.min(Number(sc.width) || 0, Number(sc.height) || 0) >= 600;
-}
-
 function clSchemaSetzen() {
   var w = clSchemaWahl();
-  var wb = w === 'wb' || (w === 'auto' && clIstGrossesGeraet());
+  /* Seit 0.118.0 heißt Auto überall Workbench — auch am Pixel. Wer das LCD will, stellt es im Menü fest ein. */
+  var wb = w !== 'lcd';
   var r = document.documentElement;
   if (r && r.classList) { r.classList.toggle('schema-wb', wb); }
   var meta = document.querySelector ? document.querySelector('meta[name="theme-color"]') : null;
@@ -28961,7 +28956,7 @@ function clSchemaUm() {
   try { window.localStorage.setItem(CL_SCHEMA_KEY, neu); } catch (e) { /* nur für jetzt */ }
   clSchemaSetzen();
   zeichne();
-  melde('Colors: ' + CL_SCHEMA_NAME[neu] + (neu === 'auto' ? ' (' + (clIstGrossesGeraet() ? 'Workbench' : 'LCD') + ' on this device)' : ''), null);
+  melde('Colors: ' + CL_SCHEMA_NAME[neu] + (neu === 'auto' ? ' (Workbench)' : ''), null);
 }
 
 function start() {
@@ -29029,9 +29024,11 @@ function start() {
   window.setInterval(minutenTakt, 30000);
   window.setInterval(spTakt, 1000);
   /* Aus einer Coach-Erinnerung im Kalender: gleich zum Coach (seit 0.33) */
-  if (String((window.location && window.location.hash) || '') === '#coach') { oeffne('coach'); }
-  /* … oder gleich zum Manifest (seit 0.106.0) */
-  if (String((window.location && window.location.hash) || '') === '#manifest') { oeffne('manifest'); }
+  /* Seit 0.118.0 öffnet jeder Anker seine App: #aufgaben, #kalender, #memo, #routinen …
+     — so landen die Verknüpfungen vom Startbildschirm direkt dort. #manifest führt
+     weiterhin in die Manifest-Sicht, auch wenn es keine eigene App mehr ist (0.109.0). */
+  var clAnker = String((window.location && window.location.hash) || '').replace(/^#/, '').toLowerCase();
+  if (clAnker && (clApp(clAnker) || clAnker === 'manifest')) { oeffne(clAnker); }
   var inhalt = document.getElementById('inhalt');
   if (inhalt) {
     inhalt.addEventListener('touchstart', wischAnfang, { passive: true });
