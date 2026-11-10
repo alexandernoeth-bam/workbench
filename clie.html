@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.119.1</title>
+<title>CLIE 0.120.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -26,7 +26,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:transparent;border:0
 button:disabled{cursor:default;color:var(--px-zart)}
 button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 
-.geraet{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;background:var(--lcd);position:relative;overflow:hidden;
+.geraet{height:100%;max-width:calc(480px / var(--zoom, 1));margin:0 auto;display:flex;flex-direction:column;background:var(--lcd);position:relative;overflow:hidden;
   padding-top:env(safe-area-inset-top)}
 .kopf{display:flex;align-items:center;gap:8px;padding:8px 8px 6px;border-bottom:2px solid var(--px);flex:0 0 auto}
 .reiter{background:var(--px);color:var(--lcd);font-weight:600;padding:3px 9px 2px;border-radius:5px 5px 0 0;font-size:22.5px;max-width:62%;
@@ -437,7 +437,9 @@ span.hs-thumb{display:block}
 .schreibleiste{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 6px}
 .schreibleiste button{min-width:40px;height:36px;border:2px solid var(--px);border-radius:3px;font-size:18px;padding:0 4px}
 /* Am PC beim Schreiben breiter (seit 0.38) */
-.geraet.schreibbreit{max-width:900px}
+/* Seit 0.120.0 teilt der Maßstab mit: bei 80 % soll die Spalte nicht mitschrumpfen,
+   sondern gleich breit bleiben und nur mehr hineinpassen. */
+.geraet.schreibbreit{max-width:calc(900px / var(--zoom, 1))}
 /* Lesezeichen (seit 0.38) */
 .lz-zeile{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px;font-size:20px}
 .lz-zeile .s{flex:0 0 26px;text-align:center}
@@ -1142,6 +1144,8 @@ input[type=checkbox]{accent-color:var(--px)}
 .pm-bal{display:flex;justify-content:space-between;align-items:center;background:var(--px);color:var(--lcd);font-weight:600;font-size:17px;padding:3px 8px;margin:10px 0 2px;border-radius:3px}
 .pm-bal small{font-weight:400;font-size:15.5px;opacity:.85}
 html.schema-wb .pm-bal{background:#19525A;color:#fff}
+/* Seit 0.120.0: die Textgrößen-Liste steht über der Leiste wie das Menü */
+.aufklapp.text-wahl{bottom:52px;top:auto}
 .pm-banner{border:2px dashed var(--px);padding:5px 8px;margin:4px 0 8px;font-size:17px;line-height:1.35}
 /* ---- Dock (seit 0.119.0): Umschalter, Zeitachse, jetzt-Linie ---- */
 .dk-um{display:flex;align-items:center;gap:0;margin:0 0 6px}
@@ -1285,7 +1289,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.119.1';
+var APP_VERSION = '0.120.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4858,7 +4862,10 @@ function aufklappZeichnen() {
   if (pmAufklapp(el)) { return; }
   /* Seit 0.87: Fenster der Kartenspiele (cl_karten.js) */
   if (ktAufklapp(el)) { return; }
-  if (cl.aufklapp === 'kat') {
+  /* Seit 0.120.0: die Textgröße */
+  if (cl.aufklapp === 'text') {
+    el.innerHTML = clTextWahlHtml();
+  } else if (cl.aufklapp === 'kat') {
     el.innerHTML = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">' + katFilterHtml('katSetzen') + '</div>';
   } else if (cl.aufklapp === 'einkauf') {
     /* Beim Neuzeichnen (etwa nach einem Abgleich) bleibt Getipptes stehen. */
@@ -5029,6 +5036,8 @@ function aufklappZeichnen() {
       + '<button type="button" onclick="menueWahl(\'farben\')">Colors: ' + CL_SCHEMA_NAME[clSchemaWahl()] + '</button>'
       /* Seit 0.119.0: das Dock öffnen und einstellen, womit CLIE auf diesem Gerät startet */
       + '<button type="button" onclick="menueWahl(\'dock\')">Dock</button>'
+      /* Seit 0.120.0: der Maßstab der Oberfläche, je Gerät */
+      + '<button type="button" onclick="menueWahl(\'text\')">Text: ' + clTextWahl() + ' %</button>'
       + '<button type="button" onclick="menueWahl(\'dockstart\')">Start: ' + CL_START_NAME[dockStartWahl()] + '</button>'
       + '<button type="button" onclick="menueWahl(\'statistik\')">Stats</button>'
       + '<button type="button" onclick="menueWahl(\'info\')">Info</button></div>';
@@ -5251,6 +5260,7 @@ function menueWahl(was) {
   if (was === 'statistik') { oeffne('statistik'); return; }
   if (was === 'farben') { aufklappZeichnen(); clSchemaUm(); return; }
   if (was === 'dock') { oeffne('dock'); return; }
+  if (was === 'text') { clTextWahlAuf(); return; }
   if (was === 'dockstart') { aufklappZeichnen(); dockStartUm(); return; }
   if (was === 'anzeigen') { aufAnzeigenAuf(); return; }
   if (was === 'pjDetails') { pjDetails(); return; }
@@ -28994,6 +29004,61 @@ function clSchemaSetzen() {
   return wb;
 }
 
+/* ---------- Textgröße (seit 0.120.0) ----------
+   Keine Schriftgrößen, sondern ein Maßstab auf der ganzen Seite: Text, Kästchen,
+   Abstände und Symbole schrumpfen im selben Verhältnis, damit nichts verrutscht.
+   Dadurch bleibt auch die Regel „keine Schrift kleiner als 15,5 px“ gültig — sie
+   beschreibt die Grundgröße bei 100 %. Je Gerät, wie Farben und Dock-Start. */
+var CL_TEXT_KEY = 'clie-text';
+var CL_TEXT_STUFEN = [80, 90, 100, 110, 125];
+
+function clTextWahl() {
+  var n = 0;
+  try { n = Number(window.localStorage.getItem(CL_TEXT_KEY) || 0); } catch (e) { n = 0; }
+  return (CL_TEXT_STUFEN.indexOf(n) >= 0) ? n : 100;
+}
+
+function clTextSetzen() {
+  var n = clTextWahl();
+  var r = document.documentElement;
+  if (r && r.style) {
+    r.style.zoom = (n === 100) ? '' : String(n / 100);
+    /* Die Spalte soll nicht mitschrumpfen: .geraet teilt seine Breite durch denselben
+       Faktor, damit bei 80 % mehr hineinpasst statt dass alles schmaler wird. */
+    if (r.style.setProperty) { r.style.setProperty('--zoom', String(n / 100)); }
+  }
+  return n;
+}
+
+function clTextWaehlen(n) {
+  if (CL_TEXT_STUFEN.indexOf(Number(n)) < 0) { return; }
+  try { window.localStorage.setItem(CL_TEXT_KEY, String(n)); } catch (e) { /* nur für jetzt */ }
+  clTextSetzen();
+  cl.aufklapp = '';
+  zeichne();
+  melde('Text: ' + n + ' %', null);
+}
+
+function clTextWahlAuf() {
+  cl.aufklapp = (cl.aufklapp === 'text') ? '' : 'text';
+  aufklappNeu();
+  /* Die Liste kommt aus dem Menü ≡ und soll dort stehen, wo das Menü stand:
+     über der Leiste, nicht oben am Kopf. */
+  var leiste = document.querySelector('.silk');
+  var wahl = document.querySelector('.text-wahl');
+  if (leiste && wahl && leiste.offsetHeight) { wahl.style.bottom = leiste.offsetHeight + 'px'; }
+}
+
+function clTextWahlHtml() {
+  var jetzt = clTextWahl();
+  return '<div class="aufklapp liste-aufklapp todo-wahl text-wahl" style="right:6px">'
+    + CL_TEXT_STUFEN.map(function (n) {
+      return '<button type="button"' + (n === jetzt ? ' class="an"' : '') + ' onclick="clTextWaehlen(' + n + ')">'
+        + '<span>' + n + ' %</span>' + (n === 100 ? '<small>normal</small>' : '') + '</button>';
+    }).join('')
+    + '</div>';
+}
+
 function clSchemaUm() {
   var folge = { auto: 'lcd', lcd: 'wb', wb: 'auto' };
   var neu = folge[clSchemaWahl()];
@@ -29005,6 +29070,7 @@ function clSchemaUm() {
 
 function start() {
   try { clSchemaSetzen(); } catch (e) { /* Farben sind kein Grund, nicht zu starten */ }
+  try { clTextSetzen(); } catch (e) { /* und der Maßstab auch nicht */ }
   /* Seit 0.85.1: unerwartete Fehler zeigen statt still eine leere Seite zu lassen */
   window.addEventListener('error', function (ev) { clFehlerZeigen(ev && (ev.error || ev.message), 'Skript'); });
   window.addEventListener('unhandledrejection', function (ev) { clFehlerZeigen(ev && ev.reason, 'Ablauf'); });
