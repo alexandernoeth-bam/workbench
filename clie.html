@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.110.0</title>
+<title>CLIE 0.113.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -716,12 +716,6 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
 .fenster .rumpf{padding:10px 12px;font-size:20px}
-/* Notizbuch ▸ Abschnitt über der Seitenliste (0.110.0) */
-.bu-krume{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:0 0 6px;padding-bottom:5px;border-bottom:2px dotted var(--px-zart)}
-.bu-krume span{color:var(--px-mitte)}
-.bu-k{font:inherit;font-size:17px;background:none;color:var(--px);border:1px solid var(--px);border-radius:11px;padding:1px 9px}
-.bu-ziel{display:block;width:100%;text-align:left;font:inherit;background:none;color:var(--px);border:1px solid var(--px-zart);padding:4px 8px;margin-bottom:4px}
-.bu-ziel.an{background:var(--px);color:var(--lcd);border-color:var(--px)}
 .up-titel{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:2px solid var(--px);padding-bottom:3px}
 .up-titel span{font-size:17px;color:var(--px-mitte)}
 .up-balken{display:flex;gap:1px;margin:7px 0 4px}
@@ -1252,7 +1246,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.110.0';
+var APP_VERSION = '0.113.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4831,15 +4825,7 @@ function aufklappZeichnen() {
     el.innerHTML = fkFensterHtml();
   } else if (cl.aufklapp === 'umprog') {
     el.innerHTML = upHtml();
-  } else if (cl.aufklapp === 'buchwahl') {
-    el.innerHTML = buBuchWahlHtml();
-  } else if (cl.aufklapp === 'abschnittwahl') {
-    el.innerHTML = buAbschnittWahlHtml();
-  } else if (cl.aufklapp === 'buch') {
-    el.innerHTML = buFensterHtml();
-  } else if (cl.aufklapp === 'seitewahl') {
-    el.innerHTML = buSeiteWahlHtml();
-  } else if (cl.aufklapp === 'umprogramm') {
+    } else if (cl.aufklapp === 'umprogramm') {
     el.innerHTML = upFensterHtml();
   } else if (cl.aufklapp === 'uptag') {
     el.innerHTML = upTagHtml();
@@ -5169,7 +5155,6 @@ function aufklappZu() {
   cl.gw.fenster = null;
   cl.up.fenster = null;
   cl.up.tagF = null;
-  cl.bu.fenster = null;
   cl.lf.fenster = null;
   cl.auf.ep = null;
   cl.auf.anzF = null;
@@ -8671,8 +8656,6 @@ function memoSpeichern() {
     if (!s) { melde('Das Memo ließ sich nicht anlegen.', 'warn'); return; }
     katPrivatSchreiben(s.__satz, f);
     s.__satz.angelegt = isoDatum();
-    /* Eine neue Seite landet dort, wo du gerade stehst (0.110.0) */
-    if (cl.bu && cl.bu.abschnitt) { s.__satz.abschnitt = cl.bu.abschnitt; }
     spaeterSichern();
     aufklappZu();
     cl.memo.id = s.id;
@@ -31370,254 +31353,6 @@ function pmArchiviert(s) {
 }
 
 /* Die Memos einer Sicht: '' (laufend), 'vorlagen', 'archiv' — nach Kürzel, dann Titel */
-/* ---------- Notizbücher und Abschnitte (seit 0.110.0) ----------
-   Drei Ebenen wie im OneNote: Notizbuch ▸ Abschnitt ▸ Seite. Buch und Abschnitt sind
-   Sätze in DB.kurs (typ 'buch' und 'abschnitt'), die Seite merkt sich nur ihren
-   Abschnitt — das Buch ergibt sich daraus. Seiten ohne Abschnitt stehen im Sammler,
-   dasselbe Muster wie Aufgaben ohne Liste. „Alle Notizen“ zeigt weiter alles flach;
-   niemand muss erst sortieren, um etwas zu finden. */
-var BU_SAMMLER = 'bu-sammler';
-cl.bu = { buch: '', abschnitt: '', fenster: null, auf: {} };
-
-function buBuecher() {
-  return krAlle('buch').sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'de'); });
-}
-
-function buAbschnitte(buchId) {
-  return krAlle('abschnitt').filter(function (a) { return a && String(a.buch || '') === String(buchId || ''); })
-    .sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'de'); });
-}
-
-function buFinden(id, typ) {
-  var x = krFinden(id);
-  return (x && x.typ === typ) ? x : null;
-}
-
-function buName(id, typ) {
-  if (id === BU_SAMMLER) { return 'Sammler'; }
-  var x = buFinden(id, typ);
-  return x ? String(x.name || '(ohne Namen)') : '';
-}
-
-/* Der Abschnitt einer Seite — nur gültig, wenn es ihn noch gibt */
-function buSeiteAbschnitt(s) {
-  var id = String((s && s.__satz && s.__satz.abschnitt) || '');
-  return buFinden(id, 'abschnitt') ? id : '';
-}
-
-function buSeiteBuch(s) {
-  var a = buSeiteAbschnitt(s);
-  if (!a) { return BU_SAMMLER; }
-  var satz = buFinden(a, 'abschnitt');
-  var b = String((satz && satz.buch) || '');
-  return buFinden(b, 'buch') ? b : BU_SAMMLER;
-}
-
-function buSeiteSetzen(seiteId, abschnittId) {
-  var s = kpSeiteFinden(seiteId);
-  if (!s || !s.__satz) { return false; }
-  var id = String(abschnittId || '');
-  if (id && !buFinden(id, 'abschnitt')) { return false; }
-  if (id) { s.__satz.abschnitt = id; } else { delete s.__satz.abschnitt; }
-  s.__satz.geaendert = Date.now();
-  spaeterSichern();
-  return true;
-}
-
-/* Wie viele Seiten in einem Abschnitt stehen (für die Auswahl) */
-function buSeitenZahl(abschnittId) {
-  return kpSeitenAlle().filter(function (s) {
-    return s.art !== 'liste' && !pmIstVorlage(s) && !pmArchiviert(s)
-      && (abschnittId === BU_SAMMLER ? !buSeiteAbschnitt(s) : buSeiteAbschnitt(s) === abschnittId);
-  }).length;
-}
-
-function buBuchZahl(buchId) {
-  if (buchId === BU_SAMMLER) { return buSeitenZahl(BU_SAMMLER); }
-  return buAbschnitte(buchId).reduce(function (n, a) { return n + buSeitenZahl(a.id); }, 0);
-}
-
-/* Passt die Seite zur gewählten Ebene? Leeres Buch heißt „Alle Notizen“. */
-function buPasst(s) {
-  if (!cl.bu.buch) { return true; }
-  if (cl.bu.buch === BU_SAMMLER) { return !buSeiteAbschnitt(s); }
-  if (cl.bu.abschnitt) { return buSeiteAbschnitt(s) === cl.bu.abschnitt; }
-  return buSeiteBuch(s) === cl.bu.buch;
-}
-
-function buWaehlen(buchId, abschnittId) {
-  cl.bu.buch = String(buchId || '');
-  cl.bu.abschnitt = String(abschnittId || '');
-  if (cl.bu.buch === BU_SAMMLER) { cl.bu.abschnitt = ''; }
-  aufklappZuStill();
-  zeichne();
-}
-
-function buBuchWahlAuf() { cl.aufklapp = 'buchwahl'; aufklappNeu(); }
-function buAbschnittWahlAuf() { if (cl.bu.buch && cl.bu.buch !== BU_SAMMLER) { cl.aufklapp = 'abschnittwahl'; aufklappNeu(); } }
-
-/* Die Brotkrumen über der Seitenliste */
-function buKrumeHtml() {
-  var h = '<div class="bu-krume"><button type="button" class="bu-k" onclick="buBuchWahlAuf()">'
-    + esc(cl.bu.buch ? buName(cl.bu.buch, 'buch') : 'Alle Notizen') + ' ▾</button>';
-  if (cl.bu.buch && cl.bu.buch !== BU_SAMMLER) {
-    h += '<span>▸</span><button type="button" class="bu-k" onclick="buAbschnittWahlAuf()">'
-      + esc(cl.bu.abschnitt ? buName(cl.bu.abschnitt, 'abschnitt') : 'Alle Abschnitte') + ' ▾</button>';
-  }
-  return h + '</div>';
-}
-
-function buBuchWahlHtml() {
-  var knopf = function (id, text, zahl) {
-    return '<button type="button"' + (cl.bu.buch === id ? ' class="an"' : '') + ' onclick="buWaehlen(\'' + esc(id) + '\',\'\')">'
-      + '<span>' + esc(text) + '</span><small>' + (zahl === '' ? '' : zahl) + '</small></button>';
-  };
-  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;left:6px">';
-  h += buBuecher().map(function (b) { return knopf(b.id, b.name || '(ohne Namen)', buAbschnitte(b.id).length + ' Abschn.'); }).join('');
-  h += '<div class="trenn"></div>' + knopf(BU_SAMMLER, 'Sammler', buBuchZahl(BU_SAMMLER));
-  h += '<div class="trenn"></div>' + knopf('', 'Alle Notizen', '');
-  h += '<div class="trenn"></div><button type="button" onclick="buNeu(\'buch\')"><span>Neues Notizbuch…</span><small></small></button>';
-  if (cl.bu.buch && cl.bu.buch !== BU_SAMMLER) {
-    h += '<button type="button" onclick="buDetails(\'' + esc(cl.bu.buch) + '\',\'buch\')"><span>Notizbuch ändern…</span><small></small></button>';
-  }
-  return h + '</div>';
-}
-
-function buAbschnittWahlHtml() {
-  var buch = cl.bu.buch;
-  var knopf = function (id, text, zahl) {
-    return '<button type="button"' + (cl.bu.abschnitt === id ? ' class="an"' : '') + ' onclick="buWaehlen(\'' + esc(buch) + '\',\'' + esc(id) + '\')">'
-      + '<span>' + esc(text) + '</span><small>' + (zahl === '' ? '' : zahl) + '</small></button>';
-  };
-  var l = buAbschnitte(buch);
-  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;left:6px">';
-  h += l.length ? l.map(function (a) { return knopf(a.id, a.name || '(ohne Namen)', buSeitenZahl(a.id)); }).join('')
-    : '<button type="button" class="leer"><span>Noch kein Abschnitt</span><small></small></button>';
-  h += '<div class="trenn"></div>' + knopf('', 'Alle Abschnitte', buBuchZahl(buch));
-  h += '<div class="trenn"></div><button type="button" onclick="buNeu(\'abschnitt\')"><span>Neuer Abschnitt…</span><small></small></button>';
-  if (cl.bu.abschnitt) {
-    h += '<button type="button" onclick="buDetails(\'' + esc(cl.bu.abschnitt) + '\',\'abschnitt\')"><span>Abschnitt ändern…</span><small></small></button>';
-  }
-  return h + '</div>';
-}
-
-/* ---- Anlegen, umbenennen, löschen ---- */
-function buNeu(typ) {
-  if (typ === 'abschnitt' && (!cl.bu.buch || cl.bu.buch === BU_SAMMLER)) {
-    melde('Erst ein Notizbuch wählen — Abschnitte gehören in eines.', 'warn');
-    return;
-  }
-  cl.bu.fenster = { modus: 'neu', typ: typ, id: '', name: '' };
-  cl.aufklapp = 'buch';
-  aufklappNeu();
-}
-
-function buDetails(id, typ) {
-  var x = buFinden(id, typ);
-  if (!x) { return; }
-  cl.bu.fenster = { modus: 'details', typ: typ, id: x.id, name: String(x.name || '') };
-  cl.aufklapp = 'buch';
-  aufklappNeu();
-}
-
-function buFensterLesen() {
-  var f = cl.bu.fenster;
-  if (!f) { return null; }
-  var e = document.getElementById('buName');
-  if (e && typeof e.value === 'string') { f.name = e.value; }
-  return f;
-}
-
-function buFensterHtml() {
-  var f = cl.bu.fenster;
-  if (!f) { return ''; }
-  var wort = f.typ === 'buch' ? 'Notizbuch' : 'Abschnitt';
-  if (f.modus === 'loeschen') {
-    var mit = f.typ === 'buch'
-      ? 'Die Abschnitte darin verschwinden mit. Die Seiten bleiben, sie stehen danach im Sammler.'
-      : 'Die Seiten bleiben, sie stehen danach im Sammler.';
-    return '<div class="fenster"><div class="titel">' + wort + ' löschen</div><div class="rumpf">'
-      + '<p>„' + esc(f.name) + '“ wirklich löschen? ' + mit + '</p>'
-      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="buLoeschen()">Löschen</button>'
-      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
-  }
-  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neues ' + wort : wort) + '</div><div class="rumpf">'
-    + '<label for="buName">Name:</label><input id="buName" class="eingabe" type="text" maxlength="60" autocomplete="off" value="' + esc(f.name) + '">'
-    + (f.typ === 'abschnitt' ? '<p class="leise">In: ' + esc(buName(cl.bu.buch, 'buch')) + '</p>' : '')
-    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="buSpeichern()">OK</button>'
-    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
-    + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="buLoeschenFragen()">Löschen…</button>') + '</div></div></div>';
-}
-
-function buSpeichern() {
-  var f = buFensterLesen();
-  if (!f) { aufklappZu(); return; }
-  var name = String(f.name || '').trim().slice(0, 60);
-  if (!name) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
-  var x = f.id ? buFinden(f.id, f.typ) : null;
-  if (!x) {
-    x = { id: (f.typ === 'buch' ? 'bu-' : 'ab-') + neueKennung(), typ: f.typ, angelegt: isoDatum() };
-    if (f.typ === 'abschnitt') { x.buch = cl.bu.buch; }
-  }
-  x.name = name;
-  krSpeichern(x);
-  if (f.typ === 'buch') { cl.bu.buch = x.id; cl.bu.abschnitt = ''; } else { cl.bu.abschnitt = x.id; }
-  aufklappZu();
-}
-
-function buLoeschenFragen() {
-  var f = buFensterLesen();
-  if (!f || !f.id) { return; }
-  f.modus = 'loeschen';
-  aufklappNeu();
-}
-
-function buLoeschen() {
-  var f = cl.bu.fenster;
-  if (!f || !buFinden(f.id, f.typ)) { aufklappZu(); return; }
-  if (f.typ === 'buch') { buAbschnitte(f.id).forEach(function (a) { krLoeschen(a.id); }); }
-  krLoeschen(f.id);
-  if (cl.bu.buch === f.id) { cl.bu.buch = ''; cl.bu.abschnitt = ''; }
-  if (cl.bu.abschnitt === f.id) { cl.bu.abschnitt = ''; }
-  aufklappZu();
-  melde(f.typ === 'buch' ? 'Notizbuch gelöscht, die Seiten stehen im Sammler.' : 'Abschnitt gelöscht, die Seiten stehen im Sammler.', null);
-}
-
-/* ---- Eine Seite einsortieren ---- */
-function buSeiteWahlAuf() {
-  if (!cl.memo.id) { return; }
-  cl.aufklapp = 'seitewahl';
-  aufklappNeu();
-}
-
-function buSeiteWahlHtml() {
-  var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
-  if (!s) { return ''; }
-  var jetzt = buSeiteAbschnitt(s);
-  var h = '<div class="fenster"><div class="titel">Seite einsortieren</div><div class="rumpf">';
-  var buecher = buBuecher();
-  if (!buecher.length) {
-    h += '<p class="leise">Noch kein Notizbuch — in der Liste oben links „Neues Notizbuch…“.</p>';
-  }
-  buecher.forEach(function (b) {
-    var l = buAbschnitte(b.id);
-    h += '<div class="gruppe">' + esc(b.name || '(ohne Namen)') + '</div>';
-    h += l.length ? l.map(function (a) {
-      return '<button type="button" class="bu-ziel' + (jetzt === a.id ? ' an' : '') + '" onclick="buSeiteZu(\'' + esc(a.id) + '\')">' + esc(a.name || '(ohne Namen)') + '</button>';
-    }).join('') : '<p class="leise">Kein Abschnitt.</p>';
-  });
-  h += '<div class="gruppe">Ohne Notizbuch</div>'
-    + '<button type="button" class="bu-ziel' + (jetzt ? '' : ' an') + '" onclick="buSeiteZu(\'\')">Sammler</button>';
-  return h + '<div class="knoepfe"><button type="button" class="knopf" onclick="aufklappZu()">Schließen</button></div></div></div>';
-}
-
-function buSeiteZu(abschnittId) {
-  if (!cl.memo.id) { aufklappZu(); return; }
-  if (!buSeiteSetzen(cl.memo.id, abschnittId)) { melde('Das ging nicht.', 'warn'); return; }
-  aufklappZu();
-  melde(abschnittId ? 'Verschoben nach ' + buName(abschnittId, 'abschnitt') + '.' : 'In den Sammler gelegt.', null);
-}
-
 function pmMemos(sicht) {
   var l = kpSeitenAlle().filter(function (s) {
     /* Seit 0.104.5 stehen To-Do-Listen nicht mehr im Memo Pad. Sie standen hier, weil
@@ -31625,8 +31360,6 @@ function pmMemos(sicht) {
        ihrer Zuordnung, obwohl nur der Memo-Eintrag gemeint war. */
     if (s.art === 'liste') { return false; }
     if (!clPasst(s)) { return false; }
-    /* Notizbuch und Abschnitt filtern nur die normale Liste, nicht Archiv und Vorlagen (0.110.0) */
-    if (!sicht && !buPasst(s)) { return false; }
     var v = pmIstVorlage(s);
     if (sicht === 'vorlagen') { return v; }
     if (v) { return false; }
@@ -31765,12 +31498,12 @@ function pmMemoSicht() { return (cl.memo.sicht === 'vorlagen' || cl.memo.sicht =
 function pmMemoListeHtml() {
   var sicht = pmMemoSicht();
   var l = pmMemos(sicht);
-  var h = sicht ? '' : pmBannerHtml() + buKrumeHtml();
+  var h = sicht ? '' : pmBannerHtml();
   if (!l.length) {
     if (!sicht && pmKzAus()) { return h + '<p class="leise">Nichts zu zeigen — ausgeschaltet: ' + pmKzAus().split('').join(' ') + '.</p>'; }
     return h + '<p class="leise">' + (sicht === 'vorlagen' ? 'Noch keine Vorlage — im Memo Menü ≡ „Als Vorlage speichern“.'
       : sicht === 'archiv' ? 'Das Archiv ist leer.'
-      : cl.bu.buch ? 'Hier steht noch nichts — „Neu“ legt die erste Seite an.' : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
+      : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
   }
   var gruppe = pmGruppiert();
   /* Seit 0.93: Balken mit Anzahl — nach Typ oder nach Kategorie */
@@ -31928,7 +31661,6 @@ function pmMemoFussHtml() {
   return '<button type="button" class="knopf" onclick="pmMemoZuListe()">Fertig</button>'
     + (pmArchiviert(s) && !pmIstVorlage(s) ? '<button type="button" class="knopf" onclick="pmArchivUm(\'' + esc(s.id) + '\')">Zurückholen</button>'
       : '<button type="button" class="knopf" onclick="pmSchreibenUm()">Schreiben</button>')
-    + '<button type="button" class="knopf" onclick="buSeiteWahlAuf()">Abschnitt…</button>'
     + '<button type="button" class="knopf" onclick="pmMemoDetails()">Details…</button>';
 }
 
