@@ -37,6 +37,9 @@ var CL_FILTER_KEY = 'clie-filter';
 var CL_APPS = [
   /* Seit 0.71: Namen unter den Symbolen englisch wie am Palm (Date Book, Memo Pad …), alles andere deutsch.
      Raster 3×4 — was ständig gebraucht wird, dazu drei Ordner (seit 0.35) */
+  /* Seit 0.96.3 das Manifest als erste App; seit 0.109.0 Roots an seiner Stelle */
+  /* Seit 0.109.0: Manifest und Routines unter einem Dach */
+  { id: 'routinen', name: 'Roots', stufe: '',    was: 'Manifest, Umprogrammierung, Gewohnheiten und Routinen an einem Ort.' },
   { id: 'kalender', name: 'Date Book', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
   /* Seit 0.61 eine App „To Do“; seit 0.71 nur noch Alle, Sammler und Listen */
   { id: 'aufgaben', name: 'To Do List', stufe: '',    was: 'Alle offenen Aufgaben aus Listen und dem Sammler, dazu Eingeplantes aus Memo Pad.' },
@@ -44,17 +47,18 @@ var CL_APPS = [
   /* Seit 0.71: Notizen, Projekte, Abläufe, Checklisten und Ziele in einer App wie das Memo Pad */
   { id: 'memo',     name: 'Memo Pad',  stufe: '',    was: 'Alles Geschriebene und Geplante wie das Memo Pad am Palm — oben rechts die Art.' },
   { id: 'sammlungen', name: 'Collections', stufe: '', was: '' },
+  /* Seit 0.98.1: Fokus steht im Raster an Shoppings Stelle; Öffnen startet den Fokus-Dialog */
+  { id: 'fokus', name: 'Fokus', stufe: '', was: 'Der Fokus-Timer: fest mit Uhrzeit-Ende oder flexibel als Stoppuhr, mit Overlay.' },
   { id: 'einkauf',  name: 'Shopping',  stufe: '',    was: '' },
   { id: 'vorlesen', name: 'Reader', stufe: '', was: '' },
   { id: 'rechner',  name: 'Calc',  stufe: '',    was: '' },
-  { id: 'routinen', name: 'Routines', stufe: '',    was: 'Routinen anlegen, ändern und pausieren, heute abhaken, „nur diesmal“ auslassen oder verlegen.' },
   /* Seit 0.72: SOS auf dem Start, Guide im Ordner Planning */
-  { id: 'sos', name: 'SOS', stufe: '', was: 'Die 3-Minuten-Selbstdistanzierung: Schritt für Schritt, mit stiller Uhr — der Plan kommt auf Papier.' },
+  { id: 'sos', name: 'SOS', raster: false, stufe: '', was: 'Die 3-Minuten-Selbstdistanzierung: Schritt für Schritt, mit stiller Uhr — der Plan kommt auf Papier.' },
   /* Seit 0.89: Raster 3×5 — Planning und Learning aufgelöst, ihre Apps liegen direkt auf dem Start */
   { id: 'ideen', name: 'Idea Lab', stufe: '', was: '' },
   /* Seit 0.96: Categories im Menü ≡; auf dem Start steht das Manifest (Notiz „Manifest“ aus dem Memo Pad) */
-  { id: 'kategorien', name: 'Categories', stufe: '', was: '', raster: false },
-  { id: 'manifest', name: 'Manifest', stufe: '', was: 'Dein Manifest: die Notiz „Manifest“ aus dem Memo Pad, nur zum Lesen.' },
+  /* Seit 0.109.0 wieder im Raster: das zusammengelegte Roots macht einen Platz frei */
+  { id: 'kategorien', name: 'Categories', stufe: '', was: 'Die Kategorien für alle Apps, mit Gesamtsicht.' },
   { id: 'leitfaden', name: 'Guide', stufe: '', was: '' },
   { id: 'lernkartei', name: 'Flashcards', stufe: '', was: '' },
   /* Seit 0.91: Coach = der Coaching-Chat in Gemini (öffnet außen); Drive ins Menü ≡ */
@@ -88,8 +92,12 @@ var CL_APPS = [
 var CL_STRICH = 'stroke="#C9D3B7" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"';
 var CL_FUELL = 'fill="#C9D3B7"';
 var CL_BILD = {
-  /* Seit 0.96: Manifest — ein Blatt mit Zeilen */
-  manifest: '<path d="M20 14h24v36H20z" ' + CL_STRICH + '/><path d="M26 24h12M26 30h12M26 36h8" ' + CL_STRICH + '/>',
+  /* Seit 0.109.2: zwei Bänder, die sich kreuzen — unten Wurzel, oben Wuchs, in der Mitte
+     die Kreuzung. Gerade Schnittkanten und volle Bandbreite statt dünner Striche. */
+  routinen: '<g fill="none" stroke="#C9D3B7" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round">'
+    + '<path d="M16 23H23C31 23 31 33 39 39C43 41.5 45 42.5 48 43"/>'
+    + '<path d="M16 41H23C31 41 31 31 39 25C43 22.5 45 21.5 48 21"/>'
+    + '<path d="M48 33C42 33 38.5 34.5 35.5 37"/></g>',
   kalender: '<rect x="18" y="20" width="28" height="26" rx="2" ' + CL_STRICH + '/><path d="M18 28h28" ' + CL_STRICH + '/><path d="M24 16v7M40 16v7" ' + CL_STRICH + '/>'
           + '<rect x="23" y="32" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="32" width="4" height="4" ' + CL_FUELL + '/><rect x="37" y="32" width="4" height="4" ' + CL_FUELL + '/>'
           + '<rect x="23" y="39" width="4" height="4" ' + CL_FUELL + '/><rect x="30" y="39" width="4" height="4" ' + CL_FUELL + '/>',
@@ -104,7 +112,8 @@ var CL_BILD = {
   sammlungen: '<path d="M20 28V19h15v9" ' + CL_STRICH + '/><path d="M29 28V14h15v14" ' + CL_STRICH + '/>'
             + '<rect x="15" y="27" width="34" height="21" rx="2" fill="#3B4433" stroke="#C9D3B7" stroke-width="3" stroke-linejoin="round"/>'
             + '<path d="M27 35h10" ' + CL_STRICH + '/>',
-  routinen: '<path d="M44 26a13 13 0 1 0 1.5 11" ' + CL_STRICH + '/><path d="M45 17v9.5h-9.5" ' + CL_STRICH + '/><path d="M32 25v8l5 3" ' + CL_STRICH + '/>',
+  /* Seit 0.98.1: Fokus — eine Stoppuhr */
+  fokus: '<circle cx="32" cy="36" r="14" ' + CL_STRICH + '/><path d="M32 36V28M27 17h10M32 17v5M46 24l3-3" ' + CL_STRICH + '/>',
   einkauf: '<path d="M15 21h6l5 18h18l4-13H24" ' + CL_STRICH + '/><circle cx="28" cy="45" r="2.8" ' + CL_FUELL + '/><circle cx="41" cy="45" r="2.8" ' + CL_FUELL + '/>'
          + '<path d="M29 30h14" stroke="#C9D3B7" stroke-width="2" stroke-linecap="round"/>',
   rechner: '<rect x="20" y="14" width="24" height="36" rx="3" ' + CL_STRICH + '/><rect x="24" y="18" width="16" height="7" ' + CL_FUELL + '/>'
@@ -219,8 +228,15 @@ function bestandStempeln(db) {
    CLIE leitet es aus der Kategorie ab: Arbeit → beruflich, sonst privat. */
 
 var CL_ARBEIT = 'kb-arbeit';
-/* Seit 0.71.3: Filter „Privat“ = alles außer Arbeit (keine echte Kategorie) */
+/* Seit 0.71.3: Filter „Privat“ = alles außer Arbeit. Seit 0.103.2 ist „Privat“ wie
+   „Arbeit“ auch eine echte, vergebbare Kategorie mit fester Kennung — und gleichzeitig
+   der Sammelfilter für alles Private. Der alte Wert bleibt als Altlast gültig. */
 var CL_PRIVAT = 'privat';
+var CL_PRIVAT_KAT = 'kb-privat';
+
+function clIstPrivatFilter(f) {
+  return f === CL_PRIVAT || f === CL_PRIVAT_KAT;
+}
 
 /* Seit 0.82: Arbeit ist „Arbeit“ und jede Kategorie, deren Name mit „Arbeit“ beginnt
    (etwa „Arbeit – OnPremis QS“) — nicht aber „Arbeitszimmer“. */
@@ -246,11 +262,15 @@ function clFilterLaden() {
 
 /* Der Filter, wie er gerade gilt — eine gelöschte Kategorie gilt als „alle“ */
 function clFilter() {
+  /* Der alte Wert „privat“ meint seit 0.103.2 die Kategorie Privat */
+  if (cl.filter === CL_PRIVAT) { return CL_PRIVAT_KAT; }
   return (cl.filter && cl.filter !== 'alle' && clFilterGueltig(cl.filter)) ? cl.filter : 'alle';
 }
 
 function katSetzen(f) {
+  if (cl.app === 'sammlungen' && f === 'letzte') { saLetztSetzen(true); cl.aufklapp = ''; zeichne(); return; }
   if (!clFilterGueltig(f)) { return; }
+  if (cl.app === 'sammlungen') { saLetztSetzen(false); }
   cl.filter = f;
   try { window.localStorage.setItem(CL_FILTER_KEY, f); } catch (e) { /* ohne Speicher eben nur für jetzt */ }
   cl.aufklapp = '';
@@ -281,7 +301,7 @@ function clPasst(o) {
   if (!o) { return false; }
   var f = clFilter();
   if (f === 'alle' || ckIstKorb(o)) { return true; }
-  if (f === CL_PRIVAT) { return !clIstArbeit(clKategorieVon(o)); }
+  if (clIstPrivatFilter(f)) { return !clIstArbeit(clKategorieVon(o)); }
   /* Seit 0.83: „Arbeit“ ist der Sammelfilter für alle Arbeit-Kategorien — wie „Privat“ für den Rest */
   if (f === CL_ARBEIT) { return clIstArbeit(clKategorieVon(o)); }
   return clKategorieVon(o) === f;
@@ -300,12 +320,23 @@ function clPasstKontext(k) {
 }
 
 /* Neues bekommt die Kategorie des ▼ — und den passenden Kontext */
-function clNeuBereich() { var f = clFilter(); return (f === 'alle' || f === CL_PRIVAT) ? '' : f; }
+function clNeuBereich() { var f = clFilter(); return (f === 'alle') ? '' : f; }
 function clNeuKontext() { return clIstArbeit(clFilter()) ? 'beruflich' : 'privat'; }
 
 /* Einmal und nach jedem Laden: Berufliches ohne Kategorie → Arbeit */
+/* „Privat“ als echte Kategorie — feste Kennung, damit zwei Geräte dieselbe anlegen */
+function clPrivatKategorie() {
+  krAnfangen();
+  var da = krFinden(CL_PRIVAT_KAT);
+  if (da) { return da; }
+  var rang = krBereiche(true, true).reduce(function (m, b) { return Math.max(m, Number(b.rang) || 0); }, 0) + 1;
+  return krSpeichern({ id: CL_PRIVAT_KAT, typ: 'bereich', name: 'Privat', rang: rang, nurKategorie: true, aus: false });
+}
+
 function clKategorienUmstellen() {
   var n = 0;
+  /* Die Kategorie Privat anlegen, aber nicht als Umstellung zählen (0.103.2) */
+  clPrivatKategorie();
   var um = function (o) {
     if (o && o.kontext === 'beruflich' && !o.bereich) { o.bereich = CL_ARBEIT; o.geaendert = jetzt(); n++; }
   };
@@ -321,8 +352,14 @@ function clKategorienUmstellen() {
 
 /* Die Kategorien für jedes ▼ — „Alle“ und die Liste */
 function katFilterHtml(aufruf, an) {
-  var f = (an === undefined) ? clFilter() : an;
-  return [{ id: 'alle', name: 'Alle' }, { id: CL_PRIVAT, name: 'Privat', klein: 'ohne Arbeit' }].concat(kgAlle().map(function (b) {
+  /* Seit 0.97.7: bei Sammlungen gibt es „Letzte“ (zehn zuletzt geänderte) zwischen Alle und Privat */
+  var sa = cl.app === 'sammlungen' && aufruf === 'katSetzen';
+  var f = (an === undefined) ? ((sa && saLetztSicht()) ? 'letzte' : clFilter()) : an;
+  var basis = [{ id: 'alle', name: 'Alle' }];
+  if (sa) { basis.push({ id: 'letzte', name: 'Letzte', klein: 'zehn zuletzt geändert' }); }
+  /* Seit 0.103.2 steht hier die echte Kategorie Privat — sie sammelt zugleich alles Private */
+  basis.push({ id: CL_PRIVAT_KAT, name: 'Privat', klein: 'mit allen privaten' });
+  return basis.concat(kgAlle().filter(function (b) { return b.id !== CL_PRIVAT_KAT; }).map(function (b) {
     /* Seit 0.83: „Arbeit“ umfasst alle Arbeit-Kategorien */
     return (b.id === CL_ARBEIT && kgAlle().some(function (x) { return x.id !== CL_ARBEIT && clIstArbeit(x.id); })) ? { id: b.id, name: b.name, klein: 'mit allen Arbeit-…' } : b;
   })).map(function (b) {
@@ -1073,11 +1110,10 @@ function inhaltZeichnen() {
     el.innerHTML = projekteHtml();
   }
   else if (cl.app === 'ziele') { el.innerHTML = zieleHtml(); }
-  else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
+  else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); if (manSicht()) { manNachzeichnen(); } }
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
-  else if (cl.app === 'manifest') { el.innerHTML = manifestHtml(); }
   else if (cl.app === 'leitfaden') {
     /* Beim Tippen in Notiz oder Tabelle nicht neu zeichnen (seit 0.68) */
     if (document.activeElement && /^lf/.test(String(document.activeElement.id || '')) && el.innerHTML.indexOf('id="' + document.activeElement.id + '"') >= 0) { return; }
@@ -1119,7 +1155,7 @@ function kopfZeichnen() {
   if (kat) {
     /* Seit 0.80 im To Do nur noch die Kategorie */
     var liste = null;
-    var saText = (cl.app === 'sammlungen') ? saKatText() : null;
+    var saText = (cl.app === 'sammlungen') ? (saKatText() !== null ? saKatText() : (!cl.sa.id && saLetztSicht() ? 'Letzte' : null)) : null;
     kat.textContent = (cl.app === 'stones') ? 'Level ' + cl.sto.level
       : (cl.app === 'invasion') ? 'Level ' + cl.iv.level
       : (cl.app === 'drive') ? ''
@@ -1160,6 +1196,166 @@ function uhrZeichnen() {
 }
 
 /* Kategorie- und Menüliste: wie die Aufklapplisten des Palm. */
+/* ---------- Fokus-Timer (seit 0.98.0) ----------
+   Fest: zählt von einer Dauer herunter, Ende ist eine Uhrzeit (überlebt Schlaf und Neustart).
+   Flexibel: Stoppuhr, läuft bis „Fertig“. Der Zustand liegt je Gerät in localStorage. */
+var FK_KEY = 'clie-fokus';
+var fkUhr = null;
+var fkWahl = { modus: 'fest', min: 25 };
+
+function fkLesen() {
+  try { var w = JSON.parse(window.localStorage.getItem(FK_KEY) || 'null'); return (w && typeof w === 'object') ? w : null; } catch (e) { return null; }
+}
+
+function fkSchreiben(z) {
+  try { if (z) { window.localStorage.setItem(FK_KEY, JSON.stringify(z)); } else { window.localStorage.removeItem(FK_KEY); } } catch (e) { /* nur für jetzt */ }
+}
+
+/* Ein neuer Timer. Fest: min Minuten ab jetzt. */
+function fkNeu(modus, min, jetzt) {
+  if (modus === 'fest') { return { modus: 'fest', laufend: true, ende: jetzt + min * 60000, rest: 0 }; }
+  return { modus: 'flex', laufend: true, start: jetzt, verbraucht: 0 };
+}
+
+/* Restzeit bei fest, verstrichene Zeit bei flexibel (in ms) */
+function fkRestMs(z, jetzt) {
+  if (!z) { return 0; }
+  if (z.modus === 'fest') { return z.laufend ? Math.max(0, z.ende - jetzt) : Math.max(0, z.rest || 0); }
+  return (z.verbraucht || 0) + (z.laufend ? Math.max(0, jetzt - z.start) : 0);
+}
+
+/* Pause und Weiter */
+function fkPauseUm(z, jetzt) {
+  var n = Object.assign({}, z);
+  if (z.modus === 'fest') {
+    if (z.laufend) { n.rest = Math.max(0, z.ende - jetzt); n.laufend = false; }
+    else { n.ende = jetzt + (z.rest || 0); n.laufend = true; }
+  } else if (z.laufend) { n.verbraucht = fkRestMs(z, jetzt); n.laufend = false; }
+  else { n.start = jetzt; n.laufend = true; }
+  return n;
+}
+
+/* Fünf Minuten dazu: beim festen Timer verlängern */
+function fkPlus5Um(z) {
+  var n = Object.assign({}, z);
+  if (z.modus !== 'fest') { return n; }
+  if (z.laufend) { n.ende = z.ende + 300000; } else { n.rest = (z.rest || 0) + 300000; }
+  return n;
+}
+
+function fkZeit(ms) {
+  var s = Math.floor(Math.max(0, ms) / 1000);
+  return zwei(Math.floor(s / 60)) + ':' + zwei(s % 60);
+}
+
+/* Titel des Fensters: die Taskleiste zeigt die Restzeit */
+function fkTitelText(z, jetzt) {
+  if (!z) { return ''; }
+  if (z.modus === 'fest' && z.laufend === false && (z.rest || 0) <= 0) { return '⏱ Fertig · Fokus'; }
+  if (z.modus === 'fest' && z.laufend && z.ende - jetzt <= 0) { return '⏱ Fertig · Fokus'; }
+  return '⏱ ' + fkZeit(fkRestMs(z, jetzt)) + (z.laufend ? '' : ' (Pause)') + ' · Fokus';
+}
+
+function fkStarten(modus, min) {
+  var z = fkNeu(modus, min, Date.now());
+  fkSchreiben(z);
+  if (cl.aufklapp === 'fokus') { aufklappZu(); }
+  fkTakt();
+  zeichne();
+}
+
+function fkPause() {
+  var z = fkLesen();
+  if (!z) { return; }
+  fkSchreiben(fkPauseUm(z, Date.now()));
+  fkTakt();
+  zeichne();
+}
+
+function fkPlus5() {
+  var z = fkLesen();
+  if (!z) { return; }
+  fkSchreiben(fkPlus5Um(z));
+  fkTakt();
+  zeichne();
+}
+
+function fkFertig() {
+  fkSchreiben(null);
+  fkTakt();
+  zeichne();
+}
+
+function fkOverlayZeichnen() {
+  var z = fkLesen();
+  var el = document.getElementById('fkOverlay');
+  if (!z) { if (el) { el.parentNode.removeChild(el); } return; }
+  if (!el) {
+    if (!document.body) { return; }
+    el = document.createElement('div');
+    el.id = 'fkOverlay';
+    el.className = 'fk-overlay';
+    document.body.appendChild(el);
+  }
+  var jetzt = Date.now();
+  var ende = z.modus === 'fest' && z.laufend === true && z.ende - jetzt <= 0;
+  var zeit = ende ? 'Ende' : fkZeit(fkRestMs(z, jetzt));
+  el.innerHTML = '<div class="fk-kopf"><b>Fokus' + (z.modus === 'fest' ? '' : ' · flex') + '</b>' + (z.laufend ? '' : '<span>Pause</span>') + '</div>'
+    + '<div class="fk-zeit">' + zeit + '</div>'
+    + '<div class="fk-reihe"><button type="button" onclick="fkPause()">' + (z.laufend ? 'Pause' : 'Weiter') + '</button>'
+    + (z.modus === 'fest' ? '<button type="button" onclick="fkPlus5()">+5</button>' : '')
+    + '<button type="button" onclick="fkFertig()">Fertig</button></div>';
+}
+
+/* Ein Takt pro Sekunde, solange ein Timer läuft; Titel und Overlay folgen */
+function fkTakt() {
+  if (fkUhr) { window.clearInterval(fkUhr); fkUhr = null; }
+  var z = fkLesen();
+  var titel = function () {
+    var t = fkTitelText(fkLesen(), Date.now());
+    document.title = t || ('CLIE ' + APP_VERSION);
+  };
+  fkOverlayZeichnen();
+  titel();
+  if (z && z.laufend) {
+    fkUhr = window.setInterval(function () {
+      fkOverlayZeichnen();
+      titel();
+      var jetzt = fkLesen();
+      if (jetzt && jetzt.modus === 'fest' && jetzt.laufend && jetzt.ende - Date.now() <= 0) { window.clearInterval(fkUhr); fkUhr = null; }
+    }, 1000);
+  }
+}
+
+function fkStartenAuf() {
+  cl.aufklapp = 'fokus';
+  aufklappNeu();
+}
+
+function fkWahlSetzen(modus) { fkWahl.modus = modus === 'flex' ? 'flex' : 'fest'; aufklappNeu(); }
+function fkMinutenSetzen(m) { fkWahl.min = Math.max(1, Math.min(600, Math.round(Number(m)) || 25)); aufklappNeu(); }
+
+function fkFensterHtml() {
+  var z = fkLesen();
+  var k = function (t, a, an) { return '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="' + a + '">' + t + '</button>'; };
+  if (z) {
+    return '<div class="fenster"><div class="titel">Fokus</div><div class="rumpf">'
+      + '<div class="fk-gross">' + fkZeit(fkRestMs(z, Date.now())) + '</div>'
+      + '<div class="leise">' + (z.modus === 'fest' ? 'Fest' : 'Flexibel') + (z.laufend ? '' : ' · Pause') + '</div>'
+      + '<div class="wahlreihe">' + k(z.laufend ? 'Pause' : 'Weiter', 'fkPause()', true) + (z.modus === 'fest' ? k('+5 Min.', 'fkPlus5()') : '') + k('Fertig', 'fkFertig()') + '</div>'
+      + '<div class="knoepfe">' + k('Schließen', 'aufklappZu()') + '</div>'
+      + '</div></div>';
+  }
+  return '<div class="fenster"><div class="titel">Fokus starten</div><div class="rumpf">'
+    + '<div class="wahlreihe">' + k('Fest', 'fkWahlSetzen(\'fest\')', fkWahl.modus === 'fest') + k('Flexibel', 'fkWahlSetzen(\'flex\')', fkWahl.modus === 'flex') + '</div>'
+    + (fkWahl.modus === 'fest'
+      ? '<div class="wahlreihe">' + [15, 25, 45, 60].map(function (m) { return k(String(m), 'fkMinutenSetzen(' + m + ')', fkWahl.min === m); }).join('') + '</div>'
+        + '<label for="fkMin">Eigene Zeit (Minuten):</label><input id="fkMin" class="eingabe" type="number" min="1" max="600" value="' + fkWahl.min + '" onchange="fkMinutenSetzen(this.value)">'
+      : '<div class="leise">Läuft als Stoppuhr, bis du „Fertig“ tippst.</div>')
+    + '<div class="knoepfe">' + k('Starten', 'fkStarten(\'' + fkWahl.modus + '\',' + fkWahl.min + ')', true) + k('Abbrechen', 'aufklappZu()') + '</div>'
+    + '</div></div>';
+}
+
 function aufklappZeichnen() {
   var el = document.getElementById('aufklapp');
   var schleier = document.getElementById('schleier');
@@ -1190,6 +1386,22 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'memo') {
     if (el.innerHTML.indexOf('memoTitel') >= 0) { return; }
     el.innerHTML = memoFensterHtml();
+  } else if (cl.aufklapp === 'fokus') {
+    el.innerHTML = fkFensterHtml();
+  } else if (cl.aufklapp === 'umprog') {
+    el.innerHTML = upHtml();
+    } else if (cl.aufklapp === 'rafang') {
+    el.innerHTML = raFangHtml();
+  } else if (cl.aufklapp === 'pmon') {
+    el.innerHTML = pmOnWahlHtml();
+  } else if (cl.aufklapp === 'ramenue') {
+    el.innerHTML = raMenueHtml();
+  } else if (cl.aufklapp === 'raknoten') {
+    el.innerHTML = raFensterHtml();
+  } else if (cl.aufklapp === 'umprogramm') {
+    el.innerHTML = upFensterHtml();
+  } else if (cl.aufklapp === 'uptag') {
+    el.innerHTML = upTagHtml();
   } else if (cl.aufklapp === 'routine') {
     if (el.innerHTML.indexOf('rtName') >= 0 || el.innerHTML.indexOf('rtZu') >= 0) { return; }
     el.innerHTML = rtFensterHtml();
@@ -1198,7 +1410,7 @@ function aufklappZeichnen() {
   } else if (cl.aufklapp === 'rtwahl') {
     el.innerHTML = rtWahlHtml();
   } else if (cl.aufklapp === 'gewohnheit') {
-    if (el.innerHTML.indexOf('gwWenn') >= 0) { return; }
+    if (el.innerHTML.indexOf('gwTitel') >= 0) { return; }
     el.innerHTML = gwFensterHtml();
   } else if (cl.aufklapp === 'handschrift') {
     el.innerHTML = hsFensterHtml();
@@ -1342,7 +1554,6 @@ function fussZeichnen() {
         : (cl.app === 'sos') ? sosFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
-        : (cl.app === 'manifest') ? manifestFussHtml()
         : (cl.app === 'leitfaden') ? leitfadenFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
         : (cl.app === 'stones') ? stonesFussHtml()
@@ -1377,7 +1588,10 @@ function zeichne() {
   [clBreiteSetzen, kopfZeichnen, inhaltZeichnen, fussZeichnen, aufklappZeichnen, standZeichnen].forEach(function (teil) {
     try { teil(); } catch (e) { clFehlerZeigen(e, teil.name); }
   });
-  document.title = 'CLIE ' + APP_VERSION;
+  /* Pflichtlektüre: die Leiste sieht stumm aus, solange sie es ist (0.106.0) */
+  var leiste = document.querySelector('.silk');
+  if (leiste) { leiste.className = manGesperrt() ? 'silk stumm' : 'silk'; }
+  document.title = fkTitelText(fkLesen(), Date.now()) || ('CLIE ' + APP_VERSION);
 }
 
 /* Seit 0.85.1: Fehler sichtbar machen — in der Seite und als Meldung, mit Ort */
@@ -1396,8 +1610,24 @@ function clFehlerZeigen(e, wo) {
 /* ---------- Bedienen ---------- */
 
 function oeffne(id) {
+  /* Pflichtlektüre: bis zur letzten Seite führt kein Weg hinaus (0.106.0) */
+  if (manGesperrt()) {
+    if (id !== 'manifest' && id !== 'routinen') {
+      melde('Noch nicht durch — das Manifest schließt, wenn du bis zur letzten Seite gelesen hast.', null);
+      return;
+    }
+    cl.rt.sicht = 'manifest';
+  }
+  /* Das Manifest ist seit 0.109.0 eine Sicht in Roots — alte Wege führen weiter dorthin */
+  if (id === 'manifest') {
+    if (!manSicht()) { cl.memo.schreiben = false; cl.man.seite = 0; }
+    cl.rt.sicht = 'manifest';
+    id = 'routinen';
+  }
   /* Einkauf ist keine eigene Seite: Es öffnet die Keep-Notiz. */
   if (id === 'einkauf') { einkaufOeffnen(); return; }
+  /* Fokus ist kein Blatt, sondern der Dialog (seit 0.98.1) */
+  if (id === 'fokus') { fkStartenAuf(); return; }
   /* Der Coach ist keine eigene Seite: Er öffnet den Chat in Gemini (seit 0.91) */
   if (id === 'gemini') { clCoachOeffnen(); return; }
   /* Ordner sind keine eigene Seite: ein Fenster mit ihren Apps (seit 0.35) */
@@ -1434,6 +1664,8 @@ function oeffne(id) {
 }
 
 function katUm() {
+  /* Während der Pflichtlektüre bleibt auch das ▼ still (0.109.0) */
+  if (manGesperrt()) { melde('Noch nicht durch — erst bis zur letzten Seite lesen.', null); return; }
   /* Am Rechner schaltet oben rechts Grad/Bogenmaß (seit 0.39) */
   if (cl.app === 'rechner') { rtTaste('winkel'); return; }
   /* Im Jahr: oben rechts Jahr und Beruf/Privat (seit 0.38.1) */
@@ -1474,6 +1706,7 @@ function katUm() {
 }
 
 function menueUm() {
+  if (manGesperrt()) { melde('Noch nicht durch — erst bis zur letzten Seite lesen.', null); return; }
   cl.aufklapp = (cl.aufklapp === 'menue') ? '' : 'menue';
   kopfZeichnen();
   aufklappZeichnen();
@@ -1484,6 +1717,8 @@ function menueUm() {
 }
 
 function aufklappZu() {
+  /* Umprogrammierung: antippen heißt weiter, nicht abbrechen (0.107.0) */
+  if (cl.aufklapp === 'umprog') { upFertig(); return; }
   cl.aufklapp = '';
   cl.termin = null;
   cl.auf.fenster = null;
@@ -1491,6 +1726,11 @@ function aufklappZu() {
   cl.cls.fenster = null;
   cl.rt.fenster = null;
   cl.gw.fenster = null;
+  cl.up.fenster = null;
+  cl.up.tagF = null;
+  cl.ra.fenster = null;
+  cl.ra.menue = '';
+  cl.ra.fang = null;
   cl.lf.fenster = null;
   cl.auf.ep = null;
   cl.auf.anzF = null;
@@ -1580,23 +1820,41 @@ function clAbgleichNachher(vorher) {
   return weg;
 }
 
+/* Seit 0.105.1: Nach einem 403 oder 404 die gemerkte Datei-Kennung verwerfen.
+   Der Unterbau merkt sie sich für die ganze Sitzung und sucht nur neu, wenn sie leer ist —
+   sonst schreibt CLIE bis zum Abmelden gegen dieselbe Wand, selbst wenn die Datei längst
+   umbenannt oder im Papierkorb liegt. Der Unterbau selbst bleibt unangetastet, er muss
+   wörtlich der Workbench entsprechen. */
+function clDriveKennungVerwerfen(f) {
+  var m = String((f && f.message) || '');
+  if (m.indexOf('403') < 0 && m.indexOf('404') < 0) { return false; }
+  if (!driveDateiId) { return false; }
+  driveDateiId = '';
+  driveStand = '';
+  return true;
+}
+
 function clAbgleichTipp() {
   if (!tokenGueltig()) { anmelden(false); return; }
   if (abgleichLaeuft) { return; }
   abgleichLaeuft = true;
   zeichne();
   var vorher = clAbgleichVorher();
+  var zaehlerHand = sichernZaehler;
   abgleichen().then(function (b) {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
-    lokalOffen = false;
+    if (zaehlerHand === sichernZaehler) { lokalOffen = false; ungesichertSetzen(false); }
     verbindungOk = true;
     melde('Abgleich fertig.\n' + berichtText(b), 'gut');
-    pmNachpflegen();
+    /* Erst prüfen, was der Abgleich geändert hat, dann nachpflegen (0.104.3):
+       sonst hält die Prüfung unsere eigene Nacharbeit für ein zweites Gerät */
     clAbgleichNachher(vorher);
+    pmNachpflegen();
   }).catch(function (f) {
     abgleichFehler = f ? f.message : 'unbekannter Fehler';
-    melde('Abgleich fehlgeschlagen.\n' + abgleichFehler, 'warn');
+    melde('Abgleich fehlgeschlagen.\n' + abgleichFehler
+      + (clDriveKennungVerwerfen(f) ? '\nDie Datei wird beim nächsten Versuch neu gesucht.' : ''), 'warn');
   }).then(function () {
     abgleichLaeuft = false;
     zeichne();
@@ -2268,7 +2526,7 @@ function clRoutineUm(id, is) {
 /* Wischen: links / rechts blättert Tag, Woche oder Monat */
 function wischAnfang(e) {
   var p = e && e.touches && e.touches[0];
-  wischStart = (p && cl.app === 'kalender' && !cl.aufklapp) ? { x: p.clientX, y: p.clientY } : null;
+  wischStart = (p && (cl.app === 'kalender' || manSicht()) && !cl.aufklapp) ? { x: p.clientX, y: p.clientY } : null;
 }
 
 function wischEnde(e) {
@@ -2277,7 +2535,7 @@ function wischEnde(e) {
   var dx = p.clientX - wischStart.x;
   var dy = p.clientY - wischStart.y;
   wischStart = null;
-  if (Math.abs(dx) > 70 && Math.abs(dy) < 50) { clBlaettern(dx < 0 ? 1 : -1); }
+  if (Math.abs(dx) > 70 && Math.abs(dy) < 50) { if (manSicht()) { manBlaettern(dx < 0 ? 1 : -1); } else { clBlaettern(dx < 0 ? 1 : -1); } }
 }
 
 /* ---- Gehe zu ---- */
@@ -2371,6 +2629,27 @@ function terminZeigen(is, id) {
   cl.termin = { modus: 'zeigen', t: t, tag: is };
   cl.aufklapp = 'termin';
   aufklappZeichnen();
+}
+
+/* Seit 0.97.14: Ändert sich die Startzeit, rückt die Endezeit um dieselbe Dauer mit.
+   Die Dauer merkt sich das Feld beim Antippen, also vor der Änderung. */
+var terminDauerMin = 60;
+
+function terminVonFokus() {
+  var a = document.getElementById('terminVon');
+  var b = document.getElementById('terminBis');
+  var von = a ? clMinuten(a.value) : -1;
+  var bis = b ? clMinuten(b.value) : -1;
+  if (von >= 0 && bis > von) { terminDauerMin = bis - von; }
+}
+
+function terminVonGeaendert() {
+  var a = document.getElementById('terminVon');
+  var b = document.getElementById('terminBis');
+  var von = a ? clMinuten(a.value) : -1;
+  if (!b || von < 0) { return; }
+  var ende = Math.min(von + terminDauerMin, 24 * 60 - 1);
+  b.value = zwei(Math.floor(ende / 60)) + ':' + zwei(ende % 60);
 }
 
 function terminAendern() {
@@ -2601,7 +2880,7 @@ function terminFensterHtml() {
     + (o.modus === 'neu' ? '<div class="wahlreihe"><button type="button" class="an">Termin</button><button type="button" onclick="aufgabeStatt()">Aufgabe</button></div>' : '')
     + '<label for="terminTitel">Titel:</label><input id="terminTitel" class="eingabe" type="text" autocomplete="off" value="' + esc(v.titel) + '">'
     + '<label for="terminDatum">' + (o.modus === 'serie' ? 'Beginn der Serie:' : 'Datum:') + '</label><input id="terminDatum" class="eingabe" type="date" value="' + esc(v.datum) + '"' + (o.modus === 'aendern' ? '' : ' onchange="terminWdhNeu()"') + '>'
-    + '<div class="zeitpaar"><input id="terminVon" class="eingabe" type="time" value="' + esc(v.von) + '" aria-label="von">'
+    + '<div class="zeitpaar"><input id="terminVon" class="eingabe" type="time" value="' + esc(v.von) + '" aria-label="von" onfocus="terminVonFokus()" oninput="terminVonGeaendert()">'
     + '<span>–</span><input id="terminBis" class="eingabe" type="time" value="' + esc(v.bis) + '" aria-label="bis"></div>'
     + '<label class="haken"><input id="terminGanz" type="checkbox"' + (v.ganztags ? ' checked' : '') + '> ganztägig</label>'
     /* Seit 0.92: Wiederholung bei „Neu“ und „alle der Serie“ */
@@ -2691,7 +2970,9 @@ function terminAusFenster() {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) { return { fehler: 'Bitte ein Datum wählen.' }; }
   if (!kalId) { return { fehler: 'Bitte einen Kalender wählen.' }; }
   var k = { summary: titel, location: clFeldWert('terminOrt').trim(), description: clFeldWert('terminNotiz'),
-            visibility: (document.getElementById('terminPrivat') || {}).checked ? 'private' : 'default' };
+            visibility: (document.getElementById('terminPrivat') || {}).checked ? 'private' : 'default',
+            /* Seit 0.98.2: ohne dieses Feld hat ein über die API angelegter Termin keine Erinnerung — jetzt gilt der Standard des Kalenders */
+            reminders: { useDefault: true } };
   if (ganz) {
     k.start = { date: datum, dateTime: null };
     k.end = { date: tagePlus(datum, 1), dateTime: null };
@@ -4390,11 +4671,13 @@ function memoNotizen() {
    Zustand „vorlage“, alles andere mit dem Feld „istVorlage“ („vorlage“ ist an
    gestarteten Checklisten die Kennung ihrer Vorlage). */
 
-var MEMO_ARTEN = [['alles', 'Alle'], ['notizen', 'Notizen'], ['projekte', 'Projekte'], ['ablaeufe', 'Abläufe'], ['checklisten', 'Checklisten'], ['ziele', 'Ziele']];
+/* Seit 0.104.0 ohne Abläufe und Checklisten: Abläufe sind Listen im To Do,
+   Checklisten sind schlichte Notizen mit Kästchen-Zeilen */
+var MEMO_ARTEN = [['alles', 'Alle'], ['notizen', 'Notizen'], ['projekte', 'Projekte'], ['ziele', 'Ziele']];
 var MEMO_SICHT_KEY = 'clie-memo-sicht';
 /* Seit 0.71.2: „Show active“ im ▼ — nur Laufendes (Ruhendes und Abgeschlossenes aus) */
 var MEMO_AKTIV_KEY = 'clie-memo-aktiv';
-var MEMO_ZEICHEN = { notiz: '✎', projekt: '◎', ablauf: '⇢', checkliste: '☑', ziel: '◇' };
+var MEMO_ZEICHEN = { notiz: '✎', projekt: '◎', ziel: '◇' };
 
 function memoIstVorlage(s) { return !!(s && s.__satz && s.__satz.istVorlage === true); }
 
@@ -4406,9 +4689,10 @@ function memoEintraege(sicht) {
     if (!clPasst(s) || memoIstVorlage(s)) { return; }
     if (s.art === 'notiz' && !aufIstCheckliste(s)) { dazu('notiz', s, false); return; }
     if (s.art === 'vorhaben') { dazu(s.typ === 'ziel' ? 'ziel' : 'projekt', s, s.zustand === 'erledigt'); return; }
-    if (aufIstCheckliste(s) && ckZustand(s) !== 'vorlage') { dazu(ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste', s, ckZustand(s) === 'fertig'); }
+    /* Seit 0.104.0 stehen Checklisten und Abläufe nicht mehr im Memo Pad — sie werden
+       beim Start umgewandelt und erscheinen danach als Notizen */
   });
-  var art = { notizen: 'notiz', projekte: 'projekt', ablaeufe: 'ablauf', checklisten: 'checkliste', ziele: 'ziel' }[sicht];
+  var art = { notizen: 'notiz', projekte: 'projekt', ziele: 'ziel' }[sicht];
   var l = art ? aus.filter(function (x) { return x.art === art; }) : aus;
   var rang = function (x) { return Number(x.s.__satz && x.s.__satz.ordnung) || 0; };
   return l.sort(function (a, b) {
@@ -4486,12 +4770,13 @@ function memoEintragOeffnen(id) {
 
 function memoArtName(s) {
   if (s && aufIstCheckliste(s) && ckZustand(s) === 'vorlage') { return 'Vorlage'; }
-  return { notiz: 'Notiz', projekt: 'Projekt', ablauf: 'Ablauf', checkliste: 'Checkliste', ziel: 'Ziel' }[memoArtVon(s)] || '';
+  return { notiz: 'Notiz', projekt: 'Projekt', ziel: 'Ziel' }[memoArtVon(s)] || '';
 }
 
+/* Seit 0.104.0 nur noch drei Arten — was vor dem Zurückbauen noch eine Checkliste
+   war, zählt hier als Notiz */
 function memoArtVon(s) {
   if (!s) { return ''; }
-  if (aufIstCheckliste(s)) { return ckArt(s) === 'aufgaben' ? 'ablauf' : 'checkliste'; }
   if (s.art === 'vorhaben') { return s.typ === 'ziel' ? 'ziel' : 'projekt'; }
   return s.art === 'notiz' ? 'notiz' : '';
 }
@@ -4573,7 +4858,7 @@ function memoVorlageBearbeiten() {
 
 function memoNeuHtml() {
   return '<div class="fenster"><div class="titel">Neu</div><div class="rumpf">'
-    + [['notiz', '✎ Notiz'], ['projekt', '◎ Projekt'], ['ablauf', '⇢ Ablauf'], ['checkliste', '☑ Checkliste'], ['ziel', '◇ Ziel']].map(function (a) {
+    + [['notiz', '✎ Notiz'], ['projekt', '◎ Projekt'], ['ziel', '◇ Ziel']].map(function (a) {
       return '<button type="button" class="wahl" onclick="memoNeuArt(\'' + a[0] + '\')">' + a[1] + '</button>';
     }).join('')
     + '<button type="button" class="wahl" onclick="memoArtSetzen(\'vorlagen\')">Aus Vorlage …</button>'
@@ -4584,14 +4869,6 @@ function memoNeuArt(art) {
   cl.aufklapp = '';
   if (art === 'projekt') { pjNeu(); return; }
   if (art === 'ziel') { ziNeu(); return; }
-  if (art === 'ablauf' || art === 'checkliste') {
-    clsAnlegen('einmalig', '');
-    var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
-    if (g && art === 'checkliste') { delete g.art; g.titel = 'Checkliste ' + clKurzDatum(isoDatum()); }
-    if (g && art === 'ablauf') { g.titel = 'Ablauf ' + clKurzDatum(isoDatum()); }
-    if (g) { var f = cl.cls.fenster; if (f && f.titel !== undefined) { f.titel = g.titel; f.art = g.art || 'abhaken'; } aufklappNeu(); }
-    return;
-  }
   cl.memo.fenster = { modus: 'neu', art: 'notiz', titel: '', kontext: clNeuKontext(), bereich: clNeuBereich(), privat: false };
   cl.aufklapp = 'memo';
   aufklappNeu();
@@ -4691,8 +4968,558 @@ function clPlanMarke(s, a) {
   return g ? '<span class="plan-marke">' + esc(clPlanText(g.datum, g.zeit)) + '</span>' : '';
 }
 
+/* ---------- OneNote-Radar (seit 0.114.0) ----------
+   Das Memo Pad bleibt, was es ist; daneben steht ein Katalog von Absprungstellen nach
+   OneNote. Inhalte liegen dort, CLIE merkt sich nur, wo. Ein Knoten ist entweder ein
+   Ordner oder ein Link; Links tragen zwei Formen, weil onenote: nur am Windows-PC
+   funktioniert und das Telefon die https-Form braucht. Der Cluster wird von oben
+   vererbt, damit du ihn nie tippst. */
+var RA_BEREICHE = [['beruflich', 'Beruflich · M365 Tenant'], ['privat', 'Privat · M365 Family']];
+var RA_TIEFE_MAX = 4;
+cl.ra = { auf: {}, wahl: '', fenster: null, menue: '', fang: null };
+
+function raKnoten() {
+  return krAlle('radar');
+}
+
+function raFinden(id) {
+  var x = krFinden(id);
+  return (x && x.typ === 'radar') ? x : null;
+}
+
+function raKinder(bereich, elternId) {
+  return raKnoten().filter(function (k) {
+    return String(k.bereich || 'beruflich') === bereich && String(k.eltern || '') === String(elternId || '');
+  }).sort(function (a, b) {
+    var r = (Number(a.rang) || 0) - (Number(b.rang) || 0);
+    if (r) { return r; }
+    if ((a.art === 'ordner') !== (b.art === 'ordner')) { return a.art === 'ordner' ? -1 : 1; }
+    return String(a.name || '').localeCompare(String(b.name || ''), 'de');
+  });
+}
+
+function raTiefe(k) {
+  var n = 0;
+  var e = k && k.eltern;
+  while (e && n < RA_TIEFE_MAX + 2) { var p = raFinden(e); if (!p) { break; } e = p.eltern; n++; }
+  return n;
+}
+
+/* Der Cluster kommt vom nächsten Ordner darüber, der einen trägt */
+function raCluster(k) {
+  var x = k;
+  var n = 0;
+  while (x && n < RA_TIEFE_MAX + 2) {
+    if (String(x.cluster || '').trim()) { return String(x.cluster).trim(); }
+    x = x.eltern ? raFinden(x.eltern) : null;
+    n++;
+  }
+  return '';
+}
+
+/* Welche Linkform dieses Gerät braucht */
+function raAmRechner() {
+  var p = '';
+  try { p = String((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''); } catch (e) { p = ''; }
+  if (/Win|Mac/i.test(p)) { return true; }
+  try { return !/Android|iPhone|iPad/i.test(navigator.userAgent || ''); } catch (e) { return true; }
+}
+
+function raLink(k) {
+  var app = String((k && k.urlApp) || '').trim();
+  var web = String((k && k.urlWeb) || '').trim();
+  if (raAmRechner()) { return app || web; }
+  return web || app;
+}
+
+function raHatLink(k) { return !!raLink(k); }
+
+function raOeffnen(id) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  var u = raLink(k);
+  if (!u) { melde('Dieser Knoten hat keinen Link.', 'warn'); return; }
+  var andere = raAmRechner() ? !String(k.urlApp || '').trim() : !String(k.urlWeb || '').trim();
+  try { window.open(u, '_blank'); } catch (e) { melde('Das Öffnen ging nicht.', 'warn'); return; }
+  if (andere) { melde('Für dieses Gerät fehlt die passende Form — die andere wurde versucht.', null); }
+}
+
+function raKopieren(id) {
+  var k = raFinden(id);
+  var u = k ? raLink(k) : '';
+  if (!u) { return; }
+  var fertig = function () { melde('Link kopiert.', null); aufklappZu(); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(u).then(fertig, fertig); return; }
+  } catch (e) { /* unten weiter */ }
+  fertig();
+}
+
+/* ---- Der Baum ---- */
+function raZweigUm(id) { cl.ra.auf[id] = !cl.ra.auf[id]; zeichne(); }
+
+function raMenueAuf(id) { cl.ra.wahl = id; cl.ra.menue = id; cl.aufklapp = 'ramenue'; aufklappNeu(); }
+
+function raAstHtml(k, tiefe) {
+  var kinder = raKinder(k.bereich || 'beruflich', k.id);
+  var auf = !!cl.ra.auf[k.id];
+  var ordner = k.art === 'ordner';
+  var h = '<div class="ra-ast t' + Math.min(tiefe, RA_TIEFE_MAX) + (cl.ra.wahl === k.id ? ' gewaehlt' : '') + '">'
+    + (ordner
+      ? '<button type="button" class="ra-pf" onclick="raZweigUm(\'' + esc(k.id) + '\')" aria-label="auf- und zuklappen">' + (auf ? '▾' : '▸') + '</button>'
+      : '<span class="ra-pf">·</span>')
+    + '<button type="button" class="ra-tx" onclick="' + (ordner ? 'raZweigUm(\'' + esc(k.id) + '\')' : 'raOeffnen(\'' + esc(k.id) + '\')') + '">' + esc(k.name || '(ohne Namen)') + '</button>'
+    + (ordner ? '<span class="ra-zahl">' + kinder.length + '</span>' : (raHatLink(k) ? '<span class="ra-on">ON</span>' : '<span class="ra-zahl">—</span>'))
+    + '<button type="button" class="ra-mehr" onclick="raMenueAuf(\'' + esc(k.id) + '\')" aria-label="Menü">⋯</button>'
+    + '</div>';
+  if (ordner && auf) { h += kinder.map(function (x) { return raAstHtml(x, tiefe + 1); }).join(''); }
+  return h;
+}
+
+function raHtml() {
+  var h = raHakenHtml();
+  RA_BEREICHE.forEach(function (b) {
+    var l = raKinder(b[0], '');
+    var zahl = raKnoten().filter(function (k) { return String(k.bereich || 'beruflich') === b[0] && k.art !== 'ordner'; }).length;
+    h += '<div class="ra-bereich"><span>' + esc(b[1]) + '</span><span>' + zahl + '</span></div>';
+    h += l.length ? l.map(function (k) { return raAstHtml(k, 0); }).join('')
+      : '<p class="leise">Noch nichts — „Neu“ legt einen Ordner oder einen Link an.</p>';
+  });
+  return h;
+}
+
+function raFussHtml() {
+  var k = cl.ra.wahl ? raFinden(cl.ra.wahl) : null;
+  return '<button type="button" class="knopf" onclick="raNeu(\'\')">Neu</button>'
+    + (k ? '<button type="button" class="knopf" onclick="raNeu(\'' + esc(k.id) + '\')">Darunter…</button>'
+         + '<button type="button" class="knopf" onclick="raDetails(\'' + esc(k.id) + '\')">Ändern…</button>' : '');
+}
+
+/* ---- Das Menü an einem Knoten ---- */
+function raMenueHtml() {
+  var k = raFinden(cl.ra.menue);
+  if (!k) { return ''; }
+  var z = function (auf, text, zeichen) {
+    return '<button type="button" onclick="' + auf + '"><span>' + text + '</span><small>' + zeichen + '</small></button>';
+  };
+  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">';
+  if (raHatLink(k)) {
+    h += z('raOeffnen(\'' + esc(k.id) + '\');aufklappZu()', 'In OneNote öffnen', '↗')
+      + z('raAlsAufgabe(\'' + esc(k.id) + '\')', 'Als Aufgabe anlegen', '☑')
+      + z('raKopieren(\'' + esc(k.id) + '\')', 'Link kopieren', '⧉')
+      + '<div class="trenn"></div>';
+  }
+  h += z('raNeu(\'' + esc(k.id) + '\')', 'Darunter anlegen…', '+')
+    + z('raDetails(\'' + esc(k.id) + '\')', 'Ändern…', '')
+    + z('raSchieben(\'' + esc(k.id) + '\',-1)', 'Nach oben', '▲')
+    + z('raSchieben(\'' + esc(k.id) + '\',1)', 'Nach unten', '▼')
+    + '<div class="trenn"></div>'
+    + z('raLoeschenFragen(\'' + esc(k.id) + '\')', 'Löschen…', '');
+  return h + '</div>';
+}
+
+function raSchieben(id, richtung) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  var l = raKinder(k.bereich || 'beruflich', k.eltern || '');
+  var i = l.map(function (x) { return x.id; }).indexOf(id);
+  var j = i + richtung;
+  if (i < 0 || j < 0 || j >= l.length) { aufklappZu(); return; }
+  l.splice(j, 0, l.splice(i, 1)[0]);
+  l.forEach(function (x, n) { x.rang = n + 1; krSpeichern(x); });
+  aufklappZu();
+}
+
+/* ---- Anlegen und Ändern ---- */
+function raNeu(elternId) {
+  var e = elternId ? raFinden(elternId) : null;
+  if (e && e.art !== 'ordner') { e = e.eltern ? raFinden(e.eltern) : null; }
+  if (e && raTiefe(e) >= RA_TIEFE_MAX - 1) { melde('Tiefer als ' + RA_TIEFE_MAX + ' Ebenen wird es unübersichtlich.', 'warn'); return; }
+  cl.ra.fenster = { modus: 'neu', id: '', art: 'link', name: '', cluster: '',
+                    bereich: e ? (e.bereich || 'beruflich') : 'beruflich', eltern: e ? e.id : '',
+                    urlApp: '', urlWeb: '' };
+  cl.aufklapp = 'raknoten';
+  aufklappNeu();
+}
+
+function raDetails(id) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  cl.ra.wahl = id;
+  cl.ra.fenster = { modus: 'details', id: k.id, art: k.art === 'ordner' ? 'ordner' : 'link',
+                    name: String(k.name || ''), cluster: String(k.cluster || ''),
+                    bereich: String(k.bereich || 'beruflich'), eltern: String(k.eltern || ''),
+                    urlApp: String(k.urlApp || ''), urlWeb: String(k.urlWeb || '') };
+  cl.aufklapp = 'raknoten';
+  aufklappNeu();
+}
+
+function raFensterLesen() {
+  var f = cl.ra.fenster;
+  if (!f) { return null; }
+  [['raName', 'name'], ['raCluster', 'cluster'], ['raApp', 'urlApp'], ['raWeb', 'urlWeb']].forEach(function (x) {
+    var e = document.getElementById(x[0]);
+    if (e && typeof e.value === 'string') { f[x[1]] = e.value; }
+  });
+  return f;
+}
+
+function raWahl(feld, wert) {
+  var f = raFensterLesen();
+  if (!f) { return; }
+  f[feld] = wert;
+  aufklappNeu();
+}
+
+function raFensterHtml() {
+  var f = cl.ra.fenster;
+  if (!f) { return ''; }
+  if (f.modus === 'loeschen') {
+    var k = raFinden(f.id);
+    var kinder = k ? raKinder(k.bereich || 'beruflich', k.id).length : 0;
+    return '<div class="fenster"><div class="titel">Knoten löschen</div><div class="rumpf">'
+      + '<p>„' + esc(f.name) + '“ löschen?' + (kinder ? ' Die ' + kinder + ' Einträge darunter verschwinden mit.' : '')
+      + ' In OneNote ändert sich nichts — CLIE vergisst nur den Weg dorthin.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="raLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+  }
+  var kn = function (feld, wert, text) {
+    return '<button type="button"' + (f[feld] === wert ? ' class="an"' : '') + ' onclick="raWahl(\'' + feld + '\',\'' + wert + '\')">' + text + '</button>';
+  };
+  var eltern = f.eltern ? raFinden(f.eltern) : null;
+  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neuer Knoten' : 'Knoten') + '</div><div class="rumpf">'
+    + '<label for="raName">Titel:</label><input id="raName" class="eingabe" type="text" maxlength="80" autocomplete="off" value="' + esc(f.name) + '">'
+    + '<label>Art:</label><div class="wahlreihe">' + kn('art', 'link', 'Link') + kn('art', 'ordner', 'Ordner') + '</div>'
+    + (eltern ? '<p class="leise">Unter: ' + esc(eltern.name || '') + '</p>'
+      : '<label>Bereich:</label><div class="wahlreihe">' + RA_BEREICHE.map(function (b) { return kn('bereich', b[0], b[0] === 'beruflich' ? 'Beruflich' : 'Privat'); }).join('') + '</div>')
+    + '<label for="raCluster">Cluster' + (f.art === 'ordner' ? '' : ' (leer = vom Ordner)') + ':</label>'
+    + '<input id="raCluster" class="eingabe" type="text" maxlength="30" autocomplete="off" value="' + esc(f.cluster) + '">'
+    + (f.art === 'ordner' ? '<p class="leise">Ordner tragen keinen Link. Ihr Cluster gilt für alles darunter.</p>'
+      : '<label for="raApp">Link für den PC (onenote:):</label><input id="raApp" class="eingabe" type="text" autocomplete="off" value="' + esc(f.urlApp) + '">'
+        + '<label for="raWeb">Link fürs Telefon (https:):</label><input id="raWeb" class="eingabe" type="text" autocomplete="off" value="' + esc(f.urlWeb) + '">')
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="raSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="raLoeschenFragen(\'' + esc(f.id) + '\')">Löschen…</button>') + '</div></div></div>';
+}
+
+function raSpeichern() {
+  var f = raFensterLesen();
+  if (!f) { aufklappZu(); return; }
+  var name = String(f.name || '').trim().slice(0, 80);
+  if (!name) { melde('Bitte einen Titel eingeben.', 'warn'); return; }
+  var app = String(f.urlApp || '').trim();
+  var web = String(f.urlWeb || '').trim();
+  if (f.art === 'link' && !app && !web) { melde('Ein Link braucht mindestens eine der beiden Formen.', 'warn'); return; }
+  var k = f.id ? raFinden(f.id) : null;
+  if (!k) { k = { id: 'ra-' + neueKennung(), typ: 'radar', angelegt: isoDatum(), rang: raKinder(f.bereich, f.eltern).length + 1 }; }
+  k.name = name;
+  k.art = f.art === 'ordner' ? 'ordner' : 'link';
+  k.bereich = f.bereich === 'privat' ? 'privat' : 'beruflich';
+  k.eltern = String(f.eltern || '');
+  k.cluster = String(f.cluster || '').trim().slice(0, 30);
+  if (k.art === 'ordner') { delete k.urlApp; delete k.urlWeb; } else { k.urlApp = app; k.urlWeb = web; }
+  krSpeichern(k);
+  cl.ra.wahl = k.id;
+  if (k.eltern) { cl.ra.auf[k.eltern] = true; }
+  aufklappZu();
+}
+
+function raLoeschenFragen(id) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  cl.ra.fenster = { modus: 'loeschen', id: k.id, name: String(k.name || '') };
+  cl.aufklapp = 'raknoten';
+  aufklappNeu();
+}
+
+function raLoeschen() {
+  var f = cl.ra.fenster;
+  var k = f ? raFinden(f.id) : null;
+  if (!k) { aufklappZu(); return; }
+  var weg = [k];
+  var sammle = function (x) {
+    raKinder(x.bereich || 'beruflich', x.id).forEach(function (y) { weg.push(y); sammle(y); });
+  };
+  sammle(k);
+  weg.forEach(function (x) { krLoeschen(x.id); });
+  if (weg.some(function (x) { return x.id === cl.ra.wahl; })) { cl.ra.wahl = ''; }
+  aufklappZu();
+  melde(weg.length > 1 ? weg.length + ' Knoten gelöscht.' : 'Knoten gelöscht.', null);
+}
+
+/* ---- Noch in OneNote abhaken (seit 0.117.0) ----
+   CLIE darf in OneNote nichts ändern — das bräuchte eine App-Registrierung bei Microsoft
+   und im Firmen-Tenant die Zustimmung der IT. Also merkt es sich, was dort noch fehlt.
+   Abgehakt wird unterwegs, aufgeräumt am PC: eine Liste wartet, ein Hinweis nicht. */
+/* Nur lesen — der Eintrag in den Einstellungen entsteht erst, wenn wirklich etwas wartet */
+function raHaken() {
+  var e = DB.einstellungen;
+  return (e && Array.isArray(e.onHaken)) ? e.onHaken : [];
+}
+
+function raHakenListe() {
+  if (!DB.einstellungen || typeof DB.einstellungen !== 'object') { DB.einstellungen = {}; }
+  if (!Array.isArray(DB.einstellungen.onHaken)) { DB.einstellungen.onHaken = []; }
+  return DB.einstellungen.onHaken;
+}
+
+function raHakenAufraeumen() {
+  var e = DB.einstellungen;
+  if (e && Array.isArray(e.onHaken) && !e.onHaken.length) { delete e.onHaken; }
+}
+
+/* Offene Einträge — ohne die, deren Aufgabe oder Knoten es nicht mehr gibt */
+function raHakenOffen() {
+  return raHaken().filter(function (e) {
+    return e && e.id && raFinden(e.radar) && pmAufgabeFinden(e.id);
+  });
+}
+
+function raHakenMerken(a) {
+  if (!a || !a.radar || !raFinden(a.radar)) { return false; }
+  var erledigt = a.wiederholung ? false : a.status === 'erledigt';
+  var vorhanden = raHaken();
+  var i = -1;
+  vorhanden.forEach(function (e, n) { if (e && e.id === a.id) { i = n; } });
+  if (!erledigt) { if (i >= 0) { vorhanden.splice(i, 1); raHakenAufraeumen(); } return false; }
+  if (i >= 0) { return false; }
+  raHakenListe().push({ id: a.id, radar: a.radar, titel: pmTitel(a), zeit: isoDatum() });
+  melde('Gemerkt — in OneNote noch abhaken.', null);
+  return true;
+}
+
+function raHakenWeg(id) {
+  var l = raHaken();
+  var i = -1;
+  l.forEach(function (e, n) { if (e && e.id === id) { i = n; } });
+  if (i < 0) { return; }
+  l.splice(i, 1);
+  raHakenAufraeumen();
+  spaeterSichern();
+  zeichne();
+}
+
+function raHakenAlleWeg() {
+  if (DB.einstellungen) { delete DB.einstellungen.onHaken; }
+  spaeterSichern();
+  zeichne();
+  melde('Liste geleert.', null);
+}
+
+function raHakenHtml() {
+  var l = raHakenOffen();
+  if (!l.length) { return ''; }
+  var h = '<div class="ra-bereich ra-warte"><span>Noch in OneNote abhaken</span><span>' + l.length + '</span></div>';
+  h += l.map(function (e) {
+    var k = raFinden(e.radar);
+    return '<div class="ra-ast">'
+      + '<button type="button" class="ra-pf" onclick="raHakenWeg(\'' + esc(e.id) + '\')" aria-label="erledigt, aus der Liste nehmen">✓</button>'
+      + '<button type="button" class="ra-tx" onclick="raOeffnen(\'' + esc(e.radar) + '\')">' + esc(e.titel || '') + '<small>' + esc(k ? k.name || '' : '') + '</small></button>'
+      + '<button type="button" class="ra-on" onclick="raOeffnen(\'' + esc(e.radar) + '\')">ON</button></div>';
+  }).join('');
+  if (l.length > 2) { h += '<div class="ra-leeren"><button type="button" class="knopf" onclick="raHakenAlleWeg()">Alle erledigt</button></div>'; }
+  return h;
+}
+
+/* Der Coach fragt erst, wenn sich etwas staut */
+function coOnHakenFragen(is) {
+  var l = raHakenOffen();
+  var id = 'on:' + montagVon(is);
+  if (l.length < 5 || coRuhig(id, is)) { return []; }
+  return [coQ(id, l.length + ' Aufgaben warten auf den Haken in OneNote. Fünf Minuten?',
+    [['jetzt', 'Ansehen'], ['spaeter', 'Später']], { radar: true }, '▤ OneNote', 4)];
+}
+
+/* ---- Links hereinholen: Ziehen, Einfügen, Teilen (seit 0.116.0) ----
+   Am PC zieht man eine Seite aus OneNote ins Fenster oder fügt den kopierten Link ein.
+   Auf dem Pixel gibt es kein Ziehen — dort meldet sich CLIE im Manifest als Ziel für
+   „Teilen“ an und bekommt Titel, Text und Adresse als Parameter. Beide Wege münden in
+   dasselbe Fenster. */
+var RA_URL = /(onenote:)?https?:\/\/[^\s"'<>)\]]+/i;
+
+/* Aus dem, was das System hergibt, Titel und beide Linkformen gewinnen */
+function raAusText(text, titelHinweis) {
+  var t = String(text || '');
+  var m = t.match(RA_URL);
+  if (!m) { return null; }
+  var roh = m[0].replace(/[.,;]+$/, '');
+  var app = '';
+  var web = '';
+  if (/^onenote:/i.test(roh)) { app = roh; web = roh.replace(/^onenote:/i, ''); }
+  else { web = roh; app = 'onenote:' + roh; }
+  if (!/^https?:\/\//i.test(web)) { return null; }
+  var titel = String(titelHinweis || '').trim();
+  if (!titel) {
+    var r = web.indexOf('#');
+    if (r >= 0) {
+      var stueck = web.slice(r + 1).split('&')[0];
+      try { titel = decodeURIComponent(stueck.replace(/\+/g, ' ')).trim(); } catch (e) { titel = stueck.replace(/\+/g, ' ').trim(); }
+    }
+  }
+  if (!titel) {
+    titel = t.split('\n').map(function (z) { return z.trim(); })
+      .filter(function (z) { return z && !RA_URL.test(z); })[0] || '';
+  }
+  if (!titel) { titel = 'Neue Seite'; }
+  var klein = web.toLowerCase();
+  var bereich = /sharepoint\.com|\.sharepoint\./.test(klein) ? 'beruflich'
+    : (/live\.net|onedrive\.live\.com|1drv\.ms/.test(klein) ? 'privat' : '');
+  return { titel: titel.slice(0, 80), urlApp: app, urlWeb: web, bereich: bereich };
+}
+
+/* Gibt es den Link schon? Verglichen wird die https-Form. */
+function raSchonDa(web) {
+  var w = String(web || '').trim().toLowerCase();
+  if (!w) { return null; }
+  return raKnoten().filter(function (k) {
+    return String(k.urlWeb || '').trim().toLowerCase() === w
+      || String(k.urlApp || '').replace(/^onenote:/i, '').trim().toLowerCase() === w;
+  })[0] || null;
+}
+
+function raFangen(text, titelHinweis) {
+  var d = raAusText(text, titelHinweis);
+  if (!d) { melde('Darin steckt kein Link, mit dem CLIE etwas anfangen kann.', 'warn'); return false; }
+  var da = raSchonDa(d.urlWeb);
+  var offen = cl.ra.wahl ? raFinden(cl.ra.wahl) : null;
+  if (offen && offen.art !== 'ordner') { offen = offen.eltern ? raFinden(offen.eltern) : null; }
+  cl.ra.fang = {
+    titel: d.titel, urlApp: d.urlApp, urlWeb: d.urlWeb,
+    bereich: d.bereich || (offen ? offen.bereich : 'beruflich') || 'beruflich',
+    eltern: offen && (!d.bereich || offen.bereich === d.bereich) ? offen.id : '',
+    schon: da ? da.id : ''
+  };
+  if (cl.app !== 'memo' || cl.memo.art !== 'radar') { oeffne('memo'); memoArtSetzen('radar'); }
+  cl.aufklapp = 'rafang';
+  aufklappNeu();
+  return true;
+}
+
+function raFangLesen() {
+  var f = cl.ra.fang;
+  if (!f) { return null; }
+  var e = document.getElementById('raFangTitel');
+  if (e && typeof e.value === 'string') { f.titel = e.value; }
+  return f;
+}
+
+function raFangWahl(feld, wert) {
+  var f = raFangLesen();
+  if (!f) { return; }
+  f[feld] = wert;
+  if (feld === 'bereich') { f.eltern = ''; }
+  aufklappNeu();
+}
+
+function raFangHtml() {
+  var f = cl.ra.fang;
+  if (!f) { return ''; }
+  var alt = f.schon ? raFinden(f.schon) : null;
+  var ordner = raKnoten().filter(function (k) { return k.art === 'ordner' && String(k.bereich || 'beruflich') === f.bereich; });
+  var kn = function (feld, wert, text) {
+    return '<button type="button"' + (f[feld] === wert ? ' class="an"' : '') + ' onclick="raFangWahl(\'' + feld + '\',\'' + esc(wert) + '\')">' + esc(text) + '</button>';
+  };
+  var h = '<div class="fenster"><div class="titel">Aus OneNote</div><div class="rumpf">';
+  if (alt) {
+    h += '<p class="leise">Diese Seite steht schon im Radar als „' + esc(alt.name || '') + '“. CLIE legt sie nicht zweimal an.</p>';
+  }
+  h += '<label for="raFangTitel">Titel:</label><input id="raFangTitel" class="eingabe" type="text" maxlength="80" autocomplete="off" value="' + esc(f.titel) + '">'
+    + '<label>Bereich:</label><div class="wahlreihe">' + RA_BEREICHE.map(function (b) { return kn('bereich', b[0], b[0] === 'beruflich' ? 'Beruflich' : 'Privat'); }).join('') + '</div>';
+  if (ordner.length) {
+    h += '<label>Ordner:</label><div class="wahlreihe">' + kn('eltern', '', 'Keiner')
+      + ordner.slice(0, 6).map(function (o) { return kn('eltern', o.id, o.name || ''); }).join('') + '</div>';
+  }
+  h += '<p class="leise">' + esc(f.urlWeb.slice(0, 70)) + (f.urlWeb.length > 70 ? '…' : '') + '</p>'
+    + '<div class="knoepfe">'
+    + (alt ? '' : '<button type="button" class="knopf voll" onclick="raFangFertig(\'merken\')">Nur merken</button>')
+    + '<button type="button" class="knopf' + (alt ? ' voll' : '') + '" onclick="raFangFertig(\'aufgabe\')">Aufgabe</button>'
+    + (alt ? '' : '<button type="button" class="knopf" onclick="raFangFertig(\'beides\')">Beides</button>')
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>';
+  return h + '</div></div>';
+}
+
+function raFangFertig(was) {
+  var f = raFangLesen();
+  if (!f) { aufklappZu(); return; }
+  var k = f.schon ? raFinden(f.schon) : null;
+  if (!k) {
+    var titel = String(f.titel || '').trim().slice(0, 80) || 'Neue Seite';
+    k = { id: 'ra-' + neueKennung(), typ: 'radar', art: 'link', name: titel,
+          bereich: f.bereich === 'privat' ? 'privat' : 'beruflich', eltern: String(f.eltern || ''),
+          cluster: '', urlApp: f.urlApp, urlWeb: f.urlWeb, angelegt: isoDatum(),
+          rang: raKinder(f.bereich, f.eltern || '').length + 1 };
+    krSpeichern(k);
+    if (k.eltern) { cl.ra.auf[k.eltern] = true; }
+  }
+  cl.ra.wahl = k.id;
+  cl.ra.fang = null;
+  if (was === 'merken') { aufklappZu(); melde('Im Radar gemerkt.', null); return; }
+  raAlsAufgabe(k.id);
+}
+
+/* Ziehen und Einfügen am Rechner */
+function raHereinHaengen() {
+  var el = document.getElementById('inhalt');
+  if (!el) { return; }
+  var aktiv = function () { return cl.app === 'memo' && cl.memo.art === 'radar' && !cl.aufklapp; };
+  el.addEventListener('dragover', function (e) { if (aktiv()) { e.preventDefault(); el.classList.add('ra-tropf'); } });
+  el.addEventListener('dragleave', function () { el.classList.remove('ra-tropf'); });
+  el.addEventListener('drop', function (e) {
+    el.classList.remove('ra-tropf');
+    if (!aktiv() || !e.dataTransfer) { return; }
+    e.preventDefault();
+    var uri = '';
+    try { uri = e.dataTransfer.getData('text/uri-list') || ''; } catch (x) { uri = ''; }
+    var txt = '';
+    try { txt = e.dataTransfer.getData('text/plain') || ''; } catch (x) { txt = ''; }
+    try { raFangen(uri || txt, uri && txt && txt !== uri ? txt.split('\n')[0] : ''); } catch (x) { melde('Das ging nicht.', 'warn'); }
+  });
+  document.addEventListener('paste', function (e) {
+    if (!aktiv() || !e.clipboardData) { return; }
+    var txt = '';
+    try { txt = e.clipboardData.getData('text/plain') || ''; } catch (x) { txt = ''; }
+    if (!RA_URL.test(txt)) { return; }
+    e.preventDefault();
+    try { raFangen(txt, ''); } catch (x) { melde('Das ging nicht.', 'warn'); }
+  });
+}
+
+function raParam(such, name) {
+  var m = String(such || '').match(new RegExp('[?&]' + name + '=([^&]*)'));
+  if (!m) { return ''; }
+  try { return decodeURIComponent(m[1].replace(/\+/g, ' ')); } catch (e) { return m[1]; }
+}
+
+/* Geteilt vom Telefon: CLIE wird mit Parametern gestartet */
+function raGeteiltPruefen() {
+  var such = '';
+  try { such = String(window.location.search || ''); } catch (e) { return false; }
+  var url = raParam(such, 'url');
+  var text = raParam(such, 'text');
+  var titel = raParam(such, 'title');
+  if (!url && !text) { return false; }
+  try { window.history.replaceState({}, '', window.location.pathname); } catch (e) { /* egal */ }
+  return raFangen(url || text, titel);
+}
+
+/* Aus einem Knoten eine Aufgabe — Link und Cluster kommen mit (0.115.0) */
+function raAlsAufgabe(id) {
+  var k = raFinden(id);
+  if (!k || !raHatLink(k)) { return; }
+  cl.ra.wahl = k.id;
+  cl.aufklapp = '';
+  pmNeu('', '');
+  if (!cl.pm.fenster) { return; }
+  cl.pm.fenster.radar = k.id;
+  cl.pm.fenster.clusterTag = raCluster(k);
+  aufklappNeu();
+  var t = document.getElementById('pmTitel');
+  if (t && t.focus) { t.focus(); }
+}
+
 function memoHtml() {
   /* Handschrift (seit 0.64) */
+  if (cl.memo.art === 'radar') { return raHtml(); }
   if (cl.memo.art === 'notizblock') { return cl.nb.id ? nbEditorHtml() : nbListeHtml(); }
   if (cl.memo.art) { return cl.hs.offen ? hsAnsichtHtml() : hsListeHtml(); }
   /* Seit 0.80: Liste mit Kürzel, Memo mit Knöpfen (cl_palm.js) */
@@ -4700,6 +5527,7 @@ function memoHtml() {
 }
 
 function memoFussHtml() {
+  if (cl.memo.art === 'radar') { return raFussHtml(); }
   if (cl.memo.art === 'notizblock') {
     if (!cl.nb.id) { return '<button type="button" class="knopf voll" onclick="nbNeu()">Neu</button>'; }
     return '<button type="button" class="knopf" onclick="nbZurListe()">Fertig</button>'
@@ -4954,6 +5782,7 @@ function memoSpeichern() {
     var s = kpSeiteAnlegen(art, titel, f.kontext, f.art === 'ziel' ? 'ziel' : '');
     if (!s) { melde('Das Memo ließ sich nicht anlegen.', 'warn'); return; }
     katPrivatSchreiben(s.__satz, f);
+    s.__satz.angelegt = isoDatum();
     spaeterSichern();
     aufklappZu();
     cl.memo.id = s.id;
@@ -5560,7 +6389,7 @@ function memoArtLaden() {
   var a = '';
   var s = '';
   try { a = window.localStorage.getItem(HS_ART_KEY) || ''; s = window.localStorage.getItem(MEMO_SICHT_KEY) || ''; } catch (e) { a = ''; }
-  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
+  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock' || a === 'radar') ? a : '';
   cl.memo.sicht = (s === 'vorlagen' || s === 'archiv' || MEMO_ARTEN.some(function (x) { return x[0] === s; })) ? s : 'alles';
   var ak = '';
   try { ak = window.localStorage.getItem(MEMO_AKTIV_KEY) || ''; } catch (e) { ak = ''; }
@@ -5589,13 +6418,14 @@ function memoSeitenModus() {
 function memoArtSetzen(a) {
   if (cl.nb.id) { nbZurListe(); }
   /* Seit 0.71: die Arten des Memo Pad (und Vorlagen) — sonst Handschrift / Notizblock */
+  if (a === 'radar') { cl.pm.memoWahl = ''; }
   if (a === 'vorlagen' || a === 'archiv' || MEMO_ARTEN.some(function (x) { return x[0] === a; })) {
     cl.memo.sicht = a;
     cl.pm.memoWahl = '';
     try { window.localStorage.setItem(MEMO_SICHT_KEY, a); } catch (e) { /* nur für jetzt */ }
   }
   if (cl.app !== 'memo') { cl.app = 'memo'; }
-  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
+  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock' || a === 'radar') ? a : '';
   try { window.localStorage.setItem(HS_ART_KEY, cl.memo.art); } catch (e) { /* nur für jetzt */ }
   cl.memo.id = '';
   cl.memo.schreiben = false;
@@ -5622,12 +6452,15 @@ function memoWahlHtml() {
     + '<div class="trenn"></div>'
     + knopf('handschrift', 'Handschrift', hsOrdner() ? (neu ? neu + ' neu' : '0') : '', hs === 'handschrift')
     + knopf('alle', 'Alle Handschriften', hsOrdner() ? cl.hs.liste.length : '', hs === 'alle')
-    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length, hs === 'notizblock') + '</div>';
+    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length, hs === 'notizblock')
+    + '<div class="trenn"></div>'
+    + knopf('radar', 'Radar', raKnoten().length, hs === 'radar') + '</div>';
 }
 
 function memoKopfText() {
   if (cl.memo.art === 'handschrift') { return 'Handschrift'; }
   if (cl.memo.art === 'alle') { return 'Alle Handschriften'; }
+  if (cl.memo.art === 'radar') { return 'Radar'; }
   if (cl.memo.art === 'notizblock') { return 'Notizblock'; }
   if (cl.memo.sicht === 'vorlagen') { return 'Vorlagen'; }
   /* Seit 0.80: Archiv, sonst die Kategorie */
@@ -7394,8 +8227,9 @@ function todoListe(id) {
   clsOeffnen(id);
 }
 
+/* Seit 0.101.0 auch mit leerem w: das sind die laufenden Listen, der erste der drei Schalter */
 function todoSicht(w) {
-  if (!TODO_SICHTEN[w]) { return; }
+  if (w && !TODO_SICHTEN[w]) { return; }
   if (cl.app !== 'checklisten') { oeffne('checklisten'); }
   cl.cls.id = '';
   cl.cls.sicht = w;
@@ -7404,41 +8238,33 @@ function todoSicht(w) {
   zeichne();
 }
 
+/* Die Tür zur Listen-Übersicht aus dem ▼ */
+function todoListen() {
+  todoSicht('');
+}
+
+function todoRoutinen() {
+  cl.aufklapp = '';
+  oeffne('routinen');
+}
+
 function todoNeueListe() {
   cl.aufklapp = '';
   clsNeu();
 }
 
-/* Laufende Listen nach Lebensbereich; ☑ = Liste zum Abhaken */
-function todoWahlZeile(s, an) {
-  var st = clsStand(s);
-  return prZeile(s, null, '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="todoListe(\'' + esc(s.id) + '\')"><span>'
-    + (ckArt(s) === 'abhaken' ? '☑ ' : '') + esc(s.titel) + '</span><small>' + st.fertig + '/' + st.alle + '</small></button>');
-}
-
+/* Seit 0.101.0 kurz und fest: die Listen stehen nicht mehr hier, sondern haben einen
+   eigenen Bildschirm. Sonst wächst dieses Menü mit jeder Liste mit und springt bei vierzig. */
 function listeAufklappHtml() {
   var offen = cl.app === 'checklisten' ? cl.cls.id : '';
-  var alle = ckAlle().filter(ckImBereich);
   var korb = ckKorb(false);
-  /* Seit 0.71 nur Listen — Abläufe und Checklisten stehen im Memo Pad */
-  var lauf = alle.filter(function (s) { return ckIstListe(s) && ckZustand(s) === 'lauf' && !ckIstKorb(s); });
-  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
+  return '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
     + katFilterHtml('todoKategorie', cl.app === 'aufgaben' ? clFilter() : '-')
     + '<div class="trenn"></div>'
-    + '<button type="button"' + (korb && offen === korb.id ? ' class="an"' : '') + ' onclick="todoListe(\'' + CK_KORB_ID + '\')"><span>Sammler</span><small>' + (korb ? kpOffeneZahl(korb) : 0) + '</small></button>';
-  var gezeigt = {};
-  ckBereiche().forEach(function (b) {
-    var l = lauf.filter(function (s) { return (s.__satz || {}).bereich === b.id; });
-    if (!l.length) { return; }
-    /* nach Bereich sortiert, ohne Überschriften (seit 0.62) */
-    h += l.map(function (s) { gezeigt[s.id] = true; return todoWahlZeile(s, s.id === offen); }).join('');
-  });
-  h += lauf.filter(function (s) { return !gezeigt[s.id]; }).map(function (s) { return todoWahlZeile(s, s.id === offen); }).join('');
-  var zahl = function (z) { return alle.filter(function (s) { return ckIstListe(s) && ckZustand(s) === z && !ckIstKorb(s); }).length; };
-  var sicht = function (w, n) {
-    return '<button type="button" class="leise' + (cl.app === 'checklisten' && !offen && cl.cls.sicht === w ? ' an' : '') + '" onclick="todoSicht(\'' + w + '\')"><span>' + TODO_SICHTEN[w] + '…</span><small>' + n + '</small></button>';
-  };
-  return h + '<div class="trenn"></div>' + sicht('ruht', zahl('ruht')) + sicht('fertig', zahl('fertig'))
+    + '<button type="button"' + (korb && offen === korb.id ? ' class="an"' : '') + ' onclick="todoListe(\'' + CK_KORB_ID + '\')"><span>Sammler</span><small>' + (korb ? kpOffeneZahl(korb) : 0) + '</small></button>'
+    + '<button type="button" onclick="todoRoutinen()"><span>Routinen</span></button>'
+    + '<div class="trenn"></div>'
+    + '<button type="button" class="leise' + (cl.app === 'checklisten' && !offen ? ' an' : '') + '" onclick="todoListen()"><span>Listen…</span></button>'
     + '<button type="button" class="leise" onclick="todoNeueListe()"><span>+ Neue Liste…</span></button>'
     + '<div class="trenn"></div><button type="button" onclick="aufErlUm()">' + (cl.auf.erlZeigen ? '■' : '▢') + ' Erledigte zeigen</button></div>';
 }
@@ -7861,6 +8687,8 @@ function clsSpeichern() {
   var titel = String(f.titel || '').trim();
   if (!titel) { melde('Bitte einen Namen eingeben.', 'warn'); return; }
   if (f.stern && !g.stern && ckSterne() >= 3) { melde('Höchstens drei Checklisten sind gleichzeitig ★ wesentlich.', 'warn'); return; }
+  /* Seit 0.103.0: jede Liste braucht eine Kategorie, denn ihre Aufgaben erben sie */
+  if (ckIstListe(s) && !ckBereichName(f.bereich)) { melde('Bitte der Liste eine Kategorie geben.', 'warn'); return; }
   s.titel = titel.slice(0, 200);
   if (f.kontext === 'beruflich' || f.kontext === 'privat') { g.kontext = f.kontext; }
   if (ckBereichName(f.bereich)) { g.bereich = f.bereich; } else { delete g.bereich; }
@@ -7874,6 +8702,8 @@ function clsSpeichern() {
   if (ckZustand(s) !== 'vorlage' && f.zustand !== ckZustand(s)) { ckZustandSetzen(s, f.zustand); }
   if (f.stern && ckZustand(s) === 'lauf') { g.stern = true; } else { delete g.stern; }
   g.geaendert = jetzt();
+  /* Die Kategorie der Liste gilt auch für ihre Aufgaben (0.103.0) */
+  if (ckIstListe(s)) { pmKatenAngleichen(); }
   spaeterSichern();
   aufklappZu();
 }
@@ -7921,6 +8751,26 @@ function clsWiederOeffnen() {
 }
 
 function clsLoeschen() {
+  /* Seit 0.102.2 auch Listen (DB.themen): ihre Aufgaben wandern in den Sammler,
+     damit keine heimatlos wird. Der Sammler selbst lässt sich nicht löschen. */
+  var liste = cl.cls.id ? ckSeite(cl.cls.id) : null;
+  if (liste && ckIstListe(liste)) {
+    if (ckIstKorb(liste)) { melde('Der Sammler bleibt.', 'warn'); return; }
+    var lid = liste.id;
+    var name = liste.titel;
+    ckKorb(true);
+    (DB.aufgaben || []).forEach(function (a) {
+      if (a && a.themaId === lid) { a.themaId = CK_KORB_ID; a.geaendert = jetzt(); }
+    });
+    DB.themen = (DB.themen || []).filter(function (x) { return x && x.id !== lid; });
+    grabsteinSetzen('themen', lid);
+    if (cl.pm.liste === lid) { cl.pm.liste = ''; }
+    spaeterSichern();
+    melde('„' + name + '“ gelöscht, die Aufgaben liegen im Sammler.', null);
+    aufklappZuStill();
+    if (cl.app === 'checklisten') { clsZurListe(); } else { zeichne(); }
+    return;
+  }
   var g = cl.cls.id ? clsFinden(cl.cls.id) : null;
   if (!g) { aufklappZu(); return; }
   /* Eingeplante Punkte erst aus Tag und Woche nehmen */
@@ -8487,12 +9337,25 @@ function saFilterWahl(s) {
   return (s.filter || []).some(function (f) { return f.id === w; }) ? w : '';
 }
 
+/* Seit 0.97.5: Begriffe für Ja/Nein im Filter („ja“, „wahr“, „falsch“ …) — null, wenn es keiner ist */
+function saJaNeinWert(t) {
+  var x = String(t || '').trim().toLowerCase();
+  if (/^(ja|wahr|true|1|x)$/.test(x)) { return true; }
+  if (/^(nein|falsch|false|0)$/.test(x)) { return false; }
+  return null;
+}
+
 function saPasst(s, d, flt) {
   var f = saFeld(s, flt.feld);
   if (!f) { return true; }
   var w = saRoh(s, d, f);
   var leer = (w === null || w === undefined || w === '');
   var heute = isoDatum();
+  /* Ja/Nein: nicht gesetzt zählt wie „nein“ (so zeigt es die Anzeige), der Vergleich läuft über den Wahrheitswert */
+  if (f.typ === 'janein' && (flt.op === 'gleich' || flt.op === 'ungleich') && saJaNeinWert(flt.wert) !== null) {
+    var soll = saJaNeinWert(flt.wert);
+    return flt.op === 'gleich' ? (!!w === soll) : (!!w !== soll);
+  }
   switch (flt.op) {
     case 'gleich': return !leer && String(w).toLowerCase() === String(flt.wert || '').toLowerCase();
     case 'ungleich': return leer || String(w).toLowerCase() !== String(flt.wert || '').toLowerCase();
@@ -8874,20 +9737,58 @@ function saKopfLoeschen() {
 
 /* ---- Zeichnen ---- */
 
+/* Seit 0.97.7: „Letzte“ — die zehn Sammlungen mit der neuesten Änderung, ohne Kategorie */
+var SA_LETZTE_ANZ = 10;
+var SA_LETZTE_KEY = 'clie-sa-letzte';
+
+function saLetztSicht() {
+  if (cl.sa.letzte === undefined) {
+    var v = null;
+    try { v = window.localStorage.getItem(SA_LETZTE_KEY); } catch (e) { v = null; }
+    cl.sa.letzte = (v !== '0');
+  }
+  return !!cl.sa.letzte;
+}
+
+function saLetztSetzen(an) {
+  cl.sa.letzte = !!an;
+  try { window.localStorage.setItem(SA_LETZTE_KEY, an ? '1' : '0'); } catch (e) { /* ohne Speicher gilt es eben nur jetzt */ }
+}
+
+/* Letzte Änderung einer Sammlung: das Neueste aus ihrem Stand und dem ihrer Einträge */
+function saLetzteAenderung(s) {
+  var t = Number(s.geaendert) || 0;
+  saSaetze(s).forEach(function (d) { t = Math.max(t, Number(d.geaendert) || 0); });
+  return t;
+}
+
+function saLetzte() {
+  return (DB.sammlungen || []).filter(function (s) { return s && !s.vorlage; }).sort(function (a, b) {
+    return saLetzteAenderung(b) - saLetzteAenderung(a) || String(a.name).localeCompare(String(b.name), 'de');
+  }).slice(0, SA_LETZTE_ANZ);
+}
+
 function saListeHtml() {
-  var alle = saAlle(false);
   var h = '';
   var hinweise = saHinweise();
-  saGruppenNamen().forEach(function (g) {
-    var l = alle.filter(function (s) { return saGruppeName(s) === g; });
-    if (!l.length) { return; }
-    h += '<div class="gruppe">' + esc(g) + '</div>';
-    l.forEach(function (s) {
-      h += prZeile(null, s, '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
-         + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
-         + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>');
+  var zeile = function (s) {
+    return prZeile(null, s, '<button type="button" class="sa-zeile" onclick="saOeffnen(\'' + esc(s.id) + '\')"><span class="sa-sym">' + saSymbolHtml(s) + '</span>'
+       + '<span class="tx">' + esc(s.name) + '</span><span class="sa-kz">' + esc(saKennzahl(s))
+       + (saKennzahl2(s) ? '<small>' + esc(saKennzahl2(s)) + '</small>' : '') + '</span></button>');
+  };
+  var letzte = saLetztSicht();
+  var alle = letzte ? saLetzte() : saAlle(false);
+  if (letzte) {
+    /* „Letzte“: flach, neueste oben, ohne Kategorie-Überschriften (seit 0.97.7) */
+    alle.forEach(function (s) { h += zeile(s); });
+  } else {
+    saGruppenNamen().forEach(function (g) {
+      var l = alle.filter(function (s) { return saGruppeName(s) === g; });
+      if (!l.length) { return; }
+      h += '<div class="gruppe">' + esc(g) + '</div>';
+      l.forEach(function (s) { h += zeile(s); });
     });
-  });
+  }
   if (!alle.length) { h += '<p class="leise">Noch keine Sammlung — „Neu…“ tippen und eine Vorlage wählen.</p>'; }
   hinweise.forEach(function (x) {
     h += '<button type="button" class="sa-hinweis" onclick="saOeffnen(\'' + esc(x.s.id) + '\')">⚠ Abo „' + esc(x.name) + '“ — kündbar bis ' + esc(saDatumText(x.bis)) + '</button>';
@@ -8939,6 +9840,13 @@ function saZeichenProZeile(spalten) {
 }
 
 function saSpaltenBreiten(s, sp, l) {
+  /* Zeichen-Spalten sind genau ein Zeichen breit (seit 0.97.6); der Rest teilt sich den Platz */
+  if (sp.some(function (f) { return f.zeichen; })) {
+    var ohne = sp.filter(function (f) { return !f.zeichen; });
+    var pr = saSpaltenBreiten(s, ohne, l);
+    var k = 0;
+    return sp.map(function (f) { return f.zeichen ? 'ZEICHEN' : pr[k++]; });
+  }
   var platz = saZeichenProZeile(sp.length);
   var bedarf = sp.map(function (f) {
     if (SA_BREITE_ZEICHEN[f.breite]) { return { hand: true, n: SA_BREITE_ZEICHEN[f.breite] }; }
@@ -8975,7 +9883,9 @@ function saSpaltenBreiten(s, sp, l) {
 }
 
 function saColgroup(breiten) {
-  return '<colgroup>' + breiten.map(function (b) { return '<col style="width:' + b + '%">'; }).join('') + '</colgroup>';
+  return '<colgroup>' + breiten.map(function (b) {
+    return b === 'ZEICHEN' ? '<col style="width:1.3em">' : '<col style="width:' + b + '%">';
+  }).join('') + '</colgroup>';
 }
 
 function saSportAlsSpalte(s) {
@@ -8987,13 +9897,14 @@ function saRechts(f) { return f.typ === 'betrag' || f.typ === 'zahl' || f.typ ==
 
 function saSummenZeile(s, sp, l, klasse, titel) {
   var werte = sp.map(function (f, i) {
+    if (f.zeichen) { return '<td class="zeichen"></td>'; }
     if (i === 0) { return '<td>' + esc(titel) + '</td>'; }
     var art = f.summe || '';
     if (f.id === '_mon') { art = ''; }
     var n = art ? saAuswerten(art, l.map(function (d) { return saRoh(s, d, f); })) : null;
     return '<td class="' + (saRechts(f) ? 'r' : '') + '">' + esc(saAuswertungText(f, art, n)) + '</td>';
   });
-  return '<tr class="' + klasse + '">' + werte.join('') + '</tr>';
+  return '<tr class="' + klasse + '">' + (cl.sa.waehlen ? '<td></td>' : '') + werte.join('') + '</tr>';
 }
 
 function saTabelleHtml(s) {
@@ -9001,13 +9912,16 @@ function saTabelleHtml(s) {
   var l = saGefiltert(s);
   var klasse = 'sa-tab' + ((sp[0] && sp[0].typ === 'datum') ? ' sa-dat' : '') + (sp.length >= 4 ? ' sa-vier' : '');
   var cols = saColgroup(saSpaltenBreiten(s, sp, l));
+  if (cl.sa.waehlen) { cols = '<colgroup><col style="width:2.2em">' + cols.slice('<colgroup>'.length); }
   /* Seit 0.14: Überschrift und Kopfwerte stehen fest, nur die Einträge scrollen.
      Zwei Tabellen mit gleichen Spaltenbreiten — so bleibt alles bündig. */
   var h = '<div class="sa-fest">' + saKopfBereichHtml(s)
     + '<div class="sa-suche"><span aria-hidden="true">⌕</span><input id="saSuche" type="search" autocomplete="off" placeholder="Suchen"'
     + ' value="' + esc(cl.sa.suche || '') + '" oninput="saSucheSetzen(this.value)">'
     + (cl.sa.suche ? '<button type="button" onclick="saSucheLeeren()" aria-label="Suche leeren">✕</button>' : '') + '</div>'
-    + '<table class="' + klasse + ' sa-kopf">' + cols + '<tr>' + sp.map(function (f) {
+    + '<table class="' + klasse + ' sa-kopf">' + cols + '<tr>' + (cl.sa.waehlen ? '<th class="sa-kas"></th>' : '') + sp.map(function (f) {
+        /* Zeichen-Spalte: keine Überschrift, nicht sortierbar (seit 0.97.6) */
+        if (f.zeichen) { return '<th class="zeichen"></th>'; }
         /* Seit 0.47.1 sortiert ein Tipp auf die Überschrift, ein zweiter dreht um */
         var so = s.sort || {};
         var aktiv = saFeld(s, so.feld) ? so.feld : ((s.felder || [])[0] || {}).id;
@@ -9017,7 +9931,11 @@ function saTabelleHtml(s) {
       }).join('') + '</tr></table></div>'
     + '<table class="' + klasse + '">' + cols;
   var zeile = function (d) {
-    return '<tr class="sa-z" onclick="saEintrag(\'' + esc(d.id) + '\')">' + sp.map(function (f) {
+    var gew = !!(cl.sa.gewaehlt || {})[d.id];
+    var vorne = cl.sa.waehlen ? '<td class="sa-kas">' + (gew ? '☑' : '☐') + '</td>' : '';
+    var klick = cl.sa.waehlen ? 'saWahlTippen' : 'saEintrag';
+    return '<tr class="sa-z' + (gew ? ' an' : '') + '" onclick="' + klick + '(\'' + esc(d.id) + '\')">' + vorne + sp.map(function (f) {
+      if (f.zeichen) { return '<td class="zeichen">' + esc(saZelle(s, f, d)) + '</td>'; }
       if (f.typ === 'link' && saLinkGueltig((d.werte || {})[f.id])) {
         return '<td class=""><button type="button" class="sa-link" onclick="event.stopPropagation();saLinkOeffnen(\'' + esc(d.id) + '\',\'' + esc(f.id) + '\')">'
           + esc(saZelle(s, f, d)) + '</button></td>';
@@ -9309,8 +10227,15 @@ function sammlungenFussHtml() {
       + esc((SA_DIA_ZR.filter(function (x) { return x[0] === saDiaZr(s); })[0] || ['', ''])[1])
       + '<button type="button" onclick="saDiaZrUm(1)" aria-label="länger">▶</button></span>';
   }
+  if (cl.sa.waehlen) {
+    return '<button type="button" class="knopf" onclick="saWahlAlle(true)">Alle</button>'
+      + '<button type="button" class="knopf" onclick="saWahlAlle(false)">Keine</button>'
+      + '<button type="button" class="knopf gefahr" onclick="saWahlLoeschenFragen()">Löschen (' + saWahlAnzahl() + ')…</button>'
+      + '<button type="button" class="knopf voll" onclick="saWahlUm()">Fertig</button>';
+  }
   return '<button type="button" class="knopf" onclick="saZurListe()">Fertig</button>'
     + '<button type="button" class="knopf" onclick="saEintrag(\'\')">Neu</button>'
+    + '<button type="button" class="knopf" onclick="saWahlUm()">Auswählen</button>'
     + (s.gruppe && saFeld(s, s.gruppe) ? '<button type="button" class="knopf' + (s.gruppenAn ? ' voll' : '') + '" onclick="saGruppenUm()">Gruppen</button>' : '')
     /* Seit 0.47.1: Umschalten unten; sortiert wird über die Spaltenköpfe */
     + (saDiagramme(s).length ? '<button type="button" class="knopf" onclick="saAnsicht(\'diagramm\')">Diagramm</button>' : '');
@@ -9364,6 +10289,58 @@ function saZurListe() {
   cl.sa.id = '';
   cl.sa.suche = '';
   cl.sa.ansicht = 'tabelle';
+  cl.sa.waehlen = false;
+  cl.sa.gewaehlt = {};
+  zeichne();
+}
+
+/* ---- Auswählen und Massenlöschen (seit 0.97.6) ----
+   Über die Kästchen in der Tabelle; Auswahl gilt nur für diese Ansicht. */
+function saWahlUm() {
+  cl.sa.waehlen = !cl.sa.waehlen;
+  cl.sa.gewaehlt = {};
+  zeichne();
+}
+
+function saWahlTippen(id) {
+  var g = cl.sa.gewaehlt || {};
+  if (g[id]) { delete g[id]; } else { g[id] = true; }
+  cl.sa.gewaehlt = g;
+  zeichne();
+}
+
+/* Alle sichtbaren (also nach Suche und Filter) wählen, oder keine */
+function saWahlAlle(an) {
+  var s = cl.sa.id ? saFinden(cl.sa.id) : null;
+  if (!s) { return; }
+  var g = {};
+  if (an) { saGefiltert(s).forEach(function (d) { g[d.id] = true; }); }
+  cl.sa.gewaehlt = g;
+  zeichne();
+}
+
+function saWahlAnzahl() { return Object.keys(cl.sa.gewaehlt || {}).length; }
+
+function saWahlLoeschenFragen() {
+  if (!saWahlAnzahl()) { melde('Bitte zuerst Einträge auswählen.', 'warn'); return; }
+  saFensterAuf({ modus: 'wahl-loeschen' });
+}
+
+function saWahlLoeschen() {
+  var ids = Object.keys(cl.sa.gewaehlt || {});
+  var n = 0;
+  ids.forEach(function (id) {
+    var d = saSatzFinden(id);
+    if (!d) { return; }
+    DB.datensaetze = (DB.datensaetze || []).filter(function (x) { return x !== d; });
+    grabsteinSetzen('datensaetze', d.id);
+    n++;
+  });
+  cl.sa.gewaehlt = {};
+  cl.sa.waehlen = false;
+  spaeterSichern();
+  aufklappZu();
+  melde(n + (n === 1 ? ' Eintrag gelöscht.' : ' Einträge gelöscht.'), null);
   zeichne();
 }
 
@@ -10654,6 +11631,7 @@ function saFensterHtml() {
       + '<label for="saFeldWerte">Werte (nur bei Auswahl, je Zeile einer):</label>'
       + '<textarea id="saFeldWerte" class="eingabe" rows="3">' + esc((x.werte || []).join('\n')) + '</textarea>'
       + '<label class="haken"><input id="saFeldSpalte" type="checkbox"' + (x.spalte ? ' checked' : '') + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' disabled' : '') + '> als Spalte in der Liste' + (!x.spalte && spalten >= SA_SPALTEN_MAX ? ' (schon ' + SA_SPALTEN_MAX + ')' : '') + '</label>'
+      + '<label class="haken"><input id="saFeldZeichen" type="checkbox"' + (x.zeichen ? ' checked' : '') + '> nur als Zeichen: Spalte ohne Überschrift, nur in der Tabelle (Auswahlfeld)</label>'
       + '<label for="saFeldBreite">Spaltenbreite:</label><select id="saFeldBreite" class="eingabe">' + SA_BREITEN.map(function (t) {
           return '<option value="' + t[0] + '"' + (t[0] === (x.breite || '') ? ' selected' : '') + '>' + t[1] + '</option>';
         }).join('') + '</select>'
@@ -10727,6 +11705,14 @@ function saFensterHtml() {
       + '<p class="leise">Der Zeitraum richtet sich nach dem ersten Datumsfeld, ohne Datumsfeld nach dem Anlegen.</p>'
       + saKnoepfe('<button type="button" class="knopf voll" onclick="saKopfSpeichern()">OK</button>' + abbrechen
         + (kw ? '<button type="button" class="knopf" onclick="saKopfLoeschen()">Löschen</button>' : ''));
+  }
+
+  if (f.modus === 'wahl-loeschen') {
+    var nw = saWahlAnzahl();
+    return kopf(nw + (nw === 1 ? ' Eintrag' : ' Einträge') + ' löschen')
+      + '<p>' + nw + (nw === 1 ? ' ausgewählter Eintrag' : ' ausgewählte Einträge') + ' aus „' + esc(s.name) + '“ löschen? Gelöschte Einträge lassen sich wie einzelne wiederherstellen.</p>'
+      + saKnoepfe('<button type="button" class="knopf voll" onclick="saWahlLoeschen()">Löschen</button>'
+        + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>');
   }
 
   if (f.modus === 'feld-loeschen') {
@@ -10988,6 +11974,9 @@ function saFeldSpeichern() {
   var sp = document.getElementById('saFeldSpalte');
   var gr = document.getElementById('saFeldGruppe');
   fe.spalte = !!(sp && sp.checked);
+  var zc = document.getElementById('saFeldZeichen');
+  fe.zeichen = !!(zc && zc.checked && fe.typ === 'auswahl' && fe.spalte);
+  if (!fe.zeichen) { delete fe.zeichen; }
   var breite = String(saFeldWert('saFeldBreite') || '');
   if (SA_BREITE_ZEICHEN[breite]) { fe.breite = breite; } else { delete fe.breite; }
   var summe = saFeldWert('saFeldSumme');
@@ -11329,6 +12318,8 @@ function rtDiesmalTag(a) {
 }
 
 function routinenHtml() {
+  if (cl.rt.sicht === 'manifest') { return manifestHtml(); }
+  if (cl.rt.sicht === 'umprog') { return upSichtHtml(); }
   if (cl.rt.sicht === 'gewohnheiten' || cl.rt.sicht === 'sitzt') { return gwListeHtml(); }
   var heute = isoDatum();
   var alle = rtAlle();
@@ -11362,7 +12353,9 @@ function routinenHtml() {
 }
 
 function routinenFussHtml() {
-  /* Seit 0.72: im ▼ auch Gewohnheiten */
+  /* Seit 0.72: im ▼ auch Gewohnheiten, seit 0.108.0 die Umprogrammierung, seit 0.109.0 das Manifest */
+  if (cl.rt.sicht === 'manifest') { return manifestFussHtml(); }
+  if (cl.rt.sicht === 'umprog') { return upFussHtml(); }
   if (cl.rt.sicht === 'gewohnheiten' || cl.rt.sicht === 'sitzt') { return gwFussHtml(); }
   return '<button type="button" class="knopf" onclick="rtNeu()">Neu</button>'
     + '<button type="button" class="knopf" onclick="rtDetailsGewaehlt()">Details…</button>'
@@ -11507,7 +12500,9 @@ function rtSpeichern() {
   var a = f.id ? rtFinden(f.id) : null;
   if (!a) {
     /* Dieselbe Gestalt wie eine neue Routine in der Workbench */
-    a = { id: neueKennung(), titel: '', beschreibung: '', kontext: f.kontext, themaId: null, projektId: null, frist: '',
+    /* Seit 0.102.1 liegen Routinen in der festen Liste „Routinen“, nicht im Sammler */
+    a = { id: neueKennung(), titel: '', beschreibung: '', kontext: f.kontext,
+          themaId: pmRoutinenListeId(f.kontext), projektId: null, frist: '',
           planung: 'backlog', uhrzeit: '', art: 'haupt', wiederholung: null, status: 'offen', erledigtAm: null,
           zuletztErledigt: null, ablaufSchritt: null, ab: '', geaendert: jetzt() };
     if (!Array.isArray(DB.aufgaben)) { DB.aufgaben = []; }
@@ -11580,10 +12575,15 @@ function rtVerlegen(von) {
    wandert unter „Verinnerlicht…“. Die Sätze liegen wie die Leitfäden
    im Bereich „kurs“ der workbench.json, mit „typ“: gewohnheit. */
 
-var GW_MAX = 5;
+var GW_MAX = 8;   /* seit 0.108.0: acht statt fünf, für das Programm */
 var GW_TAGE_MAX = 70;
 var RT_SICHT_KEY = 'clie-rt-sicht';
-var RT_SICHTEN = [['routinen', 'Routinen'], ['gewohnheiten', 'Gewohnheiten'], ['sitzt', 'Verinnerlicht']];
+var RT_SICHTEN = [['manifest', 'Manifest'], ['umprog', 'Umprogrammierung'], ['routinen', 'Routinen'], ['gewohnheiten', 'Gewohnheiten'], ['sitzt', 'Verinnerlicht']];
+
+/* Steht gerade das Manifest im Blatt? Seit 0.109.0 ist es eine Sicht, keine eigene App. */
+function manSicht() {
+  return cl.app === 'routinen' && cl.rt.sicht === 'manifest';
+}
 
 function rtSichtLaden() {
   var s = '';
@@ -11593,6 +12593,8 @@ function rtSichtLaden() {
 
 function rtSichtSetzen(s) {
   if (!RT_SICHTEN.some(function (x) { return x[0] === s; })) { return; }
+  /* Während der Pflichtlektüre führt auch das ▼ nicht heraus (0.109.0) */
+  if (manGesperrt() && s !== 'manifest') { melde('Noch nicht durch — erst bis zur letzten Seite lesen.', null); return; }
   cl.rt.sicht = s;
   cl.rt.wahl = '';
   cl.gw.wahl = '';
@@ -11604,6 +12606,8 @@ function rtSichtSetzen(s) {
 
 function rtKopfText() {
   var s = RT_SICHTEN.filter(function (x) { return x[0] === cl.rt.sicht; })[0] || RT_SICHTEN[0];
+  /* Das Manifest kennt keine Kategorie — es ist ein Text (0.109.0) */
+  if (cl.rt.sicht === 'manifest') { return s[1]; }
   return s[1] + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '');
 }
 
@@ -11612,18 +12616,28 @@ function rtWahlHtml() {
   var knopf = function (s, text, zahl) {
     return '<button type="button"' + (cl.rt.sicht === s ? ' class="an"' : '') + ' onclick="rtSichtSetzen(\'' + s + '\')"><span>' + text + '</span><small>' + zahl + '</small></button>';
   };
+  /* Seit 0.109.0 steht das Manifest ganz oben: der Text, aus dem alles andere kommt */
+  /* Keine Seitenzahl: sie steht erst fest, wenn das Manifest einmal gezeichnet wurde */
+  var man = knopf('manifest', 'Manifest', manifestNotiz() ? '' : '—') + '<div class="trenn"></div>';
+  /* Seit 0.108.0: Was gerade läuft, steht oben — ein beendetes Programm rutscht ans Ende */
+  var p = upAktiv();
+  var up = knopf('umprog', 'Umprogrammierung', p ? 'Tag ' + upTagVon(p, isoDatum()) : (upProgramme().length ? 'beendet' : '—'));
   return '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">'
+    + man
+    + (p ? up + '<div class="trenn"></div>' : '')
     + knopf('routinen', 'Routinen', rtAlle().filter(function (a) { return !a.pausiert; }).length)
     + knopf('gewohnheiten', 'Gewohnheiten', gwAlle('ueben').length)
     + '<div class="trenn"></div>' + knopf('sitzt', 'Verinnerlicht…', gwAlle('sitzt').length)
+    + (p ? '' : '<div class="trenn"></div>' + up)
     + '<div class="trenn"></div>' + katFilterHtml('katSetzen') + '</div>';
 }
 
 cl.gw = { wahl: '', fenster: null };
 
 /* zustand: 'ueben' oder 'sitzt' */
-function gwAlle(zustand) {
+function gwAlle(zustand, programm) {
   return krAlle('gewohnheit').filter(function (g) {
+    if (programm && String(g.programm || '') !== String(programm)) { return false; }
     return clPasst(g) && (!zustand || (g.zustand === 'sitzt' ? 'sitzt' : 'ueben') === zustand);
   }).sort(function (a, b) { return (Number(a.rang) || 0) - (Number(b.rang) || 0) || String(a.angelegt || '').localeCompare(String(b.angelegt || '')); });
 }
@@ -11642,16 +12656,45 @@ function gwGeschafft(g, tag) {
   return !!(g && Array.isArray(g.tage) && g.tage.indexOf(tag) >= 0);
 }
 
+function gwTagErlaubt(tag) {
+  var heute = isoDatum();
+  return tag === heute || tag === tagePlus(heute, -1);
+}
+
+function gwAufraeumen(g) {
+  var grenze = tagePlus(isoDatum(), -GW_TAGE_MAX);
+  if (Array.isArray(g.tage)) { g.tage = g.tage.filter(function (t) { return t >= grenze; }).sort(); }
+}
+
+/* ---- Titel und Beschreibung statt „Wenn … dann …“ (0.108.1) ----
+   Die Gewohnheiten sind die neuen Regeln aus dem Manifest, keine Handgriffe im
+   Wenn-dann-Muster. Alte Datensätze werden einmalig umgezogen: aus „dann“ wird der
+   Titel, das „wenn“ wandert vorn in die Beschreibung, damit nichts verlorengeht. */
+function gwNachziehen() {
+  var n = 0;
+  krAlle('gewohnheit').forEach(function (g) {
+    if (!g || (!g.wenn && !g.dann)) { return; }
+    var titel = String(g.titel || g.dann || '').trim();
+    var besch = String(g.beschreibung || '').trim();
+    var wenn = String(g.wenn || '').trim();
+    g.titel = (titel || 'Regel').slice(0, 80);
+    g.beschreibung = (wenn ? (besch ? wenn + ' — ' + besch : wenn) : besch).slice(0, 200);
+    delete g.wenn;
+    delete g.dann;
+    krSpeichern(g);
+    n++;
+  });
+  return n;
+}
+
 /* Abhaken: heute und gestern — ältere Tage nicht */
 function gwTagUm(id, tag) {
   var g = gwFinden(id);
-  var heute = isoDatum();
-  if (!g || (tag !== heute && tag !== tagePlus(heute, -1))) { return; }
+  if (!g || !gwTagErlaubt(tag)) { return; }
   if (!Array.isArray(g.tage)) { g.tage = []; }
   var i = g.tage.indexOf(tag);
   if (i >= 0) { g.tage.splice(i, 1); } else { g.tage.push(tag); }
-  var grenze = tagePlus(heute, -GW_TAGE_MAX);
-  g.tage = g.tage.filter(function (t) { return t >= grenze; }).sort();
+  gwAufraeumen(g);
   krSpeichern(g);
   inhaltZeichnen();
 }
@@ -11672,11 +12715,18 @@ function gwPunkteHtml(g) {
   return '<span class="gw-punkte">' + h + '</span>';
 }
 
+function gwTitel(g) {
+  return String((g && (g.titel || g.dann)) || '').trim();
+}
+
 function gwZeileHtml(g, mitHaken) {
   var heute = isoDatum();
-  return '<div class="gw-zeile' + (cl.gw.wahl === g.id ? ' gewaehlt' : '') + '">'
+  /* In der Liste steht nur die Regel; die Beschreibung erscheint erst beim Antippen (0.108.2) */
+  var gewaehlt = cl.gw.wahl === g.id;
+  return '<div class="gw-zeile' + (gewaehlt ? ' gewaehlt' : '') + '">'
     + (mitHaken ? clKastenHtml(gwGeschafft(g, heute), 'gwTagUm(\'' + esc(g.id) + '\',\'' + heute + '\')') : '')
-    + '<button type="button" class="tx" onclick="gwTippen(\'' + esc(g.id) + '\')"><small>' + esc(g.wenn || '') + '</small>' + esc(g.dann || '') + '</button>'
+    + '<button type="button" class="tx gw-tx" onclick="gwTippen(\'' + esc(g.id) + '\')">' + esc(gwTitel(g))
+    + (gewaehlt && g.beschreibung ? '<small>' + esc(g.beschreibung) + '</small>' : '') + '</button>'
     + (mitHaken ? gwPunkteHtml(g) : '') + '</div>';
 }
 
@@ -11690,7 +12740,7 @@ function gwListeHtml() {
   }
   var l = gwAlle('ueben');
   var h = '<div class="gw-kopf"><span>Heute · ' + esc(clWt(heute) + ' ' + clKurzDatum(heute)) + '</span><span>7 Tage</span></div>';
-  if (!l.length) { return h + '<p class="leise">Noch keine Gewohnheit — „Neu“ tippen. Muster: Wenn … (Auslöser), dann … (unter 5 Minuten).</p>'; }
+  if (!l.length) { return h + '<p class="leise">Noch keine Regel — „Neu“ tippen. Ein Titel, darunter in einem Satz, was er im Alltag heißt.</p>'; }
   return h + l.map(function (g) { return gwZeileHtml(g, true); }).join('')
     + '<p class="leise">Abends in einem Rutsch abhaken. Keine Erinnerung, kein Tagesplan, kein To Do. Gestern lässt sich am Punkt nachtragen. Höchstens ' + GW_MAX + '.</p>';
 }
@@ -11713,7 +12763,9 @@ function gwDetailsGewaehlt() {
 
 function gwNeu() {
   if (gwUebenZahl() >= GW_MAX) { melde('Höchstens ' + GW_MAX + ' Gewohnheiten gleichzeitig — erst eine verinnerlichen.', 'warn'); return; }
-  cl.gw.fenster = { modus: 'neu', id: '', wenn: '', dann: '', bereich: clNeuBereich(), zustand: 'ueben' };
+  var p = (cl.rt.sicht === 'umprog') ? upGezeigt() : null;
+  cl.gw.fenster = { modus: 'neu', id: '', titel: '', beschreibung: '', bereich: clNeuBereich(), zustand: 'ueben',
+                    programm: p ? p.id : '' };
   cl.aufklapp = 'gewohnheit';
   aufklappNeu();
 }
@@ -11722,7 +12774,9 @@ function gwDetails(id) {
   var g = gwFinden(id);
   if (!g) { return; }
   cl.gw.wahl = id;
-  cl.gw.fenster = { modus: 'details', id: g.id, wenn: g.wenn || '', dann: g.dann || '', bereich: clKategorieVon(g), zustand: g.zustand === 'sitzt' ? 'sitzt' : 'ueben' };
+  cl.gw.fenster = { modus: 'details', id: g.id, titel: gwTitel(g), beschreibung: String(g.beschreibung || ''),
+                    bereich: clKategorieVon(g), zustand: g.zustand === 'sitzt' ? 'sitzt' : 'ueben',
+                    programm: String(g.programm || '') };
   cl.aufklapp = 'gewohnheit';
   aufklappNeu();
 }
@@ -11730,12 +12784,19 @@ function gwDetails(id) {
 function gwFensterLesen() {
   var f = cl.gw.fenster;
   if (!f) { return null; }
-  var w = document.getElementById('gwWenn');
-  var d = document.getElementById('gwDann');
-  if (w && typeof w.value === 'string') { f.wenn = w.value; }
-  if (d && typeof d.value === 'string') { f.dann = d.value; }
+  var t = document.getElementById('gwTitel');
+  var b = document.getElementById('gwBesch');
+  if (t && typeof t.value === 'string') { f.titel = t.value; }
+  if (b && typeof b.value === 'string') { f.beschreibung = b.value; }
   katPrivatLesen('gw', f);
   return f;
+}
+
+function gwProgrammWahl(id) {
+  var f = gwFensterLesen();
+  if (!f) { return; }
+  f.programm = String(id || '');
+  aufklappNeu();
 }
 
 function gwWahl(wert) {
@@ -11750,14 +12811,15 @@ function gwFensterHtml() {
   if (!f) { return ''; }
   if (f.modus === 'loeschen') {
     return '<div class="fenster"><div class="titel">Gewohnheit löschen</div><div class="rumpf">'
-      + '<p>„' + esc(f.dann) + '“ wirklich löschen? Auch die abgehakten Tage verschwinden.</p>'
+      + '<p>„' + esc(f.titel) + '“ wirklich löschen? Auch die abgehakten Tage verschwinden.</p>'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="gwLoeschen()">Löschen</button>'
       + '<button type="button" class="knopf" onclick="gwDetails(\'' + esc(f.id) + '\')">Abbrechen</button></div></div></div>';
   }
   return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neue Gewohnheit' : 'Gewohnheit') + '</div><div class="rumpf">'
-    + '<label for="gwWenn">Wenn … (Auslöser):</label><input id="gwWenn" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="nach dem Essen" value="' + esc(f.wenn) + '">'
-    + '<label for="gwDann">… dann (unter 5 Minuten):</label><input id="gwDann" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="Tisch abräumen" value="' + esc(f.dann) + '">'
+    + '<label for="gwTitel">Regel:</label><input id="gwTitel" class="eingabe" type="text" maxlength="80" autocomplete="off" placeholder="Erst das Wichtige, dann das Laute" value="' + esc(f.titel) + '">'
+    + '<label for="gwBesch">Beschreibung:</label><textarea id="gwBesch" class="eingabe" rows="2" maxlength="200" placeholder="Was das im Alltag heißt">' + esc(f.beschreibung) + '</textarea>'
     + katPrivatHtml('gw', f.bereich || '', false, true)
+    + gwProgrammHtml(f)
     + (f.modus === 'neu' ? '' : '<label>Zustand:</label><div class="wahlreihe">'
       + '<button type="button"' + (f.zustand === 'ueben' ? ' class="an"' : '') + ' onclick="gwWahl(\'ueben\')">Übe ich</button>'
       + '<button type="button"' + (f.zustand === 'sitzt' ? ' class="an"' : '') + ' onclick="gwWahl(\'sitzt\')">Verinnerlicht</button></div>'
@@ -11767,12 +12829,22 @@ function gwFensterHtml() {
     + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="gwLoeschenFragen()">Löschen…</button>') + '</div></div></div>';
 }
 
+function gwProgrammHtml(f) {
+  var l = upProgramme();
+  if (!l.length) { return ''; }
+  var k = function (id, text) {
+    return '<button type="button"' + (String(f.programm || '') === id ? ' class="an"' : '') + ' onclick="gwProgrammWahl(\'' + esc(id) + '\')">' + esc(text) + '</button>';
+  };
+  return '<label>Gehört zu:</label><div class="wahlreihe">' + k('', 'Keinem')
+    + l.map(function (p) { return k(p.id, p.name || 'Programm'); }).join('') + '</div>';
+}
+
 function gwSpeichern() {
   var f = gwFensterLesen();
   if (!f) { aufklappZu(); return; }
-  var wenn = String(f.wenn || '').trim();
-  var dann = String(f.dann || '').trim();
-  if (!dann) { melde('Bitte eintragen, was du dann tust.', 'warn'); return; }
+  var titel = String(f.titel || '').trim();
+  var beschreibung = String(f.beschreibung || '').trim();
+  if (!titel) { melde('Bitte die Regel eintragen.', 'warn'); return; }
   var g = f.id ? gwFinden(f.id) : null;
   var warSitzt = g ? g.zustand === 'sitzt' : true;
   if (f.zustand !== 'sitzt' && warSitzt && gwUebenZahl() >= GW_MAX) {
@@ -11780,11 +12852,15 @@ function gwSpeichern() {
     return;
   }
   if (!g) {
-    g = { id: 'gw-' + neueKennung(), typ: 'gewohnheit', wenn: '', dann: '', zustand: 'ueben', tage: [], angelegt: isoDatum(),
+    g = { id: 'gw-' + neueKennung(), typ: 'gewohnheit', titel: '', beschreibung: '', zustand: 'ueben', tage: [], angelegt: isoDatum(),
           rang: krAlle('gewohnheit').length + 1, kontext: 'privat' };
   }
-  g.wenn = wenn.slice(0, 80);
-  g.dann = dann.slice(0, 80);
+  g.titel = titel.slice(0, 80);
+  g.beschreibung = beschreibung.slice(0, 200);
+  delete g.wenn;
+  delete g.dann;
+  g.programm = String(f.programm || '');
+  if (!g.programm) { delete g.programm; }
   if (f.zustand === 'sitzt' && g.zustand !== 'sitzt') { g.sitztSeit = isoDatum(); }
   if (f.zustand !== 'sitzt') { delete g.sitztSeit; }
   g.zustand = f.zustand === 'sitzt' ? 'sitzt' : 'ueben';
@@ -14186,7 +15262,7 @@ var LK_PAKETE_KEY = 'clie-lernkartei-pakete';
 var LK_INTERVALL = [0, 1, 2, 4, 8, 16];
 var LK_RICHTUNGEN = [['vor', 'Vorder → Rück'], ['rueck', 'Rück → Vorder'], ['gemischt', 'Gemischt']];
 
-cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '', rolle: null };
+cl.lk = { ansicht: 'liste', id: '', fenster: '', karte: '', suche: '', sitzung: null, paket: null, ziel: '', rolle: null, stapel: '', auswahl: {}, bereich: '', hinzu: '', kastenAuf: false };
 
 var lkPaketeZwischen = { roh: null, daten: {} };
 
@@ -14419,6 +15495,7 @@ function lkMischen(l) {
 /* Sitzung: fällige Karten (gemischt) und die neuen für heute — aus einem Kasten oder allen */
 function lkLernen(kastenId) {
   var d = lkDaten();
+  cl.lk.stapel = '';
   var schlange = [];
   d.kaesten.forEach(function (k) {
     if (kastenId && k.id !== kastenId) { return; }
@@ -14545,6 +15622,9 @@ function lkFensterZu() {
 
 function lkKastenOeffnen(id) {
   cl.lk.rolle = null;
+  cl.lk.suche = '';
+  cl.lk.bereich = '';
+  cl.lk.hinzu = '';
   cl.lk.id = id;
   cl.lk.ansicht = 'kasten';
   cl.lk.fenster = '';
@@ -14765,8 +15845,34 @@ function lkFaecherHtml(k) {
   return h + '</div>';
 }
 
+/* Seit 0.99.0: Suche über alle Karten aller Kästen; Stapel sind Verweise auf Karten */
 function lkListeHtml() {
   var d = lkDaten();
+  var q = String(cl.lk.suche || '');
+  return '<div class="knoepfe"><button type="button" class="knopf" onclick="lkFensterAuf(\'stapelneu\')">+ Stapel</button></div>'
+    + '<div class="su-feld"><span>⌕</span><input id="lkSuche" type="search" autocomplete="off" placeholder="In allen Karten suchen …" value="' + esc(q) + '" oninput="lkSucheAlleGetippt()"></div>'
+    + '<div id="lkTreffer">' + (lkSuchNorm(q) ? lkTrefferHtml(d, q) : lkUebersichtHtml(d)) + '</div>';
+}
+
+function lkUebersichtHtml(d) {
+  return lkStapelListeHtml(d) + lkKastenAblageHtml(d);
+}
+
+/* Die Kästen sind die Ablage: eingeklappt, auf Wunsch aufklappbar (seit 0.100.0) */
+function lkKastenAblageHtml(d) {
+  var n = d.kaesten.reduce(function (s, k) { return s + k.karten.length; }, 0);
+  return '<div class="lk-info leise">Ablage</div>'
+    + '<button type="button" class="lk-kasten" onclick="lkKastenAblageUmschalten()"><span class="lk-k1"><span>' + (cl.lk.kastenAuf ? 'Kästen ausblenden' : 'Alle Kästen anzeigen')
+    + '</span><b>' + d.kaesten.length + '</b></span><small>' + n + ' Karten in ' + d.kaesten.length + ' Kästen</small></button>'
+    + (cl.lk.kastenAuf ? lkKastenListeHtml(d) : '');
+}
+
+function lkKastenAblageUmschalten() {
+  cl.lk.kastenAuf = !cl.lk.kastenAuf;
+  lkZeichnen();
+}
+
+function lkKastenListeHtml(d) {
   if (!d.kaesten.length) {
     return '<p>Noch keine Lernkartei.</p><p class="leise">Mit „Neu…“ legst du einen Kasten an, fügst Karten als Text ein, übernimmst ein Memo oder lädst ein Kartenpaket.</p>';
   }
@@ -14888,6 +15994,25 @@ function lkFensterHtml() {
       + '<p class="leise">' + (da ? 'Schon vorhanden (v' + da.paket.version + '): Neue und geänderte Karten kommen dazu, dein Lernstand bleibt.' : 'Wird ein neuer Kasten.') + '</p>'
       + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkPaketUebernehmen()">Übernehmen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
   }
+  if (f === 'stapelwahl') {
+    var stapel = lkStapel();
+    var an = lkAuswahlAnzahl();
+    return kopf('In einen Stapel') + '<p class="leise">' + an + ' Karte' + (an === 1 ? '' : 'n') + ' ausgewählt. Ein Stapel hat keine Obergrenze.</p>'
+      + '<div class="lk-info leise">Vorhandene Stapel (auf diesem Gerät)</div>'
+      + (stapel.length ? stapel.map(function (x) { return '<button type="button" class="wahl" onclick="lkStapelZuweisen(\'' + esc(x.id) + '\')">' + esc(x.name) + ' <span class="leise">· ' + x.refs.length + '</span></button>'; }).join('')
+        : '<p class="leise">Noch kein Stapel auf diesem Gerät. Gib unten einen Namen ein.</p>')
+      + '<label for="lkStapelName">Oder neuer Stapel:</label><input id="lkStapelName" class="eingabe" type="text" autocomplete="off" value="">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkStapelZuweisen(\'\', document.getElementById(\'lkStapelName\').value)">Neu anlegen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'stapelneu') {
+    return kopf('Neuer Stapel') + '<label for="lkStapelNeuName">Name:</label><input id="lkStapelNeuName" class="eingabe" type="text" autocomplete="off" value="">'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkStapelNeuOk()">Anlegen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
+  if (f === 'stapelloeschen') {
+    var st = lkStapelFinden(lkStapel(), cl.lk.stapel);
+    return kopf('Stapel löschen') + '<p>Der Stapel „' + esc(st ? st.name : '') + '“ wird gelöscht. Die Karten bleiben in ihren Kästen und behalten ihren Lernstand.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="lkStapelLoeschen()">Löschen</button><button type="button" class="knopf" onclick="lkFensterZu()">Abbrechen</button></div>' + zu;
+  }
   if (f === 'karte' && k) {
     var c = cl.lk.karte ? k.karten.filter(function (x) { return x.id === cl.lk.karte; })[0] : null;
     return kopf(c ? 'Karte bearbeiten' : 'Neue Karte')
@@ -14918,9 +16043,289 @@ function lkFensterHtml() {
   return '';
 }
 
+/* ---- Suche über alle Kästen und eigene Stapel (seit 0.99.0) ----
+   Stapel sind nur Verweise { k: Kasten, c: Karte } auf diesem Gerät; Lernstand bleibt an der Karte.
+   Keine Obergrenze pro Stapel. */
+var LK_STAPEL_KEY = 'clie-lernkartei-stapel';
+
+/* Stapel liegen seit 0.100.0 in der Datenbank (DB.lernstapel) und reisen mit dem Abgleich.
+   Eine alte Gerätespeicherung aus 0.99.x wird einmal übernommen. */
+function lkStapelUebernehmen() {
+  var roh = null;
+  try { roh = window.localStorage.getItem(LK_STAPEL_KEY); } catch (e) { roh = null; }
+  if (roh === null || roh === undefined) { return; }
+  var alt = null;
+  try { alt = JSON.parse(roh); } catch (e) { alt = null; }
+  if (!Array.isArray(DB.lernstapel)) { DB.lernstapel = []; }
+  if (Array.isArray(alt)) {
+    alt.forEach(function (x) {
+      if (x && x.id && Array.isArray(x.refs) && !lkStapelFinden(DB.lernstapel, x.id)) { x.geaendert = jetzt(); DB.lernstapel.push(x); }
+    });
+    spaeterSichern();
+  }
+  try { window.localStorage.removeItem(LK_STAPEL_KEY); } catch (e) { /* egal */ }
+}
+
+/* Eine Kopie: Änderungen am Ergebnis wirken erst über lkStapelSichern */
+function lkStapel() {
+  lkStapelUebernehmen();
+  var l = Array.isArray(DB.lernstapel) ? DB.lernstapel : [];
+  return JSON.parse(JSON.stringify(l.filter(function (x) { return x && x.id && Array.isArray(x.refs); })));
+}
+
+/* Schreibt die Stapel in die Datenbank: geänderte Stapel bekommen einen Zeitstempel,
+   gelöschte einen Löschvermerk (seit 0.100.0) */
+function lkStapelSichern(l) {
+  if (!Array.isArray(DB.lernstapel)) { DB.lernstapel = []; }
+  var alt = {};
+  DB.lernstapel.forEach(function (x) { if (x && x.id) { alt[x.id] = x; } });
+  var z = jetzt();
+  var neu = {};
+  var liste = l.map(function (s) {
+    neu[s.id] = 1;
+    var a = alt[s.id];
+    var gleich = !!a && JSON.stringify([a.name, a.refs]) === JSON.stringify([s.name, s.refs]);
+    return { id: s.id, name: s.name, angelegt: s.angelegt || '', refs: s.refs, geaendert: gleich ? (a.geaendert || z) : z };
+  });
+  DB.lernstapel.forEach(function (x) { if (x && x.id && !neu[x.id]) { grabsteinSetzen('lernstapel', x.id); } });
+  DB.lernstapel = liste;
+  spaeterSichern();
+  return true;
+}
+
+function lkStapelFinden(l, id) {
+  return l.filter(function (x) { return x.id === id; })[0] || null;
+}
+
+/* Suchtext: Groß-/Kleinschreibung, Umlaute, Formatierung (**) und Leerzeichen/Zeilenumbrüche egal (seit 0.99.1) */
+function lkSuchNorm(t) {
+  return suNorm(t).replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/* Alle Karten (oder nur eines Kastens), die den Suchtext enthalten */
+function lkTreffer(d, q, bereich) {
+  var n = lkSuchNorm(q || '');
+  var out = [];
+  if (!n) { return out; }
+  d.kaesten.forEach(function (k) {
+    if (bereich && k.id !== bereich) { return; }
+    k.karten.forEach(function (c) {
+      if (lkSuchNorm(c.v + ' ' + c.r + ' ' + (c.w || '')).indexOf(n) >= 0) { out.push({ k: k, c: c }); }
+    });
+  });
+  return out;
+}
+
+/* Schalter: Alle oder ein Kasten (seit 0.99.1) */
+function lkBereichSetzen(id) {
+  cl.lk.bereich = id || '';
+  lkZeichnen();
+}
+
+function lkTrefferHtml(d, q) {
+  var t = lkTreffer(d, q, cl.lk.bereich);
+  var chips = '<div class="lk-chips">' + '<button type="button" class="knopf' + (cl.lk.bereich ? '' : ' voll') + '" onclick="lkBereichSetzen(\'\')">Alle</button>'
+    + d.kaesten.map(function (k) { return '<button type="button" class="knopf' + (cl.lk.bereich === k.id ? ' voll' : '') + '" onclick="lkBereichSetzen(\'' + esc(k.id) + '\')">' + esc(k.name) + '</button>'; }).join('') + '</div>';
+  var rows = t.slice(0, 300).map(function (x) {
+    var an = !!cl.lk.auswahl[x.k.id + '|' + x.c.id];
+    return '<button type="button" class="lk-karte-zeile' + (an ? ' an' : '') + '" onclick="lkAuswahlUmschalten(\'' + esc(x.k.id) + '\',\'' + esc(x.c.id) + '\')"><span>'
+      + (an ? '☑ ' : '☐ ') + esc(x.c.v)
+      + '<small>' + esc(x.k.name) + ' · ' + esc(String(x.c.w || x.c.r || '').split('\n')[0].replace(/\*\*/g, '').slice(0, 60)) + '</small></span><b>' + (x.c.fach ? 'F' + x.c.fach : 'neu') + '</b></button>';
+  }).join('');
+  return '<div class="lk-info leise">Bereich (Kästen)</div>' + chips + rows + (t.length > 300 ? '<p class="leise">… und ' + (t.length - 300) + ' weitere — die Suche grenzt ein.</p>' : '')
+    + (t.length ? '' : '<p class="leise">Keine Karte gefunden.</p>');
+}
+
+function lkSucheAlleGetippt() {
+  var f = document.getElementById('lkSuche');
+  cl.lk.suche = f ? String(f.value || '') : '';
+  var ziel = document.getElementById('lkTreffer');
+  if (!ziel) { return; }
+  var d = lkDaten();
+  ziel.innerHTML = lkSuchNorm(cl.lk.suche) ? lkTrefferHtml(d, cl.lk.suche) : lkUebersichtHtml(d);
+}
+
+function lkAuswahlUmschalten(k, c) {
+  var key = k + '|' + c;
+  if (cl.lk.auswahl[key]) { delete cl.lk.auswahl[key]; } else { cl.lk.auswahl[key] = { k: k, c: c }; }
+  lkZeichnen();
+}
+
+function lkAuswahlAnzahl() {
+  return Object.keys(cl.lk.auswahl).length;
+}
+
+/* Leerer Stapel mit Namen; Rückgabe: Kennung (seit 0.99.2) */
+function lkStapelNeu(name) {
+  var n = String(name || '').trim();
+  if (!n) { melde('Bitte einen Namen für den Stapel eingeben.', 'warn'); return ''; }
+  var l = lkStapel();
+  var s = { id: neueKennung(), name: n.slice(0, 80), angelegt: isoDatum(), refs: [] };
+  l.push(s);
+  if (!lkStapelSichern(l)) { return ''; }
+  cl.lk.fenster = '';
+  cl.lk.auswahl = {};
+  cl.lk.hinzu = '';
+  cl.lk.stapel = s.id;
+  cl.lk.ansicht = 'stapel';
+  melde('Stapel „' + s.name + '“ angelegt.', 'gut');
+  lkZeichnen();
+  return s.id;
+}
+
+function lkStapelNeuOk() {
+  var f = document.getElementById('lkStapelNeuName');
+  lkStapelNeu(f ? f.value : '');
+}
+
+/* Karten hinzufügen: die Übersicht wird Auswahlfläche für diesen Stapel (seit 0.99.2) */
+function lkKartenHinzu() {
+  cl.lk.hinzu = cl.lk.stapel;
+  cl.lk.ansicht = 'liste';
+  cl.lk.suche = '';
+  cl.lk.bereich = '';
+  cl.lk.auswahl = {};
+  lkZeichnen();
+}
+
+function lkHinzuEnde() {
+  cl.lk.hinzu = '';
+  cl.lk.auswahl = {};
+  cl.lk.suche = '';
+  cl.lk.ansicht = cl.lk.stapel ? 'stapel' : 'liste';
+  lkZeichnen();
+}
+
+/* Die Auswahl wird Verweise in einen vorhandenen oder neuen Stapel; doppelte nur einmal */
+function lkStapelZuweisen(stapelId, neuerName) {
+  var l = lkStapel();
+  var s = stapelId ? lkStapelFinden(l, stapelId) : null;
+  if (!s) {
+    var name = String(neuerName || '').trim();
+    if (!name) { melde('Bitte einen Namen für den Stapel eingeben.', 'warn'); return; }
+    s = { id: neueKennung(), name: name.slice(0, 80), angelegt: isoDatum(), refs: [] };
+    l.push(s);
+  }
+  var da = {};
+  s.refs.forEach(function (r) { da[r.k + '|' + r.c] = 1; });
+  var n = 0;
+  Object.keys(cl.lk.auswahl).forEach(function (key) {
+    var x = cl.lk.auswahl[key];
+    if (!da[key]) { s.refs.push({ k: x.k, c: x.c }); da[key] = 1; n++; }
+  });
+  if (!lkStapelSichern(l)) { return; }
+  cl.lk.auswahl = {};
+  cl.lk.fenster = '';
+  cl.lk.hinzu = '';
+  cl.lk.stapel = s.id;
+  cl.lk.ansicht = 'stapel';
+  melde(n + ' Karte' + (n === 1 ? '' : 'n') + ' in „' + s.name + '“.', 'gut');
+  lkZeichnen();
+}
+
+/* Karten eines Stapels, die es noch gibt (Kasten und Karte) */
+function lkStapelKarten(s, d) {
+  var out = [];
+  s.refs.forEach(function (r, i) {
+    var k = lkKasten(d, r.k);
+    var c = k ? k.karten.filter(function (x) { return x.id === r.c; })[0] : null;
+    if (c) { out.push({ i: i, k: k, c: c }); }
+  });
+  return out;
+}
+
+/* Heute dran: fällige Karten und neue Karten des Stapels */
+function lkStapelHeute(karten) {
+  var heute = isoDatum();
+  return karten.filter(function (x) { return !x.c.fach || (x.c.fach >= 1 && (!x.c.faellig || x.c.faellig <= heute)); }).length;
+}
+
+function lkStapelListeHtml(dd) {
+  var d = dd || lkDaten();
+  var l = lkStapel();
+  if (!l.length) { return '<p class="leise">Noch keine Stapel. Mit „+ Stapel“ legst du einen an und wählst dann Karten im Suchfeld.</p>'; }
+  return '<div class="lk-info leise">Stapel (auf allen Geräten)</div>' + l.map(function (s) {
+    var karten = lkStapelKarten(s, d);
+    var heute = lkStapelHeute(karten);
+    return '<div style="display:flex;gap:6px;align-items:center"><button type="button" class="lk-kasten" style="flex:1" onclick="lkStapelOeffnen(\'' + esc(s.id) + '\')"><span class="lk-k1"><span>' + esc(s.name)
+      + '</span><b>' + karten.length + '</b></span><small>' + (heute ? heute + ' heute dran' : 'heute nichts') + '</small></button>'
+      + '<button type="button" class="knopf voll" onclick="lkStapelLernen(\'' + esc(s.id) + '\')">Lernen</button></div>';
+  }).join('');
+}
+
+function lkStapelOeffnen(id) {
+  cl.lk.bereich = '';
+  cl.lk.stapel = id;
+  cl.lk.ansicht = 'stapel';
+  cl.lk.fenster = '';
+  lkZeichnen();
+}
+
+function lkStapelHtml() {
+  var s = lkStapelFinden(lkStapel(), cl.lk.stapel);
+  if (!s) { cl.lk.ansicht = 'liste'; cl.lk.stapel = ''; return lkListeHtml(); }
+  var l = lkStapelKarten(s, lkDaten());
+  return '<div class="lk-titel">' + esc(s.name) + '</div>'
+    + '<div class="lk-info">' + l.length + ' Karten' + (l.length < s.refs.length ? ' · ' + (s.refs.length - l.length) + ' nicht mehr vorhanden' : '') + '</div>'
+    + (l.length ? l.map(function (x) {
+        return '<div class="lk-karte-zeile"><span>' + esc(x.c.v) + '<small>' + esc(x.k.name) + '</small></span><b>' + (x.c.fach ? 'F' + x.c.fach : 'neu') + '</b>'
+          + '<button type="button" class="knopf" onclick="lkStapelKarteWeg(' + x.i + ')">✕</button></div>';
+      }).join('') : '<p class="leise">Noch keine Karten in diesem Stapel. Im Suchfeld der Übersicht Karten anhaken und dann „In Stapel“ wählen.</p>');
+}
+
+function lkStapelKarteWeg(i) {
+  var l = lkStapel();
+  var s = lkStapelFinden(l, cl.lk.stapel);
+  if (!s || !s.refs[i]) { return; }
+  s.refs.splice(i, 1);
+  if (lkStapelSichern(l)) { lkZeichnen(); }
+}
+
+function lkStapelLoeschen() {
+  var l = lkStapel().filter(function (x) { return x.id !== cl.lk.stapel; });
+  if (!lkStapelSichern(l)) { return; }
+  cl.lk.stapel = '';
+  cl.lk.ansicht = 'liste';
+  cl.lk.fenster = '';
+  melde('Stapel gelöscht. Die Karten bleiben in ihren Kästen.', 'gut');
+  lkZeichnen();
+}
+
+/* Sitzung aus dem Stapel: fällige Karten, dann neue — ohne Obergrenze pro Stapel,
+   neue Karten nur im Rahmen des Tageslimits ihres Kastens */
+function lkStapelLernen(id) {
+  var s = lkStapelFinden(lkStapel(), id);
+  if (!s) { return; }
+  var d = lkDaten();
+  var heute = isoDatum();
+  var frei = {};
+  var faellig = [];
+  var neu = [];
+  lkStapelKarten(s, d).forEach(function (x) {
+    if (x.c.fach >= 1) { if (!x.c.faellig || x.c.faellig <= heute) { faellig.push(x); } }
+    else { neu.push(x); }
+  });
+  var schlange = [];
+  lkMischen(faellig).forEach(function (x) { schlange.push({ k: x.k.id, c: x.c.id, r: x.k.richtung === 'rueck' || (x.k.richtung === 'gemischt' && Math.random() < 0.5) }); });
+  neu.forEach(function (x) {
+    if (frei[x.k.id] === undefined) { frei[x.k.id] = lkNeuFrei(d, x.k); }
+    if (frei[x.k.id] > 0) {
+      frei[x.k.id]--;
+      schlange.push({ k: x.k.id, c: x.c.id, r: x.k.richtung === 'rueck' || (x.k.richtung === 'gemischt' && Math.random() < 0.5) });
+    }
+  });
+  if (!schlange.length) { melde('Aus diesem Stapel ist heute nichts fällig.', 'gut'); return; }
+  cl.lk.id = '';
+  cl.lk.stapel = id;
+  cl.lk.sitzung = { schlange: schlange, i: 0, um: false, auf: 0, stat: { g: 0, t: 0, n: 0 }, wieder: {} };
+  cl.lk.ansicht = 'lernen';
+  cl.lk.fenster = '';
+  lkZeichnen();
+}
+
 function lernkarteiHtml() {
   var v = cl.lk.ansicht;
-  var h = v === 'lernen' ? lkLernenHtml() : (v === 'kasten' ? lkKastenHtml() : (v === 'karten' ? lkKartenHtml() : lkListeHtml()));
+  var h = v === 'lernen' ? lkLernenHtml() : (v === 'kasten' ? lkKastenHtml() : (v === 'karten' ? lkKartenHtml() : (v === 'stapel' ? lkStapelHtml() : lkListeHtml())));
   return h + '<input id="lkDatei" type="file" accept=".json,application/json" class="lk-datei" onchange="lkPaketGewaehlt(this)">' + lkFensterHtml();
 }
 
@@ -14940,7 +16345,13 @@ function lernkarteiFussHtml() {
       + k('Einfügen', 'lkFensterAuf(\'einfuegen\')') + k('Details…', 'lkFensterAuf(\'details\')');
   }
   if (v === 'karten') { return k('+ Karte', 'lkKarteOeffnen(\'\')') + k('Fertig', 'lkEbeneHoch()'); }
-  return k('Lernen (' + lkAlleHeute() + ')', 'lkLernen(\'\')', true) + k('Neu…', 'lkNeuOeffnen()');
+  if (v === 'stapel') { return k('Lernen', 'lkStapelLernen(\'' + esc(cl.lk.stapel) + '\')', true) + k('+ Karten', 'lkKartenHinzu()') + k('Löschen…', 'lkFensterAuf(\'stapelloeschen\')') + k('Zurück', 'lkEbeneHoch()'); }
+  if (v === 'liste' && cl.lk.hinzu) {
+    var hs = lkStapelFinden(lkStapel(), cl.lk.hinzu);
+    return k('Zu „' + esc(hs ? hs.name : '') + '“ (' + lkAuswahlAnzahl() + ')', 'lkStapelZuweisen(\'' + esc(cl.lk.hinzu) + '\', \'\')', true) + k('Abbrechen', 'lkHinzuEnde()');
+  }
+  var an = lkAuswahlAnzahl();
+  return k('Lernen (' + lkAlleHeute() + ')', 'lkLernen(\'\')', true) + (an ? k('In Stapel (' + an + ')', 'lkFensterAuf(\'stapelwahl\')') : k('Neu…', 'lkNeuOeffnen()'));
 }
 
 function lkNeuOeffnen() {
@@ -14957,7 +16368,9 @@ function lkKartenZeigen() {
 /* Eine Ebene zurück — true, wenn etwas getan wurde */
 function lkEbeneHoch() {
   if (cl.lk.fenster) { lkFensterZu(); return true; }
-  if (cl.lk.ansicht === 'lernen') { cl.lk.sitzung = null; cl.lk.ansicht = cl.lk.id ? 'kasten' : 'liste'; lkZeichnen(); return true; }
+  if (cl.lk.hinzu && cl.lk.ansicht === 'liste') { lkHinzuEnde(); return true; }
+  if (cl.lk.ansicht === 'lernen') { cl.lk.sitzung = null; cl.lk.ansicht = cl.lk.id ? 'kasten' : (cl.lk.stapel ? 'stapel' : 'liste'); lkZeichnen(); return true; }
+  if (cl.lk.ansicht === 'stapel') { cl.lk.stapel = ''; cl.lk.ansicht = 'liste'; lkZeichnen(); return true; }
   if (cl.lk.ansicht === 'karten') { cl.lk.ansicht = 'kasten'; lkZeichnen(); return true; }
   if (cl.lk.ansicht === 'kasten') { cl.lk.ansicht = 'liste'; cl.lk.id = ''; lkZeichnen(); return true; }
   return false;
@@ -14990,7 +16403,8 @@ function lkStatZeile() {
 function lkKopfText() {
   var d = lkDaten();
   var k = cl.lk.id ? lkKasten(d, cl.lk.id) : null;
-  var name = k ? k.name : 'Alle Kästen';
+  var st = (!k && cl.lk.stapel) ? lkStapelFinden(lkStapel(), cl.lk.stapel) : null;
+  var name = k ? k.name : (st ? st.name : 'Alle Kästen');
   return name.length > 18 ? name.slice(0, 17) + '…' : name;
 }
 
@@ -15003,7 +16417,23 @@ function lkWahlHtml() {
   return '<div class="aufklapp lk-aufklapp" style="top:49px;right:6px">'
     + zeile('', 'Alle Kästen', lkAlleHeute(), !cl.lk.id)
     + (d.kaesten.length ? '<div class="trenn"></div>' : '')
-    + d.kaesten.map(function (k) { return zeile(k.id, k.name, lkHeuteZahl(d, k), k.id === cl.lk.id); }).join('') + '</div>';
+    + d.kaesten.map(function (k) { return zeile(k.id, k.name, lkHeuteZahl(d, k), k.id === cl.lk.id); }).join('')
+    + (lkStapel().length ? '<div class="trenn"></div>' : '')
+    + lkStapel().map(function (x) { return '<button type="button" class="lk-wahl' + (x.id === cl.lk.stapel && cl.lk.ansicht === 'stapel' ? ' an' : '') + '" onclick="lkStapelAusWahl(\'' + esc(x.id) + '\')"><span>' + esc(x.name) + ' <small>Stapel</small></span><b>' + x.refs.length + '</b></button>'; }).join('')
+    + '</div>';
+}
+
+function lkStapelAusWahl(id) {
+  cl.aufklapp = '';
+  cl.lk.sitzung = null;
+  cl.lk.fenster = '';
+  cl.lk.suche = '';
+  cl.lk.bereich = '';
+  cl.lk.hinzu = '';
+  cl.lk.id = '';
+  cl.lk.stapel = id;
+  cl.lk.ansicht = 'stapel';
+  zeichne();
 }
 
 function lkWechseln(id) {
@@ -15011,6 +16441,8 @@ function lkWechseln(id) {
   cl.lk.sitzung = null;
   cl.lk.fenster = '';
   cl.lk.suche = '';
+  cl.lk.bereich = '';
+  cl.lk.stapel = '';
   var d = lkDaten();
   if (id && lkKasten(d, id)) { cl.lk.id = id; cl.lk.ansicht = 'kasten'; }
   else { cl.lk.id = ''; cl.lk.ansicht = 'liste'; }
@@ -18138,7 +19570,7 @@ function coFaellige(nun, is) {
   if (e.quellen.routinen) { l = l.concat(coRoutinenFragen(nun, is, e)); }
   if (e.quellen.ideen) { l = l.concat(coIdeenFragen(nun, is, e)); }
   if (e.quellen.sammlungen) { l = l.concat(coSammlungFragen(nun, is, e)); }
-  if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)).concat(coHandschriftFragen(is)); }
+  if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)).concat(coHandschriftFragen(is)).concat(coOnHakenFragen(is)); }
   if (e.quellen.aufgaben) { l = l.concat(coPrioFragen(nun, is, e)); }
   l = l.concat(coKampagneFragen(nun, is, e));
   /* Privates (seit 0.66) nennt der Coach nur, wenn es gezeigt wird */
@@ -20384,6 +21816,7 @@ function iwOeffnen(id) {
   var x = iwFinden(id);
   if (!x) { return; }
   cl.iw.id = id;
+  cl.iw.loeschId = '';
   cl.iw.stufe = Math.max(1, Math.min(6, Number(x.stufe) || 1));
   if (x.status === 'spaeter' && x.wiedervorlage && x.wiedervorlage <= isoDatum()) { cl.iw.stufe = 4; }
   cl.iw.ansicht = 'stufe';
@@ -20485,6 +21918,7 @@ function iwZurueck() {
 
 function iwZurListe() {
   iwLesen();
+  cl.iw.loeschId = '';
   cl.iw.ansicht = 'liste';
   cl.iw.fenster = '';
   iwZeichnen();
@@ -20546,6 +21980,22 @@ function iwEintragWeg(art, id) {
   iwLesen();
   x[art] = (x[art] || []).filter(function (y) { return y.id !== id; });
   iwSpeichern(x);
+  iwZeichnen();
+}
+
+/* Eine Idee löschen: erster Tipp fragt nach, zweiter Tipp löscht (Grabstein für den Abgleich) */
+function iwLoeschen() {
+  var x = iwFinden(cl.iw.id);
+  if (!x) { return; }
+  if (cl.iw.loeschId !== x.id) { cl.iw.loeschId = x.id; iwZeichnen(); return; }
+  var i = DB.ideen.indexOf(x);
+  if (i >= 0) { DB.ideen.splice(i, 1); }
+  grabsteinSetzen('ideen', x.id);
+  cl.iw.loeschId = '';
+  cl.iw.id = '';
+  cl.iw.ansicht = 'liste';
+  cl.iw.fenster = '';
+  spaeterSichern();
   iwZeichnen();
 }
 
@@ -20772,11 +22222,12 @@ function ideenFussHtml() {
   var k = function (t, a, voll) { return '<button type="button" class="knopf' + (voll ? ' voll' : '') + '" onclick="' + a + '">' + t + '</button>'; };
   if (cl.iw.ansicht === 'stufe') {
     var s = cl.iw.stufe;
+    var gesp = iwFinden(cl.iw.id) ? k(cl.iw.loeschId === cl.iw.id ? 'Wirklich löschen?' : 'Löschen', 'iwLoeschen()') : '';
     if (s === 6) {
       var x = iwFinden(cl.iw.id);
-      return (x && iwNaechsterSchritt(x) ? k('✓ Schritt erledigt', 'iwNaechsterErledigt()', true) : '') + k('Planen', 'iwStufeZeigen(5)') + k('Fertig', 'iwZurListe()');
+      return (x && iwNaechsterSchritt(x) ? k('✓ Schritt erledigt', 'iwNaechsterErledigt()', true) : '') + k('Planen', 'iwStufeZeigen(5)') + k('Fertig', 'iwZurListe()') + gesp;
     }
-    return k('◀', 'iwZurueck()') + k(s === 4 ? 'Entscheiden ▶' : (s === 5 ? 'Umsetzen ▶' : 'Weiter ▶'), 'iwWeiter()', true) + k('Speichern', 'iwZurListe()');
+    return k('◀', 'iwZurueck()') + k(s === 4 ? 'Entscheiden ▶' : (s === 5 ? 'Umsetzen ▶' : 'Weiter ▶'), 'iwWeiter()', true) + k('Speichern', 'iwZurListe()') + gesp;
   }
   return k('+ Idee', 'iwNeu()', true) + k(cl.iw.alle ? 'Nur offene' : 'Abgeschlossene', 'iwAlleUm()');
 }
@@ -23607,9 +25058,26 @@ function clAbmelden() {
 /* Zählt jede Änderung. Ein Abgleich, der gerade läuft, merkt daran, dass noch etwas zu senden ist (seit 0.95.0) */
 var sichernZaehler = 0;
 
+/* Seit 0.97.12: ob es Änderungen gibt, die noch nicht auf dem Server sind. Bleibt über Neustarts erhalten. */
+var UNGESICHERT_KEY = 'clie-ungesichert';
+
+function ungesichertSetzen(v) {
+  try { if (v) { window.localStorage.setItem(UNGESICHERT_KEY, '1'); } else { window.localStorage.removeItem(UNGESICHERT_KEY); } } catch (e) { /* nur für jetzt */ }
+}
+
+/* Beim ersten Abgleich nach dem Update gilt alles als ungesichert: lieber zusammenführen als verlieren */
+function ungesichertLesen() {
+  try {
+    var ls = window.localStorage;
+    if (ls.getItem(UNGESICHERT_KEY + '-v') !== '1') { ls.setItem(UNGESICHERT_KEY + '-v', '1'); return true; }
+    return ls.getItem(UNGESICHERT_KEY) === '1';
+  } catch (e) { return true; }
+}
+
 function spaeterSichern() {
   if (speicherUhr) { window.clearTimeout(speicherUhr); }
   lokalOffen = true;
+  ungesichertSetzen(true);
   sichernZaehler++;
   speicherUhr = window.setTimeout(function () {
     speicherUhr = null;
@@ -23633,14 +25101,16 @@ function abgleichStill() {
     abgleichZuletztMs = Date.now();
     abgleichFehler = '';
     verbindungOk = true;
-    if (zaehler === sichernZaehler) { lokalOffen = false; }
+    if (zaehler === sichernZaehler) { lokalOffen = false; ungesichertSetzen(false); }
     else { abgleichPlanen(false); }
-    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
+    /* Erst prüfen, was der Abgleich geändert hat, dann nachpflegen (0.104.3) */
     clAbgleichNachher(vorher);
+    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
     abgleichLaeuft = false;
     zeichne();
   }).catch(function (f) {
     abgleichFehler = f ? f.message : 'unbekannter Fehler';
+    clDriveKennungVerwerfen(f);
     abgleichLaeuft = false;
     zeichne();
   });
@@ -23684,9 +25154,17 @@ function abgleichen(versuch) {
     return driveHerunterladen();
   }).then(function (text) {
     var fremd = text ? textZuBestand(text) : null;
+    /* Seit 0.97.12: ein Serverstand, der nicht lesbar ist, wird nie überschrieben */
+    if (text && !fremd) { throw new Error('Der Stand auf dem Server ist nicht lesbar. Es wurde nichts hochgeladen.'); }
     if (!fremd) {
       letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
       return null;
+    }
+    if (!ungesichertLesen()) {
+      /* Keine ungesicherten Änderungen: der Server gilt ganz, ein älteres Gerät lädt nichts hoch */
+      DB = fremd;
+      letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
+      return speichern();
     }
     var ergebnis = zusammenfuehren(DB, fremd);
     DB = ergebnis.db;
@@ -23696,6 +25174,7 @@ function abgleichen(versuch) {
     return driveStandAbfragen();
   }).then(function (jetzt) {
     if (jetzt !== gesehen && n < 2) { return abgleichen(n + 1); }
+    if (jetzt !== gesehen) { throw new Error('Der Server wurde mehrfach während des Abgleichs geändert. Nichts wurde hochgeladen. Bitte erneut abgleichen.'); }
     return driveHochladen().then(function () {
       letzterAbgleich = isoZeit();
       return letzterBericht;
@@ -23725,8 +25204,10 @@ function rueckkehrPruefen() {
   pmNachpflegen();
   ckWecken();
   zeichne();
+  /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
+  try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
   if (!tokenGueltig()) { stillAnmelden('rueckkehr'); return; }
-  clTermineHolen(false);
+  clTermineHolen(false).then(manCoachHolen).then(function () { try { manPflichtPruefen(); } catch (e) { return null; } });
   if (Date.now() - abgleichZuletztMs < ABGLEICH_MINDEST) { return; }
   abgleichPlanen(true);
 }
@@ -23843,6 +25324,8 @@ function zurueckScharf() {
 
 /* Ein Schritt zurück. Ergebnis: true, wenn CLIE etwas getan hat. */
 function clZurueck() {
+  /* Pflichtlektüre: die Zurück-Taste führt nicht heraus (0.106.0) */
+  if (manGesperrt()) { return true; }
   if (cl.aufklapp) { aufklappZu(); return true; }
   if (cl.app === 'sammlungen' && cl.sa.id) {
     if (cl.sa.ansicht !== 'tabelle') { saAnsicht('tabelle'); } else { saZurListe(); }
@@ -24053,9 +25536,22 @@ function start() {
     ckKorb(false);   /* benennt einen alten „Korb“ in „Sammler“ um (0.62) */
     clKategorienUmstellen();   /* Beruf → Kategorie Arbeit (0.67) */
     try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
+    try { upNachziehen(); } catch (e) { clFehlerZeigen(e, 'upNachziehen'); }   /* Umprogrammierung aus 0.107 in ein Programm (0.108.0) */
+    try { gwNachziehen(); } catch (e) { clFehlerZeigen(e, 'gwNachziehen'); }   /* Gewohnheiten: Wenn-dann zu Titel und Beschreibung (0.108.1) */
     ckWecken();
     zeichne();
-    if (tokenGueltig()) { abgleichPlanen(true); verbindungPruefen(); clTermineHolen(false); hsHolen(true); }
+    /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
+    try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
+    /* Ziehen, Einfügen und Teilen für den Radar (0.116.0) */
+    try { raHereinHaengen(); } catch (e) { clFehlerZeigen(e, 'raHereinHaengen'); }
+    try { raGeteiltPruefen(); } catch (e) { clFehlerZeigen(e, 'raGeteiltPruefen'); }
+    /* Die Pflichtlektüre braucht die Termine — erst holen, dann prüfen (0.106.0) */
+    if (tokenGueltig()) {
+      abgleichPlanen(true);
+      verbindungPruefen();
+      clTermineHolen(false).then(manCoachHolen).then(function () { try { manPflichtPruefen(); } catch (e) { clFehlerZeigen(e, 'manPflichtPruefen'); } });
+      hsHolen(true);
+    }
     taktStarten();
     verbindungTaktStarten();
     clKalenderTaktStarten();
@@ -24068,12 +25564,18 @@ function start() {
   window.addEventListener('focus', standZeichnen);
   window.addEventListener('focus', erneuerungPruefen);
   window.addEventListener('focus', versionBeiFokus);
+  /* Drehen oder Fenstergröße ändern: das Manifest rechnet seine Seiten neu (seit 0.97.0) */
+  window.addEventListener('resize', function () { if (manSicht()) { inhaltZeichnen(); } });
+  /* Schriften geladen: die Höhen stimmen erst dann, also noch einmal rechnen (seit 0.97.0) */
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(function () { if (manSicht()) { inhaltZeichnen(); } }); }
   /* Wieder online: was offen geblieben ist, jetzt senden (seit 0.95.0) */
   window.addEventListener('online', function () { if (lokalOffen) { abgleichPlanen(true); } });
   window.setInterval(minutenTakt, 30000);
   window.setInterval(spTakt, 1000);
   /* Aus einer Coach-Erinnerung im Kalender: gleich zum Coach (seit 0.33) */
   if (String((window.location && window.location.hash) || '') === '#coach') { oeffne('coach'); }
+  /* … oder gleich zum Manifest (seit 0.106.0) */
+  if (String((window.location && window.location.hash) || '') === '#manifest') { oeffne('manifest'); }
   var inhalt = document.getElementById('inhalt');
   if (inhalt) {
     inhalt.addEventListener('touchstart', wischAnfang, { passive: true });
@@ -24094,17 +25596,804 @@ function manifestNotiz() {
   return treffer[0] || null;
 }
 
+function manifestInline(t) {
+  return pmInlineHtml(t).replace(/\*([^*]+)\*/g, '<i>$1</i>');
+}
+
+/* ---- Manifest: Seiten nach der echten Höhe (seit 0.97.0) ----
+   Die Notiz wird in Stücke zerlegt (Absätze, Tabellenzeilen). Jedes Stück wird
+   gemessen; dann füllen die Stücke eine Seite bis zur Höhe des Bildschirms. */
+var MAN_ABSTAND = 6;
+cl.man = { seite: 0, puffer: 0, hoehe: 0, zoom: 18, anzahl: 1, pflicht: '', frei: true };
+
+/* ---------- Pflichtlektüre (seit 0.106.0) ----------
+   Steht im Kalender „Coach“ ein Termin an, zeigt CLIE beim Öffnen das Manifest und gibt
+   die Bedienung erst frei, wenn bis zur letzten Seite geblättert wurde. Das Fenster ist
+   der Beginn bis eine Stunde danach, nur am selben Tag — wer das verpasst, verpasst es.
+   Gelesen wird je Termin gemerkt und über die workbench.json abgeglichen, damit es nicht
+   auf jedem Gerät noch einmal kommt. */
+/* Fensterlänge und Kalenderwort kommen seit 0.108.0 aus dem Programm (upKalFenster, upKalenderWort) */
+var MAN_MERK_TAGE = 14;
+
+function manGelesen() {
+  var e = DB.einstellungen || {};
+  return (e.manifestGelesen && typeof e.manifestGelesen === 'object') ? e.manifestGelesen : {};
+}
+
+function manGelesenSetzen(id) {
+  if (!id) { return; }
+  if (!DB.einstellungen) { DB.einstellungen = leereDatenbank().einstellungen; }
+  var g = manGelesen();
+  g[id] = isoDatum();
+  /* Alte Vermerke wegräumen, sonst wächst die Einstellung endlos */
+  var grenze = tagePlus(isoDatum(), -MAN_MERK_TAGE);
+  Object.keys(g).forEach(function (k) { if (String(g[k]) < grenze) { delete g[k]; } });
+  DB.einstellungen.manifestGelesen = g;
+  spaeterSichern();
+}
+
+function manIstCoachKalender(id) {
+  return String(clKalenderName(id) || '').toLowerCase().indexOf(upKalenderWort()) >= 0;
+}
+
+/* ---- Die Coach-Termine holt sich die Pflichtlektüre selbst (0.107.1) ----
+   Der Kern wirft Coach-Einträge beim Einsortieren weg (istCoachTermin), damit sie
+   nirgends auftauchen — in termineNachTag stehen sie deshalb nie. Für die Sperre
+   brauchen wir sie aber. Also ein eigener, kleiner Abruf: nur heute, nur Beginn und
+   Kennung, und das Ergebnis bleibt in einer eigenen Liste, die sonst niemand liest. */
+var coachTermine = [];
+var coachStand = '';
+
+function manCoachKalender() {
+  return kalenderListe.filter(function (k) { return k && k.id && manIstCoachKalender(k.id); });
+}
+
+function manCoachHolen() {
+  if (!tokenGueltig()) { return Promise.resolve(false); }
+  var vorbereitung = kalenderListe.length ? Promise.resolve(true) : kalenderListeHolen();
+  return vorbereitung.then(function () {
+    var kalender = manCoachKalender();
+    if (!kalender.length) { coachTermine = []; return false; }
+    var heute = isoDatum();
+    var von = tagePlus(heute, -1);
+    var bis = tagePlus(heute, 1);
+    var neu = [];
+    var reihe = Promise.resolve(true);
+    kalender.forEach(function (kal) {
+      var adresse = 'https://www.googleapis.com/calendar/v3/calendars/'
+        + encodeURIComponent(kal.id) + '/events'
+        + '?singleEvents=true&orderBy=startTime&maxResults=100'
+        + '&timeMin=' + encodeURIComponent(von + 'T00:00:00Z')
+        + '&timeMax=' + encodeURIComponent(bis + 'T23:59:59Z')
+        + '&fields=' + encodeURIComponent('items(id,summary,status,start)');
+      reihe = reihe.then(function () {
+        return window.fetch(adresse, { headers: driveKopf() })
+          .then(antwortPruefen)
+          .then(function (a) { return a.json(); })
+          .then(function (d) {
+            ((d && d.items) ? d.items : []).forEach(function (e) {
+              /* Ganztägige haben kein dateTime und lösen nicht aus */
+              if (!e || !e.id || e.status === 'cancelled' || !e.start || !e.start.dateTime) { return; }
+              if (tagAusEintrag(e.start.dateTime) !== heute) { return; }
+              neu.push({ id: e.id, titel: e.summary || '', zeit: zeitAusEintrag(e.start.dateTime), kalId: kal.id });
+            });
+            return true;
+          })
+          .catch(function () { return true; });   /* ein stummer Kalender darf die Sperre nicht sprengen */
+      });
+    });
+    return reihe.then(function () { coachTermine = neu; coachStand = heute; return true; });
+  }).catch(function () { return false; });
+}
+
+/* Der fällige Termin — der späteste, dessen Stunde noch läuft */
+function manPflichtTermin() {
+  var nun = clMinuten(clUhrzeit());
+  var gelesen = manGelesen();
+  var treffer = null;
+  (coachTermine || []).forEach(function (t) {
+    if (!t || !t.id || gelesen[t.id]) { return; }
+    var m = clMinuten(t.zeit);
+    if (m < 0 || nun < m || nun > m + upKalFenster()) { return; }
+    if (!treffer || clMinuten(treffer.zeit) < m) { treffer = t; }
+  });
+  return treffer;
+}
+
+function manPflichtPruefen() {
+  if (cl.man.pflicht || !manifestNotiz() || !upManifestAn()) { return false; }
+  var t = manPflichtTermin();
+  if (!t) { return false; }
+  cl.man.pflicht = t.id;
+  cl.man.frei = false;
+  cl.man.seite = 0;
+  cl.aufklapp = '';
+  oeffne('manifest');
+  return true;
+}
+
+/* Gesperrt? Alles außer Blättern und Schriftgröße bleibt still */
+function manGesperrt() {
+  return !!cl.man.pflicht && !cl.man.frei;
+}
+
+function manPflichtFertig() {
+  if (!cl.man.pflicht) { return; }
+  var war = String(cl.man.pflicht);
+  manGelesenSetzen(war);
+  cl.man.pflicht = '';
+  cl.man.frei = true;
+  /* Aus der Umprogrammierung heraus gelesen: ein fälliger Coach-Termin ist damit erledigt (0.107.0) */
+  if (war.indexOf('up-') === 0) { upCoachAbhaken(); }
+  oeffne('uebersicht');
+}
+
+/* ---------- Umprogrammierung (seit 0.107.0, ab 0.108.0 als Programm) ----------
+   Ein Programm läuft über eine gewählte Zahl von Tagen. Beim ersten Öffnen in einem
+   Zeitfenster zeigt CLIE für ein paar Sekunden die Regeln des Tages aus einer Notiz im
+   Memo Pad und geht dann ins Manifest — gesperrt wie die Pflichtlektüre. Ein Coach-Termin,
+   der gerade fällig wäre, gilt damit als gelesen. Gemerkt wird je Tag und Fenster über die
+   workbench.json, damit dasselbe Fenster nicht auf jedem Gerät noch einmal kommt.
+   Die Zahlen stehen seit 0.108.0 im Datensatz (typ 'umprog') und nicht mehr im Code;
+   mehrere Programme dürfen nebeneinander stehen, gelaufene bleiben als Rückblick. */
+var UP_TAGE_VOR = 56;          /* Vorgabe für ein neues Programm */
+var UP_JE_TAG_VOR = 3;
+var UP_FENSTER_VOR = 3;
+var UP_SEKUNDEN_VOR = 5;
+var UP_NOTIZ_VOR = 'Umprogrammierung';
+var UP_KAL_VOR = 'coach';
+var UP_KAL_FENSTER_VOR = 60;
+/* Die Fenster heißen innen kurz und außen lesbar */
+var UP_FENSTER_NAME = { tag: 'ganztags', frueh: 'früh', mittag: 'mittag', spaet: 'spät', nachmittag: 'nachm.', abend: 'abend' };
+/* Die Zeitfenster je Zahl der Anzeigen: Beginn in Stunden und Name */
+var UP_FENSTER_SATZ = {
+  1: [[0, 'tag']],
+  2: [[0, 'frueh'], [14, 'spaet']],
+  3: [[0, 'frueh'], [11, 'mittag'], [16, 'abend']],
+  4: [[0, 'frueh'], [11, 'mittag'], [15, 'nachmittag'], [19, 'abend']]
+};
+cl.up = { an: false, tag: 0, marke: '', regeln: [], uhr: null, programm: '', wahl: '', fenster: null, tagF: null };
+
+function upProgramme() {
+  return krAlle('umprog').sort(function (a, b) { return String(a.beginn || '').localeCompare(String(b.beginn || '')); });
+}
+
+function upFinden(id) {
+  var x = krFinden(id);
+  return (x && x.typ === 'umprog') ? x : null;
+}
+
+function upZahl(wert, vor, klein, gross) {
+  var n = Math.round(Number(wert));
+  if (!(n === n) || n < klein || n > gross) { return vor; }
+  return n;
+}
+
+/* Tag 1 ist der Starttag; außerhalb der Laufzeit kommt 0 */
+function upTagVon(p, is) {
+  if (!p || !p.beginn) { return 0; }
+  var a = Date.parse(String(p.beginn) + 'T00:00:00');
+  var b = Date.parse((is || isoDatum()) + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) { return 0; }
+  var n = Math.round((b - a) / 86400000) + 1;
+  return (n >= 1 && n <= upDauer(p)) ? n : 0;
+}
+
+function upDauer(p) {
+  return upZahl(p && p.tage, UP_TAGE_VOR, 1, 999);
+}
+
+/* Das Programm, das an diesem Tag läuft — bei mehreren das zuletzt begonnene */
+function upAktiv(is) {
+  var heute = is || isoDatum();
+  var treffer = null;
+  upProgramme().forEach(function (p) {
+    if (upTagVon(p, heute) > 0 && (!treffer || String(p.beginn) > String(treffer.beginn))) { treffer = p; }
+  });
+  return treffer;
+}
+
+/* Für die Sicht: das laufende, sonst das zuletzt begonnene */
+function upGezeigt() {
+  if (cl.up.wahl) { var g = upFinden(cl.up.wahl); if (g) { return g; } }
+  var l = upProgramme();
+  return upAktiv() || (l.length ? l[l.length - 1] : null);
+}
+
+function upTag(is) {
+  return upTagVon(upAktiv(is), is);
+}
+
+function upNotizTitel(p) {
+  return String((p && p.notiz) || UP_NOTIZ_VOR).trim().toLowerCase();
+}
+
+function upNotiz(p) {
+  var titel = upNotizTitel(p);
+  var treffer = (DB.gedanken || []).filter(function (g) {
+    return g && typeof g === 'object' && String(g.titel || '').trim().toLowerCase() === titel;
+  });
+  return treffer[0] || null;
+}
+
+/* Eine Regel je Zeile; Leerzeilen, Striche und die Typ-Zeile fallen weg */
+function upRegeln(p) {
+  var n = upNotiz(p);
+  if (!n) { return []; }
+  return String(n.text || '').split('\n').map(function (z) {
+    return String(z).replace(/^\s*[-•*]\s+/, '').trim();
+  }).filter(function (z) { return z && !MP_TYP.test(z); });
+}
+
+function upFensterListe(p) {
+  return UP_FENSTER_SATZ[upZahl(p && p.fenster, UP_FENSTER_VOR, 1, 4)] || UP_FENSTER_SATZ[UP_FENSTER_VOR];
+}
+
+/* Das Zeitfenster, in dem wir gerade stehen */
+function upFenster(zeit, p) {
+  var liste = upFensterListe(p);
+  var m = clMinuten(zeit || clUhrzeit());
+  var name = liste[0][1];
+  liste.forEach(function (f) { if (m >= f[0] * 60) { name = f[1]; } });
+  return name;
+}
+
+function upMarke(is, zeit, p) {
+  return 'up-' + (is || isoDatum()) + '-' + upFenster(zeit, p);
+}
+
+/* Die Regeln des Tages — der Reihe nach durch die Notiz, Tag für Tag weiter */
+function upTagesRegeln(tag, alle, p) {
+  var liste = alle || upRegeln(p);
+  if (!liste.length || !tag) { return []; }
+  var anz = Math.min(upZahl(p && p.jeTag, UP_JE_TAG_VOR, 1, 9), liste.length);
+  var start = ((tag - 1) * anz) % liste.length;
+  var raus = [];
+  for (var i = 0; i < anz; i++) { raus.push(liste[(start + i) % liste.length]); }
+  return raus;
+}
+
+/* Welche Fenster des Tages schon gelesen sind */
+function upGelesenAm(is, p) {
+  var gelesen = manGelesen();
+  return upFensterListe(p).map(function (f) { return !!gelesen['up-' + is + '-' + f[1]]; });
+}
+
+function upPruefen() {
+  if (cl.up.an || cl.man.pflicht) { return false; }
+  var p = upAktiv();
+  if (!p) { return false; }
+  var tag = upTagVon(p, isoDatum());
+  if (!tag) { return false; }
+  var regeln = upTagesRegeln(tag, null, p);
+  if (!regeln.length) { return false; }
+  var marke = upMarke(null, null, p);
+  if (manGelesen()[marke]) { return false; }
+  cl.up.an = true;
+  cl.up.tag = tag;
+  cl.up.marke = marke;
+  cl.up.regeln = regeln;
+  cl.up.programm = p.id;
+  cl.aufklapp = 'umprog';
+  zeichne();
+  upUhrStellen(p);
+  return true;
+}
+
+function upUhrStellen(p) {
+  if (cl.up.uhr) { clearTimeout(cl.up.uhr); }
+  var s = upZahl(p && p.sekunden, UP_SEKUNDEN_VOR, 2, 60);
+  cl.up.uhr = setTimeout(function () { cl.up.uhr = null; upFertig(); }, s * 1000);
+}
+
+function upHtml() {
+  var p = upFinden(cl.up.programm);
+  var mitManifest = upManifestAn(p) && manifestNotiz();
+  return '<div class="fenster up-fenster" onclick="upFertig()"><div class="titel">Tag ' + cl.up.tag + ' von ' + upDauer(p) + '</div><div class="rumpf">'
+    + '<div class="up-kopf">Neue Gewohnheiten mit neuen Regeln</div>'
+    + cl.up.regeln.map(function (r) { return '<div class="up-regel">' + manifestInline(r) + '</div>'; }).join('')
+    + '<div class="up-fuss">' + (mitManifest ? 'weiter zum Manifest' : 'antippen zum Schließen') + '</div>'
+    + '</div></div>';
+}
+
+/* Weiter: das Overlay schließt und das Manifest kommt direkt hinterher */
+function upFertig() {
+  if (!cl.up.an) { return; }
+  if (cl.up.uhr) { clearTimeout(cl.up.uhr); cl.up.uhr = null; }
+  var marke = cl.up.marke;
+  var p = upFinden(cl.up.programm);
+  cl.up.an = false;
+  cl.aufklapp = '';
+  if (upManifestAn(p) && manifestNotiz()) {
+    cl.man.pflicht = marke;
+    cl.man.frei = false;
+    cl.man.seite = 0;
+    oeffne('manifest');
+    return;
+  }
+  manGelesenSetzen(marke);
+  zeichne();
+}
+
+/* Was gerade fällig wäre, ist mit dem Manifest gelesen — höchstens eine Handvoll am Tag */
+function upCoachAbhaken() {
+  for (var i = 0; i < 20; i++) {
+    var t = manPflichtTermin();
+    if (!t) { return; }
+    manGelesenSetzen(t.id);
+  }
+}
+
+/* ---- Einstellungen, die früher im Code standen (0.108.0) ---- */
+function upManifestAn(p) {
+  var q = p || upAktiv();
+  return q ? q.manifest !== false : true;
+}
+
+function upKalenderWort() {
+  var p = upAktiv();
+  return String((p && p.kalender) || UP_KAL_VOR).trim().toLowerCase() || UP_KAL_VOR;
+}
+
+function upKalFenster() {
+  var p = upAktiv();
+  return upZahl(p && p.kalFenster, UP_KAL_FENSTER_VOR, 5, 720);
+}
+
+/* ---- Die Sicht in Routines (0.108.0) ---- */
+
+/* Wie weit ein Tag im Programm gekommen ist — gemessen an den Gewohnheiten */
+function upTagStand(p, is) {
+  var l = gwAlle('ueben', p && p.id);
+  if (!p || !l.length) { return 'leer'; }
+  var voll = 0;
+  l.forEach(function (g) { if (gwGeschafft(g, is)) { voll++; } });
+  if (voll === l.length) { return 'voll'; }
+  return voll ? 'halb' : 'leer';
+}
+
+function upTagNotizText(p, is) {
+  var n = (p && p.notizen && typeof p.notizen === 'object') ? p.notizen : {};
+  return String(n[is] || '');
+}
+
+function upBalkenHtml(p, tag, dauer) {
+  var h = '';
+  var i;
+  for (i = 1; i <= dauer; i++) {
+    var is = tagePlus(p.beginn, i - 1);
+    var k = (i === tag) ? 'heute' : upTagStand(p, is);
+    h += '<i class="' + k + '"></i>';
+  }
+  return '<div class="up-balken">' + h + '</div>';
+}
+
+function upRasterHtml(p, tag, dauer) {
+  var h = '<div class="gruppe">Verlauf</div><div class="up-raster">';
+  var i;
+  for (i = 1; i <= dauer; i++) {
+    var is = tagePlus(p.beginn, i - 1);
+    var kuenftig = is > isoDatum();
+    var k = (i === tag) ? 'heute' : (kuenftig ? 'aus' : upTagStand(p, is));
+    h += '<button type="button" class="' + k + (upTagNotizText(p, is) ? ' notiz' : '')
+      + '" onclick="upTagOeffnen(\'' + is + '\')">' + i + '</button>';
+  }
+  return h + '</div><p class="leise">■ alles geschafft · ◨ teils · □ nichts · Punkt = Notiz. Einen Tag antippen: Notiz lesen, heute und gestern auch schreiben.</p>';
+}
+
+function upSichtHtml() {
+  if (!upProgramme().length) {
+    return '<p class="leise">Noch kein Programm — „Neu“ tippen. Die Regeln stehen in einer Notiz im Memo Pad, eine Regel je Zeile; der Titel der Notiz wird im Programm eingetragen.</p>';
+  }
+  var p = upGezeigt();
+  var heute = isoDatum();
+  var dauer = upDauer(p);
+  var tag = upTagVon(p, heute);
+  var ende = tagePlus(p.beginn, dauer - 1);
+  var h = '<div class="up-titel"><b>' + (tag ? 'Tag ' + tag + ' von ' + dauer : esc(p.name || 'Programm')) + '</b>'
+    + '<span>' + (tag ? 'bis ' + esc(clKurzDatum(ende)) : esc(clKurzDatum(p.beginn)) + ' – ' + esc(clKurzDatum(ende))) + '</span></div>';
+  h += upBalkenHtml(p, tag, dauer);
+  h += '<div class="leise">Neue Gewohnheiten mit neuen Regeln</div>';
+
+  if (tag) {
+    var fenster = upFensterListe(p);
+    var gelesen = upGelesenAm(heute, p);
+    h += '<div class="block"><div class="gruppe">Heute gelesen · '
+      + fenster.map(function (f, i) { return (gelesen[i] ? '●' : '○') + ' ' + esc(UP_FENSTER_NAME[f[1]] || f[1]); }).join(' &nbsp; ') + '</div>';
+    var regeln = upTagesRegeln(tag, null, p);
+    h += regeln.length ? regeln.map(function (r) { return '<div class="up-regel">' + manifestInline(r) + '</div>'; }).join('')
+      : '<p class="leise">Keine Regeln — die Notiz „' + esc(p.notiz || UP_NOTIZ_VOR) + '“ fehlt oder ist leer.</p>';
+    h += '</div>';
+  }
+
+  var l = gwAlle('ueben', p.id);
+  h += '<div class="block"><div class="gruppe">Gewohnheiten im Programm</div>';
+  h += l.length ? l.map(function (g) { return gwZeileHtml(g, true); }).join('')
+    : '<p class="leise">Noch keine — „Neu“ tippen. Sie gehört dann zu diesem Programm.</p>';
+  h += '</div>';
+
+  h += '<div class="block">' + upRasterHtml(p, tag, dauer) + '</div>';
+  return h;
+}
+
+function upFussHtml() {
+  if (!upProgramme().length) {
+    return '<button type="button" class="knopf" onclick="upNeu()">Neu</button>';
+  }
+  return '<button type="button" class="knopf" onclick="gwNeu()">Neu</button>'
+    + '<button type="button" class="knopf" onclick="gwDetailsGewaehlt()">Details…</button>'
+    + '<button type="button" class="knopf" onclick="upEinstellungen()">Programm…</button>';
+}
+
+/* ---- Die Tagesnotiz ---- */
+function upTagOeffnen(is) {
+  var p = upGezeigt();
+  if (!p) { return; }
+  cl.up.tagF = { tag: is, text: upTagNotizText(p, is), schreiben: gwTagErlaubt(is) };
+  cl.aufklapp = 'uptag';
+  aufklappNeu();
+}
+
+function upTagHtml() {
+  var f = cl.up.tagF;
+  var p = upGezeigt();
+  if (!f || !p) { return ''; }
+  var nr = upTagVon(p, f.tag) || '–';
+  return '<div class="fenster"><div class="titel">Tag ' + nr + ' · ' + esc(clWt(f.tag) + ' ' + clKurzDatum(f.tag)) + '</div><div class="rumpf">'
+    + (f.schreiben
+      ? '<label for="upTagText">Wie ist der Tag gelaufen?</label>'
+        + '<textarea id="upTagText" class="eingabe" rows="3" maxlength="300">' + esc(f.text) + '</textarea>'
+        + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="upTagSichern()">OK</button>'
+        + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
+      : (f.text ? '<p>' + esc(f.text).replace(/\n/g, '<br>') + '</p>' : '<p class="leise">Keine Notiz.</p>')
+        + '<p class="leise">Schreiben geht nur für heute und gestern.</p>'
+        + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="aufklappZu()">Schließen</button></div>')
+    + '</div></div>';
+}
+
+function upTagSichern() {
+  var f = cl.up.tagF;
+  var p = upGezeigt();
+  if (!f || !p || !f.schreiben) { aufklappZu(); return; }
+  var e = document.getElementById('upTagText');
+  var text = (e && typeof e.value === 'string') ? e.value.trim().slice(0, 300) : f.text;
+  if (!p.notizen || typeof p.notizen !== 'object') { p.notizen = {}; }
+  if (text) { p.notizen[f.tag] = text; } else { delete p.notizen[f.tag]; }
+  krSpeichern(p);
+  aufklappZu();
+}
+
+/* ---- Einstellungen ---- */
+function upNeu() {
+  cl.up.fenster = { modus: 'neu', id: '', name: 'Umprogrammierung', beginn: isoDatum(), tage: UP_TAGE_VOR,
+                    jeTag: UP_JE_TAG_VOR, fenster: UP_FENSTER_VOR, sekunden: UP_SEKUNDEN_VOR, notiz: UP_NOTIZ_VOR,
+                    manifest: true, kalender: UP_KAL_VOR, kalFenster: UP_KAL_FENSTER_VOR };
+  cl.aufklapp = 'umprogramm';
+  aufklappNeu();
+}
+
+function upEinstellungen() {
+  var p = upGezeigt();
+  if (!p) { upNeu(); return; }
+  cl.up.fenster = { modus: 'details', id: p.id, name: p.name || 'Umprogrammierung', beginn: p.beginn || isoDatum(),
+                    tage: upDauer(p), jeTag: upZahl(p.jeTag, UP_JE_TAG_VOR, 1, 9), fenster: upZahl(p.fenster, UP_FENSTER_VOR, 1, 4),
+                    sekunden: upZahl(p.sekunden, UP_SEKUNDEN_VOR, 2, 60), notiz: p.notiz || UP_NOTIZ_VOR,
+                    manifest: p.manifest !== false, kalender: p.kalender || UP_KAL_VOR,
+                    kalFenster: upZahl(p.kalFenster, UP_KAL_FENSTER_VOR, 5, 720) };
+  cl.aufklapp = 'umprogramm';
+  aufklappNeu();
+}
+
+function upFensterLesen() {
+  var f = cl.up.fenster;
+  if (!f) { return null; }
+  [['upName', 'name'], ['upBeginn', 'beginn'], ['upNotizT', 'notiz'], ['upKal', 'kalender']].forEach(function (x) {
+    var e = document.getElementById(x[0]);
+    if (e && typeof e.value === 'string') { f[x[1]] = e.value; }
+  });
+  [['upDauer', 'tage'], ['upJeTag', 'jeTag'], ['upSek', 'sekunden'], ['upKalF', 'kalFenster']].forEach(function (x) {
+    var e = document.getElementById(x[0]);
+    if (e && typeof e.value === 'string') { f[x[1]] = e.value; }
+  });
+  return f;
+}
+
+function upWahl(feld, wert) {
+  var f = upFensterLesen();
+  if (!f) { return; }
+  if (feld === 'fenster') { f.fenster = upZahl(wert, UP_FENSTER_VOR, 1, 4); }
+  if (feld === 'manifest') { f.manifest = !!wert; }
+  aufklappNeu();
+}
+
+function upFensterHtml() {
+  var f = cl.up.fenster;
+  if (!f) { return ''; }
+  if (f.modus === 'loeschen') {
+    return '<div class="fenster"><div class="titel">Programm löschen</div><div class="rumpf">'
+      + '<p>„' + esc(f.name) + '“ wirklich löschen? Die Tagesnotizen verschwinden mit. Die Gewohnheiten bleiben, sie gehören dann zu keinem Programm mehr.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="upLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="upEinstellungen()">Abbrechen</button></div></div></div>';
+  }
+  var k = function (feld, wert, text, an) {
+    return '<button type="button"' + (an ? ' class="an"' : '') + ' onclick="upWahl(\'' + feld + '\',' + wert + ')">' + text + '</button>';
+  };
+  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neues Programm' : 'Umprogrammierung') + '</div><div class="rumpf">'
+    + '<label for="upName">Name:</label><input id="upName" class="eingabe" type="text" maxlength="40" autocomplete="off" value="' + esc(f.name) + '">'
+    + '<label for="upBeginn">Beginn:</label><input id="upBeginn" class="eingabe" type="date" value="' + esc(f.beginn) + '">'
+    + '<label for="upDauer">Dauer (Tage):</label><input id="upDauer" class="eingabe" type="number" min="1" max="999" value="' + esc(String(f.tage)) + '">'
+    + '<label for="upNotizT">Notiz mit den Regeln:</label><input id="upNotizT" class="eingabe" type="text" maxlength="60" autocomplete="off" value="' + esc(f.notiz) + '">'
+    + '<label for="upJeTag">Regeln je Tag:</label><input id="upJeTag" class="eingabe" type="number" min="1" max="9" value="' + esc(String(f.jeTag)) + '">'
+    + '<label>Anzeigen je Tag:</label><div class="wahlreihe">'
+    + [1, 2, 3, 4].map(function (n) { return k('fenster', n, String(n), f.fenster === n); }).join('') + '</div>'
+    + '<label for="upSek">Anzeigedauer (Sekunden):</label><input id="upSek" class="eingabe" type="number" min="2" max="60" value="' + esc(String(f.sekunden)) + '">'
+    + '<label>Manifest als Pflichtlektüre:</label><div class="wahlreihe">'
+    + k('manifest', 'true', 'An', f.manifest) + k('manifest', 'false', 'Aus', !f.manifest) + '</div>'
+    + (f.manifest
+      ? '<label for="upKal">Aus dem Kalender (Namensteil):</label><input id="upKal" class="eingabe" type="text" maxlength="40" autocomplete="off" value="' + esc(f.kalender) + '">'
+        + '<label for="upKalF">Fenster nach dem Termin (Minuten):</label><input id="upKalF" class="eingabe" type="number" min="5" max="720" value="' + esc(String(f.kalFenster)) + '">'
+      : '<p class="leise">Ohne Pflichtlektüre zeigt CLIE nur das Overlay; Coach-Termine lösen nichts aus.</p>')
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="upSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="upLoeschenFragen()">Löschen…</button>') + '</div></div></div>';
+}
+
+function upSpeichern() {
+  var f = upFensterLesen();
+  if (!f) { aufklappZu(); return; }
+  var beginn = String(f.beginn || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(beginn)) { melde('Bitte ein Startdatum wählen.', 'warn'); return; }
+  var notiz = String(f.notiz || '').trim();
+  if (!notiz) { melde('Bitte den Titel der Notiz mit den Regeln eintragen.', 'warn'); return; }
+  var p = f.id ? upFinden(f.id) : null;
+  if (!p) { p = { id: 'up-' + neueKennung(), typ: 'umprog', notizen: {}, angelegt: isoDatum() }; }
+  p.name = String(f.name || 'Umprogrammierung').trim().slice(0, 40) || 'Umprogrammierung';
+  p.beginn = beginn;
+  p.tage = upZahl(f.tage, UP_TAGE_VOR, 1, 999);
+  p.jeTag = upZahl(f.jeTag, UP_JE_TAG_VOR, 1, 9);
+  p.fenster = upZahl(f.fenster, UP_FENSTER_VOR, 1, 4);
+  p.sekunden = upZahl(f.sekunden, UP_SEKUNDEN_VOR, 2, 60);
+  p.notiz = notiz.slice(0, 60);
+  p.manifest = !!f.manifest;
+  p.kalender = String(f.kalender || UP_KAL_VOR).trim().slice(0, 40) || UP_KAL_VOR;
+  p.kalFenster = upZahl(f.kalFenster, UP_KAL_FENSTER_VOR, 5, 720);
+  krSpeichern(p);
+  cl.up.wahl = p.id;
+  aufklappZu();
+}
+
+function upLoeschenFragen() {
+  var f = upFensterLesen();
+  if (!f || !f.id) { return; }
+  f.modus = 'loeschen';
+  aufklappNeu();
+}
+
+function upLoeschen() {
+  var f = cl.up.fenster;
+  if (!f || !upFinden(f.id)) { aufklappZu(); return; }
+  krLoeschen(f.id);
+  if (cl.up.wahl === f.id) { cl.up.wahl = ''; }
+  aufklappZu();
+  melde('Programm gelöscht.', null);
+}
+
+/* Beim Laden: wer schon eine Notiz „Umprogrammierung“ hat, bekommt sein Programm (0.108.0) */
+function upNachziehen() {
+  if (upProgramme().length) { return null; }
+  if (!upNotiz(null)) { return null; }
+  return krSpeichern({
+    id: 'up-' + neueKennung(), typ: 'umprog', name: 'Umprogrammierung',
+    beginn: '2026-11-04', tage: UP_TAGE_VOR, jeTag: UP_JE_TAG_VOR, fenster: UP_FENSTER_VOR,
+    sekunden: UP_SEKUNDEN_VOR, notiz: UP_NOTIZ_VOR, manifest: true,
+    kalender: UP_KAL_VOR, kalFenster: UP_KAL_FENSTER_VOR, notizen: {}, angelegt: isoDatum()
+  });
+}
+var MAN_STUFEN = [14, 16, 18, 20, 22, 24];
+
+function manKasten(inner) {
+  return '<div style="display:flow-root;margin-bottom:' + MAN_ABSTAND + 'px">' + inner + '</div>';
+}
+
+function manTabelleHtml(kopf, zeilen) {
+  return manKasten('<table style="border-collapse:collapse;width:100%">' + kopf + zeilen + '</table>');
+}
+
+function manZeile(reihe, kopf) {
+  var tag = kopf ? 'th' : 'td';
+  var zellen = reihe.replace(/^\|/, '').replace(/\|$/, '').split('|');
+  return '<tr>' + zellen.map(function (c) {
+    /* Seit 0.97.3 enger: mehr Zeilen pro Seite */
+    return '<' + tag + ' style="border:1px solid #888;padding:1px 4px;text-align:left;vertical-align:top;line-height:1.15">' + manifestInline(c.trim()) + '</' + tag + '>';
+  }).join('') + '</tr>';
+}
+
+/* Eine Zeile der Notiz als Block: Überschrift, Linie, Liste, Zitat oder Absatz */
+function manZeileHtml(z) {
+  var t = z.trim();
+  if (/^#{1,3}\s/.test(t)) {
+    var stufe = t.match(/^#+/)[0].length;
+    var tag = stufe === 1 ? 'h2' : (stufe === 2 ? 'h3' : 'h4');
+    return '<' + tag + ' style="margin:4px 0;font-size:' + (stufe === 1 ? '1.15' : (stufe === 2 ? '1.05' : '1')) + 'em">' + manifestInline(t.replace(/^#+\s*/, '')) + '</' + tag + '>';
+  }
+  if (/^(---+|\*\*\*+)$/.test(t)) { return '<hr style="border:0;border-top:1px solid #888;margin:4px 0">'; }
+  if (/^[-*]\s+/.test(t)) { return '<p style="margin:0">• ' + manifestInline(t.replace(/^[-*]\s+/, '')) + '</p>'; }
+  if (/^>\s?/.test(t)) { return '<p style="margin:0 0 0 14px;font-style:italic">' + manifestInline(t.replace(/^>\s?/, '')) + '</p>'; }
+  return '<p style="margin:0">' + (t ? manifestInline(z) : '&nbsp;') + '</p>';
+}
+
+/* Die Notiz in Stücke: normale Zeilen, und Tabellenzeilen mit ihrer Kopfzeile (tab = Nummer der Tabelle) */
+function manItems(n) {
+  var zeilen = String(n.text || '').split('\n');
+  var items = [];
+  var tab = 0;
+  var i = 0;
+  while (i < zeilen.length) {
+    if (/^\s*\|.*\|\s*$/.test(zeilen[i])) {
+      var tz = [];
+      while (i < zeilen.length && /^\s*\|.*\|\s*$/.test(zeilen[i])) { tz.push(zeilen[i].trim()); i++; }
+      tab++;
+      var reihen = tz.filter(function (r) { return !/^\|[\s|:-]*---[\s|:-]*\|$/.test(r); });
+      if (!reihen.length) { continue; }
+      var kopf = manZeile(reihen[0], true);
+      if (reihen.length === 1) { items.push({ tab: tab, kopf: '', zeile: kopf }); }
+      for (var k = 1; k < reihen.length; k++) { items.push({ tab: tab, kopf: kopf, zeile: manZeile(reihen[k], false) }); }
+      continue;
+    }
+    if (/^(---+|\*\*\*+)$/.test(zeilen[i].trim())) { items.push({ umbruch: true }); i++; continue; }
+    items.push({ html: manZeileHtml(zeilen[i]) });
+    i++;
+  }
+  return items;
+}
+
+/* Höhe eines Stücks im Messfeld (inkl. Abstand) */
+function manMessen(html) {
+  var c = document.getElementById('manMess');
+  if (!c) { return 0; }
+  c.innerHTML = html;
+  var w = c.firstChild;
+  var h = w ? w.offsetHeight + MAN_ABSTAND : 0;
+  c.innerHTML = '';
+  return h;
+}
+
+/* Stücke in Seiten füllen. Eine Tabellen-Kopfzeile kommt auf jeder Seite einmal dazu. */
+function manPacken(items, verfuegbar) {
+  var seiten = [[]];
+  var belegt = 0;
+  var tabellen = {};
+  items.forEach(function (it, i) {
+    if (it.umbruch) {
+      if (seiten[seiten.length - 1].length) { seiten.push([]); belegt = 0; tabellen = {}; }
+      return;
+    }
+    var kopf = (it.tab !== undefined && !tabellen[it.tab]) ? (it.kopfH || 0) : 0;
+    var bedarf = it.h + kopf;
+    if (seiten[seiten.length - 1].length && belegt + bedarf > verfuegbar) {
+      seiten.push([]);
+      belegt = 0;
+      tabellen = {};
+      kopf = it.tab !== undefined ? (it.kopfH || 0) : 0;
+      bedarf = it.h + kopf;
+    }
+    seiten[seiten.length - 1].push(i);
+    belegt += bedarf;
+    if (it.tab !== undefined) { tabellen[it.tab] = true; }
+  });
+  return seiten;
+}
+
+/* HTML einer Seite: Tabellenzeilen werden wieder zu einer Tabelle zusammengefasst */
+function manSeiteHtml(items, liste) {
+  var out = '';
+  var offen = null;
+  var schliessen = function () {
+    if (offen) { out += manTabelleHtml(offen.kopf, offen.zeilen); offen = null; }
+  };
+  liste.forEach(function (i) {
+    var it = items[i];
+    if (it.tab === undefined) {
+      schliessen();
+      out += manKasten(it.html);
+    } else {
+      if (!offen || offen.tab !== it.tab) { schliessen(); offen = { tab: it.tab, kopf: it.kopf, zeilen: '' }; }
+      offen.zeilen += it.zeile;
+    }
+  });
+  schliessen();
+  return out;
+}
+
+/* Die Fußzeile kommt nach der Seite und verkürzt sie: ändert sich die Höhe, wird einmal neu gerechnet (seit 0.97.0) */
+function manNachzeichnen() {
+  var naechster = window.requestAnimationFrame ? function (f) { window.requestAnimationFrame(f); } : function (f) { window.setTimeout(f, 16); };
+  naechster(function () {
+    var el = document.getElementById('inhalt');
+    if (!manSicht() || !el) { return; }
+    var innen = el.querySelector('.ma-inhalt');
+    /* Läuft eine Seite über, rechnet sie mit etwas mehr Abstand neu (Tabellenspalten sind erst im Ganzen bekannt) */
+    if (innen && innen.scrollHeight > innen.clientHeight + 1 && cl.man.puffer < 240) { cl.man.puffer += 24; manNeuZeichnen(); return; }
+    if (el.clientHeight !== cl.man.hoehe) { manNeuZeichnen(); }
+  });
+}
+
+function manBlaettern(richtung) {
+  cl.man.seite = (cl.man.seite || 0) + richtung;
+  manNeuZeichnen();
+}
+
 function manifestHtml() {
   var n = manifestNotiz();
   if (!n) {
     return '<div class="ma"><p class="leise">Noch kein Manifest. Lege im Memo Pad eine Notiz mit dem Titel „Manifest“ an, dann erscheint sie hier.</p></div>';
   }
-  var zeilen = String(n.text || '').split('\n');
-  return '<div class="ma">' + zeilen.map(function (z) {
-    return '<p class="ma-z">' + (pmInlineHtml(z) || '&nbsp;') + '</p>';
-  }).join('') + '</div>';
+  var el = document.getElementById('inhalt');
+  var breite = el ? el.clientWidth : 0;
+  var hoehe = el ? el.clientHeight : 0;
+  var mess = null;
+  if (el && breite > 40) {
+    mess = document.createElement('div');
+    mess.id = 'manMess';
+    /* Messung außerhalb der Seite, mit derselben Schrift — sonst stört der alte Inhalt (seit 0.97.0) */
+    var stil = window.getComputedStyle(el);
+    mess.style.cssText = 'position:fixed;visibility:hidden;left:-10000px;top:0;width:' + (breite - 24) + 'px;font-family:' + stil.fontFamily + ';font-size:' + cl.man.zoom + 'px;line-height:1.25';
+    document.body.appendChild(mess);
+  }
+  var items = manItems(n);
+  items.forEach(function (it) {
+    if (it.umbruch) { return; }
+    if (it.tab === undefined) { it.h = manMessen(manKasten(it.html)); }
+    else { it.h = manMessen(manTabelleHtml('', it.zeile)); it.kopfH = it.kopf ? manMessen(manTabelleHtml(it.kopf, '')) : 0; }
+  });
+  if (mess) { document.body.removeChild(mess); }
+  cl.man.hoehe = hoehe;
+  var geteilt = hoehe >= 160;
+  var seiten = manPacken(items, geteilt ? hoehe - 16 - cl.man.puffer : 1e9);
+  if (cl.man.seite >= seiten.length) { cl.man.seite = seiten.length - 1; }
+  if (cl.man.seite < 0) { cl.man.seite = 0; }
+  var s = cl.man.seite;
+  cl.man.anzahl = seiten.length;
+  /* Letzte Seite erreicht: die Sperre fällt (0.106.0) */
+  if (cl.man.pflicht && s >= seiten.length - 1) { cl.man.frei = true; }
+  var stil = geteilt
+    ? ' style="height:' + hoehe + 'px;box-sizing:border-box;display:flex;flex-direction:column;padding:8px 12px;overflow:hidden"'
+    : ' style="padding:8px 12px"';
+  return '<div class="ma"' + stil + '><div class="ma-inhalt" style="flex:1;min-height:0;overflow:hidden;font-size:' + cl.man.zoom + 'px;line-height:1.25">' + manSeiteHtml(items, seiten[s] || []) + '</div></div>';
 }
 
+/* Seit 0.97.3: Blättern in der Fußzeile mit langen Knöpfen; Seitenzahl dazwischen */
 function manifestFussHtml() {
-  return '<button type="button" class="knopf" onclick="oeffne(\'memo\')">Memo Pad…</button>';
+  var n = cl.man.anzahl || 1;
+  var s = cl.man.seite || 0;
+  var lang = 'style="flex:1;min-height:40px;font:inherit"';
+  var blaettern = n > 1
+    ? '<button type="button" class="knopf" ' + lang + ' onclick="manBlaettern(-1)" aria-label="zurück"' + (s === 0 ? ' disabled' : '') + '>◀</button>'
+      + '<span style="flex:1.4;text-align:center;font-size:14px">Seite ' + (s + 1) + ' von ' + n + '</span>'
+      + '<button type="button" class="knopf" ' + lang + ' onclick="manBlaettern(1)" aria-label="vor"' + (s >= n - 1 ? ' disabled' : '') + '>▶</button>'
+    : '';
+  return blaettern
+    + '<button type="button" class="knopf" onclick="manZoom(-1)" aria-label="kleiner">A−</button>'
+    + '<button type="button" class="knopf" onclick="manZoom(1)" aria-label="größer">A+</button>'
+    /* Pflichtlektüre: „Fertig“ erst, wenn die letzte Seite erreicht war (0.106.0) */
+    + (cl.man.pflicht && cl.man.frei ? '<button type="button" class="knopf voll" onclick="manPflichtFertig()">Fertig</button>' : '');
 }
+
+/* Inhalt und Fußzeile gemeinsam neu zeichnen: die Fußzeile zeigt die Seitenzahl (seit 0.97.3) */
+function manNeuZeichnen() {
+  inhaltZeichnen();
+  fussZeichnen();
+}
+
+/* Schriftgröße stufenweise (seit 0.97.1); der Standard ist 18 px, das Memo Pad hat 21 px */
+function manZoom(richtung) {
+  var i = MAN_STUFEN.indexOf(cl.man.zoom);
+  if (i < 0) { i = MAN_STUFEN.indexOf(18); }
+  i = Math.max(0, Math.min(MAN_STUFEN.length - 1, i + richtung));
+  cl.man.zoom = MAN_STUFEN[i];
+  cl.man.puffer = 0;
+  manNeuZeichnen();
+}
+
+/* Timer nach dem Laden wieder aufnehmen */
+if (document.readyState === 'complete') { fkTakt(); } else { window.addEventListener('load', fkTakt); }

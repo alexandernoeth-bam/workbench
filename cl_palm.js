@@ -25,7 +25,8 @@
    ============================================================ */
 
 cl.pm = { tab: 'datum', datum: 'woche', wahl: '', frisch: {}, fenster: null, zeile: -1, memoWahl: '', terminFuer: '',
-          showF: null, mf: null, zuAlle: false, zuTermin: false, edZeile: null, mshow: null, umst: null, vorlage: '', privat: 0, marke: '' };
+          showF: null, mf: null, zuAlle: false, zuTermin: false, edZeile: null, mshow: null, umst: null, vorlage: '', privat: 0, marke: '',
+          liste: '' };
 
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
 var PM_SHOW_KEY = 'clie-pm-show';
@@ -35,7 +36,9 @@ var PM_SORT = [['prio', 'Priorität, Datum'], ['datum', 'Datum, Priorität'], ['
 var PM_DATUM = [['woche', 'Diese Woche'], ['heute', 'Heute'], ['7', 'Nächste 7 Tage'], ['ueber', 'Überfällig'], ['alle', 'Alle mit Datum']];
 /* Seit 0.94: T = ToDo-Liste (nur Kennzeichen — die Kästchen bleiben im Memo).
    Seit 0.94.1 in dieser Reihenfolge — für Balken, Sortierung, Show… und Details */
-var PM_KUERZEL = ['T', 'A', 'P', 'Z', '–'];
+/* Seit 0.104.4 ohne „A“ (Abläufe gibt es nicht mehr), dafür „C“ für Checklisten —
+   die erkennt CLIE an der Typ-Zeile im Text */
+var PM_KUERZEL = ['T', 'C', 'P', 'Z', '–'];
 /* Das To-Do-Symbol im Kleinen: ein Blatt mit zwei Haken-Zeilen */
 var PM_TODO_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2.5 1.5h11v13h-11z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
   + '<path d="M4.5 4.5h2.5v2.5h-2.5zM4.5 9.5h2.5v2.5h-2.5z" fill="none" stroke="currentColor" stroke-width="1.2"/>'
@@ -90,6 +93,391 @@ function pmDatumText(d) {
 
 function pmKatName(id) { return id ? (katName(id) === 'Alle' ? 'Nicht abgelegt' : katName(id)) : 'Nicht abgelegt'; }
 
+/* ---------- Keine Aufgabe ohne Liste (seit 0.102.0) ----------
+   Die Liste steht als themaId am Aufgabensatz — dasselbe Feld, das die Workbench
+   als Liste liest. Fehlt sie oder zeigt sie ins Leere, gilt der Sammler. Deshalb
+   braucht es keine Datenwanderung: jede Aufgabe hat immer eine Liste. */
+
+function pmListeSatz(id) {
+  return id ? (DB.themen || []).filter(function (x) { return x && x.id === id; })[0] || null : null;
+}
+
+function pmListeIdVon(a) {
+  var id = String((a && a.themaId) || '');
+  return pmListeSatz(id) ? id : CK_KORB_ID;
+}
+
+function pmListeName(id) {
+  var t = pmListeSatz(id);
+  return t ? String(t.name || '(ohne Namen)') : 'Sammler';
+}
+
+/* Die Listen der gewählten Kategorie — der Sammler steht immer oben */
+function pmListen() {
+  ckKorb(true);
+  return (DB.themen || []).filter(function (t) {
+    return t && t.id && !t.abgeschlossen && (t.id === CK_KORB_ID || clPasst(t));
+  }).sort(function (a, b) {
+    if (a.id === CK_KORB_ID) { return -1; }
+    if (b.id === CK_KORB_ID) { return 1; }
+    return String(a.name || '').localeCompare(String(b.name || ''), 'de');
+  });
+}
+
+/* ---------- Listen nachziehen (seit 0.102.1) ----------
+   Aufgaben aus einer Memo-Notiz bekommen eine Liste je Notiz, Routinen die feste Liste
+   „Routinen“, alles andere den Sammler. Die Kennung der Liste wird aus der Kennung ihrer
+   Quelle abgeleitet: so legen zwei Geräte dieselbe Liste an und der Abgleich führt sie
+   zusammen, statt sie zu verdoppeln. */
+var PM_ROUTINEN_ID = 'cl-routinen';
+
+/* Eine gelöschte Liste darf nicht wiederkommen (0.104.1). Weil die Kennung aus der
+   Quelle abgeleitet ist, legte das Nachpflegen sie sonst mit frischem Zeitstempel neu
+   an — jünger als ihr eigener Löschvermerk. Der Abgleich hielt sie dann für eine
+   Neuanlage und meldete einen Konflikt. */
+function pmGrabsteinDa(sammlung, id) {
+  return (DB.grabsteine || []).some(function (g) { return g && g.s === sammlung && g.id === id; });
+}
+
+function pmListeAnlegen(id, name, muster) {
+  var t = pmListeSatz(id);
+  if (t) { return t; }
+  if (pmGrabsteinDa('themen', id)) { return null; }
+  if (!Array.isArray(DB.themen)) { DB.themen = []; }
+  var m = muster || {};
+  t = { id: id, name: String(name || 'Liste').trim().slice(0, 200) || 'Liste',
+        kontext: (m.kontext === 'beruflich') ? 'beruflich' : 'privat',
+        text: '', ordnung: kpNaechsterRang(), geaendert: jetzt() };
+  if (m.bereich) { t.bereich = m.bereich; }
+  DB.themen.push(t);
+  return t;
+}
+
+function pmListeFuerMemo(s) {
+  return pmListeAnlegen('cl-memo-' + s.id, String(s.titel || 'Notiz'),
+    { kontext: s.kontext, bereich: (s.__satz || {}).bereich });
+}
+
+/* Die Liste für Routinen — fällt auf den Sammler zurück, wenn „Routinen“ gelöscht wurde */
+function pmRoutinenListeId(kontext) {
+  var t = pmListeAnlegen(PM_ROUTINEN_ID, 'Routinen', { kontext: kontext });
+  if (t) { return t.id; }
+  ckKorb(true);
+  return CK_KORB_ID;
+}
+
+/* Die Liste einer neuen Aufgabe: gewählt, sonst die offene Liste, sonst die Liste der
+   Notiz, aus der sie stammt, sonst der Sammler */
+function pmListeNeuZiel(f) {
+  var g = f || {};
+  if (g.liste && pmListeSatz(g.liste)) { return g.liste; }
+  if (cl.pm.tab === 'liste' && pmListeSatz(cl.pm.liste)) { return cl.pm.liste; }
+  if (g.memo && g.memo.id) {
+    var s = kpSeiteFinden(g.memo.id);
+    var t = s ? pmListeFuerMemo(s) : null;
+    if (t) { return t.id; }
+  }
+  ckKorb(true);
+  return CK_KORB_ID;
+}
+
+function pmListenNachziehen() {
+  var n = 0;
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.id || pmListeSatz(a.themaId)) { return; }
+    var ziel = '';
+    if (a.wiederholung) {
+      ziel = pmRoutinenListeId(a.kontext);
+    } else if (a.memo && a.memo.id) {
+      var s = pmMemoVon(a);
+      var t = s ? pmListeFuerMemo(s) : null;
+      if (t) { ziel = t.id; }
+    }
+    if (!ziel) { ckKorb(true); ziel = CK_KORB_ID; }
+    a.themaId = ziel;
+    a.geaendert = jetzt();
+    n++;
+  });
+  return n;
+}
+
+/* ---------- Verwaiste Notizen aufräumen (seit 0.102.3) ----------
+   Eine Notiz, die nur da war, um Aufgaben zu tragen, hat jetzt ihre Liste. Sie wird beim
+   Start gelöscht, samt der Verbindung an den Aufgaben. Verschont bleiben Projekte und
+   Ziele — dort steht der Gedanke, nicht nur die Aufgabe — und Checklisten samt Vorlagen,
+   denn die sind Abhaklisten und gehören ins Memo Pad, nicht in den Papierkorb. */
+function pmNotizAufraeumbar(s) {
+  if (!s || s.art !== 'notiz') { return false; }
+  var x = s.__satz || {};
+  if (x.checkliste) { return false; }
+  return !!pmListeSatz('cl-memo-' + s.id);
+}
+
+function pmNotizenAufraeumen() {
+  var weg = {};
+  (DB.gedanken || []).forEach(function (g) {
+    if (g && g.id && pmNotizAufraeumbar(kpSeiteFinden(g.id))) { weg[g.id] = true; }
+  });
+  var ids = Object.keys(weg);
+  if (!ids.length) { return 0; }
+  (DB.aufgaben || []).forEach(function (a) {
+    if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+  });
+  DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
+  ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
+  return ids.length;
+}
+
+/* ---------- Die Kategorie kommt von der Liste (seit 0.103.0) ----------
+   Eine Aufgabe erbt die Kategorie ihrer Liste, und jede Liste braucht eine — sonst wäre
+   die Kategorie der Aufgabe eine Frage ohne Antwort. Einzige Ausnahme ist der Sammler:
+   dort liegen lose Aufgaben aus allen Bereichen, also behalten sie ihre eigene. */
+function pmKatAusListe(a) {
+  if (!a) { return false; }
+  var t = pmListeSatz(pmListeIdVon(a));
+  var b = t ? String(t.bereich || '') : '';
+  if (!b || String(a.bereich || '') === b) { return false; }
+  katPrivatSchreiben(a, { bereich: b });
+  a.geaendert = jetzt();
+  return true;
+}
+
+function pmKatenAngleichen() {
+  var n = 0;
+  (DB.aufgaben || []).forEach(function (a) { if (a && a.id && pmKatAusListe(a)) { n++; } });
+  return n;
+}
+
+/* Listen ohne Kategorie bekommen die häufigste ihrer Aufgaben — raten ist hier besser
+   als die Aufgaben ihre Kategorie zu kosten */
+function pmListenKatNachziehen() {
+  var zahl = {};
+  (DB.aufgaben || []).forEach(function (a) {
+    var b = a ? String(a.bereich || '') : '';
+    if (!a || !a.id || !b) { return; }
+    var lid = pmListeIdVon(a);
+    if (!zahl[lid]) { zahl[lid] = {}; }
+    zahl[lid][b] = (zahl[lid][b] || 0) + 1;
+  });
+  var n = 0;
+  (DB.themen || []).forEach(function (t) {
+    if (!t || !t.id || t.bereich || t.id === CK_KORB_ID) { return; }
+    var z = zahl[t.id];
+    if (!z) { return; }
+    var best = '';
+    Object.keys(z).forEach(function (b) { if (!best || z[b] > z[best]) { best = b; } });
+    if (!best || !kgName(best)) { return; }
+    t.bereich = best;
+    t.kontext = clIstArbeit(best) ? 'beruflich' : 'privat';
+    t.geaendert = jetzt();
+    n++;
+  });
+  return n;
+}
+
+/* ---------- Memo Pad zurückbauen (seit 0.104.0) ----------
+   Abläufe sind jetzt Listen im To Do und verschwinden hier; ihre Punkte leben als
+   Aufgaben in ihren Listen weiter. Checklisten werden schlichte Notizen mit
+   Kästchen-Zeilen, ihre Vorlagen bleiben als Notiz-Vorlagen. Projekte, Ziele und die
+   umgewandelten Checklisten tragen ihren Typ als erste Zeile im Text — bei den
+   Checklisten ist das nach der Umwandlung das Einzige, was ihn noch verrät. */
+var MP_TYP = /^\s*Typ\s*:\s*(.+?)\s*$/i;
+
+/* Der Typ, wie er im Text steht — '' wenn keine Typ-Zeile oben steht (0.104.4) */
+function mpTypVon(s) {
+  var zeilen = String((s && s.text) || '').split('\n');
+  var i = 0;
+  while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+  var m = (i < zeilen.length) ? zeilen[i].match(MP_TYP) : null;
+  return m ? m[1] : '';
+}
+
+/* Setzt die Typ-Zeile oder nimmt sie weg (0.104.4) */
+function mpTypSetzen(s, typ) {
+  if (!s) { return; }
+  if (typ) {
+    var t = mpTypZeile(s.text, typ);
+    if (t !== null) { s.text = t; }
+    return;
+  }
+  var zeilen = String(s.text || '').split('\n');
+  var i = 0;
+  while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+  if (i < zeilen.length && MP_TYP.test(zeilen[i])) {
+    zeilen.splice(i, 1);
+    s.text = zeilen.join('\n');
+  }
+}
+
+/* Gibt den neuen Text oder null, wenn die Zeile schon richtig dasteht */
+function mpTypZeile(text, typ) {
+  var zeilen = String(text || '').split('\n');
+  var i = 0;
+  while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+  var m = (i < zeilen.length) ? zeilen[i].match(MP_TYP) : null;
+  if (m) {
+    if (m[1] === typ) { return null; }
+    zeilen[i] = 'Typ: ' + typ;
+    return zeilen.join('\n');
+  }
+  return 'Typ: ' + typ + '\n' + String(text || '');
+}
+
+/* Repariert, was 0.104.0 an Vorlagen verdorben hat: sie wurden zu Notiz-Vorlagen und
+   verloren damit Stichtag und Abstände. Sicher erkennbar sind sie an der Typ-Zeile, die
+   dieselbe Fassung eingefügt hat — die kommt sonst nirgends vor (0.104.2). */
+function mpVorlagenZurueck() {
+  var n = 0;
+  (DB.gedanken || []).forEach(function (g) {
+    if (!g || g.checkliste || g.istVorlage !== true) { return; }
+    var zeilen = String(g.text || '').split('\n');
+    var i = 0;
+    while (i < zeilen.length && !zeilen[i].trim()) { i++; }
+    if (i >= zeilen.length || !/^\s*Typ\s*:\s*Checkliste\s*$/i.test(zeilen[i])) { return; }
+    zeilen.splice(i, 1);
+    g.text = zeilen.join('\n');
+    g.checkliste = 'vorlage';
+    delete g.istVorlage;
+    g.geaendert = jetzt();
+    n++;
+  });
+  return n;
+}
+
+function mpArtenAufraeumen() {
+  var n = mpVorlagenZurueck();
+  /* 1. Abläufe löschen */
+  var weg = {};
+  (DB.gedanken || []).forEach(function (g) {
+    if (g && g.id && g.checkliste && g.checkliste !== 'vorlage' && g.art === 'aufgaben') { weg[g.id] = true; }
+  });
+  var ids = Object.keys(weg);
+  if (ids.length) {
+    (DB.aufgaben || []).forEach(function (a) {
+      if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+    });
+    DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
+    ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
+    n += ids.length;
+  }
+  /* 2. Checklisten werden Notizen — Vorlagen aber nicht: als schlichte Notiz verlören
+     sie Stichtag und Abstände (@+1 09:00), also genau das, wofür sie da sind (0.104.2) */
+  (DB.gedanken || []).forEach(function (g) {
+    if (!g || !g.checkliste || g.checkliste === 'vorlage') { return; }
+    delete g.checkliste;
+    delete g.art;
+    var t = mpTypZeile(g.text, 'Checkliste');
+    if (t !== null) { g.text = t; }
+    g.geaendert = jetzt();
+    n++;
+  });
+  /* 3. Projekte und Ziele bekommen ihre Typ-Zeile */
+  [['projekte', 'Projekt'], ['ziele', 'Ziel']].forEach(function (p) {
+    (DB[p[0]] || []).forEach(function (x) {
+      var t = x ? mpTypZeile(x.flaeche, p[1]) : null;
+      if (t === null || !x) { return; }
+      x.flaeche = t;
+      x.geaendert = jetzt();
+      n++;
+    });
+  });
+  return n;
+}
+
+/* ---------- Reihenfolge in einer Liste (seit 0.105.0) ----------
+   Der Rang steht als Zahl an der Aufgabe und gilt nur in der geöffneten Liste. Wer noch
+   keinen hat, steht hinten — so rutscht eine neue Aufgabe ans Ende statt nach vorn. */
+function pmRang(a) {
+  var r = Number(a && a.rang);
+  return (isFinite(r) && r > 0) ? r : 9999;
+}
+
+function pmListeSortiert(l) {
+  return l.slice().sort(function (a, b) {
+    return (pmRang(a) - pmRang(b)) || pmTitel(a).localeCompare(pmTitel(b), 'de');
+  });
+}
+
+function pmRangTauschen(id, richtung) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  var lid = pmListeIdVon(a);
+  var l = pmListeSortiert(pmTodoAlle().filter(function (x) { return pmListeIdVon(x) === lid; }));
+  var i = -1;
+  l.forEach(function (x, n) { if (x.id === id) { i = n; } });
+  var j = i + (richtung < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= l.length) { return; }
+  var h = l[i];
+  l[i] = l[j];
+  l[j] = h;
+  /* Alle neu durchzählen — sonst bliebe ein Teil der Liste ohne feste Reihenfolge */
+  var z = jetzt();
+  l.forEach(function (x, n) {
+    if (Number(x.rang) !== n + 1) { x.rang = n + 1; x.geaendert = z; }
+  });
+  spaeterSichern();
+  zeichne();
+}
+
+/* Auslassen und Verlegen an der Aufgabe (seit 0.105.2). Es öffnet dasselbe Fenster wie
+   „Nur diesmal…“ in Routines — die Logik gibt es damit weiter nur einmal. */
+function pmRoutineDiesmal() {
+  var f = cl.pm.fenster;
+  var a = (f && f.id) ? pmAufgabeFinden(f.id) : null;
+  if (!a || !a.wiederholung) { melde('Das ist keine Routine.', 'warn'); return; }
+  cl.pm.fenster = null;
+  cl.rt.fenster = { modus: 'diesmal', id: a.id };
+  cl.aufklapp = 'routine';
+  aufklappNeu();
+}
+
+function pmListenWahlAuf() {
+  cl.aufklapp = (cl.aufklapp === 'pmliste') ? '' : 'pmliste';
+  aufklappNeu();
+}
+
+function pmListenWahlHtml() {
+  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:84px;left:6px">'
+    + '<button type="button"' + (cl.pm.liste ? '' : ' class="an"') + ' onclick="pmListenWahl(\'\')"><span>Alle Listen</span></button>'
+    + '<div class="trenn"></div>';
+  var offen = {};
+  pmTodoAlle().forEach(function (a) {
+    var k = pmListeIdVon(a);
+    if (!pmErledigtJetzt(a)) { offen[k] = (offen[k] || 0) + 1; }
+  });
+  h += pmListen().map(function (t) {
+    return '<button type="button"' + (cl.pm.liste === t.id ? ' class="an"' : '') + ' onclick="pmListenWahl(\'' + esc(t.id) + '\')"><span>'
+      + esc(pmListeName(t.id)) + '</span><small>' + (offen[t.id] || 0) + '</small></button>';
+  }).join('') + '<div class="trenn"></div>';
+  if (pmListeSatz(cl.pm.liste)) {
+    h += '<button type="button" class="leise" onclick="pmListeBearbeiten()"><span>Liste bearbeiten…</span></button>';
+  }
+  return h + '<button type="button" class="leise" onclick="pmListeNeu()"><span>+ Neue Liste…</span></button></div>';
+}
+
+function pmListenWahl(id) {
+  cl.pm.liste = (id && pmListeSatz(id)) ? id : '';
+  cl.aufklapp = '';
+  zeichne();
+}
+
+/* Listen pflegen (seit 0.102.2): Name, Kategorie, Archivieren und Löschen stehen schon
+   im Fenster der Checklisten — das benutzen wir, statt ein zweites zu bauen. */
+function pmListeBearbeiten() {
+  if (!pmListeSatz(cl.pm.liste)) { melde('Erst eine Liste wählen.', 'warn'); return; }
+  cl.cls.id = cl.pm.liste;
+  clsDetails();
+}
+
+function pmListeNeu() {
+  var t = pmListeAnlegen(neueKennung(), 'Neue Liste',
+    { kontext: clIstArbeit(clFilter()) ? 'beruflich' : 'privat', bereich: ckBereichName(cl.filter) ? cl.filter : '' });
+  spaeterSichern();
+  cl.pm.liste = t.id;
+  cl.pm.tab = 'liste';
+  pmListeBearbeiten();
+}
+
 function pmKatRang(a) {
   var k = clKategorieVon(a);
   var l = kgAlle();
@@ -101,7 +489,10 @@ function pmKatRang(a) {
 /* Eine neue Aufgabe — dieselbe Gestalt wie in der Workbench */
 function pmNeueAufgabe(f) {
   var a = { id: neueKennung(), titel: String(f.titel || '').trim().slice(0, 300), beschreibung: String(f.notiz || ''), kontext: 'privat',
-            themaId: null, projektId: null, frist: '', planung: pmIstDatum(f.datum) ? f.datum : 'backlog',
+            /* Seit 0.102.0 Pflicht: die Liste. Vorbelegt ist die offene Liste, sonst die
+               Liste der Memo-Notiz, aus der die Aufgabe stammt, sonst der Sammler. */
+            themaId: pmListeNeuZiel(f),
+            projektId: null, frist: '', planung: pmIstDatum(f.datum) ? f.datum : 'backlog',
             uhrzeit: pmIstZeit(f.zeit) && pmIstDatum(f.datum) ? f.zeit : '', art: 'haupt', wiederholung: null, status: 'offen',
             erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null, ab: '', prio: (f.prio >= 1 && f.prio <= 5) ? f.prio : 3,
             geaendert: jetzt() };
@@ -110,6 +501,8 @@ function pmNeueAufgabe(f) {
   if (f.memo && f.memo.id) { a.memo = { id: f.memo.id }; if (f.memo.zeile) { a.memo.zeile = f.memo.zeile; } }
   if (!Array.isArray(DB.aufgaben)) { DB.aufgaben = []; }
   DB.aufgaben.push(a);
+  /* Seit 0.103.0 gilt die Kategorie der Liste, nicht die mitgegebene */
+  pmKatAusListe(a);
   return a;
 }
 
@@ -140,6 +533,19 @@ function pmAufgabeZurMarke(mid) {
   return (a && a.memo && a.memo.zeile === mid) ? a : null;
 }
 
+/* Der heutige Termin einer Routine — wenn sie heute fällig oder heute erledigt ist */
+function pmRoutineHeute(a) {
+  var h = isoDatum();
+  return (aufgabeFaelligAn(a, h) || istErledigtAn(a, h)) ? h : '';
+}
+
+/* Ein Memo zeigt bei seinen Routinen den Stand von heute */
+function pmRoutinenAngleichen(s) {
+  (DB.aufgaben || []).forEach(function (a) {
+    if (a && a.wiederholung && a.memo && a.memo.id === s.id) { pmZeileAngleichen(a); }
+  });
+}
+
 /* Haken der Aufgabe → Haken der Zeile */
 function pmZeileAngleichen(a) {
   var s = pmMemoVon(a);
@@ -147,7 +553,7 @@ function pmZeileAngleichen(a) {
   var nr = pmZeileMitMarke(s, a.memo.zeile);
   if (nr < 0) { return false; }
   var k = kpAufgabe(String(s.text || '').split('\n')[nr]);
-  var soll = a.status === 'erledigt';
+  var soll = a.wiederholung ? istErledigtAn(a, isoDatum()) : a.status === 'erledigt';
   if (!k || k.erledigt === soll) { return false; }
   return kpKastenSetzen(s, nr, soll);
 }
@@ -157,11 +563,12 @@ function pmHaken(id, tag) {
   var a = pmAufgabeFinden(id);
   if (!a) { return; }
   if (a.wiederholung) {
-    var d = pmIstDatum(tag) ? tag : (pmIstDatum(cl.pm.frisch[id]) ? cl.pm.frisch[id] : rtDiesmalTag(a));
+    var d = pmIstDatum(tag) ? tag : (pmIstDatum(cl.pm.frisch[id]) ? cl.pm.frisch[id] : (pmRoutineHeute(a) || rtDiesmalTag(a)));
     if (!d) { return; }
     var jetztErl = !istErledigtAn(a, d);
     wiederholungSetzen(a, d, jetztErl);
     if (!pmIstDatum(tag)) { if (jetztErl) { cl.pm.frisch[id] = d; } else { delete cl.pm.frisch[id]; } }
+    if (d === isoDatum()) { pmZeileAngleichen(a); }
   } else {
     if (a.status === 'erledigt') { a.status = 'offen'; a.erledigtAm = null; }
     else { a.status = 'erledigt'; a.erledigtAm = isoDatum(); }
@@ -169,6 +576,7 @@ function pmHaken(id, tag) {
     pmZeileAngleichen(a);
   }
   a.geaendert = jetzt();
+  raHakenMerken(a);   /* Zeigt sie nach OneNote? Dann dort noch abhaken (0.117.0) */
   spaeterSichern();
   zeichne();
 }
@@ -180,7 +588,12 @@ function pmMemoHaken(seiteId, nr) {
   var z = String(s.text || '').split('\n')[nr] || '';
   var a = pmAufgabeZurMarke(pmMarke(z));
   var k = kpAufgabe(z);
-  if (a && k && !a.wiederholung) {
+  if (a && k && a.wiederholung) {
+    /* Routine: der Haken gilt für heute — wie in der Aufgabe */
+    var h = isoDatum();
+    if (istErledigtAn(a, h) !== !!k.erledigt) { wiederholungSetzen(a, h, !!k.erledigt); }
+    a.geaendert = jetzt();
+  } else if (a && k) {
     a.status = k.erledigt ? 'erledigt' : 'offen';
     a.erledigtAm = k.erledigt ? isoDatum() : null;
     a.geaendert = jetzt();
@@ -204,11 +617,11 @@ function pmTabLaden() {
   var t = '';
   try { t = window.localStorage.getItem(PM_TAB_KEY) || ''; } catch (e) { t = ''; }
   /* Seit 0.95.0 ist Datum der Start, danach Kategorie und Alle */
-  cl.pm.tab = (t === 'alle' || t === 'kategorie') ? t : 'datum';
+  cl.pm.tab = (t === 'alle' || t === 'kategorie' || t === 'woche' || t === 'liste') ? t : 'datum';
 }
 
 function pmTab(t) {
-  if (['alle', 'datum', 'kategorie'].indexOf(t) < 0) { return; }
+  if (['alle', 'datum', 'liste', 'kategorie', 'woche'].indexOf(t) < 0) { return; }
   cl.pm.tab = t;
   try { window.localStorage.setItem(PM_TAB_KEY, t); } catch (e) { /* nur für jetzt */ }
   var el = document.getElementById('inhalt');
@@ -250,6 +663,78 @@ function pmSortieren(l, art) {
 }
 
 /* Eine Zeile: Kästchen · Priorität · Titel (ein- oder zweizeilig) · Zeichen · Datum */
+/* ---- Aufgaben mit einer Seite in OneNote (seit 0.115.0) ----
+   Die Aufgabe merkt sich den Knoten im Radar, nicht die URL — so bleibt der Link an
+   einer Stelle und eine Korrektur wirkt überall. Der Cluster wird dagegen beim Zuordnen
+   abgeschrieben: er ist eine Beschriftung, keine Verbindung, und darf stehenbleiben,
+   wenn der Knoten einmal verschwindet. */
+function pmOnKnoten(a) {
+  return (a && a.radar) ? raFinden(a.radar) : null;
+}
+
+function pmOnLink(a) {
+  var k = pmOnKnoten(a);
+  return k ? raLink(k) : '';
+}
+
+function pmOnSetzen(id, knotenId) {
+  var a = pmAufgabeFinden(id);
+  var k = knotenId ? raFinden(knotenId) : null;
+  if (!a) { return false; }
+  if (!knotenId) { delete a.radar; } else if (!k || k.art === 'ordner') { return false; } else {
+    a.radar = k.id;
+    var c = raCluster(k);
+    if (c) { a.clusterTag = c; }
+    if (a.memo) { delete a.memo; }   /* entweder oder */
+  }
+  a.geaendert = Date.now();
+  spaeterSichern();
+  return true;
+}
+
+/* Die Auswahl: alle Knoten des Radars, die einen Link tragen */
+function pmOnWahlAuf() {
+  if (!cl.pm.fenster || !cl.pm.fenster.id) { return; }
+  cl.aufklapp = 'pmon';
+  aufklappNeu();
+}
+
+function pmOnWahlHtml() {
+  var f = cl.pm.fenster;
+  if (!f) { return ''; }
+  var a = f.id ? pmAufgabeFinden(f.id) : null;
+  var jetzt = a && a.radar ? a.radar : '';
+  var h = '<div class="fenster"><div class="titel">Seite in OneNote</div><div class="rumpf">';
+  var leer = true;
+  RA_BEREICHE.forEach(function (b) {
+    var l = raKnoten().filter(function (k) { return String(k.bereich || 'beruflich') === b[0] && k.art !== 'ordner' && raHatLink(k); });
+    if (!l.length) { return; }
+    leer = false;
+    h += '<div class="gruppe">' + esc(b[1]) + '</div>';
+    h += l.sort(function (x, y) { return String(x.name || '').localeCompare(String(y.name || ''), 'de'); }).map(function (k) {
+      var c = raCluster(k);
+      return '<button type="button" class="ra-ziel' + (jetzt === k.id ? ' an' : '') + '" onclick="pmOnZu(\'' + esc(k.id) + '\')">'
+        + (c ? '[' + esc(c) + '] ' : '') + esc(k.name || '') + '</button>';
+    }).join('');
+  });
+  if (leer) { h += '<p class="leise">Noch kein Knoten mit Link im Radar — Memo Pad, ▼ Radar.</p>'; }
+  if (jetzt) { h += '<div class="gruppe">Verbindung</div><button type="button" class="ra-ziel" onclick="pmOnZu(\'\')">Lösen</button>'; }
+  return h + '<div class="knoepfe"><button type="button" class="knopf" onclick="pmDetailsZurueck()">Zurück</button></div></div></div>';
+}
+
+function pmOnZu(knotenId) {
+  var f = cl.pm.fenster;
+  if (!f || !f.id) { aufklappZu(); return; }
+  if (!pmOnSetzen(f.id, knotenId)) { melde('Das ging nicht.', 'warn'); return; }
+  melde(knotenId ? 'Mit OneNote verbunden.' : 'Verbindung gelöst.', null);
+  pmDetails(f.id);
+}
+
+function pmDetailsZurueck() {
+  var f = cl.pm.fenster;
+  if (f && f.id) { pmDetails(f.id); } else { aufklappZu(); }
+}
+
 function pmZeileHtml(a, opt) {
   var o = opt || {};
   var show = o.show || pmShow();
@@ -264,7 +749,14 @@ function pmZeileHtml(a, opt) {
   var sym = '';
   if (pmIstZeit(a.uhrzeit)) { sym += '<span class="pm-sym" aria-label="Erinnerung">◉' + (o.zeit ? ' ' + esc(clZeitText(a.uhrzeit)) : '') + '</span>'; }
   if (a.wiederholung) { sym += '<span class="pm-sym" aria-label="Wiederholung">↻</span>'; }
-  if (a.memo && a.memo.id) { sym += '<button type="button" class="pm-sym" onclick="pmMemoVonAufgabe(\'' + id + '\')" aria-label="Memo öffnen">▤</button>'; }
+  /* In der offenen Liste bekommt die angetippte Aufgabe Pfeile zum Verschieben (0.105.0) */
+  if (o.rang && gew) {
+    sym += '<button type="button" class="pm-sym" onclick="pmRangTauschen(\'' + id + '\',-1)" aria-label="Nach oben">▲</button>'
+      + '<button type="button" class="pm-sym" onclick="pmRangTauschen(\'' + id + '\',1)" aria-label="Nach unten">▼</button>';
+  }
+  /* Entweder OneNote oder das Memo — beides nebeneinander sprengt die Zeile (0.115.0) */
+  if (pmOnLink(a)) { sym += '<button type="button" class="pm-on" onclick="raOeffnen(\'' + esc(a.radar) + '\')" aria-label="In OneNote öffnen">ON</button>'; }
+  else if (a.memo && a.memo.id) { sym += '<button type="button" class="pm-sym" onclick="pmMemoVonAufgabe(\'' + id + '\')" aria-label="Memo öffnen">▤</button>'; }
   else if (String(a.beschreibung || '').trim()) { sym += '<button type="button" class="pm-sym" onclick="pmDetails(\'' + id + '\')" aria-label="Notiz">▤</button>'; }
   var datum = '';
   if (o.mitDatum !== false && show.datum && d) {
@@ -273,7 +765,8 @@ function pmZeileHtml(a, opt) {
   var html = '<div class="aufg palm pm' + (erl ? ' erl' : '') + (gew ? ' gewaehlt' : '') + (lang ? ' ausf' : '') + '" id="pmA' + id + '">'
     + clKastenHtml(erl, 'pmHaken(\'' + id + '\'' + (tag ? ',\'' + esc(tag) + '\'' : '') + ')')
     + (show.prio ? '<button type="button" class="pd" onclick="pmPrioUm(\'' + id + '\')" aria-label="Priorität">' + pmPrio(a) + '</button>' : '')
-    + '<button type="button" class="tx' + (lang ? ' lang' : '') + '" onclick="' + (tag ? 'pmDetails' : 'pmTippen') + '(\'' + id + '\')"><span class="tt">' + esc(titel) + '</span></button>'
+    + '<button type="button" class="tx' + (lang ? ' lang' : '') + '" onclick="' + (tag ? 'pmDetails' : 'pmTippen') + '(\'' + id + '\')"><span class="tt">'
+    + (a.clusterTag ? '<span class="pm-clu">[' + esc(a.clusterTag) + ']</span> ' : '') + esc(titel) + '</span></button>'
     + sym + datum
     + (show.kat && o.mitKat !== false ? '<span class="kt">' + esc(pmKatName(clKategorieVon(a))) + '</span>' : '')
     + '</div>';
@@ -294,6 +787,7 @@ function pmWocheBis() {
 
 function pmTodoHtml() {
   var h = pmBannerHtml();
+  if (cl.pm.tab === 'woche') { return h + pmWocheHtml(); }
   var show = pmShow();
   var heute = isoDatum();
   var l = pmTodoAlle();
@@ -328,6 +822,37 @@ function pmTodoHtml() {
     });
     return h;
   }
+  /* Seit 0.102.0: dieselben Aufgaben, nach Listen — oben die Wahl zum Hineingehen */
+  if (cl.pm.tab === 'liste') {
+    /* Eine gelöschte oder archivierte Liste darf nicht als Wahl stehen bleiben */
+    if (cl.pm.liste && !pmListeSatz(cl.pm.liste)) { cl.pm.liste = ''; }
+    h += '<button type="button" class="pm-datwahl" onclick="pmListenWahlAuf()">▼ '
+      + esc(cl.pm.liste ? pmListeName(cl.pm.liste) : 'Alle Listen') + '</button>';
+    if (cl.pm.liste) {
+      l = l.filter(function (a) { return pmListeIdVon(a) === cl.pm.liste; });
+      if (!l.length) { return h + '<p class="leise">Diese Liste ist leer — „Neu“ tippen.</p>'; }
+      /* In der offenen Liste gilt die eigene Reihenfolge, nicht die Sortierung aus Show (0.105.0) */
+      return h + pmListeSortiert(l).map(function (a) { return pmZeileHtml(a, { show: show, rang: true }); }).join('');
+    }
+    if (!l.length) { return h + '<p class="leise">' + (show.faellig ? 'Nichts fällig.' : 'Keine Aufgaben — „Neu“ tippen.') + '</p>'; }
+    var nachListe = {};
+    var folgeL = [];
+    pmSortieren(l, show.sort).forEach(function (a) {
+      var k = pmListeIdVon(a);
+      if (!nachListe[k]) { nachListe[k] = []; folgeL.push(k); }
+      nachListe[k].push(a);
+    });
+    folgeL.sort(function (x, y) {
+      if (x === CK_KORB_ID) { return 1; }
+      if (y === CK_KORB_ID) { return -1; }
+      return pmListeName(x).localeCompare(pmListeName(y), 'de');
+    });
+    folgeL.forEach(function (k) {
+      h += '<div class="pm-bal">' + esc(pmListeName(k)) + '<small>' + nachListe[k].length + '</small></div>'
+        + nachListe[k].map(function (a) { return pmZeileHtml(a, { show: show }); }).join('');
+    });
+    return h;
+  }
   if (!l.length) { return h + '<p class="leise">' + (show.faellig ? 'Nichts fällig.' : 'Keine Aufgaben — „Neu“ tippen.') + '</p>'; }
   if (cl.pm.tab === 'kategorie') {
     var nachKat = {};
@@ -347,11 +872,193 @@ function pmTodoHtml() {
   return h + pmSortieren(l, show.sort).map(function (a) { return pmZeileHtml(a, { show: show }); }).join('');
 }
 
+/* ---------- Wochenstatistik (seit 0.97.11) ----------
+   Zeit und Anzahl je Bereich (Privat/Beruflich): Termine nach Dauer, Aufgaben
+   und Routinen nach Priorität, Memo Pad und Ideen nach Anlage und Abschluss.
+   „erledigt“ zählt bis heute, „Vorschau“ den Plan der Woche. */
+
+function wsMontagVon(is) {
+  return tagePlus(is, -((ausIso(is).getDay() + 6) % 7));
+}
+
+function wsBereich(o) { return clIstArbeit(clKategorieVon(o)) ? 'beruflich' : 'privat'; }
+
+function wsMinuten(von, bis) {
+  if (!pmIstZeit(von) || !pmIstZeit(bis)) { return 0; }
+  var a = von.split(':');
+  var b = bis.split(':');
+  var m = (Number(b[0]) * 60 + Number(b[1])) - (Number(a[0]) * 60 + Number(a[1]));
+  return m > 0 ? m : 0;
+}
+
+function wsStdText(min) {
+  return Math.floor(min / 60) + ' h ' + (min % 60 < 10 ? '0' : '') + (min % 60);
+}
+
+function wsLeer() {
+  return { termine: [], aufgaben: [], routinen: [], memoNeu: [], memoArch: [], ideenNeu: [], ideenFertig: [] };
+}
+
+function pmWocheStand() {
+  if (!pmIstDatum(cl.pm.wocheMontag)) { cl.pm.wocheMontag = wsMontagVon(isoDatum()); }
+  if (cl.pm.wocheModus !== 'vorschau') { cl.pm.wocheModus = 'erledigt'; }
+  return { montag: cl.pm.wocheMontag, modus: cl.pm.wocheModus };
+}
+
+/* Seit 0.97.13 zählt die Statistik beide Bereiche — der Kopf-Filter gilt hier nicht */
+function pmWocheStat(montag, modus) {
+  var merkeFilter = cl.filter;
+  cl.filter = 'alle';
+  try { return pmWocheStatRechnen(montag, modus); } finally { cl.filter = merkeFilter; }
+}
+
+function pmWocheStatRechnen(montag, modus) {
+  var heute = isoDatum();
+  var ende = tagePlus(montag, 6);
+  var tage = [];
+  var i;
+  for (i = 0; i < 7; i++) { tage.push(tagePlus(montag, i)); }
+  var im = function (d) { return d >= montag && d <= ende && (modus === 'vorschau' || d <= heute); };
+  var s = { privat: wsLeer(), beruflich: wsLeer() };
+  var im2 = function (d) { return d >= montag && d <= ende; };
+
+  tage.forEach(function (d) {
+    if (!im(d)) { return; }
+    (clTermineAm(d).zeit || []).forEach(function (x) {
+      s[wsBereich(x)].termine.push({ titel: String(x.titel || ''), tag: d, zeit: x.zeit || '', min: wsMinuten(x.zeit, x.bis) });
+    });
+  });
+
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.id || prPrivatVerborgen(null, a)) { return; }
+    var b = wsBereich(a);
+    var p = pmPrio(a);
+    if (a.wiederholung) {
+      tage.forEach(function (d) {
+        if (!im(d)) { return; }
+        if (modus === 'erledigt' && istErledigtAn(a, d)) { s[b].routinen.push({ id: a.id, titel: pmTitel(a), tag: d, prio: p }); }
+        if (modus === 'vorschau' && !a.pausiert && aufgabeFaelligAn(a, d) && !istErledigtAn(a, d)) { s[b].routinen.push({ id: a.id, titel: pmTitel(a), tag: d, prio: p }); }
+      });
+      return;
+    }
+    if (modus === 'erledigt') {
+      if (a.status === 'erledigt' && pmIstDatum(a.erledigtAm) && a.erledigtAm >= montag && a.erledigtAm <= heute && a.erledigtAm <= ende) {
+        s[b].aufgaben.push({ id: a.id, titel: pmTitel(a), tag: a.erledigtAm, prio: p });
+      }
+    } else if (a.status !== 'erledigt' && pmIstDatum(pmDatum(a)) && im2(pmDatum(a))) {
+      s[b].aufgaben.push({ id: a.id, titel: pmTitel(a), tag: pmDatum(a), prio: p });
+    }
+  });
+
+  if (modus === 'erledigt') {
+    kpSeitenAlle().forEach(function (m) {
+      var x = m && m.__satz;
+      if (!x || pmIstVorlage(m) || prPrivatVerborgen(m, null)) { return; }
+      var b = wsBereich(m);
+      if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].memoNeu.push({ titel: String(m.titel || ''), tag: x.angelegt }); }
+      if (pmIstDatum(x.archivAm) && x.archivAm >= montag && x.archivAm <= heute) { s[b].memoArch.push({ titel: String(m.titel || ''), tag: x.archivAm }); }
+    });
+    iwAlle().forEach(function (x) {
+      if (prPrivatVerborgen(null, x)) { return; }
+      var b = wsBereich(x);
+      if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].ideenNeu.push({ titel: String(x.titel || ''), tag: x.angelegt }); }
+      if (pmIstDatum(x.fertigAm) && x.fertigAm >= montag && x.fertigAm <= heute) { s[b].ideenFertig.push({ titel: String(x.titel || ''), tag: x.fertigAm }); }
+    });
+  }
+  return s;
+}
+
+function pmWocheNav(n) {
+  cl.pm.wocheMontag = tagePlus(pmWocheStand().montag, n);
+  cl.pm.wocheDrill = null;
+  zeichne();
+}
+
+function pmWocheModusSetzen(m) {
+  cl.pm.wocheModus = m === 'vorschau' ? 'vorschau' : 'erledigt';
+  cl.pm.wocheDrill = null;
+  zeichne();
+}
+
+/* Antippen einer Zahl: die Liste darunter; zweiter Tipp auf dieselbe Zahl schließt sie */
+function pmWocheDrill(b, art, p) {
+  var neu = { b: b, art: art, p: p === undefined ? null : p };
+  var alt = cl.pm.wocheDrill;
+  var gleich = alt && alt.b === neu.b && alt.art === neu.art && alt.p === neu.p;
+  cl.pm.wocheDrill = gleich ? null : neu;
+  zeichne();
+}
+
+function pmWocheZahl(b, art, p, liste) {
+  var n = liste.length;
+  if (!n) { return '0'; }
+  return '<button type="button" class="pm-tipp" onclick="pmWocheDrill(\'' + b + '\',\'' + art + '\',' + (p === undefined ? 'null' : p) + ')">' + n + '</button>';
+}
+
+function pmWocheBereichHtml(b, d, st, modus) {
+  var namen = { privat: 'Privat', beruflich: 'Beruflich' };
+  var min = d.termine.reduce(function (sum, x) { return sum + x.min; }, 0);
+  var h = '<div class="pm-wbereich"><div class="pm-wkopf">' + namen[b] + '</div>';
+  h += '<div class="pm-wzeile"><span>Termine</span><span>' + (d.termine.length ? '<button type="button" class="pm-tipp" onclick="pmWocheDrill(\'' + b + '\',\'termine\',null)">' + wsStdText(min) + ' · ' + d.termine.length + '</button>' : '0') + '</span></div>';
+  if (modus === 'erledigt') {
+    h += '<div class="pm-wzeile"><span>Memo Pad · neu / archiviert</span><span>' + pmWocheZahl(b, 'memoNeu', undefined, d.memoNeu) + ' / ' + pmWocheZahl(b, 'memoArch', undefined, d.memoArch) + '</span></div>';
+    h += '<div class="pm-wzeile"><span>Ideen · neu / abgeschlossen</span><span>' + pmWocheZahl(b, 'ideenNeu', undefined, d.ideenNeu) + ' / ' + pmWocheZahl(b, 'ideenFertig', undefined, d.ideenFertig) + '</span></div>';
+  }
+  h += '<table><tr><th>Priorität</th><th>Aufgaben</th><th>Routinen</th></tr>';
+  var p;
+  for (p = 1; p <= 5; p++) {
+    var pa = d.aufgaben.filter(function (x) { return x.prio === p; });
+    var pr = d.routinen.filter(function (x) { return x.prio === p; });
+    h += '<tr><td>' + p + (p === 1 ? ' · wichtig' : (p === 5 ? ' · unwichtig' : '')) + '</td><td>' + pmWocheZahl(b, 'aufgaben', p, pa) + '</td><td>' + pmWocheZahl(b, 'routinen', p, pr) + '</td></tr>';
+  }
+  h += '</table></div>';
+  return h;
+}
+
+function pmWocheListeHtml(st) {
+  var dr = cl.pm.wocheDrill;
+  var d = st[dr.b];
+  var art = dr.art;
+  var l = [];
+  if (art === 'termine') { l = d.termine.map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) + ' ' + x.zeit + ' · ' + wsStdText(x.min) }; }); }
+  if (art === 'aufgaben' || art === 'routinen') {
+    l = d[art].filter(function (x) { return dr.p === null || x.prio === dr.p; }).map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) + ' · Prio ' + x.prio }; });
+  }
+  if (art === 'memoNeu' || art === 'memoArch' || art === 'ideenNeu' || art === 'ideenFertig') {
+    l = d[art].map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) }; });
+  }
+  var h = '<div class="pm-wliste"><div class="pm-wkopf">' + (dr.b === 'privat' ? 'Privat' : 'Beruflich') + ' · ' + esc(wsArtName(art)) + (dr.p ? ' · Priorität ' + dr.p : '') + '</div>';
+  if (!l.length) { h += '<p class="leise">Keine Einträge.</p>'; }
+  h += l.map(function (x) { return '<div class="pm-wzeile"><span>' + esc(x.t) + '</span><span class="leise">' + esc(x.r) + '</span></div>'; }).join('');
+  return h + '</div>';
+}
+
+function wsArtName(art) {
+  return { termine: 'Termine', aufgaben: 'Aufgaben', routinen: 'Routinen', memoNeu: 'Memo Pad neu', memoArch: 'Memo Pad archiviert', ideenNeu: 'Ideen neu', ideenFertig: 'Ideen abgeschlossen' }[art] || art;
+}
+
+function pmWocheHtml() {
+  var w = pmWocheStand();
+  var st = pmWocheStat(w.montag, w.modus);
+  var h = '<div class="pm-woche">';
+  h += '<div class="pm-wreihe"><button type="button" class="knopf" onclick="pmWocheNav(-7)" aria-label="Vorige Woche">◀</button>'
+    + '<div class="pm-wtitel">' + esc(clKurzDatum(w.montag)) + ' – ' + esc(clKurzDatum(tagePlus(w.montag, 6))) + '<small>' + (w.modus === 'vorschau' ? 'Vorschau' : 'erledigt') + '</small></div>'
+    + '<button type="button" class="knopf" onclick="pmWocheNav(7)" aria-label="Nächste Woche">▶</button></div>';
+  h += '<div class="pm-wmodus"><button type="button"' + (w.modus === 'erledigt' ? ' class="an"' : '') + ' onclick="pmWocheModusSetzen(\'erledigt\')">Erledigt</button>'
+    + '<button type="button"' + (w.modus === 'vorschau' ? ' class="an"' : '') + ' onclick="pmWocheModusSetzen(\'vorschau\')">Vorschau</button></div>';
+  h += pmWocheBereichHtml('privat', st.privat, st, w.modus);
+  h += pmWocheBereichHtml('beruflich', st.beruflich, st, w.modus);
+  if (cl.pm.wocheDrill) { h += pmWocheListeHtml(st); }
+  h += '<p class="leise">Unterstrichene Zahlen öffnen die Liste. Termine zählen nur als Zeit, Memo Pad und Ideen nur als Anzahl.</p></div>';
+  return h;
+}
+
 function pmTodoFussHtml() {
   return '<button type="button" class="knopf" onclick="pmNeu(\'\',\'\')">Neu</button>'
     + '<button type="button" class="knopf" onclick="pmDetailsGewaehlt()">Details…</button>'
     + '<button type="button" class="knopf" onclick="pmShowAuf()">Show…</button>'
-    + '<div class="pm-tabs">' + [['datum', 'Datum'], ['kategorie', 'Kategorie'], ['alle', 'Alle']].map(function (t) {
+    /* Seit 0.102.0 fünf Reiter — „Listen“ ist eine Sicht auf dieselben Aufgaben */
+    + '<div class="pm-tabs">' + [['datum', 'Datum'], ['liste', 'Listen'], ['kategorie', 'Kategorie'], ['alle', 'Alle'], ['woche', 'Woche']].map(function (t) {
       return '<button type="button"' + (cl.pm.tab === t[0] ? ' class="an"' : '') + ' onclick="pmTab(\'' + t[0] + '\')">' + t[1] + '</button>';
     }).join('') + '</div>';
 }
@@ -447,7 +1154,8 @@ function pmShowOk() {
 function pmNeu(datum, zeit) {
   var d = pmIstDatum(datum) ? datum : ((cl.app === 'aufgaben' && cl.pm.tab === 'datum' && cl.pm.datum !== 'ueber') ? isoDatum() : '');
   cl.pm.fenster = { modus: 'neu', id: '', titel: '', prio: 3, bereich: clNeuBereich(), privat: false, datum: d,
-                    zeit: pmIstZeit(zeit) ? zeit : '', notiz: '', memo: null, kontext: clNeuKontext() };
+                    zeit: pmIstZeit(zeit) ? zeit : '', notiz: '', memo: null, kontext: clNeuKontext(),
+                    liste: pmListeNeuZiel({}) };
   cl.aufklapp = 'pmaufgabe';
   aufklappNeu();
   var t = document.getElementById('pmTitel');
@@ -460,7 +1168,8 @@ function pmDetails(id) {
   cl.pm.wahl = a.wiederholung ? cl.pm.wahl : id;
   cl.pm.fenster = { modus: 'details', id: a.id, titel: a.titel || '', prio: pmPrio(a), bereich: clKategorieVon(a), privat: !!a.privat,
                     datum: a.wiederholung ? '' : pmDatum(a), zeit: a.uhrzeit || '', notiz: a.beschreibung || '',
-                    memo: a.memo ? { id: a.memo.id, zeile: a.memo.zeile || '' } : null };
+                    memo: a.memo ? { id: a.memo.id, zeile: a.memo.zeile || '' } : null,
+                    liste: pmListeIdVon(a) };
   cl.aufklapp = 'pmaufgabe';
   aufklappNeu();
 }
@@ -473,6 +1182,7 @@ function pmFensterLesen() {
   var d = wert('pmDatum'); if (d !== null) { f.datum = d; }
   var z = wert('pmZeit'); if (z !== null) { f.zeit = z; }
   var n = wert('pmNotiz'); if (n !== null) { f.notiz = n; }
+  var l = wert('pmListe'); if (l !== null && pmListeSatz(l)) { f.liste = l; }
   katPrivatLesen('pm', f);
   return f;
 }
@@ -512,11 +1222,28 @@ function pmFensterHtml() {
     + '<label for="pmTitel">Titel:</label><textarea id="pmTitel" class="eingabe" rows="2" autocomplete="off">' + esc(f.titel) + '</textarea>'
     + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (p) {
       return '<button type="button"' + (f.prio === p ? ' class="an"' : '') + ' onclick="pmPrioWahl(' + p + ')">' + p + '</button>';
-    }).join('') + '</div>'
-    + katPrivatHtml('pm', f.bereich || '', f.privat);
+    }).join('') + '</div>';
+  /* Seit 0.103.1: die Liste ist Pflicht und steht im Fenster — so wandert eine Aufgabe
+     von einer Liste in die andere. Hat die Liste eine Kategorie, gilt sie und ist hier
+     nur noch zu lesen; im Sammler wählst du sie weiter selbst. */
+  var lWahl = pmListeSatz(f.liste) ? f.liste : CK_KORB_ID;
+  x += '<label for="pmListe">Liste:</label><select id="pmListe" class="eingabe">'
+    + pmListen().map(function (t) {
+      return '<option value="' + esc(t.id) + '"' + (lWahl === t.id ? ' selected' : '') + '>' + esc(pmListeName(t.id)) + '</option>';
+    }).join('') + '</select>';
+  var lBereich = String((pmListeSatz(lWahl) || {}).bereich || '');
+  if (lBereich) {
+    x += '<label>Kategorie:</label><div class="pm-zeile"><span>' + esc(kgName(lBereich)) + '</span><span class="leise">von der Liste</span></div>'
+      + '<label class="haken"><input id="pmPrivat" type="checkbox"' + (f.privat ? ' checked' : '') + '> privat</label>';
+  } else {
+    x += katPrivatHtml('pm', f.bereich || '', f.privat);
+  }
   if (a && a.wiederholung) {
     x += '<label>Wiederholung:</label><div class="pm-zeile"><span>' + esc(kpFrequenz(a.wiederholung)) + (pmDatum(a) ? ' · nächste ' + esc(pmDatumText(pmDatum(a))) : '') + '</span>'
       + '<button type="button" class="knopf" onclick="pmWiederholung()">Ändern…</button></div>'
+      /* Seit 0.105.2 auch hier: die einzelne Ausführung auslassen oder verlegen (0.105.2) */
+      + '<div class="pm-zeile"><span class="leise">Nur diese Ausführung</span>'
+      + '<button type="button" class="knopf" onclick="pmRoutineDiesmal()">Auslassen / Verlegen…</button></div>'
       + '<label for="pmZeit">Erinnerung (Uhrzeit):</label><input id="pmZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '">';
   } else {
     x += '<label>Fällig:</label><div class="wahlreihe">'
@@ -531,8 +1258,15 @@ function pmFensterHtml() {
   if (memo) {
     x += '<label>Memo:</label><div class="pm-zeile"><button type="button" class="verweis" onclick="pmMemoAusFenster()">' + esc(memo.titel) + (f.memo.zeile ? ' · Zeile' : '') + '</button>'
       + (a ? '<button type="button" class="knopf" onclick="pmMemoLoesen()">Lösen</button>' : '') + '</div>';
-  } else if (a) {
+  } else if (a && !a.radar) {
     x += '<label>Memo:</label><div class="pm-zeile"><span>–</span><button type="button" class="knopf" onclick="pmZuordnenAuf()">Zuordnen…</button></div>';
+  }
+  /* Seit 0.115.0: statt eines Memos eine Seite in OneNote */
+  if (a && !memo) {
+    var kn = pmOnKnoten(a);
+    x += '<label>OneNote:</label><div class="pm-zeile">'
+      + (kn ? '<button type="button" class="verweis" onclick="raOeffnen(\'' + esc(kn.id) + '\')">' + esc(kn.name || '') + '</button>' : '<span>–</span>')
+      + '<button type="button" class="knopf" onclick="pmOnWahlAuf()">' + (kn ? 'Ändern…' : 'OneNote…') + '</button></div>';
   }
   return x + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
@@ -550,8 +1284,14 @@ function pmUebernehmen() {
   var a = f.id ? pmAufgabeFinden(f.id) : null;
   if (!a) {
     a = pmNeueAufgabe({ titel: titel, prio: f.prio, bereich: f.bereich, privat: f.privat, datum: f.datum, zeit: f.zeit, notiz: f.notiz,
-                        memo: f.memo, kontext: f.kontext });
+                        memo: f.memo, kontext: f.kontext, liste: f.liste });
     if (f.memoZeile) { pmMarkeSetzen(f.memoZeile.id, f.memoZeile.nr, f.memoZeile.text, a); }
+    /* Aus dem Radar heraus angelegt: Knoten und Cluster kommen mit (0.115.0) */
+    if (f.radar && raFinden(f.radar)) {
+      a.radar = f.radar;
+      if (f.clusterTag) { a.clusterTag = String(f.clusterTag).slice(0, 30); }
+      delete a.memo;
+    }
     f.id = a.id;
     f.modus = 'details';
     cl.pm.wahl = a.id;
@@ -561,6 +1301,9 @@ function pmUebernehmen() {
   a.prio = f.prio;
   a.beschreibung = String(f.notiz || '');
   katPrivatSchreiben(a, { bereich: f.bereich || '', privat: !!f.privat });
+  /* Die Liste zuletzt: sie entscheidet über die Kategorie (0.103.1) */
+  if (pmListeSatz(f.liste)) { a.themaId = f.liste; }
+  pmKatAusListe(a);
   if (a.wiederholung) { a.uhrzeit = f.zeit || ''; }
   else {
     a.planung = f.datum || 'backlog';
@@ -844,8 +1587,9 @@ function pmKuerzel(s) {
   if (!s) { return '–'; }
   if (s.art === 'vorhaben') { return s.typ === 'ziel' ? 'Z' : 'P'; }
   var x = s.__satz || {};
-  if (s.art === 'notiz' && x.checkliste && x.art === 'aufgaben') { return 'A'; }
   if (s.art === 'notiz' && x.todoListe === true) { return 'T'; }
+  /* Seit 0.104.4 steht der Typ als Zeile im Text, nicht mehr als Feld am Satz */
+  if (s.art === 'notiz' && mpTypVon(s) === 'Checkliste') { return 'C'; }
   return '–';
 }
 
@@ -866,8 +1610,11 @@ function pmArchiviert(s) {
 /* Die Memos einer Sicht: '' (laufend), 'vorlagen', 'archiv' — nach Kürzel, dann Titel */
 function pmMemos(sicht) {
   var l = kpSeitenAlle().filter(function (s) {
-    if (!clPasst(s) && !ckIstKorb(s)) { return false; }
-    if (ckIstKorb(s)) { return sicht !== 'vorlagen' && sicht !== 'archiv' && kpOffeneZahl(s) > 0; }
+    /* Seit 0.104.5 stehen To-Do-Listen nicht mehr im Memo Pad. Sie standen hier, weil
+       sie technisch Seiten sind — und „Löschen“ im Memo Pad löschte dann die Liste samt
+       ihrer Zuordnung, obwohl nur der Memo-Eintrag gemeint war. */
+    if (s.art === 'liste') { return false; }
+    if (!clPasst(s)) { return false; }
     var v = pmIstVorlage(s);
     if (sicht === 'vorlagen') { return v; }
     if (v) { return false; }
@@ -890,7 +1637,7 @@ function pmMemos(sicht) {
 
 var PM_KZAUS_KEY = 'clie-memo-kzaus';
 var PM_GRUPPE_KEY = 'clie-memo-gruppiert';
-var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', A: 'Abläufe', T: 'ToDo-Listen', '–': 'Sonstiges' };
+var PM_GRUPPEN = { P: 'Projekte', Z: 'Ziele', C: 'Checklisten', T: 'ToDo-Listen', '–': 'Sonstiges' };
 
 /* Die ausgeschalteten Kürzel, etwa „–“ oder „Z–“ */
 function pmKzAus() {
@@ -909,7 +1656,7 @@ var PM_GRUPPE_ART_KEY = 'clie-memo-gruppe-art';
 
 function pmMehrereKat() {
   var f = clFilter();
-  return f === 'alle' || f === CL_PRIVAT || f === CL_ARBEIT;
+  return f === 'alle' || clIstPrivatFilter(f) || f === CL_ARBEIT;
 }
 
 function pmGruppeArt() {
@@ -1010,7 +1757,8 @@ function pmMemoListeHtml() {
   if (!l.length) {
     if (!sicht && pmKzAus()) { return h + '<p class="leise">Nichts zu zeigen — ausgeschaltet: ' + pmKzAus().split('').join(' ') + '.</p>'; }
     return h + '<p class="leise">' + (sicht === 'vorlagen' ? 'Noch keine Vorlage — im Memo Menü ≡ „Als Vorlage speichern“.'
-      : sicht === 'archiv' ? 'Das Archiv ist leer.' : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
+      : sicht === 'archiv' ? 'Das Archiv ist leer.'
+      : 'Noch kein Memo — „Neu“ tippen.') + '</p>';
   }
   var gruppe = pmGruppiert();
   /* Seit 0.93: Balken mit Anzahl — nach Typ oder nach Kategorie */
@@ -1089,6 +1837,7 @@ function pmAuszeichnungNach(t) {
 
 function pmMemoSeiteHtml(s) {
   if (prPrivatVerborgen(s, null)) { return '<p class="leise">Dieser Eintrag ist privat.</p>' + prMaskeHtml(); }
+  pmRoutinenAngleichen(s);
   if (cl.memo.schreiben) { return pmEditorHtml(s); }
   var zeilen = String(s.text || '').split('\n');
   var blaetter = nbAnhaengeHtml('seite', s.id);
@@ -1173,24 +1922,88 @@ function pmMemoFussHtml() {
 /* ---- Schreiben: echte Knöpfe statt Zeichen ----
    Jede Zeile ist ein <div>. Die Art der Zeile steht in data-vor (genau der
    Anfang der Textzeile: „[] “, „[x] “, „- “, „## “ …), die Marke in data-m.
-   Was nicht bearbeitbar ist (Tabelle, Skizze, Trenner), steht in data-roh. */
+   Was nicht bearbeitbar ist (Skizze, Trenner), steht in data-roh.
+   Seit 0.97.2: Tabellenzeilen sind wieder bearbeitbare Textzeilen mit „|“;
+   Verweise und Links sind im Editor als Einheit (data-raw) erhalten. */
+
+/* Verweise [[…|Titel]], [Text](https://…) und blanke Links im Editor: atomar, der Originaltext bleibt in data-raw */
+function pmEdInhalt(t) {
+  var rest = String(t || '');
+  var re = /\[\[(projekt|ziel|flaeche|aufgabe|notiz):([A-Za-z0-9:_-]{1,40})\|([^\]]{0,80})\]\]|\[([^\]]{1,200})\] ?\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  var h = '', pos = 0, m;
+  while ((m = re.exec(rest)) !== null) {
+    h += pmInlineHtml(rest.slice(pos, m.index));
+    var titel = m[1] ? (m[3] || m[2]) : (m[4] !== undefined ? m[4] : m[6]);
+    h += '<span class="pm-lnk" contenteditable="false" data-raw="' + esc(m[0]) + '" style="text-decoration:underline">' + esc(titel) + '</span>';
+    pos = m.index + m[0].length;
+  }
+  return h + pmInlineHtml(rest.slice(pos));
+}
+
+/* Seit 0.97.15: die Marke einer Aufgabe steckt unsichtbar im Zeilentext (Nullbreiten-Zeichen).
+   So kommt sie beim Ausschneiden und Einfügen mit. */
+function pmMarkeKodieren(mid) {
+  var r = '';
+  String(mid || '').split('').forEach(function (c) {
+    var code = c.charCodeAt(0);
+    var b;
+    for (b = 7; b >= 0; b--) { r += ((code >> b) & 1) ? '\u200C' : '\u200B'; }
+  });
+  return r;
+}
+
+/* Gibt Zeile ohne Kodierung und die gefundene Marke zurück */
+function pmMarkeAusZeile(z) {
+  var treffer = String(z || '').match(/[\u200B\u200C]+/g);
+  if (!treffer) { return { z: String(z || ''), mid: '' }; }
+  var bits = treffer.join('').split('');
+  var mid = '';
+  var i;
+  for (i = 0; i + 8 <= bits.length; i += 8) {
+    var code = 0;
+    var b;
+    for (b = 0; b < 8; b++) { code = (code << 1) | (bits[i + b] === '\u200C' ? 1 : 0); }
+    mid += String.fromCharCode(code);
+  }
+  return { z: String(z || '').replace(/[\u200B\u200C]+/g, ''), mid: /^[A-Za-z0-9_-]{4,40}$/.test(mid) ? mid : '' };
+}
+
+/* Nach dem Speichern: fehlt die Marke einer verknüpften Aufgabe, wird die Zeile mit gleichem Titel gesucht und verbunden */
+function pmZeilenHeilen(s, t) {
+  var zeilen = String(t || '').split('\n');
+  (DB.aufgaben || []).forEach(function (a) {
+    if (!a || !a.memo || a.memo.id !== s.id || !a.memo.zeile) { return; }
+    if (zeilen.some(function (z) { return pmMarke(z) === a.memo.zeile; })) { return; }
+    var nr = -1;
+    zeilen.forEach(function (z, i) {
+      if (nr >= 0 || pmMarke(z)) { return; }
+      var k = kpAufgabe(z);
+      if (k && String(k.text || '').trim() === String(a.titel || '').trim()) { nr = i; }
+    });
+    if (nr >= 0) { zeilen[nr] = zeilen[nr].replace(/\s+$/, '') + ' ⟦' + a.memo.zeile + '⟧'; }
+  });
+  return zeilen.join('\n');
+}
 
 function pmEdZeileHtml(z) {
   var roh = function () { return '<div class="pm-roh" contenteditable="false" data-roh="' + esc(z) + '">' + esc(z) + '</div>'; };
-  if (/^\s*\|.*\|\s*$/.test(z) || HS_MUSTER.test(z) || /^\s*(---+|\*\*\*+)\s*$/.test(z)) { return roh(); }
+  if (HS_MUSTER.test(z) || /^\s*(---+|\*\*\*+)\s*$/.test(z)) { return roh(); }
   var einzug = function (e) { return e ? ' style="margin-left:' + Math.min(4, Math.floor(e.length / 2)) * 16 + 'px"' : ''; };
-  var inhalt = function (t) { return pmInlineHtml(t) || '<br>'; };
+  var inhalt = function (t) { return pmEdInhalt(t) || '<br>'; };
   var mid = pmMarke(z);
   var ohne = pmOhneMarke(z);
   var k = ohne.match(KP_KASTEN);
   if (k) {
     var st = (k[2] === 'x' || k[2] === 'X') ? 'x' : (k[2] === '-' ? '-' : '');
-    return '<div class="pm-k' + (st ? ' x' : '') + '" data-vor="' + esc(k[1] + '[' + st + '] ') + '"' + (mid ? ' data-m="' + esc(mid) + '"' : '') + einzug(k[1]) + '>' + inhalt(k[3]) + '</div>';
+    var c = inhalt(k[3]);
+    c = (mid && c === '<br>') ? pmMarkeKodieren(mid) + c : (mid ? c + pmMarkeKodieren(mid) : c);
+    return '<div class="pm-k' + (st ? ' x' : '') + '" data-vor="' + esc(k[1] + '[' + st + '] ') + '"' + (mid ? ' data-m="' + esc(mid) + '"' : '') + einzug(k[1]) + '>' + c + '</div>';
   }
   var p = z.match(/^(\s*)[-•*]\s+(.*)$/);
   if (p) { return '<div class="pm-p" data-vor="' + esc(p[1] + '- ') + '"' + einzug(p[1]) + '>' + inhalt(p[2]) + '</div>'; }
   var h = z.match(/^(\s*)(#{1,3})\s+(.*)$/);
-  if (h) { return '<div class="pm-h" data-vor="' + esc(h[1] + h[2] + ' ') + '">' + inhalt(h[3]) + '</div>'; }
+  /* Seit 0.97.4: die ## bleiben als Text in der Zeile, damit sie sich bearbeiten lassen (Stufe ändern) */
+  if (h) { return '<div class="pm-h">' + esc(h[1] + h[2]) + '&nbsp;' + inhalt(h[3]) + '</div>'; }
   var n = z.match(/^(\s*)(\d{1,3}[.)])\s+(.*)$/);
   if (n) { return '<div class="pm-n" data-vor="' + esc(n[1] + n[2] + ' ') + '"' + einzug(n[1]) + '>' + inhalt(n[3]) + '</div>'; }
   var e = (z.match(/^\s*/) || [''])[0];
@@ -1230,6 +2043,8 @@ function pmEdInline(n) {
   if (n.nodeType !== 1) { return ''; }
   var tag = pmTag(n);
   if (tag === 'BR') { return '\n'; }
+  /* Verweis oder Link (seit 0.97.2): unverändert zurück in den Text */
+  if (pmAttr(n, 'data-raw') !== null) { return pmAttr(n, 'data-raw'); }
   if (pmAttr(n, 'contenteditable') === 'false') { return ''; }
   var innen = '';
   var k = n.childNodes || [];
@@ -1265,9 +2080,15 @@ function pmEdLesen(root) {
   var zeilen = [];
   var marken = {};
   var lauf = null;
+  /* Eine Zeile übernehmen: eine kodierte Marke wird zur Verknüpfung (nur beim ersten Vorkommen) */
+  var rein = function (z) {
+    var e = pmMarkeAusZeile(z);
+    if (e.mid && !marken[e.mid]) { marken[e.mid] = true; return e.z.replace(/\s+$/, '') + ' ⟦' + e.mid + '⟧'; }
+    return e.z;
+  };
   var ausLauf = function () {
     if (lauf === null) { return; }
-    lauf.replace(/\n$/, '').split('\n').forEach(function (t) { zeilen.push(t); });
+    lauf.replace(/\n$/, '').split('\n').forEach(function (t) { zeilen.push(rein(t)); });
     lauf = null;
   };
   var k = (root && root.childNodes) || [];
@@ -1278,7 +2099,7 @@ function pmEdLesen(root) {
     if (n.nodeType === 1 && (tag === 'DIV' || tag === 'P')) {
       ausLauf();
       var roh = pmAttr(n, 'data-roh');
-      if (roh !== null) { zeilen.push(roh); continue; }
+      if (roh !== null) { zeilen.push(rein(roh)); continue; }
       var vor = pmAttr(n, 'data-vor') || '';
       var m = pmAttr(n, 'data-m') || '';
       var innen = '';
@@ -1290,7 +2111,7 @@ function pmEdLesen(root) {
       var istKasten = /^\s*\[[ xX-]?\]\s*$/.test(vor);
       teile.forEach(function (t, nr) {
         var v = nr ? pmVorWeiter(vor) : vor;
-        var z = v + t;
+        var z = rein(v + t);
         if (!nr && istKasten && m && !marken[m]) { marken[m] = true; z = z.replace(/\s+$/, '') + ' ⟦' + m + '⟧'; }
         zeilen.push(z);
       });
@@ -1306,7 +2127,7 @@ function pmEdGetippt() {
   var s = cl.memo.id ? kpSeiteFinden(cl.memo.id) : null;
   var el = document.getElementById('pmEditor');
   if (!s || !el || !el.childNodes) { return; }
-  var t = pmEdLesen(el);
+  var t = pmZeilenHeilen(s, pmEdLesen(el));
   if (t === String(s.text || '')) { return; }
   s.text = t;
   s.geaendert = jetzt();
@@ -1577,18 +2398,21 @@ function pmKuerzelSetzen(s, k) {
   if (!s || PM_KUERZEL.indexOf(k) < 0) { return s; }
   var alt = pmKuerzel(s);
   if (alt === k) { return s; }
-  /* Seit 0.80.1: auch eine alte Liste wird P, Z oder A (zieht um wie eine Notiz) — nur der Sammler nicht */
+  /* Seit 0.80.1: auch eine alte Liste wird P, Z oder C (zieht um wie eine Notiz) — nur der Sammler nicht */
   if (ckIstKorb(s)) { melde('Der Sammler bleibt, wie er ist.', null); return s; }
   var x = s.__satz;
-  if (s.art === 'notiz' && (k === 'A' || k === '–' || k === 'T')) {
-    if (k === 'A') {
-      if (!x.checkliste || x.checkliste === 'fertig') { x.checkliste = 'lauf'; x.gestartet = x.gestartet || isoDatum(); }
-      x.art = 'aufgaben';
+  if (s.art === 'notiz' && (k === 'C' || k === '–' || k === 'T')) {
+    /* Seit 0.104.4 steht der Typ im Text — „C“ setzt die Zeile, die anderen nehmen sie weg */
+    if (k === 'C') {
       delete x.todoListe;
+      mpTypSetzen(s, 'Checkliste');
     } else if (k === 'T') {
-      if (x.art === 'aufgaben') { delete x.art; }
       x.todoListe = true;
-    } else { delete x.art; delete x.todoListe; }
+      mpTypSetzen(s, '');
+    } else {
+      delete x.todoListe;
+      mpTypSetzen(s, '');
+    }
     x.geaendert = jetzt();
     return s;
   }
@@ -1600,9 +2424,10 @@ function pmKuerzelSetzen(s, k) {
   var ziel = kpSammlungVon(n);
   n.text = s.text;
   ['bereich', 'privat', 'termine', 'archiv', 'ordnung', 'zusatz', 'ausgeblendet'].forEach(function (f) { if (x[f] !== undefined) { ny[f] = x[f]; } else { delete ny[f]; } });
-  if (k === 'A') { ny.checkliste = 'lauf'; ny.art = 'aufgaben'; ny.gestartet = isoDatum(); }
   if (k === 'T') { ny.todoListe = true; }
   if (k === '–' && x.checkliste) { ny.checkliste = (x.checkliste === 'fertig') ? 'fertig' : 'lauf'; }
+  /* Seit 0.104.4: der Typ reist als Zeile im Text mit, nicht als Feld */
+  mpTypSetzen(n, k === 'C' ? 'Checkliste' : (k === 'P' ? 'Projekt' : (k === 'Z' ? 'Ziel' : '')));
   if (pmArchiviert(s)) { ny.archiv = true; }
   DB[von] = (DB[von] || []).filter(function (y) { return y !== x; });
   grabsteinSetzen(von, x.id);
@@ -1656,6 +2481,7 @@ function pmArchivUm(id) {
     melde('„' + s.titel + '“ zurückgeholt.', 'gut');
   } else {
     x.archiv = true;
+    x.archivAm = isoDatum();
     melde('„' + s.titel + '“ archiviert.', null);
   }
   x.geaendert = jetzt();
@@ -1706,8 +2532,9 @@ function pmKopieren(s, titel, vorlage) {
   var ny = n.__satz;
   n.text = memoTextLeer(pmOhneMarken(s.text));
   katPrivatSchreiben(ny, { bereich: x.bereich || '', privat: !!x.privat });
-  if (k === 'A') { ny.art = 'aufgaben'; }
-  if (k === 'A' || (s.art === 'notiz' && x.checkliste)) { ny.checkliste = vorlage ? 'vorlage' : 'lauf'; }
+  if (s.art === 'notiz' && x.checkliste) { ny.checkliste = vorlage ? 'vorlage' : 'lauf'; }
+  /* Seit 0.104.4: der Typ reist als Zeile im Text mit */
+  mpTypSetzen(n, k === 'C' ? 'Checkliste' : (k === 'P' ? 'Projekt' : (k === 'Z' ? 'Ziel' : '')));
   if (vorlage) { ny.istVorlage = true; if (n.art === 'vorhaben') { n.zustand = 'ruht'; } }
   else {
     delete ny.istVorlage;
@@ -1977,6 +2804,7 @@ function pmAufklapp(el) {
     return true;
   }
   if (a === 'pmdatum') { el.innerHTML = pmDatumWahlHtml(); return true; }
+  if (a === 'pmliste') { el.innerHTML = pmListenWahlHtml(); return true; }
   if (a === 'pmmemokat') { el.innerHTML = pmMemoKatHtml(); return true; }
   if (a === 'pmvorlage') {
     if (el.innerHTML.indexOf('pmVName') >= 0) { return true; }
@@ -2205,7 +3033,15 @@ function pmUmstellen() {
 function pmNachpflegen() {
   if (!pmAn()) { return 0; }
   var n = pmUmstellenKern(true);
-  var z = n.listenPunkte + n.sammler + n.memo + n.frei + n.listen + pmMarkenPruefen();
+  var z = n.listenPunkte + n.sammler + n.memo + n.frei + n.listen + pmMarkenPruefen() + pmListenNachziehen();
+  /* Erst den Listen ihre Kategorie geben, dann sie an die Aufgaben weiterreichen */
+  z += pmListenKatNachziehen();
+  z += pmKatenAngleichen();
+  /* Erst die Listen füllen, dann das Memo Pad zurückbauen, dann räumen — nie umgekehrt */
+  z += mpArtenAufraeumen();
+  var raus = pmNotizenAufraeumen();
+  if (raus) { melde(raus + (raus === 1 ? ' Notiz' : ' Notizen') + ' aufgeräumt — die Aufgaben liegen in ihren Listen.', null); }
+  z += raus;
   if (z) { spaeterSichern(); }
   return z;
 }

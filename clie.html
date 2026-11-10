@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.113.0</title>
+<title>CLIE 0.117.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0474" sizes="192x192" type="image/png">
@@ -716,6 +716,27 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
 .fenster .rumpf{padding:10px 12px;font-size:20px}
+/* Aufgabe mit Seite in OneNote (0.115.0) */
+.pm-on{font:inherit;font-size:15.5px;background:none;color:var(--px);border:1px solid var(--px);border-radius:4px;padding:0 4px;margin-left:4px;flex:0 0 auto}
+.pm-clu{color:var(--px-mitte);font-size:16px}
+.ra-tropf{outline:3px dashed var(--px);outline-offset:-5px}
+.ra-warte{background:var(--px-mitte)}
+.ra-tx small{display:block;font-size:15.5px;color:var(--px-mitte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ra-leeren{text-align:right;padding:5px 0}
+/* OneNote-Radar: Linkbaum im Memo Pad (0.114.0) */
+.ra-bereich{display:flex;justify-content:space-between;gap:8px;background:var(--px);color:var(--lcd);padding:3px 8px;margin:9px -8px 3px;font-size:17px}
+.ra-bereich:first-child{margin-top:0}
+.ra-ast{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px dotted var(--px-zart)}
+.ra-ast.gewaehlt{background:var(--px-zart)}
+.ra-pf{font:inherit;font-size:17px;background:none;border:none;color:var(--px-mitte);padding:2px 2px;width:18px;flex:0 0 auto;text-align:center}
+.ra-tx{flex:1;min-width:0;text-align:left;font:inherit;background:none;color:var(--px);border:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ra-zahl{font-size:15.5px;color:var(--px-mitte);flex:0 0 auto}
+.ra-on{font-size:15.5px;border:1px solid var(--px);border-radius:4px;padding:0 4px;flex:0 0 auto}
+.ra-mehr{font:inherit;font-size:17px;background:none;border:none;color:var(--px-mitte);padding:2px 4px;flex:0 0 auto}
+.ra-ast.t1{padding-left:18px}
+.ra-ast.t2{padding-left:36px}
+.ra-ast.t3{padding-left:54px}
+.ra-ast.t4{padding-left:72px}
 .up-titel{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border-bottom:2px solid var(--px);padding-bottom:3px}
 .up-titel span{font-size:17px;color:var(--px-mitte)}
 .up-balken{display:flex;gap:1px;margin:7px 0 4px}
@@ -1246,7 +1267,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.113.0';
+var APP_VERSION = '0.117.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4825,7 +4846,15 @@ function aufklappZeichnen() {
     el.innerHTML = fkFensterHtml();
   } else if (cl.aufklapp === 'umprog') {
     el.innerHTML = upHtml();
-    } else if (cl.aufklapp === 'umprogramm') {
+    } else if (cl.aufklapp === 'rafang') {
+    el.innerHTML = raFangHtml();
+  } else if (cl.aufklapp === 'pmon') {
+    el.innerHTML = pmOnWahlHtml();
+  } else if (cl.aufklapp === 'ramenue') {
+    el.innerHTML = raMenueHtml();
+  } else if (cl.aufklapp === 'raknoten') {
+    el.innerHTML = raFensterHtml();
+  } else if (cl.aufklapp === 'umprogramm') {
     el.innerHTML = upFensterHtml();
   } else if (cl.aufklapp === 'uptag') {
     el.innerHTML = upTagHtml();
@@ -5155,6 +5184,9 @@ function aufklappZu() {
   cl.gw.fenster = null;
   cl.up.fenster = null;
   cl.up.tagF = null;
+  cl.ra.fenster = null;
+  cl.ra.menue = '';
+  cl.ra.fang = null;
   cl.lf.fenster = null;
   cl.auf.ep = null;
   cl.auf.anzF = null;
@@ -8392,8 +8424,558 @@ function clPlanMarke(s, a) {
   return g ? '<span class="plan-marke">' + esc(clPlanText(g.datum, g.zeit)) + '</span>' : '';
 }
 
+/* ---------- OneNote-Radar (seit 0.114.0) ----------
+   Das Memo Pad bleibt, was es ist; daneben steht ein Katalog von Absprungstellen nach
+   OneNote. Inhalte liegen dort, CLIE merkt sich nur, wo. Ein Knoten ist entweder ein
+   Ordner oder ein Link; Links tragen zwei Formen, weil onenote: nur am Windows-PC
+   funktioniert und das Telefon die https-Form braucht. Der Cluster wird von oben
+   vererbt, damit du ihn nie tippst. */
+var RA_BEREICHE = [['beruflich', 'Beruflich · M365 Tenant'], ['privat', 'Privat · M365 Family']];
+var RA_TIEFE_MAX = 4;
+cl.ra = { auf: {}, wahl: '', fenster: null, menue: '', fang: null };
+
+function raKnoten() {
+  return krAlle('radar');
+}
+
+function raFinden(id) {
+  var x = krFinden(id);
+  return (x && x.typ === 'radar') ? x : null;
+}
+
+function raKinder(bereich, elternId) {
+  return raKnoten().filter(function (k) {
+    return String(k.bereich || 'beruflich') === bereich && String(k.eltern || '') === String(elternId || '');
+  }).sort(function (a, b) {
+    var r = (Number(a.rang) || 0) - (Number(b.rang) || 0);
+    if (r) { return r; }
+    if ((a.art === 'ordner') !== (b.art === 'ordner')) { return a.art === 'ordner' ? -1 : 1; }
+    return String(a.name || '').localeCompare(String(b.name || ''), 'de');
+  });
+}
+
+function raTiefe(k) {
+  var n = 0;
+  var e = k && k.eltern;
+  while (e && n < RA_TIEFE_MAX + 2) { var p = raFinden(e); if (!p) { break; } e = p.eltern; n++; }
+  return n;
+}
+
+/* Der Cluster kommt vom nächsten Ordner darüber, der einen trägt */
+function raCluster(k) {
+  var x = k;
+  var n = 0;
+  while (x && n < RA_TIEFE_MAX + 2) {
+    if (String(x.cluster || '').trim()) { return String(x.cluster).trim(); }
+    x = x.eltern ? raFinden(x.eltern) : null;
+    n++;
+  }
+  return '';
+}
+
+/* Welche Linkform dieses Gerät braucht */
+function raAmRechner() {
+  var p = '';
+  try { p = String((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''); } catch (e) { p = ''; }
+  if (/Win|Mac/i.test(p)) { return true; }
+  try { return !/Android|iPhone|iPad/i.test(navigator.userAgent || ''); } catch (e) { return true; }
+}
+
+function raLink(k) {
+  var app = String((k && k.urlApp) || '').trim();
+  var web = String((k && k.urlWeb) || '').trim();
+  if (raAmRechner()) { return app || web; }
+  return web || app;
+}
+
+function raHatLink(k) { return !!raLink(k); }
+
+function raOeffnen(id) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  var u = raLink(k);
+  if (!u) { melde('Dieser Knoten hat keinen Link.', 'warn'); return; }
+  var andere = raAmRechner() ? !String(k.urlApp || '').trim() : !String(k.urlWeb || '').trim();
+  try { window.open(u, '_blank'); } catch (e) { melde('Das Öffnen ging nicht.', 'warn'); return; }
+  if (andere) { melde('Für dieses Gerät fehlt die passende Form — die andere wurde versucht.', null); }
+}
+
+function raKopieren(id) {
+  var k = raFinden(id);
+  var u = k ? raLink(k) : '';
+  if (!u) { return; }
+  var fertig = function () { melde('Link kopiert.', null); aufklappZu(); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(u).then(fertig, fertig); return; }
+  } catch (e) { /* unten weiter */ }
+  fertig();
+}
+
+/* ---- Der Baum ---- */
+function raZweigUm(id) { cl.ra.auf[id] = !cl.ra.auf[id]; zeichne(); }
+
+function raMenueAuf(id) { cl.ra.wahl = id; cl.ra.menue = id; cl.aufklapp = 'ramenue'; aufklappNeu(); }
+
+function raAstHtml(k, tiefe) {
+  var kinder = raKinder(k.bereich || 'beruflich', k.id);
+  var auf = !!cl.ra.auf[k.id];
+  var ordner = k.art === 'ordner';
+  var h = '<div class="ra-ast t' + Math.min(tiefe, RA_TIEFE_MAX) + (cl.ra.wahl === k.id ? ' gewaehlt' : '') + '">'
+    + (ordner
+      ? '<button type="button" class="ra-pf" onclick="raZweigUm(\'' + esc(k.id) + '\')" aria-label="auf- und zuklappen">' + (auf ? '▾' : '▸') + '</button>'
+      : '<span class="ra-pf">·</span>')
+    + '<button type="button" class="ra-tx" onclick="' + (ordner ? 'raZweigUm(\'' + esc(k.id) + '\')' : 'raOeffnen(\'' + esc(k.id) + '\')') + '">' + esc(k.name || '(ohne Namen)') + '</button>'
+    + (ordner ? '<span class="ra-zahl">' + kinder.length + '</span>' : (raHatLink(k) ? '<span class="ra-on">ON</span>' : '<span class="ra-zahl">—</span>'))
+    + '<button type="button" class="ra-mehr" onclick="raMenueAuf(\'' + esc(k.id) + '\')" aria-label="Menü">⋯</button>'
+    + '</div>';
+  if (ordner && auf) { h += kinder.map(function (x) { return raAstHtml(x, tiefe + 1); }).join(''); }
+  return h;
+}
+
+function raHtml() {
+  var h = raHakenHtml();
+  RA_BEREICHE.forEach(function (b) {
+    var l = raKinder(b[0], '');
+    var zahl = raKnoten().filter(function (k) { return String(k.bereich || 'beruflich') === b[0] && k.art !== 'ordner'; }).length;
+    h += '<div class="ra-bereich"><span>' + esc(b[1]) + '</span><span>' + zahl + '</span></div>';
+    h += l.length ? l.map(function (k) { return raAstHtml(k, 0); }).join('')
+      : '<p class="leise">Noch nichts — „Neu“ legt einen Ordner oder einen Link an.</p>';
+  });
+  return h;
+}
+
+function raFussHtml() {
+  var k = cl.ra.wahl ? raFinden(cl.ra.wahl) : null;
+  return '<button type="button" class="knopf" onclick="raNeu(\'\')">Neu</button>'
+    + (k ? '<button type="button" class="knopf" onclick="raNeu(\'' + esc(k.id) + '\')">Darunter…</button>'
+         + '<button type="button" class="knopf" onclick="raDetails(\'' + esc(k.id) + '\')">Ändern…</button>' : '');
+}
+
+/* ---- Das Menü an einem Knoten ---- */
+function raMenueHtml() {
+  var k = raFinden(cl.ra.menue);
+  if (!k) { return ''; }
+  var z = function (auf, text, zeichen) {
+    return '<button type="button" onclick="' + auf + '"><span>' + text + '</span><small>' + zeichen + '</small></button>';
+  };
+  var h = '<div class="aufklapp liste-aufklapp todo-wahl" style="top:49px;right:6px">';
+  if (raHatLink(k)) {
+    h += z('raOeffnen(\'' + esc(k.id) + '\');aufklappZu()', 'In OneNote öffnen', '↗')
+      + z('raAlsAufgabe(\'' + esc(k.id) + '\')', 'Als Aufgabe anlegen', '☑')
+      + z('raKopieren(\'' + esc(k.id) + '\')', 'Link kopieren', '⧉')
+      + '<div class="trenn"></div>';
+  }
+  h += z('raNeu(\'' + esc(k.id) + '\')', 'Darunter anlegen…', '+')
+    + z('raDetails(\'' + esc(k.id) + '\')', 'Ändern…', '')
+    + z('raSchieben(\'' + esc(k.id) + '\',-1)', 'Nach oben', '▲')
+    + z('raSchieben(\'' + esc(k.id) + '\',1)', 'Nach unten', '▼')
+    + '<div class="trenn"></div>'
+    + z('raLoeschenFragen(\'' + esc(k.id) + '\')', 'Löschen…', '');
+  return h + '</div>';
+}
+
+function raSchieben(id, richtung) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  var l = raKinder(k.bereich || 'beruflich', k.eltern || '');
+  var i = l.map(function (x) { return x.id; }).indexOf(id);
+  var j = i + richtung;
+  if (i < 0 || j < 0 || j >= l.length) { aufklappZu(); return; }
+  l.splice(j, 0, l.splice(i, 1)[0]);
+  l.forEach(function (x, n) { x.rang = n + 1; krSpeichern(x); });
+  aufklappZu();
+}
+
+/* ---- Anlegen und Ändern ---- */
+function raNeu(elternId) {
+  var e = elternId ? raFinden(elternId) : null;
+  if (e && e.art !== 'ordner') { e = e.eltern ? raFinden(e.eltern) : null; }
+  if (e && raTiefe(e) >= RA_TIEFE_MAX - 1) { melde('Tiefer als ' + RA_TIEFE_MAX + ' Ebenen wird es unübersichtlich.', 'warn'); return; }
+  cl.ra.fenster = { modus: 'neu', id: '', art: 'link', name: '', cluster: '',
+                    bereich: e ? (e.bereich || 'beruflich') : 'beruflich', eltern: e ? e.id : '',
+                    urlApp: '', urlWeb: '' };
+  cl.aufklapp = 'raknoten';
+  aufklappNeu();
+}
+
+function raDetails(id) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  cl.ra.wahl = id;
+  cl.ra.fenster = { modus: 'details', id: k.id, art: k.art === 'ordner' ? 'ordner' : 'link',
+                    name: String(k.name || ''), cluster: String(k.cluster || ''),
+                    bereich: String(k.bereich || 'beruflich'), eltern: String(k.eltern || ''),
+                    urlApp: String(k.urlApp || ''), urlWeb: String(k.urlWeb || '') };
+  cl.aufklapp = 'raknoten';
+  aufklappNeu();
+}
+
+function raFensterLesen() {
+  var f = cl.ra.fenster;
+  if (!f) { return null; }
+  [['raName', 'name'], ['raCluster', 'cluster'], ['raApp', 'urlApp'], ['raWeb', 'urlWeb']].forEach(function (x) {
+    var e = document.getElementById(x[0]);
+    if (e && typeof e.value === 'string') { f[x[1]] = e.value; }
+  });
+  return f;
+}
+
+function raWahl(feld, wert) {
+  var f = raFensterLesen();
+  if (!f) { return; }
+  f[feld] = wert;
+  aufklappNeu();
+}
+
+function raFensterHtml() {
+  var f = cl.ra.fenster;
+  if (!f) { return ''; }
+  if (f.modus === 'loeschen') {
+    var k = raFinden(f.id);
+    var kinder = k ? raKinder(k.bereich || 'beruflich', k.id).length : 0;
+    return '<div class="fenster"><div class="titel">Knoten löschen</div><div class="rumpf">'
+      + '<p>„' + esc(f.name) + '“ löschen?' + (kinder ? ' Die ' + kinder + ' Einträge darunter verschwinden mit.' : '')
+      + ' In OneNote ändert sich nichts — CLIE vergisst nur den Weg dorthin.</p>'
+      + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="raLoeschen()">Löschen</button>'
+      + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
+  }
+  var kn = function (feld, wert, text) {
+    return '<button type="button"' + (f[feld] === wert ? ' class="an"' : '') + ' onclick="raWahl(\'' + feld + '\',\'' + wert + '\')">' + text + '</button>';
+  };
+  var eltern = f.eltern ? raFinden(f.eltern) : null;
+  return '<div class="fenster"><div class="titel">' + (f.modus === 'neu' ? 'Neuer Knoten' : 'Knoten') + '</div><div class="rumpf">'
+    + '<label for="raName">Titel:</label><input id="raName" class="eingabe" type="text" maxlength="80" autocomplete="off" value="' + esc(f.name) + '">'
+    + '<label>Art:</label><div class="wahlreihe">' + kn('art', 'link', 'Link') + kn('art', 'ordner', 'Ordner') + '</div>'
+    + (eltern ? '<p class="leise">Unter: ' + esc(eltern.name || '') + '</p>'
+      : '<label>Bereich:</label><div class="wahlreihe">' + RA_BEREICHE.map(function (b) { return kn('bereich', b[0], b[0] === 'beruflich' ? 'Beruflich' : 'Privat'); }).join('') + '</div>')
+    + '<label for="raCluster">Cluster' + (f.art === 'ordner' ? '' : ' (leer = vom Ordner)') + ':</label>'
+    + '<input id="raCluster" class="eingabe" type="text" maxlength="30" autocomplete="off" value="' + esc(f.cluster) + '">'
+    + (f.art === 'ordner' ? '<p class="leise">Ordner tragen keinen Link. Ihr Cluster gilt für alles darunter.</p>'
+      : '<label for="raApp">Link für den PC (onenote:):</label><input id="raApp" class="eingabe" type="text" autocomplete="off" value="' + esc(f.urlApp) + '">'
+        + '<label for="raWeb">Link fürs Telefon (https:):</label><input id="raWeb" class="eingabe" type="text" autocomplete="off" value="' + esc(f.urlWeb) + '">')
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="raSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
+    + (f.modus === 'neu' ? '' : '<button type="button" class="knopf" onclick="raLoeschenFragen(\'' + esc(f.id) + '\')">Löschen…</button>') + '</div></div></div>';
+}
+
+function raSpeichern() {
+  var f = raFensterLesen();
+  if (!f) { aufklappZu(); return; }
+  var name = String(f.name || '').trim().slice(0, 80);
+  if (!name) { melde('Bitte einen Titel eingeben.', 'warn'); return; }
+  var app = String(f.urlApp || '').trim();
+  var web = String(f.urlWeb || '').trim();
+  if (f.art === 'link' && !app && !web) { melde('Ein Link braucht mindestens eine der beiden Formen.', 'warn'); return; }
+  var k = f.id ? raFinden(f.id) : null;
+  if (!k) { k = { id: 'ra-' + neueKennung(), typ: 'radar', angelegt: isoDatum(), rang: raKinder(f.bereich, f.eltern).length + 1 }; }
+  k.name = name;
+  k.art = f.art === 'ordner' ? 'ordner' : 'link';
+  k.bereich = f.bereich === 'privat' ? 'privat' : 'beruflich';
+  k.eltern = String(f.eltern || '');
+  k.cluster = String(f.cluster || '').trim().slice(0, 30);
+  if (k.art === 'ordner') { delete k.urlApp; delete k.urlWeb; } else { k.urlApp = app; k.urlWeb = web; }
+  krSpeichern(k);
+  cl.ra.wahl = k.id;
+  if (k.eltern) { cl.ra.auf[k.eltern] = true; }
+  aufklappZu();
+}
+
+function raLoeschenFragen(id) {
+  var k = raFinden(id);
+  if (!k) { return; }
+  cl.ra.fenster = { modus: 'loeschen', id: k.id, name: String(k.name || '') };
+  cl.aufklapp = 'raknoten';
+  aufklappNeu();
+}
+
+function raLoeschen() {
+  var f = cl.ra.fenster;
+  var k = f ? raFinden(f.id) : null;
+  if (!k) { aufklappZu(); return; }
+  var weg = [k];
+  var sammle = function (x) {
+    raKinder(x.bereich || 'beruflich', x.id).forEach(function (y) { weg.push(y); sammle(y); });
+  };
+  sammle(k);
+  weg.forEach(function (x) { krLoeschen(x.id); });
+  if (weg.some(function (x) { return x.id === cl.ra.wahl; })) { cl.ra.wahl = ''; }
+  aufklappZu();
+  melde(weg.length > 1 ? weg.length + ' Knoten gelöscht.' : 'Knoten gelöscht.', null);
+}
+
+/* ---- Noch in OneNote abhaken (seit 0.117.0) ----
+   CLIE darf in OneNote nichts ändern — das bräuchte eine App-Registrierung bei Microsoft
+   und im Firmen-Tenant die Zustimmung der IT. Also merkt es sich, was dort noch fehlt.
+   Abgehakt wird unterwegs, aufgeräumt am PC: eine Liste wartet, ein Hinweis nicht. */
+/* Nur lesen — der Eintrag in den Einstellungen entsteht erst, wenn wirklich etwas wartet */
+function raHaken() {
+  var e = DB.einstellungen;
+  return (e && Array.isArray(e.onHaken)) ? e.onHaken : [];
+}
+
+function raHakenListe() {
+  if (!DB.einstellungen || typeof DB.einstellungen !== 'object') { DB.einstellungen = {}; }
+  if (!Array.isArray(DB.einstellungen.onHaken)) { DB.einstellungen.onHaken = []; }
+  return DB.einstellungen.onHaken;
+}
+
+function raHakenAufraeumen() {
+  var e = DB.einstellungen;
+  if (e && Array.isArray(e.onHaken) && !e.onHaken.length) { delete e.onHaken; }
+}
+
+/* Offene Einträge — ohne die, deren Aufgabe oder Knoten es nicht mehr gibt */
+function raHakenOffen() {
+  return raHaken().filter(function (e) {
+    return e && e.id && raFinden(e.radar) && pmAufgabeFinden(e.id);
+  });
+}
+
+function raHakenMerken(a) {
+  if (!a || !a.radar || !raFinden(a.radar)) { return false; }
+  var erledigt = a.wiederholung ? false : a.status === 'erledigt';
+  var vorhanden = raHaken();
+  var i = -1;
+  vorhanden.forEach(function (e, n) { if (e && e.id === a.id) { i = n; } });
+  if (!erledigt) { if (i >= 0) { vorhanden.splice(i, 1); raHakenAufraeumen(); } return false; }
+  if (i >= 0) { return false; }
+  raHakenListe().push({ id: a.id, radar: a.radar, titel: pmTitel(a), zeit: isoDatum() });
+  melde('Gemerkt — in OneNote noch abhaken.', null);
+  return true;
+}
+
+function raHakenWeg(id) {
+  var l = raHaken();
+  var i = -1;
+  l.forEach(function (e, n) { if (e && e.id === id) { i = n; } });
+  if (i < 0) { return; }
+  l.splice(i, 1);
+  raHakenAufraeumen();
+  spaeterSichern();
+  zeichne();
+}
+
+function raHakenAlleWeg() {
+  if (DB.einstellungen) { delete DB.einstellungen.onHaken; }
+  spaeterSichern();
+  zeichne();
+  melde('Liste geleert.', null);
+}
+
+function raHakenHtml() {
+  var l = raHakenOffen();
+  if (!l.length) { return ''; }
+  var h = '<div class="ra-bereich ra-warte"><span>Noch in OneNote abhaken</span><span>' + l.length + '</span></div>';
+  h += l.map(function (e) {
+    var k = raFinden(e.radar);
+    return '<div class="ra-ast">'
+      + '<button type="button" class="ra-pf" onclick="raHakenWeg(\'' + esc(e.id) + '\')" aria-label="erledigt, aus der Liste nehmen">✓</button>'
+      + '<button type="button" class="ra-tx" onclick="raOeffnen(\'' + esc(e.radar) + '\')">' + esc(e.titel || '') + '<small>' + esc(k ? k.name || '' : '') + '</small></button>'
+      + '<button type="button" class="ra-on" onclick="raOeffnen(\'' + esc(e.radar) + '\')">ON</button></div>';
+  }).join('');
+  if (l.length > 2) { h += '<div class="ra-leeren"><button type="button" class="knopf" onclick="raHakenAlleWeg()">Alle erledigt</button></div>'; }
+  return h;
+}
+
+/* Der Coach fragt erst, wenn sich etwas staut */
+function coOnHakenFragen(is) {
+  var l = raHakenOffen();
+  var id = 'on:' + montagVon(is);
+  if (l.length < 5 || coRuhig(id, is)) { return []; }
+  return [coQ(id, l.length + ' Aufgaben warten auf den Haken in OneNote. Fünf Minuten?',
+    [['jetzt', 'Ansehen'], ['spaeter', 'Später']], { radar: true }, '▤ OneNote', 4)];
+}
+
+/* ---- Links hereinholen: Ziehen, Einfügen, Teilen (seit 0.116.0) ----
+   Am PC zieht man eine Seite aus OneNote ins Fenster oder fügt den kopierten Link ein.
+   Auf dem Pixel gibt es kein Ziehen — dort meldet sich CLIE im Manifest als Ziel für
+   „Teilen“ an und bekommt Titel, Text und Adresse als Parameter. Beide Wege münden in
+   dasselbe Fenster. */
+var RA_URL = /(onenote:)?https?:\/\/[^\s"'<>)\]]+/i;
+
+/* Aus dem, was das System hergibt, Titel und beide Linkformen gewinnen */
+function raAusText(text, titelHinweis) {
+  var t = String(text || '');
+  var m = t.match(RA_URL);
+  if (!m) { return null; }
+  var roh = m[0].replace(/[.,;]+$/, '');
+  var app = '';
+  var web = '';
+  if (/^onenote:/i.test(roh)) { app = roh; web = roh.replace(/^onenote:/i, ''); }
+  else { web = roh; app = 'onenote:' + roh; }
+  if (!/^https?:\/\//i.test(web)) { return null; }
+  var titel = String(titelHinweis || '').trim();
+  if (!titel) {
+    var r = web.indexOf('#');
+    if (r >= 0) {
+      var stueck = web.slice(r + 1).split('&')[0];
+      try { titel = decodeURIComponent(stueck.replace(/\+/g, ' ')).trim(); } catch (e) { titel = stueck.replace(/\+/g, ' ').trim(); }
+    }
+  }
+  if (!titel) {
+    titel = t.split('\n').map(function (z) { return z.trim(); })
+      .filter(function (z) { return z && !RA_URL.test(z); })[0] || '';
+  }
+  if (!titel) { titel = 'Neue Seite'; }
+  var klein = web.toLowerCase();
+  var bereich = /sharepoint\.com|\.sharepoint\./.test(klein) ? 'beruflich'
+    : (/live\.net|onedrive\.live\.com|1drv\.ms/.test(klein) ? 'privat' : '');
+  return { titel: titel.slice(0, 80), urlApp: app, urlWeb: web, bereich: bereich };
+}
+
+/* Gibt es den Link schon? Verglichen wird die https-Form. */
+function raSchonDa(web) {
+  var w = String(web || '').trim().toLowerCase();
+  if (!w) { return null; }
+  return raKnoten().filter(function (k) {
+    return String(k.urlWeb || '').trim().toLowerCase() === w
+      || String(k.urlApp || '').replace(/^onenote:/i, '').trim().toLowerCase() === w;
+  })[0] || null;
+}
+
+function raFangen(text, titelHinweis) {
+  var d = raAusText(text, titelHinweis);
+  if (!d) { melde('Darin steckt kein Link, mit dem CLIE etwas anfangen kann.', 'warn'); return false; }
+  var da = raSchonDa(d.urlWeb);
+  var offen = cl.ra.wahl ? raFinden(cl.ra.wahl) : null;
+  if (offen && offen.art !== 'ordner') { offen = offen.eltern ? raFinden(offen.eltern) : null; }
+  cl.ra.fang = {
+    titel: d.titel, urlApp: d.urlApp, urlWeb: d.urlWeb,
+    bereich: d.bereich || (offen ? offen.bereich : 'beruflich') || 'beruflich',
+    eltern: offen && (!d.bereich || offen.bereich === d.bereich) ? offen.id : '',
+    schon: da ? da.id : ''
+  };
+  if (cl.app !== 'memo' || cl.memo.art !== 'radar') { oeffne('memo'); memoArtSetzen('radar'); }
+  cl.aufklapp = 'rafang';
+  aufklappNeu();
+  return true;
+}
+
+function raFangLesen() {
+  var f = cl.ra.fang;
+  if (!f) { return null; }
+  var e = document.getElementById('raFangTitel');
+  if (e && typeof e.value === 'string') { f.titel = e.value; }
+  return f;
+}
+
+function raFangWahl(feld, wert) {
+  var f = raFangLesen();
+  if (!f) { return; }
+  f[feld] = wert;
+  if (feld === 'bereich') { f.eltern = ''; }
+  aufklappNeu();
+}
+
+function raFangHtml() {
+  var f = cl.ra.fang;
+  if (!f) { return ''; }
+  var alt = f.schon ? raFinden(f.schon) : null;
+  var ordner = raKnoten().filter(function (k) { return k.art === 'ordner' && String(k.bereich || 'beruflich') === f.bereich; });
+  var kn = function (feld, wert, text) {
+    return '<button type="button"' + (f[feld] === wert ? ' class="an"' : '') + ' onclick="raFangWahl(\'' + feld + '\',\'' + esc(wert) + '\')">' + esc(text) + '</button>';
+  };
+  var h = '<div class="fenster"><div class="titel">Aus OneNote</div><div class="rumpf">';
+  if (alt) {
+    h += '<p class="leise">Diese Seite steht schon im Radar als „' + esc(alt.name || '') + '“. CLIE legt sie nicht zweimal an.</p>';
+  }
+  h += '<label for="raFangTitel">Titel:</label><input id="raFangTitel" class="eingabe" type="text" maxlength="80" autocomplete="off" value="' + esc(f.titel) + '">'
+    + '<label>Bereich:</label><div class="wahlreihe">' + RA_BEREICHE.map(function (b) { return kn('bereich', b[0], b[0] === 'beruflich' ? 'Beruflich' : 'Privat'); }).join('') + '</div>';
+  if (ordner.length) {
+    h += '<label>Ordner:</label><div class="wahlreihe">' + kn('eltern', '', 'Keiner')
+      + ordner.slice(0, 6).map(function (o) { return kn('eltern', o.id, o.name || ''); }).join('') + '</div>';
+  }
+  h += '<p class="leise">' + esc(f.urlWeb.slice(0, 70)) + (f.urlWeb.length > 70 ? '…' : '') + '</p>'
+    + '<div class="knoepfe">'
+    + (alt ? '' : '<button type="button" class="knopf voll" onclick="raFangFertig(\'merken\')">Nur merken</button>')
+    + '<button type="button" class="knopf' + (alt ? ' voll' : '') + '" onclick="raFangFertig(\'aufgabe\')">Aufgabe</button>'
+    + (alt ? '' : '<button type="button" class="knopf" onclick="raFangFertig(\'beides\')">Beides</button>')
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>';
+  return h + '</div></div>';
+}
+
+function raFangFertig(was) {
+  var f = raFangLesen();
+  if (!f) { aufklappZu(); return; }
+  var k = f.schon ? raFinden(f.schon) : null;
+  if (!k) {
+    var titel = String(f.titel || '').trim().slice(0, 80) || 'Neue Seite';
+    k = { id: 'ra-' + neueKennung(), typ: 'radar', art: 'link', name: titel,
+          bereich: f.bereich === 'privat' ? 'privat' : 'beruflich', eltern: String(f.eltern || ''),
+          cluster: '', urlApp: f.urlApp, urlWeb: f.urlWeb, angelegt: isoDatum(),
+          rang: raKinder(f.bereich, f.eltern || '').length + 1 };
+    krSpeichern(k);
+    if (k.eltern) { cl.ra.auf[k.eltern] = true; }
+  }
+  cl.ra.wahl = k.id;
+  cl.ra.fang = null;
+  if (was === 'merken') { aufklappZu(); melde('Im Radar gemerkt.', null); return; }
+  raAlsAufgabe(k.id);
+}
+
+/* Ziehen und Einfügen am Rechner */
+function raHereinHaengen() {
+  var el = document.getElementById('inhalt');
+  if (!el) { return; }
+  var aktiv = function () { return cl.app === 'memo' && cl.memo.art === 'radar' && !cl.aufklapp; };
+  el.addEventListener('dragover', function (e) { if (aktiv()) { e.preventDefault(); el.classList.add('ra-tropf'); } });
+  el.addEventListener('dragleave', function () { el.classList.remove('ra-tropf'); });
+  el.addEventListener('drop', function (e) {
+    el.classList.remove('ra-tropf');
+    if (!aktiv() || !e.dataTransfer) { return; }
+    e.preventDefault();
+    var uri = '';
+    try { uri = e.dataTransfer.getData('text/uri-list') || ''; } catch (x) { uri = ''; }
+    var txt = '';
+    try { txt = e.dataTransfer.getData('text/plain') || ''; } catch (x) { txt = ''; }
+    try { raFangen(uri || txt, uri && txt && txt !== uri ? txt.split('\n')[0] : ''); } catch (x) { melde('Das ging nicht.', 'warn'); }
+  });
+  document.addEventListener('paste', function (e) {
+    if (!aktiv() || !e.clipboardData) { return; }
+    var txt = '';
+    try { txt = e.clipboardData.getData('text/plain') || ''; } catch (x) { txt = ''; }
+    if (!RA_URL.test(txt)) { return; }
+    e.preventDefault();
+    try { raFangen(txt, ''); } catch (x) { melde('Das ging nicht.', 'warn'); }
+  });
+}
+
+function raParam(such, name) {
+  var m = String(such || '').match(new RegExp('[?&]' + name + '=([^&]*)'));
+  if (!m) { return ''; }
+  try { return decodeURIComponent(m[1].replace(/\+/g, ' ')); } catch (e) { return m[1]; }
+}
+
+/* Geteilt vom Telefon: CLIE wird mit Parametern gestartet */
+function raGeteiltPruefen() {
+  var such = '';
+  try { such = String(window.location.search || ''); } catch (e) { return false; }
+  var url = raParam(such, 'url');
+  var text = raParam(such, 'text');
+  var titel = raParam(such, 'title');
+  if (!url && !text) { return false; }
+  try { window.history.replaceState({}, '', window.location.pathname); } catch (e) { /* egal */ }
+  return raFangen(url || text, titel);
+}
+
+/* Aus einem Knoten eine Aufgabe — Link und Cluster kommen mit (0.115.0) */
+function raAlsAufgabe(id) {
+  var k = raFinden(id);
+  if (!k || !raHatLink(k)) { return; }
+  cl.ra.wahl = k.id;
+  cl.aufklapp = '';
+  pmNeu('', '');
+  if (!cl.pm.fenster) { return; }
+  cl.pm.fenster.radar = k.id;
+  cl.pm.fenster.clusterTag = raCluster(k);
+  aufklappNeu();
+  var t = document.getElementById('pmTitel');
+  if (t && t.focus) { t.focus(); }
+}
+
 function memoHtml() {
   /* Handschrift (seit 0.64) */
+  if (cl.memo.art === 'radar') { return raHtml(); }
   if (cl.memo.art === 'notizblock') { return cl.nb.id ? nbEditorHtml() : nbListeHtml(); }
   if (cl.memo.art) { return cl.hs.offen ? hsAnsichtHtml() : hsListeHtml(); }
   /* Seit 0.80: Liste mit Kürzel, Memo mit Knöpfen (cl_palm.js) */
@@ -8401,6 +8983,7 @@ function memoHtml() {
 }
 
 function memoFussHtml() {
+  if (cl.memo.art === 'radar') { return raFussHtml(); }
   if (cl.memo.art === 'notizblock') {
     if (!cl.nb.id) { return '<button type="button" class="knopf voll" onclick="nbNeu()">Neu</button>'; }
     return '<button type="button" class="knopf" onclick="nbZurListe()">Fertig</button>'
@@ -9262,7 +9845,7 @@ function memoArtLaden() {
   var a = '';
   var s = '';
   try { a = window.localStorage.getItem(HS_ART_KEY) || ''; s = window.localStorage.getItem(MEMO_SICHT_KEY) || ''; } catch (e) { a = ''; }
-  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
+  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock' || a === 'radar') ? a : '';
   cl.memo.sicht = (s === 'vorlagen' || s === 'archiv' || MEMO_ARTEN.some(function (x) { return x[0] === s; })) ? s : 'alles';
   var ak = '';
   try { ak = window.localStorage.getItem(MEMO_AKTIV_KEY) || ''; } catch (e) { ak = ''; }
@@ -9291,13 +9874,14 @@ function memoSeitenModus() {
 function memoArtSetzen(a) {
   if (cl.nb.id) { nbZurListe(); }
   /* Seit 0.71: die Arten des Memo Pad (und Vorlagen) — sonst Handschrift / Notizblock */
+  if (a === 'radar') { cl.pm.memoWahl = ''; }
   if (a === 'vorlagen' || a === 'archiv' || MEMO_ARTEN.some(function (x) { return x[0] === a; })) {
     cl.memo.sicht = a;
     cl.pm.memoWahl = '';
     try { window.localStorage.setItem(MEMO_SICHT_KEY, a); } catch (e) { /* nur für jetzt */ }
   }
   if (cl.app !== 'memo') { cl.app = 'memo'; }
-  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock') ? a : '';
+  cl.memo.art = (a === 'handschrift' || a === 'alle' || a === 'notizblock' || a === 'radar') ? a : '';
   try { window.localStorage.setItem(HS_ART_KEY, cl.memo.art); } catch (e) { /* nur für jetzt */ }
   cl.memo.id = '';
   cl.memo.schreiben = false;
@@ -9324,12 +9908,15 @@ function memoWahlHtml() {
     + '<div class="trenn"></div>'
     + knopf('handschrift', 'Handschrift', hsOrdner() ? (neu ? neu + ' neu' : '0') : '', hs === 'handschrift')
     + knopf('alle', 'Alle Handschriften', hsOrdner() ? cl.hs.liste.length : '', hs === 'alle')
-    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length, hs === 'notizblock') + '</div>';
+    + knopf('notizblock', 'Notizblock', nbNeuZahl() ? nbNeuZahl() + ' neu' : nbAlle().length, hs === 'notizblock')
+    + '<div class="trenn"></div>'
+    + knopf('radar', 'Radar', raKnoten().length, hs === 'radar') + '</div>';
 }
 
 function memoKopfText() {
   if (cl.memo.art === 'handschrift') { return 'Handschrift'; }
   if (cl.memo.art === 'alle') { return 'Alle Handschriften'; }
+  if (cl.memo.art === 'radar') { return 'Radar'; }
   if (cl.memo.art === 'notizblock') { return 'Notizblock'; }
   if (cl.memo.sicht === 'vorlagen') { return 'Vorlagen'; }
   /* Seit 0.80: Archiv, sonst die Kategorie */
@@ -22439,7 +23026,7 @@ function coFaellige(nun, is) {
   if (e.quellen.routinen) { l = l.concat(coRoutinenFragen(nun, is, e)); }
   if (e.quellen.ideen) { l = l.concat(coIdeenFragen(nun, is, e)); }
   if (e.quellen.sammlungen) { l = l.concat(coSammlungFragen(nun, is, e)); }
-  if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)).concat(coHandschriftFragen(is)); }
+  if (e.quellen.korb) { l = l.concat(coKorbFragen(nun, is, e)).concat(coHandschriftFragen(is)).concat(coOnHakenFragen(is)); }
   if (e.quellen.aufgaben) { l = l.concat(coPrioFragen(nun, is, e)); }
   l = l.concat(coKampagneFragen(nun, is, e));
   /* Privates (seit 0.66) nennt der Coach nur, wenn es gezeigt wird */
@@ -28411,6 +28998,9 @@ function start() {
     zeichne();
     /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
     try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
+    /* Ziehen, Einfügen und Teilen für den Radar (0.116.0) */
+    try { raHereinHaengen(); } catch (e) { clFehlerZeigen(e, 'raHereinHaengen'); }
+    try { raGeteiltPruefen(); } catch (e) { clFehlerZeigen(e, 'raGeteiltPruefen'); }
     /* Die Pflichtlektüre braucht die Termine — erst holen, dann prüfen (0.106.0) */
     if (tokenGueltig()) {
       abgleichPlanen(true);
@@ -30410,6 +31000,7 @@ function pmHaken(id, tag) {
     pmZeileAngleichen(a);
   }
   a.geaendert = jetzt();
+  raHakenMerken(a);   /* Zeigt sie nach OneNote? Dann dort noch abhaken (0.117.0) */
   spaeterSichern();
   zeichne();
 }
@@ -30496,6 +31087,78 @@ function pmSortieren(l, art) {
 }
 
 /* Eine Zeile: Kästchen · Priorität · Titel (ein- oder zweizeilig) · Zeichen · Datum */
+/* ---- Aufgaben mit einer Seite in OneNote (seit 0.115.0) ----
+   Die Aufgabe merkt sich den Knoten im Radar, nicht die URL — so bleibt der Link an
+   einer Stelle und eine Korrektur wirkt überall. Der Cluster wird dagegen beim Zuordnen
+   abgeschrieben: er ist eine Beschriftung, keine Verbindung, und darf stehenbleiben,
+   wenn der Knoten einmal verschwindet. */
+function pmOnKnoten(a) {
+  return (a && a.radar) ? raFinden(a.radar) : null;
+}
+
+function pmOnLink(a) {
+  var k = pmOnKnoten(a);
+  return k ? raLink(k) : '';
+}
+
+function pmOnSetzen(id, knotenId) {
+  var a = pmAufgabeFinden(id);
+  var k = knotenId ? raFinden(knotenId) : null;
+  if (!a) { return false; }
+  if (!knotenId) { delete a.radar; } else if (!k || k.art === 'ordner') { return false; } else {
+    a.radar = k.id;
+    var c = raCluster(k);
+    if (c) { a.clusterTag = c; }
+    if (a.memo) { delete a.memo; }   /* entweder oder */
+  }
+  a.geaendert = Date.now();
+  spaeterSichern();
+  return true;
+}
+
+/* Die Auswahl: alle Knoten des Radars, die einen Link tragen */
+function pmOnWahlAuf() {
+  if (!cl.pm.fenster || !cl.pm.fenster.id) { return; }
+  cl.aufklapp = 'pmon';
+  aufklappNeu();
+}
+
+function pmOnWahlHtml() {
+  var f = cl.pm.fenster;
+  if (!f) { return ''; }
+  var a = f.id ? pmAufgabeFinden(f.id) : null;
+  var jetzt = a && a.radar ? a.radar : '';
+  var h = '<div class="fenster"><div class="titel">Seite in OneNote</div><div class="rumpf">';
+  var leer = true;
+  RA_BEREICHE.forEach(function (b) {
+    var l = raKnoten().filter(function (k) { return String(k.bereich || 'beruflich') === b[0] && k.art !== 'ordner' && raHatLink(k); });
+    if (!l.length) { return; }
+    leer = false;
+    h += '<div class="gruppe">' + esc(b[1]) + '</div>';
+    h += l.sort(function (x, y) { return String(x.name || '').localeCompare(String(y.name || ''), 'de'); }).map(function (k) {
+      var c = raCluster(k);
+      return '<button type="button" class="ra-ziel' + (jetzt === k.id ? ' an' : '') + '" onclick="pmOnZu(\'' + esc(k.id) + '\')">'
+        + (c ? '[' + esc(c) + '] ' : '') + esc(k.name || '') + '</button>';
+    }).join('');
+  });
+  if (leer) { h += '<p class="leise">Noch kein Knoten mit Link im Radar — Memo Pad, ▼ Radar.</p>'; }
+  if (jetzt) { h += '<div class="gruppe">Verbindung</div><button type="button" class="ra-ziel" onclick="pmOnZu(\'\')">Lösen</button>'; }
+  return h + '<div class="knoepfe"><button type="button" class="knopf" onclick="pmDetailsZurueck()">Zurück</button></div></div></div>';
+}
+
+function pmOnZu(knotenId) {
+  var f = cl.pm.fenster;
+  if (!f || !f.id) { aufklappZu(); return; }
+  if (!pmOnSetzen(f.id, knotenId)) { melde('Das ging nicht.', 'warn'); return; }
+  melde(knotenId ? 'Mit OneNote verbunden.' : 'Verbindung gelöst.', null);
+  pmDetails(f.id);
+}
+
+function pmDetailsZurueck() {
+  var f = cl.pm.fenster;
+  if (f && f.id) { pmDetails(f.id); } else { aufklappZu(); }
+}
+
 function pmZeileHtml(a, opt) {
   var o = opt || {};
   var show = o.show || pmShow();
@@ -30515,7 +31178,9 @@ function pmZeileHtml(a, opt) {
     sym += '<button type="button" class="pm-sym" onclick="pmRangTauschen(\'' + id + '\',-1)" aria-label="Nach oben">▲</button>'
       + '<button type="button" class="pm-sym" onclick="pmRangTauschen(\'' + id + '\',1)" aria-label="Nach unten">▼</button>';
   }
-  if (a.memo && a.memo.id) { sym += '<button type="button" class="pm-sym" onclick="pmMemoVonAufgabe(\'' + id + '\')" aria-label="Memo öffnen">▤</button>'; }
+  /* Entweder OneNote oder das Memo — beides nebeneinander sprengt die Zeile (0.115.0) */
+  if (pmOnLink(a)) { sym += '<button type="button" class="pm-on" onclick="raOeffnen(\'' + esc(a.radar) + '\')" aria-label="In OneNote öffnen">ON</button>'; }
+  else if (a.memo && a.memo.id) { sym += '<button type="button" class="pm-sym" onclick="pmMemoVonAufgabe(\'' + id + '\')" aria-label="Memo öffnen">▤</button>'; }
   else if (String(a.beschreibung || '').trim()) { sym += '<button type="button" class="pm-sym" onclick="pmDetails(\'' + id + '\')" aria-label="Notiz">▤</button>'; }
   var datum = '';
   if (o.mitDatum !== false && show.datum && d) {
@@ -30524,7 +31189,8 @@ function pmZeileHtml(a, opt) {
   var html = '<div class="aufg palm pm' + (erl ? ' erl' : '') + (gew ? ' gewaehlt' : '') + (lang ? ' ausf' : '') + '" id="pmA' + id + '">'
     + clKastenHtml(erl, 'pmHaken(\'' + id + '\'' + (tag ? ',\'' + esc(tag) + '\'' : '') + ')')
     + (show.prio ? '<button type="button" class="pd" onclick="pmPrioUm(\'' + id + '\')" aria-label="Priorität">' + pmPrio(a) + '</button>' : '')
-    + '<button type="button" class="tx' + (lang ? ' lang' : '') + '" onclick="' + (tag ? 'pmDetails' : 'pmTippen') + '(\'' + id + '\')"><span class="tt">' + esc(titel) + '</span></button>'
+    + '<button type="button" class="tx' + (lang ? ' lang' : '') + '" onclick="' + (tag ? 'pmDetails' : 'pmTippen') + '(\'' + id + '\')"><span class="tt">'
+    + (a.clusterTag ? '<span class="pm-clu">[' + esc(a.clusterTag) + ']</span> ' : '') + esc(titel) + '</span></button>'
     + sym + datum
     + (show.kat && o.mitKat !== false ? '<span class="kt">' + esc(pmKatName(clKategorieVon(a))) + '</span>' : '')
     + '</div>';
@@ -31016,8 +31682,15 @@ function pmFensterHtml() {
   if (memo) {
     x += '<label>Memo:</label><div class="pm-zeile"><button type="button" class="verweis" onclick="pmMemoAusFenster()">' + esc(memo.titel) + (f.memo.zeile ? ' · Zeile' : '') + '</button>'
       + (a ? '<button type="button" class="knopf" onclick="pmMemoLoesen()">Lösen</button>' : '') + '</div>';
-  } else if (a) {
+  } else if (a && !a.radar) {
     x += '<label>Memo:</label><div class="pm-zeile"><span>–</span><button type="button" class="knopf" onclick="pmZuordnenAuf()">Zuordnen…</button></div>';
+  }
+  /* Seit 0.115.0: statt eines Memos eine Seite in OneNote */
+  if (a && !memo) {
+    var kn = pmOnKnoten(a);
+    x += '<label>OneNote:</label><div class="pm-zeile">'
+      + (kn ? '<button type="button" class="verweis" onclick="raOeffnen(\'' + esc(kn.id) + '\')">' + esc(kn.name || '') + '</button>' : '<span>–</span>')
+      + '<button type="button" class="knopf" onclick="pmOnWahlAuf()">' + (kn ? 'Ändern…' : 'OneNote…') + '</button></div>';
   }
   return x + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
@@ -31037,6 +31710,12 @@ function pmUebernehmen() {
     a = pmNeueAufgabe({ titel: titel, prio: f.prio, bereich: f.bereich, privat: f.privat, datum: f.datum, zeit: f.zeit, notiz: f.notiz,
                         memo: f.memo, kontext: f.kontext, liste: f.liste });
     if (f.memoZeile) { pmMarkeSetzen(f.memoZeile.id, f.memoZeile.nr, f.memoZeile.text, a); }
+    /* Aus dem Radar heraus angelegt: Knoten und Cluster kommen mit (0.115.0) */
+    if (f.radar && raFinden(f.radar)) {
+      a.radar = f.radar;
+      if (f.clusterTag) { a.clusterTag = String(f.clusterTag).slice(0, 30); }
+      delete a.memo;
+    }
     f.id = a.id;
     f.modus = 'details';
     cl.pm.wahl = a.id;
