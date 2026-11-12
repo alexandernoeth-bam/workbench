@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f4f3ef">
-<title>Workbench 0.6.1</title>
-<link rel="manifest" href="workbench.webmanifest?v=0.6.1">
-<link rel="icon" type="image/png" sizes="192x192" href="workbench-192.png?v=0.6.1">
-<link rel="apple-touch-icon" href="workbench-192.png?v=0.6.1">
+<title>Workbench 0.7.0</title>
+<link rel="manifest" href="workbench.webmanifest?v=0.7.0">
+<link rel="icon" type="image/png" sizes="192x192" href="workbench-192.png?v=0.7.0">
+<link rel="apple-touch-icon" href="workbench-192.png?v=0.7.0">
 <style>
 :root{
   --bg:#f4f3ef;--ink:#222222;--muted:#8a8984;--line:#dcdad3;--karo:#ecebe6;--aus:#b9b7af;
@@ -51,10 +51,11 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* Die Seite steht zwischen den Stapeln und bekommt ihre Breite von der Zeile,
    nicht von ihrem eigenen Inhalt — sonst schrumpft sie auf die Textbreite. */
 .blatt{display:flex;align-items:stretch;width:min(860px,100%)}
-/* Feste Seitenhöhe: die Tinte liegt in Seitenkoordinaten, und die dürfen sich
-   nicht verschieben, wenn der getippte Text wächst. Passt etwas nicht mehr
-   drauf, beginnt eine neue Seite — so ist ein Block nun einmal. */
-.seite{height:1080px}
+/* Die Höhe steht am Element: die Seite ist ein Blatt hoch und wächst nach
+   unten, wenn unten geschrieben wird. Nach oben verschiebt sich nie etwas,
+   deshalb bleiben die Tintenkoordinaten gültig. Die feine Linie markiert,
+   wo ein Blatt endet. */
+.seite{height:1080px;background-repeat:repeat,repeat,repeat}
 .werkzeug{display:flex;gap:7px;align-items:center;margin-bottom:10px;font-size:13.5px;color:var(--muted);width:min(860px,100%)}
 .werkzeug span{margin-left:auto;text-align:right}
 .werkzeug button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13.5px}
@@ -63,15 +64,16 @@ button,input,textarea,select{font:inherit;color:inherit}
 .tinte{position:absolute;inset:0;touch-action:none;pointer-events:none;z-index:3}
 .tinte.an{pointer-events:auto;cursor:crosshair}
 .regal,.fv,.start{width:100%;align-self:flex-start}
-.sicht .stapel{min-height:1080px}
-.stapel{align-self:stretch;margin:6px 0;flex:0 0 auto;min-height:220px}
+
+.stapel{align-self:stretch;margin:6px 0;flex:0 0 auto}
 .stapel.l{background:repeating-linear-gradient(90deg,#fff 0 2px,var(--line) 2px 3px);border-radius:6px 0 0 6px}
 .stapel.r{background:repeating-linear-gradient(90deg,var(--line) 0 1px,#fff 1px 3px);border-radius:0 6px 6px 0}
 .seite{position:relative;background:#fff;border:1px solid var(--line);border-radius:4px;
        flex:1 1 auto;min-width:0;padding:30px 40px;
-       background-image:linear-gradient(var(--karo) 1px,transparent 1px),
+       background-image:repeating-linear-gradient(transparent 0 1079px,#d6d2c9 1079px 1080px),
+                        linear-gradient(var(--karo) 1px,transparent 1px),
                         linear-gradient(90deg,var(--karo) 1px,transparent 1px);
-       background-size:24px 24px}
+       background-size:100% 1080px,24px 24px,24px 24px}
 .datum{font-size:13px;color:var(--muted);margin-bottom:6px}
 .stitel{display:block;width:70%;font-size:21px;font-weight:500;background:none;border:0;
         border-bottom:1px solid transparent;padding:0 0 3px;margin:0 0 14px}
@@ -83,7 +85,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .skizze img{max-width:100%;display:block}
 .skizze .weg{position:absolute;top:5px;right:5px;background:#fff;border:1px solid var(--line);
              border-radius:5px;font-size:12px;padding:1px 7px;color:var(--muted)}
-.stext{display:block;width:70%;height:620px;font-size:16px;line-height:24px;background:rgba(255,255,255,.85);
+.stext{display:block;width:70%;height:calc(100% - 118px);font-size:16px;line-height:24px;background:rgba(255,255,255,.85);
        border:0;resize:none;padding:0;margin:0}
 .stext:focus{outline:none}
 .stext::placeholder{color:var(--aus)}
@@ -196,7 +198,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 <div class="toast" id="toast"></div>
 
 <script>
-var WB_FASSUNG = '0.6.1';
+var WB_FASSUNG = '0.7.0';
 
 /* ===== wb_daten.js ===== */
 /* ============================================================
@@ -1345,6 +1347,7 @@ var wb = {
   zurueck: []          /* Rückgängig-Stapel der laufenden Sitzung */
 };
 var WB_BREITEN = [[1, 'fein', 1.4], [2, 'mittel', 2.6], [3, 'kräftig', 4.4]];
+var WB_BLATT = 1080;   /* ein Blatt der Seite in Pixeln */
 
 var WB_REITER = [['notizen', 'Notizen'], ['faecher', 'Fächer']];
 var WB_MONATE = ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'];
@@ -1480,23 +1483,27 @@ function wbBlockHtml() {
     + '</div></div>';
 }
 
+function wbBlaetter(s) {
+  return Math.max(1, Math.min(40, Number(s && s.blaetter) || 1));
+}
+
 function wbSeiteHtml(welt, s) {
   var bild = s.skizze ? (wb.bilder[welt + '|' + s.skizze] || '') : '';
-  var h = '<div class="seite">'
+  var h = '<div class="seite" style="height:' + (wbBlaetter(s) * WB_BLATT) + 'px">'
     + '<div class="datum">' + wbEsc(wbDatumText(s.datum))
     + (wbGeladeneWelten().length > 1 ? ' · ' + wbEsc(wbBestand(welt).name) : '') + '</div>'
     + '<input class="stitel" type="text" placeholder="Titel" value="' + wbEsc(s.titel)
     + '" oninput="wbFeldTippen(\'titel\', this.value)">';
-  h += '<div class="skizze">';
-  if (s.skizze && bild) {
-    h += '<img src="' + wbEsc(bild) + '" alt="Skizze">'
-      + '<button type="button" class="weg" onclick="wbSkizzeWeg()">entfernen</button>';
-  } else if (s.skizze) {
-    h += 'Skizze wird geladen…';
-  } else {
-    h += '<button type="button" class="kn" onclick="wbSkizzeWaehlen()">Skizze einfügen</button>';
+  /* Kein leerer Rahmen mehr: ist keine Skizze da, ist dort Papier. Der frühere
+     Platzhalter fraß am iPad die halbe sichtbare Seite — fünf Zeilen blieben. */
+  if (s.skizze) {
+    h += '<div class="skizze">';
+    h += bild
+      ? ('<img src="' + wbEsc(bild) + '" alt="Skizze">'
+         + '<button type="button" class="weg" onclick="wbSkizzeWeg()">entfernen</button>')
+      : 'Skizze wird geladen…';
+    h += '</div>';
   }
-  h += '</div>';
   h += '<textarea class="stext" placeholder="Schreiben…" oninput="wbFeldTippen(\'text\', this.value)">'
     + wbEsc(s.text) + '</textarea>';
   h += '<canvas class="tinte' + (wb.zeichnen ? ' an' : '') + '" id="tinte"></canvas>';
@@ -2176,6 +2183,7 @@ function wbWerkzeugHtml() {
     + '<button type="button" class="' + (wb.stift === 'radierer' ? 'an' : '')
     + '" onclick="wbRadiererUm()">Radierer</button>'
     + '<button type="button" onclick="wbTinteZurueck()">Rückgängig</button>'
+    + '<button type="button" onclick="wbSkizzeWaehlen()">Skizze…</button>'
     + '<span>' + (wb.zeichnen
         ? 'Nur Stift und Maus schreiben — der Handballen wird nicht gewertet.'
         : 'Zum Schreiben mit dem Stift „Zeichnen" einschalten.') + '</span>'
@@ -2248,16 +2256,36 @@ function wbTinteAnbinden() {
   };
   seite.onpointerup = function () {
     var striche;
+    var tief = 0;
     if (!wb.strich) { return; }
     if (wb.strich.punkte.length >= 6) {
       striche = wbTinteVon(wb.welt, wb.seite).concat([wb.strich]);
       wbTinteSetzen(wb.welt, wb.seite, striche);
+      tief = wb.strich.punkte.filter(function (x, k) { return k % 3 === 1; })
+        .reduce(function (a, b) { return Math.max(a, b); }, 0);
     }
     wb.strich = null;
+    if (tief && wbBlattAnhaengenNoetig(tief)) { wbFlaecheZeichnen(); return; }
     wbTinteMalen();
     wbReiterZeichnen();
   };
   seite.onpointercancel = seite.onpointerup;
+}
+
+/* Die Seite wächst nach unten, sobald im unteren Fünftel geschrieben wird.
+   Nach unten ist das gefahrlos: die Striche hängen an der Oberkante, ihre
+   Koordinaten verschieben sich nicht. Kürzer wird sie nie — da könnte Tinte
+   stehen, die niemand mehr sähe. */
+function wbBlattAnhaengenNoetig(tiefsterPunkt) {
+  var s = wbSeiteFinden(wb.welt, wb.seite);
+  var hoehe;
+  if (!s) { return false; }
+  hoehe = wbBlaetter(s) * WB_BLATT;
+  if (tiefsterPunkt < hoehe - (WB_BLATT / 5)) { return false; }
+  if (wbBlaetter(s) >= 40) { return false; }
+  wbSeiteAendern(wb.welt, wb.seite, { blaetter: wbBlaetter(s) + 1 });
+  melde('Ein Blatt angehängt — die Seite ist jetzt ' + wbBlaetter(s) + ' Blätter lang.', null);
+  return true;
 }
 
 function wbTinteMassSetzen(leinwand, seite) {
