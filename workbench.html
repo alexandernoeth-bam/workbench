@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f4f3ef">
-<title>Workbench 0.6.0</title>
-<link rel="manifest" href="workbench.webmanifest?v=0.6.0">
-<link rel="icon" type="image/png" sizes="192x192" href="workbench-192.png?v=0.6.0">
-<link rel="apple-touch-icon" href="workbench-192.png?v=0.6.0">
+<title>Workbench 0.6.1</title>
+<link rel="manifest" href="workbench.webmanifest?v=0.6.1">
+<link rel="icon" type="image/png" sizes="192x192" href="workbench-192.png?v=0.6.1">
+<link rel="apple-touch-icon" href="workbench-192.png?v=0.6.1">
 <style>
 :root{
   --bg:#f4f3ef;--ink:#222222;--muted:#8a8984;--line:#dcdad3;--karo:#ecebe6;--aus:#b9b7af;
@@ -196,7 +196,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 <div class="toast" id="toast"></div>
 
 <script>
-var WB_FASSUNG = '0.6.0';
+var WB_FASSUNG = '0.6.1';
 
 /* ===== wb_daten.js ===== */
 /* ============================================================
@@ -2166,7 +2166,7 @@ function wbStart() {
 
 function wbWerkzeugHtml() {
   return '<div class="werkzeug">'
-    + '<button type="button" class="' + (wb.stift === 'stift' && !wb.zeichnen ? '' : (wb.stift === 'stift' ? 'an' : ''))
+    + '<button type="button" class="' + (wb.zeichnen ? 'an' : '')
     + '" onclick="wbZeichnenUm()">' + (wb.zeichnen ? 'Zeichnen: an' : 'Zeichnen: aus') + '</button>'
     + WB_BREITEN.map(function (b) {
       return '<button type="button" class="' + (wb.breite === b[0] && wb.stift === 'stift' ? 'an' : '')
@@ -2176,7 +2176,9 @@ function wbWerkzeugHtml() {
     + '<button type="button" class="' + (wb.stift === 'radierer' ? 'an' : '')
     + '" onclick="wbRadiererUm()">Radierer</button>'
     + '<button type="button" onclick="wbTinteZurueck()">Rückgängig</button>'
-    + '<span>Der Pencil schreibt immer — auch wenn „Zeichnen" aus ist.</span>'
+    + '<span>' + (wb.zeichnen
+        ? 'Nur Stift und Maus schreiben — der Handballen wird nicht gewertet.'
+        : 'Zum Schreiben mit dem Stift „Zeichnen" einschalten.') + '</span>'
     + '</div>';
 }
 
@@ -2224,7 +2226,10 @@ function wbTinteAnbinden() {
             Math.round((e.clientY - k.top) * 10) / 10,
             Math.round((e.pressure || 0.5) * 100) / 100];
   };
-  var malt = function (e) { return e.pointerType === 'pen' || wb.zeichnen; };
+  /* Gezeichnet wird nur mit eingeschaltetem „Zeichnen" — und dann nur mit
+     Stift oder Maus. Der Handballen meldet sich als Berührung und wird
+     dadurch gar nicht erst zu einem Strich: das ist die Erkennung. */
+  var malt = function (e) { return wb.zeichnen && e.pointerType !== 'touch'; };
 
   seite.onpointerdown = function (e) {
     if (!malt(e)) { return; }
