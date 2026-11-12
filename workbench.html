@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#F6F5F2">
-<title>Workbench 0.1.0</title>
+<title>Workbench 0.2.0</title>
+<link rel="manifest" href="workbench.webmanifest?v=0.2.0">
+<link rel="icon" type="image/png" sizes="192x192" href="workbench-192.png?v=0.2.0">
+<link rel="apple-touch-icon" href="workbench-192.png?v=0.2.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
 <style>
@@ -54,15 +57,20 @@ button{font:inherit;color:inherit}
 .bal{background:var(--px);color:var(--lcd);padding:3px 10px;font-size:14px;display:flex;justify-content:space-between}
 .leise{color:var(--mitte);padding:12px 14px;font-size:15px}
 
-/* Wissensbaum */
-.baum button{display:flex;gap:8px;width:100%;text-align:left;align-items:center;background:none;
-             border:0;border-bottom:1px solid #F0EDE8;padding:5px 10px;font-size:15px}
+/* Wissensbaum: der Name öffnet, das Zeichen rechts pflegt */
+.baum .bz{display:flex;align-items:center;border-bottom:1px solid #F0EDE8;padding-right:4px}
+.baum .nmk{flex:1;min-width:0;display:flex;gap:8px;align-items:center;text-align:left;
+           background:none;border:0;padding:5px 4px 5px 10px;font-size:15px}
 .baum .e1{font-weight:600;background:var(--weiss)}
-.baum .e2{padding-left:26px}
+.baum .e2 .nmk{padding-left:26px}
 .baum .gew{background:var(--px);color:var(--lcd)}
 .baum .gew .zahl{color:var(--zart)}
+.baum .arch{opacity:.52}
+.baum .arch .nmk{font-style:italic}
 .baum .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.baum .zahl{color:var(--mitte);font-size:14px;flex:0 0 auto}
+.baum .zahl{color:var(--mitte);font-size:14px;flex:0 0 auto;padding:0 2px}
+.baum .stift{background:none;border:0;padding:4px 6px;color:var(--mitte);font-size:15px;flex:0 0 auto}
+.baum .gew .stift{color:var(--zart)}
 .baum .pkt{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
 .baum .pkt.aktiv{background:var(--rot)}
 .baum .pkt.ruht{border:1.5px solid var(--zart)}
@@ -121,7 +129,7 @@ button{font:inherit;color:inherit}
 
 <div class="rahmen">
   <div class="titel">
-    <span class="marke">Workbench <small id="fassung">0.1.0</small></span>
+    <span class="marke">Workbench <small id="fassung">0.2.0</small></span>
     <span class="welt" id="weltSchalter"></span>
     <span class="hin">— gilt für Block und Wissen</span>
     <span class="r" id="stand">…</span>
@@ -143,7 +151,7 @@ button{font:inherit;color:inherit}
 <div class="toast" id="toast"></div>
 
 <script>
-var WB_FASSUNG = '0.1.0';
+var WB_FASSUNG = '0.2.0';
 
 /* ===== wb_daten.js ===== */
 /* ============================================================
@@ -602,20 +610,25 @@ function wbWissen(welt) {
   return wbDaten[welt] || null;
 }
 
-function wbFaecher(welt) {
-  var w = wbWissen(welt);
-  if (!w) { return []; }
-  return w.faecher.slice().sort(function (a, b) {
-    return (Number(a.rang || 0) - Number(b.rang || 0)) || String(a.name).localeCompare(String(b.name), 'de');
-  });
+function wbNachRang(a, b) {
+  return (Number(a.rang || 0) - Number(b.rang || 0))
+      || String(a.name || '').localeCompare(String(b.name || ''), 'de');
 }
 
-function wbZweige(welt, fachId) {
+/* Archiviertes ist nicht gelöscht, nur aus dem Weg. Ohne das zweite
+   Argument sieht man es nirgends — auch nicht in den Auswahllisten. */
+function wbFaecher(welt, auchArchiv) {
   var w = wbWissen(welt);
   if (!w) { return []; }
-  return w.zweige.filter(function (z) { return z.fachId === fachId; }).sort(function (a, b) {
-    return (Number(a.rang || 0) - Number(b.rang || 0)) || String(a.name).localeCompare(String(b.name), 'de');
-  });
+  return w.faecher.filter(function (f) { return auchArchiv || !f.archiv; }).sort(wbNachRang);
+}
+
+function wbZweige(welt, fachId, auchArchiv) {
+  var w = wbWissen(welt);
+  if (!w) { return []; }
+  return w.zweige.filter(function (z) {
+    return z.fachId === fachId && (auchArchiv || !z.archiv);
+  }).sort(wbNachRang);
 }
 
 function wbFachFinden(welt, id) {
@@ -682,6 +695,152 @@ function wbZweigZustand(z, heute) {
 }
 
 
+/* ============================================================
+   Den Baum umbauen
+   ------------------------------------------------------------
+   Umbenennen, verschieben, ordnen, archivieren, löschen. Die
+   Kennung bleibt bei allem erhalten — an ihr hängen die Aufgaben
+   im gemeinsamen Bestand. Wer sie austauscht, lässt sie verwaisen.
+   ============================================================ */
+
+function wbSatz(welt, art, id) {
+  return (art === 'fach') ? wbFachFinden(welt, id) : wbZweigFinden(welt, id);
+}
+
+function wbUmbenennen(welt, art, id, name) {
+  var o = wbSatz(welt, art, id);
+  var n = String(name || '').trim();
+  if (!o || !n) { return false; }
+  o.name = n;
+  o.geaendert = wbIsoZeit();
+  wbSchmutzig(welt);
+  return true;
+}
+
+/* Ein Zweig zieht in ein anderes Fach um. Seine Aufgaben ziehen mit,
+   weil sie am Zweig hängen und nicht am Fach. */
+function wbZweigUmhaengen(welt, id, fachId) {
+  var z = wbZweigFinden(welt, id);
+  if (!z || !wbFachFinden(welt, fachId)) { return false; }
+  if (z.fachId === fachId) { return true; }
+  z.fachId = fachId;
+  z.rang = wbZweige(welt, fachId, true).length;
+  z.geaendert = wbIsoZeit();
+  wbSchmutzig(welt);
+  return true;
+}
+
+function wbArtSetzen(welt, id, art) {
+  var z = wbZweigFinden(welt, id);
+  if (!z || (art !== 'unterfach' && art !== 'vorhaben')) { return false; }
+  z.art = art;
+  if (art === 'unterfach') { z.zustand = 'aktiv'; z.ruhtBis = ''; }
+  z.geaendert = wbIsoZeit();
+  wbSchmutzig(welt);
+  return true;
+}
+
+/* WO-03: ruhend, wahlweise mit Datum. Ohne Datum ruht es, bis du es
+   selbst weckst; mit Datum weckt es sich. */
+function wbZustandSetzen(welt, id, zustand, ruhtBis) {
+  var z = wbZweigFinden(welt, id);
+  if (!z || z.art !== 'vorhaben') { return false; }
+  z.zustand = (zustand === 'ruhend') ? 'ruhend' : 'aktiv';
+  z.ruhtBis = (z.zustand === 'ruhend') ? String(ruhtBis || '') : '';
+  z.geaendert = wbIsoZeit();
+  wbSchmutzig(welt);
+  return true;
+}
+
+/* Die Reihenfolge wird über den Rang geführt, nicht über die Lage im
+   Feld — sonst dreht der Abgleich zwischen zwei Geräten sie wieder um. */
+function wbRangSchieben(welt, art, id, richtung) {
+  var o = wbSatz(welt, art, id);
+  var geschwister;
+  var i;
+  var nachbar;
+  if (!o) { return false; }
+  geschwister = (art === 'fach') ? wbFaecher(welt, true) : wbZweige(welt, o.fachId, true);
+  for (i = 0; i < geschwister.length; i += 1) {
+    if (geschwister[i].id === id) { break; }
+  }
+  nachbar = geschwister[i + (richtung < 0 ? -1 : 1)];
+  if (!nachbar) { return false; }
+  geschwister.forEach(function (g, k) { g.rang = k; });
+  i = o.rang;
+  o.rang = nachbar.rang;
+  nachbar.rang = i;
+  o.geaendert = wbIsoZeit();
+  nachbar.geaendert = wbIsoZeit();
+  wbSchmutzig(welt);
+  return true;
+}
+
+function wbArchivieren(welt, art, id, an) {
+  var o = wbSatz(welt, art, id);
+  if (!o) { return false; }
+  if (an) { o.archiv = true; } else { delete o.archiv; }
+  o.geaendert = wbIsoZeit();
+  /* Ein archiviertes Fach nimmt seine Zweige mit — sonst stünden sie
+     ohne sichtbares Fach im Baum. */
+  if (art === 'fach') {
+    wbZweige(welt, id, true).forEach(function (z) {
+      if (an) { z.archiv = true; } else { delete z.archiv; }
+      z.geaendert = wbIsoZeit();
+    });
+  }
+  wbSchmutzig(welt);
+  return true;
+}
+
+/* Gelöscht wird nur, was nichts mehr trägt. Alles andere wird
+   archiviert — Aufgaben, die ins Leere zeigen, sind unsichtbar
+   und damit verloren, und das ist keine Löschung, sondern ein Verlust. */
+function wbLoeschbar(welt, art, id) {
+  var o = wbSatz(welt, art, id);
+  var zweige;
+  if (!o) { return { geht: false, grund: 'Gibt es nicht.' }; }
+  if (art === 'fach') {
+    zweige = wbZweige(welt, id, true);
+    if (zweige.length) {
+      return { geht: false, grund: 'Darin liegen noch ' + zweige.length
+        + ' Unterfächer oder Vorhaben. Erst die, dann das Fach.' };
+    }
+    if (wbOffeneAufgaben(welt, id, '') > 0) {
+      return { geht: false, grund: 'Daran hängen noch offene Aufgaben.' };
+    }
+    return { geht: true, grund: '' };
+  }
+  if (wbAufgabenAm(id).length) {
+    return { geht: false, grund: 'Daran hängen noch ' + wbAufgabenAm(id).length
+      + ' Aufgaben — auch erledigte. Archivieren lässt sie stehen.' };
+  }
+  return { geht: true, grund: '' };
+}
+
+/* Alle Aufgaben an einem Zweig, offen wie erledigt. Erledigtes zählt
+   mit: es ist die Geschichte des Vorhabens. */
+function wbAufgabenAm(zweigId) {
+  var d = wbDaten.aufgaben;
+  var liste = (d && Array.isArray(d.aufgaben)) ? d.aufgaben : [];
+  return liste.filter(function (a) { return a && a.wbZweig === zweigId; });
+}
+
+/* Der Grabstein: ohne ihn holt das andere Gerät den Satz beim nächsten
+   Abgleich zurück, weil es ihn hat und wir nicht. */
+function wbLoeschen(welt, art, id) {
+  var w = wbWissen(welt);
+  var pruefung = wbLoeschbar(welt, art, id);
+  var feld;
+  if (!w || !pruefung.geht) { return false; }
+  feld = (art === 'fach') ? 'faecher' : 'zweige';
+  w[feld] = w[feld].filter(function (o) { return o.id !== id; });
+  w.grabsteine.push({ id: id, art: art, zeit: wbIsoZeit() });
+  wbSchmutzig(welt);
+  return true;
+}
+
+
 /* ===== wb_app.js ===== */
 /* ============================================================
    wb_app.js — Gerüst, Weltenschalter, Leiste, Wissensbaum
@@ -702,7 +861,7 @@ var WB_WELT_KEY = 'workbench-neu-welt';
 var WB_WELTEN = [['beruflich', 'Beruflich'], ['privat', 'Privat']];
 var WB_REITER = [['wissen', 'Wissen'], ['tag', 'Tag'], ['aufgaben', 'Aufgaben']];
 
-var wb = { welt: 'beruflich', reiter: 'wissen', fach: '', dialog: null, laeuft: false };
+var wb = { welt: 'beruflich', reiter: 'wissen', fach: '', dialog: null, laeuft: false, archiv: false };
 
 function wbHeute() {
   var d = new Date();
@@ -798,7 +957,9 @@ function wbLeisteZeichnen() {
   if (wb.reiter === 'wissen') {
     inhalt.innerHTML = wbBaumHtml();
     fuss.innerHTML = '<button type="button" class="kn voll" onclick="wbFachNeuFragen()">Neues Fach</button>'
-      + '<button type="button" class="kn" onclick="wbZweigNeuFragen()">Unterfach oder Vorhaben…</button>';
+      + '<button type="button" class="kn" onclick="wbZweigNeuFragen()">Unterfach oder Vorhaben…</button>'
+      + '<button type="button" class="kn' + (wb.archiv ? ' voll' : '') + '" onclick="wbArchivUm()">'
+      + (wb.archiv ? 'Archiv verbergen' : 'Archiv zeigen') + '</button>';
   } else {
     inhalt.innerHTML = wbSpaeterHtml(wb.reiter);
     fuss.innerHTML = '<button type="button" class="kn" disabled>Kommt in Stufe 4</button>';
@@ -827,7 +988,7 @@ function wbBaumHtml() {
         ? 'Wähle links den Ordner auf dem Firmenspeicher.'
         : 'Melde dich links bei Google an.') + '</p>';
   }
-  var faecher = wbFaecher(welt);
+  var faecher = wbFaecher(welt, wb.archiv);
   if (!faecher.length) {
     return '<p class="leise">Noch kein Fach in dieser Welt.<br><br>'
       + 'Ein Fach ist ein Bereich deiner Arbeit, der Bestand hat — '
@@ -835,21 +996,35 @@ function wbBaumHtml() {
   }
   h += '<div class="baum">';
   faecher.forEach(function (f) {
-    var zweige = wbZweige(welt, f.id);
-    h += '<button type="button" class="e1' + (wb.fach === f.id ? ' gew' : '') + '"'
-      + ' onclick="wbFachOeffnen(\'' + wbEsc(f.id) + '\')">'
-      + '<span class="nm">' + wbEsc(f.name) + '</span>'
-      + '<span class="zahl">' + wbOffeneAufgaben(welt, f.id, '') + '</span></button>';
-    zweige.forEach(function (z) {
+    h += wbZeileHtml('e1' + (wb.fach === f.id ? ' gew' : '') + (f.archiv ? ' arch' : ''),
+      'wbFachOeffnen(\'' + wbEsc(f.id) + '\')', '', f.name,
+      wbOffeneAufgaben(welt, f.id, ''), 'wbFachFragen(\'' + wbEsc(f.id) + '\')');
+    wbZweige(welt, f.id, wb.archiv).forEach(function (z) {
       var zustand = wbZweigZustand(z, heute);
-      h += '<button type="button" class="e2" onclick="wbFachOeffnen(\'' + wbEsc(f.id) + '\')">'
-        + (zustand ? '<span class="pkt ' + (zustand === 'aktiv' ? 'aktiv' : 'ruht') + '"></span>' : '')
-        + '<span class="nm">' + wbEsc(z.name) + '</span>'
-        + '<span class="zahl">' + wbOffeneAufgaben(welt, f.id, z.id) + '</span></button>';
+      h += wbZeileHtml('e2' + (z.archiv ? ' arch' : ''),
+        'wbFachOeffnen(\'' + wbEsc(f.id) + '\')',
+        zustand ? '<span class="pkt ' + (zustand === 'aktiv' ? 'aktiv' : 'ruht') + '"></span>' : '',
+        z.name, wbOffeneAufgaben(welt, f.id, z.id), 'wbZweigFragen(\'' + wbEsc(z.id) + '\')');
     });
   });
   h += '</div>';
   return h;
+}
+
+/* Eine Baumzeile: der Name öffnet, das Zeichen rechts pflegt.
+   Zwei Knöpfe nebeneinander, nicht ineinander — verschachtelte
+   Knöpfe sind kein gültiges HTML und reagieren unzuverlässig. */
+function wbZeileHtml(klasse, aufKlick, punkt, name, zahl, aufStift) {
+  return '<div class="bz ' + klasse + '">'
+    + '<button type="button" class="nmk" onclick="' + aufKlick + '">'
+    + punkt + '<span class="nm">' + wbEsc(name) + '</span></button>'
+    + '<span class="zahl">' + zahl + '</span>'
+    + '<button type="button" class="stift" title="Bearbeiten" onclick="' + aufStift + '">✎</button></div>';
+}
+
+function wbArchivUm() {
+  wb.archiv = !wb.archiv;
+  wbZeichne();
 }
 
 function wbFachOeffnen(id) {
@@ -1093,6 +1268,133 @@ function wbStart() {
   }).then(function () {
     wbZeichne();
   });
+}
+
+/* ---------- Den Baum pflegen ---------- */
+
+function wbFachFragen(id) {
+  var f = wbFachFinden(wb.welt, id);
+  var pruefung;
+  if (!f) { return; }
+  pruefung = wbLoeschbar(wb.welt, 'fach', id);
+  wb.dialog = 'fachAendern:' + id;
+  wbDialogAuf('Fach bearbeiten',
+    '<div class="feld"><label>Name</label><input id="dlgName" type="text" value="' + wbEsc(f.name) + '"></div>'
+    + '<div class="feld"><label>Reihenfolge</label>'
+    + '<button type="button" class="kn" onclick="wbSchieben(\'fach\',\'' + wbEsc(id) + '\',-1)">▲ nach oben</button> '
+    + '<button type="button" class="kn" onclick="wbSchieben(\'fach\',\'' + wbEsc(id) + '\',1)">▼ nach unten</button></div>'
+    + '<div class="feld"><label>Archiv</label>'
+    + '<button type="button" class="kn" onclick="wbArchivSetzen(\'fach\',\'' + wbEsc(id) + '\',' + (f.archiv ? 'false' : 'true') + ')">'
+    + (f.archiv ? 'Aus dem Archiv holen' : 'Ins Archiv legen — mit allem darin') + '</button></div>'
+    + (pruefung.geht ? '' : '<p class="leise" style="padding:0">Löschen geht nicht: ' + wbEsc(pruefung.grund) + '</p>'),
+    '<button type="button" class="kn rot" onclick="wbLoeschenKlick(\'fach\',\'' + wbEsc(id) + '\')"'
+    + (pruefung.geht ? '' : ' disabled') + '>Löschen</button>'
+    + '<span class="r"><button type="button" class="kn" onclick="wbDialogZu()">Abbrechen</button>'
+    + '<button type="button" class="kn voll" onclick="wbFachAendernFertig(\'' + wbEsc(id) + '\')">Übernehmen</button></span>');
+}
+
+function wbFachAendernFertig(id) {
+  var el = document.getElementById('dlgName');
+  var name = el ? String(el.value || '').trim() : '';
+  if (!name) { melde('Ohne Namen geht es nicht.', 'warn'); return; }
+  wbUmbenennen(wb.welt, 'fach', id, name);
+  wbDialogZu();
+  wbZeichne();
+  melde('Übernommen — noch ungesichert.', null);
+}
+
+function wbZweigFragen(id) {
+  var z = wbZweigFinden(wb.welt, id);
+  var faecher;
+  var pruefung;
+  var ruht;
+  if (!z) { return; }
+  faecher = wbFaecher(wb.welt, true);
+  pruefung = wbLoeschbar(wb.welt, 'zweig', id);
+  ruht = (z.art === 'vorhaben' && z.zustand === 'ruhend');
+  wb.dialog = 'zweigAendern:' + id;
+  wbDialogAuf((z.art === 'vorhaben' ? 'Vorhaben' : 'Unterfach') + ' bearbeiten',
+    '<div class="feld"><label>Name</label><input id="dlgName" type="text" value="' + wbEsc(z.name) + '"></div>'
+    + '<div class="feld"><label>Liegt im Fach</label><select id="dlgFach">'
+    + faecher.map(function (f) {
+      return '<option value="' + wbEsc(f.id) + '"' + (f.id === z.fachId ? ' selected' : '') + '>'
+        + wbEsc(f.name) + (f.archiv ? ' (Archiv)' : '') + '</option>';
+    }).join('') + '</select></div>'
+    + '<div class="feld"><label>Art</label><select id="dlgArt">'
+    + '<option value="unterfach"' + (z.art === 'unterfach' ? ' selected' : '') + '>Unterfach — ein Dauerthema</option>'
+    + '<option value="vorhaben"' + (z.art === 'vorhaben' ? ' selected' : '') + '>Vorhaben — hat ein Ziel und ein Ende</option>'
+    + '</select></div>'
+    + '<div class="feld"><label>Zustand (nur für Vorhaben)</label><div class="zwei">'
+    + '<select id="dlgZustand"><option value="aktiv"' + (ruht ? '' : ' selected') + '>aktiv</option>'
+    + '<option value="ruhend"' + (ruht ? ' selected' : '') + '>ruhend</option></select>'
+    + '<input id="dlgRuhtBis" type="date" value="' + wbEsc(z.ruhtBis || '') + '"></div></div>'
+    + '<p class="leise" style="padding:0">Ein ruhendes Vorhaben mit Datum wacht an diesem Tag von selbst auf. '
+    + 'Ohne Datum ruht es, bis du es weckst.</p>'
+    + '<div class="feld"><label>Reihenfolge und Archiv</label>'
+    + '<button type="button" class="kn" onclick="wbSchieben(\'zweig\',\'' + wbEsc(id) + '\',-1)">▲</button> '
+    + '<button type="button" class="kn" onclick="wbSchieben(\'zweig\',\'' + wbEsc(id) + '\',1)">▼</button> '
+    + '<button type="button" class="kn" onclick="wbArchivSetzen(\'zweig\',\'' + wbEsc(id) + '\',' + (z.archiv ? 'false' : 'true') + ')">'
+    + (z.archiv ? 'Aus dem Archiv holen' : 'Ins Archiv') + '</button></div>'
+    + (pruefung.geht ? '' : '<p class="leise" style="padding:0">Löschen geht nicht: ' + wbEsc(pruefung.grund) + '</p>'),
+    '<button type="button" class="kn rot" onclick="wbLoeschenKlick(\'zweig\',\'' + wbEsc(id) + '\')"'
+    + (pruefung.geht ? '' : ' disabled') + '>Löschen</button>'
+    + '<span class="r"><button type="button" class="kn" onclick="wbDialogZu()">Abbrechen</button>'
+    + '<button type="button" class="kn voll" onclick="wbZweigAendernFertig(\'' + wbEsc(id) + '\')">Übernehmen</button></span>');
+}
+
+function wbZweigAendernFertig(id) {
+  var hol = function (n) {
+    var el = document.getElementById(n);
+    return el ? String(el.value || '').trim() : '';
+  };
+  var name = hol('dlgName');
+  if (!name) { melde('Ohne Namen geht es nicht.', 'warn'); return; }
+  wbUmbenennen(wb.welt, 'zweig', id, name);
+  wbZweigUmhaengen(wb.welt, id, hol('dlgFach'));
+  wbArtSetzen(wb.welt, id, hol('dlgArt'));
+  wbZustandSetzen(wb.welt, id, hol('dlgZustand'), hol('dlgRuhtBis'));
+  wbDialogZu();
+  wbZeichne();
+  melde('Übernommen — noch ungesichert.', null);
+}
+
+function wbSchieben(art, id, richtung) {
+  if (!wbRangSchieben(wb.welt, art, id, richtung)) {
+    melde('Weiter geht es in diese Richtung nicht.', null);
+    return;
+  }
+  wbZeichne();
+  if (art === 'fach') { wbFachFragen(id); } else { wbZweigFragen(id); }
+}
+
+function wbArchivSetzen(art, id, an) {
+  wbArchivieren(wb.welt, art, id, an);
+  if (an && art === 'fach' && wb.fach === id) { wb.fach = ''; }
+  wbDialogZu();
+  wbZeichne();
+  melde(an ? 'Ins Archiv gelegt — noch ungesichert.' : 'Aus dem Archiv geholt — noch ungesichert.', null);
+}
+
+function wbLoeschenKlick(art, id) {
+  var o = wbSatz(wb.welt, art, id);
+  var pruefung = wbLoeschbar(wb.welt, art, id);
+  if (!o) { return; }
+  if (!pruefung.geht) { melde(pruefung.grund, 'warn'); return; }
+  wb.dialog = 'loeschen';
+  wbDialogAuf('Wirklich löschen?',
+    '<p>„' + wbEsc(o.name) + '" wird gelöscht und auch auf deinen anderen Geräten verschwinden. '
+    + 'Das lässt sich nicht zurückholen.</p>'
+    + '<p class="leise" style="padding:0">Soll es nur aus dem Weg: Abbrechen und stattdessen ins Archiv legen.</p>',
+    '<span class="r"><button type="button" class="kn" onclick="wbDialogZu()">Abbrechen</button>'
+    + '<button type="button" class="kn rot" onclick="wbLoeschenFertig(\'' + art + '\',\'' + wbEsc(id) + '\')">Löschen</button></span>');
+}
+
+function wbLoeschenFertig(art, id) {
+  var gut = wbLoeschen(wb.welt, art, id);
+  if (gut && art === 'fach' && wb.fach === id) { wb.fach = ''; }
+  wbDialogZu();
+  wbZeichne();
+  melde(gut ? 'Gelöscht — noch ungesichert.' : 'Das ging nicht.', gut ? null : 'warn');
 }
 
 
