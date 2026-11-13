@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<title>Schreibtisch 0.4.0 Privat</title>
+<title>Schreibtisch 0.5.0 Privat</title>
 <link rel="manifest" href="./schreibtisch.webmanifest">
 <meta name="theme-color" content="#444B40">
 <link rel="apple-touch-icon" href="./schreibtisch-192.png">
@@ -23,6 +23,9 @@
   --tinte-leise:#7A776E;
   --linie:#DEDACE;
   --reiter-breit:7px;
+  /* Zoomfaktor der Papierstapel. Wird je Gerät gesetzt, nicht in der
+     Datei gespeichert: Der PC und das Pixel wollen verschiedene Größen. */
+  --z:1;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -40,6 +43,9 @@ body{margin:0;font-family:"Fira Sans",system-ui,sans-serif;color:var(--tinte);
   padding:4px 11px;border-radius:2px;cursor:pointer}
 .stift.an{background:#DDE2D6;color:var(--tisch-tief);border-color:#DDE2D6}
 /* Kopfzeile im Bearbeiten-Modus: Name als Knopf, daneben zwei Pfeile. */
+.zoom{display:inline-flex;gap:3px;margin-right:7px}
+.zoom .stift{min-width:30px;font-size:16px;line-height:1;padding:4px 8px}
+.stift[disabled]{opacity:.35;cursor:default}
 .pl-halter{display:inline-flex;align-items:center;gap:1px;margin-right:7px}
 .pl-name{background:none;border:0;border-bottom:1px dashed rgba(221,226,214,.45);color:#DDE2D6;
   font:inherit;font-size:15px;padding:4px 6px;border-radius:2px;cursor:pointer}
@@ -84,8 +90,8 @@ body.b-schmal .pl-halter{margin-right:5px}
   text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 
 /* ---------- Bearbeiten ---------- */
-body.bearbeiten .lage:nth-child(4)::after{content:"\270E";position:absolute;right:14px;bottom:5px;
-  font-size:15px;line-height:1;color:var(--tinte-leise);transform:skewX(27deg)}
+/* Kein Stift mehr auf dem Stapel: Seit die Steller daneben stehen, sagt
+   er dasselbe ein zweites Mal — und einer davon ist selbst ein Stift. */
 .werkzeug{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap}
 .werkzeug button{font:inherit;font-size:14.5px;padding:5px 11px;background:var(--papier);
   border:1px solid var(--linie);border-radius:2px;cursor:pointer;color:var(--tinte)}
@@ -99,7 +105,7 @@ body.bearbeiten .lage:nth-child(4)::after{content:"\270E";position:absolute;righ
 .verweise li a,.verweise li .ohne{flex:1}
 /* Blatt und seine Steller stehen in einer Spalte — sonst sieht man nicht,
    welcher Steller zu welchem Blatt gehört. */
-.seite-halter{display:flex;flex-direction:column;gap:7px;width:132px}
+.seite-halter{display:flex;flex-direction:column;gap:7px;width:calc(132px * var(--z))}
 .seite-halter .seite{width:100%}
 .seite-halter .steller{margin:0}
 .seite-halter .steller button{width:28px;height:26px}
@@ -111,22 +117,27 @@ body.bearbeiten .lage:nth-child(4)::after{content:"\270E";position:absolute;righ
    Das Blatt liegt auf dem Tisch, nicht aufrecht davor: ein Parallelogramm,
    darunter die Kanten der Blätter desselben Stapels. Der Name steht darunter
    — auf einer schrägen Fläche liest sich nichts. */
-body.b-weit .stapel{width:178px}
-.lager{position:relative;height:88px;flex:0 0 88px}
-.lage{position:absolute;left:0;top:0;width:142px;height:52px;border-radius:2px;
-  transform:skewX(-27deg);transform-origin:0 100%;background:#DFDBCD}
-.lage:nth-child(1){top:24px;left:3px;background:#D1CDBE}
-.lage:nth-child(2){top:18px;left:2px;background:#DDD9CA}
-.lage:nth-child(3){top:12px;left:1px;background:#E9E6D9}
-.lage:nth-child(4){top:5px;left:0;background:var(--papier);
+body.b-weit .stapel{width:calc(178px * var(--z))}
+.lager{position:relative;height:calc(88px * var(--z));flex:0 0 calc(88px * var(--z))}
+.lage{position:absolute;left:0;top:0;width:calc(142px * var(--z));height:calc(52px * var(--z));
+  border-radius:2px;transform:skewX(-27deg);transform-origin:0 100%;background:#DFDBCD}
+.lage:nth-child(1){top:calc(24px * var(--z));left:calc(3px * var(--z));background:#D1CDBE}
+.lage:nth-child(2){top:calc(18px * var(--z));left:calc(2px * var(--z));background:#DDD9CA}
+.lage:nth-child(3){top:calc(12px * var(--z));left:calc(1px * var(--z));background:#E9E6D9}
+.lage:nth-child(4){top:calc(5px * var(--z));left:0;background:var(--papier);
   box-shadow:0 9px 15px rgba(0,0,0,.3)}
-.lage .reiter{position:absolute;left:9px;top:8px;bottom:8px;width:9px;border-radius:2px;
+.lage .reiter{position:absolute;left:calc(9px * var(--z));top:calc(8px * var(--z));
+  bottom:calc(8px * var(--z));width:calc(9px * var(--z));border-radius:2px;
   transform:skewX(27deg)}
 .stapel .name{display:block;color:#E7EADF;font-size:16.5px;font-weight:500;line-height:1.25}
 .stapel .wohin{display:block;color:#A8B09E;font-size:13.5px;margin-top:1px}
-body.b-weit .stapel:hover .lage:nth-child(4){top:1px}
-body.b-weit .stapel.gewaehlt .lage:nth-child(4){top:-4px;box-shadow:0 16px 22px rgba(0,0,0,.4)}
-body.b-weit .stapel.gewaehlt .lage:nth-child(3){top:10px}
+/* Damit die Steller im Bearbeiten-Modus auf einer Linie stehen, auch
+   wenn ein Fach kein Notizbuch nennt. */
+body.b-weit .stapel .beschriftung{display:block;min-height:42px}
+body.b-weit .stapel-halter .steller{margin-top:2px}
+body.b-weit .stapel:hover .lage:nth-child(4){top:calc(1px * var(--z))}
+body.b-weit .stapel.gewaehlt .lage:nth-child(4){top:calc(-4px * var(--z));box-shadow:0 16px 22px rgba(0,0,0,.4)}
+body.b-weit .stapel.gewaehlt .lage:nth-child(3){top:calc(10px * var(--z))}
 body.b-weit .stapel.gewaehlt .name{color:#FBFAF6;font-weight:600}
 body.b-weit .stapel-reihe{gap:16px;align-items:flex-start}
 body.b-weit .mappe{flex:0 0 272px}
@@ -139,15 +150,16 @@ body.b-weit .flaeche{padding:26px 22px}
 .fachkopf .zur{background:none;border:0;color:#B9C0B1;font:inherit;font-size:15px;cursor:pointer;
   text-decoration:underline;text-underline-offset:3px;padding:0}
 .seiten{display:flex;flex-wrap:wrap;gap:14px 16px;align-items:flex-start}
-.seite{width:132px;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;
+.seite{width:100%;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;
   display:flex;flex-direction:column;gap:7px}
-.s-lager{position:relative;height:56px}
-.s-blatt{position:absolute;left:0;top:6px;width:104px;height:36px;border-radius:2px;
+.s-lager{position:relative;height:calc(56px * var(--z))}
+.s-blatt{position:absolute;left:0;top:calc(6px * var(--z));width:calc(104px * var(--z));
+  height:calc(36px * var(--z));border-radius:2px;
   transform:skewX(-27deg);transform-origin:0 100%;background:var(--papier);
   box-shadow:0 5px 9px rgba(0,0,0,.26)}
-.s-blatt.unten{top:14px;left:2px;background:#DFDBCD;box-shadow:none}
+.s-blatt.unten{top:calc(14px * var(--z));left:calc(2px * var(--z));background:#DFDBCD;box-shadow:none}
 .seite .st{color:#E7EADF;font-size:14.5px;line-height:1.25}
-.seite.offen .s-blatt{top:1px;box-shadow:0 11px 16px rgba(0,0,0,.34)}
+.seite.offen .s-blatt{top:calc(1px * var(--z));box-shadow:0 11px 16px rgba(0,0,0,.34)}
 .seite.offen .st{color:#FBFAF6;font-weight:600}
 /* Ein Verweis ohne Link: das Blatt bleibt blass, damit man es sieht, bevor man tippt. */
 .seite.leer .s-blatt{background:#CFCBBD;box-shadow:none}
@@ -175,8 +187,8 @@ body.b-schmal .stapel-halter{width:100%}
 /* Derselbe liegende Stapel, nur klein und neben dem Namen statt darüber. */
 body.b-schmal .stapel{width:100%;flex-direction:row;align-items:center;gap:13px;
   background:var(--papier);border-radius:2px;padding:9px 14px;box-shadow:0 3px 7px rgba(0,0,0,.24)}
-body.b-schmal .lager{flex:0 0 60px;height:34px}
-body.b-schmal .lage{width:54px;height:21px}
+body.b-schmal .lager{flex:0 0 calc(60px * var(--z));height:calc(34px * var(--z))}
+body.b-schmal .lage{width:calc(54px * var(--z));height:calc(21px * var(--z))}
 body.b-schmal .lage:nth-child(1){top:11px;left:2px}
 body.b-schmal .lage:nth-child(2){top:8px;left:1px}
 body.b-schmal .lage:nth-child(3){top:4px;left:1px}
@@ -306,7 +318,7 @@ body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFA
    derselben Quelle und bekommt den Drive-Teil dazu.
    ============================================================ */
 
-var SD_FASSUNG = '0.4.0';
+var SD_FASSUNG = '0.5.0';
 var SD_VERSION = 'Privat';
 var SD_DATEI_FASSUNG = 1;
 
@@ -1047,6 +1059,45 @@ function sdZusammenfuehren(lokal, fremd) {
   return { db: ergebnis, bericht: bericht };
 }
 
+/* ---------- Zoom ----------
+   Wie groß die Papierstapel sind, ist eine Ansichtssache und gehört
+   zum Gerät, nicht zum Bestand: Der PC und das Pixel wollen
+   verschiedene Größen. Deshalb steht die Stufe im Browserspeicher und
+   nicht in schreibtisch.json — sonst schöbe der Abgleich dir die
+   PC-Einstellung aufs Handy.
+
+   Gezoomt wird nur das Papier, nicht die Schrift. Auf der kleinsten
+   Stufe wären die Namen sonst bei 13 Pixeln und nicht mehr lesbar. */
+
+var SD_ZOOM = [0.78, 1, 1.26, 1.58];
+var SD_ZOOM_KEY = 'schreibtisch-zoom';
+var sdZoomStufe = 1;
+
+function sdZoomLesen() {
+  try {
+    var v = parseInt(window.localStorage.getItem(SD_ZOOM_KEY), 10);
+    if (!isNaN(v) && v >= 0 && v < SD_ZOOM.length) { sdZoomStufe = v; }
+  } catch (e) { /* gesperrt oder leer: dann die mittlere Stufe */ }
+  sdZoomAnwenden();
+}
+
+function sdZoomAnwenden() {
+  var w = document.documentElement;
+  if (w && w.style && w.style.setProperty) {
+    w.style.setProperty('--z', String(SD_ZOOM[sdZoomStufe]));
+  }
+}
+
+function sdZoomSetzen(richtung) {
+  var n = sdZoomStufe + richtung;
+  if (n < 0 || n >= SD_ZOOM.length) { return false; }
+  sdZoomStufe = n;
+  try { window.localStorage.setItem(SD_ZOOM_KEY, String(n)); } catch (e) { /* egal */ }
+  sdZoomAnwenden();
+  sdPlanungZeichnen();
+  return true;
+}
+
 /* ---------- Breite ---------- */
 
 function sdBreite(w) {
@@ -1135,6 +1186,12 @@ function sdPlanungZeichnen() {
   }).join('');
   el.innerHTML = links
     + '<span class="luecke"></span>'
+    + '<span class="zoom">'
+    + '<button type="button" class="stift"' + (sdZoomStufe === 0 ? ' disabled' : '')
+    + ' onclick="sdZoomSetzen(-1)" title="Stapel kleiner" aria-label="Stapel kleiner">&#8722;</button>'
+    + '<button type="button" class="stift"' + (sdZoomStufe === SD_ZOOM.length - 1 ? ' disabled' : '')
+    + ' onclick="sdZoomSetzen(1)" title="Stapel größer" aria-label="Stapel größer">+</button>'
+    + '</span>'
     + (sd.bearbeiten ? '<button type="button" class="stift" onclick="sdPlanungNeu()">+ Link</button>' : '')
     + '<button type="button" class="stift' + (sd.bearbeiten ? ' an' : '') + '" onclick="sdBearbeitenUm()">'
     + (sd.bearbeiten ? 'Fertig' : 'Bearbeiten') + '</button>';
@@ -1226,6 +1283,7 @@ function sdStapelHtml(f) {
     + '<span class="beschriftung"><span class="name">' + esc(f.name) + '</span>'
     + (f.quelle ? '<span class="wohin">' + esc(f.quelle) + '</span>' : '')
     + '</span></button>';
+  if (sd.bearbeiten) { h += sdStellerHtml('sdFachStellen', f.id, !sdIstSchmal()); }
   if (gewaehlt && sdIstSchmal()) { h += sdAufklappHtml(f); }
   h += '</div>';
   return h;
@@ -1307,7 +1365,7 @@ function sdSeiteHtml(f, s) {
   var k = (offen ? ' offen' : '') + (sdZiel(s) ? '' : ' leer');
   var h = '<div class="seite-halter">'
     + sdBlattHtml(k, s.name, 'onclick="sdSeiteUm(\'' + esc(s.id) + '\')"')
-    + (sd.bearbeiten ? sdStellerHtml('sdSeiteStellen', f.id + '|' + s.id) : '')
+    + (sd.bearbeiten ? sdStellerHtml('sdSeiteStellen', f.id + '|' + s.id, true) : '')
     + '</div>';
   return h + zusatz;
 }
@@ -1319,16 +1377,23 @@ function sdLeisteBlattHtml(f, p) {
     : 'onclick="melde(\'Für diesen Verweis ist noch kein Link eingetragen.\', null)"';
   return '<div class="seite-halter">'
     + sdBlattHtml(ziel ? '' : ' leer', p.name, auf)
-    + (sd.bearbeiten ? sdStellerHtml('sdLeisteStellen', f.id + '|' + p.id) : '')
+    + (sd.bearbeiten ? sdStellerHtml('sdLeisteStellen', f.id + '|' + p.id, true) : '')
     + '</div>';
 }
 
-/* Die kleinen Steller im Bearbeiten-Modus: höher, tiefer, ändern, weg. */
-function sdStellerHtml(ruf, schluessel) {
+/* Die kleinen Steller im Bearbeiten-Modus: verschieben, ändern, weg.
+   Was nebeneinander liegt, bekommt ◀ ▶; was untereinander steht, ↑ ↓.
+   Ein Pfeil, der in eine andere Richtung zeigt als die Bewegung, die er
+   auslöst, ist eine kleine Lüge — und man probiert ihn jedes Mal neu. */
+function sdStellerHtml(ruf, schluessel, quer) {
   var s = esc(schluessel);
   return '<span class="steller">'
-    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'hoch\')" aria-label="höher">&#8593;</button>'
-    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'runter\')" aria-label="tiefer">&#8595;</button>'
+    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'hoch\')"'
+    + ' aria-label="' + (quer ? 'weiter nach vorn' : 'höher') + '">'
+    + (quer ? '&#9664;' : '&#8593;') + '</button>'
+    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'runter\')"'
+    + ' aria-label="' + (quer ? 'weiter nach hinten' : 'tiefer') + '">'
+    + (quer ? '&#9654;' : '&#8595;') + '</button>'
     + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'aendern\')" aria-label="ändern">&#9998;</button>'
     + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'weg\')" aria-label="entfernen">&#215;</button>'
     + '</span>';
@@ -1853,6 +1918,42 @@ function sdEingefuegt(ereignis) {
 
 function sdTeile(schluessel) { return String(schluessel || '').split('|'); }
 
+/* Fächer verschieben — innerhalb ihrer Reihe. „Eigene Fächer“ und
+   „Zusammenarbeit“ sind zwei Reihen, aber eine Liste: Geschoben wird
+   gegen den Nachbarn derselben Reihe, sonst spränge ein Fach beim
+   Verschieben unversehens in die andere Reihe. */
+function sdFachStellen(id, was) {
+  var f = sdFach(id);
+  if (!f) { return; }
+  if (was === 'aendern') { sdFachFenster(id, ''); return; }
+  if (was === 'weg') {
+    sdEntfernen(DB.faecher, id);
+    if (sd.fachId === id) { sd.fachId = ''; sd.sicht = 'tisch'; }
+    zeichne();
+    return;
+  }
+  var reihe = sdFaecher(f.reihe);
+  var i = reihe.map(function (x) { return x.id; }).indexOf(id);
+  var j = i + (was === 'hoch' ? -1 : 1);
+  if (j < 0 || j >= reihe.length) { return; }
+  var g = reihe[j];
+  /* Getauscht wird mit dem Nachbarn derselben Reihe, auch wenn in der
+     Gesamtliste eines der anderen Reihe dazwischenliegt. Darum hier
+     nicht sdSchieben: das bewegt immer nur eine Stelle in der ganzen
+     Liste und träfe dann den falschen. */
+  var o = f.ordnung;
+  f.ordnung = g.ordnung;
+  g.ordnung = o;
+  sdStempeln(f);
+  sdStempeln(g);
+  var ia = DB.faecher.indexOf(f);
+  var ib = DB.faecher.indexOf(g);
+  DB.faecher[ia] = g;
+  DB.faecher[ib] = f;
+  sdGeaendert();
+  zeichne();
+}
+
 function sdSeiteStellen(schluessel, was) {
   var t = sdTeile(schluessel);
   var f = sdFach(t[0]);
@@ -1910,6 +2011,7 @@ function sdSchluessel(text) {
 }
 
 function sdStart() {
+  sdZoomLesen();
   sdBreite();
   return sdLaden().then(function () {
     sdPlanungSichern();

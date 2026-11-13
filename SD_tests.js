@@ -1126,6 +1126,128 @@ console.log('\nSD-26  Kopfzeile');
 }
 
 /* ============================================================
+   SD-27  Fächer verschieben — innerhalb ihrer Reihe
+   ============================================================ */
+console.log('\nSD-27  Reihenfolge der Fächer');
+{
+  frisch();
+  const a = SD.sdFachNeu('Testmanagement', 'eigen', '#3B8EDE', '', '');
+  const b = SD.sdFachNeu('Hybride Tests', 'eigen', '#85C440', '', '');
+  const z = SD.sdFachNeu('Projekt Nordlicht', 'zusammen', '#9B6BC9', '', '');
+  const c = SD.sdFachNeu('Releaseplanung', 'eigen', '#E8A33D', '', '');
+  const namen = () => SD.DB.faecher.map(f => f.name).join('|');
+
+  SD.sdBearbeitenUm();
+  pruefe(/sdFachStellen/.test(flaeche()), 'im Bearbeiten-Modus hat jeder Stapel Steller');
+  pruefe((flaeche().match(/sdFachStellen/g) || []).length === 4 * 4,
+    'vier Knöpfe je Fach');
+  pruefe(/&#9664;|◀/.test(flaeche()), 'und sie zeigen quer, weil die Stapel nebeneinander liegen');
+
+  /* Zwischen den beiden eigenen Fächern steht in der Gesamtliste das
+     Zusammenarbeit-Fach — getauscht werden muss trotzdem innerhalb
+     der Reihe. */
+  SD.DB.faecher.forEach(f => { f.geaendert = 1000; });
+  SD.sdFachStellen(c.id, 'hoch');
+  pruefe(SD.sdFaecher('eigen').map(f => f.name).join('|') === 'Testmanagement|Releaseplanung|Hybride Tests',
+    'Releaseplanung tauscht mit Hybride Tests, nicht mit dem Zusammenarbeit-Fach dazwischen');
+  pruefe(SD.sdFaecher('eigen').length === 3, 'die eigene Reihe behält ihre drei Fächer');
+  pruefe(SD.sdFaecher('zusammen').length === 1, 'und das Zusammenarbeit-Fach bleibt, wo es hingehört');
+  const gestempelt = SD.DB.faecher.filter(f => f.geaendert > 1000).length;
+  pruefe(gestempelt === 2, 'genau zwei Fächer werden gestempelt (waren ' + gestempelt + ')');
+
+  /* Grenzen */
+  const vorher = namen();
+  SD.sdFachStellen(a.id, 'hoch');
+  pruefe(namen() === vorher, 'das erste Fach seiner Reihe lässt sich nicht weiter nach vorn schieben');
+  SD.sdFachStellen(z.id, 'hoch');
+  pruefe(namen() === vorher, 'ein Fach, das allein in seiner Reihe steht, bewegt sich nicht');
+  SD.sdFachStellen(z.id, 'runter');
+  pruefe(namen() === vorher, 'in keine Richtung');
+
+  /* Ändern und Entfernen über dieselben Steller */
+  SD.sdFachStellen(b.id, 'aendern');
+  pruefe(SD.sd.fenster && SD.sd.fenster.art === 'fach' && SD.sd.fenster.id === b.id,
+    'das Stift-Zeichen öffnet das Fach zum Ändern');
+  SD.sdFensterZu();
+  SD.sdFachStellen(b.id, 'weg');
+  pruefe(SD.DB.faecher.length === 3, 'das Kreuz entfernt es');
+  pruefe(!!SD.DB.grabsteine[b.id], 'und hinterlässt einen Grabstein');
+
+  /* Die Reihenfolge übersteht den Abgleich */
+  const eins = JSON.parse(SD.sdAlsText());
+  SD.sdFachStellen(c.id, 'hoch');
+  const zwei = JSON.parse(SD.sdAlsText());
+  const e = SD.sdZusammenfuehren(zwei, eins);
+  pruefe(e.db.faecher.map(f => f.name).join('|') === zwei.faecher.map(f => f.name).join('|'),
+    'nach dem Abgleich steht der Tisch in der zuletzt gewählten Reihenfolge');
+  SD.sdBearbeitenUm();
+}
+
+/* ============================================================
+   SD-28  Zoom: je Gerät, nicht im Bestand
+   Grund: Der PC und das Pixel wollen verschiedene Größen. Käme die
+   Stufe in die Datei, schöbe der Abgleich die PC-Einstellung aufs
+   Handy. Ansichtssachen gehören nicht in den Bestand.
+   ============================================================ */
+console.log('\nSD-28  Zoom');
+{
+  frisch();
+  SD.sdFachNeu('Testmanagement', 'eigen', '#3B8EDE', '', '');
+
+  pruefe(SD.SD_ZOOM.length === 4, 'es gibt vier Stufen');
+  pruefe(SD.SD_ZOOM[1] === 1, 'die mittlere ist die Standardgröße');
+  pruefe(SD.SD_ZOOM.every((x, i) => i === 0 || x > SD.SD_ZOOM[i - 1]), 'sie wachsen');
+
+  SD.sdZoomStufe = 1;
+  pruefe(SD.sdZoomSetzen(1) === true, 'größer geht');
+  pruefe(SD.sdZoomStufe === 2, 'und zählt eine Stufe hoch');
+  pruefe(SD.sdZoomSetzen(1) === true && SD.sdZoomSetzen(1) === false,
+    'über die oberste Stufe hinaus nicht');
+  pruefe(SD.sdZoomStufe === 3, 'die Stufe bleibt dann stehen');
+  SD.sdZoomStufe = 0;
+  pruefe(SD.sdZoomSetzen(-1) === false, 'unter die unterste auch nicht');
+
+  /* Das Entscheidende: nichts davon steht in der Datei */
+  SD.sdZoomSetzen(1);
+  const text = SD.sdAlsText();
+  pruefe(text.indexOf('zoom') < 0 && text.indexOf('--z') < 0,
+    'die Zoomstufe taucht in schreibtisch.json nicht auf');
+  const zurueck = SD.sdAusText(text);
+  pruefe(Object.keys(zurueck).sort().join(',') === 'faecher,fassung,geaendert,grabsteine,planung',
+    'die Datei trägt nur Bestand, keine Ansichtssachen');
+
+  /* Sie liegt im Browserspeicher, je Gerät */
+  pruefe(SD.localStorage.getItem(SD.SD_ZOOM_KEY) === String(SD.sdZoomStufe),
+    'sie wird im Browserspeicher gemerkt');
+  pruefe(SD.SD_ZOOM_KEY.indexOf('schreibtisch') === 0, 'unter einem eigenen Schlüssel');
+
+  /* Ein Abgleich darf sie nicht mitbringen */
+  const fremd = SD.sdAusText(text);
+  fremd.zoom = 3;                       /* ein fremdes Gerät mit anderer Stufe */
+  const stufeVorher = SD.sdZoomStufe;
+  const e = SD.sdZusammenfuehren(SD.DB, fremd);
+  pruefe(SD.sdZoomStufe === stufeVorher,
+    'der Abgleich fasst die Zoomstufe des Geräts nicht an');
+  /* Dass das fremde Feld im Ergebnis stehenbleibt, ist Absicht und in
+     SD-12 geprüft: Eine ältere Fassung darf nicht löschen, was sie nur
+     nicht versteht. Entscheidend ist, dass die App selbst nie eine
+     Zoomstufe in den Bestand schreibt — das steht weiter oben. */
+  pruefe(e.db.zoom === 3, 'ein fremdes Feld überlebt den Abgleich (so soll es sein)');
+  pruefe(SKRIPT.indexOf('DB.zoom') < 0 && !/zoom:/.test(SKRIPT),
+    'aber die App schreibt selbst nie eine Zoomstufe in den Bestand');
+
+  /* Gezoomt wird das Papier, nicht die Schrift */
+  const stil = QUELLE.match(/<style>[\s\S]*?<\/style>/)[0];
+  pruefe(/--z:1/.test(stil), 'der Faktor steht als --z bereit');
+  pruefe(/width:calc\(178px \* var\(--z\)\)/.test(stil), 'die Stapelbreite hängt daran');
+  pruefe(/height:calc\(52px \* var\(--z\)\)/.test(stil), 'die Blatthöhe auch');
+  pruefe(!/font-size:calc\([^)]*var\(--z\)/.test(stil),
+    'aber keine einzige Schriftgröße — sonst wären die Namen auf der kleinsten Stufe unlesbar');
+  pruefe(/setProperty\('--z'/.test(SKRIPT), 'und die App setzt ihn am Dokument');
+  pruefe(!!e, 'der Abgleich lief dabei durch');
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen');
