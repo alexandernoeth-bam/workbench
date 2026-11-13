@@ -1,0 +1,2395 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Schreibtisch 0.3.0 Privat</title>
+<link rel="manifest" href="./schreibtisch.webmanifest">
+<meta name="theme-color" content="#444B40">
+<link rel="apple-touch-icon" href="./schreibtisch-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --tisch:#4F574B;
+  --tisch-tief:#444B40;
+  --papier:#FBFAF6;
+  --papier-schatten:#EFECE2;
+  --kante:#E6E2D7;
+  --tinte:#33312C;
+  --tinte-leise:#7A776E;
+  --linie:#DEDACE;
+  --reiter-breit:7px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"Fira Sans",system-ui,sans-serif;color:var(--tinte);
+  background:var(--tisch);font-size:16px;line-height:1.45}
+
+/* ---------- Planungsleiste ---------- */
+.planung{display:flex;align-items:center;gap:3px;padding:9px 14px;background:var(--tisch-tief);
+  flex-wrap:wrap;flex:0 0 auto}
+.planung a{color:#DDE2D6;text-decoration:none;font-size:15px;padding:5px 11px;border-radius:2px}
+.planung a:hover,.planung a:focus-visible{background:rgba(255,255,255,.1);text-decoration:underline;
+  text-underline-offset:3px}
+.planung .luecke{flex:1}
+.stift{background:none;border:1px solid rgba(255,255,255,.3);color:#DDE2D6;font:inherit;font-size:14px;
+  padding:4px 11px;border-radius:2px;cursor:pointer}
+.stift.an{background:#DDE2D6;color:var(--tisch-tief);border-color:#DDE2D6}
+
+/* ---------- Tisch ---------- */
+.tisch{flex:1;display:flex;min-height:0}
+.flaeche{flex:1;padding:22px 24px;overflow:auto;min-width:0}
+.reihe-titel{color:#C5CCBC;font-size:14.5px;font-weight:500;margin:0 0 12px}
+.reihe-titel:not(:first-child){margin-top:28px}
+.stapel-reihe{display:flex;flex-wrap:wrap;gap:26px}
+
+/* ---------- Der Stapel ---------- */
+.stapel{position:relative;border:0;background:none;padding:0;cursor:pointer;
+  font:inherit;color:inherit;text-align:left;display:flex;flex-direction:column;gap:9px}
+.stapel-halter{display:flex;flex-direction:column}
+.stapel:focus-visible{outline:2px solid #FBFAF6;outline-offset:4px}
+.stapel .lage{transition:top .14s ease,box-shadow .14s ease}
+
+/* ---------- Die Fachmappe rechts ---------- */
+.mappe{flex:0 0 310px;background:var(--papier);padding:22px 24px;overflow:auto;
+  display:flex;flex-direction:column}
+.mappe-kopf{display:flex;align-items:flex-start;gap:11px;padding-bottom:14px;border-bottom:1px solid var(--linie)}
+.mappe-kopf .fleck{flex:0 0 7px;height:30px;border-radius:2px;margin-top:2px}
+.mappe-kopf h3{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
+.mappe-kopf .quelle{font-size:14px;color:var(--tinte-leise);margin-top:1px}
+.verweise{list-style:none;margin:6px 0 0;padding:0}
+.verweise li{border-bottom:1px solid var(--linie)}
+.verweise a{display:block;padding:11px 2px;color:var(--tinte);text-decoration:none;font-size:16.5px}
+.verweise a:hover,.verweise a:focus-visible{text-decoration:underline;text-underline-offset:3px}
+.verweise .ohne{display:block;padding:11px 2px;color:var(--tinte-leise);font-size:16.5px;font-style:italic}
+.oeffnen{margin-top:auto;padding-top:18px}
+.oeffnen a{display:inline-block;background:var(--tinte);color:var(--papier);text-decoration:none;
+  padding:9px 17px;border-radius:2px;font-size:16px}
+.ablage{font-size:14px;color:var(--tinte-leise);padding-top:14px;line-height:1.4}
+.ablage button{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--tinte);
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+
+/* ---------- Bearbeiten ---------- */
+body.bearbeiten .lage:nth-child(4)::after{content:"\270E";position:absolute;right:14px;bottom:5px;
+  font-size:15px;line-height:1;color:var(--tinte-leise);transform:skewX(27deg)}
+.werkzeug{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap}
+.werkzeug button{font:inherit;font-size:14.5px;padding:5px 11px;background:var(--papier);
+  border:1px solid var(--linie);border-radius:2px;cursor:pointer;color:var(--tinte)}
+/* Die kleinen Steller neben einem Eintrag: höher, tiefer, ändern, weg. */
+.steller{display:inline-flex;gap:2px;margin-left:7px;vertical-align:middle}
+.steller button{font:inherit;font-size:15.5px;line-height:1;width:26px;height:26px;padding:0;
+  background:var(--papier);border:1px solid var(--linie);border-radius:2px;cursor:pointer;
+  color:var(--tinte)}
+.steller button:hover{background:var(--papier-schatten)}
+.verweise li{display:flex;align-items:center}
+.verweise li a,.verweise li .ohne{flex:1}
+/* Blatt und seine Steller stehen in einer Spalte — sonst sieht man nicht,
+   welcher Steller zu welchem Blatt gehört. */
+.seite-halter{display:flex;flex-direction:column;gap:7px;width:132px}
+.seite-halter .seite{width:100%}
+.seite-halter .steller{margin:0}
+.seite-halter .steller button{width:28px;height:26px}
+.leise{color:#A8B09E;font-size:14.5px;margin:4px 0}
+.unterseiten .leise,.aufklapp .leise,.mappe .leise{color:var(--tinte-leise)}
+
+
+/* ---------- Liegender Stapel (nach Alexanders Skizze) ----------
+   Das Blatt liegt auf dem Tisch, nicht aufrecht davor: ein Parallelogramm,
+   darunter die Kanten der Blätter desselben Stapels. Der Name steht darunter
+   — auf einer schrägen Fläche liest sich nichts. */
+body.b-weit .stapel{width:178px}
+.lager{position:relative;height:88px;flex:0 0 88px}
+.lage{position:absolute;left:0;top:0;width:142px;height:52px;border-radius:2px;
+  transform:skewX(-27deg);transform-origin:0 100%;background:#DFDBCD}
+.lage:nth-child(1){top:24px;left:3px;background:#D1CDBE}
+.lage:nth-child(2){top:18px;left:2px;background:#DDD9CA}
+.lage:nth-child(3){top:12px;left:1px;background:#E9E6D9}
+.lage:nth-child(4){top:5px;left:0;background:var(--papier);
+  box-shadow:0 9px 15px rgba(0,0,0,.3)}
+.lage .reiter{position:absolute;left:9px;top:8px;bottom:8px;width:9px;border-radius:2px;
+  transform:skewX(27deg)}
+.stapel .name{display:block;color:#E7EADF;font-size:16.5px;font-weight:500;line-height:1.25}
+.stapel .wohin{display:block;color:#A8B09E;font-size:13.5px;margin-top:1px}
+body.b-weit .stapel:hover .lage:nth-child(4){top:1px}
+body.b-weit .stapel.gewaehlt .lage:nth-child(4){top:-4px;box-shadow:0 16px 22px rgba(0,0,0,.4)}
+body.b-weit .stapel.gewaehlt .lage:nth-child(3){top:10px}
+body.b-weit .stapel.gewaehlt .name{color:#FBFAF6;font-weight:600}
+body.b-weit .stapel-reihe{gap:16px;align-items:flex-start}
+body.b-weit .mappe{flex:0 0 272px}
+body.b-weit .trenner{height:1px;background:rgba(255,255,255,.18);margin:28px 0 20px}
+body.b-weit .flaeche{padding:26px 22px}
+
+/* ---------- Fachansicht: die Seiten des Faches (dritte Ebene) ---------- */
+.fachkopf{display:flex;align-items:baseline;gap:12px;margin:0 0 20px}
+.fachkopf h3{margin:0;color:#FBFAF6;font-size:21px;font-weight:600;letter-spacing:-.01em}
+.fachkopf .zur{background:none;border:0;color:#B9C0B1;font:inherit;font-size:15px;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;padding:0}
+.seiten{display:flex;flex-wrap:wrap;gap:14px 16px;align-items:flex-start}
+.seite{width:132px;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;
+  display:flex;flex-direction:column;gap:7px}
+.s-lager{position:relative;height:56px}
+.s-blatt{position:absolute;left:0;top:6px;width:104px;height:36px;border-radius:2px;
+  transform:skewX(-27deg);transform-origin:0 100%;background:var(--papier);
+  box-shadow:0 5px 9px rgba(0,0,0,.26)}
+.s-blatt.unten{top:14px;left:2px;background:#DFDBCD;box-shadow:none}
+.seite .st{color:#E7EADF;font-size:14.5px;line-height:1.25}
+.seite.offen .s-blatt{top:1px;box-shadow:0 11px 16px rgba(0,0,0,.34)}
+.seite.offen .st{color:#FBFAF6;font-weight:600}
+/* Ein Verweis ohne Link: das Blatt bleibt blass, damit man es sieht, bevor man tippt. */
+.seite.leer .s-blatt{background:#CFCBBD;box-shadow:none}
+.seite.leer .st{color:#A8B09E;font-style:italic}
+.s-blatt{transition:top .14s ease,box-shadow .14s ease}
+/* Das Unterseiten-Feld bricht die Reihe um: es gehört unter seine Seite,
+   nicht daneben. flex:0 0 100% zwingt es auf eine eigene Zeile. */
+.unterseiten{flex:0 0 100%;background:var(--papier);border-radius:2px;padding:3px 15px 12px;
+  margin:2px 0 4px;box-shadow:0 7px 15px rgba(0,0,0,.24)}
+.unterseiten .verweise a{font-size:16px;padding:9px 2px}
+.fest{margin-top:26px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18)}
+.fest .reihe-titel{margin:0 0 12px}
+.fachkopf .luecke{flex:1}
+.aufheben{background:var(--papier);color:var(--tinte);text-decoration:none;padding:7px 15px;
+  border-radius:2px;font-size:15.5px;align-self:center}
+.ablage.hell{color:#A8B09E;margin-top:28px;padding-top:0}
+.ablage.hell button{color:#D7DCCF}
+.unterseiten{max-width:460px}
+
+/* ---------- Schmal: Stapel untereinander, Mappe klappt auf ---------- */
+body.b-schmal .tisch{flex-direction:column}
+body.b-schmal .flaeche{padding:16px 14px}
+body.b-schmal .stapel-reihe{flex-direction:column;gap:11px}
+body.b-schmal .stapel-halter{width:100%}
+/* Derselbe liegende Stapel, nur klein und neben dem Namen statt darüber. */
+body.b-schmal .stapel{width:100%;flex-direction:row;align-items:center;gap:13px;
+  background:var(--papier);border-radius:2px;padding:9px 14px;box-shadow:0 3px 7px rgba(0,0,0,.24)}
+body.b-schmal .lager{flex:0 0 60px;height:34px}
+body.b-schmal .lage{width:54px;height:21px}
+body.b-schmal .lage:nth-child(1){top:11px;left:2px}
+body.b-schmal .lage:nth-child(2){top:8px;left:1px}
+body.b-schmal .lage:nth-child(3){top:4px;left:1px}
+body.b-schmal .lage:nth-child(4){top:0;left:0;box-shadow:0 3px 6px rgba(0,0,0,.25)}
+body.b-schmal .lage .reiter{left:5px;top:3px;bottom:3px;width:6px}
+body.b-schmal .stapel .beschriftung{flex:1;min-width:0}
+body.b-schmal .stapel .name{color:var(--tinte);font-size:17px}
+body.b-schmal .stapel .wohin{color:var(--tinte-leise);font-size:13.5px}
+body.b-schmal .stapel.gewaehlt{box-shadow:0 8px 16px rgba(0,0,0,.3)}
+body.b-schmal .stapel.gewaehlt .name{font-weight:600}
+body.b-schmal .stapel:focus-visible{outline-color:var(--tinte)}
+body.b-schmal .trenner{height:1px;background:rgba(255,255,255,.18);margin:24px 0 18px}
+.aufklapp{background:var(--papier);border-radius:2px;margin:9px 0 2px;padding:4px 15px 15px;
+  box-shadow:0 6px 14px rgba(0,0,0,.2)}
+/* Schmal gehört der Fachname auf eine eigene Zeile, sonst bricht „zurück
+   zum Tisch“ mitten im Satz um. */
+body.b-schmal .fachkopf{flex-wrap:wrap;gap:9px 14px;align-items:center}
+body.b-schmal .fachkopf h3{flex:0 0 100%}
+body.b-schmal .fachkopf .luecke{display:none}
+body.b-schmal .planung{padding:7px 10px;gap:1px}
+body.b-schmal .planung a{font-size:14px;padding:4px 8px}
+.ganzschmal .planung a{font-size:13.5px;padding:4px 6px}
+.ganzschmal .stapel .name{font-size:16px}
+
+/* ---------- Grundgerüst der laufenden App ---------- */
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column}
+.planung{flex:0 0 auto}
+.tisch{flex:1;min-height:0}
+.flaeche{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+body.b-schmal .tisch{flex-direction:column}
+body.b-schmal .mappe{display:none}
+/* In der Fachansicht ist die Mappe leer — dann darf sie auch keine
+   weiße Spalte am Rand stehen lassen. */
+.mappe:empty{display:none}
+/* Meldung */
+.meldung{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;
+  background:var(--tinte);color:var(--papier);padding:10px 18px;border-radius:3px;
+  font-size:16px;max-width:88vw;box-shadow:0 8px 20px rgba(0,0,0,.4);text-align:center}
+.meldung.warn{background:#8C3A33;max-width:min(620px,92vw);text-align:left;
+  display:flex;align-items:flex-start;gap:12px;line-height:1.4}
+.meldung .wort{flex:1}
+.meldung .zu{flex:0 0 auto;background:none;border:0;color:var(--papier);font:inherit;
+  font-size:21px;line-height:1;padding:0 2px;cursor:pointer;opacity:.8}
+.meldung .zu:hover{opacity:1}
+.meldung[hidden]{display:none}
+/* Nichts wird gespeichert: das muss man sehen, nicht suchen. */
+.ablage.alarm{color:#FFD9D4}
+.ablage.alarm b{color:#FFB3A8}
+/* Hinweis auf eine neue Fassung — ruhig, nicht alarmierend. */
+.meldung.neu{display:flex;align-items:center;gap:14px;background:var(--tinte)}
+.meldung .jetzt{flex:0 0 auto;background:var(--papier);color:var(--tinte);border:0;font:inherit;
+  font-size:15.5px;padding:6px 14px;border-radius:2px;cursor:pointer}
+.ablage button+button,.ablage button{margin-top:4px}
+/* Fenster */
+.schleier{position:fixed;inset:0;background:rgba(20,22,18,.55);z-index:70}
+.schleier[hidden]{display:none}
+.fenster{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;
+  background:var(--papier);border-radius:3px;width:min(460px,92vw);max-height:86vh;overflow:auto;
+  box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.fenster[hidden]{display:none}
+.fenster .titel{font-size:19px;font-weight:600;padding:17px 22px 0}
+.fenster .rumpf{padding:12px 22px 20px}
+.fenster label{display:block;font-size:14.5px;color:var(--tinte-leise);margin:13px 0 4px}
+.eingabe{width:100%;font:inherit;font-size:16.5px;padding:8px 10px;border:1px solid var(--linie);
+  border-radius:2px;background:#fff;color:var(--tinte)}
+.eingabe:focus-visible{outline:2px solid var(--tinte);outline-offset:1px}
+.farbwahl{display:flex;flex-wrap:wrap;gap:8px}
+.farbwahl button{width:30px;height:30px;border-radius:3px;border:2px solid transparent;cursor:pointer}
+.farbwahl button.an{border-color:var(--tinte)}
+.linkfeld{resize:vertical;min-height:62px;font-size:14px;font-family:Consolas,monospace;
+  line-height:1.4;word-break:break-all}
+.herkunft{margin:3px 0 0;font-size:14.5px;color:var(--tinte-leise)}
+.herkunft.warnton{color:#8C3A33}
+/* Der kleine Pfeil hinter einem Verweis: derselbe Ort im Browser. */
+.imweb{flex:0 0 auto;padding:11px 8px;color:var(--tinte-leise);text-decoration:none;font-size:15px}
+.imweb:hover,.imweb:focus-visible{color:var(--tinte)}
+.knoepfe .zweitweg{background:#fff;color:var(--tinte);border-color:var(--linie)}
+.oeffnen .zweitweg{background:none;color:var(--tinte-leise);text-decoration:underline;
+  text-underline-offset:3px;padding:9px 6px;margin-left:8px}
+.reihewahl{display:flex;gap:7px}
+.reihewahl.wickeln{flex-wrap:wrap}
+.reihewahl button{font:inherit;font-size:15px;padding:6px 13px;border:1px solid var(--linie);
+  border-radius:2px;background:#fff;cursor:pointer;color:var(--tinte)}
+.reihewahl button.an{background:var(--tinte);color:var(--papier);border-color:var(--tinte)}
+.knoepfe{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.knoepfe .knopf{font:inherit;font-size:16px;padding:9px 16px;border:1px solid var(--linie);
+  border-radius:2px;background:#fff;cursor:pointer;color:var(--tinte)}
+.knoepfe .knopf.voll{background:var(--tinte);color:var(--papier);border-color:var(--tinte)}
+.knoepfe .knopf.weg{color:#8C3A33}
+a:focus-visible,button:focus-visible{outline:2px solid #FBFAF6;outline-offset:2px}
+body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFAF6}
+.mappe a:focus-visible,.mappe button:focus-visible,.fenster a:focus-visible,.fenster button:focus-visible,
+.unterseiten a:focus-visible{outline-color:var(--tinte)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="b-weit">
+<nav class="planung" id="planung"></nav>
+<div class="tisch">
+  <div class="flaeche" id="flaeche"></div>
+  <aside class="mappe" id="mappe"></aside>
+</div>
+<div class="meldung" id="meldung" hidden></div>
+<div class="schleier" id="schleier" hidden onclick="sdFensterZu()"></div>
+<div class="fenster" id="fenster" hidden></div>
+<script>
+'use strict';
+
+/* ============================================================
+   Schreibtisch — eine ruhige Übersicht über ein OneNote-Notizbuch.
+
+   Die App speichert keine Inhalte, nur Namen, Farben und Links.
+   Geschrieben wird in OneNote; ein Verweis springt dorthin.
+
+   Drei Ebenen:
+     Fach    = ein Abschnitt im Notizbuch, auf dem Tisch ein Stapel
+     Seite   = eine Seite in diesem Abschnitt, ein einzelnes Blatt
+     Unter   = eine Unterseite, klappt unter ihrer Seite auf
+
+   Dazu je Fach die Leiste „Immer dabei“ (Aufgaben, Offene Fragen,
+   Erkenntnisse) und oben die Planungsleiste.
+
+   Diese Fassung ist die berufliche: Die Ablage ist eine Datei auf
+   dem Rechner. Es gibt keinen Weg ins Netz — nicht abgeschaltet,
+   sondern nicht vorhanden. Die private Fassung entsteht aus
+   derselben Quelle und bekommt den Drive-Teil dazu.
+   ============================================================ */
+
+var SD_FASSUNG = '0.3.0';
+var SD_VERSION = 'Privat';
+var SD_DATEI_FASSUNG = 1;
+
+var SD_SCHMAL = 820;
+var SD_GRABSTEIN_TAGE = 180;
+var SD_IDB_NAME = 'schreibtisch-speicher';
+var SD_IDB_STORE = 'griffe';
+var SD_IDB_KEY = 'datendatei';
+var SD_LS_KEY = 'schreibtisch-daten-' + SD_FASSUNG;
+
+/* Die Abschnittsfarben, wie OneNote sie anbietet. */
+var SD_FARBEN = ['#3B8EDE', '#85C440', '#E8A33D', '#9B6BC9', '#D4564F', '#3FA9A4', '#C8679F', '#7A8794'];
+
+/* Was ein neues Fach immer mitbekommt (SD-05). */
+var SD_LEISTE_VOR = ['Aufgaben', 'Offene Fragen', 'Erkenntnisse'];
+/* Zusammenarbeit zeigt nicht auf eigene Sammelseiten, sondern auf die
+   gemeinsame Projektseite — ein Verweis genügt dort. */
+var SD_LEISTE_ZUSAMMEN = ['Projektseite'];
+/* Was in der Planungsleiste steht, solange nichts geändert wurde (SD-07). */
+var SD_PLANUNG_VOR = ['Woche', 'Erinnerungen', 'Stundenplan', 'Block', 'Meetings'];
+
+/* ---------- Haken für die private Fassung ----------
+   Der einzige Unterschied zwischen den beiden Fassungen. In der
+   beruflichen bleiben diese drei null und werden nie gerufen; es gibt
+   dort keinen Cloud-Code, der sie füllen könnte. In der privaten hängt
+   sd_wolke.js sich hier ein. Kein Schalter in der Oberfläche, keine
+   Abfrage „welche Welt“ — die Fassung ist, was sie enthält. */
+var sdHaken = { beimStart: null, nachSichern: null, ablageZeile: null };
+
+var DB = sdLeer();
+var sd = {
+  sicht: 'tisch',      /* tisch | fach */
+  fachId: '',
+  seiteId: '',         /* welche Seite ihre Unterseiten zeigt */
+  bearbeiten: false,
+  fenster: null,
+  dateiName: '',
+  gesichert: '',
+  weg: 'keiner'        /* keiner | datei | lokal */
+};
+
+/* ---------- Grundlagen ---------- */
+
+function sdLeer() {
+  return { fassung: SD_DATEI_FASSUNG, faecher: [], planung: [], grabsteine: {}, geaendert: 0 };
+}
+
+/* ---------- Stempel ----------
+   Hier entscheidet sich beim Abgleich alles. Ein Stempel bedeutet: Der
+   Benutzer hat diesen Datensatz geändert. Er bedeutet NICHT: Die App hat
+   ihn angefasst. Aufräumen, Ergänzen beim Laden, Nachziehen beim Zeichnen
+   stempeln nicht — sonst gewinnt ein altes Gerät mit frischen Stempeln
+   gegen zwei Wochen Arbeit. Genau das ist im CLIE am 13.11.2026 passiert. */
+function sdStempeln(satz) {
+  if (satz) { satz.geaendert = Date.now(); }
+  return satz;
+}
+
+/* Die Stelle in der Liste gehört zum Datensatz, nicht zur Liste — sonst
+   ließe sie sich nicht zusammenführen. Beim Verschieben tauschen genau
+   zwei Datensätze ihre Stelle, nicht die ganze Liste. */
+function sdOrdnung(liste) {
+  var hoechste = -1;
+  liste.forEach(function (x) {
+    if (typeof x.ordnung === 'number' && x.ordnung > hoechste) { hoechste = x.ordnung; }
+  });
+  return hoechste + 1;
+}
+
+function sdGrabsteinSetzen(id) {
+  if (!DB.grabsteine) { DB.grabsteine = {}; }
+  DB.grabsteine[id] = Date.now();
+}
+
+/* Ein Löschvermerk hält ein halbes Jahr. Danach ist jedes Gerät, das den
+   Datensatz noch kannte, längst einmal online gewesen. */
+function sdGrabsteineAufraeumen(bestand) {
+  var grenze = Date.now() - SD_GRABSTEIN_TAGE * 86400000;
+  var alt = bestand.grabsteine || {};
+  var neu = {};
+  Object.keys(alt).forEach(function (id) {
+    if (alt[id] >= grenze) { neu[id] = alt[id]; }
+  });
+  bestand.grabsteine = neu;
+  return bestand;
+}
+
+function sdKennung() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function esc(t) {
+  return String(t === null || t === undefined ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function zwei(n) { return (n < 10 ? '0' : '') + n; }
+
+function sdUhrzeit() {
+  var d = new Date();
+  return zwei(d.getHours()) + ':' + zwei(d.getMinutes());
+}
+
+/* Nur onenote: und https: werden gespeichert (SD-08). Alles andere wird
+   beim Speichern abgelehnt — ein Link, der nirgendwohin führt, ist
+   schlimmer als gar keiner, weil man es erst beim Antippen merkt. */
+function sdLinkOk(link) {
+  var t = String(link || '').trim();
+  if (!t) { return true; }          /* leer ist erlaubt: Link nachtragbar */
+  return /^onenote:/i.test(t) || /^https:\/\/./i.test(t);
+}
+
+function sdLinkSauber(link) {
+  return String(link || '').trim();
+}
+
+/* ============================================================
+   Einen OneNote-Link lesen
+
+   „Link kopieren“ legt in Windows zwei Zeilen in die Zwischenablage:
+   die Web-Adresse und die onenote:-Adresse. Beide tragen mehr, als man
+   ihnen ansieht. Aus
+
+     onenote:<Serveradresse>/…/Mein%20Gehirn%202026/Projekte.one
+             #Aufgaben&section-id={96625D7B-…}&page-id={1F772C00-…}&end
+
+   lassen sich Name, Notizbuch, Abschnitt und — am wichtigsten — die
+   Kennungen von Abschnitt und Seite ablesen. Die page-id entscheidet,
+   ob eine Seite oder ein Abschnitt kopiert wurde, und die section-id
+   sagt später, in welches Fach die Seite gehört.
+
+   Die Web-Adresse trägt dasselbe in der Form
+     wd=target(Projekte.one|<abschnitt-id>/Aufgaben|<seiten-id>/)
+   Das gilt auch für SharePoint, deshalb wird sie als zweiter Weg
+   gelesen, wenn keine onenote:-Adresse dabei ist.
+
+   Was nicht erkannt wird, bleibt leer. Die App rät nicht — ein falscher
+   Name ist lästiger als ein leeres Feld.
+   ============================================================ */
+
+function sdEntspannen(t) {
+  try { return decodeURIComponent(String(t || '')).replace(/\+/g, ' '); }
+  catch (e) { return String(t || ''); }
+}
+
+function sdKennungAus(text, feld) {
+  var m = String(text || '').match(new RegExp(feld + '=\\{?([0-9A-Fa-f-]{36})\\}?'));
+  return m ? m[1].toUpperCase() : '';
+}
+
+/* Zerlegt den Pfad einer OneNote-Adresse: …/<Notizbuch>/<Abschnitt>.one */
+function sdPfadLesen(adresse, ergebnis) {
+  var ohneFrage = String(adresse || '').split('?')[0].split('#')[0];
+  var teile = ohneFrage.split('/');
+  var i;
+  for (i = teile.length - 1; i >= 0; i--) {
+    if (/\.one$/i.test(teile[i])) {
+      ergebnis.abschnitt = sdEntspannen(teile[i].replace(/\.one$/i, ''));
+      if (i > 0) { ergebnis.notizbuch = sdEntspannen(teile[i - 1]); }
+      return;
+    }
+  }
+}
+
+function sdLinkLesen(text) {
+  var roh = String(text || '');
+  var e = { onenote: '', web: '', name: '', notizbuch: '', abschnitt: '',
+    abschnittId: '', seiteId: '', art: '' };
+
+  /* Erst die onenote:-Adresse herausnehmen — sie enthält selbst ein
+     https://, das sonst als Web-Adresse durchginge. */
+  var m = roh.match(/onenote:\S+/i);
+  var rest = roh;
+  if (m) { e.onenote = m[0]; rest = roh.replace(m[0], ' '); }
+  var w = rest.match(/https?:\/\/\S+/i);
+  if (w) { e.web = w[0]; }
+
+  var quelle = e.onenote || e.web;
+  if (!quelle) { return e; }
+
+  e.abschnittId = sdKennungAus(quelle, 'section-id');
+  e.seiteId = sdKennungAus(quelle, 'page-id');
+
+  /* Der Name steht hinter dem # bis zum ersten & — aber nur, wenn dort
+     wirklich ein Name steht. Ein Abschnittslink hat keinen, und sein
+     Bruchstück beginnt gleich mit „section-id=…“. Enthält das erste
+     Stück ein Gleichheitszeichen, ist es ein Feld und kein Name. */
+  var raute = quelle.indexOf('#');
+  if (raute >= 0) {
+    var erstes = quelle.slice(raute + 1).split('&')[0];
+    if (erstes && erstes.indexOf('=') < 0) { e.name = sdEntspannen(erstes); }
+  }
+  sdPfadLesen(quelle, e);
+
+  /* Web-Adresse: wd=target(Abschnitt.one|<id>/Seite|<id>/) — so sieht es
+     bei OneDrive und bei SharePoint aus. */
+  var t = e.web.match(/[?&]wd=([^&]+)/i);
+  if (t) {
+    var ziel = sdEntspannen(t[1]).replace(/^target\(|\)$/g, '');
+    var stuecke = ziel.split('|');
+    if (!e.abschnitt && stuecke[0]) { e.abschnitt = stuecke[0].replace(/\.one$/i, ''); }
+    if (stuecke[1]) {
+      var schraeg = stuecke[1].split('/');
+      if (!e.abschnittId && /^[0-9A-Fa-f-]{36}$/.test(schraeg[0])) {
+        e.abschnittId = schraeg[0].toUpperCase();
+      }
+      if (!e.name && schraeg[1]) { e.name = schraeg[1]; }
+    }
+    if (stuecke[2] && !e.seiteId) {
+      var p = stuecke[2].split('/')[0];
+      if (/^[0-9A-Fa-f-]{36}$/.test(p)) { e.seiteId = p.toUpperCase(); }
+    }
+  }
+
+  if (e.seiteId) { e.art = 'seite'; }
+  else if (e.abschnittId) { e.art = 'abschnitt'; }
+
+  /* Ein Abschnittslink ohne Raute trägt seinen Namen im Dateinamen. */
+  if (!e.name && e.art === 'abschnitt') { e.name = e.abschnitt; }
+  return e;
+}
+
+/* Sucht das Fach, in dessen Abschnitt diese Seite liegt — über die
+   Kennung des Abschnitts, nicht über den Namen. Die Kennung steht im
+   Link, den das Fach ohnehin schon trägt; es muss nichts nachgetragen
+   werden, auch nicht bei von Hand angelegten Fächern. */
+function sdFachZuAbschnitt(abschnittId) {
+  if (!abschnittId) { return null; }
+  var treffer = null;
+  (DB.faecher || []).forEach(function (f) {
+    if (treffer) { return; }
+    var k = sdKennungAus(f.link || '', 'section-id')
+         || sdKennungAus(f.link_web || '', 'section-id');
+    if (k && k === abschnittId) { treffer = f; }
+  });
+  return treffer;
+}
+
+/* ---------- Lesen aus dem Bestand ---------- */
+
+function sdFaecher(reihe) {
+  return (DB.faecher || []).filter(function (f) { return !reihe || f.reihe === reihe; });
+}
+
+function sdFach(id) {
+  return (DB.faecher || []).filter(function (f) { return f.id === id; })[0] || null;
+}
+
+function sdSeite(fach, id) {
+  if (!fach) { return null; }
+  return (fach.seiten || []).filter(function (s) { return s.id === id; })[0] || null;
+}
+
+/* ---------- Schreiben ---------- */
+
+function sdGeaendert() {
+  DB.geaendert = Date.now();
+  sdSpaeterSichern();
+}
+
+function sdFachNeu(name, reihe, farbe, link, quelle, web) {
+  var jetzt = Date.now();
+  var zusammen = (reihe === 'zusammen');
+  var f = {
+    id: 'fa-' + sdKennung(),
+    name: String(name || '').trim().slice(0, 60),
+    reihe: zusammen ? 'zusammen' : 'eigen',
+    farbe: SD_FARBEN.indexOf(farbe) >= 0 ? farbe : SD_FARBEN[0],
+    link: sdLinkSauber(link),
+    link_web: sdLinkSauber(web),
+    quelle: String(quelle || '').trim().slice(0, 60),
+    seiten: [],
+    /* Eigene Fächer bekommen die drei Sammelseiten (SD-05),
+       Zusammenarbeit die eine Projektseite — beide zunächst ohne Link. */
+    leiste: (zusammen ? SD_LEISTE_ZUSAMMEN : SD_LEISTE_VOR).map(function (n, i) {
+      return { id: 'lk-' + sdKennung(), name: n, link: '', link_web: '', ordnung: i, geaendert: jetzt };
+    }),
+    ordnung: sdOrdnung(DB.faecher),
+    geaendert: jetzt
+  };
+  DB.faecher.push(f);
+  sdGeaendert();
+  return f;
+}
+
+function sdSeiteNeu(fach, name, link, web) {
+  if (!fach) { return null; }
+  var s = { id: 'se-' + sdKennung(), name: String(name || '').trim().slice(0, 80),
+    link: sdLinkSauber(link), link_web: sdLinkSauber(web), bild: '', unter: [],
+    ordnung: sdOrdnung(fach.seiten), geaendert: Date.now() };
+  fach.seiten.push(s);
+  sdGeaendert();
+  return s;
+}
+
+function sdUnterNeu(seite, name, link, web) {
+  if (!seite) { return null; }
+  var u = { id: 'un-' + sdKennung(), name: String(name || '').trim().slice(0, 80),
+    link: sdLinkSauber(link), link_web: sdLinkSauber(web),
+    ordnung: sdOrdnung(seite.unter), geaendert: Date.now() };
+  seite.unter.push(u);
+  sdGeaendert();
+  return u;
+}
+
+/* Verschiebt einen Eintrag in seiner Liste um eine Stelle (SD-06).
+   Es tauschen genau zwei Datensätze ihre Stelle — nicht die ganze Liste
+   wird neu durchnummeriert. Sonst trüge jedes Verschieben alle übrigen
+   Datensätze mit frischem Stempel in den Abgleich. */
+function sdSchieben(liste, id, richtung) {
+  var i = liste.map(function (x) { return x.id; }).indexOf(id);
+  var j = i + (richtung < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= liste.length) { return false; }
+  var a = liste[i], b = liste[j];
+  var o = a.ordnung;
+  a.ordnung = b.ordnung;
+  b.ordnung = o;
+  sdStempeln(a);
+  sdStempeln(b);
+  liste[i] = b;
+  liste[j] = a;
+  sdGeaendert();
+  return true;
+}
+
+function sdEntfernen(liste, id) {
+  var i = liste.map(function (x) { return x.id; }).indexOf(id);
+  if (i < 0) { return false; }
+  sdGrabsteinSetzen(id);
+  liste.splice(i, 1);
+  sdGeaendert();
+  return true;
+}
+
+/* ---------- Ablage: eine Datei auf dem Rechner ---------- */
+
+/* Läuft die Seite in einem fremden Rahmen — etwa einer Vorschau?
+   Dort verbietet der Browser jede Dateiauswahl, egal was die App will.
+   Der Zugriff auf window.top wirft bei fremdem Ursprung; dann ist die
+   Antwort erst recht ja. */
+function sdImRahmen() {
+  if (typeof window === 'undefined') { return false; }
+  try { return window.self !== window.top; } catch (e) { return true; }
+}
+
+/* Es genügt nicht zu fragen, ob es die Dateiauswahl GIBT. Im Rahmen gibt
+   es sie und sie darf nicht — dann bietet die App einen Knopf an, der
+   nie funktionieren kann. Also beides fragen: vorhanden und erlaubt. */
+function sdFsApiDa() {
+  if (typeof window === 'undefined') { return false; }
+  if (typeof window.showOpenFilePicker !== 'function') { return false; }
+  if (typeof window.showSaveFilePicker !== 'function') { return false; }
+  if (sdImRahmen()) { return false; }
+  return true;
+}
+
+function sdIdb() {
+  return new Promise(function (ja, nein) {
+    if (typeof indexedDB === 'undefined') { nein(new Error('kein IndexedDB')); return; }
+    var a = indexedDB.open(SD_IDB_NAME, 1);
+    a.onupgradeneeded = function () { a.result.createObjectStore(SD_IDB_STORE); };
+    a.onsuccess = function () { ja(a.result); };
+    a.onerror = function () { nein(a.error); };
+  });
+}
+
+function sdGriffMerken(griff) {
+  return sdIdb().then(function (db) {
+    return new Promise(function (ja, nein) {
+      var t = db.transaction(SD_IDB_STORE, 'readwrite');
+      t.objectStore(SD_IDB_STORE).put(griff, SD_IDB_KEY);
+      t.oncomplete = function () { ja(true); };
+      t.onerror = function () { nein(t.error); };
+    });
+  }).catch(function () { return false; });
+}
+
+function sdGriffHolen() {
+  return sdIdb().then(function (db) {
+    return new Promise(function (ja) {
+      var t = db.transaction(SD_IDB_STORE, 'readonly');
+      var a = t.objectStore(SD_IDB_STORE).get(SD_IDB_KEY);
+      a.onsuccess = function () { ja(a.result || null); };
+      a.onerror = function () { ja(null); };
+    });
+  }).catch(function () { return null; });
+}
+
+var sdGriff = null;
+var sdSicherUhr = null;
+
+function sdAlsText() {
+  return JSON.stringify(DB, null, 1);
+}
+
+/* Aus Text wird Bestand. Unbekannte Felder bleiben stehen — eine ältere
+   Fassung darf nicht löschen, was sie nur nicht versteht. */
+function sdAusText(text) {
+  var roh;
+  try { roh = JSON.parse(text); } catch (e) { return null; }
+  if (!roh || typeof roh !== 'object') { return null; }
+  if (!Array.isArray(roh.faecher)) { roh.faecher = []; }
+  if (!Array.isArray(roh.planung)) { roh.planung = []; }
+  if (!roh.grabsteine || typeof roh.grabsteine !== 'object') { roh.grabsteine = {}; }
+  /* Ein fehlender Stempel wird 0, nicht „jetzt“. Eine alte Datei darf beim
+     Einlesen nicht jünger werden, als sie ist — sonst gewinnt sie gegen
+     alles, was seitdem woanders entstanden ist. */
+  sdStempelFuellen(roh.planung);
+  roh.faecher.forEach(function (f) {
+    if (!Array.isArray(f.seiten)) { f.seiten = []; }
+    if (!Array.isArray(f.leiste)) { f.leiste = []; }
+    f.seiten.forEach(function (s) {
+      if (!Array.isArray(s.unter)) { s.unter = []; }
+      if (typeof s.bild !== 'string') { s.bild = ''; }
+      sdStempelFuellen(s.unter);
+    });
+    sdStempelFuellen(f.seiten);
+    sdStempelFuellen(f.leiste);
+  });
+  sdStempelFuellen(roh.faecher);
+  return roh;
+}
+
+function sdStempelFuellen(liste) {
+  liste.forEach(function (x, i) {
+    if (typeof x.geaendert !== 'number') { x.geaendert = 0; }
+    if (typeof x.ordnung !== 'number') { x.ordnung = i; }
+  });
+  return liste;
+}
+
+function sdSpaeterSichern() {
+  if (sdSicherUhr) { window.clearTimeout(sdSicherUhr); }
+  sdSicherUhr = window.setTimeout(function () { sdSichern(); }, 700);
+}
+
+/* Schreibt den Bestand weg und sagt hinterher die Wahrheit darüber.
+   Die alte Fassung meldete „Zuletzt gesichert 17:23" auch dann, wenn nur
+   der Browserspeicher gegriffen hatte oder gar nichts — eine Zeile, die
+   Sicherheit vortäuscht, ist schlimmer als keine Zeile. */
+function sdSichern() {
+  var text = sdAlsText();
+  var lokal = false;
+  try { window.localStorage.setItem(SD_LS_KEY, text); lokal = true; } catch (e) { lokal = false; }
+
+  function ohneDatei(f) {
+    sd.weg = lokal ? 'lokal' : 'nichts';
+    sd.gesichert = lokal ? sdUhrzeit() : '';
+    if (f) { sdFehlerZeigen('In die Datei schreiben ging nicht', f); }
+    sdAblageNachziehen();
+    /* Auch ohne Datei soll der Abgleich laufen: In der privaten Fassung
+       ist Drive die Ablage, die Datei nur die Bequemlichkeit. */
+    if (sdHaken.nachSichern && !sdHakenAus) { sdHaken.nachSichern(); }
+    return false;
+  }
+
+  if (!sdGriff) { return Promise.resolve(ohneDatei(null)); }
+
+  return sdGriff.createWritable().then(function (w) {
+    return w.write(text).then(function () { return w.close(); });
+  }).then(function () {
+    sd.weg = 'datei';
+    sd.gesichert = sdUhrzeit();
+    sdAblageNachziehen();
+    if (sdHaken.nachSichern && !sdHakenAus) { sdHaken.nachSichern(); }
+    return true;
+  }).catch(ohneDatei);
+}
+
+/* Sichert, ohne den Haken auszulösen. Nach einem Abgleich muss der
+   Bestand weggeschrieben werden — aber er darf nicht sofort den nächsten
+   Abgleich anstoßen, sonst dreht sich das im Kreis. */
+var sdHakenAus = false;
+
+function sdSichernOhneHaken() {
+  sdHakenAus = true;
+  function fertig(x) { sdHakenAus = false; return x; }
+  return sdSichern().then(fertig, function (f) { fertig(null); throw f; });
+}
+
+/* Die Ablagezeile steht je nach Ansicht in der Mappe oder auf dem Tisch.
+   Nach dem Sichern muss die nachgezogen werden, die gerade da ist. */
+function sdAblageNachziehen() {
+  if (sd.sicht === 'fach' || sdIstSchmal()) { sdFlaecheZeichnen(); }
+  else { sdMappeZeichnen(); }
+}
+
+/* Nach dem Anlegen einmal zurücklesen. Erst wenn das, was in der Datei
+   steht, dem entspricht, was hineingeschrieben wurde, ist die Ablage
+   wirklich da. Sonst meldet die App es, statt es zu glauben. */
+function sdDateiPruefen() {
+  if (!sdGriff) { return Promise.resolve(false); }
+  var soll = sdAlsText();
+  return sdGriff.getFile().then(function (d) { return d.text(); }).then(function (ist) {
+    if (ist === soll) { return true; }
+    melde('Die Datei wurde angelegt, enthält aber nicht, was hineingeschrieben wurde '
+      + '(' + (ist ? ist.length : 0) + ' statt ' + soll.length + ' Zeichen). '
+      + 'Verlass dich nicht darauf — nimm „Herunterladen“.', 'warn');
+    return false;
+  }).catch(function (f) {
+    sdFehlerZeigen('Die angelegte Datei ließ sich nicht zurücklesen', f);
+    return false;
+  });
+}
+
+/* Ein abgebrochener Dialog ist keine Störung. Alles andere schon — und
+   dann wird nicht nur gemeckert, sondern der Weg gezeigt, der noch geht. */
+function sdPickerGescheitert(wobei, f, rueckfall) {
+  if (f && f.name === 'AbortError') { return; }
+  sdFehlerZeigen(wobei, f);
+  sdFsGesperrt = true;
+  zeichne();
+  if (rueckfall) { rueckfall(); }
+}
+
+var sdFsGesperrt = false;
+
+function sdDateiWaehlen() {
+  if (!sdFsApiDa() || sdFsGesperrt) { sdDateiHochladen(); return; }
+  window.showOpenFilePicker({
+    types: [{ description: 'Schreibtisch', accept: { 'application/json': ['.json'] } }],
+    multiple: false
+  }).then(function (l) {
+    var griff = l[0];
+    return griff.getFile().then(function (d) { return d.text(); }).then(function (text) {
+      var frisch = sdAusText(text);
+      if (!frisch) { throw new Error('Die Datei ist nicht lesbar.'); }
+      sdGriff = griff;
+      sd.dateiName = griff.name;
+      DB = frisch;
+      sd.weg = 'datei';
+      return sdGriffMerken(griff);
+    });
+  }).then(function () {
+    sd.sicht = 'tisch';
+    sd.fachId = '';
+    melde('Datei geöffnet: ' + sd.dateiName, 'gut');
+    zeichne();
+  }).catch(function (f) {
+    sdPickerGescheitert('Die Datei ließ sich nicht öffnen', f, null);
+  });
+}
+
+function sdDateiAnlegen() {
+  if (!sdFsApiDa() || sdFsGesperrt) { sdDateiHerunterladen(); return; }
+  window.showSaveFilePicker({
+    suggestedName: 'schreibtisch.json',
+    types: [{ description: 'Schreibtisch', accept: { 'application/json': ['.json'] } }]
+  }).then(function (griff) {
+    sdGriff = griff;
+    sd.dateiName = griff.name;
+    /* Erst schreiben, dann den Griff merken: Das Merken ist eine
+       Bequemlichkeit, das Schreiben ist der Zweck. Scheitert IndexedDB,
+       darf das die Ablage nicht aufhalten. */
+    return sdSichern().then(function (gut) {
+      return gut ? sdDateiPruefen() : false;
+    }).then(function (geprueft) {
+      return sdGriffMerken(griff).then(function () { return geprueft; });
+    });
+  }).then(function (geprueft) {
+    if (geprueft) { melde('Datei angelegt und geprüft: ' + sd.dateiName, 'gut'); }
+    zeichne();
+  }).catch(function (f) {
+    sdGriff = null;
+    sd.dateiName = '';
+    sdPickerGescheitert('Die Datei ließ sich nicht anlegen', f, null);
+  });
+}
+
+/* Für Safari, das keinen Dateigriff kennt: herunterladen und hochladen. */
+function sdDateiHerunterladen() {
+  var b = new Blob([sdAlsText()], { type: 'application/json' });
+  var u = URL.createObjectURL(b);
+  var a = document.createElement('a');
+  a.href = u;
+  a.download = 'schreibtisch-' + SD_FASSUNG + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(function () { URL.revokeObjectURL(u); }, 1000);
+}
+
+function sdDateiHochladen() {
+  var e = document.createElement('input');
+  e.type = 'file';
+  e.accept = 'application/json,.json';
+  e.onchange = function () {
+    var d = e.files && e.files[0];
+    if (!d) { return; }
+    d.text().then(function (text) {
+      var frisch = sdAusText(text);
+      if (!frisch) { melde('Die Datei ist nicht lesbar.', 'warn'); return; }
+      DB = frisch;
+      sd.dateiName = d.name;
+      sd.weg = 'lokal';
+      sd.sicht = 'tisch';
+      sd.fachId = '';
+      sdSichern();
+      melde('Datei geladen: ' + d.name, 'gut');
+      zeichne();
+    });
+  };
+  e.click();
+}
+
+function sdLaden() {
+  return sdGriffHolen().then(function (griff) {
+    if (!griff) { return null; }
+    if (!griff.queryPermission) { return null; }
+    return griff.queryPermission({ mode: 'readwrite' }).then(function (r) {
+      if (r !== 'granted') { return null; }
+      sdGriff = griff;
+      sd.dateiName = griff.name;
+      return griff.getFile().then(function (d) { return d.text(); });
+    }).catch(function () { return null; });
+  }).then(function (text) {
+    if (text) {
+      var frisch = sdAusText(text);
+      if (frisch) { DB = frisch; sd.weg = 'datei'; return true; }
+    }
+    var roh = null;
+    try { roh = window.localStorage.getItem(SD_LS_KEY); } catch (e) { roh = null; }
+    if (roh) {
+      var l = sdAusText(roh);
+      if (l) { DB = l; sd.weg = 'lokal'; return true; }
+    }
+    return false;
+  }).catch(function () { return false; });
+}
+
+/* ============================================================
+   Zusammenführen — je Datensatz, nicht je Datei
+
+   Die Regeln, Wort für Wort aus der Workbench übernommen, weil sie sich
+   dort bewährt haben:
+     · Verglichen wird je Kennung, nicht je Liste.
+     · Der jüngere Stempel gewinnt. Gleichstand heißt gleiche Fassung und
+       ist kein Konflikt — dann bleibt, was da ist.
+     · Ein Datensatz, den nur eine Seite kennt, kommt mit. Fehlen heißt
+       „noch nicht gesehen“, nicht „gelöscht“.
+     · Gelöscht wird nur gegen einen Grabstein, und nur wenn der Tod
+       jünger ist als beide Fassungen. Sonst gewinnt eine spätere
+       Änderung gegen eine frühere Löschung.
+     · Verschachtelt wird mitgeführt: Ein neuerer Fachname überschreibt
+       nicht die Seiten, die währenddessen woanders entstanden sind.
+   ============================================================ */
+
+function sdPaare(a, b) {
+  var nach = {};
+  var reihe = [];
+  function dazu(x, wo) {
+    if (!x || !x.id) { return; }
+    if (!nach[x.id]) { nach[x.id] = { id: x.id }; reihe.push(nach[x.id]); }
+    nach[x.id][wo] = x;
+  }
+  (a || []).forEach(function (x) { dazu(x, 'a'); });
+  (b || []).forEach(function (x) { dazu(x, 'b'); });
+  return reihe;
+}
+
+function sdTot(grabsteine, id, za, zb) {
+  var t = grabsteine[id];
+  if (!t) { return false; }
+  return t >= Math.max(za || 0, zb || 0);
+}
+
+function sdSortieren(liste) {
+  return liste.sort(function (x, y) {
+    var o = (x.ordnung || 0) - (y.ordnung || 0);
+    return o !== 0 ? o : (x.id < y.id ? -1 : (x.id > y.id ? 1 : 0));
+  });
+}
+
+/* Führt eine flache Liste zusammen. tiefer darf den Gewinner noch
+   ergänzen — dort hängen die Seiten und Unterseiten dran. */
+function sdListeZusammen(a, b, grabsteine, bericht, tiefer) {
+  var raus = [];
+  sdPaare(a, b).forEach(function (paar) {
+    var x = paar.a, y = paar.b;
+    var zx = x ? (x.geaendert || 0) : 0;
+    var zy = y ? (y.geaendert || 0) : 0;
+    if (sdTot(grabsteine, paar.id, zx, zy)) { bericht.entfernt++; return; }
+    if (x && y) {
+      var sieger = (zy > zx) ? y : x;
+      var verlierer = (sieger === y) ? x : y;
+      if (zy > zx) { bericht.ersetzt++; } else { bericht.behalten++; }
+      raus.push(tiefer ? tiefer(sieger, verlierer, grabsteine, bericht) : sieger);
+    } else {
+      var einer = x || y;
+      bericht.neu++;
+      raus.push(tiefer ? tiefer(einer, null, grabsteine, bericht) : einer);
+    }
+  });
+  return sdSortieren(raus);
+}
+
+function sdSeiteZusammen(sieger, verlierer, grabsteine, bericht) {
+  var z = {};
+  Object.keys(sieger).forEach(function (k) { z[k] = sieger[k]; });
+  z.unter = sdListeZusammen(sieger.unter || [], verlierer ? (verlierer.unter || []) : [],
+    grabsteine, bericht, null);
+  return z;
+}
+
+function sdFachZusammen(sieger, verlierer, grabsteine, bericht) {
+  var z = {};
+  Object.keys(sieger).forEach(function (k) { z[k] = sieger[k]; });
+  z.seiten = sdListeZusammen(sieger.seiten || [], verlierer ? (verlierer.seiten || []) : [],
+    grabsteine, bericht, sdSeiteZusammen);
+  z.leiste = sdListeZusammen(sieger.leiste || [], verlierer ? (verlierer.leiste || []) : [],
+    grabsteine, bericht, null);
+  return z;
+}
+
+function sdZusammenfuehren(lokal, fremd) {
+  var bericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0 };
+  var grabsteine = {};
+  [lokal.grabsteine || {}, fremd.grabsteine || {}].forEach(function (g) {
+    Object.keys(g).forEach(function (id) {
+      if (!grabsteine[id] || g[id] > grabsteine[id]) { grabsteine[id] = g[id]; }
+    });
+  });
+  var ergebnis = {
+    fassung: SD_DATEI_FASSUNG,
+    faecher: sdListeZusammen(lokal.faecher, fremd.faecher, grabsteine, bericht, sdFachZusammen),
+    planung: sdListeZusammen(lokal.planung, fremd.planung, grabsteine, bericht, null),
+    grabsteine: grabsteine,
+    geaendert: Math.max(lokal.geaendert || 0, fremd.geaendert || 0)
+  };
+  /* Unbekannte Felder oben: beide Seiten durchreichen, die lokale zuletzt. */
+  [fremd, lokal].forEach(function (q) {
+    Object.keys(q).forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(ergebnis, k)) { ergebnis[k] = q[k]; }
+    });
+  });
+  sdGrabsteineAufraeumen(ergebnis);
+  return { db: ergebnis, bericht: bericht };
+}
+
+/* ---------- Breite ---------- */
+
+function sdBreite(w) {
+  var b = (typeof w === 'number') ? w : (typeof window !== 'undefined' ? window.innerWidth : 1200);
+  var schmal = b < SD_SCHMAL;
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.className = (schmal ? 'b-schmal' : 'b-weit') + (sd.bearbeiten ? ' bearbeiten' : '');
+  }
+  return schmal ? 'schmal' : 'weit';
+}
+
+function sdIstSchmal() {
+  return typeof document !== 'undefined' && document.body
+    && document.body.className.indexOf('b-schmal') >= 0;
+}
+
+/* ---------- Meldung ---------- */
+
+var sdMeldeUhr = null;
+
+/* Eine gute Nachricht darf gehen. Eine schlechte bleibt stehen, bis man
+   sie wegklickt: Ein Fehler, der sich nach fünf Sekunden selbst wegräumt,
+   ist genau dann weg, wenn man ihn vorlesen will. */
+function melde(text, art) {
+  var el = document.getElementById('meldung');
+  if (!el) { return; }
+  var warn = (art === 'warn');
+  el.innerHTML = '<span class="wort">' + esc(text).replace(/\n/g, '<br>') + '</span>'
+    + (warn ? '<button type="button" class="zu" onclick="sdMeldungZu()" aria-label="Meldung schließen">&#215;</button>' : '');
+  el.className = 'meldung' + (warn ? ' warn' : '');
+  el.hidden = false;
+  if (sdMeldeUhr) { window.clearTimeout(sdMeldeUhr); sdMeldeUhr = null; }
+  if (!warn) { sdMeldeUhr = window.setTimeout(function () { el.hidden = true; }, 2800); }
+}
+
+function sdMeldungZu() {
+  var el = document.getElementById('meldung');
+  if (el) { el.hidden = true; }
+}
+
+/* Fehler im Klartext: der Name des Fehlers sagt mehr als sein Satz.
+   NotAllowedError heißt Richtlinie, SecurityError heißt Rahmen oder
+   Ursprung, NotFoundError heißt die Datei ist weg. */
+function sdFehlerZeigen(wobei, f) {
+  var name = (f && f.name) ? f.name : 'Fehler';
+  var satz = (f && f.message) ? f.message : 'kein Grund genannt';
+  var rat = '';
+  if (name === 'SecurityError' && sdImRahmen()) {
+    rat = '\nDie Seite läuft in einer Vorschau. Lade die Datei herunter und öffne sie von deinem Rechner.';
+  } else if (name === 'NotAllowedError') {
+    rat = '\nDer Browser oder eine Richtlinie verweigert den Zugriff. Nimm „Herunterladen“.';
+  } else if (name === 'NotFoundError') {
+    rat = '\nDie Datei gibt es nicht mehr. Wähle sie neu oder lege eine neue an.';
+  }
+  melde(wobei + ': ' + name + ' — ' + satz + rat, 'warn');
+}
+
+/* ---------- Zeichnen ---------- */
+
+function zeichne() {
+  sdBreite();
+  sdPlanungZeichnen();
+  sdFlaecheZeichnen();
+  sdMappeZeichnen();
+}
+
+function sdPlanungZeichnen() {
+  var el = document.getElementById('planung');
+  if (!el) { return; }
+  var links = (DB.planung || []).map(function (p) {
+    return sdVerweisHtml(p, 'planung');
+  }).join('');
+  el.innerHTML = links
+    + '<span class="luecke"></span>'
+    + (sd.bearbeiten ? '<button type="button" class="stift" onclick="sdPlanungNeu()">+ Link</button>' : '')
+    + '<button type="button" class="stift' + (sd.bearbeiten ? ' an' : '') + '" onclick="sdBearbeitenUm()">'
+    + (sd.bearbeiten ? 'Fertig' : 'Bearbeiten') + '</button>';
+}
+
+/* Der Weg, den ein Verweis zuerst nimmt: onenote: öffnet OneNote selbst
+   und lässt den Schreibtisch stehen. Die Web-Adresse ist der Rückfall —
+   und auf dem iPad, wo onenote: nicht immer greift, der zweite Knopf. */
+function sdZiel(p) {
+  return sdLinkSauber(p.link) || sdLinkSauber(p.link_web);
+}
+
+function sdHatBeide(p) {
+  return !!sdLinkSauber(p.link) && !!sdLinkSauber(p.link_web);
+}
+
+/* Ein Öffnen-Knopf, überall gleich gebaut: der Hauptweg über onenote:,
+   daneben „Im Browser“, sobald beide Adressen da sind. */
+function sdOeffnenHtml(p, klasse, text) {
+  var ziel = sdZiel(p);
+  if (!ziel) { return ''; }
+  var neu = /^https:/i.test(ziel) ? ' target="_blank" rel="noopener"' : '';
+  return '<a class="' + klasse + '" href="' + esc(ziel) + '"' + neu + '>' + esc(text) + '</a>'
+    + (sdHatBeide(p)
+      ? '<a class="' + klasse + ' zweitweg" href="' + esc(p.link_web) + '"'
+        + ' target="_blank" rel="noopener">Im Browser</a>'
+      : '');
+}
+
+/* Ein Verweis. onenote: lässt die App stehen; https: geht in ein neues
+   Fenster, sonst wäre der Schreibtisch weg (SD-13). */
+function sdVerweisHtml(p, wo) {
+  var ziel = sdZiel(p);
+  var neu = /^https:/i.test(ziel) ? ' target="_blank" rel="noopener"' : '';
+  if (!ziel) {
+    return '<a class="ohne" aria-disabled="true" title="kein Link">' + esc(p.name) + '</a>';
+  }
+  return '<a href="' + esc(ziel) + '"' + neu + ' data-wo="' + esc(wo) + '">' + esc(p.name) + '</a>'
+    + (sdHatBeide(p)
+      ? '<a class="imweb" href="' + esc(p.link_web) + '" target="_blank" rel="noopener"'
+        + ' title="im Browser öffnen" aria-label="im Browser öffnen">&#8599;</a>'
+      : '');
+}
+
+function sdFlaecheZeichnen() {
+  var el = document.getElementById('flaeche');
+  if (!el) { return; }
+  el.innerHTML = (sd.sicht === 'fach' && sdFach(sd.fachId)) ? sdFachHtml() : sdTischHtml();
+}
+
+function sdTischHtml() {
+  var h = '';
+  if (!DB.faecher.length) {
+    h += '<p class="reihe-titel">Noch kein Fach. Im Bearbeiten-Modus legst du das erste an.</p>';
+  }
+  h += sdReiheHtml('eigen', 'Eigene Fächer');
+  h += '<div class="trenner"></div>';
+  h += sdReiheHtml('zusammen', 'Zusammenarbeit');
+  if (sd.bearbeiten) {
+    h += '<div class="werkzeug"><button type="button" onclick="sdFachFenster(\'\',\'eigen\')">Fach anlegen</button>'
+      + '<button type="button" onclick="sdFachFenster(\'\',\'zusammen\')">Zusammenarbeit anlegen</button></div>';
+  }
+  if (sdIstSchmal()) { h += sdAblageHtml(true); }
+  return h;
+}
+
+function sdReiheHtml(reihe, titel) {
+  var l = sdFaecher(reihe);
+  var h = '<p class="reihe-titel">' + esc(titel) + '</p><div class="stapel-reihe">';
+  h += l.map(function (f) { return sdStapelHtml(f); }).join('');
+  h += '</div>';
+  /* In der schmalen Ansicht klappt die Leiste unter dem gewählten Fach auf (SD-10) */
+  return h;
+}
+
+function sdStapelHtml(f) {
+  var gewaehlt = (f.id === sd.fachId);
+  var h = '<div class="stapel-halter">';
+  h += '<button type="button" class="stapel' + (gewaehlt ? ' gewaehlt' : '') + '"'
+    + ' onclick="sdFachWaehlen(\'' + esc(f.id) + '\')"'
+    + ' ondblclick="sdFachOeffnen(\'' + esc(f.id) + '\')">'
+    + '<span class="lager"><span class="lage"></span><span class="lage"></span>'
+    + '<span class="lage"></span><span class="lage">'
+    + '<span class="reiter" style="background:' + esc(f.farbe) + '"></span></span></span>'
+    + '<span class="beschriftung"><span class="name">' + esc(f.name) + '</span>'
+    + (f.quelle ? '<span class="wohin">' + esc(f.quelle) + '</span>' : '')
+    + '</span></button>';
+  if (gewaehlt && sdIstSchmal()) { h += sdAufklappHtml(f); }
+  h += '</div>';
+  return h;
+}
+
+/* Was in der schmalen Ansicht unter dem Fach aufklappt. */
+function sdAufklappHtml(f) {
+  var h = '<div class="aufklapp">';
+  h += '<ul class="verweise">'
+    + f.leiste.map(function (p) { return '<li>' + sdVerweisHtml(p, 'leiste') + '</li>'; }).join('')
+    + '</ul>';
+  h += '<div class="knoepfe">'
+    + '<button type="button" class="knopf" onclick="sdFachOeffnen(\'' + esc(f.id) + '\')">Seiten</button>'
+    + sdOeffnenHtml(f, 'knopf', 'Abschnitt öffnen')
+    + '</div></div>';
+  return h;
+}
+
+function sdFachHtml() {
+  var f = sdFach(sd.fachId);
+  var h = '<div class="fachkopf"><h3>' + esc(f.name) + '</h3>'
+    + '<button type="button" class="zur" onclick="sdZumTisch()">zurück zum Tisch</button>'
+    + '<span class="luecke"></span>'
+    + sdOeffnenHtml(f, 'aufheben', 'Abschnitt öffnen')
+    + '</div>';
+
+  h += '<div class="seiten">';
+  h += f.seiten.map(function (s) { return sdSeiteHtml(f, s); }).join('');
+  h += '</div>';
+  if (!f.seiten.length) { h += '<p class="reihe-titel">Noch keine Seite. Im Bearbeiten-Modus trägst du die erste ein.</p>'; }
+  if (sd.bearbeiten) {
+    h += '<div class="werkzeug"><button type="button" onclick="sdSeiteFenster(\'\')">Seite anlegen</button></div>';
+  }
+
+  h += '<div class="fest"><p class="reihe-titel">Immer dabei</p><div class="seiten">';
+  h += f.leiste.map(function (p) { return sdLeisteBlattHtml(f, p); }).join('');
+  h += '</div>';
+  if (sd.bearbeiten) {
+    h += '<div class="werkzeug"><button type="button" onclick="sdLeisteFenster(\'\')">Verweis anlegen</button></div>';
+  }
+  h += '</div>';
+  /* Die Fachansicht liegt immer auf dem Tisch, also immer die helle Schrift. */
+  h += sdAblageHtml(true);
+  return h;
+}
+
+function sdBlattHtml(klasse, name, aufruf) {
+  return '<button type="button" class="seite' + klasse + '" ' + aufruf + '>'
+    + '<span class="s-lager"><span class="s-blatt unten"></span><span class="s-blatt"></span></span>'
+    + '<span class="st">' + esc(name) + '</span></button>';
+}
+
+function sdSeiteHtml(f, s) {
+  var offen = (s.id === sd.seiteId);
+  var zusatz = '';
+  if (offen) {
+    zusatz = '<div class="unterseiten">';
+    if (sdZiel(s)) {
+      zusatz += '<div class="knoepfe">' + sdOeffnenHtml(s, 'knopf voll', 'Seite öffnen') + '</div>';
+    } else {
+      zusatz += '<p class="leise">Diese Seite hat noch keinen Link.</p>';
+    }
+    zusatz += '<ul class="verweise">'
+      + s.unter.map(function (u) {
+        return '<li>' + sdVerweisHtml(u, 'unter')
+          + (sd.bearbeiten ? sdStellerHtml('sdUnterStellen', f.id + '|' + s.id + '|' + u.id) : '')
+          + '</li>';
+      }).join('')
+      + '</ul>';
+    if (!s.unter.length) { zusatz += '<p class="leise">Keine Unterseiten.</p>'; }
+    if (sd.bearbeiten) {
+      zusatz += '<div class="werkzeug">'
+        + '<button type="button" onclick="sdUnterFenster(\'' + esc(s.id) + '\',\'\')">Unterseite anlegen</button>'
+        + '<button type="button" onclick="sdSeiteFenster(\'' + esc(s.id) + '\')">Seite ändern</button>'
+        + '</div>';
+    }
+    zusatz += '</div>';
+  }
+  var k = (offen ? ' offen' : '') + (sdZiel(s) ? '' : ' leer');
+  var h = '<div class="seite-halter">'
+    + sdBlattHtml(k, s.name, 'onclick="sdSeiteUm(\'' + esc(s.id) + '\')"')
+    + (sd.bearbeiten ? sdStellerHtml('sdSeiteStellen', f.id + '|' + s.id) : '')
+    + '</div>';
+  return h + zusatz;
+}
+
+function sdLeisteBlattHtml(f, p) {
+  var ziel = sdZiel(p);
+  var auf = ziel
+    ? 'onclick="sdGehe(\'' + esc(ziel) + '\')"'
+    : 'onclick="melde(\'Für diesen Verweis ist noch kein Link eingetragen.\', null)"';
+  return '<div class="seite-halter">'
+    + sdBlattHtml(ziel ? '' : ' leer', p.name, auf)
+    + (sd.bearbeiten ? sdStellerHtml('sdLeisteStellen', f.id + '|' + p.id) : '')
+    + '</div>';
+}
+
+/* Die kleinen Steller im Bearbeiten-Modus: höher, tiefer, ändern, weg. */
+function sdStellerHtml(ruf, schluessel) {
+  var s = esc(schluessel);
+  return '<span class="steller">'
+    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'hoch\')" aria-label="höher">&#8593;</button>'
+    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'runter\')" aria-label="tiefer">&#8595;</button>'
+    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'aendern\')" aria-label="ändern">&#9998;</button>'
+    + '<button type="button" onclick="' + ruf + '(\'' + s + '\',\'weg\')" aria-label="entfernen">&#215;</button>'
+    + '</span>';
+}
+
+function sdMappeZeichnen() {
+  var el = document.getElementById('mappe');
+  if (!el) { return; }
+  if (sdIstSchmal() || sd.sicht === 'fach') { el.innerHTML = ''; return; }
+  var f = sdFach(sd.fachId);
+  if (!f) {
+    el.innerHTML = '<p class="leise">Ein Fach antippen zeigt hier seine Verweise.</p>' + sdAblageHtml(false);
+    return;
+  }
+  var h = '<div class="mappe-kopf"><span class="fleck" style="background:' + esc(f.farbe) + '"></span>'
+    + '<div><h3>' + esc(f.name) + '</h3>'
+    + (f.quelle ? '<div class="quelle">' + esc(f.quelle) + '</div>' : '') + '</div></div>';
+  h += '<ul class="verweise">'
+    + f.leiste.map(function (p) {
+      return '<li>' + sdVerweisHtml(p, 'leiste')
+        + (sd.bearbeiten ? sdStellerHtml('sdLeisteStellen', f.id + '|' + p.id) : '') + '</li>';
+    }).join('')
+    + '</ul>';
+  h += '<div class="knoepfe">'
+    + '<button type="button" class="knopf" onclick="sdFachOeffnen(\'' + esc(f.id) + '\')">Seiten</button>'
+    + (sd.bearbeiten ? '<button type="button" class="knopf" onclick="sdLeisteFenster(\'\')">+ Verweis</button>'
+      + '<button type="button" class="knopf" onclick="sdFachFenster(\'' + esc(f.id) + '\',\'\')">Fach ändern</button>' : '')
+    + '</div>';
+  if (sdZiel(f)) {
+    h += '<div class="oeffnen">' + sdOeffnenHtml(f, '', 'Abschnitt öffnen') + '</div>';
+  }
+  h += sdAblageHtml(false);
+  el.innerHTML = h;
+}
+
+/* Sagt in einem Satz, wo der Bestand steht — und sagt „nicht gesichert“,
+   wenn er nirgends steht, statt eine Uhrzeit zu zeigen. */
+function sdAblageText() {
+  if (sd.weg === 'datei') { return 'Datei: ' + esc(sd.dateiName || 'unbenannt'); }
+  if (sd.weg === 'lokal') { return 'Nur in diesem Browser — nicht in einer Datei'; }
+  if (sd.weg === 'nichts') { return '<b>Nichts wird gespeichert.</b> Beim Schließen ist alles weg.'; }
+  return 'Noch keine Ablage gewählt';
+}
+
+function sdAblageHtml(hell) {
+  var dateiweg = sdFsApiDa() && !sdFsGesperrt;
+  var h = '<p class="ablage' + (hell ? ' hell' : '') + (sd.weg === 'nichts' ? ' alarm' : '') + '">'
+    + sdAblageText()
+    + (sd.gesichert ? '<br>Zuletzt gesichert ' + esc(sd.gesichert) : '');
+  if (sdImRahmen()) {
+    h += '<br>Diese Seite läuft in einer Vorschau. Der Browser verbietet dort '
+      + 'jede Dateiauswahl — lade die Datei herunter und öffne sie von deinem Rechner.';
+  }
+  h += '<br>'
+    + '<button type="button" onclick="' + (dateiweg ? 'sdDateiWaehlen()' : 'sdDateiHochladen()') + '">'
+    + (dateiweg ? 'Datei öffnen' : 'Datei laden') + '</button>'
+    + ' · <button type="button" onclick="' + (dateiweg ? 'sdDateiAnlegen()' : 'sdDateiHerunterladen()') + '">'
+    + (dateiweg ? 'Neue Datei' : 'Herunterladen') + '</button>';
+  if (sdHaken.ablageZeile) { h += sdHaken.ablageZeile(); }
+  return h + '</p>';
+}
+
+/* ---------- Wege ---------- */
+
+function sdFachWaehlen(id) {
+  sd.fachId = (sd.fachId === id && sdIstSchmal()) ? '' : id;
+  sd.seiteId = '';
+  sdFlaecheZeichnen();
+  sdMappeZeichnen();
+}
+
+function sdFachOeffnen(id) {
+  sd.fachId = id;
+  sd.sicht = 'fach';
+  sd.seiteId = '';
+  zeichne();
+}
+
+function sdZumTisch() {
+  sd.sicht = 'tisch';
+  sd.seiteId = '';
+  zeichne();
+}
+
+function sdSeiteUm(id) {
+  sd.seiteId = (sd.seiteId === id) ? '' : id;
+  sdFlaecheZeichnen();
+}
+
+/* Ein Sprung nach OneNote. onenote: nimmt das Betriebssystem an, ohne
+   dass die Seite verlassen wird; https: geht in ein neues Fenster. */
+function sdGehe(ziel) {
+  if (!ziel) { return; }
+  if (/^https:/i.test(ziel)) { window.open(ziel, '_blank', 'noopener'); return; }
+  window.location.href = ziel;
+}
+
+function sdBearbeitenUm() {
+  sd.bearbeiten = !sd.bearbeiten;
+  zeichne();
+}
+
+/* ---------- Fenster ---------- */
+
+function sdFensterZu() {
+  sd.fenster = null;
+  var f = document.getElementById('fenster');
+  var s = document.getElementById('schleier');
+  if (f) { f.hidden = true; f.innerHTML = ''; }
+  if (s) { s.hidden = true; }
+}
+
+function sdFensterAuf(html) {
+  var f = document.getElementById('fenster');
+  var s = document.getElementById('schleier');
+  if (!f || !s) { return; }
+  f.innerHTML = html;
+  f.hidden = false;
+  s.hidden = false;
+  var e = f.querySelector('input');
+  if (e && e.focus) { e.focus(); }
+}
+
+function sdFeld(id) {
+  var e = document.getElementById(id);
+  return e ? String(e.value || '') : '';
+}
+
+/* Ein Feld für beide Adressen statt zweier Felder: „Link kopieren“ legt
+   zwei Zeilen in die Zwischenablage, du fügst sie einmal ein, die App
+   sortiert sie auseinander. */
+function sdLinkFeldHtml(id, p) {
+  var beide = [sdLinkSauber(p && p.link), sdLinkSauber(p && p.link_web)]
+    .filter(function (x) { return !!x; }).join('\n');
+  return '<label for="' + id + '">Link — aus OneNote „Link kopieren“, beide Zeilen einfügen</label>'
+    + '<textarea id="' + id + '" class="eingabe linkfeld" rows="3" spellcheck="false"'
+    + ' placeholder="onenote:…&#10;https://…">' + esc(beide) + '</textarea>';
+}
+
+/* Liest das Feld und sagt nein, statt stillschweigend nichts zu
+   speichern: Ein Feld, in dem etwas steht, das aber leer gespeichert
+   wird, merkt man erst Wochen später. */
+function sdLinkFeldLesen(id) {
+  var roh = sdFeld(id).trim();
+  var e = sdLinkLesen(roh);
+  if (roh && !e.onenote && !e.web) {
+    melde('Darin steht keine onenote:- oder https-Adresse. Nimm in OneNote '
+      + '„Link kopieren“ und füge beide Zeilen hier ein.', 'warn');
+    return null;
+  }
+  if (!sdLinkOk(e.onenote) || !sdLinkOk(e.web)) {
+    melde('Nur onenote:- und https-Adressen werden gespeichert.', 'warn');
+    return null;
+  }
+  return e;
+}
+
+function sdFachFenster(id, reihe) {
+  var f = id ? sdFach(id) : null;
+  sd.fenster = { art: 'fach', id: id || '', reihe: f ? f.reihe : (reihe || 'eigen'),
+    farbe: f ? f.farbe : SD_FARBEN[0] };
+  sdFachFensterZeichnen();
+}
+
+function sdFachFensterZeichnen() {
+  var w = sd.fenster;
+  var f = w.id ? sdFach(w.id) : null;
+  var farben = SD_FARBEN.map(function (c) {
+    return '<button type="button" class="' + (c === w.farbe ? 'an' : '') + '"'
+      + ' style="background:' + c + '" onclick="sdFachFarbe(\'' + c + '\')" aria-label="Farbe"></button>';
+  }).join('');
+  sdFensterAuf('<div class="titel">' + (f ? 'Fach ändern' : 'Neues Fach') + '</div><div class="rumpf">'
+    + '<label for="sdFaName">Name</label>'
+    + '<input id="sdFaName" class="eingabe" type="text" maxlength="60" value="' + esc(f ? f.name : '') + '">'
+    + '<label>Reihe</label><div class="reihewahl">'
+    + '<button type="button" class="' + (w.reihe === 'eigen' ? 'an' : '') + '" onclick="sdFachReihe(\'eigen\')">Eigenes Fach</button>'
+    + '<button type="button" class="' + (w.reihe === 'zusammen' ? 'an' : '') + '" onclick="sdFachReihe(\'zusammen\')">Zusammenarbeit</button>'
+    + '</div>'
+    + '<label>Farbe des Abschnitts</label><div class="farbwahl">' + farben + '</div>'
+    + '<label for="sdFaQuelle">Notizbuch (kann leer bleiben)</label>'
+    + '<input id="sdFaQuelle" class="eingabe" type="text" maxlength="60" value="' + esc(f ? f.quelle : '') + '">'
+    + sdLinkFeldHtml('sdFaLink', f)
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="sdFachSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="sdFensterZu()">Abbrechen</button>'
+    + (f ? '<button type="button" class="knopf weg" onclick="sdFachWeg()">Fach entfernen</button>' : '')
+    + '</div></div>');
+}
+
+function sdFachFarbe(c) { sd.fenster.farbe = c; sdFachFensterZeichnen(); }
+function sdFachReihe(r) { sd.fenster.reihe = r; sdFachFensterZeichnen(); }
+
+function sdFachSpeichern() {
+  var w = sd.fenster;
+  var name = sdFeld('sdFaName').trim();
+  var quelle = sdFeld('sdFaQuelle').trim();
+  if (!name) { melde('Das Fach braucht einen Namen.', 'warn'); return; }
+  var e = sdLinkFeldLesen('sdFaLink');
+  if (!e) { return; }
+  var f = w.id ? sdFach(w.id) : null;
+  if (f) {
+    f.name = name.slice(0, 60);
+    f.reihe = w.reihe;
+    f.farbe = w.farbe;
+    f.link = e.onenote;
+    f.link_web = e.web;
+    f.quelle = quelle.slice(0, 60);
+    sdStempeln(f);
+    sdGeaendert();
+  } else {
+    f = sdFachNeu(name, w.reihe, w.farbe, e.onenote, quelle, e.web);
+    sd.fachId = f.id;
+  }
+  sdFensterZu();
+  zeichne();
+}
+
+function sdFachWeg() {
+  var f = sdFach(sd.fenster.id);
+  if (!f) { return; }
+  sdEntfernen(DB.faecher, f.id);
+  if (sd.fachId === f.id) { sd.fachId = ''; sd.sicht = 'tisch'; }
+  sdFensterZu();
+  zeichne();
+}
+
+function sdSeiteFenster(id) {
+  var f = sdFach(sd.fachId);
+  var s = id ? sdSeite(f, id) : null;
+  sd.fenster = { art: 'seite', id: id || '' };
+  sdFensterAuf('<div class="titel">' + (s ? 'Seite ändern' : 'Neue Seite') + '</div><div class="rumpf">'
+    + '<label for="sdSeName">Name der Seite</label>'
+    + '<input id="sdSeName" class="eingabe" type="text" maxlength="80" value="' + esc(s ? s.name : '') + '">'
+    + sdLinkFeldHtml('sdSeLink', s)
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="sdSeiteSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="sdFensterZu()">Abbrechen</button></div></div>');
+}
+
+function sdSeiteSpeichern() {
+  var f = sdFach(sd.fachId);
+  var name = sdFeld('sdSeName').trim();
+  if (!f) { return; }
+  if (!name) { melde('Die Seite braucht einen Namen.', 'warn'); return; }
+  var e = sdLinkFeldLesen('sdSeLink');
+  if (!e) { return; }
+  var s = sd.fenster.id ? sdSeite(f, sd.fenster.id) : null;
+  if (s) { s.name = name.slice(0, 80); s.link = e.onenote; s.link_web = e.web; sdStempeln(s); sdGeaendert(); }
+  else { s = sdSeiteNeu(f, name, e.onenote, e.web); sd.seiteId = s.id; }
+  sdFensterZu();
+  sdFlaecheZeichnen();
+}
+
+function sdUnterFenster(seiteId, id) {
+  var f = sdFach(sd.fachId);
+  var s = sdSeite(f, seiteId);
+  var u = id ? (s.unter || []).filter(function (x) { return x.id === id; })[0] : null;
+  sd.fenster = { art: 'unter', seiteId: seiteId, id: id || '' };
+  sdFensterAuf('<div class="titel">' + (u ? 'Unterseite ändern' : 'Neue Unterseite') + '</div><div class="rumpf">'
+    + '<label for="sdUnName">Name</label>'
+    + '<input id="sdUnName" class="eingabe" type="text" maxlength="80" value="' + esc(u ? u.name : '') + '">'
+    + sdLinkFeldHtml('sdUnLink', u)
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="sdUnterSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="sdFensterZu()">Abbrechen</button></div></div>');
+}
+
+function sdUnterSpeichern() {
+  var f = sdFach(sd.fachId);
+  var s = sdSeite(f, sd.fenster.seiteId);
+  var name = sdFeld('sdUnName').trim();
+  if (!s) { return; }
+  if (!name) { melde('Die Unterseite braucht einen Namen.', 'warn'); return; }
+  var e = sdLinkFeldLesen('sdUnLink');
+  if (!e) { return; }
+  var u = sd.fenster.id ? s.unter.filter(function (x) { return x.id === sd.fenster.id; })[0] : null;
+  if (u) { u.name = name.slice(0, 80); u.link = e.onenote; u.link_web = e.web; sdStempeln(u); sdGeaendert(); }
+  else { sdUnterNeu(s, name, e.onenote, e.web); }
+  sdFensterZu();
+  sdFlaecheZeichnen();
+}
+
+function sdLeisteFenster(id) {
+  var f = sdFach(sd.fachId);
+  var p = id ? f.leiste.filter(function (x) { return x.id === id; })[0] : null;
+  sd.fenster = { art: 'leiste', id: id || '' };
+  sdFensterAuf('<div class="titel">' + (p ? 'Verweis ändern' : 'Neuer Verweis') + '</div><div class="rumpf">'
+    + '<label for="sdLeName">Name</label>'
+    + '<input id="sdLeName" class="eingabe" type="text" maxlength="60" value="' + esc(p ? p.name : '') + '">'
+    + sdLinkFeldHtml('sdLeLink', p)
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="sdLeisteSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="sdFensterZu()">Abbrechen</button></div></div>');
+}
+
+function sdLeisteSpeichern() {
+  var f = sdFach(sd.fachId);
+  var name = sdFeld('sdLeName').trim();
+  if (!f) { return; }
+  if (!name) { melde('Der Verweis braucht einen Namen.', 'warn'); return; }
+  var e = sdLinkFeldLesen('sdLeLink');
+  if (!e) { return; }
+  var p = sd.fenster.id ? f.leiste.filter(function (x) { return x.id === sd.fenster.id; })[0] : null;
+  if (p) { p.name = name.slice(0, 60); p.link = e.onenote; p.link_web = e.web; sdStempeln(p); sdGeaendert(); }
+  else {
+    f.leiste.push({ id: 'lk-' + sdKennung(), name: name.slice(0, 60),
+      link: e.onenote, link_web: e.web,
+      ordnung: sdOrdnung(f.leiste), geaendert: Date.now() });
+    sdGeaendert();
+  }
+  sdFensterZu();
+  zeichne();
+}
+
+function sdPlanungNeu() {
+  sd.fenster = { art: 'planung', id: '' };
+  sdPlanungFensterZeichnen(null);
+}
+
+function sdPlanungFenster(id) {
+  var p = (DB.planung || []).filter(function (x) { return x.id === id; })[0];
+  sd.fenster = { art: 'planung', id: id };
+  sdPlanungFensterZeichnen(p);
+}
+
+function sdPlanungFensterZeichnen(p) {
+  sdFensterAuf('<div class="titel">' + (p ? 'Link ändern' : 'Neuer Link in der Planungsleiste') + '</div><div class="rumpf">'
+    + '<label for="sdPlName">Name</label>'
+    + '<input id="sdPlName" class="eingabe" type="text" maxlength="40" value="' + esc(p ? p.name : '') + '">'
+    + sdLinkFeldHtml('sdPlLink', p)
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="sdPlanungSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="sdFensterZu()">Abbrechen</button>'
+    + (p ? '<button type="button" class="knopf weg" onclick="sdPlanungWeg()">Entfernen</button>' : '')
+    + '</div></div>');
+}
+
+function sdPlanungSpeichern() {
+  var name = sdFeld('sdPlName').trim();
+  if (!name) { melde('Der Link braucht einen Namen.', 'warn'); return; }
+  var e = sdLinkFeldLesen('sdPlLink');
+  if (!e) { return; }
+  var p = sd.fenster.id ? (DB.planung || []).filter(function (x) { return x.id === sd.fenster.id; })[0] : null;
+  if (p) { p.name = name.slice(0, 40); p.link = e.onenote; p.link_web = e.web; sdStempeln(p); sdGeaendert(); }
+  else {
+    DB.planung.push({ id: 'pl-' + sdKennung(), name: name.slice(0, 40),
+      link: e.onenote, link_web: e.web,
+      ordnung: sdOrdnung(DB.planung), geaendert: Date.now() });
+    sdGeaendert();
+  }
+  sdFensterZu();
+  zeichne();
+}
+
+function sdPlanungWeg() {
+  sdEntfernen(DB.planung, sd.fenster.id);
+  sdFensterZu();
+  zeichne();
+}
+
+/* ============================================================
+   Einfügen legt an
+
+   Strg+V irgendwo auf dem Tisch. Aus dem Link weiß die App schon, wie
+   das Ding heißt, aus welchem Notizbuch und welchem Abschnitt es kommt
+   und ob es eine Seite oder ein Abschnitt ist. Gefragt wird nur noch,
+   was nicht im Link steht — und das ist bei einer Unterseite genau
+   eines: unter welcher Seite sie hängen soll. Das sagt kein OneNote-
+   Link, auch bei echten Unterseiten nicht.
+
+   Ziehen geht nicht: OneNote gibt beim Ziehen nichts heraus, der
+   Mauszeiger zeigt ein Verbotszeichen. Am 13.11.2026 nachgemessen.
+   ============================================================ */
+
+function sdEinfuegenFenster(info) {
+  var fach = sdFachZuAbschnitt(info.abschnittId);
+  /* Kein Treffer über die Kennung: dann das Fach, das gerade offen ist. */
+  if (!fach && sd.fachId) { fach = sdFach(sd.fachId); }
+  var seite = fach ? sdSeite(fach, sd.seiteId) : null;
+  var wahl = (info.art === 'abschnitt' || !fach) ? 'fach' : 'seite';
+  sd.fenster = {
+    art: 'einfuegen', info: info, wahl: wahl,
+    fachId: fach ? fach.id : '',
+    seiteId: seite ? seite.id : '',
+    getroffen: !!sdFachZuAbschnitt(info.abschnittId)
+  };
+  sdEinfuegenZeichnen();
+}
+
+function sdEinfuegenWahl(w) { sd.fenster.wahl = w; sdEinfuegenZeichnen(); }
+function sdEinfuegenFach() { sd.fenster.fachId = sdFeld('sdEiFach'); sdEinfuegenZeichnen(); }
+function sdEinfuegenSeite() { sd.fenster.seiteId = sdFeld('sdEiSeite'); sdEinfuegenZeichnen(); }
+
+function sdAuswahlHtml(id, ruf, liste, gewaehlt, leer) {
+  return '<select id="' + id + '" class="eingabe" onchange="' + ruf + '">'
+    + (leer ? '<option value="">' + esc(leer) + '</option>' : '')
+    + liste.map(function (x) {
+      return '<option value="' + esc(x.id) + '"' + (x.id === gewaehlt ? ' selected' : '') + '>'
+        + esc(x.name) + '</option>';
+    }).join('')
+    + '</select>';
+}
+
+function sdEinfuegenZeichnen() {
+  var w = sd.fenster;
+  var i = w.info;
+  var fach = w.fachId ? sdFach(w.fachId) : null;
+  var herkunft = [i.notizbuch, i.abschnitt].filter(function (x) { return !!x; }).join(' › ');
+
+  var arten = [
+    { s: 'seite', t: 'Seite' + (fach ? ' in „' + fach.name + '“' : '') },
+    { s: 'unter', t: 'Unterseite' },
+    { s: 'fach', t: 'Eigenes Fach' },
+    { s: 'zusammen', t: 'Zusammenarbeit' }
+  ];
+  /* Ein Abschnitt wird kein Unterpunkt einer Seite. */
+  if (i.art === 'abschnitt') { arten = arten.filter(function (a) { return a.s !== 'unter'; }); }
+  if (!DB.faecher.length) { arten = arten.filter(function (a) { return a.s === 'fach' || a.s === 'zusammen'; }); }
+
+  var h = '<div class="titel">Eingefügt: ' + esc(i.name || 'Link') + '</div><div class="rumpf">';
+  if (herkunft) { h += '<p class="herkunft">aus ' + esc(herkunft) + '</p>'; }
+  h += '<p class="herkunft">' + (i.art === 'seite' ? 'OneNote sagt: eine Seite'
+    : (i.art === 'abschnitt' ? 'OneNote sagt: ein Abschnitt' : 'Die Art steht nicht im Link'))
+    + (w.getroffen && fach ? ' · Abschnitt gehört zu „' + esc(fach.name) + '“' : '') + '</p>';
+
+  h += '<label>Was soll daraus werden?</label><div class="reihewahl wickeln">'
+    + arten.map(function (a) {
+      return '<button type="button" class="' + (w.wahl === a.s ? 'an' : '') + '"'
+        + ' onclick="sdEinfuegenWahl(\'' + a.s + '\')">' + esc(a.t) + '</button>';
+    }).join('') + '</div>';
+
+  /* Nur fragen, was nicht schon feststeht. */
+  if ((w.wahl === 'seite' || w.wahl === 'unter') && !w.getroffen && DB.faecher.length) {
+    h += '<label for="sdEiFach">In welches Fach?</label>'
+      + sdAuswahlHtml('sdEiFach', 'sdEinfuegenFach()', DB.faecher, w.fachId, '');
+  }
+  if (w.wahl === 'unter') {
+    var seiten = fach ? fach.seiten : [];
+    if (!seiten.length) {
+      h += '<p class="herkunft warnton">Dieses Fach hat noch keine Seite, '
+        + 'unter die eine Unterseite passen könnte.</p>';
+    } else {
+      h += '<label for="sdEiSeite">Unter welcher Seite?</label>'
+        + sdAuswahlHtml('sdEiSeite', 'sdEinfuegenSeite()', seiten, w.seiteId, '');
+    }
+  }
+
+  h += '<label for="sdEiName">Name</label>'
+    + '<input id="sdEiName" class="eingabe" type="text" maxlength="80" value="' + esc(i.name) + '">'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="sdEinfuegenAnlegen()">Anlegen</button>'
+    + '<button type="button" class="knopf" onclick="sdFensterZu()">Abbrechen</button></div></div>';
+  sdFensterAuf(h);
+}
+
+function sdEinfuegenAnlegen() {
+  var w = sd.fenster;
+  var i = w.info;
+  var name = sdFeld('sdEiName').trim();
+  if (!name) { melde('Der Eintrag braucht einen Namen.', 'warn'); return; }
+
+  if (w.wahl === 'fach' || w.wahl === 'zusammen') {
+    var neu = sdFachNeu(name, w.wahl === 'zusammen' ? 'zusammen' : 'eigen',
+      SD_FARBEN[DB.faecher.length % SD_FARBEN.length], i.onenote, i.notizbuch, i.web);
+    sd.fachId = neu.id;
+    sd.sicht = 'tisch';
+    sdFensterZu();
+    zeichne();
+    melde('Fach „' + name + '“ angelegt.', 'gut');
+    return;
+  }
+
+  var fach = sdFach(w.fachId);
+  if (!fach) { melde('Kein Fach gewählt.', 'warn'); return; }
+
+  if (w.wahl === 'seite') {
+    var s = sdSeiteNeu(fach, name, i.onenote, i.web);
+    sd.fachId = fach.id;
+    sd.sicht = 'fach';
+    sd.seiteId = s.id;
+    sdFensterZu();
+    zeichne();
+    melde('Seite „' + name + '“ in „' + fach.name + '“ angelegt.', 'gut');
+    return;
+  }
+
+  var seite = sdSeite(fach, w.seiteId);
+  if (!seite) { melde('Keine Seite gewählt, unter die die Unterseite gehört.', 'warn'); return; }
+  sdUnterNeu(seite, name, i.onenote, i.web);
+  sd.fachId = fach.id;
+  sd.sicht = 'fach';
+  sd.seiteId = seite.id;
+  sdFensterZu();
+  zeichne();
+  melde('Unterseite „' + name + '“ unter „' + seite.name + '“ angelegt.', 'gut');
+}
+
+/* Der Griff am Fenster: Strg+V. Nicht, während ein Fenster offen ist
+   oder in einem Eingabefeld — dort soll Einfügen einfügen. */
+function sdEingefuegt(ereignis) {
+  if (sd.fenster) { return; }
+  var z = ereignis.target;
+  var tag = z && z.tagName ? String(z.tagName).toLowerCase() : '';
+  if (tag === 'input' || tag === 'textarea' || (z && z.isContentEditable)) { return; }
+  var daten = ereignis.clipboardData;
+  if (!daten) { return; }
+  var text = '';
+  try { text = daten.getData('text/plain') || daten.getData('text/uri-list') || ''; }
+  catch (e) { text = ''; }
+  var i = sdLinkLesen(text);
+  if (!i.onenote && !i.web) {
+    melde('In der Zwischenablage steht keine onenote:- oder https-Adresse.', 'warn');
+    return;
+  }
+  ereignis.preventDefault();
+  sdEinfuegenFenster(i);
+}
+
+/* ---------- Steller ---------- */
+
+function sdTeile(schluessel) { return String(schluessel || '').split('|'); }
+
+function sdSeiteStellen(schluessel, was) {
+  var t = sdTeile(schluessel);
+  var f = sdFach(t[0]);
+  if (!f) { return; }
+  if (was === 'aendern') { sdSeiteFenster(t[1]); return; }
+  if (was === 'weg') { sdEntfernen(f.seiten, t[1]); if (sd.seiteId === t[1]) { sd.seiteId = ''; } }
+  else { sdSchieben(f.seiten, t[1], was === 'hoch' ? -1 : 1); }
+  sdFlaecheZeichnen();
+}
+
+function sdUnterStellen(schluessel, was) {
+  var t = sdTeile(schluessel);
+  var f = sdFach(t[0]);
+  var s = sdSeite(f, t[1]);
+  if (!s) { return; }
+  if (was === 'aendern') { sdUnterFenster(t[1], t[2]); return; }
+  if (was === 'weg') { sdEntfernen(s.unter, t[2]); }
+  else { sdSchieben(s.unter, t[2], was === 'hoch' ? -1 : 1); }
+  sdFlaecheZeichnen();
+}
+
+function sdLeisteStellen(schluessel, was) {
+  var t = sdTeile(schluessel);
+  var f = sdFach(t[0]);
+  if (!f) { return; }
+  if (was === 'aendern') { sdLeisteFenster(t[1]); return; }
+  if (was === 'weg') { sdEntfernen(f.leiste, t[1]); }
+  else { sdSchieben(f.leiste, t[1], was === 'hoch' ? -1 : 1); }
+  zeichne();
+}
+
+/* ---------- Start ---------- */
+
+/* Die fünf Einträge der Planungsleiste bekommen feste Kennungen statt
+   gewürfelter. Sonst legte jedes Gerät beim ersten Start seine eigenen
+   fünf an, und der Abgleich hätte am Ende zehn. Und sie tragen den
+   Stempel 0: Sie sind eine Voreinstellung, keine Eingabe — ein von Hand
+   eingetragener Link gewinnt deshalb immer gegen sie. Einen gelöschten
+   Eintrag legt die App nicht wieder an; dafür ist der Grabstein da. */
+function sdPlanungSichern() {
+  if (DB.planung.length) { return; }
+  var tot = DB.grabsteine || {};
+  DB.planung = SD_PLANUNG_VOR.filter(function (n) {
+    return !tot['pl-' + sdSchluessel(n)];
+  }).map(function (n, i) {
+    return { id: 'pl-' + sdSchluessel(n), name: n, link: '', ordnung: i, geaendert: 0 };
+  });
+}
+
+/* Aus „Offene Fragen“ wird „offene-fragen“ — eine feste, lesbare Kennung. */
+function sdSchluessel(text) {
+  return String(text).toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function sdStart() {
+  sdBreite();
+  return sdLaden().then(function () {
+    sdPlanungSichern();
+    zeichne();
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('resize', function () { sdBreite(); zeichne(); });
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { sdFensterZu(); }
+      });
+      document.addEventListener('paste', sdEingefuegt);
+      /* Im Bearbeiten-Modus führt ein Klick auf einen Planungslink zum Ändern */
+      document.getElementById('planung').addEventListener('click', function (e) {
+        if (!sd.bearbeiten) { return; }
+        var a = e.target.closest ? e.target.closest('a') : null;
+        if (!a) { return; }
+        e.preventDefault();
+        var i = Array.prototype.indexOf.call(a.parentNode.querySelectorAll('a'), a);
+        if (DB.planung[i]) { sdPlanungFenster(DB.planung[i].id); }
+      });
+    }
+    if (sdHaken.beimStart) { sdHaken.beimStart(); }
+    return true;
+  });
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && document.getElementById('flaeche')) {
+  sdStart();
+}
+
+
+/* ============================================================
+   sd_wolke.js — Google Drive für die private Fassung
+
+   Diese Datei wird NUR in schreibtisch.html eingebaut. Die berufliche
+   Fassung enthält sie nicht: nicht abgeschaltet, nicht versteckt, nicht
+   vorhanden. bauen.py baut sie dort gar nicht erst ein, und SD-14 prüft
+   das an der fertigen Datei nach.
+
+   Muster und Formulierungen aus der WorkBench, bis hin zu den Namen —
+   derselbe Google-Klient, dasselbe Vorgehen, nur eine eigene Datei
+   (schreibtisch.json) und nur das Recht drive.file.
+
+   Nahtlos heißt hier: kein Knopf. Beim Start wird geholt, nach jeder
+   Änderung mit Verzug hochgeladen, im Takt nachgesehen. Reibung gibt es
+   nur, wenn etwas schiefgeht.
+   ============================================================ */
+
+'use strict';
+
+var SW_CLIENT_ID = '347268246401-9ktgd8q5caq6v5nma36i3e38u9c37bre.apps.googleusercontent.com';
+var SW_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+var SW_GIS_URL = 'https://accounts.google.com/gsi/client';
+var SW_DATEI = 'schreibtisch.json';
+var SW_TOKEN_KEY = 'schreibtisch-zugriff';
+var SW_ANMELDE_MERKER = 'schreibtisch-war-angemeldet';
+
+var SW_VERZUG = 4000;        /* so lange nach der letzten Änderung wird gewartet */
+var SW_MINDEST = 20000;      /* nicht öfter als alle 20 Sekunden von selbst */
+var SW_TAKT = 30000;         /* alle 30 Sekunden bei Drive nachsehen */
+var SW_VORLAUF = 5 * 60 * 1000;   /* so lange vor Ablauf wird still erneuert */
+var SW_ERNEUERUNG_MAX = 5;
+var SW_ERNEUERUNG_ABSTAND = 30000;
+
+var swToken = null;
+var swAblauf = 0;
+var swKlient = null;
+var swDateiId = '';
+var swStand = '';
+var swUhr = null;
+var swTaktUhr = null;
+var swLetzter = 0;
+var swLaeuft = false;
+var swErneuerungsUhr = null;
+var swErneuerungVersuche = 0;
+var swZustand = 'aus';       /* aus | an | laeuft | fehler */
+var swText = '';
+
+/* ---------- Anmeldung ---------- */
+
+function swGisLaden() {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+    return Promise.resolve(true);
+  }
+  return new Promise(function (ja, nein) {
+    var s = document.createElement('script');
+    s.src = SW_GIS_URL;
+    s.async = true;
+    s.onload = function () { ja(true); };
+    s.onerror = function () { nein(new Error('Google ließ sich nicht laden.')); };
+    document.head.appendChild(s);
+  });
+}
+
+function swTokenGueltig() {
+  return !!swToken && swAblauf > Date.now();
+}
+
+function swRestMinuten() {
+  if (!swTokenGueltig()) { return 0; }
+  return Math.max(0, Math.round((swAblauf - Date.now()) / 60000));
+}
+
+function swTokenMerken(token, sekunden) {
+  swToken = token;
+  swAblauf = Date.now() + (sekunden || 3600) * 1000 - 30000;
+  try {
+    window.sessionStorage.setItem(SW_TOKEN_KEY, JSON.stringify({ t: swToken, a: swAblauf }));
+    window.localStorage.setItem(SW_ANMELDE_MERKER, '1');
+  } catch (e) { /* egal */ }
+  swErneuerungPlanen();
+}
+
+function swTokenHolen() {
+  try {
+    var roh = window.sessionStorage.getItem(SW_TOKEN_KEY);
+    if (!roh) { return false; }
+    var d = JSON.parse(roh);
+    if (d && d.t && d.a > Date.now()) { swToken = d.t; swAblauf = d.a; return true; }
+  } catch (e) { /* egal */ }
+  return false;
+}
+
+function swTokenVergessen() {
+  swToken = null;
+  swAblauf = 0;
+  if (swErneuerungsUhr) { window.clearTimeout(swErneuerungsUhr); swErneuerungsUhr = null; }
+  try { window.sessionStorage.removeItem(SW_TOKEN_KEY); } catch (e) { /* egal */ }
+}
+
+/* Still erneuern, bevor die Stunde um ist. Ein einziger Versuch reicht
+   nicht: Schlägt er fehl — schlafender Rechner, kurz kein Netz —, war es
+   das sonst. Deshalb wird mehrfach nachgesetzt. */
+function swErneuerungPlanen() {
+  if (swErneuerungsUhr) { window.clearTimeout(swErneuerungsUhr); swErneuerungsUhr = null; }
+  if (!swAblauf) { return; }
+  swErneuerungVersuche = 0;
+  var warten = swAblauf - Date.now() - SW_VORLAUF;
+  if (warten < 1000) { warten = 1000; }
+  swErneuerungsUhr = window.setTimeout(swErneuerungLaufen, warten);
+}
+
+function swErneuerungLaufen() {
+  swErneuerungsUhr = null;
+  swErneuerungVersuche++;
+  swAnmelden(true).then(function (gut) {
+    if (gut) { return; }
+    if (swErneuerungVersuche >= SW_ERNEUERUNG_MAX) { return; }
+    swErneuerungsUhr = window.setTimeout(swErneuerungLaufen, SW_ERNEUERUNG_ABSTAND);
+  });
+}
+
+/* Beim Zurückkehren an den Rechner: läuft der Zugriff bald ab, gleich
+   erneuern statt auf die Uhr zu warten. Ein schlafender Rechner hält
+   auch die Uhr an. */
+function swErneuerungPruefen() {
+  if (!swTokenGueltig()) { return; }
+  if (swErneuerungsUhr) { return; }
+  if (swRestMinuten() > 10) { return; }
+  swErneuerungVersuche = 0;
+  swErneuerungLaufen();
+}
+
+function swKlientVorbereiten() {
+  if (swKlient) { return Promise.resolve(swKlient); }
+  return swGisLaden().then(function () {
+    swKlient = window.google.accounts.oauth2.initTokenClient({
+      client_id: SW_CLIENT_ID,
+      scope: SW_SCOPES,
+      callback: function () { /* wird je Anfrage überschrieben */ },
+      error_callback: function () { /* wird je Anfrage überschrieben */ }
+    });
+    return swKlient;
+  });
+}
+
+/* Eine Anfrage an Google, mit drei Ausgängen: Schlüssel bekommen,
+   abgelehnt (callback) oder das Fenster scheiterte (error_callback).
+   Bleibt jede Antwort aus, entscheidet die Zeitgrenze. fertig wird genau
+   einmal gerufen. */
+function swAnmeldeAnfragen(klient, still, aufforderung, fertig) {
+  var erledigt = false;
+  var uhr = null;
+  var abschliessen = function (gut) {
+    if (erledigt) { return; }
+    erledigt = true;
+    if (uhr) { window.clearTimeout(uhr); }
+    fertig(gut);
+  };
+  klient.callback = function (antwort) {
+    if (antwort && antwort.access_token) {
+      swTokenMerken(antwort.access_token, Number(antwort.expires_in) || 3600);
+      abschliessen(true);
+    } else {
+      abschliessen(false);
+    }
+  };
+  klient.error_callback = function () { abschliessen(false); };
+  uhr = window.setTimeout(function () { abschliessen(false); }, still ? 12000 : 120000);
+  try {
+    klient.requestAccessToken({ prompt: aufforderung || '' });
+  } catch (e) {
+    abschliessen(false);
+  }
+}
+
+function swAnmeldeVersuch(still, aufforderung) {
+  return swKlientVorbereiten().then(function (klient) {
+    return new Promise(function (fertig) {
+      swAnmeldeAnfragen(klient, still, aufforderung, fertig);
+    });
+  }).catch(function () { return false; });
+}
+
+function swAnmelden(still) {
+  return swAnmeldeVersuch(still, '').then(function (gut) {
+    if (gut || still) { return gut; }
+    return swAnmeldeVersuch(false, 'consent');
+  });
+}
+
+function swAbmelden() {
+  swTokenVergessen();
+  swDateiId = '';
+  try { window.localStorage.removeItem(SW_ANMELDE_MERKER); } catch (e) { /* egal */ }
+  swZustand = 'aus';
+  swText = '';
+  zeichne();
+}
+
+function swAnmeldenVonHand() {
+  swAnmelden(false).then(function (gut) {
+    if (!gut) { melde('Die Anmeldung bei Google hat nicht geklappt.', 'warn'); zeichne(); return; }
+    swAbgleichen(true);
+  });
+}
+
+/* ---------- Drive ---------- */
+
+function swKopf(zusatz) {
+  var k = { 'Authorization': 'Bearer ' + swToken };
+  if (zusatz) {
+    Object.keys(zusatz).forEach(function (n) { k[n] = zusatz[n]; });
+  }
+  return k;
+}
+
+function swAntwortPruefen(a) {
+  if (a.ok) { return a; }
+  if (a.status === 401) {
+    swTokenVergessen();
+    throw new Error('Der Zugriff ist abgelaufen. Bitte neu anmelden.');
+  }
+  return a.text().then(function (t) {
+    if (a.status === 403 && /has not been used|is disabled|SERVICE_DISABLED/i.test(t)) {
+      throw new Error('Drive ist im Google-Projekt noch nicht freigeschaltet.\n'
+        + 'Cloud Console öffnen, Projekt wählen, unter „APIs & Dienste – Bibliothek“ '
+        + 'die Drive-Schnittstelle aktivieren und ein bis zwei Minuten warten.');
+    }
+    if (a.status === 403) {
+      throw new Error('Drive verweigert den Zugriff (403).\n' + t.slice(0, 200));
+    }
+    throw new Error('Drive antwortete mit ' + a.status + ': ' + t.slice(0, 200));
+  });
+}
+
+function swSuchen() {
+  var url = 'https://www.googleapis.com/drive/v3/files'
+          + '?q=' + encodeURIComponent("name='" + SW_DATEI + "' and trashed=false")
+          + '&fields=' + encodeURIComponent('files(id,name,modifiedTime)')
+          + '&pageSize=10';
+  return window.fetch(url, { headers: swKopf() })
+    .then(swAntwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) {
+      var liste = (d && d.files) ? d.files : [];
+      if (!liste.length) { return null; }
+      swDateiId = liste[0].id;
+      swStand = liste[0].modifiedTime || '';
+      return liste[0];
+    });
+}
+
+function swAnlegen() {
+  return window.fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: swKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name: SW_DATEI, mimeType: 'application/json' })
+  }).then(swAntwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) { swDateiId = d.id; return d.id; });
+}
+
+function swHochladen() {
+  var text = sdAlsText();
+  var los = swDateiId ? Promise.resolve(swDateiId)
+                      : swSuchen().then(function (t) { return t ? t.id : swAnlegen(); });
+  return los.then(function (id) {
+    return window.fetch('https://www.googleapis.com/upload/drive/v3/files/' + id
+                        + '?uploadType=media&fields=id,modifiedTime', {
+      method: 'PATCH',
+      headers: swKopf({ 'Content-Type': 'application/json' }),
+      body: text
+    });
+  }).then(swAntwortPruefen)
+    .then(function (a) { return a.json(); })
+    .then(function (d) { swStand = d.modifiedTime || ''; return true; });
+}
+
+function swHerunterladen() {
+  var los = swDateiId ? Promise.resolve(swDateiId)
+                      : swSuchen().then(function (t) { return t ? t.id : null; });
+  return los.then(function (id) {
+    if (!id) { return null; }
+    return window.fetch('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media', {
+      headers: swKopf()
+    }).then(swAntwortPruefen).then(function (a) { return a.text(); });
+  });
+}
+
+/* ---------- Abgleich ---------- */
+
+/* Holen, zusammenführen, zurückschreiben. Hochgeladen wird nur, wenn der
+   Abgleich wirklich etwas geändert hat — sonst wäre jede Sitzung eine
+   Schreiboperation und jeder Takt ein Risiko. */
+function swAbgleichen(vonHand) {
+  if (swLaeuft) { return Promise.resolve(false); }
+  if (!swTokenGueltig()) {
+    if (vonHand) { melde('Nicht bei Google angemeldet.', 'warn'); }
+    return Promise.resolve(false);
+  }
+  swLaeuft = true;
+  swZustand = 'laeuft';
+  swLetzter = Date.now();
+  swZeileNachziehen();
+
+  return swHerunterladen().then(function (text) {
+    if (text === null) {
+      /* Es gibt noch keine Datei in Drive — dann ist der lokale Stand der
+         erste, und er wird angelegt. */
+      return swHochladen().then(function () { return { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0 }; });
+    }
+    var fremd = sdAusText(text);
+    if (!fremd) { throw new Error('Die Datei in Drive ist nicht lesbar.'); }
+    var vorher = sdAlsText();
+    var e = sdZusammenfuehren(DB, fremd);
+    DB = e.db;
+    var nachher = sdAlsText();
+    if (nachher !== vorher) {
+      sdSichernOhneHaken();
+      zeichne();
+    }
+    if (nachher !== text) { return swHochladen().then(function () { return e.bericht; }); }
+    return e.bericht;
+  }).then(function (bericht) {
+    swLaeuft = false;
+    swZustand = 'an';
+    swText = sdUhrzeit();
+    swZeileNachziehen();
+    if (vonHand) {
+      melde('Abgeglichen: ' + bericht.neu + ' neu · ' + bericht.ersetzt + ' ersetzt · '
+        + bericht.behalten + ' behalten · ' + bericht.entfernt + ' entfernt', 'gut');
+    }
+    return true;
+  }).catch(function (f) {
+    swLaeuft = false;
+    swZustand = 'fehler';
+    swText = (f && f.message) ? f.message : 'unbekannt';
+    swZeileNachziehen();
+    if (vonHand) { melde('Abgleich: ' + swText, 'warn'); }
+    return false;
+  });
+}
+
+function swSpaeterAbgleichen() {
+  if (swUhr) { window.clearTimeout(swUhr); }
+  swUhr = window.setTimeout(function () {
+    swUhr = null;
+    if (Date.now() - swLetzter < SW_MINDEST) {
+      swUhr = window.setTimeout(function () { swUhr = null; swAbgleichen(false); },
+        SW_MINDEST - (Date.now() - swLetzter));
+      return;
+    }
+    swAbgleichen(false);
+  }, SW_VERZUG);
+}
+
+function swZeileNachziehen() {
+  if (sd.sicht === 'fach' || sdIstSchmal()) { sdFlaecheZeichnen(); } else { sdMappeZeichnen(); }
+}
+
+/* ---------- Die Zeile in der Ablage ---------- */
+
+function swZeile() {
+  if (!swTokenGueltig()) {
+    return '<br>Drive: nicht angemeldet'
+      + ' · <button type="button" onclick="swAnmeldenVonHand()">Anmelden</button>';
+  }
+  var wo = 'Drive: angemeldet';
+  if (swZustand === 'laeuft') { wo = 'Drive: gleicht ab …'; }
+  else if (swZustand === 'fehler') { wo = 'Drive: ' + esc(swText); }
+  else if (swText) { wo = 'Drive: abgeglichen ' + esc(swText); }
+  return '<br>' + wo
+    + ' · <button type="button" onclick="swAbgleichen(true)">Jetzt abgleichen</button>'
+    + ' · <button type="button" onclick="swAbmelden()">Abmelden</button>';
+}
+
+/* ---------- Einhängen ---------- */
+
+sdHaken.ablageZeile = swZeile;
+
+sdHaken.nachSichern = function () { swSpaeterAbgleichen(); };
+
+sdHaken.beimStart = function () {
+  var warAngemeldet = false;
+  try { warAngemeldet = window.localStorage.getItem(SW_ANMELDE_MERKER) === '1'; } catch (e) { /* egal */ }
+  if (swTokenHolen()) {
+    swErneuerungPlanen();
+    swAbgleichen(false);
+  } else if (warAngemeldet) {
+    /* Still versuchen. Klappt es nicht, steht „nicht angemeldet“ in der
+       Ablagezeile — ohne Fenster, ohne Meldung, ohne Reibung. */
+    swAnmelden(true).then(function (gut) {
+      if (gut) { swAbgleichen(false); } else { zeichne(); }
+    });
+  }
+  if (swTaktUhr) { window.clearInterval(swTaktUhr); }
+  swTaktUhr = window.setInterval(function () {
+    if (document.hidden) { return; }
+    swErneuerungPruefen();
+    if (!swLaeuft && swTokenGueltig() && Date.now() - swLetzter >= SW_TAKT) {
+      swAbgleichen(false);
+    }
+  }, SW_TAKT);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { return; }
+    swErneuerungPruefen();
+    if (swTokenGueltig()) { swAbgleichen(false); }
+  });
+};
+
+
+/* ============================================================
+   sd_pwa.js — Installierbar machen, nur in der privaten Fassung
+
+   Die berufliche Fassung ist eine Datei auf dem Rechner. Dort gibt es
+   keinen Ursprung, von dem ein Service Worker laden könnte, und nichts
+   zu puffern: Die Datei IST schon offline. Deshalb enthält sie dieses
+   Stück nicht.
+
+   Für das Fenster ohne Adresszeile braucht es auf dem Arbeitsrechner
+   keine PWA — eine Verknüpfung genügt:
+     msedge --app="file:///C:/Pfad/schreibtisch-beruf.html"
+   ============================================================ */
+
+'use strict';
+
+var SP_DATEI = './sw-schreibtisch.js';
+var spWartend = null;
+
+function spMoeglich() {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker) { return false; }
+  if (sdImRahmen()) { return false; }
+  var p = window.location.protocol;
+  return p === 'https:' || p === 'http:';
+}
+
+/* Eine wartende Fassung drängt sich nicht auf. Sie sagt Bescheid und
+   wartet, bis man sie holt — mitten in einer Eingabe neu zu laden wäre
+   genau der falsche Moment. */
+function spHinweisZeigen() {
+  var el = document.getElementById('meldung');
+  if (!el) { return; }
+  el.innerHTML = '<span class="wort">Eine neue Fassung liegt bereit.</span>'
+    + '<button type="button" class="jetzt" onclick="spJetztLaden()">Jetzt laden</button>'
+    + '<button type="button" class="zu" onclick="sdMeldungZu()" aria-label="Später">&#215;</button>';
+  el.className = 'meldung neu';
+  el.hidden = false;
+}
+
+function spJetztLaden() {
+  if (spWartend) { spWartend.postMessage('sofort-uebernehmen'); }
+  window.setTimeout(function () { window.location.reload(); }, 300);
+}
+
+function spAnmelden() {
+  if (!spMoeglich()) { return; }
+  navigator.serviceWorker.register(SP_DATEI).then(function (anmeldung) {
+    if (anmeldung.waiting) { spWartend = anmeldung.waiting; spHinweisZeigen(); }
+    anmeldung.addEventListener('updatefound', function () {
+      var frisch = anmeldung.installing;
+      if (!frisch) { return; }
+      frisch.addEventListener('statechange', function () {
+        if (frisch.state === 'installed' && navigator.serviceWorker.controller) {
+          spWartend = frisch;
+          spHinweisZeigen();
+        }
+      });
+    });
+  }).catch(function () {
+    /* Kein Service Worker, kein Drama: Die App läuft auch ohne ihn,
+       nur eben nicht offline. */
+    return null;
+  });
+}
+
+/* Hängt sich hinter den Haken, den sd_wolke.js schon gesetzt hat,
+   statt ihn zu überschreiben — sonst verlöre die private Fassung
+   ihren Abgleich beim Start. */
+(function () {
+  var vorher = sdHaken.beimStart;
+  sdHaken.beimStart = function () {
+    if (vorher) { vorher(); }
+    spAnmelden();
+  };
+}());
+
+</script>
+</body>
+</html>
