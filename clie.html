@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.123.0</title>
+<title>CLIE 0.124.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -1310,7 +1310,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.123.0';
+var APP_VERSION = '0.124.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1747,6 +1747,8 @@ function zusammenfuehren(lokal, fremd) {
     }
     ergebnis.einstellungen[e] = juenger[e];
   }
+  clFremdfelderUebernehmen(lokal, ergebnis);
+  clFremdfelderUebernehmen(fremd, ergebnis);
   ergebnis.einstellungen.clientId = CLIENT_ID;
   ergebnis.einstellungen.redirectUri = REDIRECT_URI;
   ergebnis.version = APP_VERSION;
@@ -1795,6 +1797,8 @@ function uebernehmen(text) {
   if (Array.isArray(gelesen.grabsteine)) { frisch.grabsteine = gelesen.grabsteine; }
   frisch.einstellungen.clientId    = CLIENT_ID;
   frisch.einstellungen.redirectUri = REDIRECT_URI;
+  /* Was diese Fassung nicht kennt, bleibt unangetastet erhalten (0.124.0) */
+  clFremdfelderUebernehmen(gelesen, frisch);
   bestandStempeln(frisch);
   DB = frisch;
   return true;
@@ -2155,6 +2159,8 @@ function textZuBestand(text) {
       }
     }
   }
+  /* Was diese Fassung nicht kennt, bleibt unangetastet erhalten (0.124.0) */
+  clFremdfelderUebernehmen(gelesen, frisch);
   bestandStempeln(frisch);
   return frisch;
 }
@@ -3856,15 +3862,16 @@ function clKategorienUmstellen() {
   /* Die Kategorie Privat anlegen, aber nicht als Umstellung zählen (0.103.2) */
   clPrivatKategorie();
   var um = function (o) {
-    if (o && o.kontext === 'beruflich' && !o.bereich) { o.bereich = CL_ARBEIT; o.geaendert = jetzt(); n++; }
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+    if (o && o.kontext === 'beruflich' && !o.bereich) { o.bereich = CL_ARBEIT; n++; }
   };
   ['themen', 'gedanken', 'projekte', 'sammlungen', 'aufgaben'].forEach(function (s) {
     (Array.isArray(DB[s]) ? DB[s] : []).forEach(um);
   });
   (Array.isArray(DB.jahrestermine) ? DB.jahrestermine : []).forEach(function (e) {
-    if (e && !e.bereich && jtKontext(e) === 'beruflich') { e.bereich = CL_ARBEIT; e.geaendert = jetzt(); n++; }
+    if (e && !e.bereich && jtKontext(e) === 'beruflich') { e.bereich = CL_ARBEIT; n++; }
   });
-  if (n) { spaeterSichern(); }
+  if (n) { spaeterSichern(true); }
   return n;
 }
 
@@ -4547,7 +4554,10 @@ function abgleichHtml() {
      + (neueVersion ? '<button type="button" class="knopf voll" onclick="neuLaden()">Jetzt laden</button>' : '')
      + '</div><div class="knoepfe">'
      + (fsApiDa() ? '<button type="button" class="knopf" onclick="dateiWaehlen()">Datei öffnen …</button>' : '')
-     + '<button type="button" class="knopf" onclick="sicherungLaden()">Sicherung</button></div>'
+     + '<button type="button" class="knopf" onclick="sicherungLaden()">Sicherung</button>'
+     + (an ? '<button type="button" class="knopf" onclick="clVomServerAuf()">Vom Server holen …</button>' : '')
+     + (clBremseStand ? '<button type="button" class="knopf" onclick="clBremseLoesen()">Trotzdem hochladen</button>' : '')
+     + '</div>'
      + '<p class="leise">CLIE arbeitet auf ' + esc(DATEINAME) + ' — derselben Datei wie die Workbench. Abgeglichen wird von selbst, '
      + 'bei jeder Änderung, beim Zurückkehren und alle 30 Sekunden. Die Termine kommen alle 2 Minuten neu.</p>';
   return h;
@@ -4867,6 +4877,8 @@ function aufklappZeichnen() {
   if (ktAufklapp(el)) { return; }
   /* Seit 0.123.0: Fenster von Casestudies */
   if (csAufklapp(el)) { return; }
+  /* Seit 0.124.0: der Weg zurück nach einer Wiederherstellung */
+  if (clVomServerAufklapp(el)) { return; }
   /* Seit 0.120.0: die Textgröße */
   if (cl.aufklapp === 'text') {
     el.innerHTML = clTextWahlHtml();
@@ -25632,10 +25644,35 @@ function ungesichertLesen() {
   } catch (e) { return true; }
 }
 
-function spaeterSichern() {
+/* „aufraeumen“ setzt die Markierung für ungesicherte Benutzeränderungen
+   nicht. Diese Markierung schaltet im Abgleich den sicheren Zweig ab, in
+   dem der Server ganz gilt — und genau den braucht ein Gerät, das lange
+   stand. Bis 0.123.0 setzte jeder Aufräumer sie beim Start und schaltete
+   damit den Schutz dort ab, wo er gebraucht wurde (0.124.0). */
+/* ---- Erst abgleichen, dann aufräumen (seit 0.124.0) ----
+   Die Aufräumer leiten Werte aus dem vorhandenen Stand ab: Welche Liste zu
+   einer Aufgabe gehört, welchen Status der Memo-Text vorgibt, welche
+   Kategorie überwiegt. Auf einem veralteten Stand leiten sie Falsches ab.
+   Bis 0.123.0 liefen sie beim Start vor dem ersten Abgleich — ein Gerät,
+   das zwei Wochen stand, hat damit seinen alten Stand „korrigiert“ und
+   anschließend hochgeladen. Jetzt laufen sie, wenn der Serverstand da ist. */
+var clNachgepflegt = false;
+
+function clNachpflegen(grund) {
+  clNachgepflegt = true;
+  ckKorb(false);   /* benennt einen alten „Korb“ in „Sammler“ um (0.62) */
+  clKategorienUmstellen();   /* Beruf → Kategorie Arbeit (0.67) */
+  try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
+  try { upNachziehen(); } catch (e) { clFehlerZeigen(e, 'upNachziehen'); }   /* Umprogrammierung aus 0.107 in ein Programm (0.108.0) */
+  try { gwNachziehen(); } catch (e) { clFehlerZeigen(e, 'gwNachziehen'); }   /* Gewohnheiten: Wenn-dann zu Titel und Beschreibung (0.108.1) */
+  ckWecken();
+  return grund;
+}
+
+function spaeterSichern(aufraeumen) {
   if (speicherUhr) { window.clearTimeout(speicherUhr); }
   lokalOffen = true;
-  ungesichertSetzen(true);
+  if (!aufraeumen) { ungesichertSetzen(true); }
   sichernZaehler++;
   speicherUhr = window.setTimeout(function () {
     speicherUhr = null;
@@ -25663,12 +25700,19 @@ function abgleichStill() {
     else { abgleichPlanen(false); }
     /* Erst prüfen, was der Abgleich geändert hat, dann nachpflegen (0.104.3) */
     clAbgleichNachher(vorher);
-    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); pmNachpflegen(); }
+    if (b && (b.neu || b.ersetzt || b.entfernt)) { melde('Abgeglichen: ' + berichtText(b), 'gut'); }
+    /* Jetzt steht der Serverstand — erst hier darf aufgeräumt werden (0.124.0) */
+    if (!clNachgepflegt) { clNachpflegen('nach dem ersten Abgleich'); }
+    else if (b && (b.neu || b.ersetzt || b.entfernt)) { pmNachpflegen(); }
     abgleichLaeuft = false;
     zeichne();
   }).catch(function (f) {
     abgleichFehler = f ? f.message : 'unbekannter Fehler';
     clDriveKennungVerwerfen(f);
+    /* Kein Serverstand zu bekommen: dann wenigstens einmal aufräumen, damit
+       ein Gerät ohne Netz nicht auf alten Formaten sitzen bleibt. Gefährlich
+       ist das nicht mehr — Aufräumen stempelt seit 0.124.0 nicht. */
+    if (!clNachgepflegt) { clNachpflegen('Abgleich fehlgeschlagen'); }
     abgleichLaeuft = false;
     zeichne();
   });
@@ -25715,9 +25759,23 @@ function abgleichen(versuch) {
     /* Seit 0.97.12: ein Serverstand, der nicht lesbar ist, wird nie überschrieben */
     if (text && !fremd) { throw new Error('Der Stand auf dem Server ist nicht lesbar. Es wurde nichts hochgeladen.'); }
     if (!fremd) {
+      /* Seit 0.124.0: Kein lesbarer Serverstand heißt nicht „der Server ist
+         leer“. Wer dort schon einmal eine Datei hatte, lädt jetzt nichts
+         hoch — sonst ersetzt ein Gerät den ganzen Server durch seinen
+         eigenen Stand, bloß weil die Suche nichts fand. Angelegt wird nur
+         beim allerersten Mal, wenn hier auch nichts liegt. */
+      if (clSchonAbgeglichen()) {
+        throw new Error('Auf dem Server war die Datei nicht zu finden. Es wurde nichts hochgeladen.\n'
+          + 'Bitte die Verbindung prüfen und erneut abgleichen.');
+      }
+      if (clBestandZahl(DB) > 0) {
+        throw new Error('Auf dem Server liegt noch nichts, hier aber ' + clBestandZahl(DB) + ' Einträge.\n'
+          + 'Zum erstmaligen Anlegen bitte einmal von Hand abgleichen.');
+      }
       letzterBericht = { neu: 0, ersetzt: 0, behalten: 0, entfernt: 0, konflikte: [] };
       return null;
     }
+    clAbgeglichenMerken();
     if (!ungesichertLesen()) {
       /* Keine ungesicherten Änderungen: der Server gilt ganz, ein älteres Gerät lädt nichts hoch */
       DB = fremd;
@@ -25725,6 +25783,18 @@ function abgleichen(versuch) {
       return speichern();
     }
     var ergebnis = zusammenfuehren(DB, fremd);
+    /* Seit 0.124.0 die Bremse: Würde dieses Gerät auffällig viele Einträge
+       auf dem Server überschreiben, wird gefragt statt geschrieben. Geprüft
+       wird vor dem Zuweisen — schlägt die Bremse an, bleibt alles, wie es ist. */
+    var lokalZahl = ergebnis.bericht.konflikte.filter(function (k) { return k.gewaehlt === 'lokal'; }).length;
+    if (!clBremseAus && lokalZahl >= CL_BREMSE_AB) {
+      clBremseStand = lokalZahl;
+      throw new Error('Dieses Gerät würde ' + lokalZahl + ' Einträge auf dem Server überschreiben.\n'
+        + 'Das sieht nach einem veralteten Stand aus. Nichts wurde hochgeladen.\n'
+        + 'Auf der Abgleich-Seite kannst du den Serverstand holen oder trotzdem hochladen.');
+    }
+    clBremseAus = false;
+    clBremseStand = 0;
     DB = ergebnis.db;
     letzterBericht = ergebnis.bericht;
     return speichern();
@@ -25758,9 +25828,8 @@ function rueckkehrPruefen() {
   erneuerungPruefen();
   if (document.hidden) { return; }
   versionPruefen(false);
-  clKategorienUmstellen();
-  pmNachpflegen();
-  ckWecken();
+  /* Aufräumen erst, wenn der Serverstand da ist (0.124.0) */
+  if (!tokenGueltig() && !clNachgepflegt) { clNachpflegen('Rückkehr ohne Anmeldung'); }
   zeichne();
   /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
   try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
@@ -26136,12 +26205,9 @@ function start() {
     /* Lernkartei aus 0.23 (nur auf diesem Gerät) einmalig in die Datenbank */
     var lkAlt = lkAltUebernehmen();
     if (lkAlt) { melde('Lernkartei: ' + lkAlt + (lkAlt === 1 ? ' Kasten' : ' Kästen') + ' in die workbench.json übernommen.', 'gut'); }
-    ckKorb(false);   /* benennt einen alten „Korb“ in „Sammler“ um (0.62) */
-    clKategorienUmstellen();   /* Beruf → Kategorie Arbeit (0.67) */
-    try { pmNachpflegen(); } catch (e) { clFehlerZeigen(e, 'pmNachpflegen'); }   /* Palm-Modell: was die Workbench alt anlegt (0.80) */
-    try { upNachziehen(); } catch (e) { clFehlerZeigen(e, 'upNachziehen'); }   /* Umprogrammierung aus 0.107 in ein Programm (0.108.0) */
-    try { gwNachziehen(); } catch (e) { clFehlerZeigen(e, 'gwNachziehen'); }   /* Gewohnheiten: Wenn-dann zu Titel und Beschreibung (0.108.1) */
-    ckWecken();
+    /* Seit 0.124.0 wird erst abgeglichen und dann aufgeräumt — siehe
+       clNachpflegen. Ohne Anmeldung kommt kein Serverstand, dann jetzt. */
+    if (!tokenGueltig()) { clNachpflegen('ohne Anmeldung'); }
     zeichne();
     /* Die Umprogrammierung zuerst — sie braucht keine Termine (0.107.0) */
     try { upPruefen(); } catch (e) { clFehlerZeigen(e, 'upPruefen'); }
@@ -27713,6 +27779,135 @@ function csAufklapp(el) {
   return false;
 }
 
+/* ---------- Vom Server holen (seit 0.124.0) ----------
+   Der Weg zurück, wenn eine Fassung auf dem Server wiederhergestellt wurde.
+   Das gewöhnliche Abgleichen hilft dort nicht: Es vergleicht Stempel, und
+   falsche Werte, die einmal mit „jetzt“ gestempelt wurden, gewinnen gegen
+   eine ältere, richtige Fassung. Dieser Weg vergleicht nicht — er verwirft
+   den lokalen Stand und nimmt den Server, wie er ist.
+
+   Damit nichts still verschwindet, wird vorher eine Sicherung des lokalen
+   Standes angeboten, und die Rückfrage benennt, was auf dem Spiel steht. */
+
+function clVomServerAuf() {
+  if (!tokenGueltig()) { melde('Dafür musst du angemeldet sein.', 'warn'); return; }
+  cl.aufklapp = 'vomserver';
+  aufklappZeichnen();
+}
+
+function clVomServerHtml() {
+  var zahl = 0;
+  SAMMLUNGEN.forEach(function (s) {
+    if (s === 'kalenderzuordnung') { zahl += Object.keys(DB[s] || {}).length; }
+    else { zahl += (Array.isArray(DB[s]) ? DB[s] : []).length; }
+  });
+  return '<div class="fenster"><div class="titel">Vom Server holen</div><div class="rumpf">'
+    + '<p>Der Stand auf dem Server ersetzt den Stand auf diesem Gerät — <b>ohne Abgleich</b>, '
+    + 'ohne Vergleich der Änderungsstempel. Was hier liegt und dort nicht, ist danach weg.</p>'
+    + '<p class="leise">Auf diesem Gerät liegen gerade ' + zahl + ' Einträge. '
+    + (lokalOffen ? 'Es gibt ungesicherte Änderungen.' : 'Es gibt keine ungesicherten Änderungen.') + '</p>'
+    + '<div class="knoepfe"><button type="button" class="knopf" onclick="sicherungLaden()">Erst sichern</button></div>'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="clVomServerJetzt()">Server übernehmen</button>'
+    + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div>'
+    + '</div></div>';
+}
+
+function clVomServerJetzt() {
+  aufklappZu();
+  melde('Hole den Stand vom Server …', null);
+  driveHerunterladen().then(function (text) {
+    if (!text) { throw new Error('Auf dem Server war nichts zu lesen. Es wurde nichts geändert.'); }
+    var fremd = textZuBestand(text);
+    if (!fremd) { throw new Error('Der Stand auf dem Server ist nicht lesbar. Es wurde nichts geändert.'); }
+    DB = fremd;
+    /* Der Server gilt jetzt ganz: keine ungesicherten Änderungen mehr, und
+       das Aufräumen darf wieder laufen — auf einem aktuellen Stand. */
+    ungesichertSetzen(false);
+    lokalOffen = false;
+    clNachgepflegt = false;
+    return speichern();
+  }).then(function () {
+    clNachpflegen('nach „Vom Server holen“');
+    melde('Der Stand vom Server ist übernommen.', 'gut');
+    zeichne();
+  }).catch(function (f) {
+    melde(f ? f.message : 'Das hat nicht geklappt.', 'warn');
+    zeichne();
+  });
+}
+
+function clVomServerAufklapp(el) {
+  if (cl.aufklapp !== 'vomserver') { return false; }
+  el.innerHTML = clVomServerHtml();
+  return true;
+}
+
+/* ---------- Fremdfelder (seit 0.124.0) ----------
+   Eine ältere CLIE kennt die Sammlungen einer neueren nicht. Bis 0.123.0
+   übernahmen uebernehmen, textZuBestand und zusammenfuehren nur, was in
+   SAMMLUNGEN der laufenden Fassung steht — alles andere fiel beim nächsten
+   Schreiben aus der Datei. Ein Gerät mit CLIE 0.119 hat damit „casestudies“
+   gelöscht, einfach weil es das Wort nicht kannte.
+
+   Ein Gerät darf nicht löschen, was es nur nicht versteht. Darum werden
+   unbekannte Felder unverändert mitgeführt. Steht ein Feld auf beiden
+   Seiten, gilt dieselbe Regel wie sonst: der Server. */
+
+var CL_EIGENE_FELDER = ['version', 'einstellungen', 'grabsteine'];
+
+function clFremdfelderUebernehmen(quelle, ziel) {
+  if (!quelle || typeof quelle !== 'object' || !ziel) { return 0; }
+  var n = 0;
+  var k;
+  for (k in quelle) {
+    if (!Object.prototype.hasOwnProperty.call(quelle, k)) { continue; }
+    if (SAMMLUNGEN.indexOf(k) >= 0 || CL_EIGENE_FELDER.indexOf(k) >= 0) { continue; }
+    var w = quelle[k];
+    if (w === null || typeof w !== 'object') { continue; }
+    ziel[k] = w;
+    n++;
+  }
+  return n;
+}
+
+/* ---------- Bremse und Erstanlage (seit 0.124.0) ----------
+   Zwei Fragen, die der Abgleich vorher nicht gestellt hat: Hat dieses Gerät
+   hier schon einmal erfolgreich abgeglichen? Und: Wie viel will es gerade
+   überschreiben? Ohne die erste Frage hält CLIE „nichts gefunden“ für
+   „Server ist leer“ und ersetzt ihn durch den eigenen Stand. Ohne die
+   zweite merkt niemand, wenn ein veraltetes Gerät alles überschreibt. */
+
+var CL_ABGEGLICHEN_KEY = 'clie-abgeglichen';
+var CL_BREMSE_AB = 20;
+var clBremseAus = false;
+var clBremseStand = 0;
+
+function clSchonAbgeglichen() {
+  try { return window.localStorage.getItem(CL_ABGEGLICHEN_KEY) === '1'; } catch (e) { return false; }
+}
+
+function clAbgeglichenMerken() {
+  try { window.localStorage.setItem(CL_ABGEGLICHEN_KEY, '1'); } catch (e) { /* nur für jetzt */ }
+}
+
+/* Wie viele Einträge liegen hier? Zählt dasselbe wie der Abgleich. */
+function clBestandZahl(db) {
+  var n = 0;
+  SAMMLUNGEN.forEach(function (s) {
+    if (s === 'kalenderzuordnung') { n += Object.keys((db && db[s]) || {}).length; }
+    else { n += (db && Array.isArray(db[s]) ? db[s] : []).length; }
+  });
+  return n;
+}
+
+/* „Trotzdem hochladen“ — gilt für genau einen Lauf. */
+function clBremseLoesen() {
+  clBremseAus = true;
+  melde('Der nächste Abgleich lädt hoch, auch wenn er viel überschreibt.', null);
+  abgleichPlanen(true);
+  zeichne();
+}
+
 /* ---------- Schachschule: Inhalte (seit 0.22) ----------
 
    Kapitel → Lektionen → Schritte (Erklärung am Brett) und Aufgaben.
@@ -28478,7 +28673,7 @@ function pmListenNachziehen() {
     }
     if (!ziel) { ckKorb(true); ziel = CK_KORB_ID; }
     a.themaId = ziel;
-    a.geaendert = jetzt();
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
     n++;
   });
   return n;
@@ -28504,7 +28699,8 @@ function pmNotizenAufraeumen() {
   var ids = Object.keys(weg);
   if (!ids.length) { return 0; }
   (DB.aufgaben || []).forEach(function (a) {
-    if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+    if (a && a.memo && weg[a.memo.id]) { delete a.memo; }
   });
   DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
   ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
@@ -28552,7 +28748,7 @@ function pmListenKatNachziehen() {
     if (!best || !kgName(best)) { return; }
     t.bereich = best;
     t.kontext = clIstArbeit(best) ? 'beruflich' : 'privat';
-    t.geaendert = jetzt();
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
     n++;
   });
   return n;
@@ -28637,7 +28833,8 @@ function mpArtenAufraeumen() {
   var ids = Object.keys(weg);
   if (ids.length) {
     (DB.aufgaben || []).forEach(function (a) {
-      if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+      /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+      if (a && a.memo && weg[a.memo.id]) { delete a.memo; }
     });
     DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
     ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
@@ -28651,7 +28848,7 @@ function mpArtenAufraeumen() {
     delete g.art;
     var t = mpTypZeile(g.text, 'Checkliste');
     if (t !== null) { g.text = t; }
-    g.geaendert = jetzt();
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
     n++;
   });
   /* 3. Projekte und Ziele bekommen ihre Typ-Zeile */
@@ -28660,7 +28857,7 @@ function mpArtenAufraeumen() {
       var t = x ? mpTypZeile(x.flaeche, p[1]) : null;
       if (t === null || !x) { return; }
       x.flaeche = t;
-      x.geaendert = jetzt();
+      /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
       n++;
     });
   });
@@ -31143,7 +31340,8 @@ function pmUmstellenKern(echt) {
       var plan = pmEingeplant(s, z.mid ? z.voll : z.a.text);
       if (z.mid) {
         var da = pmAufgabeZurMarke(z.mid);
-        if (echt && da && plan.datum && !da.wiederholung) { da.planung = plan.datum; if (plan.zeit) { da.uhrzeit = plan.zeit; } da.geaendert = jetzt(); }
+        /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+        if (echt && da && plan.datum && !da.wiederholung) { da.planung = plan.datum; if (plan.zeit) { da.uhrzeit = plan.zeit; } }
         if (plan.fund.length) { n.memo++; if (echt) { pmAusplanen(plan.fund); } }
         return;
       }
@@ -31217,15 +31415,18 @@ function pmMarkenPruefen() {
     if (a.memo.zeile === undefined) { if (pmMarkeWiederfinden(pmMemoVon(a), a) >= 0) { n++; } return; }
     if (!a.memo.zeile) { return; }
     var s = pmMemoVon(a);
-    if (!s) { delete a.memo; a.geaendert = jetzt(); n++; return; }
+    if (!s) { delete a.memo; n++; return; }
     var nr = pmZeileMitMarke(s, a.memo.zeile);
     if (nr < 0) { nr = pmMarkeWiederfinden(s, a); }
-    if (nr < 0) { delete a.memo.zeile; a.geaendert = jetzt(); n++; return; }
+    if (nr < 0) { delete a.memo.zeile; n++; return; }
     var k = kpAufgabe(String(s.text || '').split('\n')[nr]);
     if (k && !a.wiederholung && k.erledigt !== (a.status === 'erledigt')) {
+      /* Diese Zeile hat am 13.11.2026 zwei Wochen Arbeit gekostet: Das Gerät
+         las seinen zwei Wochen alten Memo-Text, setzte den Status darauf
+         zurück und stempelte ihn mit jetzt — womit der alte Stand beim
+         Abgleich gewann. Abgeleitet wird weiterhin, gestempelt nicht. */
       a.status = k.erledigt ? 'erledigt' : 'offen';
       a.erledigtAm = k.erledigt ? (a.erledigtAm || isoDatum()) : null;
-      a.geaendert = jetzt();
       n++;
     }
   });
@@ -31279,7 +31480,7 @@ function pmNachpflegen() {
   var raus = pmNotizenAufraeumen();
   if (raus) { melde(raus + (raus === 1 ? ' Notiz' : ' Notizen') + ' aufgeräumt — die Aufgaben liegen in ihren Listen.', null); }
   z += raus;
-  if (z) { spaeterSichern(); }
+  if (z) { spaeterSichern(true); }
   return z;
 }
 
