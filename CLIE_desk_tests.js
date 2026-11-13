@@ -51,7 +51,7 @@ console.log('\nD-01  Code: Syntax, keine doppelten Funktionen, DIV-Balance');
 console.log('\nD-02  Version und Anmeldung im Raster');
 {
   const v = (SKRIPT.match(/var APP_VERSION = '([\d.]+)'/) || [])[1];
-  pruefe(v === '0.125.0', 'APP_VERSION 0.125.0');
+  pruefe(v === '0.125.1', 'APP_VERSION 0.125.1');
   pruefe(QUELLE.indexOf('<title>CLIE ' + v + '</title>') >= 0, 'Titel trägt die Version');
   pruefe(/\{ id: 'desk', name: 'Desk'/.test(SKRIPT), 'Desk steht in CL_APPS');
   pruefe(/\n  desk: '/.test(SKRIPT), 'Desk hat ein Symbol in CL_BILD');
@@ -95,6 +95,18 @@ const BESTAND = {
     { id: 'z1', name: 'Verein', reihe: 'zusammen', farbe: '#9B6BC9', ordnung: 0, link: 'https://example.sharepoint.com/verein', link_web: '', leiste: [{ id: 'zl', name: 'Projektseite', link: '', link_web: '', ordnung: 0 }], seiten: [] }
   ]
 };
+
+/* So liest Android einen intent:-Link (Intent.parseUri, URI_INTENT_SCHEME):
+   der letzte „#“ trennt den Intent-Teil ab, davor steht der Rest. */
+function androidDaten(href) {
+  const i = href.lastIndexOf('#');
+  if (i < 0 || href.indexOf('#Intent;', i) !== i) { return null; }
+  const teile = href.slice(i + 8).split(';');
+  const schema = (teile.find(x => x.indexOf('scheme=') === 0) || '').slice(7);
+  let daten = href.slice(0, i);
+  if (daten.indexOf('intent:') !== 0) { return null; }
+  return schema + ':' + daten.slice(7);
+}
 
 async function browserTests() {
   let browser;
@@ -178,10 +190,16 @@ async function browserTests() {
   pruefe(await p.$$eval('.sdk-auf', e => e.length) === 0, 'zweiter Tipp klappt wieder zu');
   await p.click('.sdk-fach:has-text("Haus")');
 
-  console.log('\nD-08  Pixel: die Web-Adresse zuerst, in neuem Fenster');
-  pruefe(await p.getAttribute('.sdk-auf a.knopf', 'href') === 'https://onedrive.live.com/edit?haus', '„Abschnitt öffnen“ nimmt am Pixel die Web-Adresse');
-  pruefe(await p.getAttribute('.sdk-auf a.knopf', 'target') === '_blank', 'https öffnet in neuem Fenster — CLIE bleibt stehen');
-  pruefe(/^onenote:/.test(await p.getAttribute('.sdk-auf a.sdk-seite:has-text("Carport")', 'href')), 'ohne Web-Adresse bleibt onenote:');
+  console.log('\nD-08  Pixel: in die OneNote-App, nicht in den Browser (Fehler in 0.125.0)');
+  const hA = await p.getAttribute('.sdk-auf a.knopf', 'href');
+  pruefe(/^intent:/.test(hA), '„Abschnitt öffnen“ geht am Pixel als Intent an die App');
+  pruefe(/#Intent;scheme=onenote;package=com\.microsoft\.office\.onenote;/.test(hA), 'Schema onenote, Paket der OneNote-App');
+  pruefe(androidDaten(hA) === BESTAND.faecher[1].link, 'Android setzt daraus genau den onenote:-Link zusammen');
+  pruefe(hA.indexOf('S.browser_fallback_url=' + encodeURIComponent('https://onedrive.live.com/edit?haus') + ';') > 0, 'die Web-Adresse ist der Ausweichweg');
+  pruefe(await p.getAttribute('.sdk-auf a.knopf', 'target') === null, 'ohne target — kein leerer Browser-Tab');
+  const hC = await p.getAttribute('.sdk-auf a.sdk-seite:has-text("Carport")', 'href');
+  pruefe(/^intent:/.test(hC) && hC.indexOf('browser_fallback_url') < 0, 'ohne Web-Adresse: Intent ohne Ausweichweg');
+  pruefe(androidDaten(hC) === 'onenote:https://x/Haus.one#Carport&page-id={S1}&end', 'auch mit Abschnittsmarke (#) im Link: ' + androidDaten(hC));
   await p.screenshot({ path: path.join(os.tmpdir(), 'desk-pixel.png') });
 
   console.log('\nD-09  Ohne Netz: der zuletzt geholte Stand');
@@ -190,6 +208,13 @@ async function browserTests() {
   await p.evaluate(() => { tokenGueltig = function () { return false; }; oeffne('desk'); });
   pruefe(await p.$$eval('.sdk-fach', e => e.length) === 3, 'nach Neuladen ohne Anmeldung: alle drei Fächer aus dem Zwischenstand');
   pruefe(/Stand \d\d:\d\d/.test(await p.textContent('#inhalt')), 'mit der Uhrzeit des Stands');
+  console.log('\nD-12  Pixel: Kennungen in Klammern, nur-Web bleibt Web');
+  const roh = await p.evaluate(() => sdkKlammern('onenote:https://x/A.one#S&section-id=0ABCDEF1-2345-6789-ABCD-EF0123456789&page-id={11111111-2222-3333-4444-555555555555}&end'));
+  pruefe(roh === 'onenote:https://x/A.one#S&section-id={0ABCDEF1-2345-6789-ABCD-EF0123456789}&page-id={11111111-2222-3333-4444-555555555555}&end', 'fehlende Klammern ergänzt, vorhandene nicht verdoppelt');
+  await p.click('.sdk-fach:has-text("Verein")');
+  pruefe(await p.getAttribute('.sdk-auf a.knopf', 'href') === 'https://example.sharepoint.com/verein' && await p.getAttribute('.sdk-auf a.knopf', 'target') === '_blank', 'nur eine Web-Adresse: bleibt https in neuem Fenster');
+  const ziele = await p.$$eval('a[href]', e => e.map(a => a.getAttribute('href')));
+  pruefe(ziele.every(h => /^(intent:|https:)/.test(h)), 'am Pixel keine nackten onenote:-Links mehr');
   await ctxA.close();
 
   /* --- PC --- */
