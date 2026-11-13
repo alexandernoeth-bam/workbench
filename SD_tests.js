@@ -1248,6 +1248,63 @@ console.log('\nSD-28  Zoom');
 }
 
 /* ============================================================
+   SD-29  Eine Seite ist ein einzelnes Blatt (seit 0.5.1)
+   Fehlerart: Seiten sahen aus wie kleine Stapel — und waren so nicht
+   von einem Fach zu unterscheiden. Der Stapel gehört dem Fach.
+   ============================================================ */
+console.log('\nSD-29  Seitensymbol: ein Blatt, kein Stapel');
+{
+  [['beruflich', QUELLE], ['privat', PRIVAT_QUELLE]].forEach(function (paar) {
+    const q = paar[1];
+    if (!q) { warn(paar[0] + ': Datei fehlt, übersprungen'); return; }
+    const sk = letztesSkript(q);
+    const blatt = (sk.match(/function sdBlattHtml[\s\S]*?\n\}/) || [''])[0];
+    pruefe((blatt.match(/s-blatt/g) || []).length === 1, paar[0] + ': sdBlattHtml zeichnet genau ein Blatt');
+    pruefe(blatt.indexOf('s-blatt unten') < 0, paar[0] + ': kein zweites Blatt darunter');
+    pruefe(/\.s-blatt::after\{/.test(q), paar[0] + ': das Blatt hat ein Eselsohr');
+    pruefe(!/\.s-blatt\.unten/.test(q), paar[0] + ': keine Regel mehr für ein unteres Blatt');
+  });
+  frisch();
+  pruefe(/class="lager"/.test(flaeche()), 'Fächer bleiben Stapel');
+}
+
+/* ============================================================
+   SD-30  Beruf und Privat teilen keinen Speicher (seit 0.5.1)
+   Fehlerart: Beide Fassungen liegen auf derselben Adresse. Bis 0.5.0
+   hießen Browserspeicher und Dateigriff gleich — die private Fassung
+   hätte berufliche Daten laden und nach Drive bringen können. Dazu hing
+   der Schlüssel an der Versionsnummer: jeder Versionswechsel ließ den
+   Zwischenstand verschwinden.
+   ============================================================ */
+console.log('\nSD-30  Getrennte Ablage je Fassung');
+{
+  function wert(q, name) {
+    const m = letztesSkript(q).match(new RegExp('var ' + name + " = '([^']*)'"));
+    return m ? m[1] : null;
+  }
+  const bLs = wert(QUELLE, 'SD_LS_KEY'), bIdb = wert(QUELLE, 'SD_IDB_NAME');
+  pruefe(!!bLs && !/SD_FASSUNG/.test((letztesSkript(QUELLE).match(/var SD_LS_KEY[^\n]*/) || [''])[0]),
+    'beruflich: Speicherschlüssel ohne Versionsnummer (' + bLs + ')');
+  pruefe(Array.isArray(SD.SD_LS_ALT) && SD.SD_LS_ALT.indexOf('schreibtisch-daten-0.5.0') >= 0,
+    'beruflich: übernimmt den alten gemeinsamen Zwischenstand');
+  SD.localStorage.removeItem(SD.SD_LS_KEY);
+  SD.localStorage.setItem('schreibtisch-daten-0.5.0', '{"x":1}');
+  pruefe(SD.sdAltLesen() === '{"x":1}', 'beruflich: der alte Stand wird gelesen');
+  pruefe(SD.localStorage.getItem('schreibtisch-daten-0.5.0') === '{"x":1}', 'und nicht gelöscht');
+  SD.localStorage.removeItem('schreibtisch-daten-0.5.0');
+  if (!PRIVAT_QUELLE) {
+    warn('private Fassung fehlt — Vergleich übersprungen');
+  } else {
+    const pLs = wert(PRIVAT_QUELLE, 'SD_LS_KEY'), pIdb = wert(PRIVAT_QUELLE, 'SD_IDB_NAME');
+    pruefe(!!pLs && pLs !== bLs, 'privat und beruflich haben verschiedene Speicherschlüssel (' + pLs + ' / ' + bLs + ')');
+    pruefe(!!pIdb && pIdb !== bIdb, 'und verschiedene Dateigriffe (' + pIdb + ' / ' + bIdb + ')');
+    pruefe(/var SD_LS_ALT = \[\];/.test(PRIVAT_QUELLE),
+      'privat übernimmt nichts aus dem alten gemeinsamen Speicher (könnte beruflich sein)');
+    pruefe(pLs.indexOf('0.5') < 0 && pIdb.indexOf('0.5') < 0, 'privat: keine Versionsnummer im Schlüssel');
+  }
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen');

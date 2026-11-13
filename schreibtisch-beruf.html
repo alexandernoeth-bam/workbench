@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<title>Schreibtisch 0.5.0 Beruf</title>
+<title>Schreibtisch 0.5.1 Beruf</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -155,7 +155,9 @@ body.b-weit .flaeche{padding:26px 22px}
   height:calc(36px * var(--z));border-radius:2px;
   transform:skewX(-27deg);transform-origin:0 100%;background:var(--papier);
   box-shadow:0 5px 9px rgba(0,0,0,.26)}
-.s-blatt.unten{top:calc(14px * var(--z));left:calc(2px * var(--z));background:#DFDBCD;box-shadow:none}
+/* Seit 0.5.1: eine Seite ist ein einzelnes Blatt mit Eselsohr — der Stapel gehört dem Fach. */
+.s-blatt::after{content:"";position:absolute;right:-1px;top:-1px;width:calc(14px * var(--z));height:calc(14px * var(--z));
+  background:linear-gradient(225deg,var(--tisch) 50%,#D9D5C8 50%);border-bottom-left-radius:2px}
 .seite .st{color:#E7EADF;font-size:14.5px;line-height:1.25}
 .seite.offen .s-blatt{top:calc(1px * var(--z));box-shadow:0 11px 16px rgba(0,0,0,.34)}
 .seite.offen .st{color:#FBFAF6;font-weight:600}
@@ -316,7 +318,7 @@ body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFA
    derselben Quelle und bekommt den Drive-Teil dazu.
    ============================================================ */
 
-var SD_FASSUNG = '0.5.0';
+var SD_FASSUNG = '0.5.1';
 var SD_VERSION = 'Beruf';
 var SD_DATEI_FASSUNG = 1;
 
@@ -325,7 +327,11 @@ var SD_GRABSTEIN_TAGE = 180;
 var SD_IDB_NAME = 'schreibtisch-speicher';
 var SD_IDB_STORE = 'griffe';
 var SD_IDB_KEY = 'datendatei';
-var SD_LS_KEY = 'schreibtisch-daten-' + SD_FASSUNG;
+/* Seit 0.5.1 je Fassung getrennt und ohne Versionsnummer — sonst wäre der
+   Zwischenstand nach jedem Versionswechsel verschwunden. Die berufliche
+   übernimmt einmalig den alten gemeinsamen Speicher (bleibt lokal). */
+var SD_LS_KEY = 'schreibtisch-beruf-daten';
+var SD_LS_ALT = ['schreibtisch-daten-0.5.0'];
 
 /* Die Abschnittsfarben, wie OneNote sie anbietet. */
 var SD_FARBEN = ['#3B8EDE', '#85C440', '#E8A33D', '#9B6BC9', '#D4564F', '#3FA9A4', '#C8679F', '#7A8794'];
@@ -923,6 +929,17 @@ function sdDateiHochladen() {
   e.click();
 }
 
+/* Ein Zwischenstand unter einem alten Schlüssel (seit 0.5.1). Er wird nur
+   gelesen, nie gelöscht — beim nächsten Sichern landet er unter dem neuen. */
+function sdAltLesen() {
+  var i, roh;
+  for (i = 0; i < SD_LS_ALT.length; i++) {
+    try { roh = window.localStorage.getItem(SD_LS_ALT[i]); } catch (e) { roh = null; }
+    if (roh) { return roh; }
+  }
+  return null;
+}
+
 function sdLaden() {
   return sdGriffHolen().then(function (griff) {
     if (!griff) { return null; }
@@ -940,6 +957,7 @@ function sdLaden() {
     }
     var roh = null;
     try { roh = window.localStorage.getItem(SD_LS_KEY); } catch (e) { roh = null; }
+    if (!roh) { roh = sdAltLesen(); }
     if (roh) {
       var l = sdAusText(roh);
       if (l) { DB = l; sd.weg = 'lokal'; return true; }
@@ -1330,7 +1348,7 @@ function sdFachHtml() {
 
 function sdBlattHtml(klasse, name, aufruf) {
   return '<button type="button" class="seite' + klasse + '" ' + aufruf + '>'
-    + '<span class="s-lager"><span class="s-blatt unten"></span><span class="s-blatt"></span></span>'
+    + '<span class="s-lager"><span class="s-blatt"></span></span>'
     + '<span class="st">' + esc(name) + '</span></button>';
 }
 
