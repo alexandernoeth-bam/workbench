@@ -1056,6 +1056,76 @@ console.log('\nSD-25  Strg+V');
 }
 
 /* ============================================================
+   SD-26  Die Kopfzeile: keine Stelle als Schlüssel
+   Grund: Am 13.11.2026 öffnete ein Klick auf „Stundenplan“ den Eintrag
+   „Block“. Der „Im Browser“-Pfeil aus 0.3.0 ist ein eigenes <a>, und
+   der Klickgriff zählte die <a> durch und griff über diesen Index in
+   DB.planung. Derselbe Fehlertyp wie beim Datenverlust: eine Position
+   als Schlüssel statt einer Kennung. Diese Kategorie prüft, dass in
+   der Kopfzeile nirgends mehr gezählt wird.
+   ============================================================ */
+console.log('\nSD-26  Kopfzeile');
+{
+  frisch();
+  SD.DB.planung = [];
+  SD.sdPlanungSichern();
+  /* Der erste Eintrag bekommt beide Adressen — das war der Auslöser */
+  SD.DB.planung[0].name = 'Wochenplan';
+  SD.DB.planung[0].link = 'onenote:///C:/N/W.one#Woche';
+  SD.DB.planung[0].link_web = 'https://x.example/woche';
+  SD.zeichne();
+
+  let p = planung();
+  const anker = (p.match(/<a /g) || []).length;
+  pruefe(anker === SD.DB.planung.length,
+    'je Eintrag genau ein <a> in der Kopfzeile (' + anker + ' bei ' + SD.DB.planung.length + ' Einträgen)');
+  pruefe(!/class="imweb"/.test(p),
+    'kein „Im Browser“-Pfeil in der Kopfzeile — dort sähe er aus wie ein Menüpunkt');
+  pruefe(/class="imweb"/.test(SKRIPT), 'in den Verweislisten gibt es ihn weiterhin');
+  pruefe(/data-id="pl-woche"/.test(p), 'jeder Eintrag trägt seine Kennung im Markup');
+
+  /* Der alte Klickgriff darf es nicht mehr geben */
+  pruefe(SKRIPT.indexOf('querySelectorAll(\'a\')') < 0,
+    'die Kopfzeile zählt keine <a> mehr durch');
+  pruefe(!/indexOf\.call\([^)]*querySelectorAll/.test(SKRIPT),
+    'und greift nirgends über eine Stelle in DB.planung');
+
+  /* Bearbeiten: Namen sind Knöpfe mit Kennung, keine Links */
+  SD.sdBearbeitenUm();
+  p = planung();
+  pruefe((p.match(/<a /g) || []).length === 0, 'im Bearbeiten-Modus gibt es gar keine Links mehr');
+  pruefe((p.match(/class="pl-name"/g) || []).length === 5, 'sondern fünf Namensknöpfe');
+  pruefe(/sdPlanungFenster\('pl-stundenplan'\)/.test(p),
+    'und jeder ruft seinen Eintrag über die Kennung auf, nicht über die Stelle');
+  pruefe((p.match(/class="pl-pfeil"/g) || []).length === 10, 'dazu je zwei Pfeile');
+
+  /* Verschieben */
+  const vorher = SD.DB.planung.map(x => x.name).join('|');
+  SD.DB.planung.forEach(x => { x.geaendert = 1000; });
+  SD.sdPlanungStellen('pl-meetings', 'vor');
+  pruefe(SD.DB.planung.map(x => x.name).join('|') === 'Wochenplan|Erinnerungen|Stundenplan|Meetings|Block',
+    '◀ zieht einen Eintrag nach vorn');
+  const frischGestempelt = SD.DB.planung.filter(x => x.geaendert > 1000).length;
+  pruefe(frischGestempelt === 2,
+    'dabei werden genau zwei Einträge gestempelt, nicht die ganze Leiste (waren ' + frischGestempelt + ')');
+  SD.sdPlanungStellen('pl-meetings', 'zurueck');
+  pruefe(SD.DB.planung.map(x => x.name).join('|') === vorher, '▶ schiebt ihn wieder zurück');
+  SD.sdPlanungStellen('pl-wochenplan', 'vor');
+  pruefe(SD.DB.planung[0].name === 'Wochenplan', 'der erste lässt sich nicht weiter nach vorn schieben');
+  SD.sdPlanungStellen('pl-meetings', 'zurueck');
+  pruefe(SD.DB.planung[4].name === 'Meetings', 'und der letzte nicht weiter nach hinten');
+
+  /* Die Reihenfolge übersteht den Abgleich */
+  const a = JSON.parse(SD.sdAlsText());
+  SD.sdPlanungStellen('pl-block', 'vor');
+  const b = JSON.parse(SD.sdAlsText());
+  const e = SD.sdZusammenfuehren(b, a);
+  pruefe(e.db.planung.map(x => x.name).join('|') === b.planung.map(x => x.name).join('|'),
+    'nach dem Abgleich steht die Leiste in der zuletzt gewählten Reihenfolge');
+  SD.sdBearbeitenUm();
+}
+
+/* ============================================================
    ERGEBNIS
    ============================================================ */
 console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen');

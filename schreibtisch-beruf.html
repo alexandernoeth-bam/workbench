@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<title>Schreibtisch 0.3.0 Beruf</title>
+<title>Schreibtisch 0.4.0 Beruf</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,6 +37,16 @@ body{margin:0;font-family:"Fira Sans",system-ui,sans-serif;color:var(--tinte);
 .stift{background:none;border:1px solid rgba(255,255,255,.3);color:#DDE2D6;font:inherit;font-size:14px;
   padding:4px 11px;border-radius:2px;cursor:pointer}
 .stift.an{background:#DDE2D6;color:var(--tisch-tief);border-color:#DDE2D6}
+/* Kopfzeile im Bearbeiten-Modus: Name als Knopf, daneben zwei Pfeile. */
+.pl-halter{display:inline-flex;align-items:center;gap:1px;margin-right:7px}
+.pl-name{background:none;border:0;border-bottom:1px dashed rgba(221,226,214,.45);color:#DDE2D6;
+  font:inherit;font-size:15px;padding:4px 6px;border-radius:2px;cursor:pointer}
+.pl-name:hover{background:rgba(255,255,255,.1)}
+.pl-pfeil{background:none;border:1px solid rgba(255,255,255,.25);color:#DDE2D6;font:inherit;
+  font-size:11px;line-height:1;padding:5px 5px;border-radius:2px;cursor:pointer}
+.pl-pfeil:hover{background:rgba(255,255,255,.16)}
+body.b-schmal .pl-name{font-size:14px;padding:3px 5px}
+body.b-schmal .pl-halter{margin-right:5px}
 
 /* ---------- Tisch ---------- */
 .tisch{flex:1;display:flex;min-height:0}
@@ -294,7 +304,7 @@ body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFA
    derselben Quelle und bekommt den Drive-Teil dazu.
    ============================================================ */
 
-var SD_FASSUNG = '0.3.0';
+var SD_FASSUNG = '0.4.0';
 var SD_VERSION = 'Beruf';
 var SD_DATEI_FASSUNG = 1;
 
@@ -1104,8 +1114,22 @@ function zeichne() {
 function sdPlanungZeichnen() {
   var el = document.getElementById('planung');
   if (!el) { return; }
+  /* Im Bearbeiten-Modus ist ein Eintrag kein Link mehr, sondern sein
+     Name als Knopf plus zwei Pfeile. Damit gibt es keinen Klickgriff
+     mehr, der die <a> durchzählt und sich am „Im Browser“-Pfeil
+     verzählt — am 13.11.2026 öffnete ein Klick auf „Stundenplan“ den
+     Eintrag „Block“. Gesucht wird nach Kennung, nicht nach Stelle. */
   var links = (DB.planung || []).map(function (p) {
-    return sdVerweisHtml(p, 'planung');
+    if (!sd.bearbeiten) { return sdVerweisHtml(p, 'planung'); }
+    var s = esc(p.id);
+    return '<span class="pl-halter">'
+      + '<button type="button" class="pl-name" onclick="sdPlanungFenster(\'' + s + '\')"'
+      + ' title="ändern oder entfernen">' + esc(p.name) + '</button>'
+      + '<button type="button" class="pl-pfeil" onclick="sdPlanungStellen(\'' + s + '\',\'vor\')"'
+      + ' aria-label="weiter nach vorn">&#9664;</button>'
+      + '<button type="button" class="pl-pfeil" onclick="sdPlanungStellen(\'' + s + '\',\'zurueck\')"'
+      + ' aria-label="weiter nach hinten">&#9654;</button>'
+      + '</span>';
   }).join('');
   el.innerHTML = links
     + '<span class="luecke"></span>'
@@ -1146,11 +1170,15 @@ function sdVerweisHtml(p, wo) {
   if (!ziel) {
     return '<a class="ohne" aria-disabled="true" title="kein Link">' + esc(p.name) + '</a>';
   }
-  return '<a href="' + esc(ziel) + '"' + neu + ' data-wo="' + esc(wo) + '">' + esc(p.name) + '</a>'
-    + (sdHatBeide(p)
-      ? '<a class="imweb" href="' + esc(p.link_web) + '" target="_blank" rel="noopener"'
-        + ' title="im Browser öffnen" aria-label="im Browser öffnen">&#8599;</a>'
-      : '');
+  /* Der kleine Pfeil gehört in eine Verweisliste, nicht in eine
+     Navigationsleiste: Dort sähe er aus wie ein weiterer Menüpunkt,
+     und der Platz ist ohnehin knapp. */
+  var pfeil = (sdHatBeide(p) && wo !== 'planung')
+    ? '<a class="imweb" href="' + esc(p.link_web) + '" target="_blank" rel="noopener"'
+      + ' title="im Browser öffnen" aria-label="im Browser öffnen">&#8599;</a>'
+    : '';
+  return '<a href="' + esc(ziel) + '"' + neu + ' data-wo="' + esc(wo) + '"'
+    + ' data-id="' + esc(p.id || '') + '">' + esc(p.name) + '</a>' + pfeil;
 }
 
 function sdFlaecheZeichnen() {
@@ -1648,6 +1676,14 @@ function sdPlanungSpeichern() {
   zeichne();
 }
 
+/* Verschiebt einen Eintrag der Kopfzeile. Dieselbe Mechanik wie bei
+   Fächern und Seiten: Es tauschen genau zwei ihre Stelle, und nur die
+   beiden bekommen einen frischen Stempel. */
+function sdPlanungStellen(id, was) {
+  sdSchieben(DB.planung, id, was === 'vor' ? -1 : 1);
+  sdPlanungZeichnen();
+}
+
 function sdPlanungWeg() {
   sdEntfernen(DB.planung, sd.fenster.id);
   sdFensterZu();
@@ -1882,15 +1918,6 @@ function sdStart() {
         if (e.key === 'Escape') { sdFensterZu(); }
       });
       document.addEventListener('paste', sdEingefuegt);
-      /* Im Bearbeiten-Modus führt ein Klick auf einen Planungslink zum Ändern */
-      document.getElementById('planung').addEventListener('click', function (e) {
-        if (!sd.bearbeiten) { return; }
-        var a = e.target.closest ? e.target.closest('a') : null;
-        if (!a) { return; }
-        e.preventDefault();
-        var i = Array.prototype.indexOf.call(a.parentNode.querySelectorAll('a'), a);
-        if (DB.planung[i]) { sdPlanungFenster(DB.planung[i].id); }
-      });
     }
     if (sdHaken.beimStart) { sdHaken.beimStart(); }
     return true;
