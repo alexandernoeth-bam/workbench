@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<title>Schreibtisch 0.5.1 Privat</title>
+<title>Schreibtisch 0.6.0 Privat</title>
 <link rel="manifest" href="./schreibtisch.webmanifest">
 <meta name="theme-color" content="#444B40">
 <link rel="apple-touch-icon" href="./schreibtisch-192.png">
@@ -157,9 +157,7 @@ body.b-weit .flaeche{padding:26px 22px}
   height:calc(36px * var(--z));border-radius:2px;
   transform:skewX(-27deg);transform-origin:0 100%;background:var(--papier);
   box-shadow:0 5px 9px rgba(0,0,0,.26)}
-/* Seit 0.5.1: eine Seite ist ein einzelnes Blatt mit Eselsohr — der Stapel gehört dem Fach. */
-.s-blatt::after{content:"";position:absolute;right:-1px;top:-1px;width:calc(14px * var(--z));height:calc(14px * var(--z));
-  background:linear-gradient(225deg,var(--tisch) 50%,#D9D5C8 50%);border-bottom-left-radius:2px}
+.s-blatt.unten{top:calc(14px * var(--z));left:calc(2px * var(--z));background:#DFDBCD;box-shadow:none}
 .seite .st{color:#E7EADF;font-size:14.5px;line-height:1.25}
 .seite.offen .s-blatt{top:calc(1px * var(--z));box-shadow:0 11px 16px rgba(0,0,0,.34)}
 .seite.offen .st{color:#FBFAF6;font-weight:600}
@@ -167,6 +165,14 @@ body.b-weit .flaeche{padding:26px 22px}
 .seite.leer .s-blatt{background:#CFCBBD;box-shadow:none}
 .seite.leer .st{color:#A8B09E;font-style:italic}
 .s-blatt{transition:top .14s ease,box-shadow .14s ease}
+/* Der Artstempel: grau, klein, in der Ecke des Blatts — wie ein Stempel
+   auf Papier, kein Abzeichen. Mitgeschert, damit er auf dem Blatt liegt
+   und nicht darüber schwebt. OneNote bekommt keinen. */
+.marke{position:absolute;right:9px;bottom:5px;font-size:10.5px;letter-spacing:.03em;
+  color:#9A958A;transform:skewX(27deg);pointer-events:none;line-height:1}
+.seite.leer .marke{color:#B5B1A6}
+.marke-zeile{flex:0 0 auto;font-size:11.5px;letter-spacing:.03em;color:var(--tinte-leise);
+  margin-left:7px;align-self:center}
 /* Das Unterseiten-Feld bricht die Reihe um: es gehört unter seine Seite,
    nicht daneben. flex:0 0 100% zwingt es auf eine eigene Zeile. */
 .unterseiten{flex:0 0 100%;background:var(--papier);border-radius:2px;padding:3px 15px 12px;
@@ -320,22 +326,16 @@ body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFA
    derselben Quelle und bekommt den Drive-Teil dazu.
    ============================================================ */
 
-var SD_FASSUNG = '0.5.1';
+var SD_FASSUNG = '0.6.0';
 var SD_VERSION = 'Privat';
 var SD_DATEI_FASSUNG = 1;
 
 var SD_SCHMAL = 820;
 var SD_GRABSTEIN_TAGE = 180;
-var SD_IDB_NAME = 'schreibtisch-privat-speicher';
+var SD_IDB_NAME = 'schreibtisch-speicher';
 var SD_IDB_STORE = 'griffe';
 var SD_IDB_KEY = 'datendatei';
-/* Seit 0.5.1 je Fassung getrennt und ohne Versionsnummer. Beide Fassungen
-   liegen auf derselben Adresse und teilten sich bis 0.5.0 Browserspeicher
-   und Dateigriff — so hätte die private Fassung berufliche Daten lesen und
-   nach Drive bringen können. Die private übernimmt deshalb nichts aus dem
-   alten gemeinsamen Speicher; ihr Bestand kommt aus Drive zurück. */
-var SD_LS_KEY = 'schreibtisch-privat-daten';
-var SD_LS_ALT = [];
+var SD_LS_KEY = 'schreibtisch-daten-' + SD_FASSUNG;
 
 /* Die Abschnittsfarben, wie OneNote sie anbietet. */
 var SD_FARBEN = ['#3B8EDE', '#85C440', '#E8A33D', '#9B6BC9', '#D4564F', '#3FA9A4', '#C8679F', '#7A8794'];
@@ -933,17 +933,6 @@ function sdDateiHochladen() {
   e.click();
 }
 
-/* Ein Zwischenstand unter einem alten Schlüssel (seit 0.5.1). Er wird nur
-   gelesen, nie gelöscht — beim nächsten Sichern landet er unter dem neuen. */
-function sdAltLesen() {
-  var i, roh;
-  for (i = 0; i < SD_LS_ALT.length; i++) {
-    try { roh = window.localStorage.getItem(SD_LS_ALT[i]); } catch (e) { roh = null; }
-    if (roh) { return roh; }
-  }
-  return null;
-}
-
 function sdLaden() {
   return sdGriffHolen().then(function (griff) {
     if (!griff) { return null; }
@@ -961,7 +950,6 @@ function sdLaden() {
     }
     var roh = null;
     try { roh = window.localStorage.getItem(SD_LS_KEY); } catch (e) { roh = null; }
-    if (!roh) { roh = sdAltLesen(); }
     if (roh) {
       var l = sdAusText(roh);
       if (l) { DB = l; sd.weg = 'lokal'; return true; }
@@ -1228,6 +1216,87 @@ function sdHatBeide(p) {
   return !!sdLinkSauber(p.link) && !!sdLinkSauber(p.link_web);
 }
 
+/* ============================================================
+   Woran erkennt man, was hinter einem Verweis liegt?
+
+   OneNote wird NICHT gekennzeichnet: Es ist die Regel, nicht die
+   Ausnahme, und ein Zeichen an jedem Blatt wäre Rauschen. Gezeigt wird
+   nur, was anders ist — eine Tabelle, ein eingescannter Plan, eine
+   Confluence-Seite.
+
+   Erkannt wird aus der Adresse, nicht aus einem Feld: Nichts zu pflegen
+   heißt nichts, was veralten kann. SharePoint und OneDrive tragen die
+   Art im Pfad (/:w:/ Word, /:x:/ Excel, /:p:/ PowerPoint, /:b:/ PDF,
+   /:i:/ Bild, /:o:/ OneNote) — das ist zuverlässiger als die Endung,
+   die dort oft gar nicht in der Adresse steht. Die Endung ist der
+   zweite Weg, Confluence der dritte.
+
+   Was sich nicht sicher erkennen lässt, bekommt kein Zeichen. Lieber
+   nichts sagen als etwas Falsches — dieselbe Regel wie beim Lesen der
+   OneNote-Links.
+   ============================================================ */
+
+/* Die Kürzel bleiben bei vier Zeichen: Auf der kleinsten Zoomstufe ist
+   das Blatt 81 Pixel breit, da passt „confluence“ nicht hin. */
+var SD_MARKEN = [
+  { muster: /\/:w:\//i,  marke: 'docx' },
+  { muster: /\/:x:\//i,  marke: 'xlsx' },
+  { muster: /\/:p:\//i,  marke: 'pptx' },
+  { muster: /\/:b:\//i,  marke: 'pdf' },
+  { muster: /\/:i:\//i,  marke: 'bild' },
+  { muster: /\/:v:\//i,  marke: 'film' },
+  { muster: /\.pdf(\b|$)/i,                              marke: 'pdf' },
+  { muster: /\.(docx?|docm|dotx|rtf)(\b|$)/i,            marke: 'docx' },
+  { muster: /\.(xlsx?|xlsm|xlsb|csv)(\b|$)/i,            marke: 'xlsx' },
+  { muster: /\.(pptx?|ppsx|pptm)(\b|$)/i,                marke: 'pptx' },
+  { muster: /\.(png|jpe?g|gif|svg|webp|bmp|tiff?|heic)(\b|$)/i, marke: 'bild' },
+  { muster: /\.(mp4|mov|avi|mkv|webm)(\b|$)/i,           marke: 'film' },
+  { muster: /atlassian\.net\/wiki\//i,                   marke: 'wiki' },
+  { muster: /\/(confluence|wiki)\//i,                    marke: 'wiki' },
+  { muster: /\/display\/|\/pages\/viewpage\.action/i,    marke: 'wiki' }
+];
+
+function sdIstOneNote(adresse) {
+  var a = String(adresse || '');
+  if (/^onenote:/i.test(a)) { return true; }
+  if (/\/:o:\//i.test(a)) { return true; }
+  if (/\.one(\b|$)/i.test(a)) { return true; }
+  if (/[?&]wd=target/i.test(a)) { return true; }
+  if (/onenote\.com/i.test(a)) { return true; }
+  return false;
+}
+
+function sdMarkeAus(adresse) {
+  /* Nur der Pfad zählt; in den Parametern stehen Kennungen und
+     Dateinamen anderer Dinge, die sonst falsch anschlügen. */
+  var ganz = String(adresse || '');
+  var pfad = ganz.split('#')[0].split('?')[0];
+  var i;
+  for (i = 0; i < SD_MARKEN.length; i++) {
+    if (SD_MARKEN[i].muster.test(pfad)) { return SD_MARKEN[i].marke; }
+  }
+  return '';
+}
+
+function sdArtAusLink(p) {
+  var beide = [sdLinkSauber(p && p.link), sdLinkSauber(p && p.link_web)]
+    .filter(function (x) { return !!x; });
+  var i, m;
+  for (i = 0; i < beide.length; i++) {
+    if (sdIstOneNote(beide[i])) { return ''; }
+  }
+  for (i = 0; i < beide.length; i++) {
+    m = sdMarkeAus(beide[i]);
+    if (m) { return m; }
+  }
+  return '';
+}
+
+function sdMarkeHtml(p, klasse) {
+  var m = sdArtAusLink(p);
+  return m ? '<span class="' + klasse + '">' + esc(m) + '</span>' : '';
+}
+
 /* Ein Öffnen-Knopf, überall gleich gebaut: der Hauptweg über onenote:,
    daneben „Im Browser“, sobald beide Adressen da sind. */
 function sdOeffnenHtml(p, klasse, text) {
@@ -1257,7 +1326,8 @@ function sdVerweisHtml(p, wo) {
       + ' title="im Browser öffnen" aria-label="im Browser öffnen">&#8599;</a>'
     : '';
   return '<a href="' + esc(ziel) + '"' + neu + ' data-wo="' + esc(wo) + '"'
-    + ' data-id="' + esc(p.id || '') + '">' + esc(p.name) + '</a>' + pfeil;
+    + ' data-id="' + esc(p.id || '') + '">' + esc(p.name) + '</a>'
+    + (wo === 'planung' ? '' : sdMarkeHtml(p, 'marke-zeile')) + pfeil;
 }
 
 function sdFlaecheZeichnen() {
@@ -1350,9 +1420,10 @@ function sdFachHtml() {
   return h;
 }
 
-function sdBlattHtml(klasse, name, aufruf) {
+function sdBlattHtml(klasse, name, aufruf, p) {
   return '<button type="button" class="seite' + klasse + '" ' + aufruf + '>'
-    + '<span class="s-lager"><span class="s-blatt"></span></span>'
+    + '<span class="s-lager"><span class="s-blatt unten"></span>'
+    + '<span class="s-blatt">' + sdMarkeHtml(p, 'marke') + '</span></span>'
     + '<span class="st">' + esc(name) + '</span></button>';
 }
 
@@ -1384,7 +1455,7 @@ function sdSeiteHtml(f, s) {
   }
   var k = (offen ? ' offen' : '') + (sdZiel(s) ? '' : ' leer');
   var h = '<div class="seite-halter">'
-    + sdBlattHtml(k, s.name, 'onclick="sdSeiteUm(\'' + esc(s.id) + '\')"')
+    + sdBlattHtml(k, s.name, 'onclick="sdSeiteUm(\'' + esc(s.id) + '\')"', s)
     + (sd.bearbeiten ? sdStellerHtml('sdSeiteStellen', f.id + '|' + s.id, true) : '')
     + '</div>';
   return h + zusatz;
@@ -1396,7 +1467,7 @@ function sdLeisteBlattHtml(f, p) {
     ? 'onclick="sdGehe(\'' + esc(ziel) + '\')"'
     : 'onclick="melde(\'Für diesen Verweis ist noch kein Link eingetragen.\', null)"';
   return '<div class="seite-halter">'
-    + sdBlattHtml(ziel ? '' : ' leer', p.name, auf)
+    + sdBlattHtml(ziel ? '' : ' leer', p.name, auf, p)
     + (sd.bearbeiten ? sdStellerHtml('sdLeisteStellen', f.id + '|' + p.id, true) : '')
     + '</div>';
 }

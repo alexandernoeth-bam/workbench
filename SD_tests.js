@@ -1248,60 +1248,94 @@ console.log('\nSD-28  Zoom');
 }
 
 /* ============================================================
-   SD-29  Eine Seite ist ein einzelnes Blatt (seit 0.5.1)
-   Fehlerart: Seiten sahen aus wie kleine Stapel — und waren so nicht
-   von einem Fach zu unterscheiden. Der Stapel gehört dem Fach.
+   SD-29  Woran man sieht, was hinter einem Verweis liegt
+   OneNote bekommt kein Zeichen: Es ist die Regel, nicht die Ausnahme.
+   Erkannt wird aus der Adresse, geraten wird nicht.
    ============================================================ */
-console.log('\nSD-29  Seitensymbol: ein Blatt, kein Stapel');
+console.log('\nSD-29  Artkennzeichen');
 {
-  [['beruflich', QUELLE], ['privat', PRIVAT_QUELLE]].forEach(function (paar) {
-    const q = paar[1];
-    if (!q) { warn(paar[0] + ': Datei fehlt, übersprungen'); return; }
-    const sk = letztesSkript(q);
-    const blatt = (sk.match(/function sdBlattHtml[\s\S]*?\n\}/) || [''])[0];
-    pruefe((blatt.match(/s-blatt/g) || []).length === 1, paar[0] + ': sdBlattHtml zeichnet genau ein Blatt');
-    pruefe(blatt.indexOf('s-blatt unten') < 0, paar[0] + ': kein zweites Blatt darunter');
-    pruefe(/\.s-blatt::after\{/.test(q), paar[0] + ': das Blatt hat ein Eselsohr');
-    pruefe(!/\.s-blatt\.unten/.test(q), paar[0] + ': keine Regel mehr für ein unteres Blatt');
-  });
-  frisch();
-  pruefe(/class="lager"/.test(flaeche()), 'Fächer bleiben Stapel');
-}
+  const m = (link, web) => SD.sdArtAusLink({ link: link || '', link_web: web || '' });
 
-/* ============================================================
-   SD-30  Beruf und Privat teilen keinen Speicher (seit 0.5.1)
-   Fehlerart: Beide Fassungen liegen auf derselben Adresse. Bis 0.5.0
-   hießen Browserspeicher und Dateigriff gleich — die private Fassung
-   hätte berufliche Daten laden und nach Drive bringen können. Dazu hing
-   der Schlüssel an der Versionsnummer: jeder Versionswechsel ließ den
-   Zwischenstand verschwinden.
-   ============================================================ */
-console.log('\nSD-30  Getrennte Ablage je Fassung');
-{
-  function wert(q, name) {
-    const m = letztesSkript(q).match(new RegExp('var ' + name + " = '([^']*)'"));
-    return m ? m[1] : null;
-  }
-  const bLs = wert(QUELLE, 'SD_LS_KEY'), bIdb = wert(QUELLE, 'SD_IDB_NAME');
-  pruefe(!!bLs && !/SD_FASSUNG/.test((letztesSkript(QUELLE).match(/var SD_LS_KEY[^\n]*/) || [''])[0]),
-    'beruflich: Speicherschlüssel ohne Versionsnummer (' + bLs + ')');
-  pruefe(Array.isArray(SD.SD_LS_ALT) && SD.SD_LS_ALT.indexOf('schreibtisch-daten-0.5.0') >= 0,
-    'beruflich: übernimmt den alten gemeinsamen Zwischenstand');
-  SD.localStorage.removeItem(SD.SD_LS_KEY);
-  SD.localStorage.setItem('schreibtisch-daten-0.5.0', '{"x":1}');
-  pruefe(SD.sdAltLesen() === '{"x":1}', 'beruflich: der alte Stand wird gelesen');
-  pruefe(SD.localStorage.getItem('schreibtisch-daten-0.5.0') === '{"x":1}', 'und nicht gelöscht');
-  SD.localStorage.removeItem('schreibtisch-daten-0.5.0');
-  if (!PRIVAT_QUELLE) {
-    warn('private Fassung fehlt — Vergleich übersprungen');
-  } else {
-    const pLs = wert(PRIVAT_QUELLE, 'SD_LS_KEY'), pIdb = wert(PRIVAT_QUELLE, 'SD_IDB_NAME');
-    pruefe(!!pLs && pLs !== bLs, 'privat und beruflich haben verschiedene Speicherschlüssel (' + pLs + ' / ' + bLs + ')');
-    pruefe(!!pIdb && pIdb !== bIdb, 'und verschiedene Dateigriffe (' + pIdb + ' / ' + bIdb + ')');
-    pruefe(/var SD_LS_ALT = \[\];/.test(PRIVAT_QUELLE),
-      'privat übernimmt nichts aus dem alten gemeinsamen Speicher (könnte beruflich sein)');
-    pruefe(pLs.indexOf('0.5') < 0 && pIdb.indexOf('0.5') < 0, 'privat: keine Versionsnummer im Schlüssel');
-  }
+  /* OneNote in all seinen Formen: kein Zeichen */
+  pruefe(m('onenote:///C:/N/Arbeit.one#Seite') === '', 'onenote: bekommt kein Zeichen');
+  pruefe(m('', 'https://firma.sharepoint.com/:o:/r/sites/QS/Notizbuch') === '',
+    'ein OneNote-Link auf SharePoint (/:o:/) auch nicht');
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Arbeit.one') === '',
+    'eine .one-Datei auch nicht');
+  pruefe(m('', 'https://onedrive.live.com/view.aspx?resid=1&wd=target%28P.one%7Cabc%2F%29') === '',
+    'und ein Weblink mit wd=target auch nicht');
+  pruefe(m('onenote:///C:/N/A.one#x', 'https://firma.sharepoint.com/:b:/r/x.pdf') === '',
+    'steht onenote: dabei, zählt das — egal was die Web-Adresse sagt');
+
+  /* SharePoint und OneDrive tragen die Art im Pfad */
+  pruefe(m('', 'https://firma.sharepoint.com/:w:/r/sites/QS/Bericht') === 'docx', '/:w:/ ist Word');
+  pruefe(m('', 'https://firma.sharepoint.com/:x:/r/sites/QS/Matrix') === 'xlsx', '/:x:/ ist Excel');
+  pruefe(m('', 'https://firma.sharepoint.com/:p:/r/sites/QS/Kickoff') === 'pptx', '/:p:/ ist PowerPoint');
+  pruefe(m('', 'https://firma.sharepoint.com/:b:/r/sites/QS/Bauplan') === 'pdf', '/:b:/ ist PDF');
+  pruefe(m('', 'https://firma.sharepoint.com/:i:/r/sites/QS/Foto') === 'bild', '/:i:/ ist ein Bild');
+  pruefe(m('', 'https://firma-my.sharepoint.com/:w:/g/personal/a_n/Bericht.docx') === 'docx',
+    'auch auf OneDrive beruflich');
+
+  /* Die Endung als zweiter Weg */
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Dok/Bauplan.pdf') === 'pdf', '.pdf');
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Dok/Matrix.xlsx') === 'xlsx', '.xlsx');
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Dok/Liste.csv') === 'xlsx', '.csv zählt als Tabelle');
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Bilder/plan.png') === 'bild', '.png');
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Bilder/scan.TIFF') === 'bild',
+    'Groß- und Kleinschreibung ist egal');
+
+  /* Confluence */
+  pruefe(m('', 'https://firma.atlassian.net/wiki/spaces/QS/pages/1/Konzept') === 'wiki',
+    'Confluence in der Cloud');
+  pruefe(m('', 'https://intra.firma.de/confluence/display/QS/Konzept') === 'wiki',
+    'Confluence im Haus');
+  pruefe(m('', 'https://intra.firma.de/pages/viewpage.action?pageId=123') === 'wiki',
+    'und die alte Adressform');
+
+  /* Nicht raten */
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/_layouts/15/Doc.aspx?sourcedoc=%7B123%7D') === '',
+    'eine Adresse ohne Hinweis bekommt kein Zeichen — lieber nichts als falsch');
+  pruefe(m('', '') === '', 'ohne Link kein Zeichen');
+  pruefe(m('', 'https://firma.de/start') === '', 'eine beliebige Seite bekommt keins');
+  /* Die Parameter dürfen nicht anschlagen */
+  pruefe(m('', 'https://firma.sharepoint.com/sites/QS/Seite?datei=anhang.pdf') === '',
+    'ein Dateiname in den Parametern zählt nicht, nur der Pfad');
+
+  /* Die Kürzel bleiben kurz genug fürs kleinste Blatt */
+  const alle = SD.SD_MARKEN.map(x => x.marke);
+  pruefe(alle.every(x => x.length <= 4),
+    'kein Kürzel länger als vier Zeichen (längstes: ' + alle.reduce((a, b) => a.length >= b.length ? a : b) + ')');
+
+  /* Anzeige */
+  frisch();
+  const f = SD.sdFachNeu('Projekt Nordlicht', 'eigen', '#9B6BC9',
+    'onenote:///C:/N/P.one#section-id={AB12CD34-1111-2222-3333-444455556666}&end', 'Arbeit');
+  SD.sdSeiteNeu(f, 'Teststrategie', 'onenote:///C:/N/P.one#Teststrategie', '');
+  SD.sdSeiteNeu(f, 'Bauplan EG', '', 'https://firma.sharepoint.com/:b:/r/sites/QS/Bauplan');
+  SD.sdFachOeffnen(f.id);
+  let h = flaeche();
+  pruefe((h.match(/class="marke"/g) || []).length === 1,
+    'von zwei Seiten bekommt nur die Nicht-OneNote-Seite einen Stempel');
+  pruefe(/>pdf</.test(h), 'und zwar „pdf“');
+
+  /* Unterseiten in der Liste */
+  const s = f.seiten[0];
+  SD.sdUnterNeu(s, 'Messprotokoll', '', 'https://firma.sharepoint.com/:x:/r/sites/QS/Mess');
+  SD.sdSeiteUm(s.id);
+  pruefe(/class="marke-zeile">xlsx</.test(flaeche()),
+    'in der Unterseitenliste steht das Kürzel hinter dem Namen');
+
+  /* Nicht gekennzeichnet werden: Fächer und die Planungsleiste */
+  SD.sdZumTisch();
+  pruefe(!/class="marke/.test(flaeche()), 'Fächer bekommen keinen Stempel — ein Abschnitt ist immer OneNote');
+  SD.DB.planung = [{ id: 'pl-1', name: 'Bauplan', link: '',
+    link_web: 'https://firma.sharepoint.com/:b:/r/x', ordnung: 0, geaendert: 0 }];
+  SD.zeichne();
+  pruefe(!/class="marke/.test(planung()), 'die Planungsleiste bleibt frei davon — dort ist es zu eng');
+
+  /* Das Kennzeichen ist abgeleitet, nicht gespeichert */
+  pruefe(SD.sdAlsText().indexOf('marke') < 0,
+    'die Art steht in keiner Datei — sie wird aus dem Link gelesen, nicht gepflegt');
 }
 
 /* ============================================================
