@@ -263,7 +263,6 @@ if (CL) { ok('CLIE lässt sich außerhalb des Browsers auswerten'); }
    Coach weiter — die Funktionen bleiben; „aus“ prüft Kategorie 146. */
 const CO_AN_STD = CL ? CL.CO_AN : null;
 function frisch() {
-  CL.CO_AN = true;
   CL.DB = CL.leereDatenbank();
   CL.cl.app = 'uebersicht'; CL.cl.filter = 'alle'; CL.cl.aufklapp = ''; CL.cl.memo.sicht = 'alles'; CL.cl.memo.art = ''; CL.cl.memo.fertige = false; CL.cl.memo.aktiv = true; CL.cl.rt.sicht = 'routinen'; CL.cl.gw.wahl = '';
   CL.termineNachTag = {};
@@ -302,6 +301,9 @@ if (!WB_SKRIPT) {
     if (n === 'zusammenfuehren') { return false; }
     /* Seit 0.100.0 bewusst abweichend: leereDatenbank kennt die Stapel der Lernkartei (bauen.py) */
     if (n === 'leereDatenbank') { return false; }
+    /* Seit 0.124.0 bewusst abweichend: uebernehmen und textZuBestand reichen Felder
+       durch, die diese Fassung nicht kennt, statt sie zu verwerfen (bauen.py) */
+    if (n === 'uebernehmen' || n === 'textZuBestand') { return false; }
     const a = funktionText(SKRIPT, n), b = funktionText(WB_SKRIPT, n);
     return !a || !b || a !== b;
   });
@@ -317,7 +319,9 @@ if (!WB_SKRIPT) {
     + (kernAb.length ? ' — abweichend: ' + kernAb.join(', ') : ''));
   const samm = (s) => (s.match(/var SAMMLUNGEN = \[[\s\S]*?\];/) || [''])[0];
   /* Seit 0.100.0: CLIE ergänzt „lernstapel“ (bauen.py) — alles andere bleibt wie in der Workbench */
-  pruefe(samm(SKRIPT) && samm(SKRIPT).replace("'lernstapel',", '') === samm(WB_SKRIPT), 'dieselben Sammlungen wie die Workbench (plus Lernstapel) — beim Abgleich geht nichts verloren');
+  /* CLIE ergänzt beim Bauen zwei eigene Sammlungen; alles andere steht wörtlich wie in der Workbench */
+  const sammOhneZugabe = samm(SKRIPT).replace("'lernstapel',", '').replace(/,\s*\/\* seit CLIE 0\.123\.0[^*]*\*\/\s*'casestudies'/, '');
+  pruefe(samm(SKRIPT) && sammOhneZugabe === samm(WB_SKRIPT), 'dieselben Sammlungen wie die Workbench (plus Lernstapel und Casestudies) — beim Abgleich geht nichts verloren');
   const wb = (n) => (WB_SKRIPT.match(new RegExp("var " + n + "\\s*=\\s*'([^']*)';")) || [])[1];
   const cl = (n) => (SKRIPT.match(new RegExp("var " + n + "\\s*=\\s*'([^']*)';")) || [])[1];
   pruefe(cl('CLIENT_ID') === wb('CLIENT_ID') && cl('DRIVE_DATEI') === wb('DRIVE_DATEI'),
@@ -416,7 +420,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 15 && CL.CL_APPS.length === 33, 'fünfzehn Felder im Raster (3×5 seit 0.89; Coach seit 0.91; Manifest seit 0.109.0 in Roots), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 30, 'zwölf Felder im Raster (seit 0.123.0 mit Casestudies, 3×4), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -546,13 +550,13 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","memo","sammlungen","fokus","einkauf","vorlesen","rechner","ideen","kategorien","leitfaden","lernkartei","gemini","spiele"]'
-    && !CL.clApp('heute') && CL.clApp('coach').raster === false && !CL.clApp('manifest'),
-    'Start 3×5 (seit 0.89): Roots (seit 0.109.0 erste App, mit dem Manifest darin), Date Book, To Do List / Memo Pad, Collections, Fokus / Shopping, Reader, Calc / Idea Lab, Categories, Guide / Flashcards, Coach, Games ▸');
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","memo","sammlungen","fokus","vorlesen","rechner","kategorien","casestudies","lernkartei","spiele"]'
+    && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest'),
+    'Start (seit 0.123.0): Roots, Date Book, To Do List / Memo Pad, Collections, Fokus / Reader, Calc, Categories / Casestudies, Flashcards, Games ▸ — das Raster ist wieder voll');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 15, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/15)');
+  pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -660,56 +664,6 @@ function rechnerTest() {
   CL.tasteGlobal({ key: '^', preventDefault() {} }); CL.tasteGlobal({ key: '2', preventDefault() {} }); CL.tasteGlobal({ key: 'Enter', preventDefault() {} });
   pruefe(gedrueckt && CL.rtText(R.ergebnis) === '49', 'am PC tippt die Tastatur mit (7^2 Enter = 49)');
   CL.oeffne('uebersicht');
-}
-
-/* ============================================================
-   13. Einkauf: geteilte Keep-Notiz
-   Grund: Keep hat für normale Google-Konten keine Schnittstelle.
-   CLIE öffnet nur die gewählte Notiz — und darf dabei keine
-   fremden Adressen öffnen.
-   ============================================================ */
-function einkaufTest() {
-  console.log('\n13. Einkauf');
-  if (!CL) { return; }
-  frisch();
-  const geoeffnet = [];
-  CL.open = function (u) { geoeffnet.push(u); return {}; };
-  CL.oeffne('einkauf');
-  pruefe(CL.cl.aufklapp === 'einkauf' && /einkaufFeld/.test(CL.document.getElementById('aufklapp').innerHTML) && !geoeffnet.length,
-    'ohne Verknüpfung fragt Einkauf nach dem Link');
-  pruefe(CL.cl.app === 'uebersicht', 'Einkauf ist keine eigene Seite');
-  CL.document.getElementById('einkaufFeld').value = 'https://boese.example/keep.google.com';
-  CL.einkaufSpeichern();
-  pruefe(!CL.DB.einstellungen.clieEinkauf && CL.cl.aufklapp === 'einkauf', 'fremde Adressen werden abgelehnt');
-  CL.document.getElementById('einkaufFeld').value = 'javascript:alert(1)';
-  CL.einkaufSpeichern();
-  pruefe(!CL.DB.einstellungen.clieEinkauf, 'auch javascript:-Adressen');
-  const vorStempel = CL.DB.einstellungen.stempel || 0;
-  CL.document.getElementById('einkaufFeld').value = '  https://keep.google.com/#NOTE/abc123  ';
-  CL.einkaufSpeichern();
-  pruefe(CL.DB.einstellungen.clieEinkauf === 'https://keep.google.com/#NOTE/abc123' && CL.cl.aufklapp === '',
-    'ein Keep-Link wird gespeichert (ohne Leerzeichen)');
-  pruefe(CL.DB.einstellungen.stempel >= vorStempel && CL.DB.einstellungen.stempel > 0, 'der Stempel der Einstellungen wird gesetzt — so kommt der Link auf die anderen Geräte');
-  CL.oeffne('einkauf');
-  pruefe(geoeffnet[0] === 'https://keep.google.com/#NOTE/abc123' && CL.cl.aufklapp === '', 'danach öffnet Einkauf direkt die Notiz');
-  /* Fehler aus 0.1.4-Entwurf: mit „noopener“ liefert window.open immer null — CLIE ersetzte sich dann selbst durch Keep. */
-  pruefe(!/window\.open\([^)]*noopener/.test(SKRIPT) && !/location\.href = link/.test(SKRIPT),
-    'Einkauf öffnet ein neues Fenster und ersetzt nie CLIE selbst');
-  CL.open = function (u) { geoeffnet.push(u); return null; };
-  CL.oeffne('einkauf');
-  pruefe(CL.location.href === 'file:///test' && /Pop-ups/.test(CL.document.getElementById('toastText').textContent),
-    'blockiert der Browser das Fenster, bleibt CLIE offen und sagt es');
-  CL.open = function (u) { geoeffnet.push(u); return {}; };
-  geoeffnet.length = 1;
-  CL.DB.einstellungen.clieEinkauf = 'https://anders.example/';
-  CL.oeffne('einkauf');
-  pruefe(geoeffnet.length === 1 && CL.cl.aufklapp === 'einkauf', 'ein untergeschobener fremder Link (etwa per Abgleich) wird nicht geöffnet');
-  CL.aufklappZu();
-  CL.menueUm();
-  pruefe(/menueWahl\('einkauf'\)/.test(CL.document.getElementById('aufklapp').innerHTML), 'im Menü: „Einkauf verknüpfen…“');
-  CL.aufklappZu();
-  CL.DB.einstellungen.clieEinkauf = 'https://keep.google.com/x" onmouseover="alert(1)';
-  pruefe(!/onmouseover="alert/.test(CL.einkaufDialogHtml()), 'der Link wird im Fenster maskiert');
 }
 
 /* ============================================================
@@ -2110,68 +2064,6 @@ function ckKorbTest() {
 }
 
 /* ============================================================
-   97. Coach und Sammler (0.52)
-   Grund: Der Sammler funktioniert nur, wenn er leer wird. Der Coach fragt
-   nach Punkten, die zu lange liegen, bietet Aufräumen an (zu voll oder
-   am gewählten Wochentag), schlägt bei gleichem Thema eine Checkliste
-   vor und fragt nach Checklisten, die seit 30 Tagen ruhen.
-   Erkennt: Alter wird nicht gestempelt, Punkte mit Termin/⚑ werden als
-   „zu lange“ gefragt, Thema-Vorschlag verschiebt nicht, Aufräumen ohne
-   Wirkung, Quelle lässt sich nicht abschalten.
-   ============================================================ */
-function coKorbTest() {
-  console.log('\n97. Coach und Sammler (0.52)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  const vor = n => S.tagePlus(heute, -n);
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
-  S.termineNachTag = {};
-  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, frist: 7, korbGrenze: 5, korbTag: S.ausIso(heute).getDay() });
-  S.DB.themen = [{ id: 'cl-korb', name: 'Sammler', kontext: '', korb: true, ordnung: 0, geaendert: 1,
-    text: '[] Dachrinne reinigen\n[] Carport Fundament klären\n[] Carport Bauamt anrufen\n[] Angebot Carport Maier\n[] Fenster abdichten\n[] Steuer',
-    korbSeit: { 'Dachrinne reinigen': vor(9), 'Fenster abdichten': vor(12) } },
-    { id: 'tr', name: 'Jahresgespräche', text: '[] Bögen', kontext: 'privat', ruht: true, ruhtSeit: vor(34), ordnung: 1, geaendert: 1 }];
-  S.ckStempeln(heute);
-  pruefe(S.DB.themen[0].korbSeit['Steuer'] === heute && S.DB.themen[0].korbSeit['Dachrinne reinigen'] === vor(9), 'neue Sammler-Punkte werden gestempelt, alte behalten ihr Datum');
-  S.ckZusatzSetzen(S.kpSeiteFinden('cl-korb'), 'Fenster abdichten', S.tagePlus(heute, 5), '');
-  let l = S.coFaellige('20:45', heute);
-  const ka = l.filter(f => /^ka:/.test(f.id));
-  pruefe(ka.length === 1 && ka[0].id === 'ka:Dachrinne reinigen' && /seit 9 Tagen im Sammler/.test(ka[0].text) && ka[0].antworten.map(a => a[0]).join() === 'heute,einplanen,checkliste,loeschen',
-    'zu lange im Sammler: nur ohne ⚑/Termin, mit Heute · Einplanen · In Checkliste · Löschen');
-  pruefe(l.some(f => /^kv:/.test(f.id) && /6 Punkte/.test(f.text)), 'zu voll (ab 5): Aufräumen wird angeboten');
-  pruefe(l.some(f => /^kw:/.test(f.id) && /Sammler leeren\?/.test(f.text)), 'am gewählten Wochentag abends: „Sammler leeren?“');
-  const kt = l.filter(f => /^kt:/.test(f.id))[0];
-  pruefe(kt && kt.id === 'kt:carport' && /3 Punkte im Sammler betreffen „Carport“/.test(kt.text), 'gleiches Thema in drei Punkten: Checkliste vorschlagen');
-  const cr = l.filter(f => /^cr:/.test(f.id))[0];
-  pruefe(cr && /ruht seit 34 Tagen/.test(cr.text) && cr.antworten.map(a => a[0]).join() === 'abschliessen,wecken,weiter', 'seit 30 Tagen ruhend: Abschließen · Wecken · Weiter ruhen');
-  /* Antworten */
-  S.coAntwort('kt:carport', 'anlegen', 0, '20:45');
-  const neu = S.DB.themen.filter(x => x.name === 'Carport')[0];
-  pruefe(neu && (neu.text.match(/\[\] /g) || []).length === 3 && !/Carport/.test(S.DB.themen[0].text), 'Thema: Checkliste „Carport“ angelegt, drei Punkte aus dem Sammler hineingelegt');
-  S.coAntwort('ka:Dachrinne reinigen', 'heute', 0, '20:45');
-  pruefe(S.aufGeplant(S.kpSeiteFinden('cl-korb'), 'Dachrinne reinigen').datum === heute, '„Heute“ plant den Sammler-Punkt für heute');
-  S.coAntwort('cr:tr', 'weiter', 2, '20:45');
-  pruefe(S.DB.themen[1].ruht && S.DB.themen[1].ruhtSeit === heute, '„Weiter ruhen“: der Coach fragt erst in 30 Tagen wieder');
-  /* Aufräumen Punkt für Punkt, mit Einsortieren (0.53) */
-  S.coKorbAufraeumen();
-  pruefe(S.cl.app === 'coach' && S.cl.co.ansicht === 'korb' && /Sammler aufräumen · noch 2 von 3/.test(inhalt()) && /Fenster abdichten/.test(inhalt()), 'Aufräumen: ein Punkt nach dem anderen (ohne Termin)');
-  S.coKorbPrio(2);
-  pruefe(/\[\] P2 Fenster abdichten/.test(S.DB.themen[0].text), 'Priorität im Aufräumen setzen');
-  S.coKorbTun('spaeter');
-  pruefe(/Steuer/.test(inhalt()) && /Fenster abdichten<\/span><span class="leise">→ später/.test(inhalt()), '„Später“: weiter zum nächsten, unten „Schon entschieden“');
-  S.coKorbTun('loeschen');
-  pruefe(!/Steuer/.test(S.DB.themen[0].text) && /Alles entschieden/.test(inhalt()), 'Löschen nimmt den Punkt heraus — dann ist alles entschieden');
-  S.coKorbFertig();
-  /* Quelle abschaltbar */
-  S.krFinden('kc-einstellungen').quellen = { korb: false };
-  pruefe(!S.coFaellige('20:45', heute).some(f => /^(ka|kv|kw|kt|cr):/.test(f.id)), 'Quelle „Sammler“ ausgeschaltet: keine Sammler-Fragen');
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
    115. Agenda im Kalender (0.66.0)
    Grund: Wie die „Agenda View“ im Date Book: Termine und To Dos von
    heute auf einen Blick, Überfälliges, morgen in einer Zeile.
@@ -2302,14 +2194,13 @@ function kategorienTest() {
   S.nbDetails(); S.document.getElementById('nbTitel').value = 'Dachskizze'; S.document.getElementById('nbKat').value = k.id; S.nbSpeichern();
   pruefe(b.bereich === k.id, 'Blatt zugeordnet');
   S.memoArtSetzen('');
-  S.iwSpeichern({ id: 'iw-pv', titel: 'Speicher nachrüsten', stufe: 1, status: 'aktiv', bereich: k.id, varianten: [], meilensteine: [], schritte: [], wochen: [] });
   /* Gesamtsicht */
   S.oeffne('kategorien');
-  pruefe(/katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">7</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 7“');
+  pruefe(/katOeffnen\('[^']+'\)"><span class="tx">PV-Anlage<\/span><span class="kat-zahl">6</.test(inhalt()), 'App „Kategorien“: „PV-Anlage · 6“');
   S.katOeffnen(k.id);
   const g = inhalt();
   pruefe(/To Do · offen/.test(g) && /Foto machen/.test(g) && /Listen/.test(g) && /Zählerschrank/.test(g) && /Projekte · Ziele/.test(g) && /PV-Anlage Haus/.test(g)
-    && /Notizen/.test(g) && /Angebote Vergleich/.test(g) && /Dachskizze/.test(g) && /Speicher nachrüsten/.test(g) && /PV-Angebote/.test(g), 'Gesamtsicht: To Dos, Listen, Projekte, Notizen, Blätter, Ideen, Sammlungen');
+    && /Notizen/.test(g) && /Angebote Vergleich/.test(g) && /Dachskizze/.test(g) && /PV-Angebote/.test(g), 'Gesamtsicht: To Dos, Listen, Projekte, Notizen, Blätter, Sammlungen');
   pruefe(S.document.getElementById('reiter').textContent === 'PV-Anlage', 'Reiter: Name der Kategorie');
   S.katNeuIn(); S.document.getElementById('katNeuName').value = 'Fragen an ZEO'; S.katNeuAnlegenIn('notiz');
   const neu = S.kpSeitenAlle().filter(x => x.titel === 'Fragen an ZEO')[0];
@@ -2323,7 +2214,7 @@ function kategorienTest() {
   S.katDetails(k.id); S.document.getElementById('katName').value = 'Photovoltaik'; S.katSpeichern();
   pruefe(S.ckBereichName(k.id) === 'Photovoltaik', 'umbenennen');
   S.katDetails(k.id); S.katLoeschenFragen(); S.katLoeschen();
-  pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich && !S.iwFinden('iw-pv').bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
+  pruefe(!S.ckBereichName(k.id) && !li.__satz.bereich && !no.__satz.bereich && !sa.bereich && !b.bereich, 'löschen: Kategorie weg, Einträge nicht zugeordnet');
   S.oeffne('uebersicht');
 }
 
@@ -2643,7 +2534,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,memo,sammlungen,fokus,einkauf,vorlesen,rechner,ideen,kategorien,leitfaden,lernkartei,gemini,spiele', 'Start: fünfzehn Felder (3×5 seit 0.89), Fokus an Shoppings Stelle seit 0.98.1, SOS nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,memo,sammlungen,fokus,vorlesen,rechner,kategorien,casestudies,lernkartei,spiele', 'Start: zwölf Felder (seit 0.123.0), SOS nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -2908,137 +2799,6 @@ function minenPuzzleTest() {
 }
 
 /* ============================================================
-   123. Leitfaden: ein Problem nach Standardverfahren (0.68)
-   Grund: Methodisches Arbeiten (Konstruktion, Diagnose, Abwicklung,
-   Intervention, Verhandlung) getrennt vom Tagesgeschäft; ins To Do geht
-   nur der nächste Schritt.
-   Erkennt: Verfahren unvollständig, Fall ohne Kategorie/Kontext, Notizen
-   gehen verloren, Schritt doppelt in To Do, Abhaken nicht in beide
-   Richtungen, Fall fehlt in Kategorien/Suche, Privates sichtbar,
-   Brücke aus der Ideenwerkstatt fehlt.
-   ============================================================ */
-function leitfadenTest() {
-  console.log('\n123. Leitfaden: ein Problem nach Standardverfahren (0.68)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  S.localStorage.removeItem('clie-privat'); S.localStorage.removeItem('clie-pin');
-  const heute = S.isoDatum();
-  pruefe(S.clApp('leitfaden') && S.clApp('leitfaden').raster !== false && !S.clOrdnerVon('leitfaden') && S.clApp('leitfaden').name === 'Guide' && /M16 46h9v-8h9v-8h9v-8h7/.test(S.clSymbol('leitfaden')),
-    'App „Guide“ (Leitfaden) seit 0.89 direkt auf dem Start, Symbol Stufen');
-  pruefe(S.LF_ARTEN.length === 5 && S.LF_ARTEN.every(a => a.schritte.length === 5 && a.schritte.every(s => s[0] && s[1])) && S.LF_ARTEN[4].schritte[0][0] === 'Plan B',
-    'fünf Verfahren mit je fünf Schritten (Name und Erklärung); Verhandlung beginnt mit Plan B');
-  S.oeffne('leitfaden');
-  pruefe(S.document.getElementById('reiter').textContent === 'Leitfaden' && /lfNeu\(\)/.test(S.document.getElementById('fuss').innerHTML), 'Liste: Reiter „Leitfaden“, unten „Neu“');
-  /* Neu */
-  S.katSetzen('kb-arbeit');
-  S.lfNeu();
-  let w = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'leitfaden' && (w.match(/lfArtWahl\(/g) || []).length === 5 && /id="lfKat"/.test(w) && /id="lfPrivat"/.test(w) && /Kepner-Tregoe/.test(w), 'Neu: Titel, fünf Verfahren mit „wann“, Kategorie, privat');
-  S.document.getElementById('lfTitel').value = 'Heizung taktet';
-  S.document.getElementById('lfKat').value = 'kb-arbeit'; S.document.getElementById('lfPrivat').checked = false;
-  S.lfSpeichern();
-  pruefe(S.lfAlle().length === 0 && S.cl.aufklapp === 'leitfaden', 'ohne Verfahren wird nichts angelegt');
-  S.lfArtWahl('diagnose');
-  S.document.getElementById('lfTitel').value = 'Heizung taktet';
-  S.document.getElementById('lfKat').value = 'kb-haus';
-  S.lfSpeichern();
-  const f = S.lfAlle()[0];
-  pruefe(f && f.art === 'diagnose' && f.bereich === 'kb-haus' && f.kontext === 'privat' && f.typ === 'leitfaden' && /^lf-/.test(f.id) && S.DB.kurs.indexOf(f) >= 0,
-    'Fall angelegt: in der workbench.json (kurs), mit Kategorie und abgeleitetem Kontext');
-  S.katSetzen('alle');
-  pruefe(S.cl.lf.id === f.id && S.document.getElementById('reiter').textContent === 'Heizung taktet' && S.document.getElementById('katKnopf').textContent === 'Diagnose',
-    'nach OK: der Fall offen, oben Titel und Verfahren');
-  let h = inhalt();
-  pruefe((h.match(/lfSchrittZeigen\(/g) || []).length === 9 && /id="lfT_was_ist"/.test(h) && /id="lfNotiz"/.test(h) && /lfInsToDo\(\)/.test(h),
-    'Stufen 1–5, Schritt 1 offen mit Ist/Ist-Nicht-Tabelle, Notiz und „→ To Do“');
-  S.lfTabelleGetippt('was', 'ist', 'Brenner taktet'); S.lfTabelleGetippt('was', 'nicht', 'Warmwasser ok');
-  S.lfTabelleGetippt('quatsch', 'ist', 'x');
-  S.document.getElementById('lfNotiz').value = 'seit Oktober, nachts';
-  S.lfNotizGetippt();
-  pruefe(f.tabelle.was.ist === 'Brenner taktet' && !f.tabelle.quatsch && f.schritte[0].notiz === 'seit Oktober, nachts', 'Tabelle und Notiz werden gemerkt — Unbekanntes nicht');
-  S.lfSchrittFertig();
-  h = inhalt();
-  pruefe(f.schritte[0].fertig && S.cl.lf.offen === 1 && /<td>Brenner taktet<\/td>/.test(h) && !/id="lfT_was_ist"/.test(h), 'Schritt fertig: weiter zu Schritt 2, dort die Tabelle zum Lesen');
-  /* → To Do */
-  S.document.getElementById('lfNotiz').value = '';
-  S.lfInsToDo();
-  const korb = S.ckKorb(false);
-  const text = 'Heizung taktet: Unterschiede & Veränderungen';
-  pruefe(korb && /\[\] Heizung taktet: Unterschiede & Veränderungen/.test(korb.text) && f.schritte[1].aufgabe && f.schritte[1].aufgabe.seite === korb.id
-    && /Leitfaden: Heizung taktet · Schritt 2/.test(S.ckZusatz(korb, text).notiz || ''), '→ To Do: genau eine Aufgabe im Sammler, mit Notiz zurück zum Fall');
-  pruefe(S.clTagZeilen(heute).some(z => z.a && /Unterschiede/.test(z.a.text)), 'die Aufgabe ist für heute eingeplant');
-  S.lfInsToDo();
-  pruefe((korb.text.match(/Unterschiede/g) || []).length === 1 && !/lfInsToDo\(\)/.test(inhalt()), 'kein zweites Mal — der Schritt steht schon in To Do');
-  /* In To Do abgehakt → im Fall erledigt */
-  const nr = korb.text.split('\n').findIndex(z => /Unterschiede/.test(z));
-  S.kpSeiteKastenUmKern(korb, nr);
-  S.lfZurListe(); S.lfOeffnen(f.id);
-  pruefe(f.schritte[1].fertig && S.cl.lf.offen === 2, 'in To Do abgehakt → beim Öffnen auch im Fall erledigt');
-  /* Im Fall wieder öffnen → Aufgabe wieder offen */
-  S.lfSchrittZeigen(1); S.lfSchrittFertig();
-  pruefe(!f.schritte[1].fertig && /\[\] Heizung taktet: Unterschiede/.test(korb.text), 'im Fall wieder geöffnet → die Aufgabe ist wieder offen');
-  S.lfSchrittFertig();
-  pruefe(f.schritte[1].fertig && /\[x\] Heizung taktet: Unterschiede/.test(korb.text), 'im Fall fertig → die Aufgabe ist abgehakt');
-  [2, 3, 4].forEach(i => { S.lfSchrittZeigen(i); S.lfSchrittFertig(); });
-  pruefe(f.fertig && S.lfZahlFertig(f) === 5 && /Alle fünf Schritte erledigt/.test(inhalt()), 'alle fünf Schritte → der Fall ist fertig');
-  S.lfZurListe();
-  pruefe(/Fertige…<\/span><small>1/.test(inhalt()) && !/Heizung taktet/.test(inhalt()), 'Liste: fertige Fälle nur gezählt');
-  S.lfFertigeUm();
-  pruefe(/Heizung taktet/.test(inhalt()) && /5\/5/.test(inhalt()), '„Fertige“ aufgeklappt zeigt sie');
-  S.lfFertigeUm();
-  /* Kategorien, Suche, Filter */
-  const v = S.lfAnlegen('Lieferant Preiserhöhung', 'verhandlung', 'kb-arbeit', false);
-  S.lfSchritte(v)[0].notiz = 'Plan B: Zweitlieferant Meier';
-  pruefe(v.kontext === 'beruflich' && S.katInhalt('kb-arbeit').faelle.indexOf(v) >= 0 && S.katInhalt('kb-haus').faelle.indexOf(f) < 0, 'Kategorien-Gesamtsicht: offene Fälle (fertige nicht)');
-  pruefe(S.suTreffer('zweitlieferant').some(x => x.gruppe === 'leitfaden') && S.suTreffer('preiserhöhung').length, 'Suche findet Titel und Notizen der Schritte');
-  S.katSetzen('kb-haus');
-  pruefe(!/Lieferant/.test(inhalt()), 'das ▼ filtert nach Kategorie');
-  S.katSetzen('alle');
-  /* Privat */
-  const p = S.lfAnlegen('Arztbrief', 'abwicklung', '', true);
-  S.prModusSetzen('maskieren');
-  pruefe(/— privat —/.test(inhalt()) && !/Arztbrief/.test(inhalt()) && !S.suTreffer('arztbrief').length, 'privat: maskiert in Liste und Suche');
-  S.lfOeffnen(p.id);
-  pruefe(!/Arztbrief/.test(inhalt()) && S.document.getElementById('reiter').textContent === '— privat —', 'privat: geöffnet nur die Maske');
-  S.localStorage.removeItem('clie-privat'); S.cl.pr.zurueck = '';
-  S.lfSchrittZeigen(0); S.lfInsToDo();
-  pruefe(S.ckZusatz(korb, 'Arztbrief: Pflichtliste').privat === true, 'privater Fall → private Aufgabe in To Do');
-  /* Oben rechts und Zurück */
-  S.katUm();
-  pruefe(S.cl.aufklapp === '', 'im Fall öffnet oben rechts kein ▼');
-  S.clZurueck();
-  pruefe(S.cl.app === 'leitfaden' && !S.cl.lf.id, 'Zurück: vom Fall zur Liste');
-  /* Brücke aus der Ideenwerkstatt */
-  S.iwSpeichern({ id: 'iw-cp', titel: 'Carport', stufe: 4, status: 'aktiv', entscheidung: 'go', gewaehlt: 'v2', bereich: 'kb-haus',
-    varianten: [{ id: 'v1', name: 'Metall', groesse: 'S' }, { id: 'v2', name: 'Holz, Flachdach', groesse: 'M' }], meilensteine: [], schritte: [], wochen: [] });
-  S.oeffne('ideen'); S.iwOeffnen('iw-cp'); S.cl.iw.stufe = 4; S.cl.iw.frisch = true; S.zeichne();
-  pruefe(/lfAusIdee\('iw-cp'\)/.test(inhalt()) && /Als Konstruktion durcharbeiten/.test(inhalt()), 'Ideenwerkstatt, Entscheiden mit Go: „Als Konstruktion durcharbeiten →“');
-  S.lfAusIdee('iw-cp');
-  const k = S.lfAlle().filter(x => x.idee === 'iw-cp')[0];
-  pruefe(k && k.art === 'konstruktion' && k.bereich === 'kb-haus' && /Holz, Flachdach ★/.test(k.schritte[2].notiz) && S.cl.app === 'leitfaden' && S.cl.lf.id === k.id && /aus der Ideenwerkstatt/.test(inhalt()),
-    'Konstruktion angelegt: Kategorie und Varianten (★) übernommen, Verweis zurück');
-  S.lfAusIdee('iw-cp');
-  pruefe(S.lfAlle().filter(x => x.idee === 'iw-cp').length === 1, 'zweites Mal: derselbe Fall, kein neuer');
-  /* Intervention → Diagnose */
-  const iv = S.lfAnlegen('Server down', 'intervention', 'kb-arbeit', false);
-  S.lfSchritte(iv)[1].notiz = 'Platte voll';
-  S.lfSchritte(iv).forEach(s => { s.fertig = true; });
-  S.lfOeffnen(iv.id);
-  pruefe(/lfAlsDiagnose\(\)/.test(inhalt()), 'Intervention fertig: „Als Diagnose weiter →“');
-  S.lfAlsDiagnose();
-  const d = S.lfFinden(S.cl.lf.id);
-  pruefe(d && d.art === 'diagnose' && d.bereich === 'kb-arbeit' && /Platte voll/.test(d.schritte[0].notiz), 'Diagnose angelegt, die Lage als Ausgangspunkt');
-  /* Details und Löschen */
-  S.lfDetails();
-  pruefe(!/lfArtWahl/.test(S.document.getElementById('aufklapp').innerHTML) && /lfLoeschenFragen/.test(S.document.getElementById('aufklapp').innerHTML), 'Details: Verfahren fest, Löschen…');
-  S.lfLoeschenFragen(); S.lfLoeschen();
-  pruefe(!S.lfFinden(d.id) && !S.cl.lf.id, 'Löschen entfernt den Fall');
-  pruefe(/^\d+ Fälle offen$|^1 Fall offen$/.test(S.ordnerStandText('leitfaden')), 'Ordner Planung: Stand „… offen“ — ' + S.ordnerStandText('leitfaden'));
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
    122. Private Termine, „privat“ ohne Symbol (0.67)
    Grund: „privat“ soll auch für Termine gelten — als Googles eigene
    Sichtbarkeit „Privat“ — und überall ohne 🔒 erscheinen.
@@ -3126,8 +2886,13 @@ function katStattBerufTest() {
   S.DB.jahrestermine = [{ id: 'j1', titel: 'Dienstreise Fürth', von: '2026-11-04', art: 'dienstreise', geaendert: 1 }];
   const n = S.clKategorienUmstellen();
   pruefe(n === 3 && S.DB.themen[0].bereich === 'kb-arbeit' && !S.DB.themen[1].bereich && S.DB.themen[2].bereich === 'kb-freizeit'
-    && S.DB.aufgaben[0].bereich === 'kb-arbeit' && S.DB.jahrestermine[0].bereich === 'kb-arbeit' && S.DB.themen[0].geaendert > 1,
+    && S.DB.aufgaben[0].bereich === 'kb-arbeit' && S.DB.jahrestermine[0].bereich === 'kb-arbeit',
     'Umstellung: Berufliches ohne Kategorie → Arbeit (auch Routinen, Jahrestermine nach Art); Vorhandenes bleibt');
+  /* Bis 0.123.0 verlangte dieser Test „geaendert > 1“ — also genau den frischen
+     Stempel, der am 13.11.2026 zwei Wochen Arbeit gekostet hat. Seit 0.124.0
+     gilt das Gegenteil: Eine Umstellung ist keine Benutzeränderung. */
+  pruefe(S.DB.themen[0].geaendert === 1 && S.DB.jahrestermine[0].geaendert === 1,
+    'und sie lässt den Änderungsstempel in Ruhe — sonst gewänne ein veraltetes Gerät jeden Abgleich');
   pruefe(S.clKategorienUmstellen() === 0, 'die Umstellung läuft nur einmal (nichts mehr zu tun)');
   /* Kontext folgt der Kategorie — für die Workbench */
   const o = { kontext: 'beruflich', bereich: 'kb-arbeit' };
@@ -3360,10 +3125,6 @@ function notizblockTest() {
   S.nbNeu(); const b2 = S.nbFinden(S.cl.nb.id); strich('pen', [[10, 10], [60, 60]], 0.5);
   S.hsAblegen('nur', '');
   pruefe(b2.bei && b2.bei.nur, '„nur ablegen“');
-  S.nbNeu(); const b3 = S.nbFinden(S.cl.nb.id); strich('pen', [[10, 10], [60, 60]], 0.5);
-  S.hsAblegen('idee', '');
-  const idee = S.iwFinden(b3.bei && b3.bei.idee);
-  pruefe(idee && /nbOeffnen/.test(S.nbAnhaengeHtml('idee', idee.id)), 'als Idee: die Idee zeigt das Blatt');
   /* Details: Titel, Löschen */
   S.nbOeffnen(b2.id);
   S.nbDetails();
@@ -3434,7 +3195,7 @@ function handschriftTest() {
   pruefe(S.cl.hs.gesammelt.length === 2 && /Gesammelt: /.test(inhalt()), 'zwei Punkte gesammelt');
   /* Ablegen im Projekt: Zeile und Punkte dort */
   S.hsAblegenFragen();
-  pruefe(S.cl.aufklapp === 'handschrift' && /Ideenwerkstatt/.test(S.hsFensterHtml()) && /2 gesammelte Punkte/.test(S.hsFensterHtml()), 'Ablegen: Seite, Idee oder nur ablegen — Punkte gehen mit');
+  pruefe(S.cl.aufklapp === 'handschrift' && !/Ideenwerkstatt/.test(S.hsFensterHtml()) && /2 gesammelte Punkte/.test(S.hsFensterHtml()), 'Ablegen: Seite oder nur ablegen — Punkte gehen mit, die Ideenwerkstatt gibt es seit 0.122.0 nicht mehr');
   S.hsFensterSchritt('ziel');
   pruefe(/hsAblegen\('seite','pj1'\)">◎ Carport/.test(S.hsFensterHtml()), 'zur Wahl: Projekte, Ziele, Listen, Notizen');
   S.hsAblegen('seite', 'pj1');
@@ -3452,22 +3213,9 @@ function handschriftTest() {
   S.hsAblegen('nur', '');
   pruefe(S.krFinden('hs-f2aaaaaa') && S.krFinden('hs-f2aaaaaa').abgelegt === heute && /\[\] Garten planen/.test(S.ckKorb(false).text), '„nur ablegen“: gemerkt, Punkte im Sammler');
   pruefe(S.hsEingang().length === 0 && /Alles verarbeitet/.test(inhalt()), 'Eingang leer');
-  /* Als Idee */
-  S.cl.hs.liste.push({ id: 'f4aaaaaa', name: 'Hochbeet.pdf', mimeType: 'application/pdf', modifiedTime: alt });
-  S.hsOeffnen('f4aaaaaa'); S.hsAblegen('idee', '');
-  const idee = S.iwAlle().filter(x => x.titel === 'Hochbeet')[0];
-  pruefe(idee && JSON.stringify(idee.skizzen) === '["f4aaaaaa"]', 'als neue Idee: Titel aus dem Dateinamen, Handschrift hängt daran');
   /* Liste zeigt die Zeile ebenfalls */
   S.DB.themen.push({ id: 'lx', name: 'Haus', text: '[] a\n!skizze:f4aaaaaa', kontext: 'privat', ordnung: 1, geaendert: 1 });
   pruefe(/hs-anhang/.test(S.ckListeHtml(S.kpSeiteFinden('lx'))), 'auch in einer Liste als Vorschau');
-  /* Coach: erst bei Stau (≥ 5, älteste ≥ 7 Tage), dann eine Woche Ruhe */
-  S.cl.hs.liste = [1, 2, 3, 4].map(i => ({ id: 'n' + i + 'aaaaaa', name: 'N' + i + '.pdf', mimeType: 'application/pdf', modifiedTime: alt }));
-  pruefe(S.coHandschriftFragen(heute).length === 0, 'vier im Eingang: der Coach schweigt');
-  S.cl.hs.liste.push({ id: 'n5aaaaaa', name: 'N5.pdf', mimeType: 'application/pdf', modifiedTime: alt });
-  const q = S.coHandschriftFragen(heute);
-  pruefe(q.length === 1 && /5 Handschriften im Eingang, die älteste seit 10 Tagen/.test(q[0].text), 'fünf, älteste seit 10 Tagen: eine ruhige Frage');
-  S.coRuheSetzen(q[0].id, S.tagePlus(heute, 7));
-  pruefe(S.coHandschriftFragen(heute).length === 0, '„Später“: eine Woche Ruhe');
   S.memoArtSetzen('');
   pruefe(!/hs-zeile/.test(inhalt()) && S.localStorage.getItem('clie-memo-art') === '', '▼ Notizen: wieder die Notizen, gemerkt auf dem Gerät');
   S.oeffne('uebersicht');
@@ -3493,7 +3241,6 @@ function ohneHeuteTest() {
   pruefe(!/oeffne\('heute'\)|oeffne\(\\'heute\\'\)|function heuteHtml|function clHeuteZahl|function silkZeichnen|heuteZahl|cl\.app === 'heute'/.test(QUELLE), 'keine Reste: kein Aufruf ins Leere');
   S.oeffne('heute');
   pruefe(S.cl.app === 'uebersicht', 'ein alter Verweis auf „Heute“ landet auf der Übersicht');
-  pruefe(/if \(code === 'einzeln'\) \{ oeffne\('kalender'\); clKalGehe\(isoDatum\(\), 'tag'\)/.test(QUELLE), 'Coach „einzeln“ öffnet den Tag im Kalender');
 }
 
 /* ============================================================
@@ -3529,7 +3276,7 @@ function sammlerTest() {
   pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
   S.aufklappZu();
   const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 15 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 15 Felder (seit 0.89)');
+  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 12 Felder (seit 0.123.0)');
   S.oeffne('uebersicht');
 }
 
@@ -3850,39 +3597,6 @@ function sammlungSucheTest() {
 }
 
 /* ============================================================
-   104. Morgengruß statt Routine (0.56.1)
-   Grund: Die Borkum-Morgenroutine als Checkliste machte morgens Druck.
-   Stattdessen nur ein ruhiger Satz bis 10 Uhr — ohne Abhaken, ohne
-   Zählen, ohne Erinnerung aufs Handy.
-   Erkennt: Gruß fehlt morgens oder bleibt nach 10 Uhr/„Danke“, wird in
-   der workbench.json gezählt, verdrängt nicht die Coach-Frage, lässt sich
-   nicht ausschalten.
-   ============================================================ */
-function morgengrussTest() {
-  console.log('\n104. Morgengruß statt Routine (0.56.1)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  S.localStorage.removeItem('clie-morgengruss');
-  const g = S.coMorgengruss('07:10', heute);
-  pruefe(g && S.CO_MORGENGRUSS.indexOf(g) >= 0, 'morgens ein Satz aus der Liste');
-  pruefe(S.coMorgengruss('10:00', heute) === '' && S.coMorgengruss('03:30', heute) === '', 'nur von 4 bis 10 Uhr');
-  pruefe(S.coMorgengruss('07:10', heute) !== S.coMorgengruss('07:10', S.tagePlus(heute, 1)) || S.CO_MORGENGRUSS.length === 1, 'wechselt täglich');
-  const vorher = JSON.stringify(S.DB);
-  S.coMorgengrussWeg();
-  pruefe(S.coMorgengruss('07:10', heute) === '' && JSON.stringify(S.DB) === vorher, '„Danke“: für heute weg — nur auf dem Gerät, nichts in der workbench.json');
-  S.localStorage.removeItem('clie-morgengruss');
-  pruefe(/Danke/.test(S.coMorgengrussHtml()) || S.clUhrzeit() >= '10:00' || S.clUhrzeit() < '04:00', 'Coach-Zeile zeigt morgens den Gruß mit „Danke“');
-  pruefe(!/coAntwort|Kalender/.test(S.coMorgengrussHtml()) && !/co-ant/.test(S.coMorgengrussHtml()), 'keine Frage, kein Abhaken');
-  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', morgengruss: [] });
-  pruefe(S.coMorgengruss('07:10', heute) === '', 'leere Liste: ausgeschaltet');
-  S.krFinden('kc-einstellungen').morgengruss = ['Nur atmen.'];
-  pruefe(S.coMorgengruss('07:10', heute) === 'Nur atmen.', 'eigene Sätze');
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
    103. Kampagne, Regel-Check, Pre-Commitment, 7-Tage-Schnitt (0.56)
    Grund: Alexanders 12-Wochen-Kampagne — Phasen mit Meilensteinen am
    7-Tage-Schnitt, Do's und Don'ts (mit Ausnahme-Kontingent) und der
@@ -3899,9 +3613,7 @@ function kampagneTest() {
   const S = CL;
   const heute = S.isoDatum();
   const vor = n => S.tagePlus(heute, -n);
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf'; S.termineNachTag = {};
-  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, morgen: '07:30', nachmittag: '16:30', abend: '20:30' });
+  S.termineNachTag = {};
   const ph = S.kkPhaseLesen('28.09.2026 – 25.10.2026 | 102,9 erste Bastion | Fundament legen', 1);
   pruefe(ph && ph.von === '2026-09-28' && ph.bis === '2026-10-25' && ph.ziel === 102.9 && ph.zielName === 'erste Bastion' && ph.fokus === 'Fundament legen', 'Phase lesen: von – bis | Ziel Name | Fokus');
   const r = S.kkRegelLesen('✗ Alkohol 0,0 (max 1/Woche)');
@@ -3913,7 +3625,7 @@ function kampagneTest() {
   S.DB.sammlungen.push({ id: 'sg', name: 'Gewicht', art: 'frei', kontext: 'privat', felder: [{ id: 'fd', name: 'Datum', typ: 'datum' }, { id: 'fk', name: 'kg', typ: 'zahl' }], rollen: {}, geaendert: 1 });
   [0, 1, 2, 3, 4, 5, 6].forEach(n => S.DB.datensaetze.push({ id: 'a' + n, sammlung: 'sg', werte: { fd: vor(n), fk: 102 }, geaendert: 1 }));
   [7, 8, 9].forEach(n => S.DB.datensaetze.push({ id: 'b' + n, sammlung: 'sg', werte: { fd: vor(n), fk: 102.5 }, geaendert: 1 }));
-  pruefe(Math.abs(S.coSchnitt(S.saFinden('sg'), 'fk', heute, 7) - 102) < 0.001, '7-Tage-Schnitt');
+  pruefe(Math.abs(S.kkSchnitt(S.saFinden('sg'), 'fk', heute, 7) - 102) < 0.001, '7-Tage-Schnitt');
   /* Kampagne über das Fenster anlegen */
   S.oeffne('kurs'); S.krAnsicht('kampagne');
   S.krFensterAuf('kampagne');
@@ -3927,15 +3639,11 @@ function kampagneTest() {
   pruefe(k && k.name === 'Abnehmen' && k.phasen.length === 2 && k.regeln.length === 2 && k.regeln[0].kontingent === 1 && k.regeln[0].id, 'Kampagne gespeichert: Phasen und Regeln mit Kennung');
   const kopf = S.kkKopfText(k, heute);
   pruefe(/Woche 5 von 12/.test(kopf) && /Phase 2 \(Ausdauer\)/.test(kopf) && /7-Tage-Schnitt kg 102 — noch 0,5 bis „Halbzeit-Bastion“ \(101,5\)/.test(kopf), 'Kopf: Woche, Phase mit Fokus, Schnitt und nächster Meilenstein (erste Bastion schon erreicht)');
-  /* Coach: morgens Kampagne, abends Regel-Check */
-  pruefe(S.coFaellige('07:40', heute).some(f => f.id === 'kk:' + heute), 'morgens: Kampagne im Coach');
-  pruefe(S.coFaellige('21:00', heute).some(f => f.id === 'rc:' + heute), 'abends: Regel-Check');
   S.krRegelCheckAuf();
   pruefe(S.cl.kr.ansicht === 'regelcheck' && /Ausnahme \(1\)/.test(inhalt()), 'Regel-Check: ✓ / ✗ / Ausnahme (1 frei)');
   S.krRegelSetzen(k.regeln[0].id, 'aus'); S.krRegelSetzen(k.regeln[1].id, 'ok');
   S.krRegelCheckSpeichern();
   pruefe(k.tage[heute][k.regeln[0].id] === 'aus' && S.kkAusnahmen(k, k.regeln[0].id, heute) === 1, 'gespeichert, Ausnahme gezählt');
-  pruefe(!S.coFaellige('21:05', heute).some(f => f.id === 'rc:' + heute), 'nach dem Check fragt der Coach nicht mehr');
   k.tage[vor(1)] = {}; k.tage[vor(1)][k.regeln[0].id] = 'ok';
   if (S.montagVon(vor(1)) === S.montagVon(heute)) {
     k.tage[vor(1)][k.regeln[0].id] = 'aus';
@@ -3946,83 +3654,6 @@ function kampagneTest() {
     k.tage[vor(1)][k.regeln[0].id] = 'ok';
   }
   pruefe(S.kkSerie(k, k.regeln[1].id) === 1 && S.kkSerie(k, k.regeln[0].id) === 2, 'Serie: gehaltene Tage am Stück (Ausnahme zählt als gehalten)');
-  /* Pre-Commitment */
-  const morgen = S.tagePlus(heute, 1);
-  S.termineNachTag[morgen] = [{ id: 't9', zeit: '19:00', bis: '22:00', titel: 'Abendessen Restaurant Krone', kontext: 'privat' }];
-  const pc = S.coFaellige('17:00', heute).filter(f => f.id === 'pc:t9')[0];
-  pruefe(pc && /Was isst und trinkst du dort\?/.test(pc.text) && pc.eingabeText, 'am Vortag: Termin mit Essen → jetzt festlegen');
-  S.coAntwort('pc:t9', 'festlegen', 0, '17:00', 'Salat, Wasser');
-  pruefe(S.krFinden('kpc-t9') && S.krFinden('kpc-t9').text === 'Salat, Wasser', 'Festgelegtes gespeichert');
-  S.termineNachTag[heute] = [{ id: 't9', zeit: '19:00', bis: '22:00', titel: 'Abendessen Restaurant Krone', kontext: 'privat' }];
-  const tv = S.coFaellige('18:30', heute).filter(f => f.id === 'tv:t9')[0];
-  pruefe(tv && /Festgelegt: „Salat, Wasser“/.test(tv.text), 'vor dem Termin erinnert der Coach daran');
-  /* Gewicht eintragen: 7-Tage-Schnitt in der Antwort */
-  S.cl.co.tag = '';
-  S.krFinden('kc-einstellungen').sammlungen = { sg: { takt: 'taeglich', ab: '07:00' } };
-  S.DB.datensaetze = S.DB.datensaetze.filter(d => d.id !== 'a0');
-  const se = S.coFaellige('08:00', heute).filter(f => f.id === 'se:sg')[0];
-  pruefe(!!se, 'Coach fragt nach dem Gewicht');
-  S.coAntwort('se:sg', 'eintragen', 0, '08:00', '101,3');
-  pruefe(/7-Tage-Schnitt 101,9 \(−0,6 zur Vorwoche\)/.test(S.document.getElementById('toastText').textContent), 'Antwort mit 7-Tage-Schnitt und Vergleich zur Vorwoche — ' + S.document.getElementById('toastText').textContent);
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
-   102. Substanz, Verbindlichkeit, Routine im Coach (0.55)
-   Grund: Alexanders „Einordnung substanzieller Aufgaben“ — Substanz
-   (bleibendes Ergebnis, Hebel) = P1/P2, Verbindlichkeit = ⚑, Routine =
-   Routinen, Rest = Organisation. Der Coach fragt beim Einsortieren mit den
-   Prüffragen, macht den Nachher-Test, legt morgens einen Stein vor und
-   fragt bei ★-Checklisten, ob sie sich bewegen oder nur verwaltet werden.
-   Erkennt: Prüffragen ergeben falsche Stufe, Nachher-Test fehlt oder fragt
-   bei P3, Umformulieren ändert den Text nicht (oder verliert P), Bilanz
-   ohne Routinen, ★-Check fehlt.
-   ============================================================ */
-function coSubstanzTest() {
-  console.log('\n102. Substanz, Verbindlichkeit, Routine im Coach (0.55)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf'; S.termineNachTag = {};
-  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, morgen: '07:30', abend: '20:30' });
-  pruefe(S.coSubstanzStufe(true, true) === 1 && S.coSubstanzStufe(true, false) === 2 && S.coSubstanzStufe(false, true) === 2 && S.coSubstanzStufe(false, false) === 3, 'Prüffragen: zweimal Ja → P1, einmal → P2, keinmal → P3');
-  pruefe(S.coOrgaKlang('P1 Carport Angebote anschauen') && S.coOrgaKlang('Testdaten-Thema mit Team besprechen') && !S.coOrgaKlang('Carport: Angebotsvergleich abgeschlossen & Favorit gewählt') && !S.coOrgaKlang('Fachbuchkapitel durcharbeiten'),
-    'Nachher-Test erkennt Organisatorisches an typischen Verben');
-  /* Sammler aufräumen mit Prüffragen */
-  S.DB.themen = [{ id: 'cl-korb', name: 'Sammler', kontext: '', korb: true, ordnung: 0, geaendert: 1, text: '[] Fundamentplan zeichnen' },
-    { id: 'tc', name: 'Carport', kontext: 'privat', stern: true, ordnung: 1, geaendert: 1, text: '[] P1 Carport Angebote anschauen\n[] Ordner anlegen' }];
-  S.coKorbAufraeumen();
-  pruefe(/coKorbPruef\('ergebnis',true\)/.test(inhalt()) && /coKorbPruef\('hebel',false\)/.test(inhalt()) && /1–2 Substanz/.test(inhalt()), 'Aufräumen: zwei Prüffragen, Hinweis „1–2 Substanz“');
-  S.coKorbPruef('ergebnis', true);
-  pruefe(/\[\] Fundamentplan zeichnen/.test(S.DB.themen[0].text), 'nach der ersten Antwort noch nichts geändert');
-  S.coKorbPruef('hebel', true);
-  pruefe(/\[\] P1 Fundamentplan zeichnen/.test(S.DB.themen[0].text) && /Substanz — P1/.test(S.document.getElementById('toastText').textContent), 'beide Ja: P1 (Substanz)');
-  S.coKorbFertig();
-  /* Nachher-Test */
-  const l = S.coFaellige('09:00', heute);
-  const nt = l.filter(f => /^nt:/.test(f.id));
-  pruefe(nt.length === 2 && nt[0].id === 'nt:P1 Carport Angebote anschauen' && nt[0].eingabe && nt[0].eingabeText && nt.some(f => f.id === 'nt:Ordner anlegen'),
-    'Nachher-Test: P1 und Punkte aus ★-Checklisten, die nach Organisation klingen — mit Textfeld');
-  S.coAntwort('nt:P1 Carport Angebote anschauen', 'umformulieren', 0, '09:00', 'Carport: Angebotsvergleich abgeschlossen & Favorit gewählt');
-  pruefe(/\[\] P1 Carport: Angebotsvergleich abgeschlossen & Favorit gewählt/.test(S.DB.themen[1].text) && !/anschauen/.test(S.DB.themen[1].text), 'Umformulieren: neuer Text, P1 bleibt');
-  S.coAntwort('nt:Ordner anlegen', 'orga', 1, '09:00');
-  pruefe(/\[\] Ordner anlegen/.test(S.DB.themen[1].text), '„Ist Organisation“: P3');
-  /* Morgen: der Stein */
-  S.DB.themen[1].text += '\n[] P2 Fundamentplan freigeben';
-  const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
-  pruefe(mo && /Dein Stein fürs Mauerwerk heute: „/.test(mo.text), 'Morgen: zuerst ein Stein fürs Mauerwerk');
-  /* Bilanz mit Routinen, ★-Check */
-  S.DB.aufgaben.push({ id: 'r1', titel: 'Tabletten', wiederholung: { art: 'taeglich' }, erledigtTage: [heute], geaendert: 1 });
-  S.kpTagAnlegen(heute);
-  const tg = S.kpTagFinden(heute);
-  tg.text = '[x] Termin ausmachen\n[x] Ordner anlegen';
-  tg.eintraege = [{ id: 'e1', abschnitt: 'h', text: 'Termin ausmachen', quelle: 'tc', erledigt: true }, { id: 'e2', abschnitt: 'h', text: 'Ordner anlegen', quelle: 'tc', erledigt: true }];
-  const b = S.coWochenBilanz(heute);
-  pruefe(b.routine === 1 && b.orga === 2 && b.substanz === 0, 'Bilanz: Routinen aus der App Routinen, Organisation gezählt');
-  const sb = S.coFaellige('21:00', heute).filter(f => /^sb:tc:/.test(f.id))[0];
-  pruefe(sb && /2× Organisation, kein Baustein/.test(sb.text) && sb.antworten[0][0] === 'baustein', '★-Check: nur Organisation erledigt → „Bewegt es sich, oder wird es nur verwaltet?“');
   S.oeffne('uebersicht');
 }
 
@@ -4129,85 +3760,6 @@ function memoLoeschenTest() {
   S.memoLoeschen();
   pruefe(S.DB.gedanken.some(g => g.id === 'c1'), 'auch per Aufruf nicht');
   S.aufklappZu(); S.cl.memo.id = '';
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
-   98. Coach und Prioritäten (0.53)
-   Grund: P1 kam bisher erst, wenn es brannte. Der Coach hilft jetzt im
-   richtigen Moment: morgens „Muss und Will“ nach freier Zeit, ⚑ Frist
-   naht, zu viele P1, P5 seit 30 Tagen, sonntags ★ Wesentlich mit Bilanz
-   „fremd / eigen“, Vorab-Check bei ⚑ von außen.
-   Erkennt: Warteschlange missachtet P/★/Zeit, Frist-Frage fehlt oder
-   kommt bei Eingeplantem, P1-Grenze rechnet falsch, ★ mehr als drei,
-   Bilanz zählt falsch.
-   ============================================================ */
-function coPrioTest() {
-  console.log('\n98. Coach und Prioritäten (0.53)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
-  S.termineNachTag = {};
-  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12, morgen: '07:30', abend: '20:30' });
-  S.DB.kurs.push({ id: 'kp1', typ: 'prinzip', text: 'Erst das Wichtige, dann das Dringende.', rang: 1, geaendert: 1 });
-  S.DB.themen = [
-    { id: 'ta', name: 'Q4', kontext: 'privat', ordnung: 1, geaendert: 1, text: '[] Zahlen an Controlling\n[] P2 Präsentation\n[] P1 Lange Analyse\n[] P5 Keller',
-      zusatz: { 'Zahlen an Controlling': { frist: heute }, 'Präsentation': { frist: S.tagePlus(heute, 2), dauer: 120 }, 'Lange Analyse': { dauer: 240 } },
-      p5Seit: { Keller: S.tagePlus(heute, -40) } },
-    { id: 'tb', name: 'PV-Anlage', kontext: 'privat', stern: true, ordnung: 2, geaendert: 1, text: '[] P1 ZEO-Auftrag', zusatz: { 'ZEO-Auftrag': { dauer: 30 } } }];
-  /* Warteschlange: P1 mit ★ zuerst, Zeitgrenze */
-  const w = S.coWarteschlange(heute, 300, 3);
-  pruefe(w.map(x => S.kpPrio(x.text).text).join(' | ') === 'ZEO-Auftrag | Lange Analyse', 'Warteschlange: P1 ★ zuerst, dann P1 — nur so viel, wie in 5 Std passt (P2 mit 2 Std nicht mehr)');
-  pruefe(S.coWarteschlange(heute, 0, 3).length === 0, 'keine freie Zeit: kein Vorschlag');
-  const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
-  pruefe(mo && /^Guten Morgen\. „Erst das Wichtige, dann das Dringende\.“ Frei heute: etwa/.test(mo.text) && /Muss ⚑: „Zahlen an Controlling“ \(heute\)/.test(mo.text) && /„ZEO-Auftrag“ \(1 ★ · 30 Min\)/.test(mo.text),
-    'Morgen: dein Vorsatz, freie Zeit, Muss ⚑ getrennt, Will nach Priorität mit ★ und Dauer');
-  /* ⚑ Frist naht */
-  let l = S.coFaellige('09:00', heute);
-  const fn = l.filter(f => /^fn:/.test(f.id));
-  pruefe(fn.length === 1 && fn[0].id === 'fn:P2 Präsentation' && fn[0].rang === 1 && /noch nicht eingeplant/.test(fn[0].text), '⚑ Frist in 2 Tagen, nicht eingeplant: der Coach fragt (Rang 1)');
-  S.coAntwort('fn:P2 Präsentation', 'morgen', 1, '09:00');
-  pruefe(S.aufGeplant(S.kpSeiteFinden('ta'), 'P2 Präsentation').datum === S.tagePlus(heute, 1), '„Morgen“ plant sie ein');
-  pruefe(!S.coFaellige('09:05', heute).some(f => f.id === 'fn:P2 Präsentation'), 'eingeplant: keine Frist-Frage mehr');
-  /* P1-Grenze: 4,5 Std P1 */
-  S.krFinden('kc-einstellungen').abend = '09:30';
-  const pg = S.coFaellige('08:00', heute).filter(f => /^pg:/.test(f.id))[0];
-  pruefe(pg && /P1 für 4,5 Std, frei bis morgen Abend 3 Std/.test(pg.text), 'zu viele P1 für die freie Zeit: der Coach fragt nach dem Richtungsweisenden');
-  /* P5 seit 40 Tagen */
-  const p5 = S.coFaellige('08:00', heute).filter(f => /^p5:/.test(f.id))[0];
-  pruefe(p5 && /seit 40 Tagen auf P5/.test(p5.text), 'P5 seit über 30 Tagen: löschen?');
-  S.coAntwort(p5.id, 'loeschen', 0, '08:00');
-  pruefe(!/Keller/.test(S.DB.themen[0].text), 'gelöscht');
-  /* ★ Wesentlich und Bilanz */
-  S.kpTagAnlegen(heute);
-  const tg = S.kpTagFinden(heute);
-  tg.text = '[x] Zahlen an Controlling\n[x] P1 ZEO-Auftrag\n[x] Rasen';
-  tg.eintraege = [{ id: 'e1', abschnitt: 'h', text: 'Zahlen an Controlling', quelle: 'ta', erledigt: true }, { id: 'e2', abschnitt: 'h', text: 'P1 ZEO-Auftrag', quelle: 'tb', erledigt: true }, { id: 'e3', abschnitt: 'h', text: 'Rasen', quelle: 'ta', erledigt: true }];
-  const b = S.coWochenBilanz(heute);
-  pruefe(b.verbindlichkeit === 1 && b.substanz === 1 && b.orga === 1, 'Bilanz der Woche (seit 0.55): Verbindlichkeit 1, Substanz 1, Organisation 1');
-  S.DB.themen.push({ id: 'tc', name: 'Carport', text: '[] a', kontext: 'privat', ordnung: 3, geaendert: 1 }, { id: 'td', name: 'Garten', text: '[] b', kontext: 'privat', ordnung: 4, geaendert: 1 },
-                   { id: 'te', name: 'Keller', text: '[] c', kontext: 'privat', ordnung: 5, geaendert: 1 });
-  S.coWesentlichAuf();
-  pruefe(S.cl.co.ansicht === 'wesentlich' && S.cl.co.sterne.join() === 'tb' && /Substanz/.test(inhalt()) && /Verbindl/.test(inhalt()) && /1 von 3/.test(inhalt()), '★-Wahl: vorbelegt mit dem bisherigen ★, Bilanz oben');
-  S.coSternUm('tc'); S.coSternUm('td'); S.coSternUm('te');
-  pruefe(S.cl.co.sterne.length === 3 && /Höchstens drei/.test(S.document.getElementById('toastText').textContent), 'höchstens drei');
-  S.coSternUm('tb'); S.coSternUm('te');
-  S.coWesentlichFertig();
-  pruefe(!S.DB.themen.filter(x => x.id === 'tb')[0].stern && ['tc', 'td', 'te'].every(id => S.DB.themen.filter(x => x.id === id)[0].stern), 'Fertig: genau die gewählten haben ★');
-  /* Sonntagsfrage */
-  const so = S.coPrioFragen('21:00', '2026-10-25', S.coEinst()).filter(f => /^sw:/.test(f.id))[0];
-  pruefe(so && /bis zu drei bekommen ★/i.test(so.text), 'Sonntagabend: „Welche Checklisten sind wesentlich?“');
-  /* Vorab-Check bei ⚑ von außen */
-  S.oeffne('aufgaben');
-  S.aufNeu();
-  S.document.getElementById('aufText').value = 'Bericht für Chef';
-  S.document.getElementById('aufFrist').value = S.tagePlus(heute, 4);
-  S.aufSpeichern();
-  pruefe(S.cl.aufklapp === 'covorab' && /Jemand erwartet es bis/.test(S.coVorabHtml()), 'neue Aufgabe mit ⚑: der Vorab-Check fragt nach');
-  S.aufklappZu();
   S.oeffne('uebersicht');
 }
 
@@ -5077,7 +4629,7 @@ function projekteTest() {
   const neu = S.DB.projekte[S.DB.projekte.length - 1];
   pruefe(neu.name === 'Terrassendach' && neu.start === S.isoDatum() && S.cl.pj.id === neu.id && S.cl.pj.reiter === 'aufgaben', 'Neu: Beginn heute, öffnet die Schritte');
   /* Start, Ordner, Symbol */
-  pruefe(!S.clOrdnerVon('coach') && S.clApp('coach').raster === false, 'Coach seit 0.86 aus: nicht auf dem Start, in keinem Ordner');
+  pruefe(!S.clApp('coach') && !S.clOrdnerVon('coach'), 'Coach seit 0.122.0 ganz entfernt: keine App, in keinem Ordner');
   pruefe(/<rect x="15" y="18" width="16" height="6"/.test(S.clSymbol('projekte')), 'Symbol „Zeitplan“ (drei versetzte Balken)');
   S.oeffne('uebersicht');
   pruefe(!/oeffne\('projekte'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()) && />Memo Pad<\/button>/.test(inhalt()), 'Übersicht seit 0.71: „Memo Pad“ statt Projekte und Notizen');
@@ -5290,7 +4842,7 @@ function lesezeichenTest() {
   pruefe(S.DB.gedanken.filter(g => g.id === 'n1')[0].text === feld.value, 'das Getippte landet in der Seite');
   satz('x', 1); let verhindert = false; S.memoTaste({ key: 'Tab', shiftKey: false, preventDefault() { verhindert = true; } });
   pruefe(verhindert && feld.value === '  x', 'Tab rückt ein (am PC)');
-  pruefe(/\.geraet\.schreibbreit\{max-width:900px\}/.test(QUELLE) && /classList\.add\('schreibbreit'\)/.test(QUELLE), 'am PC beim Schreiben breiter');
+  pruefe(/\.geraet\.schreibbreit\{max-width:calc\(900px \/ var\(--zoom, 1\)\)\}/.test(QUELLE) && /classList\.add\('schreibbreit'\)/.test(QUELLE), 'am PC beim Schreiben breiter');
   S.memoSchreibenUm();
   /* Jahr ohne Farben */
   pruefe(Object.keys(S.JA_ARTEN).every(k => ['#1C2116', '#56604A', '#8E9A7C'].indexOf(S.JA_ARTEN[k].f) >= 0) && S.jaArtFarbe('training') === '#56604A', 'Jahr: nur drei Graustufen, keine Farben');
@@ -5548,7 +5100,9 @@ function trendTest() {
   S.saLinkOeffnen(S.saSaetze(b)[0].id, 'url');
   pruefe(geoeffnet.join() === 'https://www.thalia.de/deep|_blank', 'Antippen öffnet die Adresse in einem neuen Tab');
   S.saEintrag(S.saSaetze(b)[0].id);
-  pruefe(/type="url"[^>]*value="https:\/\/www\.thalia\.de\/deep"/.test(S.saFensterHtml()) && /saFormLinkOeffnen\('url'\)">↗ Öffnen/.test(S.saFensterHtml()), 'Formular: Adressfeld mit „↗ Öffnen“');
+  /* Seit 0.125.0 ein Textfeld statt type="url": Letzteres wies
+     onenote:-Adressen ohne Meldung ab. Geprüft wird weiter in saLinkGueltig. */
+  pruefe(/inputmode="url"[^>]*value="https:\/\/www\.thalia\.de\/deep"/.test(S.saFensterHtml()) && /saFormLinkOeffnen\('url'\)">↗ Öffnen/.test(S.saFensterHtml()), 'Formular: Adressfeld mit „↗ Öffnen“ (seit 0.125.0 ohne type="url")');
   S.document.getElementById('saF_name').value = 'Deep Work';
   S.document.getElementById('saF_notiz').value = '';
   S.document.getElementById('saF_url').value = 'javascript:alert(1)';
@@ -6900,15 +6454,16 @@ function startOrdnerTest() {
   /* „coach“ seit 0.86 aus — nur noch über den Link #coach erreichbar */
   /* „drive“ seit 0.91 im Menü ≡ */
   /* „sos“ seit 0.98.1 nur noch im Menü ≡ */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos'];
+  /* „dock“ seit 0.119.0 im Menü ≡, über #dock und beim Start am PC */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
   pruefe(doppelt.length === 0, 'keine App doppelt (Raster und Ordner)');
-  pruefe(raster.length === 15 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'seit 0.89 ein Ordner im Raster (Games), mit eigenem Symbol');
+  pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
-  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && !/oeffne\('sos'\)/.test(inhalt()) && /oeffne\('fokus'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && /oeffne\('gemini'\)/.test(inhalt()), 'Routines (seit 0.72) und Coach (seit 0.91) auf dem Start, Fokus statt SOS (seit 0.98.1), Drive im Menü');
+  pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && !/oeffne\('sos'\)/.test(inhalt()) && /oeffne\('fokus'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && !/oeffne\('gemini'\)/.test(inhalt()), 'Routines (seit 0.72) auf dem Start, Fokus statt SOS (seit 0.98.1), Drive und Coach nicht mehr im Raster');
   [['spiele', ['sudoku', 'poker']]].forEach(([o, apps]) => {
     S.oeffne(o);
     const h = S.document.getElementById('aufklapp').innerHTML;
@@ -6924,346 +6479,6 @@ function startOrdnerTest() {
   pruefe(/Poker: /.test(S.document.getElementById('aufklapp').innerHTML) && /Sudoku: /.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
   S.aufklappZu();
   pruefe(/oeffne\('rechner'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Rechner, Vorlesen und Memo direkt auf dem Start');
-}
-
-/* ============================================================
-   71. Coach mit allen Quellen (0.34)
-   Grund: Der Coach soll auch Aufgaben-Listen, Kalender, Routinen,
-   Ideenwerkstatt und Sammlungen kennen — mit Rang, Obergrenze und
-   Schaltern je Quelle.
-   Erkennt: Vorschläge fehlen bei leerem Tag, Dauerschieber/Überfälliges
-   nicht erkannt, Antworten ohne Wirkung (einplanen, Routine abhaken,
-   Wert eintragen, Kündigungs-Aufgabe), Obergrenze/Rang verletzt,
-   abgeschaltete Quelle fragt trotzdem, Ruhe wird nicht eingehalten.
-   ============================================================ */
-function coachQuellenTest() {
-  console.log('\n71. Coach mit allen Quellen (0.34)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  const gestern = S.tagePlus(heute, -1);
-  const morgen = S.tagePlus(heute, 1);
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
-  S.termineNachTag = {};
-  S.krSpeichern({ id: 'kc-einstellungen', typ: 'coach', max: 12 });
-  /* Aufgaben: Vorschläge bei leerem Tag */
-  const s = S.kpSeiteAnlegen('liste', 'Büro', 'beruflich', '');
-  s.text = '[] P1 Angebot Müller\n[] P1 Heizung Termin\n[] P3 Ablage\n[] Steuer-Unterlagen';
-  const mo = S.coFaellige('07:40', heute).filter(f => f.id === 'morgen')[0];
-  /* seit 0.53: „Muss und Will“ — Warteschlange nach Priorität, so viel wie in die freie Zeit passt */
-  pruefe(mo && /Frei heute: etwa/.test(mo.text) && /Will — nach deinen Prioritäten: „Angebot Müller“ \(1 · 30 Min\), „Heizung Termin“ \(1 · 30 Min\), „Ablage“ \(3 · 30 Min\)/.test(mo.text)
-    && mo.antworten.map(a => a[0]).join() === 'nehmen,nehmen,nehmen,alle,selbst,vornehmen' && mo.quelle === '☑ Aufgaben',
-    'leerer Tag: Vorschläge aus der Warteschlange (P1 zuerst), Quelle sichtbar');
-  S.coAntwort('morgen', 'nehmen', 1, '07:40');
-  pruefe(S.coTagDaten(heute).offen.some(z => /Heizung Termin/.test(z.a.text)), '„Heizung Termin“ antippen: für heute vorgenommen');
-  /* Dauerschieber: drei vergangene Tage liegen gelassen */
-  const st = 'Steuer-Unterlagen';
-  [3, 2, 1].forEach(n => { const tg = S.kpTagAnlegen(S.tagePlus(heute, -n)); tg.text = '[] ' + st; tg.eintraege = [{ id: 'e' + n, abschnitt: 'h', text: st, quelle: s.id, erledigt: false }]; });
-  S.aufPlanAnwenden(s, 3, heute, '');
-  pruefe(S.coSchiebeZahl(st, heute) === 3, 'Verschiebungen gezählt (liegen gelassene Tage)');
-  const ds = S.coFaellige('08:00', heute).filter(f => f.id === 'ds:' + st)[0];
-  pruefe(ds && /3-mal verschoben/.test(ds.text) && ds.antworten.map(a => a[0]).join() === 'klein,fest,p4,streichen' && /Ist das wirklich eine 3\?/.test(ds.text), 'Dauerschieber: „3-mal verschoben. Ist das wirklich eine 3?“ — mit „Auf P4“ (0.53)');
-  S.coAntwort('ds:' + st, 'streichen', 2, '08:00');
-  pruefe(/\[-\] Steuer-Unterlagen/.test(s.text) && !S.coTagDaten(heute).offen.some(z => z.a.text === st), 'Streichen: als „nicht relevant“ markiert, aus dem Tag');
-  /* Überfälliges */
-  s.text += '\n[] Rechnung prüfen';
-  const tg2 = S.kpTagFinden(gestern); tg2.text += '\n[] Rechnung prüfen'; tg2.eintraege.push({ id: 'eR', abschnitt: 'h', text: 'Rechnung prüfen', quelle: s.id, erledigt: false });
-  const ue = S.coFaellige('08:00', heute).filter(f => f.id === 'ue:Rechnung prüfen')[0];
-  pruefe(ue && /war für .* geplant und ist noch offen/.test(ue.text), 'Überfälliges: gestern geplant, noch offen, nicht neu eingeplant');
-  S.coAntwort('ue:Rechnung prüfen', 'heute', 0, '08:00');
-  pruefe(S.coTagDaten(heute).offen.some(z => z.a.text === 'Rechnung prüfen') && !S.coUeberfaellig(heute).some(u => u.text === 'Rechnung prüfen'), '„Heute“: eingeplant, nicht mehr überfällig');
-  /* Kalender: voller Tag morgen, nach dem Termin */
-  S.termineNachTag[morgen] = [9, 11, 14].map((h, i) => ({ id: 'm' + i, titel: 'T' + i, rohTitel: 'T' + i, zeit: S.zwei(h) + ':00', bis: S.zwei(h + 2) + ':00', ganztags: false, kontext: '' }));
-  ['A', 'B'].forEach(x => { const nr = S.aufZeileAnhaengen(s, 'Morgen ' + x); S.aufPlanAnwenden(s, nr, morgen, ''); });
-  const kv = S.coFaellige('16:40', heute).filter(f => f.id === 'kv:' + morgen)[0];
-  pruefe(kv && /Morgen 6 Std\. Termine — für deine 2 Aufgaben/.test(kv.text) && !S.coFaellige('12:00', heute).some(f => /^kv:/.test(f.id)), 'Kalender: voller Tag morgen (ab Nachmittag)');
-  S.termineNachTag[heute] = [{ id: 'tr', titel: 'Team-Runde', rohTitel: 'Team-Runde', zeit: '10:00', bis: '11:00', ganztags: false, kontext: '' }];
-  pruefe(S.coFaellige('11:20', heute).some(f => f.id === 'tn:tr' && /„Team-Runde“ ist vorbei\. Ergibt sich daraus etwas zu tun\?/.test(f.text)) && !S.coFaellige('13:30', heute).some(f => f.id === 'tn:tr'),
-    'Kalender: nach dem Termin (bis zwei Stunden danach)');
-  S.coAntwort('tn:tr', 'ja', 0, '11:20');
-  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster && S.cl.pm.fenster.modus === 'neu', '„Ja → Aufgabe“ öffnet „Neue Aufgabe“ (seit 0.80 die des To Do)');
-  S.aufklappZu();
-  /* Routinen */
-  const wt = S.ausIso(heute).getDay();
-  S.DB.aufgaben.push({ id: 'rj', titel: 'Joggen', wiederholung: { takt: 'woche', tage: [0, 1, 2, 3, 4, 5, 6], intervall: 1 }, ab: S.tagePlus(heute, -10), kontext: '', geaendert: 1 });
-  const rr = S.coFaellige('08:00', heute).filter(f => f.id === 'rr:rj')[0];
-  pruefe(rr && /jetzt 10-mal ausgelassen/.test(rr.text), 'Routine: Reihe ausgelassen erkannt');
-  pruefe(!S.coFaellige('12:00', heute).some(f => f.id === 'ro:rj') && S.coFaellige('20:40', heute).some(f => f.id === 'ro:rj' && /steht heute noch aus/.test(f.text)), 'Routine: abends „steht heute noch aus“');
-  S.coAntwort('ro:rj', 'ja', 0, '20:40');
-  const rj = S.DB.aufgaben.filter(a => a.id === 'rj')[0];
-  pruefe(S.istErledigtAn(rj, heute), '„Erledigt“: Routine für heute abgehakt');
-  S.coAntwort('rr:rj', 'pause', 2, '20:41');
-  pruefe(rj.pausiert === true, '„Pausieren“: Routine pausiert');
-  /* Ideenwerkstatt: Stillstand */
-  S.DB.ideen = [{ id: 'iw-x', titel: 'Fotobuch', stufe: 6, status: 'aktiv', zuletzt: S.tagePlus(heute, -12), schritte: [{ id: 's1', text: 'Bilder sichten', erledigt: false }], varianten: [], meilensteine: [],
-    /* Wochen-Check dieser Woche schon da — sonst geht er sonntags vor (Test war vom Wochentag abhängig, 0.70) */
-    wochen: [{ kw: S.krWochenId(), status: 'kurs', datum: heute }] }];
-  const is = S.coFaellige('20:45', heute).filter(f => f.id === 'is:iw-x')[0];
-  pruefe(is && /Seit 12 Tagen nichts an „Fotobuch“/.test(is.text) && !S.coFaellige('12:00', heute).some(f => f.id === 'is:iw-x'), 'Idee steht still: abends nachgefragt');
-  S.coAntwort('is:iw-x', 'pause', 1, '20:45');
-  pruefe(S.iwFinden('iw-x').status === 'spaeter' && S.iwFinden('iw-x').wiedervorlage === S.tagePlus(heute, 14), '„Pausieren“: kommt in zwei Wochen wieder');
-  /* Sammlungen: regelmäßig, Eintrag in der Antwort, Trend, Frist */
-  S.DB.sammlungen = [{ id: 'sg', name: 'Gewicht', felder: [{ id: 'fd', name: 'Datum', typ: 'datum' }, { id: 'fk', name: 'kg', typ: 'zahl' }], rollen: {}, geaendert: 1 },
-    { id: 'sab', name: 'Abos', art: 'abos', felder: [{ id: 'an', name: 'Name', typ: 'text' }, { id: 'alz', name: 'Laufzeit', typ: 'datum' }, { id: 'afr', name: 'Frist', typ: 'zahl' }], rollen: { laufzeit: 'alz', frist: 'afr' }, geaendert: 1 }];
-  S.DB.datensaetze = [];
-  [20, 16, 12, 8, 4].forEach((n, i) => S.DB.datensaetze.push({ id: 'g' + n, sammlung: 'sg', werte: { fd: S.tagePlus(heute, -n), fk: 78 + i * 0.6 }, angelegt: 1, geaendert: 1 }));
-  const e = S.krFinden('kc-einstellungen') || { id: 'kc-einstellungen', typ: 'coach' };
-  e.sammlungen = { sg: { takt: 'taeglich', ab: '18:00' } }; S.krSpeichern(e);
-  pruefe(!S.coFaellige('17:00', heute).some(f => f.id === 'se:sg') && S.coFaellige('18:05', heute).some(f => f.id === 'se:sg' && f.eingabe === 'kg'), 'Sammlung täglich: ab 18:00 „heute noch nicht eingetragen“ mit Eingabefeld');
-  const tr = S.coFaellige('18:05', heute).filter(f => f.id === 'st:sg')[0];
-  pruefe(tr && /seit drei Wochen steigend \(78 → 80,4\)/.test(tr.text), 'Trend erkannt: steigend');
-  S.coAntwort('se:sg', 'eintragen', 0, '18:05', '80,4');
-  const neu = S.DB.datensaetze.filter(d => d.sammlung === 'sg' && d.werte.fd === heute)[0];
-  pruefe(neu && neu.werte.fk === 80.4 && !S.coFaellige('18:10', heute).some(f => f.id === 'se:sg'), '„Eintragen“: Wert mit heutigem Datum gespeichert, Frage erledigt');
-  pruefe(S.coTag(false, heute).coach.verlauf.some(f => f.id === 'se:sg' && /Eintragen: 80,4/.test(f.antwortText)), 'Antwort zeigt den Wert');
-  S.DB.datensaetze.push({ id: 'ab1', sammlung: 'sab', werte: { an: 'Netflix', alz: S.saMonatePlus(S.tagePlus(heute, 6), 1), afr: 1 }, angelegt: 1, geaendert: 1 });
-  const sf = S.coFaellige('09:00', heute).filter(f => f.id === 'sf:ab1')[0];
-  pruefe(sf && /„Netflix“ ist bis .* kündbar — noch \d+ Tage/.test(sf.text) && sf.rang === 1, 'Kündigungsfrist: Rang 1');
-  S.coAntwort('sf:ab1', 'kuendigen', 0, '09:00');
-  const coachL = S.kpSeitenAlle().filter(x => x.titel === 'Coach')[0];
-  pruefe(coachL && /Kündigen: Netflix/.test(coachL.text) && !S.coFaellige('09:05', heute).some(f => f.id === 'sf:ab1') && S.coRuhig('sf:ab1', heute), '„Kündigen“: Aufgabe für heute, Frage ruht bis zur Frist');
-  /* Obergrenze und Rang */
-  S.localStorage.removeItem('clie-coach-gesehen');
-  e.max = 4; S.krSpeichern(e);
-  const v = S.coVerlauf('20:50', heute);
-  const beantwortet = S.coTag(false, heute).coach.verlauf.length;
-  pruefe(v.length === Math.max(4, beantwortet), 'Obergrenze: höchstens ' + 4 + ' Fragen am Tag (' + v.length + ')');
-  e.max = 12; S.krSpeichern(e);
-  S.localStorage.removeItem('clie-coach-gesehen');
-  const alle = S.coFaellige('20:50', heute).filter(f => !S.coTag(false, heute).coach.verlauf.some(x => x.id === f.id));
-  e.max = beantwortet + 1; S.krSpeichern(e);
-  S.localStorage.removeItem('clie-coach-gesehen');
-  const eine = S.coVerlauf('20:50', heute).filter(f => !f.antwort);
-  const besterRang = Math.min.apply(null, alle.map(f => f.rang));
-  pruefe(eine.length === 1 && eine[0].rang === besterRang, 'bei knapper Grenze gewinnt der beste Rang');
-  S.termineNachTag[heute] = [{ id: 'spaet', titel: 'Elternabend', rohTitel: 'Elternabend', zeit: '21:15', bis: '22:00', ganztags: false, kontext: '' }];
-  e.max = 1; S.krSpeichern(e);
-  pruefe(S.coVerlauf('20:50', heute).some(f => f.id === 'tv:spaet' && !f.antwort), 'Termine (Rang 1) kommen auch über der Grenze');
-  S.termineNachTag[heute] = [];
-  e.max = 8; S.krSpeichern(e);
-  /* Schalter je Quelle */
-  e.quellen = { aufgaben: true, kalender: true, routinen: false, ideen: true, sammlungen: false }; S.krSpeichern(e);
-  rj.pausiert = false;
-  pruefe(!S.coFaellige('20:50', heute).some(f => /^(ro|rr|se|st|sf):/.test(f.id)), 'abgeschaltete Quellen (Routinen, Sammlungen) fragen nicht');
-  e.quellen = {}; S.krSpeichern(e);
-  /* Einstellungen */
-  S.oeffne('coach'); S.coEinstOeffnen();
-  pruefe(/coQ-routinen/.test(inhalt()) && /coS-sg/.test(inhalt()) && /coMax/.test(inhalt()) && /coFrist/.test(inhalt()), 'Einstellungen: Quellen, Sammlungen (Takt, ab), Obergrenze, Fristen');
-  ['morgen', 'mittag', 'nachmittag', 'abend'].forEach((z, i) => { S.document.getElementById('coZ-' + z).value = ['07:30', '12:30', '16:30', '20:30'][i]; });
-  S.document.getElementById('coVorlauf').value = '45'; S.document.getElementById('coKal').checked = false;
-  S.document.getElementById('coQ-ideen').checked = false; ['aufgaben', 'kalender', 'routinen', 'sammlungen'].forEach(q => { S.document.getElementById('coQ-' + q).checked = true; });
-  S.document.getElementById('coMax').value = '6'; S.document.getElementById('coFrist').value = '14';
-  S.document.getElementById('coS-sg').value = 'woechentlich'; S.document.getElementById('coSab-sg').value = '19:00';
-  S.document.getElementById('coS-sab').value = '';
-  S.coEinstSpeichern();
-  const e2 = S.coEinst();
-  pruefe(e2.quellen.ideen === false && e2.max === 6 && e2.frist === 14 && e2.sammlungen.sg.takt === 'woechentlich' && e2.sammlungen.sg.ab === '19:00' && !e2.sammlungen.sab, 'Einstellungen gespeichert');
-  pruefe(!S.coFaellige('19:30', heute).some(f => f.id === 'se:sg'), 'wöchentlich: Eintrag dieser Woche genügt');
-  /* Anzeige und Tippen */
-  S.oeffne('uebersicht');
-  pruefe(/co-q|Coach · \d/.test(inhalt()) || /co-zeile-still/.test(inhalt()), 'Übersicht zeigt die Quelle der Frage');
-  S.document.activeElement = { id: 'coIn0', value: '80' };
-  const vorher = inhalt(); S.document.getElementById('inhalt').innerHTML = vorher + '<!--tippt-->'; S.inhaltZeichnen();
-  pruefe(/<!--tippt-->/.test(inhalt()), 'beim Tippen einer Antwort wird nicht neu gezeichnet');
-  S.document.activeElement = null;
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
-   69. Coach (0.33)
-   Grund: Kurs war eine Doku-App mit Fragebogen am Morgen. Gewünscht ist
-   ein Assistent, der von sich aus anspricht: „Du hast dir X vorgenommen —
-   wie steht es?“, Termine vorbereiten lässt, an Vorsätze erinnert und
-   abends Bilanz zieht. Antworten wirken (verschieben, aus dem Tag nehmen,
-   Vorbereitungs-Aufgabe anlegen).
-   Erkennt: Fragen zur falschen Zeit, Erledigtes wird weiter abgefragt,
-   Antworten ohne Wirkung, bloßes Anzeigen schreibt in die workbench.json,
-   Coach-Termine erscheinen in CLIE, Energie-Frage taucht wieder auf.
-   ============================================================ */
-function coachTest() {
-  console.log('\n69. Coach (0.33)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  const morgen = S.tagePlus(heute, 1);
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.cl.co.tag = ''; S.cl.co.ansicht = 'verlauf';
-  const s = S.kpSeiteAnlegen('liste', 'Haus', 'privat', '');
-  ['Steuer-Unterlagen sortieren', 'P1 Angebot Müller', 'Keller aufräumen', 'Fahrrad flicken'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
-  S.termineNachTag = {}; S.termineNachTag[heute] = [{ id: 'tr1', titel: 'Team-Runde', rohTitel: 'Team-Runde', zeit: '10:00', bis: '11:00', ganztags: false, kontext: '' },
-    { id: 'tc1', titel: 'Coach: Halbzeit', rohTitel: 'Coach: Halbzeit', zeit: '12:30', bis: '12:35', ganztags: false, kontext: '' }];
-  pruefe(S.clApp('coach') && S.CL_BILD.coach && S.clApp('kurs').raster === false, 'App „Coach“ da, Kurs liegt darunter (seit 0.62 wieder nicht im Raster)');
-  pruefe(S.clTermineAm(heute).zeit.length === 1 && S.coTagDaten(heute).termine.length === 1, 'Coach-Termine („Coach: …“) sind in CLIE ausgeblendet');
-  /* Morgen */
-  const m = S.coFaellige('07:45', heute);
-  const mo = m.filter(f => f.id === 'morgen')[0];
-  pruefe(mo && /Vorgenommen für heute/.test(mo.text) && /Angebot Müller/.test(mo.text) && /Team-Runde|Termine: 1/.test(mo.text) && /Womit fängst du an\?/.test(mo.text), 'morgens: was vorgenommen ist, die Termine, „Womit fängst du an?“');
-  pruefe(mo.antworten[0][1] === 'Angebot Müller' && mo.antworten.some(a => a[0] === 'vornehmen'), 'Antworten: die Aufgaben (P1 zuerst) und „+ Vornehmen“');
-  pruefe(!m.some(f => /Energie/.test(f.text)) && !S.coFaellige('07:00', heute).some(f => f.id === 'morgen'), 'keine Energie-Frage; vor 7:30 noch still');
-  /* Termin vorbereiten */
-  const tv = S.coFaellige('09:20', heute).filter(f => /^tv:/.test(f.id))[0];
-  pruefe(tv && /In 40 Min\.: „Team-Runde“/.test(tv.text) && !S.coFaellige('09:00', heute).some(f => /^tv:/.test(f.id)), 'Termin: 45 Min. vorher „Ist alles vorbereitet?“');
-  const vorher = S.alsText().replace(/"gespeichert": "[^"]*"/, '');
-  const v1 = S.coVerlauf('09:20', heute);
-  pruefe(S.alsText().replace(/"gespeichert": "[^"]*"/, '') === vorher && v1.length >= 2, 'Anzeigen allein schreibt nichts in die workbench.json');
-  S.coAntwort(tv.id, 'nein', 1, '09:20');
-  const coachListe = S.kpSeitenAlle().filter(x => x.titel === 'Coach')[0];
-  pruefe(coachListe && /Vorbereiten: Team-Runde/.test(coachListe.text) && S.coTagDaten(heute).offen.some(z => /Vorbereiten: Team-Runde/.test(z.a.text)), '„Noch nicht“: Aufgabe „Vorbereiten: Team-Runde“ für heute');
-  pruefe(S.coTag(false, heute).coach.verlauf.filter(f => f.id === tv.id && f.antwort === 'nein').length === 1, 'die Antwort ist im Tag gespeichert');
-  pruefe(!S.coVerlauf('09:25', heute).some(f => f.id === tv.id && !f.antwort), 'beantwortet: wird nicht erneut gefragt');
-  /* Mittag */
-  const steuerNr = S.clTagZeilen(heute).filter(z => z.a && /Angebot/.test(z.a.text))[0].nr;
-  S.clTagZeileUm(heute, steuerNr);
-  const mi = S.coFaellige('12:40', heute).filter(f => f.id === 'mittag')[0];
-  pruefe(mi && /Halbzeit: „Angebot Müller“ ✓/.test(mi.text) && /schaffst du das heute noch\?/.test(mi.text) && mi.antworten.map(a => a[0]).join() === 'ja,morgen,lass', 'Halbzeit: Erledigtes ✓, nächstes Offenes mit Ja / Morgen / Lass ich');
-  const offen1 = mi.bezug.text;
-  S.coAntwort('mittag', 'morgen', 1, '12:40');
-  pruefe(!S.coTagDaten(heute).offen.some(z => z.a.text === offen1) && S.clTagZeilen(morgen).some(z => z.a && z.a.text === offen1), '„Morgen“: Aufgabe auf morgen verschoben');
-  /* Nachmittag: je offene Aufgabe, Erledigtes fällt heraus */
-  const nm = S.coFaellige('16:40', heute).filter(f => /^nm:/.test(f.id));
-  pruefe(nm.length >= 2 && nm.length <= 3 && !nm.some(f => /Angebot/.test(f.id)), 'Nachmittag: nur noch Offenes, höchstens drei');
-  const kel = nm.filter(f => /Keller/.test(f.id))[0];
-  S.coAntwort(kel.id, 'lass', 2, '16:40');
-  const kz = S.kpZeileSuchen(s, 'Keller aufräumen');
-  pruefe(!S.coTagDaten(heute).offen.some(z => /Keller/.test(z.a.text)) && kz && !kz.erledigt, '„Lass ich“: aus dem Tag genommen, bleibt in der Liste');
-  /* Vorsätze */
-  S.krSpeichern({ id: 'kp-t1', typ: 'prinzip', rang: 1, text: 'Kein Handy', konkret: 'ins Regal legen', zeit: '21:00', zeitArt: 'ab' });
-  S.krSpeichern({ id: 'kp-t2', typ: 'prinzip', rang: 2, text: '20 Min. spazieren', zeit: '18:00', zeitArt: 'bis' });
-  pruefe(!S.coFaellige('20:30', heute).some(f => f.id === 'vs:kp-t1') && S.coFaellige('20:46', heute).some(f => f.id === 'vs:kp-t1' && /Ab 21:00 gilt dein Vorsatz: „Kein Handy“ — ins Regal legen/.test(f.text)), 'Vorsatz „ab“: eine Viertelstunde vorher');
-  const sp = S.coFaellige('17:10', heute).filter(f => f.id === 'vs:kp-t2')[0];
-  pruefe(sp && /Bis 18:00 wolltest du/.test(sp.text) && sp.antworten.length === 3 && !S.coFaellige('16:50', heute).some(f => f.id === 'vs:kp-t2'), 'Vorsatz „bis“: eine Stunde vorher „Schon geschafft?“');
-  /* Abend */
-  const ab = S.coFaellige('20:35', heute).filter(f => f.id === 'abend')[0];
-  pruefe(ab && /Heute erledigt: 1 von/.test(ab.text) && ab.antworten[0][0] === 'alle-morgen', 'Abend: Bilanz und „Alles auf morgen“');
-  S.coAntwort('abend', 'alle-morgen', 0, '20:35');
-  pruefe(S.coTagDaten(heute).offen.length === 0 && S.clTagZeilen(morgen).filter(z => z.a && !z.a.erledigt).length >= 3, 'Alles Offene steht morgen an');
-  pruefe(S.coFaellige('20:40', heute).filter(f => f.id === 'abend')[0].antworten[0][0] === 'ok', 'danach: „Alles erledigt“');
-  /* Übersicht, App, Tag-Auswahl, Zurück */
-  S.localStorage.removeItem('clie-coach-gesehen');
-  S.oeffne('uebersicht');
-  pruefe(/co-oben|co-zeile-still/.test(inhalt()) && /oeffne\('coach'\)/.test(inhalt()), 'Übersicht: oben spricht der Coach');
-  S.oeffne('coach');
-  pruefe(/co-verlauf/.test(inhalt()) && /Team-Runde/.test(inhalt()) && /co-msg ich/.test(inhalt()), 'Coach-App: Tagesverlauf mit Fragen und Antworten');
-  pruefe(/aufNeuAm\(isoDatum\(\)/.test(S.document.getElementById('fuss').innerHTML) && /coMehr\('prinzipien'\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: + Vornehmen, Vorsätze, Mehr…');
-  S.katUm();
-  pruefe(S.cl.aufklapp === 'cotag' && /Gestern/.test(S.document.getElementById('aufklapp').innerHTML), '▾: die letzten Tage');
-  S.coTagWahl(S.tagePlus(heute, -1));
-  pruefe(S.cl.co.tag && /still/.test(inhalt()), 'gestern ohne Coach: „still“');
-  S.clZurueck();
-  pruefe(S.cl.co.tag === '' && S.cl.app === 'coach', 'Zurück: wieder heute');
-  S.coMehrAuf();
-  pruefe(/coMehr\('bilanz'\)/.test(S.document.getElementById('aufklapp').innerHTML) && /coMehr\('woche'\)/.test(S.document.getElementById('aufklapp').innerHTML) && /coEinstOeffnen/.test(S.document.getElementById('aufklapp').innerHTML), 'Mehr: Einstellungen, Fokus & Bereiche, Woche & Rückblick, Pfade');
-  S.coMehr('bilanz');
-  pruefe(S.cl.app === 'kurs' && S.cl.kr.ansicht === 'bilanz', 'Mehr → Kurs-Bilanz');
-  S.clZurueck();
-  pruefe(S.cl.app === 'coach', 'aus Kurs zurück zum Coach');
-  /* Einstellungen */
-  S.coEinstOeffnen();
-  pruefe(/coZ-mittag/.test(inhalt()) && /coKal/.test(inhalt()), 'Einstellungen: Zeiten, Vorlauf, Kalender');
-  S.document.getElementById('coZ-morgen').value = '07:30'; S.document.getElementById('coZ-mittag').value = '13:00';
-  S.document.getElementById('coZ-nachmittag').value = '16:30'; S.document.getElementById('coZ-abend').value = '21:00';
-  S.document.getElementById('coVorlauf').value = '30'; S.document.getElementById('coKal').checked = false;
-  S.coEinstSpeichern();
-  const e = S.coEinst();
-  pruefe(e.mittag === '13:00' && e.abend === '21:00' && e.vorlauf === 30 && e.kalender === false && S.cl.co.ansicht === 'verlauf', 'Einstellungen gespeichert (synchronisiert über „kurs“)');
-  pruefe(!S.coFaellige('12:40', heute).some(f => f.id === 'mittag'), 'Mittag jetzt erst ab 13:00');
-  /* Vorsatz mit Uhrzeit im Prinzip-Fenster */
-  S.oeffne('kurs'); S.krAnsicht('prinzipien'); S.krPrinzipOeffnen('kp-t1');
-  pruefe(/krPZeit/.test(inhalt()) && /krPArt/.test(inhalt()), 'Prinzip/Vorsatz: Uhrzeit „ab“ / „bis“');
-  S.document.getElementById('krPText').value = 'Kein Handy'; S.document.getElementById('krPKonkret').value = '';
-  S.document.getElementById('krPArt').value = 'bis'; S.document.getElementById('krPZeit').value = '22:15';
-  S.krPrinzipSpeichern();
-  pruefe(S.krFinden('kp-t1').zeit === '22:15' && S.krFinden('kp-t1').zeitArt === 'bis', 'Uhrzeit am Vorsatz gespeichert');
-  S.oeffne('uebersicht');
-}
-
-/* ============================================================
-   70. Coach: Vorab hinterfragen und Kalender-Erinnerungen (0.33)
-   Grund: Neues soll vorab hinterfragt werden („Was fällt dafür weg?“);
-   der Coach soll sich über den Kalender aufs Handy melden.
-   Erkennt: Nachfrage bei Kleinkram, keine Nachfrage bei P1 oder vollem
-   Tag, „Lass ich“ löscht nicht, „Bis Sonntag“ ohne Wiedervorlage,
-   doppelte Kalender-Termine, Erinnerungen ohne Aufräumen.
-   ============================================================ */
-async function coachVorabTest() {
-  console.log('\n70. Coach: Vorab hinterfragen und Kalender-Erinnerungen (0.33)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const heute = S.isoDatum();
-  const s = S.kpSeiteAnlegen('liste', 'Verein', 'privat', '');
-  S.termineNachTag = {};
-  pruefe(!S.coVorabNoetig('Batterien kaufen', '') && S.coVorabNoetig('P1 Vereinsfest mitorganisieren', '') && S.coVorabNoetig('P2 Steuer', ''), 'Nachfrage bei Prio 1/2, nicht bei Kleinkram');
-  ['A', 'B', 'C'].forEach(x => { const nr = S.aufZeileAnhaengen(s, x); S.aufPlanAnwenden(s, nr, heute, ''); });
-  pruefe(S.coVorabNoetig('Noch etwas', heute) && !S.coVorabNoetig('Noch etwas', S.tagePlus(heute, 3)), 'Nachfrage, wenn der Tag schon drei offene Aufgaben hat');
-  /* Neue Aufgabe über das Fenster — seit 0.80 im alten Fenster der Listen (aufNeu), das neue prüft 135 */
-  S.oeffne('checklisten'); S.clsOeffnen(s.id); S.aufNeu();
-  S.cl.auf.fenster.seite = s.id; S.cl.auf.fenster.text = 'P1 Vereinsfest mitorganisieren'; S.cl.auf.fenster.datum = heute;
-  S.document.getElementById('aufText').value = 'P1 Vereinsfest mitorganisieren';
-  S.document.getElementById('aufDatum').value = heute;
-  S.aufSpeichern();
-  pruefe(S.cl.aufklapp === 'covorab' && /Was fällt dafür weg\?/.test(S.document.getElementById('aufklapp').innerHTML) && /Vereinsfest/.test(S.document.getElementById('aufklapp').innerHTML), 'neue P1-Aufgabe: „Coach fragt nach“');
-  S.document.getElementById('coWeg').value = 'Dienstag-Training';
-  S.coVorabEntscheiden('spaeter');
-  const o = S.krAlle('coachoffen')[0];
-  const so = S.coSonntag(heute);
-  pruefe(o && o.text === 'Vereinsfest mitorganisieren' && o.faellig === so && S.ausIso(so).getDay() === 0 && so > heute && o.weg === 'Dienstag-Training', '„Bis Sonntag überlegen“: Wiedervorlage am Sonntag, „fällt weg“ gemerkt');
-  pruefe(!S.coTagDaten(heute).offen.some(z => /Vereinsfest/.test(z.a.text)) && /Vereinsfest/.test(s.text), 'bis dahin nicht für heute geplant, bleibt in der Liste');
-  pruefe(S.krEntscheidungen('').some(x => x.quelle === 'coach' && /Dienstag-Training/.test(x.antwort)), 'Entscheidung im Buch (Kurs)');
-  const oe = S.coFaellige('10:00', so).filter(f => f.id === 'oe:' + o.id)[0];
-  pruefe(oe && /Du wolltest entscheiden: „Vereinsfest mitorganisieren“ \(dafür fiele weg: Dienstag-Training\)/.test(oe.text) && !S.coFaellige('10:00', heute).some(f => f.id === 'oe:' + o.id), 'am Sonntag fragt der Coach nach');
-  S.cl.co.tag = ''; S.localStorage.removeItem('clie-coach-gesehen');
-  S.coOffenEntscheiden(o.id, false);
-  pruefe(!/Vereinsfest/.test(s.text) && S.krFinden(o.id).erledigt === 'nein', '„Lass ich“: Aufgabe gestrichen');
-  /* Lass ich sofort */
-  S.coVorabAuf({ art: 'aufgabe', text: 'P2 Grillabend', seite: s.id, datum: '' });
-  S.aufZeileAnhaengen(s, 'P2 Grillabend');
-  S.document.getElementById('coWeg').value = '';
-  S.coVorabEntscheiden('lass');
-  pruefe(!/Grillabend/.test(s.text) && !S.cl.aufklapp, 'sofort „Lass ich“: gelöscht, Fenster zu');
-  /* Kalender-Erinnerungen */
-  const abrufe = [];
-  let nr = 0;
-  S.zugriffToken = 'test'; S.tokenAblauf = Date.now() + 3600000;
-  S.schreibKalender = [{ id: 'haupt', name: 'Privat', primary: true }, { id: 'coachkal', name: 'Coach', primary: false }];
-  S.fetch = function (adresse, opt) {
-    abrufe.push((opt && opt.method || 'GET') + ' ' + adresse + ' ' + ((opt && opt.body) || ''));
-    nr++;
-    return Promise.resolve({ ok: true, status: 200, json() { return Promise.resolve({ id: 'ev' + nr }); }, text() { return Promise.resolve(''); } });
-  };
-  S.cl.co.kalZuletzt = 0; S.cl.co.kalLaeuft = false;
-  await S.coKalenderPlanen(true, '08:00', heute);
-  const posts = abrufe.filter(a => /^POST /.test(a));
-  pruefe(posts.length >= 3 && posts.every(a => /calendars\/coachkal\/events/.test(a)) && posts.every(a => /"summary":"Coach: /.test(a)) && posts.some(a => /Halbzeit/.test(a)),
-    'Erinnerungen als „Coach: …“-Termine im Kalender „Coach“ (' + posts.length + ')');
-  pruefe(posts.every(a => /"overrides":\[\{"method":"popup","minutes":0\}\]/.test(a)) && posts.every(a => /#coach/.test(a)), 'mit Benachrichtigung zur Zeit und Link zurück zum Coach');
-  const kal = S.coTag(false, heute).coach.kal;
-  pruefe(Object.keys(kal).length === posts.length && kal.mittag && kal.mittag.id, 'Termin-Kennungen im Tag gemerkt');
-  abrufe.length = 0;
-  await S.coKalenderPlanen(true, '08:00', heute);
-  pruefe(abrufe.filter(a => /^(POST|PATCH|DELETE) /.test(a)).length === 0, 'unverändert: kein zweiter Termin');
-  /* Alles erledigt: Mittag/Nachmittag fallen weg, Abend-Text ändert sich */
-  S.clTagZeilen(heute).forEach(z => { if (z.a && !z.a.erledigt) { S.clTagZeileUm(heute, z.nr); } });
-  abrufe.length = 0;
-  await S.coKalenderPlanen(true, '08:00', heute);
-  pruefe(abrufe.filter(a => /^DELETE /.test(a)).length === 2 && abrufe.some(a => /^PATCH .*Tagesrückblick/.test(a)) && !S.coTag(false, heute).coach.kal.mittag, 'nicht mehr nötig: gelöscht; geänderter Text: angepasst');
-  /* Ohne Kalender „Coach“: Hauptkalender */
-  S.schreibKalender = [{ id: 'haupt', name: 'Privat', primary: true }];
-  let ziel = await S.coKalenderZiel();
-  pruefe(ziel === 'haupt', 'ohne Kalender „Coach“: im Hauptkalender');
-  /* Termin ab einer Stunde */
-  pruefe(/dauer >= 60/.test(QUELLE) && /coVorabAuf\(\{ art: 'termin'/.test(QUELLE), 'neuer Termin ab einer Stunde: der Coach fragt nach');
-  S.coVorabAuf({ art: 'termin', text: 'Vereinssitzung', dauer: '2 Std.', kalId: 'haupt', terminId: 'evX', datum: heute });
-  abrufe.length = 0;
-  S.coVorabEntscheiden('lass');
-  await new Promise(r => setImmediate(r));
-  pruefe(abrufe.some(a => /^DELETE .*calendars\/haupt\/events\/evX/.test(a)), 'Termin „Lass ich“: im Kalender gelöscht');
-  S.fetch = function () { return Promise.reject(new Error('kein Netz im Test')); };
-  S.zugriffToken = null; S.tokenAblauf = 0;
-  S.oeffne('uebersicht');
 }
 
 /* ============================================================
@@ -7455,16 +6670,6 @@ function eingabeTest() {
   frisch();
   const S = CL;
   const el = S.document.getElementById('inhalt');
-  S.oeffne('ideen'); S.iwNeu();
-  pruefe(/iwTitel/.test(el.innerHTML), 'Ideen: Formular steht');
-  el.innerHTML = el.innerHTML + '<!--getippt-->';
-  S.zeichne();
-  pruefe(/<!--getippt-->/.test(el.innerHTML), 'Ideen: Neuzeichnen im Hintergrund lässt das Formular stehen');
-  S.iwZeichnen();
-  pruefe(!/<!--getippt-->/.test(el.innerHTML) && /iwTitel/.test(el.innerHTML), 'Ideen: eigene Aktion zeichnet neu');
-  S.iwZurListe();
-  el.innerHTML = el.innerHTML + '<!--alt-->'; S.zeichne();
-  pruefe(!/<!--alt-->/.test(el.innerHTML), 'Ideen: Liste ohne Eingabefelder wird im Hintergrund neu gezeichnet');
   S.oeffne('kurs'); S.krMorgenStarten(); S.krRundeSetzen('energie', 3); S.krRundeSchritt(1); S.krRundeSchritt(1);
   pruefe(/krWennDann/.test(el.innerHTML), 'Kurs: Morgen-Runde mit Eingabefeld');
   el.innerHTML = el.innerHTML + '<!--getippt-->'; S.zeichne();
@@ -7472,8 +6677,8 @@ function eingabeTest() {
   S.krZeichnen();
   pruefe(!/<!--getippt-->/.test(el.innerHTML), 'Kurs: eigene Aktion zeichnet neu');
   S.cl.kr.runde = null; S.cl.kr.ansicht = 'heute';
-  S.oeffne('ideen'); el.innerHTML = '<div class="kr-form kr-app"><input class="eingabe"></div>'; S.zeichne();
-  pruefe(/iw-form/.test(el.innerHTML), 'App-Wechsel: fremdes Formular wird nicht festgehalten');
+  S.oeffne('sammlungen'); el.innerHTML = '<div class="kr-form kr-app"><input class="eingabe"></div>'; S.zeichne();
+  pruefe(!/kr-app/.test(el.innerHTML), 'App-Wechsel: fremdes Formular wird nicht festgehalten');
   /* Liste löschen */
   S.cl.filter = 'alle';
   const s = S.kpSeiteAnlegen('liste', 'Wegwerfliste', 'privat', '');
@@ -7494,134 +6699,6 @@ function eingabeTest() {
   S.listeBearbeiten();
   pruefe(S.cl.aufklapp === 'liste-neu' && S.kpSeiteFinden(s2.id), 'Abbrechen: Liste bleibt');
   S.aufklappZu(); S.oeffne('uebersicht');
-}
-
-/* ============================================================
-   65. Ideenwerkstatt: von der Idee zur Umsetzung (0.31)
-   Grund: Neue App. Eine Idee läuft durch sechs Stufen; Entscheidungen
-   (Go/Später/Verwerfen), Plan, Projekt in der Workbench, nächster Schritt
-   als Vorschlag in der Kurs-Morgen-Runde, Hinweise unter „Heute“.
-   Erkennt: Stufen überspringbar, Weiter ohne Pflichtangaben, „Später“
-   ohne Wiedervorlage, Projekt ohne Aufgaben, Kurs-Haken ohne Wirkung,
-   fehlende Felder in iwSetzen (z. B. „zulasten“), Zurück-Taste, Raster.
-   ============================================================ */
-function ideenTest() {
-  console.log('\n65. Ideenwerkstatt: von der Idee zur Umsetzung (0.31)');
-  if (!CL) { return; }
-  frisch();
-  const S = CL;
-  const setz = (o) => Object.keys(o).forEach(k => { S.document.getElementById(k).value = o[k]; });
-  const leer = (l) => l.forEach(k => { S.document.getElementById(k).value = ''; });
-  pruefe(S.clApp('ideen') && /oeffne\('ideen'\)">[\s\S]*?Idea Lab</.test((S.oeffne('uebersicht'), inhalt())) && S.CL_BILD.ideen, 'App „Idea Lab“ (Ideenwerkstatt) seit 0.89 direkt auf dem Start, mit eigenem Symbol');
-  S.aufklappZu();
-  pruefe(Array.isArray(S.DB.ideen) && /'ideen'[\],]/.test(QUELLE), 'Bereich „ideen“ kommt aus der Workbench (6.3.5)');
-  S.oeffne('ideen');
-  pruefe(/Noch keine Idee/.test(inhalt()) && /iwNeu\(\)/.test(S.document.getElementById('fuss').innerHTML), 'leere Liste mit „+ Idee“');
-  S.iwNeu();
-  setz({ iwTitel: '', iwWarum: '', iwBereich: '' });
-  S.iwWeiter();
-  pruefe(S.iwAlle().length === 0 && S.cl.iw.stufe === 1, 'ohne Satz keine Idee');
-  setz({ iwTitel: 'Fotobuch für die Großeltern', iwWarum: 'Weihnachten', iwBereich: 'kb-beziehungen' });
-  S.iwWeiter();
-  const x = S.iwAlle()[0];
-  pruefe(x && x.titel === 'Fotobuch für die Großeltern' && x.bereich === 'kb-beziehungen' && S.cl.iw.stufe === 2 && x.stufe === 2, 'Einfangen: gespeichert, weiter zu „Klären“');
-  S.iwStufeZeigen(5);
-  pruefe(S.cl.iw.stufe === 2, 'Stufen lassen sich nicht überspringen');
-  setz({ iwErgebnis: '', iwFuerWen: '', iwErfolg: '', iwNicht: '' });
-  S.iwWeiter();
-  pruefe(S.cl.iw.stufe === 2, 'ohne Ergebnisbild kein Weiter');
-  setz({ iwErgebnis: 'Ein Buch' });
-  S.iwLesen();
-  const hw = S.iwHinweiseKlaeren(x);
-  pruefe(hw.some(h => /kein Datum/.test(h)) && hw.some(h => /NICHT/.test(h)) && hw.some(h => /Erfolg|gelungen/.test(h)), 'Klären: Hinweise auf Datum/Zahl, Grenzen und Erfolg');
-  setz({ iwErgebnis: 'Bis 20.12. liegen drei gedruckte Fotobücher unterm Baum.', iwFuerWen: 'Oma und Opa', iwErfolg: 'Sie blättern es durch', iwNicht: 'kein Kalender' });
-  S.iwWeiter();
-  pruefe(S.iwHinweiseKlaeren(x).length === 0 && S.cl.iw.stufe === 3, 'gutes Ergebnisbild: keine Hinweise, weiter zu „Ausloten“');
-  setz({ iwVS: '', iwVM: '', iwVL: '', iwKS: '', iwKM: '', iwKL: '', iwAS: '', iwAM: '', iwAL: '', iwZulasten: '' });
-  S.iwWeiter();
-  pruefe(S.cl.iw.stufe === 3, 'ohne Variante kein Weiter');
-  setz({ iwVS: 'ein Buch online', iwKS: '40 €', iwAS: '1 Abend', iwVM: 'drei Bücher', iwKM: '120 €', iwAM: '3 Abende' });
-  S.iwSetzen('risiko', 'M:gering');
-  const vm = x.varianten.filter(v => v.groesse === 'M')[0];
-  pruefe(x.varianten.length === 2 && vm && vm.risiko === 'gering' && vm.kosten === '120 €', 'Varianten S und M mit Kosten und Risiko');
-  S.iwSetzen('gewaehlt', vm.id); S.iwSetzen('wollen', 8);
-  S.iwSetzen('zulasten', 'kb-haus');
-  pruefe(x.zulasten === 'kb-haus', 'iwSetzen kennt „zulasten“');
-  const c = S.iwCheck(x);
-  pruefe(c && c.v === vm && /Wollen 8\/10/.test(c.text) && typeof c.wahl === 'string', 'Vorab-Check aus Kurs auf den Favoriten');
-  S.iwWeiter();
-  pruefe(S.cl.iw.stufe === 4, 'weiter zu „Entscheiden“');
-  S.iwWeiter();
-  pruefe(S.cl.iw.stufe === 4 && !x.entscheidDatum, 'ohne Entscheidung bleibt es bei „Entscheiden“');
-  /* Später → Wiedervorlage */
-  S.iwSetzen('entscheidung', 'spaeter');
-  pruefe(/iwWiedervorlage/.test(inhalt()), 'Später: Feld für die Wiedervorlage');
-  setz({ iwWiedervorlage: S.tagePlus(S.isoDatum(), -1) });
-  S.iwWeiter();
-  pruefe(x.status === 'spaeter' && x.wiedervorlage === S.tagePlus(S.isoDatum(), -1) && S.cl.iw.ansicht === 'liste', 'Später: Status und Datum gespeichert, zurück zur Liste');
-  pruefe(S.iwGruppe(x) === 'reifen' && S.iwHinweise().indexOf(x) >= 0, 'fällige Wiedervorlage: Idee ist „wieder da“ und Hinweis unter Heute');
-  S.oeffne('heute');
-  pruefe(!/Idee wieder da: Fotobuch/.test(inhalt()) && S.coFaellige('09:00', S.isoDatum()).some(f => f.id === 'iw:' + x.id), 'seit 0.34 fragt der Coach „Idee ist wieder da“ (nicht mehr unter Heute)');
-  S.oeffne('ideen');
-  S.iwOeffnen(x.id);
-  pruefe(S.cl.iw.stufe === 4, 'wieder da → öffnet bei „Entscheiden“');
-  S.iwSetzen('entscheidung', 'go'); S.iwWeiter();
-  pruefe(x.status === 'aktiv' && x.stufe === 5 && S.cl.iw.stufe === 5 && S.iwHinweise().indexOf(x) < 0, 'Go: weiter zu „Planen“, Hinweis weg');
-  /* Planen */
-  setz({ iwMsText: '', iwMsDatum: '', iwSchrittText: '' });
-  S.iwWeiter();
-  pruefe(S.cl.iw.stufe === 5, 'ohne nächsten Schritt kein Weiter');
-  setz({ iwMsText: 'Bilder ausgewählt', iwMsDatum: '2026-11-15', iwSchrittText: 'Ordner „Fotobuch“ anlegen' });
-  S.iwLesen(); leer(['iwMsText', 'iwMsDatum', 'iwSchrittText']);
-  setz({ iwSchrittText: 'Anbieter heraussuchen' }); S.iwLesen(); leer(['iwSchrittText']);
-  pruefe(x.meilensteine.length === 1 && x.schritte.length === 2, 'Meilenstein und zwei Schritte eingetragen');
-  pruefe(/kleiner/.test(S.iwHinweisSchritt('Alles organisieren und planen')) && S.iwHinweisSchritt('Ordner anlegen') === '', 'Hinweis bei zu großem ersten Schritt');
-  S.iwWeiter();
-  pruefe(S.cl.iw.stufe === 6 && S.iwGruppe(x) === 'umsetzung', 'Umsetzen erreicht');
-  pruefe(/Steckbrief/.test(inhalt()) && /Ergebnis: Bis 20\.12\./.test(S.iwSteckbriefText(x)) && /Nächster Schritt: Ordner/.test(S.iwSteckbriefText(x)), 'Steckbrief mit Ergebnis und nächstem Schritt');
-  /* Kurs-Haken */
-  const v = S.krEinesVorschlaege(3).filter(y => y.idee === x.id)[0];
-  pruefe(v && v.text === 'Ordner „Fotobuch“ anlegen' && /Idee: Fotobuch/.test(v.quelle), 'nächster Schritt erscheint in der Kurs-Morgen-Runde');
-  S.krMorgenStarten(); S.krRundeSetzen('energie', 3); S.krRundeSchritt(1); S.krRundeSchritt(1);
-  S.krRundeSetzen('wahl', String(S.krEinesVorschlaege(3).findIndex(y => y.idee === x.id)));
-  S.document.getElementById('krAufgabe').checked = false; S.document.getElementById('krWennDann').value = '';
-  S.krRundeSchritt(1);
-  pruefe(S.krTag(false).eines && S.krTag(false).eines.idee === x.id, '„das Eine“ merkt sich die Idee');
-  S.krEinesErledigt();
-  pruefe(x.schritte[0].erledigt && S.iwNaechsterSchritt(x).text === 'Anbieter heraussuchen', 'in Kurs erledigt → Schritt in der Idee abgehakt');
-  S.cl.kr.runde = null; S.cl.kr.ansicht = 'heute';
-  S.oeffne('ideen'); S.iwOeffnen(x.id);
-  /* Projekt in der Workbench */
-  S.iwProjektAnlegen();
-  const pr = S.kpSeiteFinden(x.projekt);
-  pruefe(pr && pr.titel === 'Fotobuch für die Großeltern' && /^Ziel: Bis 20\.12\./.test(pr.text) && /\[\] Anbieter heraussuchen/.test(pr.text) && /\[\] Bilder ausgewählt \(bis /.test(pr.text) && !/Ordner/.test(pr.text),
-    'Projekt angelegt: Ziel, offene Schritte und Meilensteine als Aufgaben');
-  const anz = S.DB.projekte.length; S.iwProjektAnlegen();
-  pruefe(S.DB.projekte.length === anz, 'kein zweites Projekt');
-  pruefe(S.iwNaechsterSchritt(x).projekt && S.iwNaechsterSchritt(x).text === 'Anbieter heraussuchen', 'nächster Schritt kommt jetzt aus dem Projekt');
-  S.iwNaechsterErledigt();
-  pruefe(/\[x\] Anbieter heraussuchen/.test(pr.text) && S.iwNaechsterSchritt(x).text.indexOf('Bilder ausgewählt') === 0, 'Schritt erledigt → im Projekt abgehakt');
-  /* Wochen-Check */
-  pruefe(S.iwWocheFaellig(x) === (new Date().getDay() === 0), 'Wochen-Check nur sonntags fällig');
-  S.iwSetzen('woche', 'kurs');
-  pruefe(x.wochen.length === 1 && x.wochen[0].kw === S.krWochenId() && !S.iwWocheFaellig(x), 'Wochen-Check gespeichert');
-  S.iwSetzen('woche', 'kurs');
-  pruefe(x.wochen.length === 1, 'pro Woche nur ein Eintrag');
-  /* Zurück-Taste und Statistik */
-  pruefe(S.cl.iw.ansicht === 'stufe' && S.clZurueck() !== false && S.cl.iw.ansicht === 'liste', 'Zurück: von der Idee zur Liste');
-  pruefe(/In Umsetzung/.test(inhalt()) && /nächster Schritt: Bilder/.test(inhalt()), 'Liste: Gruppe „In Umsetzung“ mit nächstem Schritt');
-  S.iwSetzen && S.iwOeffnen(x.id); S.iwSetzen('woche', 'fertig');
-  pruefe(x.status === 'fertig' && S.iwGruppe(x) === 'fertig' && S.iwVorschlaege().length === 0, 'abgeschlossen: kein Vorschlag mehr in Kurs');
-  pruefe(S.iwStatZeile() === '1 · 0 · 1', 'Statistik: Ideen · in Umsetzung · abgeschlossen');
-  /* Verwerfen */
-  S.iwNeu(); setz({ iwTitel: 'Zweite Idee', iwWarum: '', iwBereich: '' }); S.iwWeiter();
-  const y = S.iwFinden(S.cl.iw.id);
-  y.stufe = 4; S.cl.iw.stufe = 4; S.iwSetzen('entscheidung', 'verwerfen'); S.iwWeiter();
-  pruefe(y.status === 'verworfen' && S.cl.iw.ansicht === 'liste' && !/Zweite Idee/.test(inhalt()), 'Verwerfen: aus der offenen Liste');
-  S.iwAlleUm();
-  pruefe(/Verworfen/.test(inhalt()) && /Zweite Idee/.test(inhalt()), '„Abgeschlossene“ zeigt auch Verworfenes');
-  pruefe(/\.iw-stufen button\.hier/.test(QUELLE) && /\.iw-var\{/.test(QUELLE), 'Gestaltung für die Ideenwerkstatt vorhanden');
-  S.oeffne('uebersicht');
 }
 
 /* ============================================================
@@ -7692,7 +6769,7 @@ function kurs2Test() {
   /* Zurück */
   S.krMorgenStarten(); S.krRundeSchritt(1); S.krRundeSchritt(1);
   S.clZurueck(); pruefe(S.cl.kr.runde.schritt === 2, 'Zurück in der Morgen-Runde: ein Schritt');
-  S.clZurueck(); S.clZurueck(); pruefe(S.cl.app === 'coach', 'dann zum Coach (seit 0.33)');
+  S.clZurueck(); S.clZurueck(); pruefe(S.cl.app === 'uebersicht', 'dann zur Übersicht (seit 0.122.0, vorher zum Coach)');
   S.oeffne('kurs'); S.krAnsicht('prinzipien'); S.clZurueck(); pruefe(S.cl.kr.ansicht === 'bilanz', 'Prinzipien → zurück zur Bilanz');
   S.oeffne('uebersicht');
 }
@@ -7863,11 +6940,10 @@ function kursTest() {
   const sonntag = new Date().getDay() === 0;
   pruefe(S.krRueckblickFaellig() === sonntag, 'Rückblick-Hinweis nur sonntags');
   w2.rueckblick = rb;
-  pruefe(/if \(krRueckblickFaellig\(\)\) \{/.test(QUELLE.slice(QUELLE.indexOf('function coFaellige'))), 'Hinweis kommt seit 0.63 vom Coach (keine App „Heute“ mehr)');
   /* Zurück */
   S.krCheckNeu(); S.document.getElementById('krWas').value = 'x'; S.krCheckSchritt(1);
   S.clZurueck(); pruefe(S.cl.kr.check.schritt === 1, 'Zurück im Check: ein Schritt zurück');
-  S.clZurueck(); pruefe(S.cl.app === 'coach' && !S.cl.kr.check, 'dann zum Coach (seit 0.33)');
+  S.clZurueck(); pruefe(S.cl.app === 'uebersicht' && !S.cl.kr.check, 'dann zur Übersicht (seit 0.122.0)');
   S.oeffne('kurs');
   S.oeffne('uebersicht');
 }
@@ -8535,12 +7611,8 @@ function palmDetailsTest() {
   S.pmPrioWahl(1);
   S.document.getElementById('pmTitel').value = 'Angebot schreiben'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
   S.pmSpeichern();
-  pruefe(S.cl.aufklapp === 'covorab' && /Angebot schreiben/.test(S.document.getElementById('aufklapp').innerHTML), 'neue Aufgabe mit Priorität 1: der Coach fragt nach (wie bisher)');
-  const neu = S.DB.aufgaben.filter(x => x.titel === 'Angebot schreiben')[0];
-  S.document.getElementById('coWeg').value = '';
-  S.coVorabEntscheiden('spaeter');
-  pruefe(neu.planung === 'backlog' && S.krAlle('coachoffen').some(o => o.text === 'Angebot schreiben'), '„Bis Sonntag überlegen“: die Aufgabe verliert ihr Datum, der Coach fragt Sonntag');
-  S.aufklappZu();
+  pruefe(!S.cl.aufklapp && S.DB.aufgaben.some(x => x.titel === 'Angebot schreiben'),
+    'neue Aufgabe mit Priorität 1: seit 0.122.0 fragt niemand mehr nach, sie ist einfach angelegt');
   S.oeffne('uebersicht');
 }
 
@@ -8865,11 +7937,6 @@ function palmAgendaTest() {
   h = inhalt();
   pruefe(/To Do · heute/.test(h) && /Anwendungen aufrufen/.test(h) && /Überfälliges/.test(h), 'Agenda: dieselben Aufgaben unter „To Do · heute“');
   S.clKalAnsicht('tag');
-  /* Coach */
-  const d = S.coTagDaten(heute);
-  pruefe(d.offen.some(x => x.a.text === 'P1 Anwendungen aufrufen' && x.pm) && d.erledigt.some(x => /Schon erledigt/.test(x.a.text)), 'der Coach sieht die Aufgaben des Tages (mit Priorität)');
-  S.coVerschieben(heute, 'P1 Anwendungen aufrufen', S.tagePlus(heute, 1));
-  pruefe(S.DB.aufgaben.filter(x => x.titel === 'Anwendungen aufrufen')[0].planung === S.tagePlus(heute, 1), 'Coach „morgen“: die Aufgabe bekommt den nächsten Tag');
   S.oeffne('uebersicht');
 }
 
@@ -9116,35 +8183,6 @@ function fehlerZeigenTest() {
 }
 
 
-function coachAusTest() {
-  console.log('\n146. Coach ausgeschaltet — Coaching im Gespräch statt in der App (0.86)');
-  if (!CL) { return; }
-  const S = pmFrisch();
-  pruefe(CO_AN_STD === false, 'Grundstellung: Coach aus');
-  S.CO_AN = false;
-  const heute = S.isoDatum();
-  S.pmNeueAufgabe({ titel: 'A', prio: 1, datum: heute });
-  S.pmNeueAufgabe({ titel: 'B', prio: 2, datum: heute });
-  S.pmNeueAufgabe({ titel: 'C', prio: 2, datum: heute });
-  S.oeffne('uebersicht');
-  pruefe(!/co-oben|co-zeile-still|Coach ·/.test(inhalt()), 'Startseite: keine Coach-Zeile und keine Fragen');
-  pruefe(S.coKalenderPlan('06:00', heute).length === 0, 'keine Coach-Erinnerungen im Kalender — noch kommende werden entfernt');
-  pruefe(!S.coVorabNoetig('P1 Wichtig', heute), 'keine Vorab-Nachfrage bei Neuem');
-  S.oeffne('aufgaben'); S.pmNeu('', '');
-  S.document.getElementById('pmTitel').value = 'Neu P1'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
-  S.pmPrioWahl(1);
-  S.document.getElementById('pmTitel').value = 'Neu P1'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
-  S.pmSpeichern();
-  pruefe(S.cl.aufklapp !== 'covorab' && S.DB.aufgaben.some(a => a.titel === 'Neu P1'), 'neue Aufgabe mit Priorität 1: gespeichert, ohne Nachfrage');
-  pruefe(!S.CL_ORDNER.planung && !S.clOrdnerVon('coach'), 'nicht mehr erreichbar (Ordner Planning seit 0.89 aufgelöst)');
-  S.localStorage.setItem('clie-morgengruss', '');
-  pruefe(typeof S.coMorgengrussHtml === 'function', 'der ruhige Morgengruß bleibt');
-  S.localStorage.setItem('clie-morgengruss', heute);
-  S.CO_AN = true;
-  S.oeffne('uebersicht');
-}
-
-
 function leisteCssTest() {
   console.log('\n147. Umschalter im Inhalt haben ihr Aussehen (Schach-Schule, Drive) (0.86.1)');
   if (!CL) { return; }
@@ -9310,9 +8348,9 @@ function farbschemaTest() {
   const alt = S.window.screen;
   delete S.__ablage['clie-schema'];
   S.window.screen = { width: 412, height: 915 };
-  pruefe(!S.clIstGrossesGeraet() && S.clSchemaSetzen() === false, 'Pixel (412 × 915): LCD-Grün');
+  pruefe(S.clSchemaSetzen() === true, 'Pixel (412 × 915): seit 0.118.0 Workbench-Farben, nicht mehr LCD');
   S.window.screen = { width: 820, height: 1180 };
-  pruefe(S.clIstGrossesGeraet() && S.clSchemaSetzen() === true, 'iPad (820 × 1180): Workbench-Farben');
+  pruefe(S.clSchemaSetzen() === true, 'iPad (820 × 1180): Workbench-Farben');
   S.window.screen = { width: 1920, height: 1080 };
   pruefe(S.clSchemaSetzen() === true, 'PC (1920 × 1080): Workbench-Farben');
   S.clSchemaUm();
@@ -9321,7 +8359,7 @@ function farbschemaTest() {
   S.window.screen = { width: 412, height: 915 };
   pruefe(S.clSchemaWahl() === 'wb' && S.clSchemaSetzen() === true, 'Menü: fest auf Workbench — auch am Handy');
   S.clSchemaUm();
-  pruefe(S.clSchemaWahl() === 'auto' && S.clSchemaSetzen() === false, 'Menü: zurück auf Auto');
+  pruefe(S.clSchemaWahl() === 'auto' && S.clSchemaSetzen() === true, 'Menü: zurück auf Auto — und Auto heißt jetzt überall Workbench');
   S.window.screen = alt;
   S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
   pruefe(/menueWahl\('farben'\)">Colors: Auto/.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡ zeigt „Colors: Auto“');
@@ -9341,23 +8379,23 @@ function farbschemaTest() {
 
 
 function raster35Test() {
-  console.log('\n151. Start als Raster 3×5: Planning und Learning aufgelöst, Games bleibt Ordner (0.89)');
+  console.log('\n151. Start als Raster: Planning und Learning aufgelöst, Games bleibt Ordner (0.89, seit 0.122.0 elf Felder)');
   if (!CL) { return; }
   /* Fehlerarten: Raster nicht voll oder überzählig, eine App doppelt (Raster und Ordner) oder gar nicht erreichbar, Ordner zeigt auf eine App, die es nicht gibt */
   const S = pmFrisch();
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.length === 15 && raster.length % 3 === 0, 'Raster genau voll: 15 Felder in drei Spalten');
-  pruefe(['ideen', 'routinen', 'leitfaden', 'lernkartei', 'gemini'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Idea Lab, Roots, Guide, Flashcards, Coach direkt auf dem Start');
+  pruefe(raster.length === 12 && raster.length % 3 === 0, 'Raster genau voll: zwölf Felder in drei Spalten (seit 0.123.0)');
+  pruefe(['routinen', 'lernkartei'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Roots und Flashcards direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
   Object.keys(S.CL_ORDNER).forEach(k => S.CL_ORDNER[k].apps.forEach(id => { if (!S.clApp(id) || raster.indexOf(id) >= 0) { fehlt.push(k + ':' + id); } }));
   pruefe(!fehlt.length, 'jede App im Ordner gibt es und sie liegt nicht zusätzlich im Raster' + (fehlt.length ? ': ' + fehlt.join(', ') : ''));
   pruefe(raster.every(id => S.CL_BILD[id]), 'jedes Feld hat ein Symbol');
   S.oeffne('uebersicht');
-  pruefe((inhalt().match(/class="app"/g) || []).length === 15 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 15 Felder, eines davon Ordner (Games ▸)');
+  pruefe((inhalt().match(/class="app"/g) || []).length === 12 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 12 Felder, eines davon Ordner (Games ▸)');
   const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
   pruefe(/\.sym\{width:68px;height:68px/.test(css) && /\.sym svg\{width:68px;height:68px/.test(css) && /\.apps\{display:grid;grid-template-columns:repeat\(3,1fr\);gap:14px 4px/.test(css), 'kleinere Symbole (68 px) und engere Zeilen, damit fünf Reihen ohne Rollen passen');
-  S.oeffne('ideen'); S.clZurueck();
+  S.oeffne('rechner'); S.clZurueck();
   pruefe(S.cl.app === 'uebersicht' && !S.cl.aufklapp, 'Zurück aus Idea Lab: direkt auf den Start, kein Ordner');
 }
 
@@ -9442,35 +8480,6 @@ function markenReparaturTest() {
     'Hinweis: „Jour fixe“ auf zwei Geräten geändert — die jüngere Fassung gilt');
   pruefe(Number(S.__ablage['clie-abgleich-stand']) > 1000, 'neuer Stand gemerkt');
   pruefe(/var vorher = clAbgleichVorher\(\);[\s\S]{0,80}abgleichen\(\)/.test(SKRIPT) && (SKRIPT.match(/clAbgleichNachher\(vorher\);/g) || []).length === 2, 'beide Abgleich-Wege (Tipp und still) melden');
-}
-
-
-function geminiCoachTest() {
-  console.log('\n154. Coach öffnet den Gemini-Chat; Drive im Menü ≡ (0.91)');
-  if (!CL) { return; }
-  /* Fehlerarten: Coach ersetzt CLIE selbst (noopener → null) oder öffnet nichts; Drive nach dem Umzug nicht mehr erreichbar */
-  const S = pmFrisch();
-  const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.length === 15 && raster[13] === 'gemini' && S.clApp('gemini').name === 'Coach' && S.CL_BILD.gemini && S.clApp('drive').raster === false, 'Coach auf dem Platz von Drive, mit eigenem Symbol; Drive nicht mehr im Raster');
-  const echt = S.window.open;
-  let geoeffnet = null, ziel = null;
-  const fenster = { opener: 'x' };
-  S.window.open = (u, z) => { geoeffnet = u; ziel = z; return fenster; };
-  const appVorher = S.cl.app;
-  S.oeffne('gemini');
-  pruefe(geoeffnet === 'https://gemini.google.com/app/cf60dcb4506a19a6' && ziel === '_blank' && fenster.opener === null && S.cl.app === appVorher, 'Coach: öffnet den Gemini-Chat in neuem Fenster, CLIE bleibt, wo er war');
-  S.window.open = () => null;
-  S.oeffne('gemini');
-  pruefe(/Gemini ließ sich nicht öffnen/.test(S.document.getElementById('toastText').textContent) && S.location.href === 'file:///test', 'blockiert: Hinweis auf Pop-ups, CLIE ersetzt sich nicht selbst');
-  S.window.open = echt;
-  pruefe(!/window\.open\([^)]*noopener/.test(SKRIPT), 'kein „noopener“ im Aufruf');
-  /* Fehlerart 0.94.2: ein geteilter Link (share.gemini.google / g.co) öffnet nie den laufenden Chat, sondern legt einen neuen an */
-  pruefe(/^https:\/\/gemini\.google\.com\/(app|gem)\/[A-Za-z0-9_-]+$/.test(S.CL_COACH_LINK), 'Coach-Link zeigt auf einen Chat oder Gem (gemini.google.com/app|gem/…), nicht auf einen geteilten Link');
-  S.cl.aufklapp = 'menue'; S.aufklappZeichnen();
-  pruefe(/menueWahl\('drive'\)">Drive</.test(S.document.getElementById('aufklapp').innerHTML), 'Menü ≡: Drive');
-  S.menueWahl('drive');
-  pruefe(S.cl.app === 'drive', 'Drive öffnet aus dem Menü');
-  S.oeffne('uebersicht');
 }
 
 
@@ -10080,24 +9089,6 @@ function routineMemoTest() {
   S.DB.aufgaben = S.DB.aufgaben.filter(x => x.id !== 'rout1');
 }
 
-function ideeLoeschenTest() {
-  console.log('\n173. Ideenwerkstatt: eine Idee lässt sich löschen — erst Nachfrage, dann Löschen, mit Grabstein (0.97.10)');
-  if (!CL) { return; }
-  const S = pmFrisch();
-  S.DB.ideen = S.DB.ideen || [];
-  S.DB.ideen.push({ id: 'idloe1', titel: 'Testidee zum Löschen', stufe: 1, geaendert: 1 });
-  S.oeffne('ideen');
-  S.iwOeffnen('idloe1');
-  pruefe(/iwLoeschen\(\)/.test(S.ideenFussHtml()) && />Löschen</.test(S.ideenFussHtml()), 'Stufen-Ansicht: der Löschen-Knopf ist da');
-  S.iwLoeschen();
-  pruefe(!!S.iwFinden('idloe1') && /Wirklich löschen/.test(S.ideenFussHtml()), 'erster Tipp: nur die Nachfrage, die Idee bleibt');
-  S.iwLoeschen();
-  pruefe(!S.iwFinden('idloe1') && !S.DB.ideen.some(x => x.id === 'idloe1'), 'zweiter Tipp: die Idee ist aus der Ideenwerkstatt entfernt');
-  pruefe(S.DB.grabsteine.some(g => g.s === 'ideen' && g.id === 'idloe1'), 'ein Grabstein hält die Löschung beim Abgleich fest');
-  pruefe(S.cl.iw.ansicht === 'liste', 'danach wieder in der Liste');
-  S.DB.grabsteine = S.DB.grabsteine.filter(g => g.id !== 'idloe1');
-}
-
 function wochenStatTest() {
   console.log('\n174. Wochenstatistik: Zeit und Anzahl je Bereich, Erledigt und Vorschau, DrillDown (0.97.11)');
   if (!CL) { return; }
@@ -10120,11 +9111,10 @@ function wochenStatTest() {
   pruefe(st.beruflich.aufgaben.some(x => x.id === 'wsa2'), 'berufliche Aufgabe im Bereich Beruflich');
   pruefe(st.privat.routinen.some(x => x.id === 'wsr1' && x.prio === 3), 'erledigter Routinen-Tag mit seiner Priorität');
   pruefe(st.privat.memoNeu.some(x => x.titel === 'Wochenmemo') && st.privat.memoArch.some(x => x.titel === 'Wochenmemo'), 'Memo Pad: neu und archiviert');
-  pruefe(st.privat.ideenNeu.some(x => x.titel === 'Wochenidee') && st.privat.ideenFertig.some(x => x.titel === 'Wochenidee'), 'Ideen: neu und abgeschlossen');
   pruefe(!st.privat.aufgaben.some(x => x.id === 'wsa3'), 'offene, geplante Aufgabe fehlt im Erledigt-Modus');
   const vor = S.pmWocheStat(mo, 'vorschau');
   pruefe(vor.privat.aufgaben.some(x => x.id === 'wsa3' && x.prio === 4), 'Vorschau: geplante offene Aufgabe mit Priorität');
-  pruefe(!vor.privat.memoNeu.length && !vor.privat.ideenNeu.length, 'Vorschau zählt Memo Pad und Ideen nicht');
+  pruefe(!vor.privat.memoNeu.length, 'Vorschau zählt das Memo Pad nicht');
   S.cl.pm.tab = 'woche'; S.cl.pm.wocheMontag = mo; S.cl.pm.wocheModus = 'erledigt'; S.cl.pm.wocheDrill = null;
   const html = S.pmWocheHtml();
   pruefe(/Privat/.test(html) && /Beruflich/.test(html) && />Erledigt</.test(html) && />Vorschau</.test(html), 'Ansicht: Bereiche und Umschalter Erledigt/Vorschau');
@@ -10265,14 +9255,14 @@ function fokusRasterTest() {
   const S = CL;
   frisch();
   const ids = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(ids.indexOf('fokus') === ids.indexOf('einkauf') - 1, 'Fokus steht direkt vor Shopping, also an dessen Stelle');
+  pruefe(ids.indexOf('fokus') >= 0 && ids.indexOf('einkauf') < 0, 'Fokus steht im Raster, Shopping ist seit 0.122.0 draußen');
   pruefe(ids.indexOf('sos') < 0 && S.CL_APPS.some(a => a.id === 'sos' && a.raster === false), 'SOS ist aus dem Raster genommen');
   pruefe(/if \(was === 'sos'\) \{ oeffne\('sos'\); return; \}/.test(QUELLE), 'SOS bleibt über das Menü erreichbar');
   pruefe(/if \(id === 'fokus'\) \{ fkStartenAuf\(\); return; \}/.test(QUELLE), 'Öffnen der Kachel startet den Fokus-Dialog');
   pruefe(typeof S.CL_BILD.fokus === 'string' && S.CL_BILD.fokus.length > 40, 'Fokus hat ein eigenes Bildzeichen');
   const h = S.uebersichtHtml();
   pruefe(/onclick="oeffne\('fokus'\)"/.test(h) && !/fk-start/.test(QUELLE), 'kein Knopf oben mehr; die Kachel steht im Raster');
-  pruefe((h.match(/class="app"/g) || []).length === 15, 'im Raster bleiben 15 Kacheln');
+  pruefe((h.match(/class="app"/g) || []).length === 12, 'im Raster bleiben 12 Kacheln');
 }
 
 function terminErinnerungTest() {
@@ -11130,80 +10120,6 @@ function pmRoutineDiesmalTest() {
   S.cl.pm.fenster = null; S.cl.rt.fenster = null; S.cl.aufklapp = ''; S.cl.pm.wahl = ''; S.cl.app = 'uebersicht';
 }
 
-/* Fehlertyp: eine Sperre, die nicht sperrt — oder eine, die nicht wieder aufgeht. Beides
-   wäre schlimm: im ersten Fall ist die Pflichtlektüre wirkungslos, im zweiten sitzt man
-   fest. Dazu: das Fenster darf nicht über den Tag hinausreichen, und gelesen muss über
-   den Abgleich gelten, sonst kommt es auf jedem Gerät noch einmal. */
-function manPflichtTest() {
-  console.log('\n203. Manifest: Pflichtlektüre aus dem Coach-Kalender, gesperrt bis zur letzten Seite (0.106.0)');
-  if (!CL) { return; }
-  const S = CL;
-  frisch();
-  const heute = S.isoDatum();
-  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
-  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }, { id: 'kal-privat', name: 'Privat' }];
-  const nun = S.clMinuten(S.clUhrzeit());
-  const zeit = m => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
-
-  /* fällig: vor einer halben Stunde begonnen */
-  S.coachTermine = [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }];
-  pruefe(!!S.manPflichtTermin(), 'ein Termin aus dem Coach-Kalender in der letzten Stunde ist fällig');
-
-  /* 0.107.1: die normale Terminliste ist NICHT die Quelle — der Kern wirft Coach-Einträge
-     beim Einsortieren weg (istCoachTermin), dort stehen sie also nie. */
-  S.coachTermine = [];
-  S.termineNachTag = { [heute]: [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }] };
-  pruefe(!S.manPflichtTermin(), 'aus der normalen Terminliste kommt nichts');
-  S.termineNachTag = {};
-
-  /* nicht fällig: zu alt, noch nicht dran */
-  S.coachTermine = [{ id: 'ev3', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 90)), kalId: 'kal-coach' }];
-  pruefe(!S.manPflichtTermin(), 'nach einer Stunde ist das Fenster zu');
-  S.coachTermine = [{ id: 'ev4', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 30)), kalId: 'kal-coach' }];
-  pruefe(!S.manPflichtTermin(), 'vor dem Beginn passiert nichts');
-
-  /* Sperre */
-  S.coachTermine = [{ id: 'ev1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 30)), kalId: 'kal-coach' }];
-  pruefe(S.manPflichtPruefen() === true && S.manSicht(), 'die Prüfung öffnet das Manifest');
-  pruefe(S.cl.man.pflicht === 'ev1', 'der Termin ist als Pflicht vermerkt');
-  /* Im Testrahmen hat der Bildschirm keine Höhe, also passt alles auf eine Seite und die
-     Sperre fällt sofort. Für die Wächter wird der mehrseitige Fall von Hand gesetzt. */
-  S.cl.man.frei = false; S.cl.man.seite = 0; S.cl.man.anzahl = 3;
-  pruefe(S.manGesperrt() === true, 'und sperrt');
-  S.oeffne('kalender');
-  pruefe(S.manSicht(), 'eine andere App lässt sich nicht öffnen');
-  S.menueUm();
-  pruefe(S.cl.aufklapp !== 'menue', 'das Menü öffnet nicht');
-  pruefe(S.clZurueck() === true && S.manSicht(), 'die Zurück-Taste führt nicht heraus');
-  S.katUm();
-  pruefe(S.cl.aufklapp !== 'rtwahl', '0.109.0: auch das ▼ öffnet nicht');
-  S.rtSichtSetzen('gewohnheiten');
-  pruefe(S.manSicht(), 'und die Sicht lässt sich nicht wechseln');
-
-  /* Freigabe auf der letzten Seite */
-  pruefe(S.manifestFussHtml().indexOf('manPflichtFertig()') < 0, 'vorher gibt es kein „Fertig“');
-  S.manifestHtml();
-  pruefe(S.cl.man.frei === true && S.manGesperrt() === false, 'auf der letzten Seite fällt die Sperre');
-  pruefe(S.manifestFussHtml().indexOf('manPflichtFertig()') >= 0, 'und „Fertig“ erscheint');
-  S.manPflichtFertig();
-  pruefe(S.cl.app === 'uebersicht' && !S.cl.man.pflicht, 'Fertig führt hinaus');
-
-  /* gelesen gilt kontoweit und kommt nicht wieder */
-  pruefe(S.manGelesen().ev1 === heute, 'der Termin ist als gelesen vermerkt');
-  pruefe(S.DB.einstellungen.manifestGelesen.ev1 === heute, 'und zwar in der Datenbank, also auf allen Geräten');
-  pruefe(S.manPflichtTermin() === null && S.manPflichtPruefen() === false, 'derselbe Termin löst nicht noch einmal aus');
-
-  /* ohne Manifest-Notiz passiert gar nichts */
-  S.DB.gedanken = [];
-  S.DB.einstellungen.manifestGelesen = {};
-  pruefe(S.manPflichtPruefen() === false, 'ohne Manifest-Notiz wird nichts gesperrt');
-
-  /* der Sprung aus der Erinnerung */
-  pruefe(/location\.wi hash[\s\S]{0,40}#manifest/.test('') || SKRIPT.indexOf("=== '#manifest') { oeffne('manifest'); }") >= 0, 'der Link #manifest öffnet das Manifest');
-
-  S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0; S.termineNachTag = {}; S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
-}
-
 /* Fehlertyp: ein Overlay, das nicht kommt, zu oft kommt oder nicht weiterführt. Dazu der
    Tageszähler: ein Tag daneben und „Tag 12 von 56“ ist falsch, und er darf vor dem Start
    und nach dem letzten Tag gar nichts zeigen. Außerdem muss ein fälliger Coach-Termin mit
@@ -11258,38 +10174,17 @@ function upTest() {
   pruefe(h.indexOf('Tag 12 von 56') >= 0, 'die Kopfzeile nennt Tag und Ziel');
   pruefe(h.indexOf('Neue Gewohnheiten mit neuen Regeln') >= 0, 'die Überschrift steht darunter');
   pruefe(S.cl.up.regeln.length === 3, 'drei Regeln stehen darin');
-  pruefe(h.indexOf('weiter zum Manifest') >= 0, 'und der Hinweis, was danach kommt');
+  pruefe(h.indexOf('antippen zum Schließen') >= 0, 'und der Hinweis, was danach kommt');
   pruefe(S.upPruefen() === false, 'ein zweites Mal im selben Fenster kommt es nicht');
   pruefe(S.upGelesenAm('2026-11-15', p).join(',') === 'false,false,false', 'gelesen ist noch keines der drei Fenster');
 
-  /* Direkt weiter ins Manifest, gesperrt */
+  /* Antippen schließt — seit 0.122.0 kommt nichts mehr hinterher */
   const heute = '2026-11-15';
-  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
-  const nun = S.clMinuten(S.clUhrzeit());
-  const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
-  S.coachTermine = [{ id: 'ev9', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 10)), kalId: 'kal-coach' }];
-  pruefe(!!S.manPflichtTermin(), 'ein Coach-Termin wäre gerade fällig');
   S.upFertig();
-  pruefe(S.manSicht() && !S.cl.aufklapp, 'nach dem Overlay kommt das Manifest');
-  pruefe(S.cl.man.pflicht === marke, 'und zwar als Pflichtlektüre');
-  S.cl.man.frei = false; S.cl.man.seite = 0; S.cl.man.anzahl = 3;
-  pruefe(S.manGesperrt() === true, 'gesperrt wie beim Coach-Termin');
-  S.oeffne('kalender');
-  pruefe(S.manSicht(), 'eine andere App lässt sich nicht öffnen');
-
-  /* Fertig: die Marke ist gelesen und der fällige Coach-Termin gleich mit */
-  S.manifestHtml();
-  S.manPflichtFertig();
-  pruefe(S.cl.app === 'uebersicht' && !S.cl.man.pflicht, 'Fertig führt hinaus');
+  pruefe(!S.cl.up.an && !S.cl.aufklapp && S.cl.app !== 'manifest', 'nach dem Overlay geht es einfach weiter');
   pruefe(S.DB.einstellungen.manifestGelesen[marke] === heute, 'die Marke steht in der Datenbank, gilt also auf allen Geräten');
-  pruefe(S.manGelesen().ev9 === heute, 'der fällige Coach-Termin ist damit erledigt');
-  pruefe(S.manPflichtTermin() === null && S.manPflichtPruefen() === false, 'er löst also nicht noch einmal aus');
-  pruefe(S.upPruefen() === false, 'und das Overlay kommt im selben Fenster auch nicht wieder');
+  pruefe(S.upPruefen() === false, 'und das Overlay kommt im selben Fenster nicht wieder');
   pruefe(S.upGelesenAm(heute, p).filter((x) => x).length === 1, 'ein Fenster des Tages gilt als gelesen');
-
-  /* Ein Coach-Termin, der erst später dran ist, bleibt stehen */
-  S.coachTermine = [{ id: 'ev10', titel: 'Manifest', zeit: zeit(Math.min(1439, nun + 120)), kalId: 'kal-coach' }];
-  pruefe(!S.manGelesen().ev10, 'ein Termin, der erst später dran ist, wird nicht mit abgehakt');
 
   /* Außerhalb der Laufzeit und ohne Notiz passiert nichts */
   falschesHeute('2026-12-30');
@@ -11328,94 +10223,12 @@ function upTest() {
   pruefe(/function aufklappZu\(\)\s*\{[\s\S]{0,200}umprog'\s*\)\s*\{\s*upFertig\(\)/.test(SKRIPT), 'das Antippen führt weiter, nicht ab');
   pruefe(SKRIPT.split('function upPruefen(').length === 2, 'upPruefen gibt es genau einmal');
   pruefe(SKRIPT.split('function upFertig(').length === 2, 'upFertig gibt es genau einmal');
-  pruefe(/upPruefen\(\);[\s\S]{0,400}?clTermineHolen\(false\)\.then\([\s\S]{0,120}manPflichtPruefen/.test(SKRIPT), 'beim Start kommt die Umprogrammierung vor der Pflichtlektüre');
+  pruefe(/upPruefen\(\);/.test(SKRIPT) && !/manPflichtPruefen/.test(SKRIPT), 'beim Start kommt die Umprogrammierung; die Pflichtlektüre gibt es seit 0.122.0 nicht mehr');
   pruefe(SKRIPT.indexOf('var UP_START') < 0 && SKRIPT.indexOf('var MAN_FENSTER_MIN') < 0, 'die festen Zahlen aus 0.107 stehen nicht mehr im Code');
 
   S.isoDatum = echtIso;
   S.cl.up.an = false; S.cl.up.marke = ''; S.cl.up.wahl = ''; S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
-  S.DB.kurs = []; S.termineNachTag = {}; S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
-}
-
-/* Fehlertyp: eine Sperre, die ihre Termine aus einem Topf liest, in den sie nie gelangen.
-   Genau das war 0.106.0: der Kern wirft Coach-Einträge beim Einsortieren weg, damit sie
-   nirgends auftauchen — die Pflichtlektüre suchte sie aber dort. Der Test geht deshalb
-   den echten Weg: Antwort von Google rein, coachTermine raus. */
-function manCoachHolenTest() {
-  console.log('\n205. Manifest: die Coach-Termine holt sich die Pflichtlektüre selbst (0.107.1)');
-  if (!CL) { return; }
-  const S = CL;
-  frisch();
-  const heute = S.isoDatum();
-
-  /* Die Regel des Kerns, an der alles hing */
-  pruefe(S.istCoachTermin('Manifest', 'Coach') === true, 'der Kern wirft alles aus einem Kalender „Coach“ weg');
-  pruefe(S.istCoachTermin('Coach: Rückblick', 'Privat') === true, 'und jeden Titel, der mit „Coach:“ beginnt');
-  pruefe(S.istCoachTermin('Manifest', 'Coach Manifest') === false, 'ein Kalender mit Zusatz im Namen bleibt erhalten');
-
-  /* Welche Kalender die Pflichtlektüre abfragt */
-  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }, { id: 'kal-c2', name: 'CLIE Coach' }, { id: 'kal-privat', name: 'Privat' }];
-  const ausgewaehlt = S.manCoachKalender().map((k) => k.id).join(',');
-  pruefe(ausgewaehlt === 'kal-coach,kal-c2', 'abgefragt wird jeder Kalender, in dessen Namen „coach“ steht');
-
-  /* Der echte Weg: Antwort von Google → coachTermine */
-  const echtFetch = S.window.fetch;
-  const echtToken = S.tokenGueltig;
-  let adressen = [];
-  S.tokenGueltig = () => true;
-  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
-  S.window.fetch = (adresse) => {
-    adressen.push(String(adresse));
-    return Promise.resolve({
-      ok: true, status: 200,
-      json: () => Promise.resolve({ items: [
-        { id: 'g1', summary: 'Manifest', start: { dateTime: heute + 'T23:00:00+01:00' } },
-        { id: 'g2', summary: 'Abgesagt', status: 'cancelled', start: { dateTime: heute + 'T07:00:00+01:00' } },
-        { id: 'g3', summary: 'Ganztägig', start: { date: heute } },
-        { id: 'g4', summary: 'Morgen', start: { dateTime: S.tagePlus(heute, 1) + 'T07:00:00+01:00' } }
-      ] })
-    });
-  };
-
-  return S.manCoachHolen().then(() => {
-    pruefe(adressen.length === 1 && adressen[0].indexOf(encodeURIComponent('kal-coach')) >= 0, 'der Coach-Kalender wird einmal abgefragt');
-    pruefe(adressen[0].indexOf('singleEvents=true') >= 0, 'Serien werden dabei aufgelöst');
-    const ids = S.coachTermine.map((t) => t.id).join(',');
-    pruefe(ids === 'g1', 'nur der heutige Termin mit Uhrzeit landet in der Liste');
-    pruefe(S.coachTermine[0].zeit === '23:00' && S.coachTermine[0].kalId === 'kal-coach', 'mit Beginn und Kalenderkennung');
-
-    /* Und damit löst die Sperre aus — ohne dass in termineNachTag irgendetwas steht */
-    pruefe(Object.keys(S.termineNachTag).length === 0, 'in der normalen Terminliste steht dabei nichts');
-    const nun = S.clMinuten(S.clUhrzeit());
-    const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
-    S.coachTermine = [{ id: 'g1', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 5)), kalId: 'kal-coach' }];
-    S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Eins\nZwei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
-    pruefe(S.manPflichtPruefen() === true && S.manSicht(), 'und die Pflichtlektüre öffnet');
-
-    /* Ein stummer Kalender darf die Sperre nicht sprengen */
-    S.window.fetch = () => Promise.reject(new Error('kein Netz'));
-    return S.manCoachHolen();
-  }).then((wert) => {
-    pruefe(wert === true && Array.isArray(S.coachTermine), 'ein Abruffehler wirft die Sperre nicht um');
-
-    /* Ohne Coach-Kalender gar kein Abruf */
-    S.kalenderListe = [{ id: 'kal-privat', name: 'Privat' }];
-    let gerufen = 0;
-    S.window.fetch = () => { gerufen++; return Promise.reject(new Error('darf nicht')); };
-    return S.manCoachHolen().then(() => {
-      pruefe(gerufen === 0 && S.coachTermine.length === 0, 'ohne Coach-Kalender wird gar nicht erst abgefragt');
-
-      /* Die Wächter in der Quelle */
-      pruefe(SKRIPT.split('function manCoachHolen(').length === 2, 'manCoachHolen gibt es genau einmal');
-      pruefe(/function manPflichtTermin\(\)[\s\S]{0,400}coachTermine/.test(SKRIPT), 'manPflichtTermin liest coachTermine');
-      pruefe(!/function manPflichtTermin\(\)[\s\S]{0,400}termineNachTag/.test(SKRIPT), 'und eben nicht termineNachTag');
-      pruefe(/clTermineHolen\(false\)\.then\(manCoachHolen\)/.test(SKRIPT), 'geholt wird im Anschluss an die normalen Termine');
-
-      S.window.fetch = echtFetch;
-      S.tokenGueltig = echtToken;
-      S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
-      S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
-    });
-  });
+  S.DB.kurs = []; S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
 }
 
 /* Fehlertyp: eine Dokumentation, die nicht dokumentiert. Konkret: Unterpunkte, die den
@@ -11526,31 +10339,16 @@ function upSichtTest() {
   pruefe(S.upFensterListe(p).length === 4 && S.upTagesRegeln(1, null, p).length === 2, 'und wirken sofort');
   pruefe(S.upTagVon(p, '2026-12-29') === 0, 'die kürzere Laufzeit gilt');
 
-  /* Pflichtlektüre abschalten */
-  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Eins\nZwei\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
-  S.kalenderListe = [{ id: 'kal-coach', name: 'Coach' }];
-  const nun = S.clMinuten(S.clUhrzeit());
-  const zeit = (m) => ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
-  S.coachTermine = [{ id: 'ev-s', titel: 'Manifest', zeit: zeit(Math.max(0, nun - 10)), kalId: 'kal-coach' }];
-  pruefe(S.manPflichtPruefen() === true, 'mit eingeschalteter Pflichtlektüre sperrt der Coach-Termin');
-  S.cl.man.pflicht = ''; S.cl.man.frei = true;
-  S.upEinstellungen(); S.upWahl('manifest', false); S.upSpeichern();
-  pruefe(p.manifest === false && S.upManifestAn(p) === false, 'die Pflichtlektüre lässt sich abschalten');
-  pruefe(S.manPflichtPruefen() === false, 'dann löst auch ein Coach-Termin nichts aus');
-
-  /* Kalenderwort und Fensterlänge */
+  /* Seit 0.122.0 ohne Pflichtlektüre: das Fenster hat die drei Felder dafür nicht mehr */
   S.upEinstellungen();
-  S.upWahl('manifest', true);
-  S.document.getElementById('upKal').value = 'Trainer';
-  S.document.getElementById('upKalF').value = '90';
-  S.upSpeichern();
-  pruefe(S.upKalenderWort() === 'trainer' && S.upKalFenster() === 90, 'Kalenderwort und Fensterlänge kommen aus dem Programm');
-  S.kalenderListe = [{ id: 'k1', name: 'Mein Trainer' }, { id: 'k2', name: 'Coach' }];
-  pruefe(S.manIstCoachKalender('k1') === true && S.manIstCoachKalender('k2') === false, 'und steuern, welcher Kalender zählt');
+  const ff = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(!/Pflichtlektüre/.test(ff) && !/upKal"/.test(ff) && !/upKalF"/.test(ff),
+    'keine Wahl „Manifest als Pflichtlektüre“, kein Kalenderwort, keine Fensterlänge');
+  S.aufklappZu();
 
   /* Zwei Programme nebeneinander */
   const p2 = { id: 'up-s2', typ: 'umprog', name: 'Zweites', beginn: '2027-01-05', tage: 28, jeTag: 3, fenster: 3,
-               sekunden: 5, notiz: 'Umprogrammierung', manifest: true, kalender: 'coach', kalFenster: 60, notizen: {}, angelegt: heute };
+               sekunden: 5, notiz: 'Umprogrammierung', notizen: {}, angelegt: heute };
   S.DB.kurs.push(p2);
   pruefe(S.upProgramme().length === 2 && S.upAktiv() === p, 'zwei Programme stehen nebeneinander, es läuft das passende');
   S.isoDatum = (d) => (d ? echtIso(d) : '2027-01-10');
@@ -11572,7 +10370,596 @@ function upSichtTest() {
   S.isoDatum = echtIso;
   S.DB.kurs = []; S.cl.rt.sicht = 'routinen'; S.cl.gw.wahl = ''; S.cl.up.wahl = '';
   S.cl.man.pflicht = ''; S.cl.man.frei = true;
-  S.coachTermine = []; S.kalenderListe = []; S.cl.app = 'uebersicht';
+  S.kalenderListe = []; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: ein Link, der nur auf einem Gerät funktioniert. „onenote:“ gibt es nur am
+   Windows-PC, das Telefon braucht die https-Form — wählt CLIE die falsche, merkt man es
+   erst unterwegs, wenn nichts passiert. Dazu der zweite Fehlertyp: ein Cluster, der nicht
+   von oben erbt, und ein Ordner, dessen Löschen mehr mitnimmt als seine eigenen Kinder. */
+function radarTest() {
+  console.log('\n209. OneNote-Radar: Linkbaum, zwei Linkformen, vererbter Cluster (0.114.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  const kn = (id, name, art, eltern, bereich, extra) => {
+    const k = Object.assign({ id: id, typ: 'radar', name: name, art: art, eltern: eltern || '', bereich: bereich || 'beruflich', angelegt: '2026-11-10' }, extra || {});
+    S.DB.kurs.push(k);
+    return k;
+  };
+  const ordner = kn('ra-1', 'Testdaten & Umgebungen', 'ordner', '', 'beruflich', { cluster: 'Testdaten', rang: 1 });
+  kn('ra-2', 'Laufsteuerung 2027', 'ordner', '', 'beruflich', { rang: 2 });
+  const unter = kn('ra-3', 'DFÜ', 'ordner', 'ra-1', 'beruflich', { rang: 1 });
+  const seite = kn('ra-4', 'Abrufprotokolle', 'link', 'ra-3', 'beruflich',
+    { rang: 1, urlApp: 'onenote:https://firma/x', urlWeb: 'https://firma/x' });
+  kn('ra-5', 'Testfälle', 'link', 'ra-1', 'beruflich', { rang: 2, urlApp: 'onenote:https://firma/y' });
+  kn('ra-6', 'Neubau', 'ordner', '', 'privat', { cluster: 'Neubau', rang: 1 });
+  const privat = kn('ra-7', 'Elektro', 'link', 'ra-6', 'privat', { rang: 1, urlWeb: 'https://privat/z' });
+
+  /* Der Baum */
+  pruefe(S.raKinder('beruflich', '').map((k) => k.id).join(',') === 'ra-1,ra-2', 'die oberste Ebene je Bereich');
+  pruefe(S.raKinder('privat', '').map((k) => k.id).join(',') === 'ra-6', 'Bereiche bleiben getrennt');
+  pruefe(S.raKinder('beruflich', 'ra-1').map((k) => k.id).join(',') === 'ra-3,ra-5', 'Kinder stehen nach Rang');
+  pruefe(S.raTiefe(seite) === 2 && S.raTiefe(ordner) === 0, 'die Tiefe wird richtig gezählt');
+
+  /* Der Cluster erbt von oben */
+  pruefe(S.raCluster(seite) === 'Testdaten', 'der Cluster kommt vom Ordner zwei Ebenen höher');
+  pruefe(S.raCluster(unter) === 'Testdaten', 'auch für den Zwischenordner');
+  pruefe(S.raCluster(privat) === 'Neubau', 'im privaten Bereich ebenso');
+  unter.cluster = 'DFÜ';
+  pruefe(S.raCluster(seite) === 'DFÜ', 'ein eigener Cluster weiter unten gewinnt');
+  delete unter.cluster;
+  pruefe(S.raCluster(S.raFinden('ra-2')) === '', 'ohne Cluster irgendwo oben bleibt er leer');
+
+  /* Die Linkform je Gerät — der eigentliche Fehlertyp */
+  const echtNav = S.navigator;
+  S.navigator = { platform: 'Win32', userAgent: 'Mozilla/5.0 (Windows NT 10.0)' };
+  pruefe(S.raAmRechner() === true && S.raLink(seite) === 'onenote:https://firma/x', 'am PC gilt die onenote-Form');
+  S.navigator = { platform: 'Linux armv8l', userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel)' };
+  pruefe(S.raAmRechner() === false && S.raLink(seite) === 'https://firma/x', 'am Pixel die https-Form');
+  pruefe(S.raLink(S.raFinden('ra-5')) === 'onenote:https://firma/y', 'fehlt die passende Form, nimmt CLIE die andere statt nichts');
+  pruefe(S.raLink(privat) === 'https://privat/z', 'und umgekehrt genauso');
+  pruefe(S.raHatLink(ordner) === false, 'ein Ordner hat keinen Link');
+  S.navigator = echtNav;
+
+  /* Die Darstellung */
+  S.oeffne('memo');
+  S.memoArtSetzen('radar');
+  pruefe(S.cl.memo.art === 'radar' && S.memoKopfText() === 'Radar', 'die Sicht Radar lässt sich wählen');
+  let h = inhalt();
+  pruefe(/Beruflich/.test(h) && /Privat/.test(h), 'beide Bereiche stehen da');
+  pruefe(/Testdaten &amp; Umgebungen/.test(h) && h.indexOf('Abrufprotokolle') < 0, 'zugeklappt sind die Kinder nicht zu sehen');
+  S.raZweigUm('ra-1'); S.raZweigUm('ra-3');
+  h = inhalt();
+  pruefe(/Abrufprotokolle/.test(h) && /ra-on">ON</.test(h), 'aufgeklappt erscheint der Knoten mit ON-Marke');
+  pruefe((h.match(/ra-on">ON</g) || []).length === 2, 'nur Knoten mit Link tragen die Marke');
+
+  /* Anlegen */
+  S.raNeu('ra-1');
+  S.document.getElementById('raName').value = 'Schnittstellen Q1';
+  S.document.getElementById('raCluster').value = '';
+  S.document.getElementById('raApp').value = 'onenote:https://firma/neu';
+  S.document.getElementById('raWeb').value = 'https://firma/neu';
+  S.raSpeichern();
+  const neu = S.raKnoten().filter((k) => k.name === 'Schnittstellen Q1')[0];
+  pruefe(!!neu && neu.eltern === 'ra-1' && neu.art === 'link', 'ein neuer Knoten hängt unter dem gewählten Ordner');
+  pruefe(S.raCluster(neu) === 'Testdaten', 'und erbt dessen Cluster');
+  S.raNeu('ra-4');
+  pruefe(S.cl.ra.fenster.eltern === 'ra-3', 'unter einem Link angelegt heißt: neben ihn, nicht darunter');
+  S.aufklappZu();
+
+  /* Ein Link ohne jede Form wird abgewiesen */
+  S.raNeu('');
+  S.document.getElementById('raName').value = 'Leer';
+  S.document.getElementById('raApp').value = '';
+  S.document.getElementById('raWeb').value = '';
+  S.raSpeichern();
+  pruefe(S.cl.aufklapp === 'raknoten' && !S.raKnoten().some((k) => k.name === 'Leer'), 'ein Link ohne beide Formen wird nicht gespeichert');
+  S.document.getElementById('raName').value = 'Ordner ohne Link';
+  S.raWahl('art', 'ordner');
+  S.raSpeichern();
+  pruefe(S.raKnoten().some((k) => k.name === 'Ordner ohne Link'), 'als Ordner geht es ohne Link');
+
+  /* Sortieren */
+  S.raSchieben('ra-5', -1);
+  pruefe(S.raKinder('beruflich', 'ra-1')[0].id === 'ra-5', 'ein Knoten lässt sich nach oben schieben');
+  S.raSchieben('ra-5', -1);
+  pruefe(S.raKinder('beruflich', 'ra-1')[0].id === 'ra-5', 'über den Anfang hinaus passiert nichts');
+
+  /* Löschen nimmt die Kinder mit — und sonst nichts */
+  const vorher = S.raKnoten().length;
+  const privatVorher = S.raKinder('privat', '').length;
+  S.raLoeschenFragen('ra-1');
+  S.raLoeschen();
+  pruefe(!S.raFinden('ra-1') && !S.raFinden('ra-3') && !S.raFinden('ra-4'), 'der Ordner nimmt Kinder und Enkel mit');
+  pruefe(!!S.raFinden('ra-2') && S.raKinder('privat', '').length === privatVorher, 'alles andere bleibt stehen');
+  pruefe(S.raKnoten().length < vorher && S.raKnoten().length > 0, 'es verschwindet nicht der ganze Baum');
+
+  /* Die Wächter in der Quelle */
+  pruefe(SKRIPT.split('function raLink(').length === 2, 'raLink gibt es genau einmal');
+  pruefe(/function raLink\(k\)[\s\S]{0,260}raAmRechner\(\)/.test(SKRIPT), 'raLink entscheidet nach Gerät, nicht nach Zufall');
+  pruefe(SKRIPT.indexOf("window.open(u, '_blank')") >= 0, 'geöffnet wird in einem neuen Fenster');
+
+  S.cl.ra.wahl = ''; S.cl.ra.auf = {}; S.DB.kurs = []; S.cl.memo.art = ''; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: zwei Knöpfe in derselben Zeile. Die Aufgabe zeigt entweder zum Memo oder
+   nach OneNote, nie beides — sonst platzt die Zeile auf dem Telefon. Zweiter Fehlertyp:
+   ein Verweis auf einen gelöschten Radar-Knoten, der einen Knopf ins Leere stehen lässt. */
+function aufgabeOnTest() {
+  console.log('\n210. Aufgaben mit OneNote: Badge, Cluster und entweder-oder (0.115.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  S.DB.kurs.push({ id: 'ra-o', typ: 'radar', name: 'Testdaten & Umgebungen', art: 'ordner', eltern: '', bereich: 'beruflich', cluster: 'Testdaten', angelegt: '2026-11-10' });
+  S.DB.kurs.push({ id: 'ra-s', typ: 'radar', name: 'Abrufprotokolle', art: 'link', eltern: 'ra-o', bereich: 'beruflich', urlApp: 'onenote:https://firma/x', urlWeb: 'https://firma/x', angelegt: '2026-11-10' });
+  const auf = (id, titel, extra) => {
+    const a = Object.assign({ id: id, titel: titel, status: 'offen', planung: 'backlog', kontext: 'beruflich', geaendert: 1 }, extra || {});
+    S.DB.aufgaben.push(a);
+    return a;
+  };
+  const mitOn = auf('a-1', 'Schnittstellen klären', { radar: 'ra-s', clusterTag: 'Testdaten' });
+  const mitMemo = auf('a-2', 'Protokoll schreiben', { memo: { id: 'm-1', zeile: 'z1' } });
+  const schlicht = auf('a-3', 'Urlaubsantrag abgeben', {});
+
+  /* Die Zeile */
+  const z1 = S.pmZeileHtml(mitOn, {});
+  pruefe(/pm-on"/.test(z1) && /raOeffnen\('ra-s'\)/.test(z1), 'die Aufgabe zeigt das ON-Badge');
+  pruefe(/\[Testdaten\]/.test(z1) && /pm-clu/.test(z1), 'der Cluster steht als Vorsatz vor dem Titel');
+  pruefe(z1.indexOf('pmMemoVonAufgabe') < 0, 'und eben KEIN Memo-Knopf daneben');
+  const z2 = S.pmZeileHtml(mitMemo, {});
+  pruefe(/pmMemoVonAufgabe/.test(z2) && z2.indexOf('pm-on"') < 0, 'eine Aufgabe am Memo zeigt nur den Memo-Knopf');
+  const z3 = S.pmZeileHtml(schlicht, {});
+  pruefe(z3.indexOf('pm-on"') < 0 && z3.indexOf('pm-clu') < 0, 'ohne beides bleibt die Zeile schlicht');
+
+  /* Im Date Book dieselbe Zeile */
+  const z4 = S.pmZeileHtml(mitOn, { tag: S.isoDatum(), zeit: true });
+  pruefe(/pm-on"/.test(z4) && /\[Testdaten\]/.test(z4), 'im Tag stehen Badge und Cluster ebenso');
+
+  /* Zuordnen: Knoten und Cluster kommen, das Memo geht */
+  pruefe(S.pmOnSetzen('a-2', 'ra-s') === true, 'eine Aufgabe lässt sich nachträglich verbinden');
+  pruefe(mitMemo.radar === 'ra-s' && mitMemo.clusterTag === 'Testdaten', 'Knoten und Cluster stehen an der Aufgabe');
+  pruefe(!mitMemo.memo, 'die Memo-Verbindung wird dabei gelöst — entweder oder');
+  pruefe(S.pmOnSetzen('a-2', 'ra-o') === false, 'ein Ordner lässt sich nicht zuordnen');
+  pruefe(S.pmOnSetzen('a-2', '') === true && !mitMemo.radar, 'lösen geht auch');
+  pruefe(mitMemo.clusterTag === 'Testdaten', 'der Cluster bleibt als Beschriftung stehen');
+
+  /* Ein gelöschter Knoten darf keinen Knopf ins Leere lassen */
+  S.DB.kurs = S.DB.kurs.filter((k) => k.id !== 'ra-s');
+  pruefe(S.pmOnKnoten(mitOn) === null && S.pmOnLink(mitOn) === '', 'ohne Knoten gibt es keinen Link');
+  const z5 = S.pmZeileHtml(mitOn, {});
+  pruefe(z5.indexOf('pm-on"') < 0, 'und kein Badge, das nirgendwohin führt');
+  pruefe(/\[Testdaten\]/.test(z5), 'der Cluster bleibt trotzdem lesbar');
+
+  /* Aus dem Radar eine Aufgabe anlegen */
+  S.DB.kurs.push({ id: 'ra-s', typ: 'radar', name: 'Abrufprotokolle', art: 'link', eltern: 'ra-o', bereich: 'beruflich', urlWeb: 'https://firma/x', angelegt: '2026-11-10' });
+  S.oeffne('memo');
+  S.memoArtSetzen('radar');
+  S.raAlsAufgabe('ra-s');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.radar === 'ra-s', 'der Knoten öffnet das Aufgabenfenster vorbereitet');
+  pruefe(S.cl.pm.fenster.clusterTag === 'Testdaten', 'mit dem Cluster des Ordners');
+  S.document.getElementById('pmTitel').value = 'Abrufprotokolle prüfen';
+  S.pmSpeichern();
+  const neu = S.DB.aufgaben.filter((a) => a.titel === 'Abrufprotokolle prüfen')[0];
+  pruefe(!!neu && neu.radar === 'ra-s' && neu.clusterTag === 'Testdaten', 'die neue Aufgabe trägt Knoten und Cluster');
+
+  /* Die Auswahl in den Details */
+  S.pmDetails(neu.id);
+  pruefe(/OneNote:/.test(S.pmFensterHtml()) && /pmOnWahlAuf\(\)/.test(S.pmFensterHtml()), 'die Details bieten OneNote an');
+  S.pmOnWahlAuf();
+  const w = S.pmOnWahlHtml();
+  pruefe(/Abrufprotokolle/.test(w) && /\[Testdaten\]/.test(w), 'die Auswahl zeigt Knoten mit Cluster');
+  pruefe(w.indexOf('Testdaten &amp; Umgebungen') < 0, 'Ordner stehen nicht zur Auswahl');
+  pruefe(/pmOnZu\(''\)/.test(w), 'und es gibt einen Weg zum Lösen');
+  S.aufklappZu();
+
+  /* Die Wächter in der Quelle */
+  pruefe(SKRIPT.split('function pmOnLink(').length === 2, 'pmOnLink gibt es genau einmal');
+  pruefe(/pmOnLink\(a\)\)\s*\{[\s\S]{0,200}\}\s*else if \(a\.memo/.test(SKRIPT), 'in der Zeile schließen sich OneNote und Memo gegenseitig aus');
+  pruefe(/a\.radar = k\.id/.test(SKRIPT) && !/a\.oneNoteUrl/.test(SKRIPT), 'die Aufgabe merkt sich den Knoten, nicht die URL');
+
+  S.DB.kurs = []; S.cl.pm.fenster = null; S.cl.pm.wahl = ''; S.cl.memo.art = ''; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: ein hereingezogener Link wird falsch zerlegt — dann zeigt der Knoten ins
+   Leere oder trägt Kauderwelsch als Titel. Dazu die Dublette: dieselbe Seite zweimal
+   geteilt darf nicht zweimal im Radar stehen. */
+function raFangTest() {
+  console.log('\n211. Radar: Ziehen, Einfügen und Teilen (0.116.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+
+  /* Zerlegen */
+  const a1 = S.raAusText('onenote:https://firma.sharepoint.com/sites/x/Notizbuch.one#Abrufprotokolle&section-id=1&page-id=2&end');
+  pruefe(!!a1 && a1.urlApp.indexOf('onenote:') === 0, 'die onenote-Form bleibt erhalten');
+  pruefe(a1.urlWeb === 'https://firma.sharepoint.com/sites/x/Notizbuch.one#Abrufprotokolle&section-id=1&page-id=2&end', 'die https-Form entsteht durch Weglassen des Vorsatzes');
+  pruefe(a1.titel === 'Abrufprotokolle', 'der Titel kommt aus dem Anker der Adresse');
+  pruefe(a1.bereich === 'beruflich', 'SharePoint heißt beruflich');
+
+  const a2 = S.raAusText('https://firma.sharepoint.com/sites/x/N.one#Testf%C3%A4lle+Abnahme&section-id=9');
+  pruefe(a2.urlApp === 'onenote:https://firma.sharepoint.com/sites/x/N.one#Testf%C3%A4lle+Abnahme&section-id=9', 'aus https wird die onenote-Form gebaut');
+  pruefe(a2.titel === 'Testfälle Abnahme', 'Umlaute und Pluszeichen werden aufgelöst');
+
+  const a3 = S.raAusText('https://d.docs.live.net/abc/Privat.one#Neubau&section-id=3');
+  pruefe(a3.bereich === 'privat', 'OneDrive heißt privat');
+  const a4 = S.raAusText('Schau mal hier:\nhttps://firma.sharepoint.com/sites/x/N.one');
+  pruefe(a4.titel === 'Schau mal hier:', 'ohne Anker dient die erste Textzeile als Titel');
+  pruefe(S.raAusText('gar kein Link') === null, 'Text ohne Adresse ergibt nichts');
+  pruefe(S.raAusText('onenote:kaputt') === null, 'eine Adresse ohne http wird abgewiesen');
+  pruefe(S.raAusText('https://firma.sharepoint.com/x.one#A&b', 'Eigener Titel').titel === 'Eigener Titel', 'ein mitgelieferter Titel gewinnt');
+
+  /* Das Fenster und das Anlegen */
+  pruefe(S.raFangen('onenote:https://firma.sharepoint.com/sites/x/N.one#Abrufprotokolle&id=1') === true, 'ein Link öffnet das Fenster');
+  pruefe(S.cl.aufklapp === 'rafang' && S.cl.memo.art === 'radar', 'und bringt dich in den Radar');
+  pruefe(S.cl.ra.fang.titel === 'Abrufprotokolle' && !S.cl.ra.fang.schon, 'mit Titel und ohne Dublettenhinweis');
+  pruefe(/Nur merken/.test(S.raFangHtml()) && /Beides/.test(S.raFangHtml()), 'das Fenster bietet merken, Aufgabe und beides');
+  S.document.getElementById('raFangTitel').value = 'Abrufprotokolle';
+  S.raFangFertig('merken');
+  const k = S.raKnoten().filter((x) => x.name === 'Abrufprotokolle')[0];
+  pruefe(!!k && k.art === 'link' && k.bereich === 'beruflich', 'der Knoten steht im Radar');
+  pruefe(k.urlApp.indexOf('onenote:') === 0 && k.urlWeb.indexOf('https://') === 0, 'mit beiden Linkformen');
+  pruefe(S.raKnoten().length === 1, 'genau einer');
+
+  /* Dieselbe Seite ein zweites Mal */
+  S.raFangen('https://firma.sharepoint.com/sites/x/N.one#Abrufprotokolle&id=1');
+  pruefe(S.cl.ra.fang.schon === k.id, 'die Dublette wird erkannt');
+  pruefe(/steht schon im Radar/.test(S.raFangHtml()) && S.raFangHtml().indexOf('Nur merken') < 0, 'dann gibt es nur noch den Weg zur Aufgabe');
+  S.raFangFertig('merken');
+  pruefe(S.raKnoten().length === 1, 'und es entsteht kein zweiter Knoten');
+  pruefe(!!S.raSchonDa('https://firma.sharepoint.com/sites/x/N.one#Abrufprotokolle&id=1'), 'raSchonDa findet ihn über die https-Form');
+
+  /* Geteilt vom Telefon */
+  pruefe(S.raParam('?title=Mein+Titel&url=https%3A%2F%2Fa.de%2Fx', 'title') === 'Mein Titel', 'Parameter werden aufgelöst');
+  pruefe(S.raParam('?url=https%3A%2F%2Fa.de%2Fx', 'url') === 'https://a.de/x', 'auch die Adresse');
+  pruefe(S.raParam('?a=1', 'url') === '', 'ein fehlender Parameter ist leer');
+  pruefe(QUELLE.indexOf('raGeteiltPruefen()') >= 0, 'beim Start wird auf Geteiltes geschaut');
+
+  /* Die Wächter */
+  pruefe(SKRIPT.split('function raAusText(').length === 2, 'raAusText gibt es genau einmal');
+  pruefe(SKRIPT.indexOf('URLSearchParams') < 0, 'ohne URLSearchParams — der Prüfer kennt sie nicht');
+  pruefe(/dragover/.test(SKRIPT) && /addEventListener\('paste'/.test(SKRIPT), 'Ziehen und Einfügen sind angemeldet');
+
+  S.cl.ra.fang = null; S.cl.ra.wahl = ''; S.DB.kurs = []; S.cl.memo.art = ''; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: eine Merkliste, die nicht vergisst. Nimmst du den Haken zurück, muss der
+   Eintrag wieder weg; ist die Aufgabe oder der Knoten gelöscht, darf keine Leiche in der
+   Liste stehen. Und leer sein heißt: gar nicht in der workbench.json stehen. */
+function raHakenTest() {
+  console.log('\n212. Noch in OneNote abhaken: die Merkliste (0.117.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
+  S.DB.kurs.push({ id: 'ra-s', typ: 'radar', name: 'Abrufprotokolle', art: 'link', eltern: '', bereich: 'beruflich', cluster: 'Testdaten', urlWeb: 'https://firma/x', angelegt: '2026-11-10' });
+  const a = { id: 'a-1', titel: 'Schnittstellen klären', status: 'offen', planung: 'backlog', kontext: 'beruflich', prio: 3, radar: 'ra-s', clusterTag: 'Testdaten', geaendert: 1 };
+  const ohne = { id: 'a-2', titel: 'Urlaubsantrag', status: 'offen', planung: 'backlog', kontext: 'beruflich', prio: 3, geaendert: 1 };
+  S.DB.aufgaben.push(a, ohne);
+
+  /* Leer heißt wirklich leer */
+  pruefe(S.raHaken().length === 0 && !('onHaken' in (S.DB.einstellungen || {})), 'solange nichts wartet, steht nichts in den Einstellungen');
+  pruefe(S.raHakenHtml() === '', 'und im Radar erscheint keine Liste');
+
+  /* Abhaken merkt */
+  S.pmHaken('a-1');
+  pruefe(a.status === 'erledigt', 'die Aufgabe ist erledigt');
+  pruefe(S.raHakenOffen().length === 1 && S.raHakenOffen()[0].id === 'a-1', 'sie wartet auf den Haken in OneNote');
+  pruefe(S.raHakenOffen()[0].titel === 'Schnittstellen klären', 'mit ihrem Titel');
+  pruefe(/Noch in OneNote abhaken/.test(S.raHakenHtml()) && /Abrufprotokolle/.test(S.raHakenHtml()), 'die Liste nennt Aufgabe und Seite');
+  pruefe(/raOeffnen\('ra-s'\)/.test(S.raHakenHtml()), 'und führt zur Seite');
+
+  /* Eine Aufgabe ohne OneNote landet nicht darin */
+  S.pmHaken('a-2');
+  pruefe(S.raHakenOffen().length === 1, 'eine Aufgabe ohne Seite wird nicht gemerkt');
+
+  /* Haken zurücknehmen räumt wieder auf */
+  S.pmHaken('a-1');
+  pruefe(a.status === 'offen' && S.raHakenOffen().length === 0, 'der zurückgenommene Haken verschwindet aus der Liste');
+  pruefe(!('onHaken' in (S.DB.einstellungen || {})), 'und die leere Liste bleibt nicht in den Einstellungen stehen');
+
+  /* Zweimal abhaken erzeugt keinen zweiten Eintrag */
+  S.pmHaken('a-1');
+  S.raHakenListe().push({ id: 'a-1', radar: 'ra-s', titel: 'doppelt', zeit: '2026-11-10' });
+  pruefe(S.raHaken().length === 2, 'zum Prüfen künstlich doppelt eingetragen');
+  S.pmHaken('a-1'); S.pmHaken('a-1');
+  pruefe(S.raHaken().filter((e) => e.id === 'a-1').length === 1, 'nach Zurücknehmen und erneutem Haken steht sie genau einmal da');
+
+  /* Von Hand streichen */
+  S.raHakenWeg('a-1');
+  pruefe(S.raHakenOffen().length === 0, 'ein Eintrag lässt sich streichen');
+  pruefe(S.DB.aufgaben.filter((x) => x.id === 'a-1').length === 1 && a.status === 'erledigt', 'die Aufgabe selbst bleibt erledigt');
+
+  /* Leichen werden nicht gezeigt */
+  S.pmHaken('a-1'); S.pmHaken('a-1');   /* erledigt → offen → erledigt */
+  pruefe(S.raHakenOffen().length === 1, 'wieder ein Eintrag');
+  S.DB.kurs = S.DB.kurs.filter((k) => k.id !== 'ra-s');
+  pruefe(S.raHakenOffen().length === 0 && S.raHakenHtml() === '', 'ohne Knoten verschwindet der Eintrag aus der Ansicht');
+  S.DB.kurs.push({ id: 'ra-s', typ: 'radar', name: 'Abrufprotokolle', art: 'link', eltern: '', bereich: 'beruflich', urlWeb: 'https://firma/x', angelegt: '2026-11-10' });
+  S.DB.aufgaben = S.DB.aufgaben.filter((x) => x.id !== 'a-1');
+  pruefe(S.raHakenOffen().length === 0, 'ohne Aufgabe ebenso');
+
+  /* Alles erledigt */
+  S.raHakenAlleWeg();
+  pruefe(S.raHaken().length === 0 && !('onHaken' in S.DB.einstellungen), '„Alle erledigt“ räumt die Liste und den Eintrag weg');
+
+  /* Die Wächter */
+  pruefe(SKRIPT.split('function raHakenMerken(').length === 2, 'raHakenMerken gibt es genau einmal');
+  pruefe(/function pmHaken\([\s\S]{0,900}raHakenMerken\(a\)/.test(SKRIPT), 'das Abhaken ruft die Merkliste');
+  pruefe(!/graph\.microsoft\.com/.test(SKRIPT), 'CLIE schreibt nichts nach OneNote — es merkt sich nur, was dort fehlt');
+
+  S.DB.kurs = []; S.DB.aufgaben = []; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: eine Einstellung, die nur diesem Gerät gehört. Drei Schäden drohen. Sie
+   landet in der workbench.json und reist dann ans andere Gerät mit — der Pixel zwingt
+   dem PC seine Textgröße auf. Sie übersteht das Neuladen nicht, weil beim Start niemand
+   sie anwendet. Oder ein krummer Wert aus einer alten Fassung kommt zurück und die App
+   steht auf 0,37-facher Größe. Der Maßstab ist die erste solche Einstellung, die alles
+   sichtbar verändert — ein falscher Wert fällt sofort auf, ein verlorener erst morgen. */
+function textgroesseTest() {
+  console.log('\n216. Textgröße: je Gerät, übersteht das Neuladen, nie in der workbench.json (0.120.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const echt = S.window.localStorage.getItem('clie-text');
+
+  /* Ohne eigene Wahl: normal */
+  S.window.localStorage.removeItem('clie-text');
+  pruefe(S.clTextWahl() === 100, 'ohne eigene Wahl steht der Maßstab auf 100 %');
+  pruefe(S.clTextSetzen() === 100 && S.document.documentElement.style.zoom === '', 'bei 100 % bleibt gar kein Maßstab stehen');
+
+  /* Krumme Werte fallen auf normal zurück, statt die App zu verbiegen */
+  ['', 'abc', '0', '37', '1000', '95'].forEach((w) => {
+    S.window.localStorage.setItem('clie-text', w);
+    pruefe(S.clTextWahl() === 100, '„' + w + '“ ist keine Stufe und fällt auf 100 % zurück');
+  });
+
+  /* Die fünf Stufen */
+  pruefe(S.CL_TEXT_STUFEN.join(',') === '80,90,100,110,125', 'fünf Stufen: ' + S.CL_TEXT_STUFEN.join(' · ') + ' %');
+  S.clTextWaehlen(90);
+  pruefe(S.clTextWahl() === 90, 'gewählt wird 90 %');
+  pruefe(S.window.localStorage.getItem('clie-text') === '90', 'gespeichert in localStorage — je Gerät, wie die Farben');
+  pruefe(S.document.documentElement.style.zoom === '0.9', 'und sofort angewandt');
+  S.clTextWaehlen(95);
+  pruefe(S.clTextWahl() === 90, 'eine Stufe, die es nicht gibt, ändert nichts');
+
+  /* Der Wächter: nichts davon darf in die Daten wandern */
+  pruefe(JSON.stringify(S.DB.einstellungen || {}).indexOf('text') < 0 && JSON.stringify(S.DB.einstellungen || {}).indexOf('zoom') < 0,
+    'der Maßstab steht nicht in den Einstellungen und reist nicht zum anderen Gerät mit');
+  pruefe(S.alsText().indexOf('clie-text') < 0, 'und auch nicht in der workbench.json');
+
+  /* Beim Start wird er angewandt — sonst steht er nach dem Neuladen wieder auf normal */
+  pruefe(/function start\(\)[\s\S]{0,400}clTextSetzen\(\)/.test(SKRIPT), 'start() wendet den Maßstab an, gleich nach den Farben');
+  pruefe(/\.geraet\{[^}]*max-width:calc\(480px \/ var\(--zoom, 1\)\)/.test(QUELLE), 'die Spalte teilt durch denselben Faktor — bei 80 % passt mehr hinein, statt alles schmaler zu machen');
+
+  /* Im Menü sichtbar und aufklappbar */
+  S.oeffne('uebersicht');
+  S.menueUm();
+  pruefe(/Text: 90 %/.test(S.document.getElementById('aufklapp').innerHTML), 'das Menü zeigt die eingestellte Stufe');
+  S.clTextWahlAuf();
+  const w = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/clTextWaehlen\(80\)/.test(w) && /clTextWaehlen\(125\)/.test(w), 'die Liste bietet alle Stufen an');
+  pruefe((w.match(/class="an"/g) || []).length === 1, 'genau eine Stufe ist als gewählt markiert');
+  S.cl.aufklapp = '';
+
+  ['clTextWahl', 'clTextSetzen', 'clTextWaehlen', 'clTextWahlHtml'].forEach((n) => {
+    pruefe(SKRIPT.split('function ' + n + '(').length === 2, n + ' gibt es genau einmal');
+  });
+
+  if (echt === null) { S.window.localStorage.removeItem('clie-text'); } else { S.window.localStorage.setItem('clie-text', echt); }
+  S.clTextSetzen();
+  S.oeffne('uebersicht');
+}
+
+/* Fehlertyp: ein Symbol, das nur bei 68 Pixeln auf dunkler Scheibe funktioniert. Zwei
+   Schäden drohen. Erstens die Haarlinie: ein Zeichen aus vielen dünnen Strichen wird
+   klein zu Grau — gemerkt wird das erst auf dem Startbildschirm. Zweitens die leere
+   Kachel: die Verknüpfungsbilder entstehen aus denselben Zeichnungen, nur umgefärbt
+   (helles Zeichen wird dunkel, dunkle Aussparung wird Grund). Ein Zeichen ganz ohne
+   Fläche hat umgedreht nichts, was dunkel werden könnte, und Android zeigt eine fast
+   weiße Scheibe — genau das, was ein fehlendes PNG auch tut. */
+function symbolTest() {
+  console.log('\n215. Symbole: tragen klein und umgedreht, und die PNG dazu liegen da (0.119.1)');
+  if (!CL) { return; }
+  const S = CL;
+  const VERKNUEPFT = ['aufgaben', 'kalender', 'memo', 'routinen'];
+
+  /* Geprüft wird, was wirklich auf den Startbildschirm kommt — im Raster darf ein
+     Zeichen feiner sein, dort steht es immer bei 68 Pixeln auf der Scheibe. */
+  const breiten = (id) => (String(S.CL_BILD[id] || '').match(/stroke-width="([\d.]+)"/g) || []).map((m) => Number((m.match(/[\d.]+/) || [0])[0]));
+  VERKNUEPFT.forEach((id) => {
+    const g = String(S.CL_BILD[id] || '');
+    const b = breiten(id);
+    /* Genug Tinte: eine helle Fläche oder wenigstens ein kräftiger Strich — sonst bleibt
+       umgedreht nichts übrig, was dunkel werden könnte */
+    pruefe(/fill="#C9D3B7"/.test(g) || Math.max.apply(null, b.concat([0])) >= 3,
+      id + ': helle Fläche oder kräftiger Strich — umgedreht wird daraus ein dunkler Körper');
+    /* Keine Haarlinie: unter 2,4 verschwindet ein Strich beim Verkleinern */
+    pruefe(Math.min.apply(null, b.concat([9])) >= 2.4, id + ': keine Haarlinie (dünnster Strich ' + Math.min.apply(null, b.concat([9])) + ')');
+  });
+
+  /* Die drei überarbeiteten: die alten, zu kleinteiligen Fassungen sind weg */
+  pruefe(!/width="4" height="4"/.test(String(S.CL_BILD.kalender)), 'Date Book: die fünf Punkte à vier Pixel sind raus');
+  pruefe(/stroke-width="5.5"/.test(String(S.CL_BILD.aufgaben)), 'To Do List: der Haken ist breit genug, um klein zu tragen');
+  pruefe((String(S.CL_BILD.sammlungen).match(/rx="2.5"/g) || []).length === 3, 'Collections: drei volle Karten statt dreier Umrisse');
+
+  /* Und die Bilder dazu liegen wirklich da, mit Inhalt */
+  if (!fs.existsSync(MANIFEST_PFAD)) { warn('clie.webmanifest fehlt'); return; }
+  const mf = JSON.parse(fs.readFileSync(MANIFEST_PFAD, 'utf8'));
+  const groesse = (f) => { const b = fs.readFileSync(path.join(ORDNER, f)); return b.readUInt32BE(16) + 'x' + b.readUInt32BE(20); };
+  (mf.shortcuts || []).forEach((k) => {
+    (k.icons || []).forEach((i) => {
+      const datei = path.basename(String(i.src || '').split('?')[0]);
+      const voll = path.join(ORDNER, datei);
+      if (!fs.existsSync(voll)) { fail(datei + ' fehlt — Android zeigt dann eine leere weiße Kachel'); return; }
+      pruefe(groesse(datei) === i.sizes, datei + ' ist wirklich ' + i.sizes);
+      /* Eine einfarbige Kachel bleibt winzig; ein Zeichen darin braucht Platz */
+      pruefe(fs.statSync(voll).size > 600, datei + ' hat ein Zeichen darin, ist keine leere Fläche (' + fs.statSync(voll).size + ' B)');
+    });
+  });
+
+  /* Dieselbe Fassungsnummer in Seite und Manifest — sonst holt Android das alte Bild */
+  const v = ((((mf.shortcuts || [])[0] || {}).icons || [])[0] || {}).src || '';
+  const nr = (String(v).match(/\?v=(\d+)/) || [])[1];
+  pruefe(!!nr && QUELLE.indexOf('?v=' + nr) >= 0, 'Verknüpfungen und Seite zeigen auf dieselbe Fassung (v=' + nr + ')');
+}
+
+/* Fehlertyp: eine zweite Sicht auf dieselben Daten. Zwei Schäden drohen. Erstens leiht
+   sie sich den Zustand der großen App und gibt ihn verändert zurück — hier den Reiter der
+   To-Do-Liste, der nach einem Blick ins Dock plötzlich auf „Listen“ stünde. Zweitens
+   verschluckt ihre Zeitachse Einträge: jeder Posten des Tages braucht genau einen Platz
+   (Uhrzeit, überfällig oder terminlos), und wer durch alle Siebe fällt, ist weg, ohne
+   dass etwas blinkt. Dazu der Start: ein schmales Fenster am PC ist das Dock, ein
+   schmales am Pixel nicht. */
+function dockTest() {
+  console.log('\n214. Dock: zwei Sichten, nichts verschluckt, nichts verliehen (0.119.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const heute = S.isoDatum();
+  const gestern = S.tagePlus(heute, -1);
+
+  /* Die App gibt es — aber nicht im Raster, das 3×5 ist voll */
+  pruefe(!!S.clApp('dock') && S.clApp('dock').raster === false, 'Dock ist eine App, steht aber nicht im Raster');
+  pruefe(typeof S.CL_BILD.dock === 'string' && S.CL_BILD.dock.length > 40, 'das Dock hat ein eigenes Bildzeichen');
+  pruefe(/if \(was === 'dock'\) \{ oeffne\('dock'\); return; \}/.test(SKRIPT), 'über das Menü erreichbar');
+
+  /* Der Tag: ein Termin, eine Aufgabe mit Uhrzeit, eine ohne, eine überfällige, eine erledigte */
+  S.DB.aufgaben = [
+    { id: 'a-zeit', titel: 'Schnittstellen klären', themaId: S.CK_KORB_ID, planung: heute, uhrzeit: '11:00', prio: 2, status: 'offen', art: 'haupt', kontext: 'beruflich', geaendert: 1 },
+    { id: 'a-ohne', titel: 'Urlaubsantrag abgeben', themaId: S.CK_KORB_ID, planung: heute, uhrzeit: '', prio: 2, status: 'offen', art: 'haupt', kontext: 'beruflich', geaendert: 1 },
+    { id: 'a-ueber', titel: 'Protokoll verschicken', themaId: S.CK_KORB_ID, planung: gestern, uhrzeit: '', prio: 1, status: 'offen', art: 'haupt', kontext: 'beruflich', geaendert: 1 },
+    { id: 'a-erl', titel: 'Zugänge beantragen', themaId: S.CK_KORB_ID, planung: heute, uhrzeit: '', prio: 3, status: 'erledigt', erledigtAm: heute, art: 'haupt', kontext: 'beruflich', geaendert: 1 }
+  ];
+  S.termineNachTag[heute] = [{ id: 't1', zeit: '09:00', bis: '10:00', titel: 'Abstimmung Migration', kontext: 'beruflich' }];
+
+  const p = S.dockPosten(heute);
+  pruefe(p.zeit.length === 2, 'Zeitachse: Termin und Aufgabe mit Uhrzeit gemischt (' + p.zeit.length + ')');
+  pruefe(!!p.zeit[0].termin && !!p.zeit[1].a && p.zeit[1].a.id === 'a-zeit', 'in der Reihenfolge des Tages — 09:00 vor 11:00');
+  pruefe(p.ueber.length === 1 && p.ueber[0].id === 'a-ueber', 'Überfälliges steht für sich, nicht in der Zeitachse');
+  pruefe(p.ohne.map((x) => x.a.id).sort().join(',') === 'a-erl,a-ohne', 'ohne Uhrzeit: das Offene und das Erledigte von heute');
+  /* Der eigentliche Wächter: jeder Posten genau einmal, keiner durch alle Siebe gefallen */
+  const alle = [].concat(p.ueber.map((a) => a.id), p.zeit.filter((x) => x.a).map((x) => x.a.id), p.ohne.map((x) => x.a.id));
+  pruefe(alle.length === 4 && alle.filter((x, i, l) => l.indexOf(x) === i).length === 4,
+    'jede Aufgabe des Tages genau einmal, keine doppelt (' + alle.join(',') + ')');
+
+  /* Die Zeitachse gezeichnet: Uhrzeiten, jetzt-Linie, Erledigtes durchgestrichen */
+  S.oeffne('dock');
+  S.dockSicht('tag');
+  let h = inhalt();
+  pruefe(/Abstimmung Migration/.test(h) && /Schnittstellen klären/.test(h) && /Urlaubsantrag/.test(h), 'alle drei stehen auch in der Anzeige');
+  pruefe(/class="dk-jetzt"/.test(h), 'die rote Linie steht auf der Uhr');
+  pruefe(/class="dk-t ue">gestern</.test(h), 'das Überfällige trägt „gestern“, nicht eine Uhrzeit');
+  pruefe(/aufg palm pm erl/.test(h), 'Erledigtes bleibt stehen, durchgestrichen');
+  pruefe(S.document.getElementById('reiter').textContent === 'Dock' && /▼ Alle/.test(S.document.getElementById('katKnopf').textContent),
+    'Reiter „Dock“, oben rechts derselbe Filter');
+
+  /* Der Filter gilt für beide Sichten — eine Privataufgabe verschwindet mit „Arbeit“ */
+  S.DB.aufgaben.push({ id: 'a-priv', titel: 'Rasen mähen', themaId: S.CK_KORB_ID, planung: heute, uhrzeit: '', prio: 2, status: 'offen', art: 'haupt', kontext: 'privat', geaendert: 1 });
+  S.cl.filter = 'alle';
+  pruefe(S.dockPosten(heute).ohne.length === 3, 'ohne Filter sind alle drei terminlosen da');
+  S.cl.filter = S.CL_ARBEIT;
+  const gefiltert = S.dockPosten(heute);
+  pruefe(gefiltert.ohne.length === 2 && !gefiltert.ohne.some((x) => x.a.id === 'a-priv'), 'mit „Arbeit“ fällt das Private aus der Tagessicht');
+  S.dockSicht('todo');
+  h = inhalt();
+  pruefe(!/Rasen mähen/.test(h) && /Urlaubsantrag/.test(h), 'und genauso aus der To-Do-Sicht');
+  S.cl.filter = 'alle';
+
+  /* Der Wächter gegen das Verleihen: die To-Do-Sicht gibt den Reiter zurück, wie er war */
+  S.pmTab('datum');
+  S.dockSicht('todo');
+  pruefe(S.cl.pm.tab === 'datum', 'nach der To-Do-Sicht im Dock steht der Reiter der großen App noch auf „Datum“');
+  h = inhalt();
+  pruefe(/pm-bal/.test(h) && /pmListenWahlAuf/.test(h), 'gezeigt wird trotzdem nach Listen, mit der Listenwahl');
+  pruefe(/function dockTodoHtml\([\s\S]{0,400}finally \{ cl\.pm\.tab = merke; \}/.test(SKRIPT), 'der Reiter wird in finally zurückgegeben, auch wenn das Zeichnen wirft');
+  S.oeffne('aufgaben');
+  pruefe(/class="pm-datwahl"/.test(inhalt()) && S.cl.pm.tab === 'datum', 'die große To-Do-Liste steht unverändert auf Datum');
+
+  /* Umschalten merkt sich die Sicht je Gerät */
+  S.oeffne('dock');
+  S.dockSicht('todo');
+  pruefe(S.window.localStorage.getItem('clie-dock-sicht') === 'todo', 'die Sicht liegt in localStorage, nicht in der workbench.json');
+  S.dockSichtLaden();
+  pruefe(S.cl.dock.sicht === 'todo', 'und wird beim Start wieder gelesen');
+  S.dockSicht('tag');
+
+  /* Der Start: drei Stellungen, Vorgabe „schmal“, und am Pixel bleibt es die Übersicht */
+  const echt = S.window.localStorage.getItem('clie-start');
+  const echteMedia = S.window.matchMedia;
+  S.window.localStorage.removeItem('clie-start');
+  pruefe(S.dockStartWahl() === 'schmal', 'ohne eigene Wahl: Dock bei schmalem Fenster');
+  S.window.matchMedia = function () { return { matches: false, addEventListener() {} }; };
+  pruefe(S.dockStartet() === false, 'grober Zeiger (Pixel): die Übersicht bleibt der Start, auch im schmalen Fenster');
+  S.window.matchMedia = function () { return { matches: true, addEventListener() {} }; };
+  pruefe(S.dockStartet() === true, 'feiner Zeiger und schmales Fenster (angedockter PC): das Dock');
+  S.window.localStorage.setItem('clie-start', 'uebersicht');
+  pruefe(S.dockStartet() === false, '„Home“ fest: nie das Dock');
+  S.window.localStorage.setItem('clie-start', 'dock');
+  S.window.matchMedia = function () { return { matches: false, addEventListener() {} }; };
+  pruefe(S.dockStartet() === true, '„Dock“ fest: immer das Dock, auch ohne Maus');
+  pruefe(/else if \(dockStartet\(\)\)/.test(SKRIPT) && !/manGesperrt/.test(SKRIPT), 'ein Anker geht vor; die Pflichtlektüre gibt es seit 0.122.0 nicht mehr');
+  S.window.matchMedia = echteMedia;
+  if (echt === null) { S.window.localStorage.removeItem('clie-start'); } else { S.window.localStorage.setItem('clie-start', echt); }
+
+  /* Die Wächter gegen doppelte und leere Aufrufe */
+  ['dockPosten', 'dockTagHtml', 'dockTodoHtml', 'dockHtml', 'dockFussHtml', 'dockStartet', 'dockSicht'].forEach((n) => {
+    pruefe(SKRIPT.split('function ' + n + '(').length === 2, n + ' gibt es genau einmal');
+  });
+  pruefe(typeof S.dockNeu === 'function' && /function dockNeu\([\s\S]{0,120}pmNeu\(dockDatum\(\)/.test(SKRIPT), '„Neu“ im Dock legt für den gezeigten Tag an — ohne Rückfrage nach dem Datum');
+  pruefe(!/function dockZeile2|function dockTagHtmlNeu/.test(SKRIPT), 'keine kopierte zweite Fassung einer Dock-Funktion');
+
+  S.DB.aufgaben = []; S.termineNachTag = {}; S.cl.dock.datum = ''; S.oeffne('uebersicht');
+}
+
+/* Fehlertyp: eine Verknüpfung, die ins Leere führt. Sie zeigt auf einen Anker, den CLIE
+   nicht kennt, oder auf eine Symboldatei, die nie mit hochgeladen wurde — gemerkt wird
+   das erst auf dem Startbildschirm, wenn das Symbol fehlt oder die Übersicht aufgeht. */
+function verknuepfungTest() {
+  console.log('\n213. Verknüpfungen auf dem Startbildschirm und Workbench als Vorgabe (0.118.0)');
+  if (!CL) { return; }
+  const S = CL;
+  if (!fs.existsSync(MANIFEST_PFAD)) { warn('clie.webmanifest fehlt'); return; }
+  const mf = JSON.parse(fs.readFileSync(MANIFEST_PFAD, 'utf8'));
+
+  /* Die Verknüpfungen */
+  pruefe(Array.isArray(mf.shortcuts) && mf.shortcuts.length === 4, 'vier Verknüpfungen — mehr zeigt Android nicht');
+  (mf.shortcuts || []).forEach((k) => {
+    const anker = String(k.url || '').split('#')[1] || '';
+    pruefe(!!anker && !!S.clApp(anker), 'Verknüpfung „' + k.name + '“ zeigt auf die App ' + anker);
+    pruefe(!!k.short_name && k.short_name.length <= 12, '„' + k.name + '“ hat einen kurzen Namen für das Symbol');
+    const bild = String(((k.icons || [])[0] || {}).src || '').split('?')[0];
+    pruefe(!!bild && fs.existsSync(path.join(ORDNER, path.basename(bild))), 'das Symbol ' + path.basename(bild) + ' liegt wirklich da');
+  });
+  pruefe((mf.shortcuts || []).map((k) => k.url).filter((u, i, l) => l.indexOf(u) === i).length === 4, 'keine zweimal dieselbe App');
+
+  /* Der Anker öffnet die App */
+  pruefe(/clAnker && \(clApp\(clAnker\)/.test(SKRIPT), 'beim Start wird der Anker ausgewertet');
+  pruefe(/clApp\(clAnker\) \|\| clAnker === 'manifest'/.test(SKRIPT), 'und #manifest funktioniert weiter');
+  pruefe(SKRIPT.indexOf("hash) || '') === '#coach'") < 0, 'die fest verdrahteten Anker sind weg');
+  ['aufgaben', 'kalender', 'memo', 'routinen', 'rechner'].forEach((id) => {
+    pruefe(!!S.clApp(id), 'die App ' + id + ' gibt es — ein Anker darauf führt irgendwohin');
+  });
+
+  /* Workbench als Vorgabe, auch am Pixel */
+  const echt = S.window.localStorage.getItem('clie-schema');
+  S.window.localStorage.removeItem('clie-schema');
+  pruefe(S.clSchemaWahl() === 'auto' && S.clSchemaSetzen() === true, 'ohne eigene Wahl gilt Workbench');
+  S.window.localStorage.setItem('clie-schema', 'lcd');
+  pruefe(S.clSchemaSetzen() === false, 'wer LCD fest einstellt, bekommt LCD');
+  S.window.localStorage.setItem('clie-schema', 'wb');
+  pruefe(S.clSchemaSetzen() === true, 'und wer Workbench fest einstellt, Workbench');
+  if (echt === null) { S.window.localStorage.removeItem('clie-schema'); } else { S.window.localStorage.setItem('clie-schema', echt); }
+  pruefe(SKRIPT.indexOf('clIstGrossesGeraet') < 0, 'die Unterscheidung nach Gerätegröße ist raus — kein toter Code');
+
+  /* Das Teilen-Ziel aus 0.116.0 steht weiter */
+  pruefe(!!mf.share_target && String(mf.share_target.action || '').indexOf('clie.html') >= 0, 'das Teilen-Ziel zeigt auf CLIE');
+
+  S.clSchemaSetzen();
 }
 
 /* Fehlertyp: eine Funktion wird zurückgebaut und lässt Reste zurück. Zwei Schäden sind
@@ -11636,13 +11023,13 @@ function leuchtturmTest() {
   /* Aus zwei Apps ist eine geworden */
   pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'das Manifest ist keine eigene App mehr');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
-  pruefe(raster.length === 15 && raster[0].id === 'routinen', 'Roots steht als erste App, das Raster bleibt voll');
+  pruefe(raster.length === 12 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
   pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
   /* Der alte Weg führt in die Sicht */
   S.oeffne('manifest');
   pruefe(S.cl.app === 'routinen' && S.cl.rt.sicht === 'manifest' && S.manSicht() === true, "oeffne('manifest') führt in die Manifest-Sicht");
-  pruefe(SKRIPT.indexOf("=== '#manifest') { oeffne('manifest'); }") >= 0, 'der Link #manifest aus den Kalendereinträgen ebenso');
+  pruefe(/clAnker && \(clApp\(clAnker\)/.test(SKRIPT), 'der Link #manifest aus den Kalendereinträgen ebenso');
   pruefe(/Zeile eins/.test(inhalt()), 'und dort steht der Text der Notiz');
   pruefe(/manZoom\(1\)/.test(S.document.getElementById('fuss').innerHTML), 'mit der Schriftgröße in der Fußzeile');
   pruefe(S.document.getElementById('katKnopf').textContent.indexOf('Manifest') >= 0, 'oben steht die Sicht, ohne Kategorie');
@@ -11653,20 +11040,15 @@ function leuchtturmTest() {
   S.rtSichtSetzen('gewohnheiten');
   pruefe(!S.manSicht() && S.cl.app === 'routinen', 'von dort geht es direkt in die Gewohnheiten');
 
-  /* Die Pflichtlektüre sperrt jetzt die Sicht */
+  /* Seit 0.122.0 sperrt nichts mehr: das Manifest ist eine Sicht wie jede andere */
   S.oeffne('manifest');
-  S.cl.man.pflicht = 'ev-l'; S.cl.man.frei = false; S.cl.man.anzahl = 3; S.cl.man.seite = 0;
-  pruefe(S.manGesperrt() === true, 'gesperrt');
+  pruefe(S.manSicht(), 'das Manifest steht');
   S.oeffne('kalender');
-  pruefe(S.manSicht(), 'keine andere App');
-  S.rtSichtSetzen('routinen');
-  pruefe(S.manSicht(), 'keine andere Sicht');
-  S.katUm();
-  pruefe(S.cl.aufklapp !== 'rtwahl', 'und das ▼ öffnet nicht');
-  pruefe(S.clZurueck() === true && S.manSicht(), 'die Zurück-Taste führt nicht heraus');
-  S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
-  S.rtSichtSetzen('gewohnheiten');
-  pruefe(!S.manSicht(), 'nach der Freigabe geht es wieder weiter');
+  pruefe(!S.manSicht() && S.cl.app === 'kalender', 'eine andere App lässt sich jederzeit öffnen');
+  S.oeffne('manifest'); S.katUm();
+  pruefe(S.cl.aufklapp === 'rtwahl', 'und das ▼ öffnet');
+  S.aufklappZu();
+  pruefe(!/cl\.man\.pflicht|cl\.man\.frei/.test(SKRIPT), 'von der Pflichtlektüre ist kein Zustand übrig');
 
   /* Die Wächter in der Quelle */
   pruefe(SKRIPT.split('function manSicht(').length === 2, 'manSicht gibt es genau einmal');
@@ -11674,6 +11056,714 @@ function leuchtturmTest() {
   pruefe(!/cl\.app !== 'manifest'/.test(SKRIPT), 'auch nicht verneint');
 
   S.cl.rt.sicht = 'routinen'; S.cl.app = 'uebersicht';
+}
+
+/* Fehlertyp: ein Bericht, der mehr meldet, als geschehen ist. Der Abgleich zählte
+   jeden Datensatz, der auf beiden Seiten denselben Änderungsstempel trug, als
+   „ersetzt“ und zusätzlich als Konflikt — weil die Anpassung aus 0.97.12 („bei
+   Gleichstand gilt der Server“) den Gleichstand in den Ersetzungszweig schob. Nach
+   einem gewöhnlichen Abgleich stand da „830 ersetzt · 798 Konflikte“, während sich
+   kein einziger Satz geändert hatte. Der Schaden ist nicht an den Daten, sondern am
+   Vertrauen: Wer jedes Mal Hunderte Konflikte gemeldet bekommt, sieht den einen
+   echten nicht mehr. Erkannt wird hier beides — dass der Server bei Gleichstand
+   weiterhin gilt (das Verhalten bleibt) und dass der Bericht dabei schweigt. */
+function abgleichBerichtTest() {
+  console.log('\n217. Abgleich-Bericht: Gleichstand ist kein Konflikt (0.121.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* Gleichstand in einer Liste: derselbe Stempel auf beiden Seiten */
+  const lok = S.leereDatenbank();
+  const fre = S.leereDatenbank();
+  for (let i = 1; i <= 5; i++) {
+    lok.aufgaben.push({ id: 'ab' + i, titel: 'Gleich ' + i, status: 'offen', geaendert: 1000, kontext: 'privat' });
+    fre.aufgaben.push({ id: 'ab' + i, titel: 'Gleich ' + i, status: 'offen', geaendert: 1000, kontext: 'privat' });
+  }
+  let e = S.zusammenfuehren(lok, fre);
+  pruefe(e.bericht.konflikte.length === 0, 'fünf gleiche Sätze: kein Konflikt gemeldet — statt ' + e.bericht.konflikte.length);
+  pruefe(e.bericht.ersetzt === 0, 'und nichts als „ersetzt“ gezählt — statt ' + e.bericht.ersetzt);
+  pruefe(e.bericht.behalten === 5, 'sondern fünfmal „behalten“ — statt ' + e.bericht.behalten);
+  pruefe(e.db.aufgaben.length === 5, 'alle fünf Sätze sind noch da');
+
+  /* Das Verhalten aus 0.97.12 bleibt: bei Gleichstand gewinnt der Server */
+  const lok2 = S.leereDatenbank();
+  const fre2 = S.leereDatenbank();
+  lok2.aufgaben.push({ id: 'ab9', titel: 'Lokal', status: 'offen', geaendert: 500, kontext: 'privat' });
+  fre2.aufgaben.push({ id: 'ab9', titel: 'Server', status: 'erledigt', geaendert: 500, kontext: 'privat' });
+  e = S.zusammenfuehren(lok2, fre2);
+  const satz = e.db.aufgaben.filter(x => x.id === 'ab9')[0];
+  pruefe(satz && satz.titel === 'Server' && satz.status === 'erledigt', 'bei Gleichstand gilt weiterhin der Server (0.97.12 bleibt)');
+
+  /* Ein echter Unterschied wird weiterhin gemeldet */
+  const lok3 = S.leereDatenbank();
+  const fre3 = S.leereDatenbank();
+  lok3.aufgaben.push({ id: 'ab10', titel: 'Alt', status: 'offen', geaendert: 100, kontext: 'privat' });
+  fre3.aufgaben.push({ id: 'ab10', titel: 'Neu', status: 'erledigt', geaendert: 200, kontext: 'privat' });
+  e = S.zusammenfuehren(lok3, fre3);
+  pruefe(e.bericht.ersetzt === 1 && e.bericht.konflikte.length === 1, 'ein echter Unterschied wird weiterhin als Ersetzung und Konflikt gemeldet');
+  pruefe(e.bericht.konflikte[0].gewaehlt === 'fremd', 'und zwar zugunsten des Servers');
+
+  /* Neu und gelöscht zählen unverändert */
+  const lok4 = S.leereDatenbank();
+  const fre4 = S.leereDatenbank();
+  fre4.aufgaben.push({ id: 'ab11', titel: 'Nur Server', status: 'offen', geaendert: 300, kontext: 'privat' });
+  e = S.zusammenfuehren(lok4, fre4);
+  pruefe(e.bericht.neu === 1 && e.bericht.konflikte.length === 0, 'ein neuer Satz vom Server zählt als „neu“, nicht als Konflikt');
+
+  /* Auch die Kalenderzuordnung (ein Verzeichnis, keine Liste) zählt den Gleichstand nicht */
+  const lok5 = S.leereDatenbank();
+  const fre5 = S.leereDatenbank();
+  lok5.kalenderzuordnung = { 'kal-1': { art: 'arbeit', geaendert: 700 } };
+  fre5.kalenderzuordnung = { 'kal-1': { art: 'arbeit', geaendert: 700 } };
+  e = S.zusammenfuehren(lok5, fre5);
+  pruefe(e.bericht.ersetzt === 0 && e.bericht.behalten === 1, 'Kalenderzuordnung: Gleichstand zählt als „behalten“, nicht als Ersetzung');
+
+  /* Die Wächter in der Quelle */
+  const z = S.zusammenfuehren.toString();
+  pruefe(z.split('bericht.ersetzt++').length === 3, 'es wird an genau zwei Stellen „ersetzt“ gezählt');
+  pruefe(/\} else \{[\s\S]{0,400}ergebnis\[s\]\.push\(paar\.b\); bericht\.behalten\+\+;/.test(z),
+    'der Gleichstand-Zweig nimmt den Serversatz und zählt ihn als behalten');
+  pruefe(!/if \(zb >= za\)/.test(z), 'der Listenzweig vergleicht wieder mit „größer“ — der Gleichstand hat einen eigenen Zweig');
+  pruefe(/if \(\(wb\.geaendert \|\| 0\) >= \(wa\.geaendert \|\| 0\)\)/.test(z), 'im Verzeichniszweig gilt der Server bei Gleichstand weiterhin');
+}
+
+/* Fehlertyp: eine App wird entfernt, aber nicht überall. Beim Herausnehmen von
+   Shopping, Idea Lab, Guide und Coach (0.122.0) fielen 180 Funktionen weg — und an
+   über fünfzig Stellen blieb der Aufruf stehen: im Verteiler, in der Fußzeile, in der
+   Suche, in den Kategorien, in der Wochenschau, im Kurs. Jede dieser Stellen wirft erst
+   dann, wenn man sie öffnet, und bis dahin sieht die App gesund aus. Umgekehrt droht der
+   stille Rückweg: ein Eintrag in CL_APPS oder CL_BILD, den niemand bemerkt, und die App
+   steht wieder im Raster. Und drittens die Daten: Die Sammlungen der entfernten Apps
+   gehören weiter in SAMMLUNGEN und in die leere Datenbank, sonst wirft der Abgleich
+   beim nächsten Lauf weg, was auf dem anderen Gerät noch liegt.
+
+   Diese Kategorie prüft darum nicht nur die vier Apps, sondern die ganze Datei: Jeder
+   Name, der irgendwo aufgerufen wird, muss auch erklärt sein. Damit fällt jeder künftige
+   Rückbau sofort auf, nicht erst beim Antippen. */
+function rueckbau122Test() {
+  console.log('\n218. Entfernte Apps: kein Rest, kein Rückweg, keine Daten verloren (0.122.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* ---- 1. Kein Rückweg ---- */
+  const WEG = ['einkauf', 'ideen', 'leitfaden', 'coach', 'gemini'];
+  WEG.forEach(id => {
+    pruefe(!S.clApp(id), 'die App „' + id + '“ steht nicht mehr in CL_APPS');
+    pruefe(!S.CL_BILD[id], 'und hat kein Bildzeichen mehr');
+    pruefe(!S.clOrdnerVon(id), 'und liegt in keinem Ordner');
+  });
+  WEG.forEach(id => {
+    S.oeffne(id);
+    pruefe(S.cl.app === 'uebersicht', 'ein alter Verweis auf „' + id + '“ landet auf der Übersicht');
+  });
+
+  /* ---- 2. Keine Reste der Pflichtlektüre ---- */
+  ['manGesperrt', 'manPflichtPruefen', 'manPflichtTermin', 'manPflichtFertig', 'manCoachHolen',
+   'manCoachKalender', 'upCoachAbhaken', 'upManifestAn', 'upKalenderWort', 'upKalFenster'].forEach(n => {
+    pruefe(typeof S[n] === 'undefined', n + ' gibt es nicht mehr');
+  });
+  pruefe(typeof S.coachTermine === 'undefined', 'die Liste der Coach-Termine ist weg');
+  pruefe(!/cl\.man\.pflicht|cl\.man\.frei/.test(SKRIPT), 'und kein Zustand dafür');
+  pruefe(typeof S.manSicht === 'function' && typeof S.manifestHtml === 'function',
+    'das Manifest selbst bleibt — es steht in Roots und wird von Hand aufgeschlagen');
+
+  /* ---- 3. Kein co…, iw…, lf…, einkauf… mehr ---- */
+  ['co', 'iw', 'lf', 'einkauf'].forEach(p => {
+    const re = new RegExp('(?:^|\\n)function (' + p + '[A-Za-z0-9_$]*)\\s*\\(', 'g');
+    const rest = [];
+    let m;
+    while ((m = re.exec(SKRIPT)) !== null) { rest.push(m[1]); }
+    pruefe(rest.length === 0, 'keine Funktion mehr mit „' + p + '“ am Anfang' + (rest.length ? ': ' + rest.slice(0, 8).join(', ') : ''));
+  });
+
+  /* ---- 4. Die Daten bleiben ---- */
+  const samm = (SKRIPT.match(/var SAMMLUNGEN = \[[\s\S]*?\];/) || [''])[0];
+  ['ideen', 'themen', 'gedanken', 'projekte', 'sammlungen'].forEach(s => {
+    pruefe(samm.indexOf("'" + s + "'") >= 0, '„' + s + "“ steht weiter in SAMMLUNGEN — der Abgleich wirft nichts weg");
+  });
+  const leer = S.leereDatenbank();
+  pruefe(Array.isArray(leer.ideen), 'die leere Datenbank kennt „ideen“ weiter');
+  /* Eine Idee überlebt einen Abgleich, obwohl die App sie nicht mehr zeigt */
+  const a = S.leereDatenbank();
+  const b = S.leereDatenbank();
+  a.ideen.push({ id: 'iw-alt', titel: 'Alte Idee', stufe: 1, status: 'aktiv', geaendert: 4000 });
+  const e = S.zusammenfuehren(a, b);
+  pruefe(e.db.ideen.some(x => x.id === 'iw-alt'), 'eine alte Idee übersteht den Abgleich unversehrt');
+
+  /* ---- 5. Das Raster ---- */
+  const raster = S.CL_APPS.filter(x => x.raster !== false);
+  pruefe(raster.length === 12, 'zwölf Felder im Raster (' + raster.length + ')');
+  pruefe(raster.every(x => S.CL_BILD[x.id]), 'jedes Feld hat sein Bildzeichen');
+  pruefe(S.CL_APPS.every(x => S.CL_BILD[x.id]), 'zu jeder App, auch außerhalb des Rasters, gibt es eines');
+
+  /* ---- 6. Der Wächter: kein Aufruf ins Leere, nirgends in der Datei ---- */
+  pruefe(offeneRufe(SKRIPT).length === 0, 'kein Aufruf einer Funktion, die es nicht gibt'
+    + (offeneRufe(SKRIPT).length ? ': ' + offeneRufe(SKRIPT).slice(0, 10).join(', ') : ''));
+
+  S.oeffne('uebersicht');
+}
+
+/* Sucht Namen, die aufgerufen werden, aber nirgends erklärt sind.
+   Kommentare, Zeichenketten und reguläre Ausdrücke werden vorher
+   ausgeblendet, sonst zählten deutsche Wörter aus Kommentaren mit. */
+function offeneRufe(skript) {
+  const UMGEBUNG = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'function', 'typeof',
+    'new', 'delete', 'void', 'in', 'of', 'do', 'else', 'try', 'throw', 'case', 'var', 'let', 'const',
+    'instanceof', 'yield', 'await', 'this',
+    'Array', 'Object', 'String', 'Number', 'Boolean', 'Math', 'JSON', 'Date', 'RegExp', 'Error',
+    'TypeError', 'Promise', 'Map', 'Set', 'WeakMap', 'Symbol', 'parseInt', 'parseFloat', 'isNaN',
+    'isFinite', 'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI', 'setTimeout',
+    'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame',
+    'alert', 'confirm', 'prompt', 'fetch', 'window', 'document', 'console', 'localStorage',
+    'sessionStorage', 'indexedDB', 'navigator', 'location', 'history', 'screen', 'caches', 'crypto',
+    'performance', 'atob', 'btoa', 'Blob', 'File', 'FileReader', 'FormData', 'Headers', 'Request',
+    'Response', 'URL', 'URLSearchParams', 'Image', 'Audio', 'AudioContext', 'webkitAudioContext',
+    'Worker', 'SpeechSynthesisUtterance', 'speechSynthesis', 'MutationObserver', 'ResizeObserver',
+    'IntersectionObserver', 'CustomEvent', 'Event', 'XMLHttpRequest', 'TextEncoder', 'TextDecoder',
+    'Uint8Array', 'Int32Array', 'Float64Array', 'ArrayBuffer', 'DataView', 'structuredClone',
+    'queueMicrotask', 'matchMedia', 'getComputedStyle', 'scrollTo', 'open', 'close', 'print',
+    'focus', 'blur', 'postMessage', 'addEventListener', 'removeEventListener', 'DOMParser',
+    'XMLSerializer', 'Intl', 'globalThis', 'self']);
+
+  /* Kommentare, Zeichenketten und Regex ausblenden — Länge bleibt gleich */
+  const VOR = new Set('(,=:[!&|?{};+-*%~^<>'.split('').concat(['\n']));
+  const VOR_WORT = new Set(['return', 'typeof', 'case', 'in', 'of', 'delete', 'void', 'new', 'do',
+    'else', 'yield', 'await', 'instanceof', 'throw']);
+  const aus = [];
+  const davor = () => {
+    let j = aus.length - 1;
+    while (j >= 0 && (aus[j] === ' ' || aus[j] === '\t')) { j--; }
+    if (j < 0) { return '\n'; }
+    if (/[A-Za-z0-9_$]/.test(aus[j])) {
+      let k = j;
+      while (k >= 0 && /[A-Za-z0-9_$]/.test(aus[k])) { k--; }
+      return VOR_WORT.has(aus.slice(k + 1, j + 1).join('')) ? '\n' : aus[j];
+    }
+    return aus[j];
+  };
+  const leer = (t) => t.replace(/[^\n]/g, ' ');
+  let i = 0;
+  const n = skript.length;
+  while (i < n) {
+    const c = skript[i];
+    if (c === '/' && skript[i + 1] !== '*' && skript[i + 1] !== '/' && VOR.has(davor())) {
+      let j = i + 1;
+      let klasse = false;
+      while (j < n) {
+        if (skript[j] === '\\') { j += 2; continue; }
+        if (skript[j] === '[') { klasse = true; }
+        else if (skript[j] === ']') { klasse = false; }
+        else if (skript[j] === '/' && !klasse) { break; }
+        else if (skript[j] === '\n') { break; }
+        j++;
+      }
+      j = Math.min(j + 1, n);
+      while (j < n && 'gimsuyd'.indexOf(skript[j]) >= 0) { j++; }
+      aus.push(leer(skript.slice(i, j)));
+      i = j;
+    } else if (c === '/' && skript[i + 1] === '*') {
+      let j = skript.indexOf('*/', i + 2);
+      j = j < 0 ? n : j + 2;
+      aus.push(leer(skript.slice(i, j)));
+      i = j;
+    } else if (c === '/' && skript[i + 1] === '/') {
+      let j = skript.indexOf('\n', i);
+      j = j < 0 ? n : j;
+      aus.push(leer(skript.slice(i, j)));
+      i = j;
+    } else if (c === '\'' || c === '"' || c === '`') {
+      let j = i + 1;
+      while (j < n && skript[j] !== c) {
+        if (skript[j] === '\\') { j++; }
+        j++;
+      }
+      j = Math.min(j + 1, n);
+      aus.push(leer(skript.slice(i, j)));
+      i = j;
+    } else {
+      aus.push(c);
+      i++;
+    }
+  }
+  const nackt = aus.join('');
+
+  const da = new Set(UMGEBUNG);
+  let m;
+  const rf = /function\s+([A-Za-z_$][\w$]*)\s*\(/g;
+  while ((m = rf.exec(nackt)) !== null) { da.add(m[1]); }
+  const rv = /\b(?:var|let|const)\s+([A-Za-z_$][\w$]*)/g;
+  while ((m = rv.exec(nackt)) !== null) { da.add(m[1]); }
+  const ro = /([A-Za-z_$][\w$]*)\s*:\s*function/g;
+  while ((m = ro.exec(nackt)) !== null) { da.add(m[1]); }
+  const rp = /\(([^()]*)\)\s*\{/g;
+  while ((m = rp.exec(nackt)) !== null) {
+    m[1].split(',').forEach(t => { t = t.trim(); if (/^[A-Za-z_$][\w$]*$/.test(t)) { da.add(t); } });
+  }
+
+  const offen = new Set();
+  const rc = /(^|[^.\w$'"])([A-Za-z_$][\w$]*)\s*\(/g;
+  while ((m = rc.exec(nackt)) !== null) {
+    if (!da.has(m[2])) { offen.add(m[2]); }
+  }
+  return Array.from(offen).sort();
+}
+
+/* Fehlertyp: ein neues Modul, das an einer Stelle nicht mitgedacht ist. Casestudies
+   hängt an vier Dingen, die ihm nicht gehören — den Kategorien (die Fächer sind die
+   bestehenden Lebensbereiche), dem Memo Pad (verknüpfte Lehrplanpunkte), dem Abgleich
+   (eine neue Sammlung, die der Unterbau nicht kennt) und dem Date Book (von dem es
+   sich strikt fernhalten soll). Jede dieser Nahtstellen kann still brechen: Die
+   Kategorie wird umbenannt und das Fach verschwindet; das Projekt wird gelöscht und
+   der Punkt zeigt ins Leere; „casestudies“ fehlt in SAMMLUNGEN und der erste Abgleich
+   räumt das ganze Semester weg; ein Fenster landet versehentlich als Termin im
+   Kalender. Diese Kategorie prüft die zwölf Abnahmekriterien CS-01 bis CS-12 einzeln,
+   damit beim nächsten Umbau sofort auffällt, welche Naht gerissen ist. */
+function casestudiesTest() {
+  console.log('\n219. Casestudies: Semester, Lehrplan, Abgaben, Stundenplan (0.123.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  S.krAnfangen();
+  const heute = S.isoDatum();
+  const tp = (n) => S.tagePlus(heute, n);
+
+  /* ---- CS-01: Semester anlegen, Fächer sind die bestehenden Kategorien ---- */
+  S.oeffne('casestudies');
+  pruefe(S.cl.app === 'casestudies', 'das Modul lässt sich öffnen');
+  pruefe(/Belegen/.test(inhalt()), 'ohne Semester steht nur „Belegen…“ da');
+  S.csBelegenAuf();
+  S.document.getElementById('csName').value = 'Wintersemester 25/26';
+  S.document.getElementById('csStart').value = tp(-44);
+  S.document.getElementById('csEnde').value = tp(96);
+  S.csBelegenWahl('kb-arbeit');
+  S.csBelegenWahl('kb-geist');
+  S.csBelegenSpeichern();
+  const sem = S.csSemester();
+  pruefe(!!sem && sem.name === 'Wintersemester 25/26' && sem.start === tp(-44) && sem.ende === tp(96),
+    'CS-01 Semester mit Name, Start und Ende angelegt');
+  pruefe(sem.faecher.length === 2 && sem.faecher.every(f => !!S.kgName(f.kat)),
+    'CS-01 die Fächer sind bestehende Kategorien, keine eigenen');
+  pruefe(!S.csAlle('semester').some(x => x.name === ''), 'kein leeres Semester nebenher angelegt');
+  /* Getipptes überlebt das Umschalten einer Kategorie */
+  S.csBelegenAuf();
+  S.document.getElementById('csName').value = 'Zwischenstand';
+  S.csBelegenWahl('kb-haus');
+  pruefe(S.document.getElementById('csName').value === 'Zwischenstand', 'beim Wählen einer Kategorie bleibt der Name stehen');
+  S.aufklappZu();
+
+  /* ---- CS-02: Woche X von Y ---- */
+  const w = S.csWoche(sem);
+  pruefe(w.nr === 7 && w.von === 21, 'CS-02 „Woche 7 von 21“ — 44 Tage nach dem Start (' + w.nr + '/' + w.von + ')');
+  pruefe(S.csWoche({ start: heute, ende: tp(6) }).nr === 1, 'am ersten Tag ist es Woche 1');
+  pruefe(S.csWoche({ start: tp(-6), ende: tp(0) }).nr === 1, 'der siebte Tag gehört noch zu Woche 1');
+  pruefe(S.csWoche({ start: tp(-7), ende: tp(7) }).nr === 2, 'der achte beginnt Woche 2');
+  S.zeichne();
+  pruefe(/Woche 7 von 21/.test(inhalt()), 'CS-02 und es steht so in der Übersicht');
+
+  /* ---- CS-03: getrennt nach Beruflich und Privat ---- */
+  pruefe(S.csSeiteVor('kb-arbeit') === 'beruflich', 'CS-03 „Arbeit“ ist beruflich vorbelegt');
+  pruefe(S.csSeiteVor('kb-geist') === 'privat', 'CS-03 alles andere privat');
+  const h3 = inhalt();
+  pruefe(h3.indexOf('Beruflich') >= 0 && h3.indexOf('Privat') >= 0 && h3.indexOf('Beruflich') < h3.indexOf('Privat'),
+    'CS-03 beide Gruppen, beruflich zuerst');
+  pruefe(h3.indexOf('Arbeit') > h3.indexOf('Beruflich') && h3.indexOf('Arbeit') < h3.indexOf('Privat'),
+    'CS-03 „Arbeit“ steht unter Beruflich');
+  /* Umschalten geht, und es hängt nicht am Namen */
+  S.csBelegenAuf();
+  S.csBelegenSeite('kb-arbeit', 'privat');
+  S.csBelegenSpeichern();
+  pruefe(S.csFaecher(S.csSemester()).filter(f => f.kat === 'kb-arbeit')[0].seite === 'privat',
+    'CS-03 die Zuordnung lässt sich umschalten und überlebt das Speichern');
+  S.csBelegenAuf();
+  S.csBelegenSeite('kb-arbeit', 'beruflich');
+  S.csBelegenSpeichern();
+
+  /* ---- CS-04: Fortschritt ---- */
+  S.cl.cs.kat = 'kb-arbeit';
+  S.csPunktNeu('Testumgebung aufsetzen', '');
+  S.csPunktNeu('Prüfkriterien abstimmen', '');
+  S.csPunktNeu('Lastprofile messen', '');
+  let lp = S.csLehrplan(sem.id, 'kb-arbeit');
+  pruefe(lp.length === 3 && lp.map(x => x.rang).join(',') === '1,2,3', 'drei Punkte mit aufsteigendem Rang');
+  S.csHaken(lp[0].id);
+  let fo = S.csFortschritt(sem.id, 'kb-arbeit');
+  pruefe(fo.fertig === 1 && fo.alle === 3, 'CS-04 Fortschritt ist erledigte durch alle Punkte des Fachs');
+  pruefe(S.csFortschritt(sem.id, 'kb-geist').alle === 0, 'CS-04 und zählt nur das eigene Fach');
+
+  /* ---- CS-05: Freitext oder Verknüpfung auf ein Projekt derselben Kategorie ---- */
+  /* Ein Projekt heißt im Satz „name“ und trägt seine Kategorie unter „bereich“. */
+  S.DB.projekte.push({ id: 'pj-a', name: 'Testautomatisierung 2026', kontext: 'beruflich', bereich: 'kb-arbeit',
+    flaeche: '', status: 'laufend', ordnung: 1, geaendert: S.jetzt() });
+  S.DB.projekte.push({ id: 'pj-b', name: 'Lesekreis', kontext: 'privat', bereich: 'kb-geist',
+    flaeche: '', status: 'laufend', ordnung: 2, geaendert: S.jetzt() });
+  pruefe(S.katVon(S.kpSeiteFinden('pj-a')) === 'kb-arbeit', 'ein Projekt trägt seine Kategorie');
+  const frei = S.csProjekteFrei().map(x => x.id);
+  pruefe(frei.indexOf('pj-a') >= 0 && frei.indexOf('pj-b') < 0,
+    'CS-05 zur Auswahl stehen nur Projekte derselben Kategorie');
+  S.csProjektNehmen('pj-a');
+  const verk = S.csLehrplan(sem.id, 'kb-arbeit').filter(x => x.projekt === 'pj-a')[0];
+  pruefe(!!verk, 'CS-05 ein Projekt wird als Lehrplanpunkt übernommen');
+  pruefe(S.csPunktText(verk) === 'Testautomatisierung 2026', 'CS-05 der Punkt zeigt den Titel des Projekts');
+  pruefe(S.csProjekteFrei().map(x => x.id).indexOf('pj-a') < 0, 'CS-05 und steht danach nicht noch einmal zur Wahl');
+  S.csPunktAuf(verk.id);
+  pruefe(S.cl.app === 'projekte' && S.cl.pj.id === 'pj-a', 'CS-05 Antippen öffnet das Memo');
+  S.oeffne('casestudies'); S.csFachAuf('kb-arbeit');
+  /* Ein gelöschtes Projekt darf nicht ins Leere führen */
+  S.DB.projekte = S.DB.projekte.filter(x => x.id !== 'pj-a');
+  S.csPunktAuf(verk.id);
+  pruefe(S.cl.app === 'casestudies', 'CS-05 ein gelöschtes Projekt führt nirgendwohin, statt zu stürzen');
+  S.csPunktWeg(verk.id);
+
+  /* ---- CS-06: abhaken, sortieren, löschen ---- */
+  lp = S.csLehrplan(sem.id, 'kb-arbeit');
+  const ersterId = lp[0].id;
+  S.csHaken(ersterId);
+  pruefe(!S.csFinden(ersterId).erledigt, 'CS-06 abhaken geht auch wieder zurück');
+  S.csHaken(ersterId);
+  S.csSchieben(lp[2].id, -1);
+  pruefe(S.csLehrplan(sem.id, 'kb-arbeit').map(x => S.csPunktText(x)).join('|')
+    === 'Testumgebung aufsetzen|Lastprofile messen|Prüfkriterien abstimmen', 'CS-06 sortieren: ein Punkt rückt hoch');
+  S.csSchieben(lp[2].id, 1);
+  pruefe(S.csLehrplan(sem.id, 'kb-arbeit').map(x => S.csPunktText(x)).join('|')
+    === 'Testumgebung aufsetzen|Prüfkriterien abstimmen|Lastprofile messen', 'CS-06 und wieder herunter');
+  S.csSchieben(S.csLehrplan(sem.id, 'kb-arbeit')[0].id, -1);
+  pruefe(S.csLehrplan(sem.id, 'kb-arbeit')[0].id === ersterId, 'CS-06 über den Rand hinaus passiert nichts');
+  S.csPunktWeg(S.csLehrplan(sem.id, 'kb-arbeit')[2].id);
+  pruefe(S.csLehrplan(sem.id, 'kb-arbeit').length === 2, 'CS-06 löschen');
+
+  /* ---- CS-07: mehrere Abgaben je Fach, die nächste offene in der Übersicht ---- */
+  S.csAbgabeAuf('');
+  S.document.getElementById('csAbErg').value = 'Testkonzept Release 24';
+  S.document.getElementById('csAbDat').value = tp(16);
+  S.document.getElementById('csAbEmp').value = 'Frau Berger';
+  S.csAbgabeSpeichern();
+  S.csAbgabeAuf('');
+  S.document.getElementById('csAbErg').value = 'Messprotokoll Last';
+  S.document.getElementById('csAbDat').value = tp(37);
+  S.document.getElementById('csAbEmp').value = '';
+  S.csAbgabeSpeichern();
+  S.csAbgabeAuf('');
+  S.document.getElementById('csAbErg').value = 'Prüfplan Grundlagen';
+  S.document.getElementById('csAbDat').value = tp(-19);
+  S.document.getElementById('csAbEmp').value = 'QS-Runde';
+  S.csAbgabeSpeichern();
+  const ab = S.csAbgaben(sem.id, 'kb-arbeit');
+  pruefe(ab.length === 3, 'CS-07 mehrere Abgaben je Fach');
+  pruefe(ab[0].ergebnis === 'Prüfplan Grundlagen' && ab[0].empfaenger === 'QS-Runde' && !!ab[0].datum,
+    'CS-07 mit Ergebnis, Datum und Empfänger');
+  pruefe(ab.filter(x => x.ergebnis === 'Messprotokoll Last')[0].empfaenger === '', 'CS-07 der Empfänger darf leer bleiben');
+  pruefe(S.csNaechsteAbgabe(sem.id, 'kb-arbeit').ergebnis === 'Prüfplan Grundlagen', 'CS-07 die nächste offene ist die älteste offene');
+  S.csAbgabeHaken(ab[0].id);
+  pruefe(S.csFinden(ab[0].id).erreicht === true, 'CS-07 „erreicht“ lässt sich setzen');
+  pruefe(S.csNaechsteAbgabe(sem.id, 'kb-arbeit').ergebnis === 'Testkonzept Release 24', 'CS-07 danach rückt die nächste nach');
+  S.csZurUebersicht();
+  pruefe(/Testkonzept Release 24/.test(inhalt()), 'CS-07 und sie steht in der Übersicht');
+
+  /* ---- CS-08: Fenster je Fach, das nächste in der Übersicht ---- */
+  S.csFachAuf('kb-arbeit');
+  S.csFensterAuf('');
+  S.csFensterTag(1);
+  S.document.getElementById('csFeVon').value = '09:00';
+  S.document.getElementById('csFeBis').value = '10:30';
+  S.csFensterSpeichern();
+  S.csFensterAuf('');
+  S.csFensterTag(3);
+  S.document.getElementById('csFeVon').value = '16:00';
+  S.document.getElementById('csFeBis').value = '17:00';
+  S.csFensterSpeichern();
+  pruefe(S.csFenster(sem.id, 'kb-arbeit').length === 2, 'CS-08 zwei Fenster am Fach');
+  /* Eine Zeit, die rückwärts läuft, wird abgelehnt */
+  S.csFensterAuf('');
+  S.document.getElementById('csFeVon').value = '11:00';
+  S.document.getElementById('csFeBis').value = '10:00';
+  S.csFensterSpeichern();
+  pruefe(S.csFenster(sem.id, 'kb-arbeit').length === 2, 'CS-08 ein Fenster, das rückwärts läuft, wird nicht angelegt');
+  S.aufklappZu();
+  /* Ändern statt neu anlegen */
+  const f1 = S.csFenster(sem.id, 'kb-arbeit')[0];
+  S.csFensterAuf(f1.id);
+  S.document.getElementById('csFeVon').value = '08:45';
+  S.document.getElementById('csFeBis').value = '10:15';
+  S.csFensterSpeichern();
+  pruefe(S.csFenster(sem.id, 'kb-arbeit').length === 2 && S.csFinden(f1.id).von === '08:45',
+    'CS-08 ändern legt kein zweites an');
+  const naechst = S.csNaechstesFenster(sem.id, 'kb-arbeit');
+  pruefe(!!naechst && S.csFenster(sem.id, 'kb-arbeit').map(x => x.id).indexOf(naechst.id) >= 0,
+    'CS-08 es gibt ein nächstes Fenster, und es ist eines der beiden');
+  S.csZurUebersicht();
+  pruefe(/nächstes<\/b>(Mo|Di|Mi|Do|Fr|Sa|So) /.test(inhalt().replace(/<b>/g, '<b>')) || /0[89]:|1[0-7]:/.test(inhalt()),
+    'CS-08 und es steht in der Übersicht');
+
+  /* ---- CS-09: das Wochenraster zeigt alle Fenster des Semesters ---- */
+  S.cl.cs.kat = 'kb-geist';
+  S.csFensterAuf('');
+  S.csFensterTag(5);
+  S.document.getElementById('csFeVon').value = '08:30';
+  S.document.getElementById('csFeBis').value = '10:00';
+  S.csFensterSpeichern();
+  S.csPlanAuf();
+  const plan = inhalt();
+  pruefe((plan.match(/class="wb-blk/g) || []).length === 3, 'CS-09 alle drei Fenster stehen im Raster');
+  pruefe((plan.match(/class="kz/g) || []).length === 7, 'CS-09 sieben Spalten, Mo bis So');
+  pruefe(/>Mo</.test(plan) && />So</.test(plan), 'CS-09 die Woche beginnt am Montag und endet am Sonntag');
+  pruefe(/wb-blk s1/.test(plan) && /wb-blk s3/.test(plan), 'CS-09 beruflich dunkel, privat hell');
+  pruefe(/csFachAuf/.test(plan), 'CS-09 ein Block führt ins Fach');
+  /* Ein Fenster eines anderen Semesters bleibt draußen */
+  S.csSpeichern({ typ: 'fenster', id: 'cs-fremd', semester: 'cs-anderes', kat: 'kb-arbeit', tag: 2, von: '12:00', bis: '13:00' });
+  S.inhaltZeichnen();
+  pruefe((inhalt().match(/class="wb-blk/g) || []).length === 3, 'CS-09 Fenster eines anderen Semesters bleiben draußen');
+  S.csLoeschen('cs-fremd');
+
+  /* ---- CS-10: kein Eintrag im Date Book ---- */
+  pruefe(Object.keys(S.termineNachTag).length === 0, 'CS-10 es ist kein Termin entstanden');
+  pruefe(S.DB.jahrestermine.length === 0 && S.DB.ablaeufe.length === 0, 'CS-10 auch kein Jahrestermin und keine Routine');
+  const quelle = SKRIPT.slice(SKRIPT.indexOf('function csAlle('));
+  const modul = quelle.slice(0, quelle.indexOf('\n/* ---------- ') + 1 || quelle.length);
+  ['terminAnlegen', 'terminSchreiben', 'kalenderSchreiben', 'termineNachTag', 'merkeTermin', 'clTermineHolen'].forEach(n => {
+    pruefe(modul.indexOf(n + '(') < 0 && modul.indexOf(n + ' =') < 0,
+      'CS-10 das Modul fasst „' + n + '“ nicht an');
+  });
+
+  /* ---- CS-11: nach dem Enddatum ---- */
+  const vorbei = S.csFinden(sem.id);
+  vorbei.start = tp(-200);
+  vorbei.ende = tp(-1);
+  S.csSpeichern(vorbei);
+  S.csZurUebersicht();
+  pruefe(S.csLaeuft(vorbei) === false, 'CS-11 das Semester ist beendet');
+  const h11 = inhalt();
+  pruefe(/Semester beendet/.test(h11), 'CS-11 die Übersicht sagt „Semester beendet“');
+  pruefe(/Belegen/.test(h11), 'CS-11 und bietet „Belegen…“ an');
+  pruefe(S.csLehrplan(vorbei.id, 'kb-arbeit').length === 2 && S.csAbgaben(vorbei.id, 'kb-arbeit').length === 3
+    && S.csFenster(vorbei.id, '').length === 3, 'CS-11 Lehrplan, Abgaben und Fenster bleiben erhalten');
+  /* Ein neues Semester daneben: das alte bleibt liegen, das neue gilt */
+  S.csBelegenAuf();
+  S.document.getElementById('csName').value = 'Sommersemester 26';
+  S.document.getElementById('csStart').value = heute;
+  S.document.getElementById('csEnde').value = tp(120);
+  S.csBelegenWahl('kb-arbeit');
+  S.csBelegenSpeichern();
+  pruefe(S.csAlle('semester').length === 2, 'CS-11 das alte Semester bleibt gespeichert');
+  pruefe(S.csSemester().name === 'Sommersemester 26', 'CS-11 und das laufende gilt');
+  pruefe(S.csLehrplan(vorbei.id, 'kb-arbeit').length === 2, 'CS-11 die alten Lehrplanpunkte hängen weiter am alten Semester');
+  pruefe(S.csLehrplan(S.csSemester().id, 'kb-arbeit').length === 0, 'CS-11 das neue Semester beginnt leer');
+
+  /* ---- CS-12: Neuladen und Abgleich ---- */
+  pruefe(S.SAMMLUNGEN.indexOf('casestudies') >= 0, 'CS-12 „casestudies“ steht in SAMMLUNGEN');
+  pruefe(Array.isArray(S.leereDatenbank().casestudies), 'CS-12 und in der leeren Datenbank');
+  const text = S.alsText();
+  const zurueck = JSON.parse(text);
+  pruefe(Array.isArray(zurueck.casestudies) && zurueck.casestudies.length === S.DB.casestudies.length,
+    'CS-12 alles steht in der Datei, die geschrieben wird');
+  pruefe(S.DB.casestudies.every(x => x.id && x.typ && x.geaendert), 'CS-12 jeder Satz hat Kennung, Typ und Änderungsstempel');
+  /* Abgleich gegen einen leeren Server: nichts geht verloren */
+  const lokal = JSON.parse(JSON.stringify(S.DB));
+  const leer = S.leereDatenbank();
+  let e = S.zusammenfuehren(lokal, leer);
+  pruefe(e.db.casestudies.length === S.DB.casestudies.length, 'CS-12 der Abgleich mit einem leeren Server behält alles');
+  /* Abgleich gegen einen Server, der einen Punkt neuer hat */
+  const fremd = JSON.parse(JSON.stringify(S.DB));
+  const pid = S.csLehrplan(vorbei.id, 'kb-arbeit')[0].id;
+  fremd.casestudies.filter(x => x.id === pid)[0].text = 'Vom anderen Gerät';
+  fremd.casestudies.filter(x => x.id === pid)[0].geaendert = S.jetzt() + 10000;
+  e = S.zusammenfuehren(JSON.parse(JSON.stringify(S.DB)), fremd);
+  pruefe(e.db.casestudies.filter(x => x.id === pid)[0].text === 'Vom anderen Gerät',
+    'CS-12 der neuere Satz vom Server setzt sich durch');
+  pruefe(e.db.casestudies.length === S.DB.casestudies.length, 'CS-12 und keiner geht dabei verloren');
+  /* Ein gelöschter Satz kommt nicht zurück */
+  const weg = S.csLehrplan(vorbei.id, 'kb-arbeit')[1].id;
+  S.csLoeschen(weg);
+  const alt = JSON.parse(JSON.stringify(fremd));
+  e = S.zusammenfuehren(JSON.parse(JSON.stringify(S.DB)), alt);
+  pruefe(!e.db.casestudies.some(x => x.id === weg), 'CS-12 ein gelöschter Satz kommt über den Abgleich nicht zurück');
+
+  S.oeffne('uebersicht');
+}
+
+/* Fehlertyp: eine örtliche Aufräumarbeit gibt sich als Benutzeränderung aus und
+   gewinnt damit den Abgleich. Am 13.11.2026 wurden so zwei Wochen Arbeit
+   überschrieben: Das iPhone stand zwei Wochen, beim Start las pmMarkenPruefen
+   seinen alten Memo-Text, setzte die Aufgabenstati darauf zurück und stempelte
+   sie mit jetzt(). Derselbe Stempel entscheidet beim Zusammenführen, wessen
+   Fassung gilt — also gewann der alte Stand jeden einzelnen Vergleich. Kein Satz
+   ging verloren, deshalb fiel nichts durch Zählen auf; es waren die Werte in den
+   Sätzen: Datumswerte, Aufgabenstati, Benennungen von Listen und Aufgaben.
+
+   Zwei Dinge machen den Fehler so heimtückisch. Erstens setzt jeder Aufräumer
+   über spaeterSichern die Markierung „ungesicherte Änderungen“ — und genau die
+   schaltet im Abgleich den sicheren Zweig ab, in dem der Server ganz gilt. Der
+   Schutz verschwand also dort, wo er gebraucht wurde. Zweitens liefen die
+   Aufräumer vor dem ersten Abgleich, also auf veralteten Daten: Was sie
+   ableiteten, war notwendig falsch.
+
+   Diese Kategorie hält beides fest — dass Aufräumen nicht stempelt und nicht als
+   Benutzeränderung zählt, und dass ein veraltetes Gerät den Server nicht mehr
+   überschreiben kann. */
+function veraltetesGeraetTest() {
+  console.log('\n220. Ein veraltetes Gerät überschreibt den Server nicht mehr (0.124.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const vorZweiWochen = Date.now() - 14 * 24 * 3600 * 1000;
+  const gestern = Date.now() - 24 * 3600 * 1000;
+
+  /* ---- 1. Aufräumen stempelt nicht ---- */
+  /* Die Marke im Memo-Text ist die Kennung der Aufgabe in ⟦…⟧ */
+  S.DB.gedanken.push({ id: 'm1', titel: 'Projektliste', text: '[] Angebot schreiben ⟦a1mark⟧\n', kontext: 'beruflich', ordnung: 1, geaendert: vorZweiWochen });
+  S.DB.aufgaben.push({ id: 'a1', titel: 'Angebot schreiben', status: 'erledigt', erledigtAm: '2026-11-10',
+    kontext: 'beruflich', themaId: 'ck-korb', memo: { id: 'm1', zeile: 'a1mark' }, geaendert: vorZweiWochen });
+  const vorher = S.DB.aufgaben[0].geaendert;
+  S.pmMarkenPruefen();
+  pruefe(S.DB.aufgaben[0].status === 'offen', 'pmMarkenPruefen leitet den Status weiterhin aus dem Memo ab');
+  pruefe(S.DB.aufgaben[0].geaendert === vorher,
+    'aber es stempelt ihn nicht — der Stempel bleibt stehen (' + (S.DB.aufgaben[0].geaendert === vorher ? 'ja' : 'nein') + ')');
+
+  /* Keiner der Start-Aufräumer darf stempeln */
+  ['pmUmstellenKern', 'pmListenKatNachziehen', 'pmMarkenPruefen', 'pmListenNachziehen',
+   'mpArtenAufraeumen', 'pmNotizenAufraeumen', 'clKategorienUmstellen'].forEach(n => {
+    const t = funktionText(SKRIPT, n);
+    pruefe(t && t.indexOf('geaendert = jetzt()') < 0, n + ' setzt keinen Änderungsstempel');
+  });
+
+  /* ---- 2. Aufräumen zählt nicht als ungesicherte Benutzeränderung ---- */
+  pruefe(/function spaeterSichern\(aufraeumen\)/.test(SKRIPT), 'spaeterSichern kennt den stillen Fall');
+  pruefe(/if \(!aufraeumen\) \{ ungesichertSetzen\(true\); \}/.test(SKRIPT),
+    'und setzt die Markierung dann nicht — sonst fiele der sichere Zweig des Abgleichs aus');
+  const np = funktionText(SKRIPT, 'pmNachpflegen');
+  pruefe(np && /spaeterSichern\(true\)/.test(np), 'pmNachpflegen sichert still');
+  const ku = funktionText(SKRIPT, 'clKategorienUmstellen');
+  pruefe(ku && /spaeterSichern\(true\)/.test(ku), 'clKategorienUmstellen sichert still');
+
+  /* ---- 3. Erst abgleichen, dann aufräumen ---- */
+  pruefe(typeof S.clNachpflegen === 'function', 'die Aufräumer stehen an einer Stelle (clNachpflegen)');
+  const start = SKRIPT.slice(SKRIPT.indexOf('function clStart'));
+  const bisAbgleich = start.slice(0, start.indexOf('abgleichPlanen(true)'));
+  ['pmNachpflegen()', 'clKategorienUmstellen()', 'ckWecken()'].forEach(n => {
+    pruefe(bisAbgleich.indexOf('\n    ' + n) < 0, 'beim Start läuft ' + n + ' nicht mehr vor dem Abgleich');
+  });
+  pruefe(/if \(!clNachgepflegt\) \{ clNachpflegen\('nach dem ersten Abgleich'\); \}/.test(SKRIPT),
+    'aufgeräumt wird, wenn der Serverstand da ist');
+  pruefe(/if \(!tokenGueltig\(\)\) \{ clNachpflegen\('ohne Anmeldung'\); \}/.test(SKRIPT),
+    'ohne Anmeldung kommt kein Serverstand — dann sofort');
+
+  /* ---- 4. Der ganze Fall: zwei Wochen altes Gerät gegen neueren Server ---- */
+  frisch();
+  /* So sah es vor zwei Wochen aus — und so liegt es noch auf dem iPhone */
+  const altGeraet = S.leereDatenbank();
+  altGeraet.aufgaben.push({ id: 'a1', titel: 'Angebot schreiben', status: 'offen', planung: '2026-10-30',
+    kontext: 'beruflich', geaendert: vorZweiWochen });
+  altGeraet.themen.push({ id: 't1', name: 'Alte Listenbenennung', text: '', kontext: 'beruflich', geaendert: vorZweiWochen });
+  /* So sieht es auf dem Server aus — zwei Wochen Arbeit */
+  const server = S.leereDatenbank();
+  server.aufgaben.push({ id: 'a1', titel: 'Angebot an Fa. Berger schreiben', status: 'erledigt', erledigtAm: '2026-11-11',
+    planung: '2026-11-11', kontext: 'beruflich', geaendert: gestern });
+  server.themen.push({ id: 't1', name: 'Angebote 2026', text: '', kontext: 'beruflich', geaendert: gestern });
+  server.aufgaben.push({ id: 'a2', titel: 'In zwei Wochen neu entstanden', status: 'offen', kontext: 'privat', geaendert: gestern });
+
+  const e = S.zusammenfuehren(altGeraet, server);
+  const a1 = e.db.aufgaben.filter(x => x.id === 'a1')[0];
+  const t1 = e.db.themen.filter(x => x.id === 't1')[0];
+  pruefe(a1 && a1.titel === 'Angebot an Fa. Berger schreiben', 'der Server behält die neuere Benennung der Aufgabe');
+  pruefe(a1 && a1.status === 'erledigt' && a1.planung === '2026-11-11', 'und Status und Datum');
+  pruefe(t1 && t1.name === 'Angebote 2026', 'und die neuere Benennung der Liste');
+  pruefe(e.db.aufgaben.some(x => x.id === 'a2'), 'was nur auf dem Server steht, bleibt');
+
+  /* Und jetzt dasselbe, nachdem das alte Gerät aufgeräumt hat — das war der Schaden */
+  S.DB = altGeraet;
+  S.clKategorienUmstellen();
+  S.pmNachpflegen();
+  const e2 = S.zusammenfuehren(S.DB, server);
+  const a1n = e2.db.aufgaben.filter(x => x.id === 'a1')[0];
+  const t1n = e2.db.themen.filter(x => x.id === 't1')[0];
+  pruefe(a1n && a1n.titel === 'Angebot an Fa. Berger schreiben',
+    'auch nach dem Aufräumen auf dem alten Gerät gilt der Server — das ist der Kern von 0.124.0');
+  pruefe(a1n && a1n.status === 'erledigt', 'der Aufgabenstatus wird nicht zurückgesetzt');
+  pruefe(t1n && t1n.name === 'Angebote 2026', 'die Listenbenennung bleibt die neuere');
+
+  /* ---- 5. Die Bremse ---- */
+  pruefe(S.CL_BREMSE_AB >= 10, 'es gibt eine Schwelle, ab der gefragt wird (' + S.CL_BREMSE_AB + ')');
+  const ab = funktionText(SKRIPT, 'abgleichen');
+  pruefe(ab && /gewaehlt === 'lokal'/.test(ab), 'der Abgleich zählt, wie viel dieses Gerät überschreiben will');
+  pruefe(ab && ab.indexOf('clBremseAus') < ab.indexOf('DB = ergebnis.db'),
+    'und prüft das, bevor der lokale Stand ersetzt wird — schlägt die Bremse an, bleibt alles stehen');
+  pruefe(typeof S.clBremseLoesen === 'function', 'es gibt einen Weg, sie bewusst zu lösen');
+
+  /* ---- 6. Kein Hochladen ohne gelesenen Serverstand ---- */
+  pruefe(ab && /clSchonAbgeglichen\(\)/.test(ab), 'wer hier schon abgeglichen hat, lädt bei „nichts gefunden“ nichts hoch');
+  pruefe(ab && /clBestandZahl\(DB\) > 0/.test(ab), 'und ein voller lokaler Stand wird nicht für eine Erstanlage gehalten');
+
+  /* ---- 7. Unbekannte Felder werden durchgereicht ---- */
+  const mitFremd = S.leereDatenbank();
+  mitFremd.aufgaben.push({ id: 'a3', titel: 'Da', status: 'offen', geaendert: gestern });
+  mitFremd.waskommtnoch = [{ id: 'x1', text: 'aus einer neueren Fassung', geaendert: gestern }];
+  const text = JSON.stringify(mitFremd);
+  const gelesen = S.textZuBestand(text);
+  pruefe(gelesen && Array.isArray(gelesen.waskommtnoch) && gelesen.waskommtnoch.length === 1,
+    'textZuBestand reicht ein unbekanntes Feld durch, statt es zu verwerfen');
+  const e3 = S.zusammenfuehren(S.leereDatenbank(), gelesen);
+  pruefe(Array.isArray(e3.db.waskommtnoch) && e3.db.waskommtnoch.length === 1,
+    'und der Abgleich trägt es mit — eine alte Fassung löscht nicht, was sie nicht versteht');
+  S.DB = gelesen;
+  pruefe(JSON.parse(S.alsText()).waskommtnoch.length === 1, 'und es steht wieder in der Datei, die geschrieben wird');
+
+  /* ---- 8. Der Weg zurück ---- */
+  pruefe(typeof S.clVomServerJetzt === 'function', 'es gibt „Vom Server holen“');
+  const vs = funktionText(SKRIPT, 'clVomServerJetzt');
+  pruefe(vs && /DB = fremd;/.test(vs) && !/zusammenfuehren/.test(vs),
+    'und der Weg vergleicht keine Stempel — er übernimmt den Server ganz');
+  pruefe(vs && /ungesichertSetzen\(false\)/.test(vs), 'danach liegen hier keine ungesicherten Änderungen mehr');
+
+  frisch();
+}
+
+function onenoteLinkTest() {
+  console.log('\n221. Links in Sammlungen nehmen auch onenote: an (0.125.0)');
+  if (!CL) { return; }
+  const S = CL;
+
+  /* Was bisher ging, geht weiter */
+  pruefe(S.saLinkGueltig('https://firma.sharepoint.com/sites/QS'), 'https bleibt gültig');
+  pruefe(S.saLinkGueltig('http://intra.firma.de/wiki'), 'http auch');
+  pruefe(!S.saLinkGueltig('Nur Text'), 'Fließtext bleibt ungültig');
+  pruefe(!S.saLinkGueltig('file:///C:/geheim.txt'), 'file: bleibt ungültig');
+  pruefe(!S.saLinkGueltig('javascript:alert(1)'), 'javascript: bleibt ungültig');
+  pruefe(!S.saLinkGueltig(''), 'leer bleibt ungültig');
+
+  /* Neu: onenote: */
+  pruefe(S.saLinkGueltig('onenote:///C:/N/Arbeit.one#Seite'), 'die örtliche onenote:-Form wird angenommen');
+  pruefe(S.saLinkGueltig('onenote:https://d.docs.live.net/x/A.one#Aufgaben&section-id={1}&end'),
+    'und die mit eingebetteter Web-Adresse');
+  pruefe(S.saLinkOneNote('onenote:///C:/x'), 'onenote: wird als solches erkannt');
+  pruefe(!S.saLinkOneNote('https://x.de'), 'https nicht');
+
+  /* Die Kurzform: ein Rechnername sagt bei OneNote nichts */
+  pruefe(S.saLinkKurz('https://www.firma.de/x') === 'firma.de', 'bei https der Rechnername ohne www');
+  pruefe(S.saLinkKurz('onenote:https://d.docs.live.net/x/A.one#Teststrategie&section-id={1}&end')
+    === 'Teststrategie', 'bei onenote: der Seitenname hinter der Raute');
+  pruefe(S.saLinkKurz('onenote:///C:/N/A.one#Offene%20Fragen&page-id={1}&end') === 'Offene Fragen',
+    'Leerzeichen im Namen werden entschlüsselt');
+  pruefe(S.saLinkKurz('onenote:///C:/N/A.one#section-id={1}&end') === 'OneNote',
+    'ein Abschnittslink hat dort keinen Namen — dann steht da „OneNote“');
+  pruefe(S.saLinkKurz('onenote:///C:/N/A.one') === 'OneNote', 'ohne Raute ebenso');
+
+  /* Geöffnet wird onenote: im selben Fenster. window.open liefert bei
+     einem fremden Schema null — CLIE meldete dann fälschlich, man solle
+     Pop-ups erlauben. */
+  const quelle = funktionText(SKRIPT, 'saLinkAufrufen') || '';
+  pruefe(/saLinkOneNote\(ziel\)/.test(quelle) && /window\.location\.href = ziel/.test(quelle),
+    'onenote: geht über location.href, nicht über window.open');
+  pruefe(quelle.indexOf('window.location.href = ziel') < quelle.indexOf('var fenster = window.open'),
+    'und zwar vor dem window.open-Zweig, sonst käme es nie dort an');
+
+  /* Das Eingabefeld darf onenote: nicht stumm abweisen */
+  pruefe(!/type="url" inputmode="url"/.test(SKRIPT),
+    'das Linkfeld ist kein type="url" mehr — das wies onenote: ohne Meldung ab');
+  pruefe(/placeholder="https:\/\/… oder onenote:…"/.test(SKRIPT),
+    'und sagt im Platzhalter, dass beides geht');
+  pruefe(/http:\/\/, https:\/\/ oder onenote:/.test(SKRIPT),
+    'die Meldung beim Speichern nennt alle drei Schemata');
 }
 
 (async function () {
@@ -11685,7 +11775,6 @@ function leuchtturmTest() {
   schriftTest();
   palmTest();
   rechnerTest();
-  einkaufTest();
   try { kalenderTest(); } catch (e) { fail('Kalender warf: ' + e.message); }
   try { await schreibTest(); } catch (e) { fail('Termine schreiben warf: ' + e.message); }
   zifferTest();
@@ -11735,7 +11824,6 @@ function leuchtturmTest() {
   try { memoPadTest(); } catch (e) { fail('Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { planEinplanenTest(); } catch (e) { fail('Plan/Einplanen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { minenPuzzleTest(); } catch (e) { fail('Minen/Puzzle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { leitfadenTest(); } catch (e) { fail('Leitfaden warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { privatTermineTest(); } catch (e) { fail('Private Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { katStattBerufTest(); } catch (e) { fail('Kategorien statt Beruf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { katUebersichtTest(); } catch (e) { fail('Kategorien-▼ warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -11754,14 +11842,10 @@ function leuchtturmTest() {
   try { trainingSportDoppeltTest(); } catch (e) { fail('Training Sport doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spaltenBreitenTest(); } catch (e) { fail('Spaltenbreiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungSucheTest(); } catch (e) { fail('Sammlung-Suche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { morgengrussTest(); } catch (e) { fail('Morgengruß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kampagneTest(); } catch (e) { fail('Kampagne warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coSubstanzTest(); } catch (e) { fail('Substanz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlAusspracheTest(); } catch (e) { fail('Vorlesen-Aussprache warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clsAusNotizTest(); } catch (e) { fail('Checkliste aus Notiz warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoLoeschenTest(); } catch (e) { fail('Notiz löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coPrioTest(); } catch (e) { fail('Coach-Prioritäten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coKorbTest(); } catch (e) { fail('Coach-Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saImportTest(); } catch (e) { fail('Tabellen-Import warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckPrioTest(); } catch (e) { fail('Prioritäten 1–5 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ckKorbTest(); } catch (e) { fail('Sammler warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -11787,13 +11871,9 @@ function leuchtturmTest() {
   try { jahrTest(); } catch (e) { fail('Jahr warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoBereichTest(); } catch (e) { fail('Memo-Bereich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { startOrdnerTest(); } catch (e) { fail('Start mit Ordnern warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coachQuellenTest(); } catch (e) { fail('Coach-Quellen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coachTest(); } catch (e) { fail('Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { await coachVorabTest(); } catch (e) { fail('Coach vorab warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { spieleSudokuTest(); } catch (e) { fail('Sudoku warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { solitaerTest(); } catch (e) { fail('Solitär warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { eingabeTest(); } catch (e) { fail('Getipptes/Liste löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { ideenTest(); } catch (e) { fail('Ideenwerkstatt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kurs2Test(); } catch (e) { fail('Kurs 2.0 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlMarkenTest(); } catch (e) { fail('Lesezeichen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await vlDoppeltTest(); } catch (e) { fail('Vorlesen doppelt warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -11819,7 +11899,6 @@ function leuchtturmTest() {
   try { zuordnenFilterTest(); } catch (e) { fail('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoSortTest(); } catch (e) { fail('0.84/0.85 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fehlerZeigenTest(); } catch (e) { fail('0.85.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { coachAusTest(); } catch (e) { fail('0.86 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leisteCssTest(); } catch (e) { fail('0.86.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pokerTest(); } catch (e) { fail('0.87 Poker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { schafkopfTest(); } catch (e) { fail('0.87 Schafkopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -11827,7 +11906,6 @@ function leuchtturmTest() {
   try { raster35Test(); } catch (e) { fail('0.89 Raster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminMemoTest(); } catch (e) { fail('0.90 Termin→Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { markenReparaturTest(); } catch (e) { fail('0.90.1 Marken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { geminiCoachTest(); } catch (e) { fail('0.91 Coach warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { zeileImSchreibenTest(); } catch (e) { fail('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { auszeichnungVerschachteltTest(); } catch (e) { fail('0.91.2 Auszeichnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await serienTerminTest(); } catch (e) { fail('0.92 Serien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -11845,7 +11923,6 @@ function leuchtturmTest() {
   try { schreibenKopfTest(); } catch (e) { fail('0.97.4 Schreiben-Kopf warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verweisEditTest(); } catch (e) { fail('0.97.2 Verweise im Schreiben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { routineMemoTest(); } catch (e) { fail('0.97.9 Routine im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { ideeLoeschenTest(); } catch (e) { fail('0.97.10 Ideen löschen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { wochenStatTest(); } catch (e) { fail('0.97.11 Wochenstatistik warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { syncServerVorrangTest(); } catch (e) { fail('0.97.12 Sync-Vorrang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminEndeTest(); } catch (e) { fail('0.97.14 Termin-Ende warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -11874,12 +11951,23 @@ function leuchtturmTest() {
   try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { manPflichtTest(); } catch (e) { fail('0.106.0 Pflichtlektüre warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { upTest(); } catch (e) { fail('0.107.0 Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { await manCoachHolenTest(); } catch (e) { fail('0.107.1 Coach-Termine holen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { upSichtTest(); } catch (e) { fail('0.108.0 Sicht Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leuchtturmTest(); } catch (e) { fail('0.109.0 Roots warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rueckbauTest(); } catch (e) { fail('0.113.0 Rückbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { radarTest(); } catch (e) { fail('0.114.0 Radar warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { aufgabeOnTest(); } catch (e) { fail('0.115.0 Aufgaben mit OneNote warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { raFangTest(); } catch (e) { fail('0.116.0 Radar-Fang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { raHakenTest(); } catch (e) { fail('0.117.0 Merkliste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { verknuepfungTest(); } catch (e) { fail('0.118.0 Verknüpfungen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { dockTest(); } catch (e) { fail('0.119.0 Dock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { symbolTest(); } catch (e) { fail('0.119.1 Symbole warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { textgroesseTest(); } catch (e) { fail('0.120.0 Textgröße warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { abgleichBerichtTest(); } catch (e) { fail('0.121.0 Abgleich-Bericht warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { rueckbau122Test(); } catch (e) { fail('0.122.0 Rückbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { casestudiesTest(); } catch (e) { fail('0.123.0 Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { veraltetesGeraetTest(); } catch (e) { fail('0.124.0 veraltetes Gerät warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { onenoteLinkTest(); } catch (e) { fail('0.125.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
