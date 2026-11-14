@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1C2116">
+<title>To Do 1.0.0 – CLIE</title>
+<link rel="manifest" href="./clie-todo.webmanifest?v=1.0.0">
+<link rel="icon" href="./clie-app-todo-192.png?v=1.0.0">
+<link rel="apple-touch-icon" href="./clie-app-todo-192.png?v=1.0.0">
+<style>
+html,body{height:100%;margin:0}
+body{background:#B9C4A6;color:#1C2116;font:18px/1.45 ui-monospace,"Courier New",monospace;display:flex;justify-content:center}
+.blatt{max-width:420px;padding:28px 20px}
+h1{display:inline-block;background:#1C2116;color:#DCE4CC;font-size:20px;padding:3px 10px;border-radius:4px;margin:0 0 18px}
+img{display:block;width:120px;height:120px;margin:0 0 18px}
+p{margin:0 0 14px}
+ol{margin:0 0 18px;padding-left:22px}
+.knopf{display:inline-block;font:inherit;color:#1C2116;background:#DCE4CC;border:2px solid #1C2116;border-radius:14px;padding:4px 14px;margin:0 8px 8px 0;text-decoration:none;cursor:pointer}
+[hidden]{display:none !important}
+.leise{font-size:15px;opacity:.75}
+</style>
+</head>
+<body>
+<div class="blatt">
+<h1>To Do</h1>
+<img src="./clie-app-todo-512.png?v=1.0.0" alt="">
+<p>Die Aufgaben aus CLIE. Eine eigene App auf dem Startbildschirm — dahinter läuft CLIE mit denselben Daten.</p>
+<div id="direkt" hidden><button type="button" class="knopf" id="installieren">Installieren</button></div>
+<ol id="anleitung">
+<li>Chrome-Menü <b>⋮</b> öffnen</li>
+<li><b>Zum Startbildschirm hinzufügen</b> › <b>Installieren</b></li>
+</ol>
+<a class="knopf" href="./clie.html#aufgaben">Ohne Installieren öffnen</a>
+<p class="leise">To Do 1.0.0 · gehört zu CLIE</p>
+</div>
+<script>
+'use strict';
+var aufschub = null;
+function installierenTipp() {
+  if (!aufschub) { return; }
+  aufschub.prompt();
+  aufschub.userChoice.then(function () { aufschub = null; document.getElementById('direkt').hidden = true; });
+}
+function startSeite() {
+  /* Als App gestartet, aber nicht über die Startadresse: gleich zu CLIE */
+  if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+    window.location.replace('./clie.html#aufgaben');
+    return;
+  }
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    aufschub = e;
+    document.getElementById('direkt').hidden = false;
+  });
+  document.getElementById('installieren').addEventListener('click', installierenTipp);
+  /* Derselbe Service Worker und Bereich wie CLIE */
+  if (navigator.serviceWorker && /^https?:/.test(window.location.protocol)) {
+    navigator.serviceWorker.register('./sw-clie.js', { scope: './clie' }).catch(function () { return null; });
+  }
+}
+startSeite();
+</script>
+</body>
+</html>
