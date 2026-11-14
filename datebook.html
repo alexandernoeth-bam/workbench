@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1C2116">
+<title>Date Book 1.1.0</title>
+<link rel="manifest" href="./datebook.webmanifest?v=1.1.0">
+<link rel="icon" href="./clie-app-datebook-192.png?v=1.0.0">
+<link rel="apple-touch-icon" href="./clie-app-datebook-192.png?v=1.0.0">
+<!--
+  Date Book als eigene App (seit 1.1.0).
+  Die Seite liegt bewusst außerhalb des Bereichs von CLIE (./clie…): Läge sie
+  darin, hielte Chrome sie für „schon installiert“ und legte nur eine
+  Verknüpfung mit Chrome-Zeichen an (Fehler in 1.0.0). Darin läuft CLIE
+  eingebettet, direkt in Date Book — dieselbe Adresse, dieselben Daten.
+-->
+<style>
+html,body{height:100%;margin:0;background:#B9C4A6;overflow:hidden}
+body{display:flex;flex-direction:column}
+#hinweis{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:8px 12px;background:#1C2116;color:#DCE4CC;font:15px/1.35 ui-monospace,"Courier New",monospace}
+#hinweis span{flex:1}
+#hinweis button{font:inherit;color:#1C2116;background:#DCE4CC;border:0;border-radius:12px;padding:4px 12px}
+#clie{flex:1 1 auto;width:100%;border:0;display:block}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div id="hinweis" hidden><span>Date Book als App: Chrome-Menü ⋮ › Zum Startbildschirm hinzufügen › Installieren</span><button type="button" id="installieren" hidden>Installieren</button></div>
+<iframe id="clie" title="Date Book" src="./clie.html#kalender" allow="clipboard-read; clipboard-write; fullscreen; screen-wake-lock; autoplay"></iframe>
+<script>
+'use strict';
+var aufschub = null;
+function alsApp() {
+  return !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function installierenTipp() {
+  if (!aufschub) { return; }
+  aufschub.prompt();
+  aufschub.userChoice.then(function () { aufschub = null; document.getElementById('installieren').hidden = true; });
+}
+function startSeite() {
+  /* Im Browser-Tab ein schmaler Hinweis zum Installieren, als App nur CLIE */
+  if (!alsApp()) { document.getElementById('hinweis').hidden = false; }
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    aufschub = e;
+    document.getElementById('installieren').hidden = false;
+  });
+  window.addEventListener('appinstalled', function () { document.getElementById('hinweis').hidden = true; });
+  document.getElementById('installieren').addEventListener('click', installierenTipp);
+}
+startSeite();
+</script>
+</body>
+</html>

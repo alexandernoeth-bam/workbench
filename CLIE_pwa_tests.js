@@ -1,6 +1,6 @@
 /* ============================================================
    CLIE_pwa_tests.js — Regressionstests für die Einzel-Apps
-   Desk, To Do und Date Book als eigene PWA (seit 14.11.2026, 1.0.0)
+   Desk, To Do und Date Book als eigene PWA (1.1.0)
    Aufruf:  node CLIE_pwa_tests.js [ordner]   (Standard: Ordner der Datei)
 
    Teil A prüft Manifeste, Seiten und Symbole statisch.
@@ -38,26 +38,43 @@ console.log('\nP-01  Manifeste');
 const ids = [];
 APPS.forEach(function (a) {
   let m = null;
-  try { m = JSON.parse(lies('clie-' + a.key + '.webmanifest')); } catch (e) { fail(a.name + ': Manifest fehlt oder ist kein JSON'); return; }
+  try { m = JSON.parse(lies(a.key + '.webmanifest')); } catch (e) { fail(a.name + ': Manifest fehlt oder ist kein JSON'); return; }
   ids.push(m.id);
   pruefe(m.name === a.name && m.short_name === a.name, a.name + ': Name „' + m.name + '“');
-  pruefe(m.start_url === './clie.html#' + a.anker, a.name + ': startet in ' + m.start_url);
-  pruefe(m.scope === './clie', a.name + ': Bereich ./clie wie CLIE');
+  pruefe(m.start_url === './' + a.key + '.html' && m.scope === './' + a.key + '.html', a.name + ': startet auf der eigenen Seite, eigener Bereich');
   pruefe(m.display === 'standalone', a.name + ': eigenständiges Fenster');
   const groessen = (m.icons || []).map(function (i) { return i.sizes + (i.purpose ? '/' + i.purpose : ''); });
   pruefe(groessen.indexOf('192x192') >= 0 && groessen.indexOf('512x512') >= 0 && groessen.indexOf('512x512/maskable') >= 0, a.name + ': Symbole 192, 512, 512 maskierbar');
   pruefe((m.icons || []).every(function (i) { return gibt(i.src.replace(/^\.\//, '')); }), a.name + ': alle Symboldateien vorhanden');
-  pruefe(new RegExp("\\{ id: '" + a.anker + "'").test(CLIE) || a.anker === 'desk' && /\{ id: 'desk'/.test(CLIE), a.name + ': CLIE kennt die App #' + a.anker);
+  pruefe(new RegExp("\\{ id: '" + a.anker + "'").test(CLIE), a.name + ': CLIE kennt die App #' + a.anker);
 });
 pruefe(new Set(ids).size === APPS.length && ids.indexOf('./clie.html') < 0, 'jede App hat eine eigene Kennung, keine gleicht CLIE');
 
-console.log('\nP-02  Installationsseiten');
+/* P-05 Fehlerart aus 1.0.0: Die Startadresse lag im Bereich der installierten
+   CLIE-App (./clie…). Chrome hielt die App für schon installiert und legte nur
+   eine Verknüpfung mit Chrome-Zeichen an. Keine andere App darf einen engeren
+   Bereich haben, der die Startadresse einschließt. */
+console.log('\nP-05  Kein fremder Bereich über der Startadresse');
+{
+  const andere = fs.readdirSync(ORDNER).filter(function (n) { return /\.webmanifest$|^manifest.*\.json$/.test(n); })
+    .filter(function (n) { return APPS.every(function (a) { return n !== a.key + '.webmanifest'; }); })
+    .map(function (n) { try { const m = JSON.parse(lies(n)); return { n: n, scope: String(m.scope || './').replace(/^\/workbench\//, './') }; } catch (e) { return null; } })
+    .filter(Boolean);
+  pruefe(andere.some(function (x) { return x.n === 'clie.webmanifest'; }), 'CLIE-Manifest liegt zum Vergleich vor (' + andere.length + ' fremde Manifeste)');
+  APPS.forEach(function (a) {
+    const start = './' + a.key + '.html';
+    const eng = andere.filter(function (x) { return start.indexOf(x.scope) === 0 && x.scope.length >= start.length; });
+    pruefe(!eng.length, a.name + ': kein engerer fremder Bereich' + (eng.length ? ' — ' + eng.map(function (x) { return x.n; }).join(', ') : ''));
+    pruefe(start.indexOf('./clie') !== 0, a.name + ': Startadresse liegt nicht im Bereich von CLIE (./clie)');
+  });
+}
+
+console.log('\nP-02  App-Seiten');
 APPS.forEach(function (a) {
-  const s = lies('clie-' + a.key + '.html');
-  pruefe(s.indexOf('<link rel="manifest" href="./clie-' + a.key + '.webmanifest') > 0, a.name + ': verweist auf ihr Manifest');
+  const s = lies(a.key + '.html');
+  pruefe(s.indexOf('<link rel="manifest" href="./' + a.key + '.webmanifest') > 0, a.name + ': verweist auf ihr Manifest');
   pruefe(/<title>[^<]*\d+\.\d+\.\d+[^<]*<\/title>/.test(s), a.name + ': Version im Titel');
-  pruefe(s.indexOf("register('./sw-clie.js', { scope: './clie' })") > 0, a.name + ': derselbe Service Worker wie CLIE');
-  pruefe(s.indexOf('href="./clie.html#' + a.anker + '"') > 0, a.name + ': Link „ohne Installieren“ führt in die richtige App');
+  pruefe(s.indexOf('src="./clie.html#' + a.anker + '"') > 0, a.name + ': bettet CLIE in #' + a.anker + ' ein');
   const markup = s.replace(/<script>[\s\S]*?<\/script>/g, '');
   pruefe((markup.match(/<div[\s>]/g) || []).length === (markup.match(/<\/div>/g) || []).length, a.name + ': DIV-Balance');
   const js = (s.match(/<script>([\s\S]*?)<\/script>/) || [])[1] || '';
@@ -103,20 +120,23 @@ async function browserTests() {
     console.log('\nP-03  ' + a.name + ': installierbar und startet richtig');
     const p = await ctx.newPage();
     p.on('pageerror', function (e) { fehler.push(a.name + ': ' + e.message); });
-    await p.goto(basis + 'clie-' + a.key + '.html');
+    await p.goto(basis + a.key + '.html');
     await p.waitForTimeout(800);
     const cdp = await ctx.newCDPSession(p);
     const man = await cdp.send('Page.getAppManifest');
-    pruefe(!man.errors.length && /clie-/.test(man.url), 'Chrome liest das Manifest (' + man.url.replace(basis, '') + ')');
+    pruefe(!man.errors.length && man.url.indexOf(a.key + '.webmanifest') > 0, 'Chrome liest das Manifest (' + man.url.replace(basis, '') + ')');
     let fehlerListe = [];
     try { fehlerListe = (await cdp.send('Page.getInstallabilityErrors')).installabilityErrors.map(function (x) { return x.errorId; }); }
     catch (e) { fehlerListe = ['nicht abfragbar']; }
     pruefe(!fehlerListe.length, 'installierbar' + (fehlerListe.length ? ' — ' + fehlerListe.join(', ') : ''));
-    const m = JSON.parse(lies('clie-' + a.key + '.webmanifest'));
-    await p.goto(new URL(m.start_url, basis + 'clie-' + a.key + '.webmanifest').href);
-    await p.waitForTimeout(700);
-    const reiter = (await p.textContent('#reiter').catch(function () { return ''; })).trim();
-    pruefe(await p.evaluate(function () { return cl.app; }) === a.anker, 'Startadresse öffnet CLIE in „' + reiter + '“');
+    const rahmen = p.frame({ url: /clie\.html/ });
+    pruefe(!!rahmen, 'CLIE läuft eingebettet');
+    const app = rahmen ? await rahmen.evaluate(function () { return cl.app; }) : '';
+    const reiter = rahmen ? (await rahmen.textContent('#reiter')).trim() : '';
+    pruefe(app === a.anker, 'CLIE steht in „' + reiter + '“');
+    const box = await p.$eval('#clie', function (f) { const r = f.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.bottom)]; });
+    pruefe(box[0] === 412 && box[1] === 860, 'CLIE füllt den Bildschirm (' + box.join(' × ') + ')');
+    pruefe(await p.$eval('#hinweis', function (h) { return !h.hidden; }), 'im Browser-Tab: Hinweis zum Installieren');
     await p.close();
   }
   console.log('\nP-04  Keine Laufzeitfehler');
