@@ -420,7 +420,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 30, 'zwölf Felder im Raster (seit 0.123.0 mit Casestudies, 3×4), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 32, 'zwölf Felder im Raster (seit 0.127.0 mit Desk statt Calc, 3×4), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -550,9 +550,10 @@ function palmTest() {
   frisch();
   CL.zeichne();
   const h = inhalt();
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","memo","sammlungen","fokus","vorlesen","rechner","kategorien","casestudies","lernkartei","spiele"]'
+  /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","memo","sammlungen","fokus","vorlesen","kategorien","casestudies","desk","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest'),
-    'Start (seit 0.123.0): Roots, Date Book, To Do List / Memo Pad, Collections, Fokus / Reader, Calc, Categories / Casestudies, Flashcards, Games ▸ — das Raster ist wieder voll');
+    'Start (seit 0.127.0): Roots, Date Book, To Do List / Memo Pad, Collections, Fokus / Reader, Categories, Casestudies / Desk, Flashcards, Games ▸ — das Raster ist wieder voll');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2534,7 +2535,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,memo,sammlungen,fokus,vorlesen,rechner,kategorien,casestudies,lernkartei,spiele', 'Start: zwölf Felder (seit 0.123.0), SOS nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,memo,sammlungen,fokus,vorlesen,kategorien,casestudies,desk,lernkartei,spiele', 'Start: zwölf Felder (seit 0.127.0), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -5100,9 +5101,9 @@ function trendTest() {
   S.saLinkOeffnen(S.saSaetze(b)[0].id, 'url');
   pruefe(geoeffnet.join() === 'https://www.thalia.de/deep|_blank', 'Antippen öffnet die Adresse in einem neuen Tab');
   S.saEintrag(S.saSaetze(b)[0].id);
-  /* Seit 0.125.0 ein Textfeld statt type="url": Letzteres wies
+  /* Seit 0.126.0 ein Textfeld statt type="url": Letzteres wies
      onenote:-Adressen ohne Meldung ab. Geprüft wird weiter in saLinkGueltig. */
-  pruefe(/inputmode="url"[^>]*value="https:\/\/www\.thalia\.de\/deep"/.test(S.saFensterHtml()) && /saFormLinkOeffnen\('url'\)">↗ Öffnen/.test(S.saFensterHtml()), 'Formular: Adressfeld mit „↗ Öffnen“ (seit 0.125.0 ohne type="url")');
+  pruefe(/inputmode="url"[^>]*value="https:\/\/www\.thalia\.de\/deep"/.test(S.saFensterHtml()) && /saFormLinkOeffnen\('url'\)">↗ Öffnen/.test(S.saFensterHtml()), 'Formular: Adressfeld mit „↗ Öffnen“ (seit 0.126.0 ohne type="url")');
   S.document.getElementById('saF_name').value = 'Deep Work';
   S.document.getElementById('saF_notiz').value = '';
   S.document.getElementById('saF_url').value = 'javascript:alert(1)';
@@ -6455,7 +6456,9 @@ function startOrdnerTest() {
   /* „drive“ seit 0.91 im Menü ≡ */
   /* „sos“ seit 0.98.1 nur noch im Menü ≡ */
   /* „dock“ seit 0.119.0 im Menü ≡, über #dock und beim Start am PC */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock'];
+  /* „rechner“ seit 0.127.0 im Menü ≡ — Desk kam ins Raster, Calc ging dafür */
+  /* „verknuepfungen“ seit 0.127.0 im Menü ≡ */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -6478,7 +6481,8 @@ function startOrdnerTest() {
   S.oeffne('spiele');
   pruefe(/Poker: /.test(S.document.getElementById('aufklapp').innerHTML) && /Sudoku: /.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
   S.aufklappZu();
-  pruefe(/oeffne\('rechner'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Rechner, Vorlesen und Memo direkt auf dem Start');
+  /* Seit 0.127.0 steht Calc im Menü ≡ statt auf dem Start; dafür Desk. */
+  pruefe(/oeffne\('desk'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Desk, Vorlesen und Memo direkt auf dem Start');
 }
 
 /* ============================================================
@@ -11719,7 +11723,7 @@ function veraltetesGeraetTest() {
 }
 
 function onenoteLinkTest() {
-  console.log('\n221. Links in Sammlungen nehmen auch onenote: an (0.125.0)');
+  console.log('\n222. Links in Sammlungen nehmen auch onenote: an (0.126.0)');
   if (!CL) { return; }
   const S = CL;
 
@@ -11764,6 +11768,58 @@ function onenoteLinkTest() {
     'und sagt im Platzhalter, dass beides geht');
   pruefe(/http:\/\/, https:\/\/ oder onenote:/.test(SKRIPT),
     'die Meldung beim Speichern nennt alle drei Schemata');
+}
+
+function ankerTest() {
+  console.log('\n223. Jede App ist über ihren Anker erreichbar (0.127.0)');
+  if (!CL) { return; }
+  const S = CL;
+
+  /* Die Weiche beim Start: jeder App-Name wirkt als Anker */
+  pruefe(/clApp\(clAnker\) \|\| clAnker === 'manifest'/.test(SKRIPT),
+    'die Weiche nimmt jeden App-Namen als Anker');
+
+  /* Ein Ordner ist keine Seite, sondern ein Fenster: er setzt cl.ordner,
+     nicht cl.app. Genau das hatte ich beim Prüfen erst übersehen und
+     „#spiele geht nicht“ gemeldet, obwohl es ging. */
+  pruefe(!!S.CL_ORDNER['spiele'], 'Games ist ein Ordner, keine App-Seite');
+  frisch();
+  S.oeffne('spiele');
+  pruefe(S.cl.ordner === 'spiele', '#spiele öffnet das Ordnerfenster (cl.ordner, nicht cl.app)');
+  pruefe(S.cl.app === 'uebersicht', 'und lässt die Seite darunter stehen');
+
+  /* Die übrigen Apps setzen cl.app */
+  ['sammlungen', 'casestudies', 'desk', 'dock', 'kalender', 'memo'].forEach(function (id) {
+    frisch();
+    S.oeffne(id);
+    pruefe(S.cl.app === id, '#' + id + ' öffnet ' + id + (S.cl.app === id ? '' : ' — kam aber bei ' + S.cl.app + ' an'));
+  });
+
+  /* Fokus ist ein Dialog, keine Seite — der Anker darf nicht ins Leere führen */
+  frisch();
+  S.oeffne('fokus');
+  pruefe(S.cl.app !== 'fokus', 'Fokus bleibt ein Dialog und wird keine eigene Seite');
+
+  /* Die Liste der Verknüpfungen */
+  frisch();
+  S.oeffne('verknuepfungen');
+  const h = inhalt();
+  pruefe(S.cl.app === 'verknuepfungen', 'Shortcuts öffnet aus dem Menü ≡');
+  pruefe(/vk-zeile/.test(h), 'die Liste zeigt Zeilen');
+  const zeilen = (h.match(/class="vk-zeile"/g) || []).length;
+  const erwartet = S.CL_APPS.filter(a => S.VK_AUS.indexOf(a.id) < 0).length;
+  pruefe(zeilen === erwartet, 'eine Zeile je App (' + zeilen + ' von ' + erwartet + ')');
+  pruefe(/#sammlungen</.test(h) && /#desk</.test(h) && /#spiele</.test(h),
+    'die Anker stehen im Klartext dabei');
+  pruefe(!/#checklisten</.test(h) && !/#projekte</.test(h),
+    'andere Sichten derselben App bekommen keine eigene Zeile');
+  pruefe(/Auf dem Start/.test(h) && /Weitere/.test(h), 'geteilt in Raster und Übrige');
+  pruefe(/vkKopieren/.test(h), 'jede Zeile kopiert ihre Adresse');
+
+  /* Die Adresse ist vollständig, sonst taugt sie nicht zum Einfügen */
+  const adr = S.vkAdresse('sammlungen');
+  pruefe(adr.indexOf('#sammlungen') === adr.length - 11, 'die Adresse endet auf den Anker');
+  pruefe(adr.indexOf('://') > 0, 'und ist vollständig, nicht nur der Anker (' + adr + ')');
 }
 
 (async function () {
@@ -11967,7 +12023,8 @@ function onenoteLinkTest() {
   try { rueckbau122Test(); } catch (e) { fail('0.122.0 Rückbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { casestudiesTest(); } catch (e) { fail('0.123.0 Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { veraltetesGeraetTest(); } catch (e) { fail('0.124.0 veraltetes Gerät warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { onenoteLinkTest(); } catch (e) { fail('0.125.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
