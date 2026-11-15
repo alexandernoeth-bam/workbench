@@ -11916,13 +11916,19 @@ function deskPinTest() {
 }
 
 function huellenTest() {
-  console.log('\n225. Hüllen für einzelne Apps (0.128.0)');
+  console.log('\n225. Hüllen für einzelne Apps (1.2.0)');
   if (!CL) { return; }
 
   /* Jede *.webmanifest neben clie.html, die nicht die von CLIE selbst ist,
-     gehört zu einer Hülle. Der Fehler, den diese Kategorie fängt: eine Hülle,
-     die auf eine App zeigt, die es nicht (mehr) gibt — dann landet man beim
-     Antippen in einem leeren CLIE, ohne dass irgendetwas warnt. */
+     gehört zu einer Hülle. Zwei Fehlerarten fängt diese Kategorie:
+
+     1. Ein Bereich, der clie.html einschließt (oder in ./clie hineinreicht).
+        Dann hält Chrome die Hülle für die schon installierte App und bietet
+        kein Installieren an — genau das war in Hülle 1.0.0 und noch einmal
+        beim ersten Bookmarks-Versuch der Fehler. Auf dem Gerät sieht man es
+        erst beim Installieren, hier sofort.
+     2. Eine Hülle, die auf eine App zeigt, die es nicht (mehr) gibt — dann
+        landet man in einem leeren CLIE, ohne dass irgendetwas warnt. */
   const alle = fs.readdirSync(ORDNER).filter(d => /\.webmanifest$/.test(d) && d !== 'clie.webmanifest');
   if (!alle.length) {
     warn('keine Hüllen erzeugt — node huellen.js <app> legt welche an');
@@ -11947,27 +11953,35 @@ function huellenTest() {
     pruefe(fs.existsSync(path.join(ORDNER, String(mf.start_url).replace(/^\.\//, ''))),
       'und die Datei dahinter gibt es wirklich');
     pruefe(mf.display === 'standalone', 'display ist standalone — eigenes Fenster, keine Adresszeile');
-    pruefe(mf.scope === './', 'der Geltungsbereich schließt clie.html ein, sonst springt die Hülle aus der App heraus');
 
-    /* Der eigentliche Punkt: das Sprungziel muss eine App sein, die es gibt */
-    const ziele = (seite.match(/\.\/clie\.html#([a-z0-9_-]+)/gi) || [])
-      .map(t => t.split('#')[1]);
-    pruefe(ziele.length >= 2, name + '.html hat Knopf und Weiterleitung auf dasselbe Ziel');
-    pruefe(ziele.length > 0 && ziele.every(z => z === ziele[0]),
-      'beide Wege führen zur selben App (' + ziele.join(', ') + ')');
-    pruefe(ziele.length > 0 && ids.indexOf(ziele[0]) >= 0,
-      'und „' + (ziele[0] || '—') + '“ steht wirklich in CL_APPS — kein Sprung ins Leere');
+    /* Der Bereich: genau diese eine Datei. */
+    pruefe(mf.scope === './' + name + '.html',
+      'der Bereich ist nur die Hülle selbst (' + mf.scope + ')');
+    const bereich = String(mf.scope || '').replace(/^\.\//, '');
+    pruefe('clie.html'.indexOf(bereich) !== 0,
+      'der Bereich verschluckt clie.html nicht — sonst hält Chrome die Hülle für CLIE');
+    pruefe(name.indexOf('clie') !== 0,
+      'die Hülle liegt nicht im Bereich ./clie — der Fehler aus Hülle 1.0.0');
+
+    /* CLIE läuft eingebettet. Würde gesprungen, verließe die App ihren
+       Bereich und Chrome öffnete einen Tab mit Adresszeile. */
+    const rahmen = seite.match(/<iframe[^>]*src="\.\/clie\.html#([a-z0-9_-]+)"/i);
+    pruefe(!!rahmen, 'CLIE läuft im iframe, es wird nicht dorthin gesprungen');
+    pruefe(!/location\.(replace|href)\s*=?\s*\(?['"]\.\/clie\.html/.test(seite),
+      'und es gibt keinen Sprung, der den Bereich verließe');
+    pruefe(!!rahmen && ids.indexOf(rahmen[1]) >= 0,
+      'das Ziel „' + ((rahmen && rahmen[1]) || '—') + '“ steht wirklich in CL_APPS — kein Sprung ins Leere');
     pruefe(fs.existsSync(path.join(ORDNER, 'clie.html')),
-      'clie.html, auf das die Hülle zeigt, liegt daneben');
+      'clie.html, das die Hülle einbettet, liegt daneben');
 
-    /* Nur als installierte App weiterleiten. Springt sie immer, kann man sie
-       nie installieren — Chrome hat die Seite verlassen, bevor das Menü aufgeht. */
+    /* Installieren ohne Menüsuche, und der Service Worker von CLIE. */
+    pruefe(/beforeinstallprompt/.test(seite), 'ein Installieren-Knopf hängt an beforeinstallprompt');
     pruefe(/display-mode: standalone/.test(seite),
-      'die Weiterleitung hängt an display-mode: standalone');
-    pruefe(/if \(alsApp\) \{ window\.location\.replace/.test(seite),
-      'und springt nur dann — im Browser bleibt die Hülle stehen');
+      'der Hinweis erscheint nur im Browser, nicht in der installierten App');
+    pruefe(/register\('\.\/sw-clie\.js', \{ scope: '\.\/clie' \}\)/.test(seite),
+      'die Hülle meldet den Service Worker von CLIE an, keinen eigenen');
 
-    pruefe(new RegExp('rel="manifest" href="\\./' + name + '\\.webmanifest"').test(seite),
+    pruefe(new RegExp('rel="manifest" href="\\./' + name + '\\.webmanifest').test(seite),
       'die Hülle verweist auf ihr eigenes Manifest');
 
     const groesse = f => { const b = fs.readFileSync(path.join(ORDNER, f));
@@ -11983,6 +11997,9 @@ function huellenTest() {
     }
     pruefe((mf.icons || []).some(i => i.purpose === 'maskable'),
       'ein maskierbares Symbol ist dabei — sonst schneidet der Launcher ab');
+
+    /* Und die Hülle darf CLIE nicht im Weg stehen */
+    pruefe(mf.id !== './clie.html', 'die Kennung ist nicht die von CLIE');
   }
 }
 

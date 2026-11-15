@@ -1,5 +1,5 @@
 /* ============================================================
-   huellen.js — kleine Hüllen für einzelne CLIE-Apps
+   huellen.js — kleine Hüllen für einzelne CLIE-Apps      1.2.0
 
      node huellen.js lesezeichen desk sammlungen
 
@@ -10,17 +10,24 @@
      <name>-512.png
      <name>-512-maskierbar.png
 
-   Danach lässt sie sich wie jede PWA installieren und ins Dock ziehen.
+   Nach dem Muster von todo.html / desk.html / datebook.html (1.1.0),
+   die auf dem Pixel nachweislich installierbar sind. Zwei Dinge daran
+   sind nicht Geschmack, sondern die Bedingung dafür:
+
+   1. Der Bereich ist die Datei selbst („./bookmarks.html“), nicht der
+      Ordner. Ein Bereich „./“ verschluckt clie.html — dann hält Chrome
+      die Hülle für eine Seite der schon installierten App und bietet
+      kein Installieren an. Umgekehrt darf die Hülle auch nicht im
+      Bereich von CLIE („./clie…“) liegen; genau daran scheiterte 1.0.0,
+      als die Dateien noch clie-todo.html hießen.
+
+   2. CLIE läuft im iframe, es wird nicht dorthin gesprungen. So
+      verlässt die App ihren Bereich nie und bleibt im eigenen Fenster
+      ohne Adresszeile. Gesprungen hieße: Chrome öffnet einen Tab.
 
    Name und Symbol holt das Skript aus CL_APPS und CL_BILD der gebauten
    clie.html — nichts wird doppelt gepflegt, und eine App, die es nicht
    gibt, bricht den Lauf ab, statt eine Hülle ins Leere zu bauen.
-
-   Warum die Hülle nicht sofort weiterleitet: Dann käme man nie zum
-   Installieren, weil Chrome die Seite schon verlassen hätte, bevor man
-   das Menü öffnen kann. Sie springt nur weiter, wenn sie bereits als
-   App gestartet wurde; im Browser zeigt sie einen Knopf und sagt, wie
-   man sie auf den Startbildschirm legt.
    ============================================================ */
 
 'use strict';
@@ -29,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
+const V = '1.2.0';
 const HIER = __dirname;
 const QUELLE = path.join(HIER, 'clie.html');
 
@@ -40,46 +48,73 @@ function slug(name) {
 }
 
 function huelleHtml(app, datei) {
-  const ziel = './clie.html#' + app.id;
-  return `<!doctype html>
+  return `<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${app.name}</title>
-<link rel="manifest" href="./${datei}.webmanifest">
 <meta name="theme-color" content="#1C2116">
-<link rel="apple-touch-icon" href="./${datei}-192.png">
+<title>${app.name} ${V}</title>
+<link rel="manifest" href="./${datei}.webmanifest?v=${V}">
+<link rel="icon" href="./${datei}-192.png?v=${V}">
+<link rel="apple-touch-icon" href="./${datei}-192.png?v=${V}">
+<!--
+  ${app.name} als eigene App (Hülle ${V}).
+  Die Seite liegt bewusst außerhalb des Bereichs von CLIE (./clie…) und ihr
+  eigener Bereich ist nur diese Datei. Darin läuft CLIE eingebettet, direkt
+  in ${app.name} — dieselbe Adresse, dieselben Daten.
+-->
 <style>
-html,body{height:100%;margin:0}
-body{background:#B9C4A6;color:#1C2116;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:18px;padding:24px;
-  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center}
-img{width:112px;height:112px}
-h1{font-size:25px;font-weight:600;margin:0}
-a.knopf{display:inline-block;background:#1C2116;color:#B9C4A6;text-decoration:none;
-  font-size:18px;padding:12px 26px;border-radius:3px}
-p{font-size:16px;line-height:1.4;max-width:34ch;color:#3B4433;margin:0}
+html,body{height:100%;margin:0;background:#B9C4A6;overflow:hidden}
+body{display:flex;flex-direction:column}
+#hinweis{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:#1C2116;color:#DCE4CC;font:15px/1.35 ui-monospace,"Courier New",monospace}
+#hinweis span{flex:1}
+#hinweis button{font:inherit;color:#1C2116;background:#DCE4CC;border:0;border-radius:12px;padding:4px 12px}
+#clie{flex:1 1 auto;width:100%;border:0;display:block}
+[hidden]{display:none !important}
 </style>
 </head>
 <body>
-  <img src="./${datei}-512.png" alt="">
-  <h1>${app.name}</h1>
-  <a class="knopf" href="${ziel}">Öffnen</a>
-  <p>Diese Seite ist nur die Hülle. Über das Chrome-Menü
-     „Zum Startbildschirm hinzufügen“ wird daraus ein eigenes Symbol,
-     das sich ins Dock ziehen lässt.</p>
+<div id="hinweis" hidden><span>${app.name} als App: Chrome-Menü ⋮ › Zum Startbildschirm hinzufügen › Installieren</span><button type="button" id="installieren" hidden>Installieren</button></div>
+<iframe id="clie" title="${app.name}" src="./clie.html#${app.id}" allow="clipboard-read; clipboard-write; fullscreen; screen-wake-lock; autoplay"></iframe>
 <script>
-/* Als installierte App: gleich durchspringen. Im Browser stehen
-   bleiben, sonst käme man nie zum Installieren. */
-(function () {
-  var alsApp = false;
+'use strict';
+var aufschub = null;
+
+function alsApp() {
   try {
-    alsApp = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
       || window.navigator.standalone === true;
-  } catch (e) { alsApp = false; }
-  if (alsApp) { window.location.replace('${ziel}'); }
-}());
+  } catch (e) { return false; }
+}
+
+function installieren() {
+  if (!aufschub) { return; }
+  aufschub.prompt();
+  aufschub.userChoice.then(function () {
+    aufschub = null;
+    document.getElementById('hinweis').hidden = true;
+  });
+}
+
+function startSeite() {
+  /* Als installierte App ist nichts zu zeigen — nur CLIE. */
+  if (!alsApp()) {
+    document.getElementById('hinweis').hidden = false;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      aufschub = e;
+      document.getElementById('installieren').hidden = false;
+    });
+    document.getElementById('installieren').addEventListener('click', installieren);
+  }
+  /* Derselbe Service Worker und Bereich wie CLIE — die Hülle legt keinen eigenen an. */
+  if (navigator.serviceWorker && /^https?:/.test(window.location.protocol)) {
+    navigator.serviceWorker.register('./sw-clie.js', { scope: './clie' }).catch(function () { return null; });
+  }
+}
+startSeite();
 </script>
 </body>
 </html>
@@ -91,19 +126,20 @@ function manifest(app, datei) {
     id: './' + datei + '.html',
     name: app.name,
     short_name: app.name,
-    description: app.was || ('CLIE — ' + app.name),
+    description: app.was || (app.name + ' aus CLIE als eigene App — dieselben Daten wie CLIE.'),
     lang: 'de',
     start_url: './' + datei + '.html',
-    /* Muss clie.html einschließen, sonst verlässt der Sprung die App
-       und landet in einem Browser-Tab mit Adresszeile. */
-    scope: './',
+    /* Nur diese eine Datei. Ein weiterer Bereich verschluckt clie.html und
+       Chrome hält die Hülle dann für CLIE selbst — dann kein Installieren. */
+    scope: './' + datei + '.html',
     display: 'standalone',
+    orientation: 'portrait',
     background_color: '#B9C4A6',
     theme_color: '#1C2116',
     icons: [
-      { src: './' + datei + '-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: './' + datei + '-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: './' + datei + '-512-maskierbar.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      { src: './' + datei + '-192.png?v=' + V, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: './' + datei + '-512.png?v=' + V, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: './' + datei + '-512-maskierbar.png?v=' + V, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
     ]
   }, null, 2) + '\n';
 }
@@ -141,6 +177,14 @@ function manifest(app, datei) {
     await b.close();
     process.exit(1);
   }
+  /* Eine Hülle, die „clie…“ hieße, läge im Bereich von CLIE — der Fehler
+     aus 1.0.0. Lieber hier abbrechen als auf dem Gerät scheitern. */
+  const imBereich = wunsch.filter(id => /^clie/.test(slug(apps.filter(a => a.id === id)[0].name)));
+  if (imBereich.length) {
+    console.log('Abbruch: der Dateiname läge im Bereich von CLIE: ' + imBereich.join(', '));
+    await b.close();
+    process.exit(1);
+  }
 
   await seite.evaluate(() => {
     document.documentElement.className = 'schema-wb';
@@ -172,7 +216,7 @@ function manifest(app, datei) {
 
     fs.writeFileSync(path.join(HIER, datei + '.html'), huelleHtml(app, datei), 'utf8');
     fs.writeFileSync(path.join(HIER, datei + '.webmanifest'), manifest(app, datei), 'utf8');
-    console.log('  ' + datei + '.html  ·  ' + datei + '.webmanifest  ·  3 Symbole   -> #' + id);
+    console.log('  ' + datei + '.html  ·  ' + datei + '.webmanifest  ·  3 Symbole   -> #' + id + '  (Hülle ' + V + ')');
   }
 
   await b.close();
