@@ -8780,37 +8780,6 @@ function typReihenfolgeTest() {
 }
 
 
-function manifestTest() {
-  console.log('\n163. Manifest: zeigt die Notiz „Manifest“ aus dem Memo Pad, nur zum Lesen; Categories im Menü (0.96.0)');
-  if (!CL) { return; }
-  const S = pmFrisch();
-  const q = SKRIPT;
-  pruefe(/M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen) && !S.CL_BILD.manifest && !/stroke-linecap="round"/.test(S.CL_BILD.routinen), 'Symbol Roots: zwei gekreuzte Bänder mit geraden Schnittkanten (0.109.2)');
-  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots' && S.clApp('kategorien').raster !== false, '0.109.0: Manifest keine eigene App mehr, Categories wieder auf dem Start');
-  pruefe(/menueWahl\(\\'kategorien\\'\)/.test(q) && /if \(was === 'kategorien'\) \{ oeffne\('kategorien'\); return; \}/.test(q), 'Categories im Menü ≡');
-  S.oeffne('uebersicht');
-  pruefe(/oeffne\('routinen'\)/.test(inhalt()) && !!S.CL_BILD.routinen, 'Roots auf dem Start, mit eigenem Symbol');
-  /* Ohne Notiz: ein Hinweis, kein Fehler */
-  S.DB.gedanken = (S.DB.gedanken || []).filter(g => String(g.titel || '').trim().toLowerCase() !== 'manifest');
-  S.oeffne('manifest');
-  pruefe(/Noch kein Manifest/.test(inhalt()), 'ohne Notiz „Manifest“: Hinweis statt Fehler');
-  /* Mit Notiz: Zeilen, Auszeichnung, keine Sterne */
-  S.DB.gedanken.push({ id: 'mf1', titel: 'Manifest', text: 'Zeile **eins**\nZeile zwei', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
-  /* Aus dem Memo Pad kommend darf das Manifest nicht im Schreiben-Zustand öffnen (0.96.1) */
-  S.oeffne('memo'); S.cl.memo.schreiben = true;
-  S.oeffne('manifest');
-  pruefe(S.cl.memo.schreiben === false && !/memoFeld/.test(inhalt()), 'Manifest öffnet in der Lesen-Ansicht, nicht im Schreiben');
-  const h = inhalt();
-  pruefe((h.match(/<p style="margin:0">/g) || []).length === 2 && /eins/.test(h) && !/\*\*/.test(h), 'Notiz wird Zeile für Zeile angezeigt, ohne rohe Sterne');
-  pruefe(/manZoom\(-1\)/.test(S.document.getElementById('fuss').innerHTML) && /manZoom\(1\)/.test(S.document.getElementById('fuss').innerHTML), 'unten: A− und A+ (Schrift)');
-  /* Lesen statt Quelltext (0.96.2): Überschrift, Tabelle, Linie, Kursiv */
-  S.DB.gedanken = S.DB.gedanken.filter(g => g.id !== 'mf1');
-  S.DB.gedanken.push({ id: 'mf2', titel: 'Manifest', text: '# Regeln\n| Nr. | Regel |\n| --- | --- |\n| 1 | *Ruhe* |\n---\nText', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
-  S.oeffne('manifest');
-  const r = inhalt();
-  pruefe(/<h2[^>]*>Regeln<\/h2>/.test(r) && /<table[^>]*><tr><th[^>]*>Nr\.<\/th>/.test(r) && /<i>Ruhe<\/i>/.test(r) && !/<hr/.test(r) && !/\| ---|# Regeln|\*Ruhe/.test(r), 'Notiz wird gelesen: Überschrift, Tabelle, Kursiv — kein Quelltext, --- ist ein Seitenumbruch (0.97.1)');
-}
-
 function verweisEditTest() {
   console.log('\n166. Schreiben: Tabellenzeilen bleiben bearbeitbar; Verweise und Links sind im Editor als Einheit erhalten und kommen unverändert zurück (0.97.2)');
   if (!CL) { return; }
@@ -8917,58 +8886,6 @@ function janeinFilterTest() {
   pruefe(!S.saPasst(s, { werte: { u: true } }, { feld: 'u', op: 'gleich', wert: 'falsch' }), 'wahr + ist „falsch“: trifft nicht');
   pruefe(S.saPasst(s, { werte: { u: true } }, { feld: 'u', op: 'ungleich', wert: 'falsch' }), 'wahr + ist nicht „falsch“: trifft');
   S.saFeld = orig;
-}
-
-function manifestFussTest() {
-  console.log('\n167. Manifest: Blättern in der Fußzeile mit langen Knöpfen, Seitenzahl dort; Tabellenzellen enger (0.97.3)');
-  if (!CL) { return; }
-  const S = pmFrisch();
-  S.DB.gedanken = (S.DB.gedanken || []).filter(g => g.id !== 'mf4');
-  S.DB.gedanken.push({ id: 'mf4', titel: 'Manifest', text: '| Nr. | Regel |\n| --- | --- |\n| 1 | Eins |\nText', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
-  S.oeffne('manifest');
-  pruefe(!/Seite \d+ von/.test(inhalt()), 'die Seitenleiste steht nicht mehr im Inhalt, sondern unten');
-  const fuss = S.document.getElementById('fuss').innerHTML;
-  pruefe(/manZoom\(-1\)/.test(fuss) && /manZoom\(1\)/.test(fuss), 'A− und A+ bleiben unten');
-  S.cl.man.anzahl = 3; S.cl.man.seite = 1;
-  const f = S.manifestFussHtml();
-  pruefe(/manBlaettern\(-1\)/.test(f) && /manBlaettern\(1\)/.test(f) && /Seite 2 von 3/.test(f), 'bei mehreren Seiten: ◀ Seite 2 von 3 ▶ unten');
-  pruefe(f.indexOf('flex:1;min-height:40px;font:inherit') >= 0, 'Blätter-Knöpfe lang: flex 1, mindestens 40 px hoch');
-  S.cl.man.seite = 0; S.cl.man.anzahl = 1;
-  pruefe(!/manBlaettern/.test(S.manifestFussHtml()), 'eine Seite: keine Blätter-Knöpfe');
-  S.cl.man.anzahl = 1;
-  const z = S.manZeile('| 1 | Eins |', false);
-  pruefe(z.indexOf('padding:1px 4px') >= 0 && z.indexOf('line-height:1.15') >= 0, 'Tabellenzellen enger (1 px, 4 px, Zeilenhöhe 1,15)');
-  pruefe(typeof S.manNeuZeichnen === 'function', 'Blättern, Schrift und Nachrechnen zeichnen die Fußzeile mit');
-}
-
-function manifestSeitenTest() {
-  console.log('\n164. Manifest: Seiten nach der echten Höhe; ◀ ▶ und Wischen; Tabellenkopf auf jeder Seite (0.97.0)');
-  if (!CL) { return; }
-  const S = pmFrisch();
-  /* Die Seiten werden aus gemessenen Höhen gefüllt — geprüft an der reinen Rechenfunktion */
-  pruefe(JSON.stringify(S.manPacken([{ h: 30 }, { h: 30 }, { h: 30 }], 70)) === '[[0,1],[2]]', 'Seite voll bis zur Höhe, dann die nächste');
-  pruefe(JSON.stringify(S.manPacken([{ tab: 1, h: 10, kopfH: 20 }, { tab: 1, h: 10, kopfH: 20 }, { tab: 1, h: 10, kopfH: 20 }], 45)) === '[[0,1],[2]]', 'Tabelle: Kopfzeile wird auf der neuen Seite wieder gebraucht');
-  pruefe(JSON.stringify(S.manPacken([{ h: 30 }, { h: 100 }, { h: 10 }], 50)) === '[[0],[1],[2]]', 'Ein zu großes Stück steht allein auf einer Seite');
-  /* Ohne Layout (Test) passt alles auf eine Seite: keine Leiste */
-  S.__ablage = S.__ablage || {};
-  S.DB.gedanken = (S.DB.gedanken || []).filter(g => g.id !== 'mf3');
-  S.DB.gedanken.push({ id: 'mf3', titel: 'Manifest', text: 'Eins\nZwei\nDrei', kontext: 'privat', bereich: '', ordnung: 1, geaendert: 1 });
-  S.oeffne('manifest');
-  pruefe(!/Seite \d+ von/.test(inhalt()) && (inhalt().match(/class="ma-z"|<p style="margin:0">/g) || []).length === 3, 'ohne Höhe: alles auf einer Seite, ohne Blätterleiste');
-  /* Blättern: nur innerhalb der Seitenzahl */
-  S.manBlaettern(1);
-  pruefe(S.cl.man.seite === 0, 'Blättern über die letzte Seite hinaus bleibt auf der letzten');
-  pruefe(/manBlaettern\(-1\)/.test(SKRIPT) && /manBlaettern\(dx < 0/.test(SKRIPT), 'Wischen im Manifest blättert ebenfalls');
-  pruefe(/window\.addEventListener\('resize'/.test(SKRIPT), 'Drehen oder Größenänderung rechnet die Seiten neu');
-  /* Schrift und harter Umbruch (0.97.1) */
-  pruefe(S.cl.man.zoom === 18 && S.MAN_STUFEN.indexOf(18) >= 0, 'Manifest: Standardschrift 18 px');
-  S.manZoom(1);
-  pruefe(S.cl.man.zoom === 20, 'A+ macht die Schrift größer, Stufe für Stufe');
-  S.manZoom(-5);
-  pruefe(S.cl.man.zoom === 14, 'A− bleibt an der kleinsten Stufe stehen');
-  S.cl.man.zoom = 18;
-  pruefe(JSON.stringify(S.manPacken([{ h: 10 }, { umbruch: true }, { h: 10 }], 100)) === '[[0],[2]]', '--- erzwingt einen Seitenumbruch');
-  pruefe(JSON.stringify(S.manPacken([{ umbruch: true }, { h: 10 }], 100)) === '[[1]]', 'ein Umbruch am Anfang macht keine leere Seite');
 }
 
 function syncWocheTest() {
@@ -10124,259 +10041,6 @@ function pmRoutineDiesmalTest() {
   S.cl.pm.fenster = null; S.cl.rt.fenster = null; S.cl.aufklapp = ''; S.cl.pm.wahl = ''; S.cl.app = 'uebersicht';
 }
 
-/* Fehlertyp: ein Overlay, das nicht kommt, zu oft kommt oder nicht weiterführt. Dazu der
-   Tageszähler: ein Tag daneben und „Tag 12 von 56“ ist falsch, und er darf vor dem Start
-   und nach dem letzten Tag gar nichts zeigen. Außerdem muss ein fälliger Coach-Termin mit
-   dem gelesenen Manifest erledigt sein, sonst kommt die Sperre zweimal hintereinander.
-   Seit 0.108.0 kommen alle Zahlen aus dem Programm — der Test setzt sie deshalb dort. */
-function upTest() {
-  console.log('\n204. Umprogrammierung: Programm über 56 Tage, drei Anzeigen am Tag, dann das Manifest (0.107.0, Programm seit 0.108.0)');
-  if (!CL) { return; }
-  const S = CL;
-  frisch();
-  const echtIso = S.isoDatum;
-  const falschesHeute = (is) => { S.isoDatum = (d) => (d ? echtIso(d) : is); };
-  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
-  const p = { id: 'up-t', typ: 'umprog', name: 'Umprogrammierung', beginn: '2026-11-04', tage: 56, jeTag: 3,
-              fenster: 3, sekunden: 5, notiz: 'Umprogrammierung', manifest: true, kalender: 'coach',
-              kalFenster: 60, notizen: {}, angelegt: '2026-11-04' };
-  S.DB.kurs.push(p);
-
-  /* Der Tageszähler */
-  pruefe(S.upTagVon(p, '2026-11-04') === 1, 'der 04.11. ist Tag 1');
-  pruefe(S.upTagVon(p, '2026-11-15') === 12, 'der 15.11. ist Tag 12');
-  pruefe(S.upTagVon(p, '2026-12-29') === 56, 'der 29.12. ist Tag 56');
-  pruefe(S.upTagVon(p, '2026-11-03') === 0, 'vor dem Start läuft nichts');
-  pruefe(S.upTagVon(p, '2026-12-30') === 0, 'nach Tag 56 läuft nichts');
-  pruefe(S.upTagVon({ beginn: '2026-11-04', tage: 14 }, '2026-11-20') === 0, 'die Dauer kommt aus dem Programm, nicht aus dem Code');
-
-  /* Die Zeitfenster */
-  pruefe(S.upFenster('07:30', p) === 'frueh' && S.upFenster('12:00', p) === 'mittag' && S.upFenster('20:15', p) === 'abend', 'drei Fenster am Tag: früh, mittag, abend');
-  pruefe(S.upFenster('10:59', p) === 'frueh' && S.upFenster('11:00', p) === 'mittag' && S.upFenster('15:59', p) === 'mittag' && S.upFenster('16:00', p) === 'abend', 'die Grenzen liegen bei 11 und 16 Uhr');
-  pruefe(S.upFensterListe({ fenster: 1 }).length === 1 && S.upFensterListe({ fenster: 4 }).length === 4, 'eine bis vier Anzeigen am Tag sind einstellbar');
-  pruefe(S.upMarke('2026-11-15', '09:00', p) !== S.upMarke('2026-11-15', '13:00', p), 'jedes Fenster hat seine eigene Marke');
-  pruefe(S.upMarke('2026-11-15', '09:00', p) !== S.upMarke('2026-11-16', '09:00', p), 'und jeder Tag seine eigene');
-
-  /* Die Regeln aus der Notiz */
-  S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Typ: Notiz\nEins\n\n- Zwei\nDrei\nVier\nFünf\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
-  const alle = S.upRegeln(p);
-  pruefe(alle.length === 5 && alle[0] === 'Eins' && alle[1] === 'Zwei', 'eine Regel je Zeile, ohne Leerzeilen, Striche und Typ-Zeile');
-  pruefe(S.upTagesRegeln(1, alle, p).join('|') === 'Eins|Zwei|Drei', 'Tag 1 zeigt die ersten drei');
-  pruefe(S.upTagesRegeln(2, alle, p).join('|') === 'Vier|Fünf|Eins', 'Tag 2 macht weiter und läuft um');
-  pruefe(S.upTagesRegeln(1, alle, { jeTag: 2 }).join('|') === 'Eins|Zwei', 'die Zahl der Regeln kommt aus dem Programm');
-  pruefe(S.upTagesRegeln(0, alle, p).length === 0, 'außerhalb der Laufzeit gibt es keine');
-  pruefe(S.upRegeln({ notiz: 'Gibt es nicht' }).length === 0, 'welche Notiz gilt, steht ebenfalls im Programm');
-
-  /* Das Overlay beim Öffnen */
-  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 2, geaendert: 1 });
-  falschesHeute('2026-11-15');
-  pruefe(S.upAktiv() === p, 'an diesem Tag läuft das Programm');
-  pruefe(S.upPruefen() === true, 'am Tag 12 kommt das Overlay');
-  const marke = S.cl.up.marke;
-  pruefe(S.cl.aufklapp === 'umprog' && S.cl.up.tag === 12, 'als Fenster, mit dem Tageszähler');
-  const h = S.upHtml();
-  pruefe(h.indexOf('Tag 12 von 56') >= 0, 'die Kopfzeile nennt Tag und Ziel');
-  pruefe(h.indexOf('Neue Gewohnheiten mit neuen Regeln') >= 0, 'die Überschrift steht darunter');
-  pruefe(S.cl.up.regeln.length === 3, 'drei Regeln stehen darin');
-  pruefe(h.indexOf('antippen zum Schließen') >= 0, 'und der Hinweis, was danach kommt');
-  pruefe(S.upPruefen() === false, 'ein zweites Mal im selben Fenster kommt es nicht');
-  pruefe(S.upGelesenAm('2026-11-15', p).join(',') === 'false,false,false', 'gelesen ist noch keines der drei Fenster');
-
-  /* Antippen schließt — seit 0.122.0 kommt nichts mehr hinterher */
-  const heute = '2026-11-15';
-  S.upFertig();
-  pruefe(!S.cl.up.an && !S.cl.aufklapp && S.cl.app !== 'manifest', 'nach dem Overlay geht es einfach weiter');
-  pruefe(S.DB.einstellungen.manifestGelesen[marke] === heute, 'die Marke steht in der Datenbank, gilt also auf allen Geräten');
-  pruefe(S.upPruefen() === false, 'und das Overlay kommt im selben Fenster nicht wieder');
-  pruefe(S.upGelesenAm(heute, p).filter((x) => x).length === 1, 'ein Fenster des Tages gilt als gelesen');
-
-  /* Außerhalb der Laufzeit und ohne Notiz passiert nichts */
-  falschesHeute('2026-12-30');
-  pruefe(S.upAktiv() === null && S.upPruefen() === false, 'nach Tag 56 kommt kein Overlay mehr');
-  falschesHeute('2026-11-03');
-  pruefe(S.upPruefen() === false, 'vor dem 04.11. auch nicht');
-  falschesHeute('2026-11-16');
-  S.DB.gedanken = S.DB.gedanken.filter((g) => g.titel !== 'Umprogrammierung');
-  pruefe(S.upPruefen() === false, 'ohne die Notiz mit den Regeln bleibt es still');
-
-  /* Ohne Manifest-Notiz schließt das Overlay einfach */
-  S.DB.gedanken = [];
-  S.DB.kurs = [p];
-  S.DB.einstellungen.manifestGelesen = {};
-  S.cl.up.an = false; S.cl.man.pflicht = ''; S.cl.man.frei = true;
-  falschesHeute('2026-11-20');
-  S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Eins\nZwei\nDrei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
-  pruefe(S.upPruefen() === true && S.upHtml().indexOf('antippen zum Schließen') >= 0, 'ohne Manifest-Notiz schließt das Overlay nur');
-  S.upFertig();
-  pruefe(!S.cl.aufklapp && !S.cl.man.pflicht, 'und sperrt nichts');
-  pruefe(S.upPruefen() === false, 'abgehakt ist es trotzdem');
-
-  /* Kein Programm: gar nichts */
-  S.DB.kurs = [];
-  S.DB.einstellungen.manifestGelesen = {};
-  S.cl.up.an = false;
-  pruefe(S.upAktiv() === null && S.upPruefen() === false, 'ohne Programm kommt kein Overlay');
-
-  /* Das Nachziehen aus 0.107 */
-  const neu = S.upNachziehen();
-  pruefe(!!neu && neu.beginn === '2026-11-04' && neu.tage === 56, 'wer schon eine Notiz hat, bekommt sein Programm nachgezogen');
-  pruefe(S.upNachziehen() === null, 'ein zweites Mal legt es nichts an');
-
-  /* Die Wächter in der Quelle */
-  pruefe(SKRIPT.indexOf("cl.aufklapp === 'umprog'") >= 0, 'das Overlay hängt im Aufklapp');
-  pruefe(/function aufklappZu\(\)\s*\{[\s\S]{0,200}umprog'\s*\)\s*\{\s*upFertig\(\)/.test(SKRIPT), 'das Antippen führt weiter, nicht ab');
-  pruefe(SKRIPT.split('function upPruefen(').length === 2, 'upPruefen gibt es genau einmal');
-  pruefe(SKRIPT.split('function upFertig(').length === 2, 'upFertig gibt es genau einmal');
-  pruefe(/upPruefen\(\);/.test(SKRIPT) && !/manPflichtPruefen/.test(SKRIPT), 'beim Start kommt die Umprogrammierung; die Pflichtlektüre gibt es seit 0.122.0 nicht mehr');
-  pruefe(SKRIPT.indexOf('var UP_START') < 0 && SKRIPT.indexOf('var MAN_FENSTER_MIN') < 0, 'die festen Zahlen aus 0.107 stehen nicht mehr im Code');
-
-  S.isoDatum = echtIso;
-  S.cl.up.an = false; S.cl.up.marke = ''; S.cl.up.wahl = ''; S.cl.man.pflicht = ''; S.cl.man.frei = true; S.cl.man.seite = 0;
-  S.DB.kurs = []; S.termineNachTag = {}; S.kalenderListe = []; S.cl.app = 'uebersicht';
-}
-
-/* Fehlertyp: eine Dokumentation, die nicht dokumentiert. Konkret: Unterpunkte, die den
-   Tag fälschlich als geschafft zählen (oder nie), eine Prozentzahl statt der Kette, eine
-   Tagesnotiz, die am falschen Ort landet oder für beliebige Tage schreibbar ist, und
-   Einstellungen, die zwar gespeichert werden, aber nirgends wirken. */
-function upSichtTest() {
-  console.log('\n206. Routines: die Sicht Umprogrammierung mit Gewohnheiten, Unterpunkten und Tagesnotiz (0.108.0)');
-  if (!CL) { return; }
-  const S = CL;
-  frisch();
-  const echtIso = S.isoDatum;
-  const heute = '2026-11-15';
-  S.isoDatum = (d) => (d ? echtIso(d) : heute);
-  if (!Array.isArray(S.DB.kurs)) { S.DB.kurs = []; }
-  const p = { id: 'up-s', typ: 'umprog', name: 'Umprogrammierung', beginn: '2026-11-04', tage: 56, jeTag: 3,
-              fenster: 3, sekunden: 5, notiz: 'Umprogrammierung', manifest: true, kalender: 'coach',
-              kalFenster: 60, notizen: {}, angelegt: '2026-11-04' };
-  S.DB.kurs.push(p);
-  S.DB.gedanken.push({ id: 'up', titel: 'Umprogrammierung', text: 'Eins\nZwei\nDrei\nVier\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
-
-  /* Die Sicht */
-  S.oeffne('routinen');
-  S.rtSichtSetzen('umprog');
-  pruefe(S.cl.rt.sicht === 'umprog', 'die vierte Sicht lässt sich wählen');
-  let h = inhalt();
-  pruefe(/Tag 12 von 56/.test(h), 'sie nennt den Tag im Programm');
-  pruefe(/up-balken/.test(h) && /up-raster/.test(h), 'mit Balken und Verlauf');
-  pruefe(/Heute gelesen/.test(h) && /Eins|Zwei|Drei|Vier/.test(h), 'und den Regeln des Tages');
-  pruefe(/Umprogrammierung/.test(S.rtWahlHtml()) && S.rtWahlHtml().indexOf('Tag 12') >= 0, 'im ▼ steht sie mit dem Tageszähler');
-
-  /* Neu hängt die Regel ans Programm — Titel und Beschreibung, kein Wenn-dann (0.108.1) */
-  S.gwNeu();
-  pruefe(S.cl.gw.fenster && S.cl.gw.fenster.programm === p.id, '„Neu“ hängt die Regel an das Programm');
-  S.document.getElementById('gwTitel').value = 'Erst das Wichtige, dann das Laute';
-  S.document.getElementById('gwBesch').value = 'Vor dem ersten Blick in den Posteingang.';
-  S.gwSpeichern();
-  const g = S.gwAlle('ueben', p.id)[0];
-  pruefe(!!g && g.titel === 'Erst das Wichtige, dann das Laute' && g.beschreibung === 'Vor dem ersten Blick in den Posteingang.', 'sie wird mit Titel und Beschreibung gespeichert');
-  pruefe(!('wenn' in g) && !('dann' in g) && !('schritte' in g), 'ohne Wenn-dann und ohne Unterpunkte');
-  pruefe(S.gwAlle('ueben', 'anderes').length === 0, 'und zählt nur zu ihrem eigenen Programm');
-
-  /* Die Kette bleibt binär */
-  pruefe(S.gwGeschafft(g, heute) === false, 'noch nicht abgehakt');
-  S.gwTagUm(g.id, heute);
-  pruefe(S.gwGeschafft(g, heute) === true && g.tage.indexOf(heute) >= 0, 'abgehakt: der Tag steht in der Kette');
-  S.gwTagUm(g.id, '2026-11-05');
-  pruefe(g.tage.indexOf('2026-11-05') < 0, 'ältere Tage lassen sich nicht nachträglich abhaken');
-
-  /* Titel groß, Beschreibung klein darunter — und nirgends eine Prozentzahl */
-  S.cl.gw.wahl = g.id;
-  S.inhaltZeichnen();
-  h = inhalt();
-  pruefe(/Erst das Wichtige, dann das Laute<small>Vor dem ersten Blick/.test(h), 'die Beschreibung steht klein unter der Regel');
-  pruefe(h.indexOf('%') < 0 && h.indexOf('gw-schritt') < 0, 'keine Prozentzahl und keine Unterpunkte');
-  /* 0.108.2: eine lange Beschreibung darf die Liste nicht zur Wand machen */
-  S.cl.gw.wahl = '';
-  S.inhaltZeichnen();
-  h = inhalt();
-  pruefe(/Erst das Wichtige, dann das Laute/.test(h), 'in der Liste steht die Regel');
-  pruefe(h.indexOf('Vor dem ersten Blick') < 0, 'die Beschreibung bleibt weg, bis die Regel angetippt wird');
-  g.beschreibung = 'Sehr langer Text. '.repeat(20);
-  S.inhaltZeichnen();
-  pruefe(inhalt().indexOf('Sehr langer Text') < 0, 'auch eine sehr lange Beschreibung bläht die Zeile nicht auf');
-  g.beschreibung = 'Vor dem ersten Blick in den Posteingang.';
-  S.inhaltZeichnen();
-
-  /* Das Nachziehen alter Gewohnheiten */
-  S.DB.kurs.push({ id: 'gw-alt', typ: 'gewohnheit', wenn: 'nach dem Essen', dann: 'Tisch abräumen', zustand: 'ueben', tage: [], angelegt: heute, rang: 9, kontext: 'privat' });
-  pruefe(S.gwNachziehen() === 1, 'eine alte Gewohnheit wird umgezogen');
-  const alt = S.gwFinden('gw-alt');
-  pruefe(alt.titel === 'Tisch abräumen' && alt.beschreibung === 'nach dem Essen', 'aus „dann“ wird der Titel, aus „wenn“ die Beschreibung');
-  pruefe(!('wenn' in alt) && !('dann' in alt) && S.gwNachziehen() === 0, 'die alten Felder sind weg und bleiben es');
-  S.DB.kurs = S.DB.kurs.filter((x) => x.id !== 'gw-alt');
-
-  /* Der Verlauf */
-  pruefe(S.upTagStand(p, heute) === 'voll', 'ein Tag mit allem abgehakt ist voll');
-  pruefe(S.upTagStand(p, '2026-11-05') === 'leer', 'ein Tag ohne alles ist leer');
-
-  /* Die Tagesnotiz */
-  S.upTagOeffnen(heute);
-  pruefe(S.cl.aufklapp === 'uptag' && S.cl.up.tagF.schreiben === true, 'heute lässt sich eine Notiz schreiben');
-  S.document.getElementById('upTagText').value = 'Lief gut.';
-  S.upTagSichern();
-  pruefe(p.notizen[heute] === 'Lief gut.', 'sie hängt am Programm, nicht am Gerät');
-  S.upTagOeffnen('2026-11-14');
-  pruefe(S.cl.up.tagF.schreiben === true, 'gestern geht auch noch');
-  S.upTagOeffnen('2026-11-05');
-  pruefe(S.cl.up.tagF.schreiben === false && S.upTagHtml().indexOf('upTagSichern') < 0, 'ältere Tage nur zum Lesen');
-  S.aufklappZu();
-  S.inhaltZeichnen();
-  pruefe(/class="[a-z]* ?notiz"/.test(inhalt()) && S.upRasterHtml(p, 12, 56).indexOf('notiz') >= 0, 'ein Tag mit Notiz ist im Verlauf erkennbar');
-
-  /* Die Einstellungen */
-  S.upEinstellungen();
-  pruefe(S.cl.aufklapp === 'umprogramm', '„Programm…“ öffnet die Einstellungen');
-  S.document.getElementById('upName').value = 'Umprogrammierung';
-  S.document.getElementById('upBeginn').value = '2026-11-04';
-  S.document.getElementById('upNotizT').value = 'Umprogrammierung';
-  S.document.getElementById('upDauer').value = '30';
-  S.document.getElementById('upJeTag').value = '2';
-  S.document.getElementById('upSek').value = '8';
-  S.document.getElementById('upKal').value = 'coach';
-  S.document.getElementById('upKalF').value = '60';
-  S.upWahl('fenster', 4);
-  S.upSpeichern();
-  pruefe(p.tage === 30 && p.jeTag === 2 && p.fenster === 4 && p.sekunden === 8, 'Dauer, Regeln, Anzeigen und Dauer landen im Datensatz');
-  pruefe(S.upFensterListe(p).length === 4 && S.upTagesRegeln(1, null, p).length === 2, 'und wirken sofort');
-  pruefe(S.upTagVon(p, '2026-12-29') === 0, 'die kürzere Laufzeit gilt');
-
-  /* Seit 0.122.0 ohne Pflichtlektüre: das Fenster hat die drei Felder dafür nicht mehr */
-  S.upEinstellungen();
-  const ff = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(!/Pflichtlektüre/.test(ff) && !/upKal"/.test(ff) && !/upKalF"/.test(ff),
-    'keine Wahl „Manifest als Pflichtlektüre“, kein Kalenderwort, keine Fensterlänge');
-  S.aufklappZu();
-
-  /* Zwei Programme nebeneinander */
-  const p2 = { id: 'up-s2', typ: 'umprog', name: 'Zweites', beginn: '2027-01-05', tage: 28, jeTag: 3, fenster: 3,
-               sekunden: 5, notiz: 'Umprogrammierung', notizen: {}, angelegt: heute };
-  S.DB.kurs.push(p2);
-  pruefe(S.upProgramme().length === 2 && S.upAktiv() === p, 'zwei Programme stehen nebeneinander, es läuft das passende');
-  S.isoDatum = (d) => (d ? echtIso(d) : '2027-01-10');
-  pruefe(S.upAktiv() === p2, 'im Januar läuft das zweite');
-
-  /* Löschen */
-  S.isoDatum = (d) => (d ? echtIso(d) : heute);
-  S.upEinstellungen(); S.upLoeschenFragen(); S.upLoeschen();
-  pruefe(!S.upFinden(p.id) && !!S.gwFinden(g.id), 'das Programm lässt sich löschen, die Gewohnheit bleibt');
-
-  /* Die Wächter in der Quelle */
-  pruefe(SKRIPT.split('function upSichtHtml(').length === 2, 'upSichtHtml gibt es genau einmal');
-  pruefe(SKRIPT.split('function gwNachziehen(').length === 2, 'gwNachziehen gibt es genau einmal');
-  pruefe(SKRIPT.indexOf('function gwSchritte(') < 0 && SKRIPT.indexOf('gwSchrittUm') < 0 && SKRIPT.indexOf('UP_SCHRITTE_MAX') < 0, '0.108.1: die Unterpunkte sind restlos zurückgebaut');
-  pruefe(SKRIPT.indexOf('gwWenn') < 0 && SKRIPT.indexOf('gwDann') < 0, 'und das Wenn-dann-Fenster ebenso');
-  pruefe(SKRIPT.indexOf('var GW_MAX = 8;') >= 0, 'die Obergrenze der Gewohnheiten steht bei acht');
-  pruefe(/RT_SICHTEN = \[\['manifest'\], ?/.test(SKRIPT) || /RT_SICHTEN = \[\['manifest'/.test(SKRIPT), 'das Manifest steht als erste Sicht im Vorrat der Reiter');
-
-  S.isoDatum = echtIso;
-  S.DB.kurs = []; S.cl.rt.sicht = 'routinen'; S.cl.gw.wahl = ''; S.cl.up.wahl = '';
-  S.cl.man.pflicht = ''; S.cl.man.frei = true;
-  S.kalenderListe = []; S.cl.app = 'uebersicht';
-}
-
 /* Fehlertyp: ein Link, der nur auf einem Gerät funktioniert. „onenote:“ gibt es nur am
    Windows-PC, das Telefon braucht die https-Form — wählt CLIE die falsche, merkt man es
    erst unterwegs, wenn nichts passiert. Dazu der zweite Fehlertyp: ein Cluster, der nicht
@@ -10942,8 +10606,8 @@ function verknuepfungTest() {
   pruefe((mf.shortcuts || []).map((k) => k.url).filter((u, i, l) => l.indexOf(u) === i).length === 4, 'keine zweimal dieselbe App');
 
   /* Der Anker öffnet die App */
-  pruefe(/clAnker && \(clApp\(clAnker\)/.test(SKRIPT), 'beim Start wird der Anker ausgewertet');
-  pruefe(/clApp\(clAnker\) \|\| clAnker === 'manifest'/.test(SKRIPT), 'und #manifest funktioniert weiter');
+  pruefe(/clAnker && clApp\(clAnker\)/.test(SKRIPT), 'beim Start wird der Anker ausgewertet');
+  pruefe(!/clAnker === 'manifest'/.test(SKRIPT), 'der Sonderweg #manifest ist weg (0.129.0)');
   pruefe(SKRIPT.indexOf("hash) || '') === '#coach'") < 0, 'die fest verdrahteten Anker sind weg');
   ['aufgaben', 'kalender', 'memo', 'routinen', 'rechner'].forEach((id) => {
     pruefe(!!S.clApp(id), 'die App ' + id + ' gibt es — ein Anker darauf führt irgendwohin');
@@ -11018,46 +10682,32 @@ function rueckbauTest() {
    Pflichtlektüre, die nun eine Sicht sperren muss statt einer App. Dazu das Raster, das
    mit einer App weniger ein Loch bekäme. */
 function leuchtturmTest() {
-  console.log('\n207. Roots: Manifest und Routines zusammengelegt, alte Wege führen weiter hin (0.109.0, Name seit 0.109.1)');
+  console.log('\n207. Roots nach dem Ausbau: nur noch Routinen und Gewohnheiten (0.129.0)');
   if (!CL) { return; }
   const S = CL;
   frisch();
-  S.DB.gedanken.push({ id: 'mf', titel: 'Manifest', text: 'Zeile eins\nZeile zwei\n', kontext: 'privat', ordnung: 1, geaendert: 1 });
 
-  /* Aus zwei Apps ist eine geworden */
-  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'das Manifest ist keine eigene App mehr');
+  /* Roots ist geblieben, Manifest und Umprogrammierung sind weg */
+  pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'Roots gibt es, das Manifest nicht');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
   pruefe(raster.length === 12 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
   pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
-  /* Der alte Weg führt in die Sicht */
-  S.oeffne('manifest');
-  pruefe(S.cl.app === 'routinen' && S.cl.rt.sicht === 'manifest' && S.manSicht() === true, "oeffne('manifest') führt in die Manifest-Sicht");
-  pruefe(/clAnker && \(clApp\(clAnker\)/.test(SKRIPT), 'der Link #manifest aus den Kalendereinträgen ebenso');
-  pruefe(/Zeile eins/.test(inhalt()), 'und dort steht der Text der Notiz');
-  pruefe(/manZoom\(1\)/.test(S.document.getElementById('fuss').innerHTML), 'mit der Schriftgröße in der Fußzeile');
-  pruefe(S.document.getElementById('katKnopf').textContent.indexOf('Manifest') >= 0, 'oben steht die Sicht, ohne Kategorie');
-
-  /* Das ▼ führt ohne Umweg weiter */
+  /* Das ▼ kennt nur noch drei Sichten */
+  pruefe(S.RT_SICHTEN.length === 3, 'drei Sichten: ' + S.RT_SICHTEN.map((x) => x[0]).join(', '));
+  pruefe(!S.RT_SICHTEN.some((x) => x[0] === 'manifest' || x[0] === 'umprog'), 'Manifest und Umprogrammierung stehen nicht mehr darin');
   const dd = S.rtWahlHtml();
-  pruefe(dd.indexOf("rtSichtSetzen('manifest')") >= 0 && dd.indexOf("rtSichtSetzen('manifest')") < dd.indexOf("rtSichtSetzen('gewohnheiten')"), 'im ▼ steht das Manifest oben');
-  S.rtSichtSetzen('gewohnheiten');
-  pruefe(!S.manSicht() && S.cl.app === 'routinen', 'von dort geht es direkt in die Gewohnheiten');
+  pruefe(dd.indexOf('Manifest') < 0 && dd.indexOf('Umprogrammierung') < 0, 'und tauchen im ▼ nicht auf');
 
-  /* Seit 0.122.0 sperrt nichts mehr: das Manifest ist eine Sicht wie jede andere */
+  /* Ein alter Weg darf nicht ins Leere führen */
   S.oeffne('manifest');
-  pruefe(S.manSicht(), 'das Manifest steht');
-  S.oeffne('kalender');
-  pruefe(!S.manSicht() && S.cl.app === 'kalender', 'eine andere App lässt sich jederzeit öffnen');
-  S.oeffne('manifest'); S.katUm();
-  pruefe(S.cl.aufklapp === 'rtwahl', 'und das ▼ öffnet');
-  S.aufklappZu();
-  pruefe(!/cl\.man\.pflicht|cl\.man\.frei/.test(SKRIPT), 'von der Pflichtlektüre ist kein Zustand übrig');
+  pruefe(S.cl.app === 'routinen', "oeffne('manifest') landet in Roots statt im Nichts");
+  pruefe(S.cl.rt.sicht !== 'manifest', 'und bleibt in einer Sicht, die es gibt');
 
-  /* Die Wächter in der Quelle */
-  pruefe(SKRIPT.split('function manSicht(').length === 2, 'manSicht gibt es genau einmal');
-  pruefe(!/cl\.app === 'manifest'/.test(SKRIPT), 'nirgends mehr ein Vergleich auf die alte App');
-  pruefe(!/cl\.app !== 'manifest'/.test(SKRIPT), 'auch nicht verneint');
+  /* Eine gespeicherte Sicht von früher darf die App nicht lahmlegen */
+  try { S.window.localStorage.setItem('clie-rt-sicht', 'umprog'); } catch (e) { /* egal */ }
+  S.rtSichtLaden();
+  pruefe(S.cl.rt.sicht === 'routinen', 'eine alte gespeicherte Sicht fällt auf Routinen zurück');
 
   S.cl.rt.sicht = 'routinen'; S.cl.app = 'uebersicht';
 }
@@ -11170,8 +10820,8 @@ function rueckbau122Test() {
   });
   pruefe(typeof S.coachTermine === 'undefined', 'die Liste der Coach-Termine ist weg');
   pruefe(!/cl\.man\.pflicht|cl\.man\.frei/.test(SKRIPT), 'und kein Zustand dafür');
-  pruefe(typeof S.manSicht === 'function' && typeof S.manifestHtml === 'function',
-    'das Manifest selbst bleibt — es steht in Roots und wird von Hand aufgeschlagen');
+  pruefe(typeof S.manSicht === 'undefined' && typeof S.manifestHtml === 'undefined',
+    'seit 0.129.0 ist auch das Manifest selbst draußen');
 
   /* ---- 3. Kein co…, iw…, lf…, einkauf… mehr ---- */
   ['co', 'iw', 'lf', 'einkauf'].forEach(p => {
@@ -11776,7 +11426,7 @@ function ankerTest() {
   const S = CL;
 
   /* Die Weiche beim Start: jeder App-Name wirkt als Anker */
-  pruefe(/clApp\(clAnker\) \|\| clAnker === 'manifest'/.test(SKRIPT),
+  pruefe(/clAnker && clApp\(clAnker\)/.test(SKRIPT),
     'die Weiche nimmt jeden App-Namen als Anker');
 
   /* Ein Ordner ist keine Seite, sondern ein Fenster: er setzt cl.ordner,
@@ -11913,6 +11563,69 @@ function deskPinTest() {
     pruefe(!/DB\.pinnwand\s*=\s*\(?DB\.pinnwand\s*\|\|\s*\[\]\)?\.filter/.test(WB_SKRIPT),
       'die Workbench filtert DB.pinnwand nirgends — ein Desk-Pin übersteht die Runde unversehrt');
   }
+}
+
+/* Fehlertyp: ein Ausbau, der eine Ruine hinterlässt. Beim Entfernen der
+   Umprogrammierung (0.129.0) fiel in rtWahlHtml die Zeile „var p = upAktiv();“
+   weg, eine spätere Zeile benutzte „p“ aber weiter. node --check sieht das
+   nicht (die Syntax stimmt), pruefe_rufe.py auch nicht (es prüft Aufrufe, keine
+   Variablen) — erst beim Antippen des ▼ in Roots brach die Seite mit
+   „p is not defined“ ab. Diese Kategorie zeichnet deshalb jede App und jede
+   Sicht einmal wirklich und lässt jeden Fehler durchschlagen. */
+function ruineTest() {
+  console.log('\n226. Nach einem Ausbau: jede App und jede Sicht zeichnet ohne Fehler (0.129.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* Jede App einmal öffnen und zeichnen */
+  let kaputt = [];
+  S.CL_APPS.forEach(function (a) {
+    try { S.oeffne(a.id); S.zeichne(); }
+    catch (e) { kaputt.push(a.id + ': ' + e.message); }
+  });
+  pruefe(!kaputt.length, kaputt.length ? 'Apps werfen: ' + kaputt.join(' | ')
+    : 'alle ' + S.CL_APPS.length + ' Apps zeichnen ohne Fehler');
+
+  /* Jede Sicht in Roots, Blatt und Fußzeile, dazu das ▼ — dort saß der Fehler */
+  kaputt = [];
+  S.oeffne('routinen');
+  S.RT_SICHTEN.forEach(function (x) {
+    try {
+      S.rtSichtSetzen(x[0]);
+      S.routinenHtml(); S.routinenFussHtml(); S.rtKopfText(); S.rtWahlHtml();
+    } catch (e) { kaputt.push(x[0] + ': ' + e.message); }
+  });
+  pruefe(!kaputt.length, kaputt.length ? 'Sichten werfen: ' + kaputt.join(' | ')
+    : 'alle ' + S.RT_SICHTEN.length + ' Sichten in Roots zeichnen, auch das ▼');
+
+  /* Und die Ausbaureste selbst: nichts darf übrig sein */
+  const reste = ['manSicht', 'manifestHtml', 'manifestNotiz', 'manifestInline', 'manGelesen',
+    'upPruefen', 'upAktiv', 'upProgramme', 'upHtml', 'upFertig', 'gwProgrammHtml', 'gwProgrammWahl'];
+  const da = reste.filter(function (n) { return typeof S[n] !== 'undefined'; });
+  pruefe(!da.length, da.length ? 'noch da: ' + da.join(', ') : 'keine der ' + reste.length + ' ausgebauten Funktionen ist übrig');
+  pruefe(!/cl\.(man|up)\./.test(SKRIPT), 'kein Zugriff auf cl.man oder cl.up mehr');
+  pruefe(!/\.up-|\bup-regel\b/.test(SKRIPT), 'auch die Stilregeln der Umprogrammierung sind weg');
+  pruefe(SKRIPT.indexOf('krPArt') < 0 && SKRIPT.indexOf('Coach erinnert') < 0,
+    'das tote Feld „Coach erinnert" ist aus dem Prinzip-Dialog raus');
+
+  /* Coach-Termine bleiben ausgeblendet — das war nie die Erinnerung, sondern der Filter */
+  pruefe(typeof S.clIstCoachTermin === 'function'
+    && S.clIstCoachTermin({ titel: 'Coach: Wochenblick' }) === true
+    && S.clIstCoachTermin({ titel: 'Zahnarzt' }) === false,
+    'Termine mit „Coach:" werden weiterhin überall ausgeblendet');
+
+  /* Alte Daten bleiben unangetastet: CLIE wirft nicht weg, was es nicht mehr kennt */
+  frisch();
+  S.DB.gedanken.push({ id: 'up-alt', typ: 'umprog', name: 'Altes Programm', tage: 56, geaendert: 1 });
+  S.DB.einstellungen.manifestGelesen = { 'alt-1': '2026-11-01' };
+  S.clNachpflegen('Test');
+  pruefe(S.DB.gedanken.some(function (g) { return g.id === 'up-alt'; }),
+    'ein alter Umprogrammierungs-Satz überlebt das Aufräumen');
+  pruefe(S.DB.einstellungen.manifestGelesen && S.DB.einstellungen.manifestGelesen['alt-1'] === '2026-11-01',
+    'und der alte Lesevermerk wird nicht gelöscht');
+
+  S.cl.app = 'uebersicht';
 }
 
 function huellenTest() {
@@ -12151,9 +11864,6 @@ function huellenTest() {
   try { typReihenfolgeTest(); } catch (e) { fail('0.94.1 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vlStummTest(); } catch (e) { fail('0.94.3 Vorlesen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { syncWocheTest(); } catch (e) { fail('0.95.0 Sync/Woche warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { manifestTest(); } catch (e) { fail('0.96.0 Manifest warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { manifestSeitenTest(); } catch (e) { fail('0.97.0 Manifest-Seiten warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { manifestFussTest(); } catch (e) { fail('0.97.3 Manifest-Fuß warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungLetzteTest(); } catch (e) { fail('0.97.7 Letzte warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { sammlungWahlTest(); } catch (e) { fail('0.97.6 Sammlung Auswahl warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { janeinFilterTest(); } catch (e) { fail('0.97.5 Ja/Nein-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12188,8 +11898,6 @@ function huellenTest() {
   try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { upTest(); } catch (e) { fail('0.107.0 Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { upSichtTest(); } catch (e) { fail('0.108.0 Sicht Umprogrammierung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leuchtturmTest(); } catch (e) { fail('0.109.0 Roots warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rueckbauTest(); } catch (e) { fail('0.113.0 Rückbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { radarTest(); } catch (e) { fail('0.114.0 Radar warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12207,6 +11915,7 @@ function huellenTest() {
   try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================

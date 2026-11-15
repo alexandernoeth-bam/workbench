@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CLIE __VERSION__</title>
+<meta name="theme-color" content="#1C2116">
+<link rel="manifest" href="./clie.webmanifest">
+<link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./clie-192.png?v=0491">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Ziffern: Die Pixelschrift zeichnet 5 wie S und 2 wie Z — deshalb
+   kommen 0–9 und der Doppelpunkt aus VT323 (SIL Open Font License),
+   eingebettet, damit sie auch ohne Netz da sind. */
+@font-face{font-family:"CLIE Ziffern";src:url(data:font/woff2;base64,__ZIFFERN__) format("woff2");
+  unicode-range:U+0030-0039,U+003A;size-adjust:__ZGROESSE__;font-display:block}
+/* Optik A: grünes LCD, Pixelschrift, Knöpfe mit runden Ecken — wie der Palm */
+:root{--lcd:#B9C4A6;--lcd-hell:#C9D3B7;--px:#1C2116;--px-mitte:#56604A;--px-zart:#8E9A7C;--gehaeuse:#1E1E1E;--akzent:#1C2116}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--gehaeuse);color:var(--px);overflow:hidden;
+  font-family:"CLIE Ziffern","Pixelify Sans",ui-monospace,Menlo,Consolas,monospace;font-size:21px;line-height:1.25;-webkit-font-smoothing:none}
+button{font:inherit;color:inherit;cursor:pointer;background:transparent;border:0;padding:0;-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:default;color:var(--px-zart)}
+button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
+
+.geraet{height:100%;max-width:calc(480px / var(--zoom, 1));margin:0 auto;display:flex;flex-direction:column;background:var(--lcd);position:relative;overflow:hidden;
+  padding-top:env(safe-area-inset-top)}
+.kopf{display:flex;align-items:center;gap:8px;padding:8px 8px 6px;border-bottom:2px solid var(--px);flex:0 0 auto}
+.reiter{background:var(--px);color:var(--lcd);font-weight:600;padding:3px 9px 2px;border-radius:5px 5px 0 0;font-size:22.5px;max-width:62%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.luecke{flex:1}
+.uhr{font-size:20px}
+.kat{font-size:20px;padding:2px 2px 2px 6px;white-space:nowrap;min-width:0;max-width:62%;overflow:hidden;text-overflow:ellipsis}
+.kat.an{background:var(--px);color:var(--lcd);border-radius:3px}
+
+.anmeldebanner{display:none;align-items:center;gap:8px;padding:7px 8px;border-bottom:2px solid var(--px);background:var(--px);color:var(--lcd);font-size:18.5px}
+.anmeldebanner.sichtbar{display:flex}
+#anmeldeText{flex:1;min-width:0}
+.anmeldebanner button{border:2px solid var(--lcd);border-radius:12px;padding:1px 9px;font-size:18.5px;white-space:nowrap}
+.neustreifen{display:none;align-items:center;gap:8px;padding:6px 8px;border-bottom:2px dotted var(--px);font-size:18.5px;width:100%;text-align:left}
+.neustreifen.sichtbar{display:flex}
+#neuText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.neu-wort{border:2px solid var(--px);border-radius:12px;padding:0 8px}
+
+.inhalt{flex:1;min-height:0;overflow:auto;padding:6px 10px 14px;position:relative}
+/* Bildlaufleiste wie am Palm (seit 0.41): eigene Leiste statt der dünnen von Android */
+.inhalt.mitbar{padding-right:26px;scrollbar-width:none}
+.inhalt.mitbar::-webkit-scrollbar{display:none}
+.rollbar{position:absolute;right:2px;width:18px;display:none;flex-direction:column;z-index:5}
+.rollbar.auf{display:flex}
+.rollbar button{flex:0 0 26px;font-size:15.5px;line-height:1;color:var(--px);padding:0}
+.rollbar button:active{background:var(--px);color:var(--lcd)}
+.rb-bahn{flex:1;position:relative;border-left:2px dotted var(--px-mitte);margin:0 0 0 8px}
+.rb-bahn i{position:absolute;left:-6px;width:10px;background:var(--px);touch-action:none;cursor:grab}
+
+/* Silkscreen: die festen Tasten unten (seit 0.8 wieder da — die Android-
+   Taste ◀ geht zusätzlich zurück, der Reiter öffnet ebenfalls das Menü) */
+.silk{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);background:var(--lcd-hell);border-top:2px solid var(--px-mitte);
+  padding:6px 4px calc(8px + env(safe-area-inset-bottom));text-align:center;font-size:16px;color:var(--px-mitte)}
+.silk button{color:var(--px-mitte);font-size:16px;padding:2px 0}
+.silk button b{display:block;font-size:28px;line-height:1.05;color:var(--px)}
+.silk button:disabled b{color:var(--px-zart)}
+/* Die einzige Zahl: an „Heute“ — auf der Übersicht und unten (seit 0.9) */
+.silk button{position:relative}
+/* Suchen (seit 0.10) */
+.su-feld{display:flex;gap:6px;align-items:center;border:2px solid var(--px);background:var(--lcd-hell);padding:2px 8px;margin:4px 0 8px;font-size:21px}
+.su-feld input{flex:1;min-width:0;font:inherit;font-size:19px;color:var(--px);background:transparent;border:0;padding:6px 2px;outline:none}
+.su-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.su-chip{border:2px solid var(--px);border-radius:12px;padding:0 9px;font-size:18px}
+.su-gruppe{display:flex;justify-content:space-between;font-weight:600;font-size:18.5px;border-bottom:2px solid var(--px);margin:10px 0 2px}
+.su-treffer{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:19.5px;overflow-wrap:anywhere}
+.su-treffer small{display:block;font-size:16px;color:var(--px-mitte)}
+.su-treffer mark,.su-treffer small mark{background:var(--px);color:var(--lcd);padding:0 2px}
+.su-mehr{font-size:16.5px;color:var(--px-mitte);text-decoration:underline;padding:4px 0}
+.hz{display:flex;gap:9px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:4px 0;min-height:38px}
+.hz .zt{flex:0 0 52px;text-align:right;color:var(--px-mitte);font-size:19px}
+.hz .tx{flex:1;min-width:0;text-align:left;overflow-wrap:anywhere}
+.hz.erl .tx,.hz.erl .zt{color:var(--px-zart);text-decoration:line-through}
+
+/* Übersicht */
+/* Seit 0.89: 3×5 — etwas kleinere Symbole, damit alle 15 ohne Rollen passen */
+.apps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 4px;padding:10px 0 6px}
+.app{text-align:center;font-size:20px;display:flex;flex-direction:column;align-items:center}
+.sym{width:68px;height:68px;margin:0 auto 4px;position:relative;display:block}
+.sym svg{width:68px;height:68px;display:block}
+.app:active .sym svg{filter:invert(1)}
+.fassung{display:block;width:100%;text-align:center;font-size:16px;color:var(--px-mitte);margin:10px 0 0;padding:6px 0}
+.fassung button{font-size:16px;color:var(--px-mitte);padding:0}
+/* Seit 0.46: das Menü steht über der Leiste unten */
+.aufklapp.menue-unten{left:0;right:0;bottom:var(--silk-h,64px);box-shadow:0 -3px 0 var(--px)}
+.fassung u{color:var(--px)}
+/* Statistik (seit 0.7.1) */
+.st-kopf{display:flex;gap:7px;align-items:center;width:100%;text-align:left;font-weight:600;font-size:18.5px;border-bottom:2px solid var(--px);margin:10px 0 2px;padding:2px 0}
+.st-kopf svg{width:26px;height:26px;flex:0 0 26px}
+.st .reihe span:first-child{flex:1 1 auto}
+.st .reihe span:last-child{flex:0 0 auto;white-space:nowrap}
+
+/* Aufklapplisten: Kategorie und Menü */
+.aufklapp{position:absolute;z-index:20;background:var(--lcd);border:2px solid var(--px);box-shadow:3px 3px 0 var(--px);min-width:150px}
+.aufklapp button{display:block;width:100%;text-align:left;padding:5px 12px;font-size:21px}
+.aufklapp button.an,.aufklapp button:active{background:var(--px);color:var(--lcd)}
+.aufklapp .trenn{border-top:2px dotted var(--px-zart);margin:2px 0}
+.menue-zeile{display:flex;gap:0;border-bottom:2px solid var(--px);background:var(--px);color:var(--lcd)}
+.menue-zeile span{padding:3px 12px;font-weight:600}
+.schleier{position:absolute;inset:0;z-index:15;display:none}
+.schleier.auf{display:block}
+
+/* Platzhalter späterer Apps */
+.spaeter-text{margin:18px 6px;font-size:20px;line-height:1.45}
+.spaeter-text .gross{text-align:center;margin:10px 0 14px}
+.spaeter-text .gross svg{width:110px;height:110px}
+
+/* Abgleich (HotSync) */
+.hs{text-align:center;padding:14px 0 6px}
+.hs-knopf{width:112px;height:112px;border:2px solid var(--px);border-radius:50%;font-size:66.5px;background:var(--lcd-hell);box-shadow:3px 3px 0 var(--px)}
+.hs-knopf:active{background:var(--px);color:var(--lcd);box-shadow:none;transform:translate(3px,3px)}
+.hs-knopf.laeuft{animation:hs-dreh 1.2s steps(8) infinite}
+@keyframes hs-dreh{to{transform:rotate(360deg)}}
+.hs-wort{margin-top:8px;font-size:22.5px;font-weight:600}
+.hs-stand{font-size:18.5px;color:var(--px-mitte);margin-top:2px}
+.abschnitt{font-weight:600;margin:12px 0 2px;font-size:18.5px;border-bottom:2px solid var(--px)}
+.reihe{display:flex;gap:8px;border-bottom:2px dotted var(--px-zart);padding:4px 0;font-size:19px}
+.reihe span:first-child{flex:0 0 42%;color:var(--px-mitte)}
+.reihe span:last-child{flex:1;min-width:0;overflow-wrap:anywhere;text-align:right}
+.reihe .warn{font-weight:600}
+.knoepfe{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
+.knopf{border:2px solid var(--px);border-radius:12px;padding:2px 10px;font-size:19px}
+.knopf.voll{background:var(--px);color:var(--lcd)}
+.knopf:disabled{border-color:var(--px-zart)}
+.leise{font-size:17.5px;color:var(--px-mitte);margin:6px 0 0;line-height:1.4}
+
+/* Rechner */
+.anzeige{border:2px solid var(--px);background:var(--lcd-hell);padding:6px 10px;margin:4px 0 8px;text-align:right;position:relative}
+.verlauf-zeile{font-size:17.5px;color:var(--px-mitte);min-height:22px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.m-marke{position:absolute;left:10px;bottom:8px;font-size:17.5px;color:var(--px-mitte)}
+.zahl-gross{font-size:44px;line-height:1.1;overflow:hidden;white-space:nowrap}
+.tasten{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.taste{border:2px solid var(--px);border-radius:14px;height:58px;font-size:27px;background:var(--lcd)}
+.taste:active{background:var(--px);color:var(--lcd)}
+.taste.op{background:var(--lcd-hell)}
+.taste.gl{background:var(--px);color:var(--lcd)}
+.taste.klein{height:44px;font-size:20px}
+.rt-verlauf{border:2px dotted var(--px-mitte);padding:6px 8px;font-size:19px;min-height:200px}
+/* Schulrechner (seit 0.39) */
+.rt-anzeige{text-align:left}
+.rt-status{display:flex;justify-content:space-between;font-size:15.5px;color:var(--px-mitte)}
+.rt-eingabe{font:19px/1.3 ui-monospace,Menlo,Consolas,monospace;min-height:25px;word-break:break-all}
+.rt-cursor{display:inline-block;width:2px;height:19px;background:var(--px);vertical-align:text-bottom;margin-left:1px}
+.rt-anzeige .zahl-gross{text-align:right;font-size:38px}
+.rt-anzeige .zahl-gross small{font-size:18px;font-weight:400}
+.rt-fehler{font-size:20px}
+.rt-fn{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:7px}
+.taste.fn{height:38px;font-size:17px;border-radius:6px;padding:0}
+.taste.fn.an{background:var(--px);color:var(--lcd)}
+.rt-zahlen{grid-template-columns:repeat(5,1fr);gap:6px}
+.rt-zahlen .taste{height:52px;font-size:25px}
+.rt-zahlen .taste.klein{font-size:16px}
+.rt-verlauf div{padding:3px 0;border-bottom:2px dotted var(--px-zart);text-align:right}
+
+/* Untere Knopfzeile einer App (Neu, Gehe zu, T/W/M) */
+.fuss{display:none;flex:0 0 auto;gap:6px;padding:7px 8px;border-top:2px solid var(--px);align-items:center}
+.fuss.auf{display:flex}
+.ansicht{display:inline-flex;gap:4px;margin-left:auto}
+.ansicht button{width:34px;height:32px;border:2px solid var(--px);border-radius:3px;font-size:17.5px}
+.ansicht button.an{background:var(--px);color:var(--lcd)}
+
+/* Kalender */
+.wochenleiste{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--px);padding:2px 0 5px;margin-bottom:4px;font-size:19px}
+.wochenleiste button{min-width:30px;height:32px;text-align:center}
+.wochenleiste .wt.heute{text-decoration:underline}
+.wochenleiste .wt.an{background:var(--px);color:var(--lcd);border-radius:3px}
+.pr-maske{display:block;width:100%;text-align:left;border:0;border-bottom:2px dotted var(--px-zart);background:transparent;font:inherit;color:var(--px-mitte);letter-spacing:1px;padding:6px 0}
+.kat-zeile{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:7px 0;font:inherit;background:transparent;color:inherit}
+.kat-zeile .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kat-zeile .knopf{flex:0 0 auto;padding:0 8px}
+.kat-zahl{font-size:15.5px;color:var(--px-mitte)}
+.kat-eintrag{display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font:inherit;background:transparent;color:inherit}
+.kat-eintrag .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kat-eintrag small{font-size:15.5px;color:var(--px-mitte);white-space:nowrap}
+/* Leitfaden (seit 0.68) */
+.lf-typ{font-size:15.5px;border:1.5px solid var(--px);border-radius:3px;padding:0 4px;white-space:nowrap}
+.lf-schritt{border:2px solid var(--px);padding:6px 8px;margin:6px 0}
+.lf-schritt b{display:block;font-size:18px}
+.lf-schritt label{display:block;font-size:15.5px;color:var(--px-mitte);margin:8px 0 2px}
+.lf-schritt-zu{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0;font:inherit;background:transparent;color:inherit}
+.lf-schritt-zu .tx{flex:1;min-width:0}
+.lf-schritt-zu small{font-size:15.5px;color:var(--px-mitte);max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-schritt-zu .k{width:16px;height:16px;border:2px solid var(--px);flex:0 0 16px}
+.lf-schritt-zu .k.x{background:var(--px)}
+.lf-tabelle{border-collapse:collapse;width:100%;font-size:15.5px;margin:6px 0}
+.lf-tabelle th,.lf-tabelle td{border:1.5px solid var(--px-mitte);padding:2px 4px;text-align:left;vertical-align:top}
+.lf-tabelle th{font-weight:600;background:var(--lcd-hell)}
+.lf-tabelle input.eingabe{width:100%;box-sizing:border-box;font-size:15.5px;padding:1px 3px;margin:0}
+.lf-verweis{display:block;font:inherit;font-size:15.5px;color:var(--px-mitte);background:transparent;text-align:left;padding:2px 0 4px}
+.fenster .wahl.lf-art small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.fenster .wahl.lf-art.an{background:var(--px);color:var(--lcd)}
+.fenster .wahl.lf-art.an small{color:var(--lcd)}
+.pr-wahl{display:flex;gap:4px;padding:2px 10px 6px}
+.pr-wahl button{flex:1;text-align:center;padding:4px 2px;font-size:16.5px}
+.ag-naechst{background:var(--px);color:var(--lcd);padding:6px 9px;margin:6px 0 4px;font-size:18.5px}
+.ag-gr{display:flex;justify-content:space-between;align-items:baseline;width:100%;text-align:left}
+.ag-gr small{font-size:15.5px;color:var(--px-mitte);font-weight:400}
+.ag-zeile{display:flex;gap:8px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:4px 0}
+.ag-zeile.vorbei{color:var(--px-mitte)}
+.ag-zt{flex:0 0 48px;font-size:16.5px}
+.ag-morgen{margin-top:12px}
+.ganztags{display:block;width:100%;text-align:left;border:2px solid var(--px);padding:2px 6px;margin:3px 0;font-size:19px}
+/* Aus der Workbench (seit 0.8.2): Feiertag kräftig, Ferien leise */
+.ganztags.gz-feiertag{background:var(--px);color:var(--lcd)}
+.ganztags.gz-ferien{border-style:dashed;color:var(--px-mitte)}
+.std{display:flex;gap:8px;border-bottom:2px dotted var(--px-zart);min-height:36px;align-items:center}
+.std .z{width:60px;flex:0 0 60px;color:var(--px-mitte);font-size:19px}
+.std .t{flex:1;min-width:0;display:flex;gap:8px;align-items:center;min-height:34px}
+.std .tx{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.std.vorbei .tx,.std.vorbei .z{color:var(--px-zart)}
+/* Titel laufender und kommender Einträge brechen um (höchstens 3 Zeilen), Vergangenes bleibt einzeilig (seit 0.6.2) */
+.std:not(.vorbei) .tx{white-space:normal;overflow-wrap:anywhere;line-height:1.2;max-height:3.6em;padding:3px 0}
+.std.ende .t{min-height:28px}
+.k{width:20px;height:20px;border:2px solid var(--px);flex:0 0 20px;display:inline-block;background:transparent}
+/* Priorität (seit 0.12): 1 gefüllt, 2 umrandet, 3 gepunktet, ohne = leerer Platz */
+.prio{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 22px;font-size:15.5px;font-weight:600;margin-right:6px;vertical-align:-3px;border:2px solid transparent}
+.prio.p1{background:var(--px);color:var(--lcd);border-color:var(--px)}
+.prio.p2{border-color:var(--px)}
+.prio.p3{border:2px dotted var(--px);color:var(--px-mitte)}
+/* fünf Stufen (seit 0.49): 4 und 5 leise, ohne Kürzel = 3 noch leiser */
+.prio.p4{color:var(--px-mitte)}
+.prio.p5{color:var(--px-zart)}
+.prio.still{border-color:var(--px-zart);color:var(--px-zart)}
+.aufg .prio{margin-right:0}
+.aufg .prio.p0{border:2px dotted var(--px-zart)}
+.k.an{background:var(--px)}
+.aufg{display:flex;gap:9px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:4px 0;min-height:36px}
+.aufg .tx{flex:1;min-width:0}
+.aufg .q{font-size:17.5px;color:var(--px-mitte);white-space:nowrap;max-width:40%;overflow:hidden;text-overflow:ellipsis}
+.aufg.erl .tx{color:var(--px-zart);text-decoration:line-through}
+.unterabschnitt{font-weight:600;margin:6px 0 2px}
+.notiz{padding:3px 0;border-bottom:2px dotted var(--px-zart)}
+.erl-knopf{margin:10px 0 0;font-size:17.5px;color:var(--px-mitte);text-decoration:underline}
+.wochenkopf{font-size:19px;color:var(--px-mitte);margin:2px 0 4px}
+/* Blättern mit Pfeilen in Woche, Blöcken, Monat (seit 0.46.2) */
+.blatt{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--px);padding:2px 0 5px;margin-bottom:4px;font-size:19px}
+.blatt span{color:var(--px-mitte)}
+.blatt-pfeil{min-width:40px;height:32px;text-align:center;font-size:19px}
+.blatt-zeile{display:flex;align-items:center;gap:6px;margin:2px 0 6px}
+.blatt-zeile .tagwahl{margin:0}
+.blatt-pfeile{margin-left:auto;display:flex}
+.blatt-pfeile .blatt-pfeil{min-width:30px}
+.blatt-zeile .tagwahl button{white-space:nowrap;padding:1px 8px}
+.wtag{display:flex;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:4px 0}
+.wtag b{flex:0 0 72px;font-weight:600}
+.wtag.heute b{background:var(--px);color:var(--lcd);padding:0 4px}
+.wtag .e{flex:1;min-width:0;font-size:19px}
+.wtag .e div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.monat{display:grid;grid-template-columns:repeat(7,1fr);border-left:2px solid var(--px);border-top:2px solid var(--px);margin-top:4px}
+.monat .mk,.monat .mt{border-right:2px solid var(--px);border-bottom:2px solid var(--px)}
+.monat .mk{text-align:center;font-weight:600;background:var(--lcd-hell);font-size:17.5px}
+.monat .mt{height:66px;padding:2px 3px;font-size:17.5px;text-align:left;display:flex;flex-direction:column;align-items:stretch}
+.monat .mt.aus{color:var(--px-zart)}
+.monat .mt.heute{background:var(--px);color:var(--lcd)}
+.monat .mt.an{outline:2px dotted var(--px);outline-offset:-5px}
+.monat .mt i{display:block;height:5px;background:currentColor;margin-top:3px;opacity:.8}
+
+/* Zeitklammern im Tag (seit 0.2.2) */
+.kl{flex:0 0 18px;align-self:stretch;display:flex;gap:2px;margin-right:-4px}
+.kl i{width:8px;display:block;font-style:normal}
+.kl i.oben{border-left:2px solid var(--px);border-top:2px solid var(--px);margin-top:10px}
+.kl i.mitte{border-left:2px solid var(--px)}
+.kl i.unten{border-left:2px solid var(--px);border-bottom:2px solid var(--px);margin-bottom:10px}
+.kl i.einzel{border:2px solid var(--px);border-right:0;margin:10px 0}
+/* Seit 0.45.1: eine Klammer schließt, die nächste öffnet in derselben Zeile */
+.kl i.wechsel,.kl i.schluss{position:relative}
+.kl i.wechsel::before,.kl i.schluss::before{content:'';position:absolute;left:0;right:0;top:0;bottom:calc(50% + 2px);border-left:2px solid var(--px);border-bottom:2px solid var(--px)}
+.kl i.wechsel::after{content:'';position:absolute;left:0;right:0;top:calc(50% + 2px);bottom:0;border-left:2px solid var(--px);border-top:2px solid var(--px)}
+.std.vorbei .kl i,.std.vorbei .kl i::before,.std.vorbei .kl i::after{border-color:var(--px-zart)}
+
+/* Woche als Blöcke (seit 0.2.2) */
+.tagwahl{display:flex;margin:2px 0 6px;border:2px solid var(--px);width:max-content}
+.tagwahl button{padding:1px 10px;font-size:18px}
+.tagwahl button.an{background:var(--px);color:var(--lcd)}
+.wb{display:grid;position:relative}
+.wb .kz{text-align:center;font-weight:600;font-size:17.5px;border-bottom:2px solid var(--px);padding-bottom:2px;line-height:1.1}
+.wb .kz.heute{background:var(--px);color:var(--lcd)}
+.wb-uhr{position:relative;font-size:18px;color:var(--px-mitte)}
+.wb-uhr span{position:absolute;right:5px;transform:translateY(-50%)}
+.wb-sp{position:relative;border-left:2px dotted var(--px-zart)}
+.wb-sp.heute{background:rgba(28,33,22,.07)}
+.wb-tag{position:absolute;inset:0;width:100%}
+.wb-blk{position:absolute;border-radius:2px;color:var(--lcd);font-size:15.5px;line-height:1.05;padding:1px 2px;overflow:hidden;
+  white-space:nowrap;text-align:left;vertical-align:top;display:block}
+.wb-blk.s1{background:var(--px)}
+.wb-blk.s2{background:#4A5440}
+.wb-blk.s3{background:#7A8668;color:var(--px)}
+.wb-blk.vorbei{opacity:.55}
+.wb.breit .wb-blk{font-size:17.5px;white-space:normal}
+.wb-ganz-z{text-align:center;font-size:16px;color:var(--px-mitte);border-bottom:2px solid var(--px);padding-top:2px}
+.wb-ganz-sp{border-left:2px dotted var(--px-zart);border-bottom:2px solid var(--px);padding:2px 2px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.wb-ganz{display:block;width:100%;border:2px solid var(--px);border-radius:2px;font-size:15.5px;line-height:1.1;padding:1px 2px;text-align:left;
+  white-space:nowrap;overflow:hidden;text-overflow:clip}
+.wb.breit .wb-ganz{font-size:17.5px;white-space:normal}
+.wb-jetzt{position:absolute;left:0;right:0;border-top:3px solid var(--px);pointer-events:none;z-index:1}
+
+/* Aufgaben (seit 0.3) */
+.aufg .tx{background:none;border:0;padding:4px 0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aufg.gewaehlt{background:var(--px);color:var(--lcd)}
+.aufg.gewaehlt .q{color:var(--lcd-hell)}
+.aufg.gewaehlt .k{border-color:var(--lcd)}
+.aufg.hervor{outline:3px dotted var(--px);outline-offset:-1px}
+/* To Do flach wie am Palm (seit 0.70): ☐ · Ziffer · Text · Datum */
+.aufg.palm{gap:8px;min-height:36px;padding:2px 0;border-bottom:1px dotted var(--px-zart)}
+.aufg.palm .k{flex:0 0 20px}
+.aufg.palm .pd{flex:0 0 16px;font-size:16px;font-weight:700;text-align:center;padding:0;background:none;border:0}
+.aufg.palm .tx{flex:1;min-width:0;padding:5px 0}
+.aufg.palm .tx .tt{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aufg.palm .tx.lang .tt{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25}
+.aufg.palm.gewaehlt .tx.lang .tt{-webkit-line-clamp:4}
+.aufg.palm .nm{font-size:15.5px;border:1.5px solid currentColor;padding:0 2px}
+.aufg.palm .dt{flex:0 0 auto;min-width:58px;text-align:right;font-size:16px;white-space:nowrap}
+.aufg.palm .dt.ue{font-weight:700}
+.aufg.palm .kt,.aufg.palm .kz{flex:0 0 auto;max-width:64px;font-size:15.5px;color:var(--px-mitte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aufg.palm.ausf{align-items:flex-start}
+.aufg.palm.ausf .k,.aufg.palm.ausf .pd,.aufg.palm.ausf .dt,.aufg.palm.ausf .kt,.aufg.palm.ausf .kz{margin-top:6px}
+.aufg.palm.gewaehlt{background:var(--lcd-hell);color:var(--px)}
+.aufg.palm.gewaehlt .k{border-color:var(--px)}
+.aufg.palm.gewaehlt .herkunft{color:var(--px-mitte)}
+.aufg.palm.erl .tt{color:var(--px-zart);text-decoration:line-through}
+.ep-tage{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 6px}
+.ep-tage button{border:2px solid var(--px);border-radius:10px;padding:0 7px;font-size:16px}
+.ep-tage button.an{background:var(--px);color:var(--lcd)}
+.plan-marke{flex:0 0 auto;font-size:17.5px;border:2px solid currentColor;border-radius:6px;padding:0 5px;white-space:nowrap}
+/* Checklisten-Punkte in Heute und Kalender (seit 0.16) */
+.herkunft{display:block;font-size:15.5px;color:var(--px-mitte);line-height:1.2}
+.cls-vorschau div{display:flex;gap:8px;font-size:17.5px;padding:2px 0;border-bottom:2px dotted var(--px-zart)}
+.cls-vorschau b{font-weight:400;flex:0 0 auto;min-width:6.5em}
+/* Umschalter oben im Inhalt (Schach: Spielen · Partien · Schule · Eröffnungen; Drive) — seit 0.70 versehentlich entfernt, 0.86.1 wieder da */
+.auf-leiste{display:flex;gap:6px;margin:2px 0 6px}
+.auf-leiste .schalter{display:flex;flex:1;border:2px solid var(--px)}
+.auf-leiste .schalter button{flex:1;text-align:center;padding:2px 0;font-size:17.5px;border-right:2px solid var(--px)}
+.auf-leiste .schalter button:last-child{border-right:0}
+.auf-leiste .schalter button.an{background:var(--px);color:var(--lcd)}
+.aufklapp .schalter{display:flex;margin:6px 8px;border:2px solid var(--px)}
+.aufklapp .schalter button{flex:1;text-align:center;padding:2px 0;font-size:18px;width:auto}
+.aufklapp .schalter button.an{background:var(--px);color:var(--lcd)}
+.aufklapp .zw{font-size:16px;color:var(--px-mitte);padding:6px 12px 0}
+.liste-aufklapp{left:40px;max-height:calc(100% - 120px);overflow:auto}
+.liste-aufklapp button{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.todo-wahl button{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.todo-wahl button span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.todo-wahl button small{flex:0 0 auto;font-size:15.5px;color:var(--px-mitte)}
+.todo-wahl button.an small{color:inherit}
+.todo-wahl button.leise{color:var(--px-mitte)}
+.todo-bereich{display:block;border:0;background:transparent;font:inherit;font-size:15.5px;color:var(--px-mitte);padding:6px 0 2px;text-align:left}
+.wahlreihe{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.wahlreihe button{border:2px solid var(--px);border-radius:3px;padding:1px 9px;font-size:18px}
+.wahlreihe button.an{background:var(--px);color:var(--lcd)}
+.wahlfeld{text-align:left;cursor:pointer}
+.wahlfeld.pflicht{outline:2px solid var(--px);color:var(--px-mitte)}
+.zeitfeld{width:140px;margin-top:6px}
+.fenster .wahl{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 4px}
+.fenster .gruppe{font-size:17px;font-weight:600;border-bottom:2px solid var(--px);margin:10px 0 2px}
+.knopf:disabled{color:var(--px-zart);border-color:var(--px-zart)}
+
+/* Memo (seit 0.3) */
+.gruppe{font-size:17.5px;font-weight:600;border-bottom:2px solid var(--px);margin:12px 0 2px}
+.nb-leiste{display:flex;gap:4px;align-items:center;padding:6px 0;border-bottom:2px solid var(--px);margin:0 0 6px}
+.nb-leiste button{border:2px solid var(--px);border-radius:4px;padding:2px 8px;font:inherit;font-size:17.5px;background:transparent;color:inherit}
+.nb-leiste button.an{background:var(--px);color:var(--lcd)}
+.nb-leiste button[disabled]{opacity:.4}
+.nb-leiste .luecke{flex:1}
+.nb-blatt{border:2px solid var(--px);background:var(--lcd-hell);line-height:0}
+.nb-blatt canvas{display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.nb-hinweis{font-size:15.5px;margin:4px 0}
+span.hs-thumb{display:block}
+.hs-zeile{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0}
+.hs-zeile .tx{flex:1;min-width:0}
+.hs-zeile .tx b{display:block;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hs-zeile .tx small{font-size:15.5px;color:var(--px-mitte)}
+.hs-thumb{width:46px;height:60px;object-fit:cover;object-position:top;border:2px solid var(--px);background:#eef1e8;flex:0 0 46px}
+.hs-alt{font-size:15.5px;border:1px solid var(--px);border-radius:3px;padding:0 4px;white-space:nowrap}
+.hs-seite{margin:8px 0;border:2px solid var(--px);background:#eef1e8;overflow:auto;max-height:62vh}
+.hs-seite img{display:block;width:100%;height:auto}
+.hs-seite.gross img{width:200%}
+.hs-blaettern{display:flex;justify-content:center;align-items:center;gap:14px;margin:4px 0}
+.hs-gesammelt{font-size:15.5px;color:var(--px-mitte);margin:6px 0}
+.hs-gesammelt button{font:inherit;color:inherit;background:transparent;border:0;padding:0 4px 0 0;text-align:left}
+.hs-tippen{display:flex;gap:6px;align-items:center;margin:8px 0 12px}
+.hs-tippen .eingabe{flex:1;min-width:0;margin:0}
+.hs-anhang{display:flex;gap:10px;align-items:center;width:100%;text-align:left;margin:6px 0;padding:4px;border:2px dashed var(--px-zart);border-radius:6px;background:transparent;font:inherit}
+.hs-anhang img{width:46px;height:60px;object-fit:cover;object-position:top;border:2px solid var(--px);background:#eef1e8}
+.memo-zeile{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0;min-height:40px}
+.memo-zeile .mz{flex:0 0 22px;text-align:center}
+/* Seit 0.12.1: bis zu zwei Zeilen, erst dann abgeschnitten */
+.memo-zeile .tx{flex:1;min-width:0;white-space:normal;overflow:hidden;overflow-wrap:anywhere;line-height:1.25;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;max-height:2.5em}
+.memo-zeile .q{color:var(--px-mitte);font-size:18px}
+.memo-kopf{margin:2px 0 6px;font-size:17.5px}
+.memo-zeile .mz.art{flex:0 0 24px;color:var(--px-mitte);font-size:16px}
+.memo-zeile.fertig .tx{color:var(--px-mitte);text-decoration:line-through}
+.memo-filter{display:block;width:100%;text-align:left;font:inherit;font-size:15.5px;padding:4px 0;border-bottom:1px dotted var(--px-zart)}
+.memo-zeile .mz.nr{color:var(--px-mitte);text-align:right;flex:0 0 30px}
+/* Projekte (seit 0.43) — wie „Projects“ am Palm */
+.pj-zeile{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);min-height:42px;padding:6px 0}
+.pj-liste.fertig .pj-zeile{color:var(--px-mitte)}
+.pj-filter{display:flex;margin:0 0 8px}
+/* Ziele (seit 0.44) */
+.zi-frist{display:flex;justify-content:space-between;align-items:baseline;gap:8px;border:2px solid var(--px);padding:6px 8px;margin:4px 0 10px}
+.zi-frist b{font-size:21px;text-align:right;white-space:nowrap}
+.zi-text{border-top:2px solid var(--px);padding-top:6px}
+.pj-filter button{flex:1;border:2px solid var(--px);margin-left:-2px;padding:3px 0;font-size:17px}
+.pj-filter button:first-child{margin-left:0}
+.pj-filter button.an{background:var(--px);color:var(--lcd)}
+.pj-n{flex:1;min-width:0;overflow-wrap:anywhere}
+.pj-p{flex:0 0 auto;font-size:16px;color:var(--px-mitte)}
+.pj-titel{font-weight:600;font-size:21px;margin:2px 0 6px}
+.pj-reiter{display:flex;margin-bottom:8px}
+.pj-reiter button{flex:1 1 auto;border:2px solid var(--px);margin-left:-2px;padding:3px 4px;font-size:16px;white-space:nowrap}
+.pj-reiter button:first-child{margin-left:0}
+.pj-reiter button.an{background:var(--px);color:var(--lcd)}
+.pj-daten{display:flex;gap:10px}
+.pj-daten label{flex:1;min-width:0}
+.pj-gr{display:flex;justify-content:space-between;font-weight:600;border-bottom:2px solid var(--px);margin:14px 0 4px}
+.pj-gr span{font-weight:400;color:var(--px-mitte);font-size:16px}
+.pj-ms{display:flex;align-items:center;gap:6px;border-bottom:2px dotted var(--px-zart);min-height:36px}
+.pj-ms.erreicht{color:var(--px-mitte)}
+.pj-msk{flex:0 0 26px;font-size:20px;text-align:center}
+.pj-mst{flex:1;min-width:0;text-align:left;padding:4px 0}
+.pj-msd{font-size:16px;color:var(--px-mitte);white-space:nowrap}
+.memo-h1{font-size:23px;font-weight:600;border-bottom:2px solid var(--px);margin:12px 0 4px}
+.memo-h2{font-size:21px;font-weight:600;margin:10px 0 2px}
+.memo-h3{font-weight:600;color:var(--px-mitte);margin:8px 0 2px}
+.memo-trenn{border-top:2px solid var(--px);margin:8px 0}
+.memo-punkt,.memo-text{padding:3px 0}
+.memo-leer{height:10px}
+.schreibleiste{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 6px}
+.schreibleiste button{min-width:40px;height:36px;border:2px solid var(--px);border-radius:3px;font-size:18px;padding:0 4px}
+/* Am PC beim Schreiben breiter (seit 0.38) */
+/* Seit 0.120.0 teilt der Maßstab mit: bei 80 % soll die Spalte nicht mitschrumpfen,
+   sondern gleich breit bleiben und nur mehr hineinpassen. */
+.geraet.schreibbreit{max-width:calc(900px / var(--zoom, 1))}
+/* Lesezeichen (seit 0.38) */
+.lz-zeile{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px;font-size:20px}
+.lz-zeile .s{flex:0 0 26px;text-align:center}
+.lz-zeile .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lz-zeile .q{font-size:16px;color:var(--px-mitte);white-space:nowrap}
+.lz-zeile button{border:2px solid var(--px);min-width:36px;height:32px;font-size:16px}
+.lz-zeile button:disabled{border-color:var(--px-zart);color:var(--px-zart)}
+.memo-feld{display:block;width:100%;min-height:60vh;font:17.5px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--px);background:var(--lcd-hell);
+  border:2px solid var(--px);padding:8px;resize:vertical}
+
+/* Checklisten (seit 0.4) */
+.cls-zeile{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;min-height:44px}
+.cls-zeile .tx{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.cls-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
+.cls-zeile.erl .tx{color:var(--px-mitte)}
+/* kompakte Liste (seit 0.48.2) */
+.cls-zeile.lauf,.cls-zeile.vorl{min-height:0;padding:6px 0}
+.cls-zeile.lauf .tx,.cls-zeile.erl .tx{white-space:nowrap}
+.cls-zeile.vorl .tx{white-space:nowrap}
+.cls-zeile .balken{width:36px;flex:0 0 36px;height:10px}
+.cls-name{resize:none;line-height:1.3;overflow:hidden}
+/* Alles ist eine Checkliste (seit 0.49): Sammler, Bereiche, geweckt, ⚑ Frist */
+.cls-korb{display:flex;justify-content:space-between;align-items:center;width:100%;margin:8px 0 2px;padding:6px 8px;border:2px solid var(--px);border-radius:6px;font-size:17.5px;text-align:left}
+.cls-bereich{font-size:15.5px;color:var(--px-mitte);letter-spacing:.5px;margin:8px 0 0;text-transform:uppercase}
+.cls-geweckt{font-size:15.5px;background:var(--px);color:var(--lcd);padding:0 5px;border-radius:4px;white-space:nowrap}
+.notiz-marke{flex:0 0 auto;font:inherit;font-size:15.5px;border:1px solid var(--px-mitte);border-radius:3px;padding:0 4px;color:var(--px-mitte);background:transparent;margin-left:4px}
+.auf-notiz{font:inherit;font-size:17px;resize:vertical;min-height:2.4em}
+.frist-marke{font-size:15.5px;border:2px solid var(--px);padding:0 4px;border-radius:4px;white-space:nowrap;margin-left:4px}
+.balken{display:inline-block;width:64px;height:12px;border:2px solid var(--px);position:relative;flex:0 0 64px;vertical-align:middle}
+.balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
+.cls-zahl{font-size:18px;white-space:nowrap;margin-left:6px}
+.cls-kopf{margin:2px 0 6px;font-size:17.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.gruppe.klapp{display:block;width:100%;text-align:left;color:var(--px-mitte)}
+/* Aufgaben: Ansicht und „1. Nächste“ (seit 0.17) */
+/* Drive (seit 0.19) */
+.drv-pfad{font-size:15.5px;color:var(--px-mitte);margin:2px 0 4px;overflow-wrap:anywhere}
+.drv-zeile{display:flex;align-items:center;gap:6px;border-bottom:2px dotted var(--px-zart)}
+.drv-n{flex:1;display:flex;gap:8px;align-items:center;text-align:left;padding:6px 0;min-width:0}
+.drv-sym{width:26px;text-align:center;flex:0 0 26px;font-size:22px;line-height:1;font-family:ui-monospace,Menlo,monospace}
+.drv-n .tx{flex:1;min-width:0;overflow-wrap:anywhere}
+.drv-n small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.drv-n mark{background:var(--px);color:var(--lcd);padding:0 2px}
+.drv-stern{font-size:28px;line-height:1;padding:4px 8px;flex:0 0 auto;font-family:ui-monospace,Menlo,monospace}
+.drv-hoch{display:block;width:100%;text-align:left;padding:6px 0;border-bottom:2px dotted var(--px-zart)}
+/* Schach (seit 0.20) */
+.sch-geschlagen{min-height:20px;display:flex;flex-wrap:wrap;gap:1px;margin-bottom:2px}
+.sch-mini svg{width:16px;height:16px;display:block}
+.sch-rahmen{border:2px solid var(--px);padding:2px;width:max-content;margin:0 auto;--q:min(calc((min(100vw,480px) - 60px) / 8),calc((100vh - 400px) / 8),52px)}
+.sch-rahmen.ruht{opacity:.4}
+.sch-brett{display:grid;grid-template-columns:16px repeat(8,var(--q));grid-template-rows:repeat(8,var(--q)) 18px}
+.sch-ko{font-size:15.5px;color:var(--px-mitte);display:flex;align-items:center;justify-content:center}
+.sch-f{position:relative;display:flex;align-items:center;justify-content:center;padding:0;width:var(--q);height:var(--q)}
+.sch-f.h{background:var(--lcd-hell)}
+.sch-f.d{background:var(--px-zart)}
+.sch-f.wahl{box-shadow:inset 0 0 0 3px var(--px)}
+.sch-f.letzt{box-shadow:inset 0 0 0 2px var(--px-mitte)}
+.sch-f.schach{box-shadow:inset 0 0 0 3px var(--px),inset 0 0 0 6px var(--lcd-hell)}
+.sch-f svg{width:84%;height:84%;position:relative;display:block}
+.sch-ziel{position:absolute;width:26%;height:26%;background:var(--px);border-radius:50%}
+.sch-schlag{position:absolute;inset:6%;border:3px solid var(--px);border-radius:50%}
+.sch-status{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 4px;font-size:17.5px}
+.sch-status b{background:var(--px);color:var(--lcd);font-weight:400;padding:0 6px;white-space:nowrap}
+.sch-zuege{font-size:16px;border-top:2px solid var(--px);padding-top:4px;column-count:2;column-gap:14px}
+.sch-zuege div{display:flex;gap:6px;break-inside:avoid}
+.sch-zuege span:first-child{color:var(--px-mitte);min-width:2em}
+.sch-umw{display:flex;gap:8px;justify-content:center;margin:4px 0}
+.sch-umw button{border:2px solid var(--px);padding:4px;background:var(--lcd)}
+.sch-umw svg{width:40px;height:40px;display:block}
+.sto-fenster .wahlreihe{margin-bottom:4px}
+/* Schach: Bereiche, Partien, Schule, Eröffnungen (seit 0.22) */
+.sch-f.feldmarke{box-shadow:inset 0 0 0 3px var(--px),inset 0 0 0 5px var(--lcd-hell),inset 0 0 0 8px var(--px)}
+.sch-hinweis{background:var(--px);color:var(--lcd);padding:5px 8px;margin:6px 0;font-size:17px;line-height:1.3}
+.sch-hinweis.gut{background:var(--lcd-hell);color:var(--px);border:2px solid var(--px)}
+.sch-erkl{border:2px solid var(--px);background:var(--lcd-hell);padding:6px 8px;margin:6px 0;font-size:17px;line-height:1.35}
+.sch-nav{display:flex;justify-content:center;align-items:center;gap:10px;margin:6px 0}
+.sch-nav button{border:2px solid var(--px);border-radius:50%;width:44px;height:44px;font-size:20px;background:var(--lcd-hell);display:flex;align-items:center;justify-content:center}
+.sch-zeile{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 0;border-bottom:2px dotted var(--px-zart)}
+.sch-zeile small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.sch-zeile b{font-weight:600;white-space:nowrap}
+.sch-balken{flex:0 0 72px;height:12px;border:2px solid var(--px);position:relative}
+.sch-balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
+.sch-kapitel-titel{font-weight:600;border-bottom:2px solid var(--px);margin:2px 0 6px;font-size:18px}
+.sch-gruppe{font-weight:600;border-bottom:2px solid var(--px);margin:10px 0 2px;font-size:16px}
+.sch-aufg-liste,.sch-optionen{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sch-optionen .knopf{white-space:normal;text-align:left;border-radius:8px}
+.knopf.falsch{text-decoration:line-through}
+.sch-zk{padding:0 2px}
+.sch-analyse{margin:4px 0}
+/* Stones (seit 0.18) */
+/* Invasion (seit 0.45) */
+.iv-stand{display:flex;justify-content:space-between;font-size:17px;border-bottom:2px dotted var(--px-zart);padding:0 2px 3px;margin-bottom:4px}
+.iv-feld{display:block;margin:0 auto;height:min(calc(100vh - 280px),calc((min(100vw,480px) - 40px) * 1.375));aspect-ratio:160/220;max-width:100%;touch-action:none;image-rendering:pixelated;background:var(--lcd);border-bottom:0}
+.iv-feld.ruht{opacity:.45}
+.iv-fenster{top:120px}
+.sto-spiel{display:flex;gap:10px;justify-content:center;--z:min(calc((min(100vw,480px) - 150px) / 10),calc((100vh - 360px) / 18),30px)}
+.sto-feld{display:grid;grid-template-columns:repeat(10,var(--z));grid-template-rows:repeat(18,var(--z));gap:1px;border:2px solid var(--px);padding:2px;background:var(--lcd-hell);touch-action:none;flex:0 0 auto}
+.sto-feld i{display:block}
+.sto-feld i.f{background:var(--px)}
+.sto-feld i.s{background:var(--px);box-shadow:inset 0 0 0 3px var(--px),inset 0 0 0 5px var(--lcd-hell)}
+.sto-feld i.g{box-shadow:inset 0 0 0 2px var(--px-zart)}
+.sto-spiel.ruht .sto-feld{opacity:.45}
+.sto-seite{display:flex;flex-direction:column;gap:10px;font-size:17.5px;min-width:96px}
+.sto-seite b{display:block;font-size:24px}
+.sto-vorschau{display:grid;grid-template-columns:repeat(4,13px);grid-template-rows:repeat(2,13px);gap:1px;border:2px solid var(--px);padding:3px;width:max-content;margin-top:2px}
+.sto-vorschau i.s{background:var(--px)}
+.sto-fenster{position:absolute;left:24px;right:24px;top:90px;border:2px solid var(--px);background:var(--lcd-hell);box-shadow:3px 3px 0 var(--px);z-index:5}
+.sto-fenster .titel{background:var(--px);color:var(--lcd);padding:3px 8px;font-weight:600}
+.sto-fenster .rumpf{padding:8px 10px}
+.sto-fenster p{margin:0 0 6px}
+.sto-liste div{display:flex;justify-content:space-between;border-bottom:2px dotted var(--px-zart);padding:2px 0}
+.sto-liste div.neu{background:var(--px);color:var(--lcd);padding:2px 4px}
+.sto-tasten{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%}
+.sto-tasten button{border:2px solid var(--px);border-radius:50%;aspect-ratio:1/1;max-height:64px;font-size:24px;background:var(--lcd-hell);display:flex;align-items:center;justify-content:center;margin:0 auto;width:min(64px,100%)}
+.sto-tasten button:active{background:var(--px);color:var(--lcd)}
+.gruppe.klick{display:flex;justify-content:space-between;align-items:baseline;gap:8px;width:100%;text-align:left}
+.gruppe.klick small{font-weight:400;font-size:15.5px;color:var(--px-mitte);white-space:nowrap}
+.aufg .mehr{flex:0 0 auto;font-size:15.5px;color:var(--px-mitte);border:2px dotted var(--px-mitte);border-radius:6px;padding:0 4px}
+#inhalt > .zw{font-size:15.5px;color:var(--px-mitte);border-bottom:2px solid var(--px-mitte);margin:10px 0 2px}
+.fuss{flex-wrap:wrap}
+
+/* Routinen (seit 0.5) */
+.rt-zeile{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;min-height:44px}
+.rt-zeile .tx{flex:1;min-width:0}
+.rt-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
+.rt-zeile.pause .tx{color:var(--px-mitte)}
+.rt-zeile.gewaehlt{background:var(--px);color:var(--lcd)}
+.rt-zeile.gewaehlt small{color:var(--lcd-hell)}
+/* Gewohnheiten (seit 0.72) */
+.gw-kopf{display:flex;justify-content:space-between;font-size:16px;color:var(--px-mitte);border-bottom:2px solid var(--px-zart);padding-bottom:3px;margin:2px 0 4px}
+.gw-zeile{display:flex;gap:8px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:5px 0;min-height:48px}
+.gw-zeile .tx{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gw-zeile .tx small{display:block;font-size:15.5px;color:var(--px-mitte);overflow:hidden;text-overflow:ellipsis}
+.gw-zeile.gewaehlt .tx{background:var(--px);color:var(--lcd)}
+.gw-zeile.gewaehlt .tx small{color:var(--lcd-hell)}
+.gw-punkte{display:flex;gap:1px;flex:0 0 auto;font-size:15.5px;letter-spacing:0}
+.gw-p{width:14px;text-align:center;color:var(--px)}
+.gw-p.gestern{border-bottom:2px solid var(--px-mitte);padding:0;min-height:0}
+/* SOS (seit 0.72) */
+.sos-unter{font-size:16px;margin:2px 0 4px}
+.sos-titel{font-size:22px;font-weight:600;margin:4px 0 10px}
+ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bottom:6px}
+.sos-uhr{font-size:64px;text-align:center;margin:22px 0 10px;letter-spacing:2px}
+.sos-balken{height:12px;border:2px solid var(--px);margin:0 30px}.sos-balken i{display:block;height:100%;background:var(--px);width:0}
+.sos-mitte{text-align:center}
+.sos-um{margin-top:18px;border-top:2px solid var(--px);padding-top:8px}
+.menue-unten .sos-menue{font-weight:700}
+.aufg .zeit{color:var(--px-mitte);font-size:19px}
+.marke{font-size:15.5px;border:2px solid var(--px-mitte);border-radius:6px;padding:0 4px;color:var(--px-mitte);white-space:nowrap}
+.wahlreihe.tage button{min-width:40px;padding:1px 0;text-align:center}
+.zahlfeld{width:64px;text-align:center}
+
+/* 0.6: umbrechende Titel, Auszeichnungen, Tabellen, Verweise */
+.tx.umbruch{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2}
+.tx.umbruch small{display:block;font-size:16px;color:var(--px-mitte);-webkit-line-clamp:1}
+.tx.umbruch.drei{-webkit-line-clamp:3}
+.aufg.gewaehlt .tx small{color:var(--lcd-hell)}
+.memo-punkt .nr{color:var(--px-mitte)}
+.memo-text a,.memo-punkt a,.memo-tabelle a{color:inherit;text-decoration:underline}
+.verweis{text-decoration:underline dotted;font:inherit;color:inherit;padding:0}
+.verweis.tot{color:var(--px-mitte);text-decoration:none}
+.fl-kap{font-variant:small-caps}
+.memo-tabelle{overflow-x:auto;margin:6px 0}
+.memo-tabelle table{border-collapse:collapse;font-size:18px}
+.memo-tabelle th,.memo-tabelle td{border:2px solid var(--px);padding:2px 6px;text-align:left;vertical-align:top}
+.memo-tabelle th{background:var(--lcd-hell)}
+.wb-blk{display:flex;align-items:flex-start}
+
+/* Fenster wie die Dialoge des Palm */
+/* Sammlungen (seit 0.7) */
+.sa-zeile{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0;min-height:46px}
+.sa-zeile .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.sa-zeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
+.sa-sym{width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:#3B4433;color:var(--lcd-hell);display:flex;align-items:center;justify-content:center;font-size:18px}
+/* Pixel-Symbole der Sammlungen (seit 0.48) */
+.sa-sym .sa-ikone{width:22px;height:22px}
+.sa-ikone-text{width:18px;height:18px;vertical-align:-3px}
+.eingabe.sa-symwahl{display:flex;align-items:center;gap:10px;text-align:left;padding:4px}
+.sa-symwahl .sa-sym{width:30px;height:30px;flex:0 0 30px}
+.sa-symwahl-pf{margin-left:auto}
+.sa-raster{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin:2px 0 4px}
+.sa-raster button{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:50%;background:#3B4433;color:var(--lcd-hell);border:2px solid transparent}
+.sa-raster button.an{outline:3px solid var(--px);outline-offset:1px;background:var(--px)}
+.sa-raster .sa-ikone{width:62%;height:62%}
+/* Import aus Notiz-Tabellen (seit 0.49.1) */
+.sa-imp{border-collapse:collapse;width:100%;margin:2px 0 4px;table-layout:fixed}
+.sa-imp td{border-bottom:2px dotted var(--px-zart);padding:2px 2px;vertical-align:middle;font-size:16px}
+.sa-imp td.ik{width:32%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sa-imp td.ib{width:24%;color:var(--px-mitte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15.5px}
+.sa-imp select.eingabe{margin:1px 0;padding:2px;font-size:16px}
+.sa-imp-info{border:2px solid var(--px);padding:4px 6px;margin:6px 0;font-size:16px}
+/* Coach: Sammler aufräumen, ★ Wesentlich (seit 0.52/0.53) */
+.co-korbkopf{margin:6px 0 4px}
+.co-korbkarte{border:2px solid var(--px);border-radius:6px;padding:8px 10px;margin:6px 0 8px;font-size:17px}
+.co-korbtext{font-size:20px;line-height:1.3}
+.co-korblog{display:flex;justify-content:space-between;gap:8px;border-bottom:2px dotted var(--px-zart);padding:3px 0;font-size:16.5px}
+.co-bilzeile{display:flex;align-items:center;gap:8px;font-size:16.5px;margin-top:4px}
+.co-bilzeile span:first-child{flex:0 0 7.5em}
+.co-bilzeile .balken.co-bil{flex:1 1 auto;width:auto}
+/* Kampagne (seit 0.56) */
+.kk-regel{display:flex;flex-direction:column;border-bottom:2px dotted var(--px-zart);padding:4px 0;font-size:17px}
+.kk-regel small{color:var(--px-mitte);font-size:15.5px}
+.kk-phase{border-bottom:2px dotted var(--px-zart);padding:4px 0;font-size:16.5px}
+.kk-phase.an{background:var(--lcd-hell)}
+.kk-phase small{display:block;color:var(--px-mitte);font-size:15.5px}
+.kk-check{border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:17px}
+.kk-feld{min-height:6.5em;font-size:16px}
+.sa-kz{color:var(--px-mitte);font-size:19px;white-space:nowrap;text-align:right;line-height:1.15}
+/* Kennzahl 2 klein darunter (seit 0.11.1) */
+.sa-kz small{display:block;font-size:16px}
+.sa-hinweis{display:block;width:100%;text-align:left;border:2px dashed var(--px);padding:3px 7px;margin:8px 0;font-size:18px}
+.sa-plan{display:block;width:100%;margin:12px 0 0;padding:5px 8px;border:2px dashed var(--px);border-radius:6px;background:transparent;font:inherit;font-size:17px;color:inherit;text-align:left}
+.sa-suche{display:flex;align-items:center;gap:4px;border:2px solid var(--px);border-radius:4px;padding:0 4px;margin:0 0 6px}
+.sa-suche span{font-size:18px}
+.sa-suche input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:18px;padding:4px 2px;color:inherit;outline:none}
+.sa-suche input::-webkit-search-cancel-button{display:none}
+.sa-suche button{border:0;background:transparent;font:inherit;font-size:16px;padding:2px 6px;color:inherit}
+.sa-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:19px}
+.sa-tab th{font-size:16px;font-weight:600;text-align:left;border-bottom:2px solid var(--px);padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-tab td{border-bottom:2px dotted var(--px-zart);padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Seit 0.47.1 sortieren die Spaltenköpfe */
+.sa-tab th.sort{cursor:pointer}
+.sa-pfeil{font-weight:400}
+.sa-tab.sa-vier{font-size:17.5px}
+/* Kopf der Sammlung steht fest, nur die Einträge scrollen (seit 0.14) */
+.sa-fest{position:sticky;top:-6px;z-index:5;background:var(--lcd);margin:-6px -10px 0;padding:6px 10px 0}
+.sa-tab.sa-kopf{margin:0}
+.sa-tab.sa-kopf + .sa-tab{margin-top:0}
+.sa-kw{display:grid;grid-template-columns:1fr 1fr;gap:4px;border:2px solid var(--px);padding:4px;margin:0 0 6px;background:var(--lcd-hell)}
+.sa-kw div{border:2px solid var(--px-zart);padding:2px 6px;line-height:1.15;min-width:0}
+.sa-kw small{display:block;font-size:15.5px;color:var(--px-mitte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-kw b{display:block;font-weight:400;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-kw.sa-kw3{grid-template-columns:1fr 1fr 1fr}
+/* Info je Sammlung (seit 0.46) */
+.sa-kopfzeile{display:flex;gap:6px;align-items:flex-start}
+.sa-kopfzeile .sa-kw{flex:1;min-width:0}
+.sa-kw-leer{flex:1}
+.sa-info{flex:0 0 30px;height:30px;border:2px solid var(--px);border-radius:50%;font-weight:700;font-size:18px;line-height:1;margin:4px 0 6px}
+.sa-infohinweis{border-left:3px solid var(--px);padding:2px 8px;margin:0 0 8px;font-size:16.5px}
+.sa-infotext p{margin:0 0 8px}
+.sa-infofeld{min-height:150px;resize:vertical}
+/* Diagramme in Sammlungen (seit 0.47) */
+.sa-dia{margin:4px 0 12px}
+.sa-dia-kopf{display:flex;justify-content:space-between;align-items:baseline;font-weight:600;border-bottom:2px solid var(--px);margin-bottom:4px}
+.sa-dia-kopf small{font-weight:400;font-size:15.5px;color:var(--px-mitte)}
+.sa-dia-svg{display:block;width:100%;height:auto;font-family:inherit}
+.sa-dia-tipp{cursor:pointer}
+.sa-dia-zr{display:inline-flex;align-items:center;gap:6px}
+.sa-dia-zr button{font-size:16px;padding:0 2px}
+.sa-kw.sa-kw3 div{padding:2px 4px}
+.sa-kw.sa-kw3 b{font-size:20px}
+.sa-tab .r{text-align:right}
+.sa-tab tr.sa-z{cursor:pointer}
+.sa-tab td.zeichen,.sa-tab th.zeichen{text-align:center;padding-left:0;padding-right:0;font-size:16px}
+.sa-tab td.sa-kas,.sa-tab th.sa-kas{text-align:center;padding:0 2px;font-size:16px}
+.sa-tab tr.sa-z.an{background:rgba(31,42,26,.12)}
+.sa-tab tr.sa-gr td{font-weight:600;border-bottom:2px solid var(--px-mitte);padding-top:8px}
+.sa-tab tr.sa-sum td{font-weight:600;border-top:2px solid var(--px);border-bottom:0}
+.sa-box{border:2px solid var(--px);margin:10px 0 4px;padding:3px 8px 6px}
+.sa-box .reihe:last-of-type{border-bottom:0}
+.sa-balken{height:14px;border:2px solid var(--px);margin:6px 0 2px;position:relative}
+.sa-balken i{position:absolute;left:0;top:0;bottom:0;background:var(--px)}
+.sa-feldzeile{display:flex;gap:6px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:4px 0}
+.sa-feldzeile .tx{flex:1;min-width:0;text-align:left}
+.sa-feldzeile .tx small{display:block;font-size:16px;color:var(--px-mitte)}
+.sa-feldzeile .knopf{padding:0 8px}
+.sa-vzeile{display:flex;gap:6px;align-items:center}
+.sa-vzeile .wahl{flex:1}
+.fenster .wahl.sa-gewaehlt{font-weight:600}
+/* Links (seit 0.11) */
+.sa-link{text-decoration:underline;font-size:inherit;padding:0;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sa-linkzeile{display:flex;gap:6px;align-items:center}
+.sa-linkzeile .eingabe{flex:1;min-width:0}
+/* In der Pixelschrift sehen [ ] fast wie ( ) aus — Formeln deshalb in klarer Schrift (seit 0.8) */
+.fenster .sa-formel{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px}
+.fenster select.eingabe,.fenster textarea.eingabe{font:inherit;font-size:17.5px}
+.fenster{position:absolute;z-index:20;left:10px;right:10px;top:60px;max-height:calc(100% - 150px);overflow:auto;background:var(--lcd);border:2px solid var(--px);box-shadow:4px 4px 0 var(--px)}
+.fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
+.fenster .rumpf{padding:10px 12px;font-size:20px}
+/* Aufgabe mit Seite in OneNote (0.115.0) */
+.pm-on{font:inherit;font-size:15.5px;background:none;color:var(--px);border:1px solid var(--px);border-radius:4px;padding:0 4px;margin-left:4px;flex:0 0 auto}
+.pm-clu{color:var(--px-mitte);font-size:16px}
+.ra-tropf{outline:3px dashed var(--px);outline-offset:-5px}
+.ra-warte{background:var(--px-mitte)}
+.ra-tx small{display:block;font-size:15.5px;color:var(--px-mitte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ra-leeren{text-align:right;padding:5px 0}
+/* OneNote-Radar: Linkbaum im Memo Pad (0.114.0) */
+.ra-bereich{display:flex;justify-content:space-between;gap:8px;background:var(--px);color:var(--lcd);padding:3px 8px;margin:9px -8px 3px;font-size:17px}
+.ra-bereich:first-child{margin-top:0}
+.ra-ast{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px dotted var(--px-zart)}
+.ra-ast.gewaehlt{background:var(--px-zart)}
+.ra-pf{font:inherit;font-size:17px;background:none;border:none;color:var(--px-mitte);padding:2px 2px;width:18px;flex:0 0 auto;text-align:center}
+.ra-tx{flex:1;min-width:0;text-align:left;font:inherit;background:none;color:var(--px);border:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ra-zahl{font-size:15.5px;color:var(--px-mitte);flex:0 0 auto}
+.ra-on{font-size:15.5px;border:1px solid var(--px);border-radius:4px;padding:0 4px;flex:0 0 auto}
+.ra-mehr{font:inherit;font-size:17px;background:none;border:none;color:var(--px-mitte);padding:2px 4px;flex:0 0 auto}
+.ra-ast.t1{padding-left:18px}
+.ra-ast.t2{padding-left:36px}
+.ra-ast.t3{padding-left:54px}
+.ra-ast.t4{padding-left:72px}
+/* Regeln sind Sätze: umbrechen statt abschneiden, aber höchstens zwei Zeilen — die
+   Beschreibung bleibt weg, bis die Regel angetippt wird (0.108.1, Zeilen 0.108.2) */
+.gw-zeile{align-items:flex-start}
+.gw-zeile .k,.gw-zeile .gw-punkte{margin-top:4px}
+.gw-zeile .gw-tx{white-space:normal;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.gw-zeile.gewaehlt .gw-tx{display:block;padding:2px 4px}
+.gw-zeile .gw-tx small{display:block;font-size:16px;color:var(--px-mitte);line-height:1.25;white-space:normal;margin-top:3px}
+.eingabe{display:block;width:100%;font:inherit;font-size:17.5px;color:var(--px);background:var(--lcd-hell);border:0;border-bottom:2px dotted var(--px);padding:6px 4px;margin:6px 0 4px}
+.eingabe:focus{outline:2px solid var(--px)}
+.fenster label{display:block;margin-top:6px;color:var(--px-mitte);font-size:17.5px}
+.fenster label.haken{display:flex;gap:8px;align-items:center;color:var(--px)}
+.fenster .zeitpaar{display:flex;gap:8px;align-items:center}
+.fenster .zeitpaar .eingabe{flex:1}
+.fenster .feld{display:flex;gap:10px;padding:4px 0}
+.fenster .feld b{font-weight:400;color:var(--px-mitte);flex:0 0 92px;text-align:right}
+.fenster .notiz-text{white-space:pre-line}
+
+/* Hinweis wie ein Palm-Alarm */
+.toast{position:absolute;left:10px;right:10px;bottom:calc(70px + env(safe-area-inset-bottom));z-index:40;display:none;gap:10px;align-items:center;
+  background:var(--lcd);border:2px solid var(--px);box-shadow:3px 3px 0 var(--px);padding:8px 10px;font-size:19px;white-space:pre-line}
+.toast.auf{display:flex}
+.toast.warn{background:var(--px);color:var(--lcd);box-shadow:3px 3px 0 var(--px-mitte)}
+#toastText{flex:1}
+.toast button{border:2px solid currentColor;border-radius:12px;padding:0 8px;font-size:18.5px}
+/* Lernkartei (seit 0.23) */
+.lk-kasten{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px}
+.lk-k1{display:flex;justify-content:space-between;gap:8px;font-size:20px}
+.lk-k1 b{font-weight:400;background:var(--px);color:var(--lcd);padding:0 6px;white-space:nowrap}
+.lk-kasten small,.lk-karte-zeile small{display:block;font-size:16px;color:var(--px-mitte)}
+.lk-titel{font-size:21px;font-weight:600;border-bottom:2px solid var(--px);margin:2px 0 8px}
+.lk-faecher{display:flex;gap:8px;align-items:flex-end;margin:6px 0 10px}
+.lk-faecher div{flex:1;display:flex;flex-direction:column;align-items:center;font-size:17px}
+.lk-faecher small{font-size:15.5px;color:var(--px-mitte)}
+.lk-saeule{display:flex;align-items:flex-end;width:100%;height:70px;border:2px solid var(--px)}
+.lk-saeule i{display:block;width:100%;background:var(--px)}
+.lk-info{font-size:18px;margin:4px 0}
+.lk-karte-zeile{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 2px;font-size:19px}
+.lk-karte-zeile b{font-weight:400;color:var(--px-mitte);white-space:nowrap}
+.lk-kopfzeile{display:flex;justify-content:space-between;font-size:17px;color:var(--px-mitte);margin-bottom:6px}
+.lk-seite{display:block;width:100%;text-align:left;border:2px solid var(--px);background:var(--lcd-hell);padding:10px 12px;margin:0 0 10px;font-size:20px;line-height:1.4}
+.lk-seite.vorn{box-shadow:3px 3px 0 var(--px)}
+.lk-seite.hinten{background:var(--lcd)}
+.lk-seite small{display:block;font-size:15.5px;color:var(--px-mitte);margin-bottom:6px}
+.lk-zeile{margin:0 0 2px}
+.lk-leer{height:8px}
+.lk-punkt{display:flex;gap:8px;margin:2px 0}
+.lk-punkt span:first-child{flex:0 0 auto;min-width:18px}
+.lk-punkt.zu span:last-child{color:var(--px-zart)}
+.lk-mitte{text-align:center;justify-content:center}
+.lk-bewerten{display:flex;gap:6px;margin-top:8px}
+.lk-bewerten .knopf{flex:1;padding:6px 4px}
+.lk-feld{display:block;width:100%;min-height:150px;font:17.5px/1.4 ui-monospace,Menlo,Consolas,monospace;color:var(--px);background:var(--lcd-hell);border:2px solid var(--px);padding:6px;box-sizing:border-box}
+.lk-feld.klein{min-height:64px}
+.lk-datei{display:none}
+.lk-hinweis{border:2px dashed var(--px);padding:8px 10px;margin:6px 0 10px;font-size:17.5px;line-height:1.4}
+.lk-aufklapp{max-height:70vh;overflow:auto;min-width:240px}
+.lk-wahl{display:flex!important;justify-content:space-between;gap:12px;width:100%}
+.lk-wahl b{font-weight:400;color:var(--px-mitte)}
+.lk-wahl.an b{color:inherit}
+/* Vorlesen (seit 0.26) */
+.vl-text p.vl-mark{border-left:4px solid var(--px);padding-left:6px;margin-left:-2px}
+.vl-markknopf{font-size:15.5px;margin-right:4px}
+.vl-lz{border-bottom:2px dotted var(--px-zart);padding:6px 0}
+.vl-lz-t{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;font-size:19px}
+.vl-lz-t b{font-weight:400;color:var(--px-mitte);font-size:16px;white-space:nowrap}
+.vl-lz-text{display:block;width:100%;text-align:left;font-size:16px;color:var(--px-mitte)}
+.vl-lz-text q{display:block;quotes:"„" "“"}
+.vl-lz-text i{display:block;color:var(--px)}
+.vl-doc{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 2px}
+.vl-t{display:flex;justify-content:space-between;gap:8px;font-size:20px}
+.vl-t span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vl-t b{height:fit-content}
+.vl-t b{font-weight:400;background:var(--px);color:var(--lcd);padding:0 6px;white-space:nowrap;font-size:17px}
+.vl-doc small{display:block;font-size:16px;color:var(--px-mitte)}
+.vl-doc small.vl-fehlt{color:var(--px)}
+.vl-balken{display:block;height:8px;border:2px solid var(--px);margin-top:5px}
+.vl-balken i{display:block;height:100%;background:var(--px)}
+.vl-laeuft{display:flex;justify-content:space-between;align-items:center;gap:8px;border:2px solid var(--px);padding:4px 8px;margin:4px 0 8px;font-size:18px}
+.vl-kopf{margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vl-text{font-size:20px;line-height:1.55;height:calc(100vh - 445px);height:calc(100dvh - 445px);min-height:150px;overflow-y:auto;padding-right:4px}
+.vl-text p{margin:0 0 12px}
+.vl-s{cursor:pointer}
+.vl-s.gelesen{color:var(--px-mitte)}
+.vl-s.akt{background:var(--px);color:var(--lcd);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:0 2px}
+.vl-status{display:flex;justify-content:space-between;gap:8px;font-size:16px;color:var(--px-mitte);border-top:2px solid var(--px);padding-top:6px;margin-top:8px}
+.vl-steuer{display:flex;justify-content:space-between;align-items:center;margin:6px 4px}
+.vl-steuer button{width:48px;height:48px;border:2px solid var(--px);border-radius:50%;font-size:20px;display:flex;align-items:center;justify-content:center}
+.vl-steuer button.gross{width:66px;height:66px;background:var(--px);color:var(--lcd);font-size:28px}
+.vl-chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+.vl-stimme{display:flex!important;justify-content:space-between;gap:8px}
+.vl-stimme.an{font-weight:600}
+.vl-unter{padding-left:22px!important}
+.vl-regler{width:100%;accent-color:var(--px)}
+.vl-sperre{position:fixed;inset:0;z-index:10000;background:#040504;color:#3f4a37;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:12vh;font-size:17px;touch-action:none;user-select:none;-webkit-user-select:none}
+.vl-lauf{position:absolute;top:38%;left:0;right:0;text-align:center;line-height:1.7}
+.vl-entsperren{text-align:center}
+.vl-wisch{width:240px;height:46px;border:2px solid #2b3326;border-radius:23px;display:flex;align-items:center;padding:0 4px;margin:10px auto 0;touch-action:none}
+.vl-wisch i{width:36px;height:36px;border-radius:50%;background:#2b3326;color:#6a775f;font-style:normal;display:flex;align-items:center;justify-content:center;font-size:20px}
+/* Coach (seit 0.33) */
+.co-oben{background:var(--px);color:var(--lcd);margin:0 0 6px;padding:8px 10px}
+.co-oben-text{display:block;width:100%;text-align:left;color:var(--lcd);font-size:18px;line-height:1.3}
+.co-oben-text b{display:block;font-weight:400;font-size:15.5px;opacity:.8}
+.co-oben .co-ant button{border-color:var(--lcd);color:var(--lcd);background:none}
+.co-oben .co-ant button:active{background:var(--lcd);color:var(--px)}
+.co-gruss{display:flex;align-items:center;gap:10px;margin:0 0 6px;padding:8px 10px;border:2px solid var(--px-zart);border-radius:6px;font-size:17px;color:var(--px)}
+.co-gruss span{flex:1}
+.co-gruss button{border:2px solid var(--px);border-radius:10px;padding:0 8px;font-size:16px}
+.co-zeile-still{display:block;width:100%;text-align:left;font-size:16px;color:var(--px-mitte);border-bottom:2px dotted var(--px-zart);padding:2px 0 4px}
+.co-ant{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.co-ant button{border:2px solid var(--px);border-radius:14px;padding:1px 10px;font-size:16px;background:var(--lcd)}
+.co-ant button:active{background:var(--px);color:var(--lcd)}
+.co-tl{font-size:16px;color:var(--px-mitte);text-align:center;border-bottom:2px dotted var(--px-zart);margin:2px 0 6px}
+.co-msg{display:flex;gap:6px;margin:8px 0}
+.co-z{flex:0 0 42px;font-size:15.5px;color:var(--px-mitte);padding-top:3px}
+.co-b{flex:1;border:2px solid var(--px);background:var(--lcd-hell);padding:6px 8px;border-radius:0 9px 9px 9px;font-size:18px;line-height:1.3}
+.co-msg.jetzt .co-b{box-shadow:3px 3px 0 var(--px)}
+.co-msg.ich{justify-content:flex-end}
+.co-msg.ich .co-b{flex:0 1 auto;background:var(--px);color:var(--lcd);border-radius:9px 0 9px 9px;margin-left:48px}
+.co-msg.ich small{display:block;font-size:15.5px;opacity:.85}
+.co-b.co-spaeter{border-style:dashed;background:none;color:var(--px-mitte)}
+.co-zeile{display:flex;justify-content:space-between;gap:8px;border-bottom:2px dotted var(--px-zart);padding:5px 0}
+.co-zeile b{font-weight:400;color:var(--px-mitte)}
+.co-haken{display:flex;gap:8px;align-items:center;margin-top:10px}
+.co-pzeit{display:flex;gap:8px}
+.co-pzeit select{flex:0 0 90px}
+.co-pzeit input{flex:1}
+.co-vorab{flex-wrap:wrap}
+.co-q{display:block;font-size:15.5px;color:var(--px-mitte);margin-bottom:2px}
+.co-in{margin-top:7px;width:100%}
+.co-sa{display:flex;gap:6px;align-items:center;border-bottom:2px dotted var(--px-zart);padding:4px 0}
+.co-sa span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.co-sa select{flex:0 0 120px}
+.co-sa input{flex:0 0 105px}
+/* Memo: Bereich als Auswahl (seit 0.36) */
+.memo-bereich{display:flex;justify-content:space-between;align-items:center;width:100%;border:2px solid var(--px);padding:4px 10px;margin:6px 0 8px;font-size:20px;text-align:left}
+.memo-bereich span{font-size:17px;color:var(--px-mitte)}
+.memo-bereich.an{background:var(--px);color:var(--lcd)}
+.memo-bereich.an span{color:var(--lcd)}
+.lz-gruppen{border:2px solid var(--px);border-top:0;margin:-8px 0 8px;padding:0 6px}
+.fenster .lz-gruppen .wahl.an{font-weight:600}
+.memo-bereich-auf{top:96px;left:6px;right:6px}
+.memo-bereich-auf button{display:flex;justify-content:space-between}
+/* Jahr (seit 0.37) */
+.ja-chips{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px}
+.ja-chips button{border:2px solid var(--px);border-radius:12px;padding:0 8px;font-size:15.5px;display:inline-flex;align-items:center;gap:4px}
+.ja-chips button.an{background:var(--px);color:var(--lcd)}
+.ja-chips i{display:inline-block;width:10px;height:10px}
+.ja-chips i.fer{background:repeating-linear-gradient(90deg,var(--lcd-hell) 0 2px,var(--px-zart) 2px 4px);border:1px solid var(--px-zart)}
+.ja-hinweis{margin:0 0 4px}
+.ja-raster{display:grid;grid-template-columns:26px repeat(12,1fr);gap:1px}
+.ja-raster b{font-weight:400;font-size:15.5px;text-align:right;padding-right:3px;color:var(--px-mitte);line-height:1;display:flex;align-items:center;justify-content:flex-end}
+.ja-raster b:nth-child(-n+13){justify-content:center;padding-right:0}
+/* Das Raster füllt den Platz (seit 0.38.2): 32 Zeilen in der freien Höhe, mindestens 16 px */
+.ja-raster i{display:block;min-height:15px;background:var(--lcd-hell)}
+.ja{min-height:100%;display:flex;flex-direction:column}
+.ja .ja-raster{flex:1 1 auto;grid-template-rows:auto repeat(31,minmax(15px,1fr))}
+.ja-raster i.we{background:#aab597}
+.ja-raster i.fer{background-image:repeating-linear-gradient(90deg,transparent 0 2px,rgba(28,33,22,.35) 2px 3px)}
+.ja-raster i.fei{box-shadow:inset 0 0 0 1px var(--px)}
+.ja-raster i.heute{outline:2px solid var(--px);outline-offset:-1px}
+/* Art als Knopf ▼ (seit 0.38.2) */
+.ja-art{margin:2px 0 6px}
+.ja-art .ja-art-name{color:var(--px);font-size:19px}
+.memo-bereich.an .ja-art-name{color:var(--lcd)}
+.ja-art i{display:inline-block;width:12px;height:12px;margin:0 6px 0 2px;vertical-align:middle}
+.ja-punkt.fer,.ja-art i.fer{background:repeating-linear-gradient(90deg,var(--lcd-hell) 0 2px,var(--px-zart) 2px 4px);border:1px solid var(--px-zart)}
+.ja-zeile{display:flex;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:18px}
+.ja-zeile .d{flex:0 0 100px;color:var(--px-mitte);font-size:16px}
+.ja-zeile .t{flex:1;min-width:0}
+.ja-zeile .z{color:var(--px-mitte);font-size:15.5px;white-space:nowrap}
+.ja-google{border-bottom:2px dotted var(--px-zart);padding:5px 0}
+.ja-google small{display:block}
+.ja-chips.klein button{font-size:15.5px}
+.ja-punkt{display:inline-block;width:12px;height:12px;margin-right:6px}
+/* Spiele (seit 0.32) */
+.sym .ord{position:absolute;right:-2px;bottom:2px;background:var(--lcd);border:2px solid var(--px);border-radius:9px;font-size:15.5px;line-height:1;padding:1px 4px}
+.sp-fenster{top:90px}
+.sp-apps{padding:4px 0}
+.sp-apps .app{font-size:18px}
+.sp-apps .sym,.sp-apps .sym svg{width:64px;height:64px}
+.sp-stand{font-size:16px;margin:8px 0 0}
+.sd-kopf{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--px);margin:2px 0 6px;font-size:17px}
+.sd-kopf span{color:var(--px-mitte);font-size:16px}
+.sd-gitter{display:grid;grid-template-columns:repeat(9,1fr);border:3px solid var(--px);background:var(--lcd);max-width:460px;margin:0 auto}
+.sd-gitter button{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--px-zart);border-bottom:1px solid var(--px-zart);font-size:22px;padding:0;color:#3b4a2a}
+.sd-gitter button.v{color:var(--px);font-weight:700}
+.sd-gitter button.r3{border-right:2px solid var(--px)}
+.sd-gitter button.b3{border-bottom:2px solid var(--px)}
+.sd-gitter button.g{background:var(--lcd-hell)}
+.sd-gitter button.gleich{text-decoration:underline}
+.sd-gitter button.f{background:var(--px);color:var(--lcd)}
+.sd-gitter button.x{color:#8a1c1c;text-decoration:line-through}
+.sd-gitter button.n{display:grid;grid-template-columns:repeat(3,1fr);font-size:15.5px;line-height:.86;letter-spacing:-1px;color:var(--px-mitte);padding:0;overflow:hidden}
+.sd-gitter button.n i{font-style:normal;text-align:center}
+.sd-gitter button.f.n{color:var(--lcd)}
+/* Minen und Puzzle (seit 0.69) */
+.mi-feld{display:grid;border:2px solid var(--px);margin:0 auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.mi-feld button{aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:0;font-size:17px;font-weight:700;min-width:0}
+.mi-feld button.zu{background:var(--lcd-hell);box-shadow:inset -2px -2px 0 var(--px-zart),inset 2px 2px 0 #dfe6d0}
+.mi-feld button.auf{background:var(--lcd);border:1px solid var(--px-zart)}
+.mi-feld button.mine{color:var(--px)}
+.mi-feld button.knall{background:var(--px);color:var(--lcd)}
+.mi-feld button.falsch{text-decoration:line-through}
+.pz-feld{display:grid;gap:4px;margin:6px auto;max-width:360px}
+.pz-stein,.pz-frei{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-weight:700;padding:0}
+.pz-stein{border:2px solid var(--px);background:var(--lcd-hell);box-shadow:3px 3px 0 var(--px)}
+.pz-stein.recht{background:var(--px);color:var(--lcd)}
+.pz-frei{border:2px dotted var(--px-zart)}
+.pz-3 .pz-stein{font-size:36px}.pz-4 .pz-stein{font-size:30px}.pz-5 .pz-stein{font-size:24px}.pz-6 .pz-stein{font-size:20px}
+.pz-feld.ziel .pz-stein{box-shadow:none}
+.aufklapp.mp-wahl{min-width:260px}
+.aufklapp.mp-wahl button{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.aufklapp.mp-wahl button.an{background:var(--px);color:var(--lcd)}
+.aufklapp.mp-wahl small,.mp-best small{font-size:15.5px;color:inherit;opacity:.8;white-space:nowrap}
+.mp-best{display:flex;justify-content:space-between;padding:3px 10px;font-size:16px}
+.sd-ziffern{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:8px auto 0;max-width:460px}
+.sd-ziffern button{border:2px solid var(--px);font-size:23px;padding:3px 0;text-align:center}
+.sd-ziffern button:active{background:var(--px);color:var(--lcd)}
+.sd-ziffern button.voll{color:var(--px-zart);border-color:var(--px-zart)}
+.so-tisch{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;--kh:calc((min(100vw,480px) - 44px) / 7 * 1.38)}
+.so-oben{align-items:start;margin-bottom:10px}
+.so-k{display:block;width:100%;height:var(--kh);border:2px solid var(--px);border-radius:4px;background:var(--lcd-hell);font-size:16px;line-height:1.05;padding:1px 2px;text-align:left;vertical-align:top;color:var(--px)}
+.so-k.rot{color:#8a1c1c}
+.so-k.zu{background:repeating-linear-gradient(45deg,var(--px) 0 2px,var(--px-zart) 2px 6px)}
+.so-k.leer{background:none;border-style:dashed;border-color:var(--px-zart)}
+.so-k.neu{text-align:center;font-size:22px;color:var(--px-mitte)}
+.so-k.gew{outline:3px solid var(--px);outline-offset:-1px;background:var(--lcd);font-weight:700}
+.so-k.zu.gew{background:repeating-linear-gradient(45deg,var(--px) 0 2px,var(--px-zart) 2px 6px)}
+.so-spalte .so-k.nach-z{margin-top:calc(var(--kh) * -1 + 9px)}
+.so-spalte .so-k.nach-o{margin-top:calc(var(--kh) * -1 + 23px)}
+.so-abwurf{position:relative;grid-column:span 1}
+.so-abwurf .so-k.unter{display:none}
+.so-spalten{align-items:start;padding-bottom:20px}
+/* Kartenspiele: Poker und Schafkopf (seit 0.87) — einfarbig */
+.kt-k{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:44px;height:60px;margin:2px;border:2px solid var(--px);border-radius:4px;background:var(--lcd-hell);color:var(--px);font-size:17px;line-height:1.05;padding:0;vertical-align:middle}
+.kt-k b{font-weight:700}
+.kt-k i{font-style:normal;font-size:21px}
+.kt-k.zu{background:repeating-linear-gradient(45deg,var(--px) 0 2px,var(--px-zart) 2px 6px)}
+.kt-k.leer{background:none;border-style:dashed;border-color:var(--px-zart)}
+.kt-k.hoch{transform:translateY(-8px);outline:3px solid var(--px);outline-offset:-1px;background:var(--lcd)}
+.kt-k.blass{border-color:var(--px-zart);color:var(--px-zart)}
+.kt-farbe{display:block;margin-top:2px}
+.kt-sp{display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:2px dotted var(--px-zart);padding:3px 2px;font-size:17px}
+.kt-sp.raus{color:var(--px-mitte)}
+.kt-sp.dran .kt-name{font-weight:700}
+.kt-sp .kt-akt{grid-column:1 / span 2;font-size:15.5px;color:var(--px-mitte)}
+.kt-sp .kt-hand .kt-k{width:34px;height:46px;font-size:15.5px}
+.kt-sp small,.kt-du small,.kt-platz small{font-size:15.5px}
+.kt-tisch-mitte{text-align:center;margin:10px 0 4px}
+.kt-board{display:flex;justify-content:center;flex-wrap:wrap}
+.kt-pot{display:inline-block;margin-top:4px;font-size:17px;font-weight:700}
+.kt-du{text-align:center;border-top:2px solid var(--px);padding-top:6px;margin-top:6px;font-size:17px}
+.kt-meldung{text-align:center;font-size:17px;margin:8px 4px;line-height:1.35}
+.kt-tisch{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-areas:". p2 ." "p1 . p3" ". p0 .";gap:2px;text-align:center;font-size:17px;margin-top:4px}
+.kt-platz.p0{grid-area:p0}.kt-platz.p1{grid-area:p1}.kt-platz.p2{grid-area:p2}.kt-platz.p3{grid-area:p3}
+.kt-handreihe{display:flex;flex-wrap:wrap;justify-content:center;border-top:2px solid var(--px);padding-top:12px;margin-top:6px}
+.kt-handreihe .kt-k{width:42px;height:60px}
+.kt-k.sk .kt-farbe{width:22px;height:22px}
+.kt-ansage{font-size:17px;font-weight:600;border-bottom:2px solid var(--px);margin:10px 0 2px}
+.kt-ansage .wahl{font-weight:400}
+.kt-ansage .wahl .kt-farbe{display:inline-block;vertical-align:-2px;margin:0 4px 0 0}
+.kt-tab{width:100%;border-collapse:collapse;font-size:17px;margin:4px 0}
+.kt-tab td{padding:3px 4px;border-bottom:2px dotted var(--px-zart)}
+.kt-tab td:last-child{text-align:right}
+/* Ideenwerkstatt (seit 0.31) */
+.iw-idee{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:7px 0}
+.iw-idee small{display:block;font-size:16px;color:var(--px-mitte);margin-top:2px}
+.iw-idee .kr-kh b{font-weight:400;border:2px solid var(--px);padding:0 5px;font-size:15.5px;white-space:nowrap;height:fit-content}
+.iw-titel{font-size:19px;color:var(--px)}
+.iw-stufen button{flex:1;text-align:center;font-size:15.5px;border:2px solid var(--px);padding:1px 0}
+.iw-stufen button.an{background:var(--px);color:var(--lcd)}
+.iw-stufen button.hier{outline:3px solid var(--px);outline-offset:2px}
+.iw-stufen button:disabled{border-color:var(--px-zart);color:var(--px-zart)}
+.iw-var{border:2px solid var(--px);padding:6px 8px;margin:8px 0}
+.iw-var.an{box-shadow:3px 3px 0 var(--px);background:var(--lcd-hell)}
+.iw-var > b{font-size:18px}
+.iw-zeile{display:flex;gap:6px;margin-top:4px}
+.iw-zeile .eingabe{flex:1;min-width:0}
+.iw-datum{flex:0 0 150px!important}
+.iw-schr{display:flex;gap:8px;align-items:flex-start;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:18px}
+.iw-schr span{flex:1}
+.iw-steck{white-space:pre-wrap}
+.iw-entsch{grid-template-columns:1fr 1fr 1fr}
+/* Kurs (seit 0.28) */
+.kr-karte{display:block;width:100%;text-align:left;border:2px solid var(--px);background:var(--lcd-hell);padding:8px 10px;margin:8px 0}
+.kr-karte.jetzt{box-shadow:3px 3px 0 var(--px)}
+.kr-karte.fertig{background:var(--lcd);border-style:dashed}
+.kr-karte small{display:block;font-size:16px;color:var(--px-mitte);margin-top:3px}
+.kr-kh{display:flex;justify-content:space-between;gap:8px;font-size:18px}
+.kr-kh span{font-size:16px;color:var(--px-mitte);white-space:nowrap}
+.kr-eines{font-size:21px;line-height:1.3;margin:4px 0}
+.kr-kette{display:flex;gap:5px;margin:6px 0}
+.kr-kette i{flex:1;max-width:38px;height:30px;border:2px solid var(--px);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:16px}
+.kr-kette i.an{background:var(--px);color:var(--lcd)}
+.kr-kette i.halb{background:repeating-linear-gradient(45deg,var(--px-zart) 0 3px,transparent 3px 6px)}
+.kr-kette i.heute{outline:2px solid var(--px);outline-offset:2px}
+.kr-stufen{display:flex;gap:3px;margin:2px 0 10px}
+.kr-stufen span{flex:1;text-align:center;font-size:15.5px;border:2px solid var(--px);padding:1px 0}
+.kr-stufen span.an{background:var(--px);color:var(--lcd)}
+.kr-gross{font-size:21px;line-height:1.4;margin:8px 0 12px}
+.kr-hinweis{border-left:4px solid var(--px);padding:6px 10px;background:var(--lcd-hell);font-size:17.5px;margin:8px 0;line-height:1.4}
+.kr-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.kr-chips button{border:2px solid var(--px);padding:4px 10px;font-size:17px}
+.kr-chips button.an{background:var(--px);color:var(--lcd)}
+.kr-var{display:block;width:100%;text-align:left;border:2px solid var(--px);padding:6px 9px;margin:6px 0;font-size:16px;color:var(--px-mitte)}
+.kr-var b{display:block;font-size:19px;color:var(--px)}
+.kr-var.an{background:var(--px);color:var(--lcd)}
+.kr-var.an b{color:var(--lcd)}
+.kr-pfad{border:2px solid var(--px);padding:8px 10px;margin:8px 0}
+.kr-pfad.an{box-shadow:3px 3px 0 var(--px);background:var(--lcd-hell)}
+.kr-pfad small{display:block;font-size:16px;color:var(--px-mitte);margin:3px 0}
+.kr-skala.klein{height:10px}
+.kr-form label{display:block;margin-top:10px;color:var(--px-mitte);font-size:17.5px}
+.kr-form label.haken{display:flex;gap:8px;align-items:center;color:var(--px)}
+.kr-leer{flex:1;text-align:center}
+.kr-ab{display:flex;justify-content:space-between;align-items:center}
+.kr-ber{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0}
+.kr-t{display:flex;justify-content:space-between;gap:6px;font-size:19px}
+.kr-t b{font-weight:400;color:var(--px-mitte);font-size:17px;white-space:nowrap}
+.kr-ber small{display:block;font-size:16px;color:var(--px-mitte);margin-top:2px}
+.kr-fokus{background:var(--px);color:var(--lcd);font-size:15.5px;padding:0 5px;margin-left:6px;font-style:normal}
+.kr-skala{display:block;position:relative;height:14px;border:2px solid var(--px);margin-top:4px;background:var(--lcd-hell)}
+.kr-skala i{position:absolute;top:0;bottom:0;left:0;background:var(--px)}
+.kr-skala s{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,var(--px-zart) 0 3px,transparent 3px 6px)}
+.kr-skala u{position:absolute;top:-6px;width:4px;height:22px;background:var(--px)}
+.kr-box{border:2px solid var(--px);background:var(--lcd-hell);padding:6px 8px;margin:8px 0;font-size:17.5px;line-height:1.4}
+.kr-text{white-space:pre-wrap;user-select:text;-webkit-user-select:text}
+.kr-feld{min-height:64px}
+.kr-pfeil{border:2px solid var(--px);border-radius:3px;padding:0 6px;margin:0 4px;font-size:16px}
+.kr-pfeil:disabled{border-color:var(--px-zart);color:var(--px-zart)}
+.kr-prinz{display:block;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0;font-size:19px}
+.kr-prinz small{display:block;font-size:16px;color:var(--px-mitte)}
+.kr-schritte{display:flex;gap:4px;margin:2px 0 10px}
+.kr-schritte span{flex:1;height:6px;background:var(--px-zart)}
+.kr-schritte span.an{background:var(--px)}
+.kr-frage{font-size:19px;font-weight:600;margin:10px 0 6px}
+.kr-regel{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:2px solid var(--px);padding:5px 8px;margin:4px 0;font-size:17.5px}
+.kr-regel b{font-weight:400;white-space:nowrap}
+.kr-regel.an{background:var(--px);color:var(--lcd)}
+.kr-zahlen{display:flex;gap:3px}
+.kr-zahlen button{flex:1;border:2px solid var(--px);padding:4px 0;font-size:16px;text-align:center}
+.kr-zahlen button.an{background:var(--px);color:var(--lcd)}
+.kr-ergebnis{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.kr-ergebnis button{border:2px solid var(--px);padding:8px 2px;text-align:center;font-size:17.5px}
+.kr-ergebnis button.an{background:var(--px);color:var(--lcd)}
+.kr-wes{display:flex;gap:8px;align-items:flex-start;border-bottom:2px dotted var(--px-zart);padding:6px 0;font-size:19px}
+.kr-wes span{flex:1}
+.kr-wes small{display:block;font-size:16px;color:var(--px-mitte)}
+.kr-haken{font-size:22px;line-height:1}
+.kr-weg{color:var(--px-mitte);font-size:17px}
+.kr-erledigt{text-decoration:line-through;color:var(--px-mitte)}
+.kr-ent{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;font-size:18px}
+.kr-ent small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.kr-ent b{font-weight:400;border:2px solid var(--px);padding:0 5px;font-size:15.5px;white-space:nowrap;height:fit-content}
+.kr-ent b.nein{background:var(--px);color:var(--lcd)}
+.kr-kz{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:17px}
+.kr-kz span{width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kr-kz b{font-weight:400;min-width:44px;text-align:right}
+.kr-kurve{flex:1;height:26px}
+.kr-kurve.gross{display:block;width:100%;height:60px;border:2px solid var(--px);background:var(--lcd-hell)}
+.kr-linie{fill:none;stroke:var(--px);stroke-width:2.5}
+.kr-soll{stroke:var(--px-mitte);stroke-dasharray:4 4;stroke-width:1.5}
+
+/* ---------- Palm-Modell (seit 0.80): To Do, Memo Pad, Agenda ---------- */
+.fuss:has(.pm-tabs){flex-wrap:wrap}
+.cl-fehler{border:2px solid var(--px);padding:8px;margin:6px 0;font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+.cl-fehler small{font-size:15.5px;color:var(--px-mitte)}
+/* Seit 0.85: Haken ohne Browser-Blau — CLIE ist einfarbig */
+input[type=checkbox]{accent-color:var(--px)}
+.memo-zeile.pm.aus .tx{color:var(--px-mitte)}
+.memo-zeile.pm .pm-ausgebl{flex:0 0 auto;font-size:15.5px;color:var(--px-mitte)}
+.pm-tabs{display:flex;flex:1 0 100%;border:2px solid var(--px);margin-top:2px}
+.pm-tabs button{flex:1;text-align:center;padding:2px 0;font-size:18px}
+.pm-tabs button+button{border-left:2px solid var(--px)}
+.pm-tabs button.an{background:var(--px);color:var(--lcd)}
+.aufg.pm .pm-sym,.aufg .pm-sym,.std .pm-sym{flex:0 0 auto;font-size:15.5px;padding:0 2px;background:none;border:0;color:var(--px-mitte);white-space:nowrap}
+.aufg.pm .tx{background:none;border:0;text-align:left}
+.aufg.pm .tx:not(.lang) .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aufg.pm.erl .pd{color:var(--px-zart)}
+.pm-datwahl{border:2px solid var(--px);padding:0 8px;font-size:17px;margin:4px 0 2px}
+.pm-gr{font-size:15.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--px-mitte);margin:10px 0 0;border-bottom:1px solid var(--px-zart)}
+/* Seit 0.93: Balken für Typ (Memo Pad) und Kategorie (To Do, Memo Pad) */
+.pm-bal{display:flex;justify-content:space-between;align-items:center;background:var(--px);color:var(--lcd);font-weight:600;font-size:17px;padding:3px 8px;margin:10px 0 2px;border-radius:3px}
+.pm-bal small{font-weight:400;font-size:15.5px;opacity:.85}
+html.schema-wb .pm-bal{background:#19525A;color:#fff}
+/* Seit 0.120.0: die Textgrößen-Liste steht über der Leiste wie das Menü */
+.aufklapp.text-wahl{bottom:52px;top:auto}
+.pm-banner{border:2px dashed var(--px);padding:5px 8px;margin:4px 0 8px;font-size:17px;line-height:1.35}
+/* ---- Dock (seit 0.119.0): Umschalter, Zeitachse, jetzt-Linie ---- */
+.dk-um{display:flex;align-items:center;gap:0;margin:0 0 6px}
+.dk-um button{font:inherit;font-size:16px;background:none;border:2px solid var(--px);color:var(--px);padding:1px 11px}
+.dk-um button:first-child{border-radius:12px 0 0 12px}
+.dk-um button:nth-child(2){border-radius:0 12px 12px 0;border-left-width:0}
+.dk-um button.an{background:var(--px);color:var(--lcd)}
+.dk-um .dk-datum{margin-left:auto;font-size:16px;color:var(--px-mitte);white-space:nowrap}
+.dk-z{display:flex;gap:7px;align-items:flex-start}
+.dk-z .dk-t{flex:0 0 46px;padding-top:7px;font-size:16px;color:var(--px-mitte);white-space:nowrap}
+.dk-z .dk-t.ue{color:var(--akzent);font-weight:700}
+.dk-z .dk-n{flex:1;min-width:0}
+.dk-z.vorbei .dk-t,.dk-z.vorbei .dk-tx{color:var(--px-zart)}
+.dk-tx{font:inherit;font-size:17px;background:none;border:0;padding:5px 0;color:inherit;text-align:left;width:100%;min-height:30px}
+.dk-gz{font-size:16px;padding:2px 6px;margin:2px 0;border-left:4px solid var(--px);background:var(--lcd-hell)}
+.dk-jetzt{position:relative;height:0;border-top:2px solid var(--akzent);margin:5px 0 7px}
+.dk-jetzt span{position:absolute;right:0;top:-9px;background:var(--akzent);color:var(--lcd);font-size:15.5px;line-height:1.1;padding:0 4px;border-radius:2px}
+/* Eine Desk-Seite mit Nadel zum Anheften (seit 0.128.0) */
+.sdk-zeile{display:flex;align-items:stretch;border-bottom:2px dotted var(--px-zart)}
+.sdk-zeile .sdk-seite{flex:1;min-width:0;border-bottom:0}
+.sdk-nadel{flex:0 0 auto;background:transparent;border:0;color:var(--px-zart);
+  padding:0 4px 0 8px;cursor:pointer;display:flex;align-items:center}
+.sdk-nadel svg{width:24px;height:24px;display:block}
+.sdk-nadel.an{color:var(--akzent)}
+.lz-zeile .s svg{width:22px;height:22px;display:block;margin:0 auto}
+/* Verknüpfungen (seit 0.127.0) */
+.vk-hinweis{font-size:16px;line-height:1.35;color:var(--px-mitte);margin:2px 0 12px}
+.vk-kopf{font-size:15.5px;color:var(--px-mitte);margin:14px 0 4px;text-transform:none}
+.vk-zeile{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;
+  color:inherit;background:transparent;border:0;border-bottom:2px dotted var(--px-zart);
+  padding:6px 0;min-height:44px}
+.vk-sym{flex:0 0 30px;width:30px;height:30px}
+.vk-sym svg{width:30px;height:30px;display:block}
+.vk-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.vk-name{font-size:17px}
+.vk-anker{font-size:15.5px;color:var(--px-mitte)}
+.vk-kopie{flex:0 0 auto;font-size:15.5px;border:2px solid var(--px);padding:2px 8px;border-radius:2px}
+/* Desk (seit 0.125.0) — der Schreibtisch, nur lesend. Graustufen, keine Abschnittsfarben. */
+.sdk-fach{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0;min-height:42px;font:inherit;background:transparent;color:inherit}
+.sdk-fach .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sdk-fach.an{background:var(--px);color:var(--lcd)}
+.sdk-pf{flex:0 0 auto;font-size:16px;padding-right:4px}
+.sdk-sym{flex:0 0 26px;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.sdk-sym svg{width:24px;height:24px;display:block}
+.sdk-auf{border-left:2px dotted var(--px-mitte);margin:4px 0 8px 12px;padding:2px 0 4px 10px}
+.sdk-seite{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:5px 0;min-height:38px;color:inherit;text-decoration:none}
+.sdk-seite .tx{flex:1;min-width:0;overflow-wrap:anywhere}
+.sdk-seite.leer{color:var(--px-mitte)}
+.sdk-seite.leer small{font-size:15.5px;margin-left:auto;white-space:nowrap}
+.sdk-seite.tief{padding-left:22px}
+.sdk-unter{font-size:15.5px;color:var(--px-mitte);margin:8px 0 0}
+.sdk-fehler{border:2px dashed var(--px);padding:6px 8px;margin:6px 0;font-size:17px;line-height:1.35}
+.sdk-auf a.knopf{display:inline-block;color:inherit;text-decoration:none}
+/* Casestudies (seit 0.123.0) — das Wochenraster leiht sich die .wb-Regeln des Date Book */
+.cs-sem{font-weight:600;padding:2px 0 0}
+.cs-beendet{border:2px solid var(--px);padding:8px 10px;margin:8px 0;text-align:center;font-weight:600}
+.cs-fach{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:8px 0;font:inherit;background:transparent;color:inherit}
+.cs-fkopf{display:flex;align-items:center;gap:8px}
+.cs-fkopf .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.cs-fkopf small{font-size:15.5px;color:var(--px-mitte);white-space:nowrap}
+.cs-zeile{display:flex;gap:7px;align-items:baseline;font-size:16.5px;color:var(--px-mitte)}
+.cs-zeile b{font-weight:400;flex:0 0 58px}
+.cs-zeile.faellig{color:var(--px)}
+.cs-lp,.cs-ab,.cs-fe{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 0;min-height:40px}
+.cs-lp .tx,.cs-ab .tx,.cs-fe .tx{flex:1;min-width:0;font:inherit;background:none;border:0;color:inherit;text-align:left;padding:0}
+.cs-lp.erl .tx{text-decoration:line-through;color:var(--px-mitte)}
+.cs-ab small{display:block;font-size:15.5px;color:var(--px-mitte)}
+.cs-ab.erreicht .tx{color:var(--px-mitte)}
+.cs-verweis{font-size:15.5px;color:var(--px-mitte)}
+.cs-haken{flex:0 0 26px;height:26px;border:2px solid var(--px);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1}
+.cs-pf{flex:0 0 auto;display:flex;gap:2px}
+.cs-pf button{border:2px solid var(--px-zart);border-radius:3px;width:28px;height:26px;font-size:15.5px;line-height:1}
+.cs-kat{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border-bottom:2px dotted var(--px-zart);padding:6px 2px}
+.cs-kat .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:inherit;background:none;border:0;color:inherit;text-align:left;padding:0}
+.wb.cs-plan{height:min(62vh,560px);grid-template-rows:auto 1fr}
+.wb.cs-plan .wb-blk{text-align:left;border:0;width:100%}
+.memo-zeile.pm .mz.kz{flex:0 0 22px;text-align:left;font-weight:700}
+.memo-zeile.pm.gewaehlt{background:var(--px);color:var(--lcd)}
+.aufg.pm-z{align-items:flex-start;border-bottom:0;min-height:30px;padding:2px 0}
+.aufg.pm-z .k{margin-top:4px}
+/* Seit 0.80.1: im Memo steht der ganze Text — ohne die Zwei-Zeilen-Grenze von .tx.umbruch (sonst lagen Zeilen übereinander) */
+.aufg.pm-z .tx,.aufg.pm-z .tx.umbruch{flex:1;min-width:0;text-align:left;background:none;border:0;padding:2px 0;white-space:normal;overflow:visible;display:block;-webkit-line-clamp:unset;line-clamp:none;max-height:none;line-height:1.3;overflow-wrap:anywhere}
+.aufg.pm-z.erl .tx{color:var(--px-zart);text-decoration:line-through}
+.aufg.pm-z.gewaehlt{background:var(--lcd-hell);outline:2px solid var(--px);outline-offset:-1px}
+.pm-todo{flex:0 0 22px;width:22px;height:24px;padding:3px 2px 0;background:none;border:0;color:var(--px)}
+.pm-todo svg{display:block}
+.pm-leiste{display:flex;gap:6px;margin:2px 0 8px;position:sticky;top:0;z-index:2;background:var(--lcd);padding:2px 0}
+.pm-leiste button{border:2px solid var(--px);min-width:34px;height:30px;font-size:18px;padding:0 6px}
+.pm-leiste button:active{background:var(--px);color:var(--lcd)}
+.pm-editor{outline:none;min-height:55vh;white-space:pre-wrap;overflow-wrap:anywhere;font-size:19px;line-height:1.35;padding-bottom:40px}
+.pm-editor>div{position:relative;min-height:1.35em;padding:1px 0}
+.pm-editor .pm-k{padding-left:28px}
+.pm-editor .pm-k::before{content:'';position:absolute;left:1px;top:.25em;width:14px;height:14px;border:2px solid var(--px)}
+.pm-editor .pm-k.x::before{background:var(--px)}
+.pm-editor .pm-k.x{color:var(--px-zart);text-decoration:line-through}
+.pm-editor .pm-k[data-m]::after{content:'';display:inline-block;width:16px;height:16px;margin-left:8px;vertical-align:-2px;background:var(--px);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 1.5h11v13h-11z' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M4.5 4.5h2.5v2.5h-2.5zM4.5 9.5h2.5v2.5h-2.5z' fill='none' stroke='black' stroke-width='1.2'/%3E%3Cpath d='M8.5 5.75h3.5M8.5 10.75h3.5' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 1.5h11v13h-11z' fill='none' stroke='black' stroke-width='1.5'/%3E%3Cpath d='M4.5 4.5h2.5v2.5h-2.5zM4.5 9.5h2.5v2.5h-2.5z' fill='none' stroke='black' stroke-width='1.2'/%3E%3Cpath d='M8.5 5.75h3.5M8.5 10.75h3.5' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E") center/contain no-repeat}
+.pm-editor .pm-p{padding-left:22px}
+.pm-editor .pm-p::before{content:'•';position:absolute;left:6px}
+.pm-editor .pm-n{padding-left:30px}
+.pm-editor .pm-n::before{content:attr(data-vor);position:absolute;left:0;color:var(--px-mitte)}
+.pm-editor .pm-h{font-weight:700}
+.pm-editor .pm-roh{color:var(--px-mitte);font-size:16px;white-space:pre}
+.pm-det textarea.eingabe{resize:vertical;font:inherit}
+.pm-zeile{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.fenster .feld .pm-zeile{flex:1}
+.pm-kz button{min-width:38px;font-weight:700}
+.pm-kz button:disabled{opacity:.4}
+.pm-verb{border-top:2px dotted var(--px-zart);margin-top:8px;padding-top:2px}
+.pm-verb .verweis{display:block;text-align:left;font-size:18px}
+
+/* Farbschema Workbench (seit 0.88) — PC und iPad; am Handy bleibt LCD-Grün */
+html.schema-wb{--lcd:#F6F5F2;--lcd-hell:#FFFFFF;--px:#2E2C29;--px-mitte:#645F58;--px-zart:#B9B4AB;--gehaeuse:#E4E1DA;--akzent:#8A0B22}
+html.schema-wb body{font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:auto}
+html.schema-wb .geraet{box-shadow:0 0 0 1px #D4D0C8}
+html.schema-wb .reiter{background:#8A0B22;color:#fff}
+html.schema-wb .kopf{border-bottom-color:#8A0B22}
+html.schema-wb .anmeldebanner{background:#19525A;color:#fff;border-bottom-color:#19525A}
+html.schema-wb .anmeldebanner button{border-color:#fff}
+html.schema-wb .knopf.voll{background:#8A0B22;border-color:#8A0B22;color:#fff}
+html.schema-wb .kat.an{background:#19525A;color:#fff}
+html.schema-wb .silk{border-top-color:#D4D0C8}
+/* Symbole: die Farben stehen im Code — CSS geht vor die Attribute */
+html.schema-wb svg [fill="#3B4433"]{fill:#19525A}
+/* Seit 0.119.1 auch als Strich: die ausgesparten Fugen der neuen Symbole */
+html.schema-wb svg [stroke="#3B4433"]{stroke:#19525A}
+html.schema-wb svg [stroke="#1C2116"]{stroke:#19525A}
+html.schema-wb svg [fill="#1C2116"]{fill:#19525A}
+html.schema-wb svg [fill="#C9D3B7"]{fill:#FFFFFF}
+html.schema-wb svg [stroke="#C9D3B7"]{stroke:#FFFFFF}
+html.schema-wb .sa-sym,html.schema-wb .sa-raster button{background:#19525A;color:#fff}
+html.schema-wb .wb-blk.s1{background:#19525A;color:#fff}
+html.schema-wb .wb-blk.s2{background:#8A0B22;color:#fff}
+html.schema-wb .wb-blk.s3{background:#D4D0C8;color:var(--px)}
+html.schema-wb .wb-sp.heute{background:rgba(138,11,34,.05)}
+html.schema-wb .ja-raster i.we{background:#E4E1DA}
+html.schema-wb .mi-feld button.zu{box-shadow:inset -2px -2px 0 var(--px-zart),inset 2px 2px 0 #fff}
+html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
+/* Wochenstatistik (seit 0.97.11) */
+.pm-woche { padding: 2px 0; }
+.pm-wreihe { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
+.pm-wtitel { text-align: center; font-size: 16px; }
+.pm-wtitel small { display: block; opacity: .7; font-size: 16px; }
+.pm-wmodus { display: flex; gap: 4px; justify-content: center; margin-bottom: 6px; }
+.pm-wbereich, .pm-wliste { border: 1px solid currentColor; border-radius: 4px; padding: 4px 6px; margin: 6px 0; }
+.pm-wkopf { font-size: 17px; border-bottom: 1px solid currentColor; margin-bottom: 2px; }
+.pm-wzeile { display: flex; justify-content: space-between; gap: 6px; font-size: 16px; padding: 1px 0; }
+.pm-wbereich table { width: 100%; border-collapse: collapse; font-size: 16px; }
+.pm-wbereich th, .pm-wbereich td { text-align: right; padding: 1px 4px; font-weight: normal; }
+.pm-wbereich th:first-child, .pm-wbereich td:first-child { text-align: left; }
+.pm-tipp { background: none; border: 0; border-bottom: 1px dashed currentColor; font: inherit; color: inherit; padding: 0; cursor: pointer; }
+.fk-overlay { position: fixed; right: 8px; bottom: 74px; z-index: 60; width: 150px; background: var(--lcd, #c9d3b0); color: var(--ink, #1f2a1a); border: 2px solid var(--ink, #1f2a1a); border-radius: 6px; padding: 4px 6px; box-shadow: 0 4px 10px rgba(0,0,0,.35); font-family: "VT323", "Courier New", monospace; }
+.fk-overlay .fk-kopf { display: flex; justify-content: space-between; font-size: 16px; }
+.fk-overlay .fk-zeit { font-size: 34px; text-align: center; line-height: 1.1; }
+.fk-overlay .fk-reihe { display: flex; gap: 4px; justify-content: center; }
+.fk-overlay button { font: inherit; font-size: 16px; background: none; color: inherit; border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; cursor: pointer; }
+.fk-gross { font-size: 56px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="geraet">
+  <header class="kopf">
+    <span class="reiter" id="reiter">Home</span>
+    <span class="luecke"></span>
+    <span class="uhr" id="uhr"></span>
+    <button type="button" class="kat" id="katKnopf" onclick="katUm()" title="Beruf oder Privat">▼ Alle</button>
+  </header>
+  <div class="anmeldebanner" id="anmeldeStreifen">
+    <span id="anmeldeText">Keine Verbindung zu Google.</span>
+    <button type="button" onclick="anmelden(false)">Verbinden</button>
+  </div>
+  <button class="neustreifen" id="neuStreifen" type="button" onclick="neuLaden()">
+    <span id="neuText"></span>
+    <span class="neu-wort">Laden</span>
+  </button>
+  <main class="inhalt" id="inhalt"></main>
+  <div class="rollbar" id="rollbar" aria-hidden="true"><button type="button" onclick="rbSeite(-1)" tabindex="-1">▲</button><div class="rb-bahn" id="rbBahn" onclick="rbBahnTipp(event)"><i id="rbSchieber" onpointerdown="rbZiehenStart(event)"></i></div><button type="button" onclick="rbSeite(1)" tabindex="-1">▼</button></div>
+  <div class="fuss" id="fuss"></div>
+  <nav class="silk" aria-label="Tasten">
+    <button type="button" onclick="oeffne('uebersicht')"><b>⌂</b>Home</button>
+    <button type="button" onclick="oeffne('lesezeichen')"><b>☆</b>Bookmarks</button>
+    <button type="button" onclick="oeffne('suchen')"><b>⌕</b>Find</button>
+    <button type="button" onclick="menueUm()" id="menueTaste"><b>≡</b>Menu</button>
+  </nav>
+  <div class="schleier" id="schleier" onclick="aufklappZu()"></div>
+  <div id="aufklapp"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span><button type="button" onclick="toastZu()">OK</button></div>
+</div>
+
+<script>
+/*__SKRIPT__*/
+</script>
+</body>
+</html>
