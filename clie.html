@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.127.0</title>
+<title>CLIE 0.128.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -1161,6 +1161,14 @@ html.schema-wb .pm-bal{background:#19525A;color:#fff}
 .dk-gz{font-size:16px;padding:2px 6px;margin:2px 0;border-left:4px solid var(--px);background:var(--lcd-hell)}
 .dk-jetzt{position:relative;height:0;border-top:2px solid var(--akzent);margin:5px 0 7px}
 .dk-jetzt span{position:absolute;right:0;top:-9px;background:var(--akzent);color:var(--lcd);font-size:15.5px;line-height:1.1;padding:0 4px;border-radius:2px}
+/* Eine Desk-Seite mit Nadel zum Anheften (seit 0.128.0) */
+.sdk-zeile{display:flex;align-items:stretch;border-bottom:2px dotted var(--px-zart)}
+.sdk-zeile .sdk-seite{flex:1;min-width:0;border-bottom:0}
+.sdk-nadel{flex:0 0 auto;background:transparent;border:0;color:var(--px-zart);
+  padding:0 4px 0 8px;cursor:pointer;display:flex;align-items:center}
+.sdk-nadel svg{width:24px;height:24px;display:block}
+.sdk-nadel.an{color:var(--akzent)}
+.lz-zeile .s svg{width:22px;height:22px;display:block;margin:0 auto}
 /* Verknüpfungen (seit 0.127.0) */
 .vk-hinweis{font-size:16px;line-height:1.35;color:var(--px-mitte);margin:2px 0 12px}
 .vk-kopf{font-size:15.5px;color:var(--px-mitte);margin:14px 0 4px;text-transform:none}
@@ -1338,7 +1346,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.127.0';
+var APP_VERSION = '0.128.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -22947,6 +22955,14 @@ function lzZiel(p) {
     if (!sa || sa.vorlage) { return aus; }
     return { lebt: true, titel: sa.name, zeichen: '▤', symbol: saIkone(sa.symbol) ? saIkoneSvg(sa.symbol, 'sa-ikone-text') : '', stand: String(saSaetze(sa).length), kontext: sa.kontext || '' };
   }
+  /* Seit 0.128.0: eine Seite aus dem Desk. Lebt immer — Name und Link
+     stehen im Pin; aus den Desk-Daten wird nur aufgefrischt. */
+  if (p.art === 'desk') {
+    var tr = sdkSeiteSuchen(p.zielId);
+    return { lebt: true, symbol: SDK_BLATT,
+             titel: (tr ? tr.seite.name : p.titel) || 'Seite',
+             stand: (tr ? tr.fach.name : p.fach) || 'Desk', kontext: '' };
+  }
   if (p.art === 'jahrliste') {
     return { lebt: true, titel: jaArtName(p.zielId), zeichen: '▦', stand: 'Jahr ▸ Liste', kontext: '' };
   }
@@ -22973,6 +22989,7 @@ function lzOeffnen(id) {
   var p = lzAlle().filter(function (x) { return x.id === id; })[0];
   if (!p) { return; }
   var zid = String(p.zielId || '').replace(/^g:/, '');
+  if (p.art === 'desk') { sdkPinSprung(p); return; }
   if (p.art === 'sammlung') { oeffne('sammlungen'); saOeffnen(zid); return; }
   if (p.art === 'jahrliste') { oeffne('kalender'); clKalAnsicht('jahr'); jaFilter(zid); jaAnsicht('liste'); return; }
   seiteOeffnen(zid);
@@ -27925,6 +27942,67 @@ function vkKopieren(id) {
   fertig(false);
 }
 
+/* ---------- Eine Desk-Seite an die Pinnwand (seit 0.128.0) ----------
+
+   Der Pin trägt Name und Link SELBST, nicht nur eine Kennung. Grund:
+   Desk liest schreibtisch.json aus Drive. Ein Pin, der nur verweist,
+   wäre immer dann weg, wenn diese Datei gerade nicht geladen ist —
+   offline, nicht angemeldet, oder in den ersten Sekunden nach dem
+   Start. So steht das Lesezeichen sofort und überall; sind die
+   Desk-Daten da, wird der Name daraus aufgefrischt.
+
+   Die Pinnwand gehört der workbench.json und wird abgeglichen. Die
+   Workbench kennt die Art „desk“ nicht: pinInhalt fällt durch alle
+   Zweige, lebt bleibt false, und pinnwandZeichnen überspringt den
+   Zettel. Gelöscht wird er dort nirgends — nachgesehen am 15.11.2026.
+   Auf dem Arbeits-PC ist der Pin also unsichtbar, aber unversehrt. */
+
+/* Sucht eine Seite oder Unterseite in den geladenen Desk-Daten. */
+function sdkSeiteSuchen(id) {
+  var db = cl.sdk.db;
+  if (!db || !Array.isArray(db.faecher)) { return null; }
+  var treffer = null;
+  db.faecher.forEach(function (f) {
+    (f.seiten || []).forEach(function (s) {
+      if (s.id === id) { treffer = { seite: s, fach: f }; }
+      (s.unter || []).forEach(function (u) {
+        if (u.id === id) { treffer = { seite: u, fach: f }; }
+      });
+    });
+  });
+  return treffer;
+}
+
+function sdkAnheften(id, fachName) {
+  var da = lzHat('desk', id);
+  if (da) { lzWeg(da.id); zeichne(); return; }
+  var tr = sdkSeiteSuchen(id);
+  if (!tr) { melde('Diese Seite steht gerade nicht in den Desk-Daten.', 'warn'); return; }
+  var s = tr.seite;
+  if (!Array.isArray(DB.pinnwand)) { DB.pinnwand = []; }
+  var max = lzAlle().reduce(function (m, p) {
+    return Math.max(m, typeof p.ordnung === 'number' ? p.ordnung : 0);
+  }, 0);
+  DB.pinnwand.push({
+    id: neueKennung(), art: 'desk', zielId: id,
+    titel: String(s.name || '').slice(0, 80),
+    link: String(s.link || ''), link_web: String(s.link_web || ''),
+    fach: String(fachName || tr.fach.name || '').slice(0, 60),
+    farbe: 'gelb', seit: isoDatum(), ordnung: max + 10, geaendert: jetzt()
+  });
+  spaeterSichern();
+  melde('„' + s.name + '“ an die Pinnwand geheftet.', '');
+  zeichne();
+}
+
+/* Der Sprung aus dem Lesezeichen — derselbe Weg wie im Desk selbst. */
+function sdkPinSprung(p) {
+  var ziel = sdkZiel(p);
+  if (!ziel) { melde('Dieses Lesezeichen hat keinen Link.', 'warn'); return; }
+  if (/^https:/i.test(ziel)) { window.open(ziel, '_blank'); return; }
+  window.location.href = ziel;
+}
+
 /* ---------- Desk (seit 0.125.0) ----------
    Der Schreibtisch auf dem Pixel: die Fächer (OneNote-Abschnitte) als Stapel,
    darunter ihre Verweise und Seiten als einzelne Blätter. Ein Tipp springt in
@@ -27945,6 +28023,8 @@ var SDK_LS_KEY = 'clie-schreibtisch';
 var SDK_FRISCH = 120000;   /* so lange gilt ein geholter Stand als frisch */
 var SDK_STAPEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6V3h12v10h-2M6 9V6h12v10h-2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="9" width="13" height="11" fill="currentColor"/></svg>';
 var SDK_BLATT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+/* Reißzwecke zum Anheften einer Seite an die Pinnwand (seit 0.128.0) */
+var SDK_NADEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 3v2H6v-2l4-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 14v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
 cl.sdk = { fach: '', laedt: false, fehler: '', db: null, stand: '', geholt: 0 };
 
@@ -28017,9 +28097,19 @@ function sdkAnker(p, klasse, inhalt) {
   return '<a class="' + klasse + '" href="' + esc(z) + '"' + neu + '>' + inhalt + '</a>';
 }
 
-function sdkSeiteHtml(p, tief) {
-  return sdkAnker(p, 'sdk-seite' + (tief ? ' tief' : ''),
+/* heftbar: nur echte Seiten und Unterseiten bekommen die Nadel — die
+   Verweise aus „Immer dabei“ und die Fächer nicht (0.128.0). */
+function sdkSeiteHtml(p, tief, heftbar, fachName) {
+  var anker = sdkAnker(p, 'sdk-seite' + (tief ? ' tief' : ''),
     '<span class="sdk-sym">' + SDK_BLATT + '</span><span class="tx">' + esc(p.name) + '</span>');
+  if (!heftbar) { return anker; }
+  var dran = !!lzHat('desk', p.id);
+  return '<span class="sdk-zeile">' + anker
+    + '<button type="button" class="sdk-nadel' + (dran ? ' an' : '') + '"'
+    + ' onclick="sdkAnheften(\'' + esc(p.id) + '\',\'' + esc(fachName || '') + '\')"'
+    + ' title="' + (dran ? 'Von der Pinnwand nehmen' : 'An die Pinnwand heften') + '"'
+    + ' aria-label="' + (dran ? 'Von der Pinnwand nehmen' : 'An die Pinnwand heften') + '">'
+    + SDK_NADEL + '</button></span>';
 }
 
 function sdkFachHtml(f, i) {
@@ -28030,13 +28120,13 @@ function sdkFachHtml(f, i) {
   if (!offen) { return h; }
   h += '<div class="sdk-auf">';
   if (sdkZiel(f)) { h += '<div class="knoepfe">' + sdkAnker(f, 'knopf', 'Abschnitt öffnen') + '</div>'; }
-  h += sdkSortiert(f.leiste).map(function (p) { return sdkSeiteHtml(p, false); }).join('');
+  h += sdkSortiert(f.leiste).map(function (p) { return sdkSeiteHtml(p, false, false, ''); }).join('');
   var seiten = sdkSortiert(f.seiten);
   if (seiten.length) {
     h += '<div class="sdk-unter">Seiten</div>';
     seiten.forEach(function (s) {
-      h += sdkSeiteHtml(s, false);
-      h += sdkSortiert(s.unter).map(function (u) { return sdkSeiteHtml(u, true); }).join('');
+      h += sdkSeiteHtml(s, false, true, f.name);
+      h += sdkSortiert(s.unter).map(function (u) { return sdkSeiteHtml(u, true, true, f.name); }).join('');
     });
   }
   return h + '</div>';

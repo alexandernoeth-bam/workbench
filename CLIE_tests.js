@@ -11822,6 +11822,99 @@ function ankerTest() {
   pruefe(adr.indexOf('://') > 0, 'und ist vollständig, nicht nur der Anker (' + adr + ')');
 }
 
+function deskPinTest() {
+  console.log('\n224. Desk-Seiten an die Pinnwand heften (0.128.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* Desk-Daten, wie sie aus Drive kämen */
+  S.cl.sdk.db = { faecher: [ { id: 'fa-1', name: 'Projekt Nordlicht', reihe: 'eigen',
+    leiste: [ { id: 'lk-1', name: 'Aufgaben', link: 'onenote:///C:/N/P.one#Aufgaben' } ],
+    seiten: [
+      { id: 'se-1', name: 'Teststrategie', link: 'onenote:///C:/N/P.one#Teststrategie',
+        link_web: 'https://firma.sharepoint.com/t', unter: [
+          { id: 'un-1', name: 'Risikoklassen', link: 'onenote:///C:/N/P.one#Risiko', unter: [] } ] },
+      { id: 'se-2', name: 'Ohne Link', link: '', link_web: '', unter: [] } ] } ] };
+
+  /* Nur Seiten und Unterseiten bekommen die Nadel */
+  S.cl.sdk.fach = 'fa-1';
+  const h = S.sdkHtml();
+  pruefe((h.match(/class="sdk-nadel/g) || []).length === 3,
+    'drei Nadeln: zwei Seiten und eine Unterseite');
+  pruefe(/sdkAnheften\('se-1'/.test(h) && /sdkAnheften\('un-1'/.test(h),
+    'Seite und Unterseite sind heftbar');
+  pruefe(!/sdkAnheften\('lk-1'/.test(h),
+    '„Immer dabei“ bekommt keine Nadel — es sind keine Seiten');
+  pruefe(!/sdkAnheften\('fa-1'/.test(h), 'und das Fach auch nicht');
+
+  /* Anheften */
+  S.DB.pinnwand = [];
+  S.sdkAnheften('se-1', 'Projekt Nordlicht');
+  pruefe(S.DB.pinnwand.length === 1, 'Anheften legt einen Zettel an');
+  const pin = S.DB.pinnwand[0];
+  pruefe(pin.art === 'desk', 'mit der Art „desk“');
+  pruefe(pin.zielId === 'se-1', 'und der Kennung der Seite');
+  pruefe(pin.titel === 'Teststrategie', 'der Name steht IM Pin, nicht nur als Verweis');
+  pruefe(pin.link === 'onenote:///C:/N/P.one#Teststrategie', 'der onenote-Link auch');
+  pruefe(pin.link_web === 'https://firma.sharepoint.com/t', 'und die Web-Adresse');
+  pruefe(pin.fach === 'Projekt Nordlicht', 'dazu das Fach, aus dem sie stammt');
+  pruefe(typeof pin.ordnung === 'number' && !!pin.geaendert, 'Ordnung und Stempel wie bei jedem Zettel');
+
+  /* Nochmal tippen nimmt ihn wieder ab */
+  S.sdkAnheften('se-1', 'Projekt Nordlicht');
+  pruefe(S.DB.pinnwand.length === 0, 'nochmal tippen nimmt ihn ab');
+  pruefe(!S.lzHat('desk', 'se-1'), 'und lzHat findet ihn danach nicht mehr');
+
+  /* Das Entscheidende: ohne Desk-Daten muss der Pin trotzdem leben.
+     Desk liest aus Drive — offline wäre ein reiner Verweis unsichtbar. */
+  S.sdkAnheften('se-1', 'Projekt Nordlicht');
+  const gemerkt = S.DB.pinnwand[0];
+  S.cl.sdk.db = null;
+  const z = S.lzZiel(gemerkt);
+  pruefe(z.lebt === true, 'ohne geladene Desk-Daten lebt der Pin weiter');
+  pruefe(z.titel === 'Teststrategie', 'und zeigt den gemerkten Namen');
+  pruefe(z.stand === 'Projekt Nordlicht', 'und das gemerkte Fach');
+  pruefe(S.lzSichtbar().filter(function (x) { return x.id === gemerkt.id; }).length === 1,
+    'er steht damit auch in der Lesezeichenliste');
+
+  /* Mit Daten wird der Name aufgefrischt */
+  S.cl.sdk.db = { faecher: [ { id: 'fa-1', name: 'Nordlicht neu', reihe: 'eigen', leiste: [],
+    seiten: [ { id: 'se-1', name: 'Teststrategie v2', link: 'onenote:///x', unter: [] } ] } ] };
+  const z2 = S.lzZiel(gemerkt);
+  pruefe(z2.titel === 'Teststrategie v2', 'sind die Desk-Daten da, gewinnt der frische Name');
+  pruefe(z2.stand === 'Nordlicht neu', 'auch beim Fach');
+
+  /* Eine Seite, die es im Desk nicht mehr gibt, verschwindet NICHT */
+  S.cl.sdk.db = { faecher: [] };
+  pruefe(S.lzZiel(gemerkt).lebt === true,
+    'eine im Desk gelöschte Seite nimmt das Lesezeichen nicht mit — es bleibt mit dem alten Namen');
+
+  /* Der Sprung nimmt den onenote-Weg */
+  const quelle = funktionText(SKRIPT, 'sdkPinSprung') || '';
+  pruefe(/sdkZiel\(p\)/.test(quelle), 'der Sprung benutzt denselben sdkZiel-Weg wie Desk selbst');
+  pruefe(/window\.location\.href = ziel/.test(quelle), 'onenote: geht über location.href');
+  pruefe(quelle.indexOf('window.location.href') > quelle.indexOf('window.open'),
+    'https vorher in ein neues Fenster');
+  pruefe(/if \(p\.art === 'desk'\) \{ sdkPinSprung\(p\); return; \}/.test(SKRIPT),
+    'lzOeffnen schickt desk-Pins dorthin statt zu seiteOeffnen');
+
+  /* Und die Workbench: sie kennt die Art nicht und darf sie nicht anrühren */
+  if (!WB_SKRIPT) {
+    warn('workbench.html nicht da — die Prüfung gegen die Workbench entfällt');
+  } else {
+    const pinInhalt = funktionText(WB_SKRIPT, 'pinInhalt') || '';
+    pruefe(pinInhalt.length > 0, 'die Workbench hat pinInhalt');
+    pruefe(pinInhalt.indexOf("'desk'") < 0, 'sie kennt die Art „desk“ nicht');
+    pruefe(/lebt: false/.test(pinInhalt), 'und liefert dann lebt:false');
+    const zeichnen = funktionText(WB_SKRIPT, 'pinnwandZeichnen') || '';
+    pruefe(/if \(!z\.lebt\) \{ continue; \}/.test(zeichnen),
+      'pinnwandZeichnen überspringt solche Zettel, statt sie zu entfernen');
+    pruefe(!/DB\.pinnwand\s*=\s*\(?DB\.pinnwand\s*\|\|\s*\[\]\)?\.filter/.test(WB_SKRIPT),
+      'die Workbench filtert DB.pinnwand nirgends — ein Desk-Pin übersteht die Runde unversehrt');
+  }
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -12025,6 +12118,7 @@ function ankerTest() {
   try { veraltetesGeraetTest(); } catch (e) { fail('0.124.0 veraltetes Gerät warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
