@@ -11915,6 +11915,77 @@ function deskPinTest() {
   }
 }
 
+function huellenTest() {
+  console.log('\n225. Hüllen für einzelne Apps (0.128.0)');
+  if (!CL) { return; }
+
+  /* Jede *.webmanifest neben clie.html, die nicht die von CLIE selbst ist,
+     gehört zu einer Hülle. Der Fehler, den diese Kategorie fängt: eine Hülle,
+     die auf eine App zeigt, die es nicht (mehr) gibt — dann landet man beim
+     Antippen in einem leeren CLIE, ohne dass irgendetwas warnt. */
+  const alle = fs.readdirSync(ORDNER).filter(d => /\.webmanifest$/.test(d) && d !== 'clie.webmanifest');
+  if (!alle.length) {
+    warn('keine Hüllen erzeugt — node huellen.js <app> legt welche an');
+    return;
+  }
+  const ids = CL.CL_APPS.map(a => a.id);
+
+  for (const mfDatei of alle) {
+    const name = mfDatei.replace(/\.webmanifest$/, '');
+    let mf = null;
+    try { mf = JSON.parse(fs.readFileSync(path.join(ORDNER, mfDatei), 'utf8'));
+      ok(mfDatei + ' ist gültiges JSON'); }
+    catch (e) { fail(mfDatei + ': ' + e.message); continue; }
+
+    const seiteDatei = path.join(ORDNER, name + '.html');
+    pruefe(fs.existsSync(seiteDatei), name + '.html liegt neben dem Manifest');
+    if (!fs.existsSync(seiteDatei)) { continue; }
+    const seite = fs.readFileSync(seiteDatei, 'utf8');
+
+    pruefe(mf.start_url === './' + name + '.html',
+      'start_url zeigt auf die Hülle selbst (' + mf.start_url + ')');
+    pruefe(fs.existsSync(path.join(ORDNER, String(mf.start_url).replace(/^\.\//, ''))),
+      'und die Datei dahinter gibt es wirklich');
+    pruefe(mf.display === 'standalone', 'display ist standalone — eigenes Fenster, keine Adresszeile');
+    pruefe(mf.scope === './', 'der Geltungsbereich schließt clie.html ein, sonst springt die Hülle aus der App heraus');
+
+    /* Der eigentliche Punkt: das Sprungziel muss eine App sein, die es gibt */
+    const ziele = (seite.match(/\.\/clie\.html#([a-z0-9_-]+)/gi) || [])
+      .map(t => t.split('#')[1]);
+    pruefe(ziele.length >= 2, name + '.html hat Knopf und Weiterleitung auf dasselbe Ziel');
+    pruefe(ziele.length > 0 && ziele.every(z => z === ziele[0]),
+      'beide Wege führen zur selben App (' + ziele.join(', ') + ')');
+    pruefe(ziele.length > 0 && ids.indexOf(ziele[0]) >= 0,
+      'und „' + (ziele[0] || '—') + '“ steht wirklich in CL_APPS — kein Sprung ins Leere');
+    pruefe(fs.existsSync(path.join(ORDNER, 'clie.html')),
+      'clie.html, auf das die Hülle zeigt, liegt daneben');
+
+    /* Nur als installierte App weiterleiten. Springt sie immer, kann man sie
+       nie installieren — Chrome hat die Seite verlassen, bevor das Menü aufgeht. */
+    pruefe(/display-mode: standalone/.test(seite),
+      'die Weiterleitung hängt an display-mode: standalone');
+    pruefe(/if \(alsApp\) \{ window\.location\.replace/.test(seite),
+      'und springt nur dann — im Browser bleibt die Hülle stehen');
+
+    pruefe(new RegExp('rel="manifest" href="\\./' + name + '\\.webmanifest"').test(seite),
+      'die Hülle verweist auf ihr eigenes Manifest');
+
+    const groesse = f => { const b = fs.readFileSync(path.join(ORDNER, f));
+      return b.readUInt32BE(16) + 'x' + b.readUInt32BE(20); };
+    for (const bild of (mf.icons || [])) {
+      const datei = String(bild.src).replace(/^\.\//, '').replace(/\?.*$/, '');
+      if (!fs.existsSync(path.join(ORDNER, datei))) {
+        fail(datei + ' fehlt — Android zeigt dann eine leere Kachel');
+        continue;
+      }
+      pruefe(groesse(datei) === bild.sizes,
+        datei + ' ist wirklich ' + bild.sizes + ' (' + groesse(datei) + ')');
+    }
+    pruefe((mf.icons || []).some(i => i.purpose === 'maskable'),
+      'ein maskierbares Symbol ist dabei — sonst schneidet der Launcher ab');
+  }
+}
+
 (async function () {
   try { await terminTest(); } catch (e) { fail('Termine holen warf: ' + e.message); }
   try { uebersichtTest(); } catch (e) { fail('Übersicht warf: ' + e.message); }
@@ -12119,6 +12190,7 @@ function deskPinTest() {
   try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
