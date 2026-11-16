@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.129.0</title>
+<title>CLIE 0.130.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -1142,6 +1142,11 @@ html.schema-wb .pm-bal{background:#19525A;color:#fff}
 .dk-jetzt{position:relative;height:0;border-top:2px solid var(--akzent);margin:5px 0 7px}
 .dk-jetzt span{position:absolute;right:0;top:-9px;background:var(--akzent);color:var(--lcd);font-size:15.5px;line-height:1.1;padding:0 4px;border-radius:2px}
 /* Eine Desk-Seite mit Nadel zum Anheften (seit 0.128.0) */
+/* Der berufliche Schreibtisch, eingebettet (seit 0.130.0). .inhalt ist
+   position:relative, also füllt inset:0 den ganzen Bereich — auch den
+   Innenabstand, damit der Schreibtisch randlos sitzt. */
+.sdk-rahmen{position:absolute;inset:0}
+.sdk-rahmen iframe{width:100%;height:100%;border:0;display:block}
 .sdk-zeile{display:flex;align-items:stretch;border-bottom:2px dotted var(--px-zart)}
 .sdk-zeile .sdk-seite{flex:1;min-width:0;border-bottom:0}
 .sdk-nadel{flex:0 0 auto;background:transparent;border:0;color:var(--px-zart);
@@ -1326,7 +1331,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.129.0';
+var APP_VERSION = '0.130.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4713,7 +4718,7 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
       : (cl.app === 'casestudies') ? csKopfText()
-      : (cl.app === 'desk') ? 'Privat'
+      : (cl.app === 'desk') ? (sdkQuelle() === 'beruf' ? 'Beruf' : 'Privat')
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '')
@@ -5096,6 +5101,7 @@ function fussZeichnen() {
         : (cl.app === 'checklisten') ? checklistenFussHtml()
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sos') ? sosFussHtml()
+        : (cl.app === 'desk') ? sdkFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'casestudies') ? csFussHtml()
@@ -27270,6 +27276,42 @@ function sdkPinSprung(p) {
 
 var SDK_DATEI = 'schreibtisch.json';
 var SDK_LS_KEY = 'clie-schreibtisch';
+
+/* Welchen Schreibtisch zeigt Desk? Die Antwort gilt nur für DIESES Gerät
+   (seit 0.130.0). Am Arbeits-PC liegt der Schreibtisch als Datei auf der
+   Platte und seine Daten dürfen nie nach Drive; am Pixel kommt er aus Drive.
+   Deshalb localStorage und nicht die workbench.json — über den Abgleich
+   zöge die Einstellung sonst aufs andere Gerät und brächte dort das Falsche. */
+var SDK_QUELLE_KEY = 'clie-desk-quelle';
+var SDK_BERUF_SEITE = './schreibtisch-beruf.html';
+
+function sdkQuelle() {
+  try { return window.localStorage.getItem(SDK_QUELLE_KEY) === 'beruf' ? 'beruf' : 'drive'; }
+  catch (e) { return 'drive'; }
+}
+
+function sdkQuelleSetzen(q) {
+  var wert = (q === 'beruf') ? 'beruf' : 'drive';
+  try { window.localStorage.setItem(SDK_QUELLE_KEY, wert); } catch (e) { /* nur dieses Gerät */ }
+  if (cl.app === 'desk') { zeichne(); }
+}
+
+/* Die Rückfalltür: klemmt das Einbetten, geht der Schreibtisch im eigenen Fenster. */
+function sdkBerufFenster() {
+  if (window.open) { window.open(SDK_BERUF_SEITE, '_blank'); }
+}
+
+function sdkBerufHtml() {
+  return '<div class="sdk-rahmen"><iframe src="' + SDK_BERUF_SEITE + '" title="Schreibtisch"'
+    + ' allow="clipboard-read; clipboard-write"></iframe></div>';
+}
+
+function sdkFussHtml() {
+  var beruf = sdkQuelle() === 'beruf';
+  return '<button type="button" class="knopf' + (beruf ? '' : ' voll') + '" onclick="sdkQuelleSetzen(\'drive\')">Aus Drive</button>'
+    + '<button type="button" class="knopf' + (beruf ? ' voll' : '') + '" onclick="sdkQuelleSetzen(\'beruf\')">Datei · Beruf</button>'
+    + (beruf ? '<button type="button" class="knopf" onclick="sdkBerufFenster()">Eigenes Fenster</button>' : '');
+}
 var SDK_FRISCH = 120000;   /* so lange gilt ein geholter Stand als frisch */
 var SDK_STAPEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6V3h12v10h-2M6 9V6h12v10h-2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="9" width="13" height="11" fill="currentColor"/></svg>';
 var SDK_BLATT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
@@ -27390,6 +27432,9 @@ function sdkReiheHtml(db, reihe, titel) {
 }
 
 function sdkHtml() {
+  /* Am Arbeits-PC zeigt Desk den beruflichen Schreibtisch, eingebettet.
+     Kein Drive, keine Google-Frage — die beruflichen Daten bleiben auf dem PC. */
+  if (sdkQuelle() === 'beruf') { return sdkBerufHtml(); }
   var db = cl.sdk.db;
   var fehler = cl.sdk.fehler ? '<div class="sdk-fehler">' + esc(cl.sdk.fehler) + '</div>' : '';
   if (!db) {
@@ -27428,12 +27473,14 @@ function sdkVerbinden() {
 }
 
 function sdkAuffrischen() {
+  if (sdkQuelle() === 'beruf') { return Promise.resolve(false); }
   if (!cl.sdk.db) { sdkCacheLesen(); }
   if (Date.now() - cl.sdk.geholt > SDK_FRISCH) { return sdkLaden(); }
   return Promise.resolve(false);
 }
 
 function sdkLaden() {
+  if (sdkQuelle() === 'beruf') { return Promise.resolve(false); }
   if (cl.sdk.laedt) { return Promise.resolve(false); }
   if (!tokenGueltig()) { if (cl.app === 'desk') { zeichne(); } return Promise.resolve(false); }
   cl.sdk.laedt = true;

@@ -11572,6 +11572,63 @@ function deskPinTest() {
    Variablen) — erst beim Antippen des ▼ in Roots brach die Seite mit
    „p is not defined“ ab. Diese Kategorie zeichnet deshalb jede App und jede
    Sicht einmal wirklich und lässt jeden Fehler durchschlagen. */
+/* Fehlertyp: eine Einstellung, die nur für ein Gerät gilt, landet in den
+   gemeinsamen Daten. Desk zeigt am Arbeits-PC den beruflichen Schreibtisch
+   (Datei auf der Platte), am Pixel den privaten (aus Drive). Stünde diese
+   Wahl in der workbench.json, zöge sie über den Abgleich aufs andere Gerät
+   und brächte dort das Falsche — am Pixel einen Schreibtisch, den es da
+   nicht gibt. Sie gehört deshalb in den localStorage. Zweiter Fehlertyp:
+   der berufliche Weg greift trotzdem nach Google. Beides wird hier geprüft. */
+function deskQuelleTest() {
+  console.log('\n227. Desk: Quelle je Gerät, der berufliche Weg ohne Google (0.130.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* Standard ist und bleibt der private Weg */
+  pruefe(S.sdkQuelle() === 'drive', 'ohne Einstellung zeigt Desk den privaten Schreibtisch');
+  pruefe(!/<iframe/.test(S.sdkHtml()) && /sdkLaden\(\)/.test(S.sdkHtml()),
+    'und holt ihn aus Drive, statt etwas einzubetten');
+
+  /* Umschalten wirkt — aber nur auf diesem Gerät */
+  S.sdkQuelleSetzen('beruf');
+  pruefe(S.sdkQuelle() === 'beruf', 'umgeschaltet auf den beruflichen Schreibtisch');
+  pruefe(S.window.localStorage.getItem('clie-desk-quelle') === 'beruf', 'die Wahl steht im localStorage');
+  pruefe(!JSON.stringify(S.DB).includes('desk-quelle') && !JSON.stringify(S.DB).includes('"beruf"'),
+    'und NICHT in der Datenbank — sonst zöge sie über den Abgleich aufs Pixel');
+  pruefe(typeof S.DB.einstellungen.deskQuelle === 'undefined', 'auch nicht unter den Einstellungen');
+
+  /* Der berufliche Weg bettet ein und fragt nicht nach Google */
+  const h = S.sdkHtml();
+  pruefe(/<iframe[^>]*schreibtisch-beruf\.html/.test(h), 'Desk bettet schreibtisch-beruf.html ein');
+  pruefe(h.indexOf('Google') < 0 && h.indexOf('Drive') < 0, 'und kein Wort von Google oder Drive');
+  pruefe(S.SDK_BERUF_SEITE.indexOf('./') === 0, 'die Adresse ist relativ — derselbe Ort wie CLIE, sonst kein eigener Rahmen');
+
+  /* Und er holt nichts aus Drive, auch wenn jemand danach ruft */
+  let gerufen = 0;
+  const altesFetch = S.window.fetch;
+  S.window.fetch = function () { gerufen++; return Promise.reject(new Error('darf nicht')); };
+  S.sdkLaden();
+  S.sdkAuffrischen();
+  S.window.fetch = altesFetch;
+  pruefe(gerufen === 0, 'sdkLaden und sdkAuffrischen greifen im Beruf nicht ins Netz');
+
+  /* Oben steht, woran man ist, und unten kommt man zurück */
+  S.oeffne('desk'); S.zeichne();
+  pruefe(S.document.getElementById('katKnopf').textContent.indexOf('Beruf') >= 0, 'die Kopfzeile sagt „Beruf"');
+  const fuss = S.document.getElementById('fuss').innerHTML;
+  pruefe(/sdkQuelleSetzen\('drive'\)/.test(fuss) && /sdkQuelleSetzen\('beruf'\)/.test(fuss),
+    'die Fußzeile führt in beide Richtungen — man kommt zurück');
+  pruefe(/sdkBerufFenster\(\)/.test(fuss), 'und bietet die Rückfalltür „Eigenes Fenster"');
+
+  /* Zurück auf privat: alles wie vorher */
+  S.sdkQuelleSetzen('drive');
+  pruefe(S.sdkQuelle() === 'drive' && !/<iframe/.test(S.sdkHtml()) && /sdkLaden\(\)/.test(S.sdkHtml()),
+    'zurückgeschaltet ist der private Weg unverändert da');
+
+  S.cl.app = 'uebersicht';
+}
+
 function ruineTest() {
   console.log('\n226. Nach einem Ausbau: jede App und jede Sicht zeichnet ohne Fehler (0.129.0)');
   if (!CL) { return; }
@@ -11915,6 +11972,7 @@ function huellenTest() {
   try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deskQuelleTest(); } catch (e) { fail('0.130.0 Desk-Quelle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 

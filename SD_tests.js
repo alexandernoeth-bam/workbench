@@ -1338,6 +1338,62 @@ console.log('\nSD-29  Artkennzeichen');
     'die Art steht in keiner Datei — sie wird aus dem Link gelesen, nicht gepflegt');
 }
 
+/* Fehlertyp: eine Sperre, die zu weit greift. sdFsApiDa() verbot die
+   Dateiauswahl in JEDEM Rahmen, weil sie in einem fremden wirklich verboten
+   ist. In einem Rahmen derselben Herkunft erlaubt der Browser sie aber —
+   nachgemessen in Chrome: dort kommt AbortError, nicht SecurityError. Die zu
+   breite Sperre nahm dem Schreibtisch damit die Dateiablage, sobald er im
+   Desk von CLIE lief, obwohl beide vom selben Ort kommen. Erkannt wird hier
+   beides: dass der eigene Rahmen die Auswahl behält und der fremde nicht. */
+console.log('\nSD-30  Rahmen derselben Herkunft behält die Dateiauswahl (0.7.0)');
+{
+  pruefe(/function sdFremderRahmen/.test(SKRIPT), 'es gibt die Unterscheidung sdFremderRahmen');
+  const fs = SKRIPT.match(/function sdFsApiDa[\s\S]*?\n}/)[0];
+  pruefe(/sdFremderRahmen\(\)/.test(fs) && !/[^r]sdImRahmen\(\)/.test(fs),
+    'und die Dateiauswahl hängt an ihr, nicht mehr am Rahmen allein');
+
+  /* Eigener Rahmen: self !== top, aber dieselbe Herkunft */
+  const eigen = ladeIn(SKRIPT, 'eigen', 1280);
+  eigen.location.origin = 'https://alexandernoeth-bam.github.io';
+  eigen.top = { location: { origin: 'https://alexandernoeth-bam.github.io' } };
+  eigen.showOpenFilePicker = function () { return Promise.resolve([]); };
+  eigen.showSaveFilePicker = function () { return Promise.resolve({}); };
+  eigen.DB = eigen.sdLeer();
+  eigen.sdPlanungSichern();
+  eigen.zeichne();
+  const me = eigen.document.getElementById('mappe').innerHTML;
+  pruefe(eigen.sdImRahmen() === true, 'der Rahmen wird weiterhin erkannt');
+  pruefe(eigen.sdFremderRahmen() === false, 'aber er gilt nicht als fremd');
+  pruefe(eigen.sdFsApiDa() === true, 'die Dateiauswahl bleibt verfügbar — das ist der Punkt');
+  pruefe(/Neue Datei/.test(me) && /Datei öffnen/.test(me),
+    'die Knöpfe heißen „Datei öffnen“ und „Neue Datei“, nicht „Herunterladen“');
+  pruefe(!/Vorschau/.test(me), 'und keine Zeile behauptet mehr, hier ginge nichts');
+
+  /* Fremder Rahmen: andere Herkunft, alles bleibt gesperrt */
+  const fremd = ladeIn(SKRIPT, 'fremd', 1280);
+  fremd.location.origin = 'https://alexandernoeth-bam.github.io';
+  fremd.top = { location: { origin: 'https://claude.ai' } };
+  fremd.showOpenFilePicker = function () { return Promise.resolve([]); };
+  fremd.showSaveFilePicker = function () { return Promise.resolve({}); };
+  fremd.DB = fremd.sdLeer();
+  fremd.sdPlanungSichern();
+  fremd.zeichne();
+  const mf2 = fremd.document.getElementById('mappe').innerHTML;
+  pruefe(fremd.sdFremderRahmen() === true, 'eine andere Herkunft gilt als fremd');
+  pruefe(fremd.sdFsApiDa() === false, 'und dort bleibt die Dateiauswahl gesperrt');
+  pruefe(/Herunterladen/.test(mf2) && /Vorschau/.test(mf2), 'mit Herunterladen-Knopf und Begründung');
+
+  /* Lässt sich die Herkunft nicht vergleichen, gilt der Rahmen als fremd */
+  const leer = ladeIn(SKRIPT, 'leer', 1280);
+  leer.location.origin = 'null';
+  leer.top = { location: { origin: 'null' } };
+  pruefe(leer.sdFremderRahmen() === true, 'ohne vergleichbare Herkunft (file://) gilt der Rahmen als fremd');
+
+  /* Der Dienst darf sich im Rahmen weiterhin nicht einnisten */
+  pruefe(/function spMoeglich[\s\S]*?sdImRahmen\(\)/.test(PRIVAT_QUELLE),
+    'der Service Worker hängt weiter am Rahmen selbst — eingebettet meldet er sich nicht an');
+}
+
 /* ============================================================
    ERGEBNIS
    ============================================================ */

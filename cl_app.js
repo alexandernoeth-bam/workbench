@@ -1184,7 +1184,7 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
       : (cl.app === 'casestudies') ? csKopfText()
-      : (cl.app === 'desk') ? 'Privat'
+      : (cl.app === 'desk') ? (sdkQuelle() === 'beruf' ? 'Beruf' : 'Privat')
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '')
@@ -1567,6 +1567,7 @@ function fussZeichnen() {
         : (cl.app === 'checklisten') ? checklistenFussHtml()
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sos') ? sosFussHtml()
+        : (cl.app === 'desk') ? sdkFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'casestudies') ? csFussHtml()
@@ -23741,6 +23742,42 @@ function sdkPinSprung(p) {
 
 var SDK_DATEI = 'schreibtisch.json';
 var SDK_LS_KEY = 'clie-schreibtisch';
+
+/* Welchen Schreibtisch zeigt Desk? Die Antwort gilt nur für DIESES Gerät
+   (seit 0.130.0). Am Arbeits-PC liegt der Schreibtisch als Datei auf der
+   Platte und seine Daten dürfen nie nach Drive; am Pixel kommt er aus Drive.
+   Deshalb localStorage und nicht die workbench.json — über den Abgleich
+   zöge die Einstellung sonst aufs andere Gerät und brächte dort das Falsche. */
+var SDK_QUELLE_KEY = 'clie-desk-quelle';
+var SDK_BERUF_SEITE = './schreibtisch-beruf.html';
+
+function sdkQuelle() {
+  try { return window.localStorage.getItem(SDK_QUELLE_KEY) === 'beruf' ? 'beruf' : 'drive'; }
+  catch (e) { return 'drive'; }
+}
+
+function sdkQuelleSetzen(q) {
+  var wert = (q === 'beruf') ? 'beruf' : 'drive';
+  try { window.localStorage.setItem(SDK_QUELLE_KEY, wert); } catch (e) { /* nur dieses Gerät */ }
+  if (cl.app === 'desk') { zeichne(); }
+}
+
+/* Die Rückfalltür: klemmt das Einbetten, geht der Schreibtisch im eigenen Fenster. */
+function sdkBerufFenster() {
+  if (window.open) { window.open(SDK_BERUF_SEITE, '_blank'); }
+}
+
+function sdkBerufHtml() {
+  return '<div class="sdk-rahmen"><iframe src="' + SDK_BERUF_SEITE + '" title="Schreibtisch"'
+    + ' allow="clipboard-read; clipboard-write"></iframe></div>';
+}
+
+function sdkFussHtml() {
+  var beruf = sdkQuelle() === 'beruf';
+  return '<button type="button" class="knopf' + (beruf ? '' : ' voll') + '" onclick="sdkQuelleSetzen(\'drive\')">Aus Drive</button>'
+    + '<button type="button" class="knopf' + (beruf ? ' voll' : '') + '" onclick="sdkQuelleSetzen(\'beruf\')">Datei · Beruf</button>'
+    + (beruf ? '<button type="button" class="knopf" onclick="sdkBerufFenster()">Eigenes Fenster</button>' : '');
+}
 var SDK_FRISCH = 120000;   /* so lange gilt ein geholter Stand als frisch */
 var SDK_STAPEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6V3h12v10h-2M6 9V6h12v10h-2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="9" width="13" height="11" fill="currentColor"/></svg>';
 var SDK_BLATT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
@@ -23861,6 +23898,9 @@ function sdkReiheHtml(db, reihe, titel) {
 }
 
 function sdkHtml() {
+  /* Am Arbeits-PC zeigt Desk den beruflichen Schreibtisch, eingebettet.
+     Kein Drive, keine Google-Frage — die beruflichen Daten bleiben auf dem PC. */
+  if (sdkQuelle() === 'beruf') { return sdkBerufHtml(); }
   var db = cl.sdk.db;
   var fehler = cl.sdk.fehler ? '<div class="sdk-fehler">' + esc(cl.sdk.fehler) + '</div>' : '';
   if (!db) {
@@ -23899,12 +23939,14 @@ function sdkVerbinden() {
 }
 
 function sdkAuffrischen() {
+  if (sdkQuelle() === 'beruf') { return Promise.resolve(false); }
   if (!cl.sdk.db) { sdkCacheLesen(); }
   if (Date.now() - cl.sdk.geholt > SDK_FRISCH) { return sdkLaden(); }
   return Promise.resolve(false);
 }
 
 function sdkLaden() {
+  if (sdkQuelle() === 'beruf') { return Promise.resolve(false); }
   if (cl.sdk.laedt) { return Promise.resolve(false); }
   if (!tokenGueltig()) { if (cl.app === 'desk') { zeichne(); } return Promise.resolve(false); }
   cl.sdk.laedt = true;

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
-<title>Schreibtisch 0.6.0 Privat</title>
+<title>Schreibtisch 0.7.0 Privat</title>
 <link rel="manifest" href="./schreibtisch.webmanifest">
 <meta name="theme-color" content="#444B40">
 <link rel="apple-touch-icon" href="./schreibtisch-192.png">
@@ -326,7 +326,7 @@ body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFA
    derselben Quelle und bekommt den Drive-Teil dazu.
    ============================================================ */
 
-var SD_FASSUNG = '0.6.0';
+var SD_FASSUNG = '0.7.0';
 var SD_VERSION = 'Privat';
 var SD_DATEI_FASSUNG = 1;
 
@@ -673,14 +673,31 @@ function sdImRahmen() {
   try { return window.self !== window.top; } catch (e) { return true; }
 }
 
-/* Es genügt nicht zu fragen, ob es die Dateiauswahl GIBT. Im Rahmen gibt
-   es sie und sie darf nicht — dann bietet die App einen Knopf an, der
+/* Ein Rahmen allein ist kein Grund (seit 0.7.0). Verboten ist die
+   Dateiauswahl nur in einem Rahmen FREMDER Herkunft — in einem Rahmen
+   derselben Herkunft erlaubt der Browser sie, nachgemessen in Chrome:
+   dort kommt AbortError, nicht SecurityError. Erst das macht es möglich,
+   dass der Schreibtisch im Desk von CLIE läuft, beide vom selben Ort.
+   Lässt sich die Herkunft nicht vergleichen, gilt der Rahmen als fremd —
+   lieber ein Knopf weniger als einer, der nie funktioniert. */
+function sdFremderRahmen() {
+  if (!sdImRahmen()) { return false; }
+  try {
+    var hier = window.location.origin;
+    var oben = window.top.location.origin;
+    if (!hier || hier === 'null' || !oben || oben === 'null') { return true; }
+    return hier !== oben;
+  } catch (e) { return true; }
+}
+
+/* Es genügt nicht zu fragen, ob es die Dateiauswahl GIBT. Im fremden Rahmen
+   gibt es sie und sie darf nicht — dann bietet die App einen Knopf an, der
    nie funktionieren kann. Also beides fragen: vorhanden und erlaubt. */
 function sdFsApiDa() {
   if (typeof window === 'undefined') { return false; }
   if (typeof window.showOpenFilePicker !== 'function') { return false; }
   if (typeof window.showSaveFilePicker !== 'function') { return false; }
-  if (sdImRahmen()) { return false; }
+  if (sdFremderRahmen()) { return false; }
   return true;
 }
 
@@ -1153,7 +1170,7 @@ function sdFehlerZeigen(wobei, f) {
   var name = (f && f.name) ? f.name : 'Fehler';
   var satz = (f && f.message) ? f.message : 'kein Grund genannt';
   var rat = '';
-  if (name === 'SecurityError' && sdImRahmen()) {
+  if (name === 'SecurityError' && sdFremderRahmen()) {
     rat = '\nDie Seite läuft in einer Vorschau. Lade die Datei herunter und öffne sie von deinem Rechner.';
   } else if (name === 'NotAllowedError') {
     rat = '\nDer Browser oder eine Richtlinie verweigert den Zugriff. Nimm „Herunterladen“.';
@@ -1534,8 +1551,8 @@ function sdAblageHtml(hell) {
   var h = '<p class="ablage' + (hell ? ' hell' : '') + (sd.weg === 'nichts' ? ' alarm' : '') + '">'
     + sdAblageText()
     + (sd.gesichert ? '<br>Zuletzt gesichert ' + esc(sd.gesichert) : '');
-  if (sdImRahmen()) {
-    h += '<br>Diese Seite läuft in einer Vorschau. Der Browser verbietet dort '
+  if (sdFremderRahmen()) {
+    h += '<br>Diese Seite läuft in einer fremden Vorschau. Der Browser verbietet dort '
       + 'jede Dateiauswahl — lade die Datei herunter und öffne sie von deinem Rechner.';
   }
   h += '<br>'
