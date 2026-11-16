@@ -15,7 +15,7 @@
 
 'use strict';
 
-var FASSUNG = '0.8.0';
+var FASSUNG = '0.9.0';
 var VORRAT = 'schreibtisch-vorrat-' + FASSUNG;
 var PRAEFIX = 'schreibtisch-';
 var GRUNDLAGE = [

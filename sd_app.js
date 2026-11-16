@@ -1008,17 +1008,14 @@ function sdMarkeHtml(p, klasse) {
   return m ? '<span class="' + klasse + '">' + esc(m) + '</span>' : '';
 }
 
-/* Ein Öffnen-Knopf, überall gleich gebaut: der Hauptweg über onenote:,
-   daneben „Im Browser“, sobald beide Adressen da sind. */
+/* Ein Öffnen-Knopf, überall gleich gebaut. Seit 0.9.0 nur noch EIN Weg:
+   der zweite Knopf „Im Browser“ ist weg. Er wurde nicht gebraucht und war
+   es, der am 13.11.2026 die Zählung der <a> durcheinanderbrachte. */
 function sdOeffnenHtml(p, klasse, text) {
   var ziel = sdZiel(p);
   if (!ziel) { return ''; }
   var neu = /^https:/i.test(ziel) ? ' target="_blank" rel="noopener"' : '';
-  return '<a class="' + klasse + '" href="' + esc(ziel) + '"' + neu + '>' + esc(text) + '</a>'
-    + (sdHatBeide(p)
-      ? '<a class="' + klasse + ' zweitweg" href="' + esc(p.link_web) + '"'
-        + ' target="_blank" rel="noopener">Im Browser</a>'
-      : '');
+  return '<a class="' + klasse + '" href="' + esc(ziel) + '"' + neu + '>' + esc(text) + '</a>';
 }
 
 /* Ein Verweis. onenote: lässt die App stehen; https: geht in ein neues
@@ -1088,21 +1085,7 @@ function sdStapelHtml(f) {
     + (f.quelle ? '<span class="wohin">' + esc(f.quelle) + '</span>' : '')
     + '</span></button>';
   if (sd.bearbeiten) { h += sdStellerHtml('sdFachStellen', f.id, !sdIstSchmal()); }
-  if (gewaehlt && sdIstSchmal()) { h += sdAufklappHtml(f); }
   h += '</div>';
-  return h;
-}
-
-/* Was in der schmalen Ansicht unter dem Fach aufklappt. */
-function sdAufklappHtml(f) {
-  var h = '<div class="aufklapp">';
-  h += '<ul class="verweise">'
-    + f.leiste.map(function (p) { return '<li>' + sdVerweisHtml(p, 'leiste') + '</li>'; }).join('')
-    + '</ul>';
-  h += '<div class="knoepfe">'
-    + '<button type="button" class="knopf" onclick="sdFachOeffnen(\'' + esc(f.id) + '\')">Seiten</button>'
-    + sdOeffnenHtml(f, 'knopf', 'Abschnitt öffnen')
-    + '</div></div>';
   return h;
 }
 
@@ -1122,7 +1105,7 @@ function sdFachHtml() {
     h += '<div class="werkzeug"><button type="button" onclick="sdSeiteFenster(\'\')">Seite anlegen</button></div>';
   }
 
-  h += '<div class="fest"><p class="reihe-titel">Immer dabei</p><div class="seiten">';
+  h += '<div class="fest"><p class="reihe-titel">Angeheftet</p><div class="seiten">';
   h += f.leiste.map(function (p) { return sdLeisteBlattHtml(f, p); }).join('');
   h += '</div>';
   if (sd.bearbeiten) {
@@ -1134,10 +1117,15 @@ function sdFachHtml() {
   return h;
 }
 
+/* Ein Blatt, nicht zwei (seit 0.9.0). Vorher lagen hier zwei geschrägte
+   Lagen übereinander — das sah aus wie ein kleiner Fächerstapel und war
+   genau die Verwechslung: Stapel heißt Fach, Blatt heißt Seite. Jetzt ein
+   Blatt hochkant mit Eselsohr, unverwechselbar. */
 function sdBlattHtml(klasse, name, aufruf, p) {
   return '<button type="button" class="seite' + klasse + '" ' + aufruf + '>'
-    + '<span class="s-lager"><span class="s-blatt unten"></span>'
-    + '<span class="s-blatt">' + sdMarkeHtml(p, 'marke') + '</span></span>'
+    + '<span class="s-lager"><span class="s-blatt">'
+    + '<span class="s-ohr"></span><span class="s-zeilen"><i></i><i></i><i></i></span>'
+    + sdMarkeHtml(p, 'marke') + '</span></span>'
     + '<span class="st">' + esc(name) + '</span></button>';
 }
 
@@ -1210,7 +1198,7 @@ function sdMappeZeichnen() {
   if (sdIstSchmal() || sd.sicht === 'fach') { el.innerHTML = ''; return; }
   var f = sdFach(sd.fachId);
   if (!f) {
-    el.innerHTML = '<p class="leise">Ein Fach antippen zeigt hier seine Verweise.</p>' + sdAblageHtml(false);
+    el.innerHTML = '<p class="leise">Ein Fach antippen schlägt es auf und öffnet seinen OneNote-Abschnitt.</p>' + sdAblageHtml(false);
     return;
   }
   var h = '<div class="mappe-kopf"><span class="fleck" style="background:' + esc(f.farbe) + '"></span>'
@@ -1263,11 +1251,19 @@ function sdAblageHtml(hell) {
 
 /* ---------- Wege ---------- */
 
+/* Ein Klick aufs Fach macht beides (seit 0.9.0): er schlägt das Fach auf
+   UND springt in den OneNote-Abschnitt. Die Zwischenleiste mit [Seiten]
+   [Abschnitt öffnen] dazwischen ist entfallen — sie war ein Klick, der
+   nichts entschied. Gezeichnet wird zuerst: OneNote nimmt den Fokus, und
+   wenn man zurückkommt, soll das Fach schon offen dastehen. */
 function sdFachWaehlen(id) {
-  sd.fachId = (sd.fachId === id && sdIstSchmal()) ? '' : id;
+  var f = sdFach(id);
+  if (!f) { return; }
+  sd.fachId = id;
+  sd.sicht = 'fach';
   sd.seiteId = '';
-  sdFlaecheZeichnen();
-  sdMappeZeichnen();
+  zeichne();
+  sdGehe(sdZiel(f));
 }
 
 function sdFachOeffnen(id) {

@@ -228,7 +228,10 @@ console.log('\nSD-03  Fach wählen zeigt die Verweise');
   const f = SD.sdFachNeu('Testmanagement', 'eigen', '#3B8EDE', 'onenote:///Test', '');
   SD.zeichne();
   pruefe(/Ein Fach antippen/.test(mappe()), 'ohne Wahl steht in der Mappe ein ruhiger Hinweis');
+  /* Seit 0.9.0 führt ein Klick aufs Fach in die Fachansicht. Die Mappe zeigt
+     ein Fach nur noch, wenn man vom Fach zum Tisch zurückkommt. */
   SD.sdFachWaehlen(f.id);
+  SD.sdZumTisch();
   const m = mappe();
   pruefe(/Testmanagement/.test(m), 'die Mappe nennt das gewählte Fach');
   pruefe(/Aufgaben/.test(m) && /Offene Fragen/.test(m) && /Erkenntnisse/.test(m),
@@ -280,7 +283,7 @@ console.log('\nSD-05  Immer dabei: Aufgaben, Offene Fragen, Erkenntnisse');
   pruefe(f.leiste.every(p => p.link === ''), 'die drei kommen ohne Link und werden nachgetragen');
   pruefe(f.leiste.every(p => !!p.id), 'jeder Verweis hat eine eigene Kennung');
   SD.sdFachOeffnen(f.id);
-  pruefe(/Immer dabei/.test(flaeche()), 'die Fachansicht zeigt die Leiste unter den Seiten');
+  pruefe(/Angeheftet/.test(flaeche()), 'die Fachansicht zeigt die Leiste unter den Seiten');
   const g = SD.sdFachNeu('Zweites Fach', 'zusammen', '#9B6BC9', '', '');
   pruefe(g.leiste[0].id !== f.leiste[0].id, 'zwei Fächer teilen sich keine Verweise');
 }
@@ -406,18 +409,20 @@ console.log('\nSD-10  Breiten');
   SD.sd.fachId = '';
   SD.zeichne();
   pruefe(mappe() === '', 'schmal gibt es keine Mappe an der Seite');
+  /* Seit 0.9.0 gibt es keine Zwischenleiste mehr: der Klick schlägt das
+     Fach auf, statt darunter etwas aufzuklappen. */
   SD.sdFachWaehlen(f.id);
   const h = flaeche();
-  pruefe(/class="aufklapp"/.test(h), 'schmal klappen die Verweise unter dem Fach auf');
-  pruefe(/Aufgaben/.test(h), 'die drei Verweise stehen im Aufklapp');
-  pruefe(/Seiten</.test(h), 'der Weg zu den Seiten steht im Aufklapp');
-  SD.sdFachWaehlen(f.id);
-  pruefe(!/class="aufklapp"/.test(flaeche()), 'noch ein Tipp klappt schmal wieder zu');
+  pruefe(!/class="aufklapp"/.test(h), 'schmal klappt nichts mehr unter dem Fach auf');
+  pruefe(SD.sd.sicht === 'fach', 'der Klick führt stattdessen in die Fachansicht');
+  pruefe(/Aufgaben/.test(h), 'die Verweise stehen dort unter „Angeheftet“');
   SD.innerWidth = 1280;
+  SD.sdZumTisch();
   SD.sdFachWaehlen(f.id);
-  SD.zeichne();
-  pruefe(!/class="aufklapp"/.test(flaeche()), 'weit klappt nichts unter dem Stapel auf');
-  pruefe(/Testmanagement/.test(mappe()), 'weit stehen die Verweise wieder in der Mappe');
+  pruefe(!/class="aufklapp"/.test(flaeche()) && SD.sd.sicht === 'fach',
+    'weit tut der Klick dasselbe');
+  SD.sdZumTisch();
+  pruefe(/Testmanagement/.test(mappe()), 'zurück auf dem Tisch stehen die Verweise wieder in der Mappe');
 }
 
 /* ============================================================
@@ -490,6 +495,7 @@ console.log('\nSD-13  In OneNote springen');
   /* Derselbe Weg aus dem Fach heraus */
   const f = SD.sdFachNeu('X', 'eigen', '#3B8EDE', 'onenote:///Abschnitt', '');
   SD.sdFachWaehlen(f.id);
+  SD.sdZumTisch();
   pruefe(/href="onenote:\/\/\/Abschnitt"/.test(mappe()), 'auch der Abschnitt wird über onenote: geöffnet');
   pruefe(typeof SD.sdGehe === 'function', 'es gibt einen gemeinsamen Weg für den Sprung');
 }
@@ -938,16 +944,20 @@ console.log('\nSD-23  onenote: zuerst, Web als zweiter Weg');
   pruefe(SD.sdHatBeide(nurWeb) === false, 'dann gibt es keinen zweiten Weg');
 
   SD.sdFachWaehlen(f.id);
+  SD.sdZumTisch();
   const m = mappe();
   pruefe(/href="onenote:\/\/\/C:\/N\/T\.one#x"/.test(m), 'die Mappe öffnet den Abschnitt über onenote:');
-  pruefe(/zweitweg/.test(m) && /Im Browser/.test(m), 'und bietet daneben „Im Browser“');
-  pruefe(/target="_blank"[^>]*>Im Browser|Im Browser/.test(m), 'der Web-Weg geht in ein neues Fenster');
+  /* Seit 0.9.0 gibt es nur noch einen Knopf. „Im Browser“ daneben war der
+     zweite Weg, den niemand ging — und die Zählung, die am 13.11.2026
+     „Stundenplan“ zu „Block“ machte, verzählte sich an genau ihm. */
+  pruefe(!/zweitweg/.test(m) && !/Im Browser/.test(m), 'und bietet keinen zweiten Knopf mehr');
 
   /* In der Verweisliste der kleine Pfeil */
   f.leiste[0].link = 'onenote:///C:/N/T.one#a';
   f.leiste[0].link_web = 'https://x.sharepoint.com/a';
   SD.sdFachWaehlen(f.id);
-  pruefe(/class="imweb"/.test(mappe()), 'ein Verweis mit beiden Adressen bekommt den kleinen Pfeil');
+  SD.sdZumTisch();
+  pruefe(/class="imweb"/.test(mappe()), 'ein Verweis mit beiden Adressen behält den kleinen Pfeil');
 
   /* Eine Seite ohne jede Adresse bleibt blass */
   const s = SD.sdSeiteNeu(f, 'Ohne', '', '');
@@ -970,6 +980,7 @@ console.log('\nSD-24  Projektseite statt der drei');
   pruefe(team.leiste[0].link === '' && team.leiste[0].geaendert > 0,
     'zunächst ohne Link, aber mit Stempel');
   SD.sdFachWaehlen(team.id);
+  SD.sdZumTisch();
   pruefe(/Projektseite/.test(mappe()) && !/Offene Fragen/.test(mappe()),
     'die Mappe zeigt nur die Projektseite');
 }
@@ -1465,6 +1476,75 @@ console.log('\nSD-31  Schmal: Fächer bleiben Stapel, mindestens drei nebeneinan
     'und der Halter trägt die Marke dafür, nicht nur der Knopf');
   pruefe((markup.match(/class="lage"/g) || []).length === 4,
     'der Stapel hat weiterhin vier Lagen');
+}
+
+/* Fehlertyp: ein Klick, der nichts entscheidet, und ein Symbol, das zwei
+   Dinge bedeutet. Bis 0.8.0 führte der Klick aufs Fach auf eine Leiste mit
+   [Seiten] [Abschnitt öffnen] [Im Browser] — drei Wege, von denen zwei
+   dasselbe wollten. Und die Seiten waren als zwei geschrägte Lagen
+   gezeichnet, also wie kleine Fächerstapel: Stapel hieß einmal Fach und
+   einmal Seite. Beides wird hier festgehalten, damit es nicht zurückkommt. */
+console.log('\nSD-32  Ein Klick, ein Weg — und ein Blatt ist kein Stapel (0.9.0)');
+{
+  const V = ladeIn(SKRIPT, 'wege', 470);
+  V.DB = V.sdLeer();
+  const f = V.sdFachNeu('Interne Prozesse', 'zusammen', '#B03030',
+    'onenote:///T.one#I&section-id={4}&end', 'Team-Notizbuch', 'https://x.sharepoint.com/T');
+  V.sdSeiteNeu(f, 'Freigabeprozess', 'onenote:///T.one#F&page-id={1}&end', '');
+
+  /* Der Sprung wird abgefangen, statt ihn auszulösen */
+  let gesprungen = '';
+  V.sdGehe = function (z) { gesprungen = String(z || ''); };
+
+  V.sdFachWaehlen(f.id);
+  pruefe(V.sd.sicht === 'fach', 'ein Klick aufs Fach schlägt das Fach auf');
+  pruefe(V.sd.fachId === f.id, 'und zwar das angetippte');
+  pruefe(gesprungen === 'onenote:///T.one#I&section-id={4}&end',
+    'und springt im selben Zug in den OneNote-Abschnitt');
+  pruefe(/Freigabeprozess/.test(V.document.getElementById('flaeche').innerHTML),
+    'die Seiten stehen schon da, wenn man aus OneNote zurückkommt');
+
+  /* Kein zweiter Weg mehr */
+  pruefe(typeof V.sdAufklappHtml === 'undefined',
+    'die Zwischenleiste gibt es nicht mehr — kein Klick, der nichts entscheidet');
+  const ganz = V.document.getElementById('flaeche').innerHTML;
+  pruefe(ganz.indexOf('Im Browser') < 0, '„Im Browser“ steht nirgends mehr');
+  pruefe(SKRIPT.indexOf('zweitweg') < 0, 'auch die Klasse dafür ist weg');
+  pruefe(/Angeheftet/.test(ganz) && ganz.indexOf('Immer dabei') < 0,
+    'die Leiste heißt „Angeheftet“');
+
+  /* Ein Fach ohne Link darf nicht ins Leere springen */
+  gesprungen = 'nichts angefasst';
+  const ohne = V.sdFachNeu('Ohne Link', 'eigen', '#2F6F8F', '', '');
+  V.sdZumTisch();
+  V.sdFachWaehlen(ohne.id);
+  pruefe(V.sd.sicht === 'fach', 'ein Fach ohne Link schlägt trotzdem auf');
+  pruefe(gesprungen === 'nichts angefasst' || gesprungen === '',
+    'und löst keinen Sprung ins Leere aus');
+
+  /* Blatt ist nicht Stapel */
+  const blatt = V.sdBlattHtml('', 'Freigabeprozess', '', { link: 'onenote:///x' });
+  pruefe(blatt.indexOf('s-blatt unten') < 0, 'ein Blatt hat keine zweite Lage mehr');
+  pruefe((blatt.match(/class="s-blatt"/g) || []).length === 1, 'genau ein Blatt');
+  pruefe(/s-ohr/.test(blatt), 'es trägt ein Eselsohr — daran erkennt man die Seite');
+  const stil = QUELLE.slice(QUELLE.indexOf('.s-blatt{'));
+  const regel = stil.slice(0, stil.indexOf('}') + 1);
+  pruefe(regel.indexOf('skew') < 0, 'und ist nicht geschrägt — geschrägt heißt Fach');
+  pruefe(/aspect-ratio:3\/4/.test(regel), 'sondern steht hochkant im Seitenverhältnis 3:4');
+  /* Am Zeilenanfang suchen: „.stapel .lage{“ steht vorher in der Datei und
+     ist eine andere Regel — indexOf('.lage{') griff die falsche. */
+  const lageRegel = (QUELLE.match(/\n\.lage\{[^}]*\}/) || [''])[0];
+  pruefe(/skewX\(-27deg\)/.test(lageRegel),
+    'der Fächerstapel bleibt dagegen geschrägt — die beiden sind auseinanderzuhalten');
+
+  /* Helles Schema wie in CLIE */
+  pruefe(/--tisch:#F6F5F2/.test(QUELLE), 'der Tisch ist hell wie CLIEs Fläche');
+  pruefe(/--tinte:#2E2C29/.test(QUELLE), 'die Schrift ist CLIEs Tinte');
+  pruefe(/--akzent:#8A0B22/.test(QUELLE) && /--teal:#19525A/.test(QUELLE), 'Akzent und Petrol dazu');
+  pruefe(QUELLE.indexOf('rgba(255,255,255,.18)') < 0,
+    'keine weißen Trennlinien mehr — auf hellem Grund wären sie unsichtbar');
+  pruefe(/box-shadow:0 0 0 1px var\(--kante\)/.test(lageRegel),
+    'jede Lage hat eine Kante, sonst geht der Stapel im hellen Grund unter');
 }
 
 /* ============================================================
