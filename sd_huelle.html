@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Schreibtisch __FASSUNG__ __VERSION__</title>
+<!--__KOPF__-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --tisch:#4F574B;
+  --tisch-tief:#444B40;
+  --papier:#FBFAF6;
+  --papier-schatten:#EFECE2;
+  --kante:#E6E2D7;
+  --tinte:#33312C;
+  --tinte-leise:#7A776E;
+  --linie:#DEDACE;
+  --reiter-breit:7px;
+  /* Zoomfaktor der Papierstapel. Wird je Gerät gesetzt, nicht in der
+     Datei gespeichert: Der PC und das Pixel wollen verschiedene Größen. */
+  --z:1;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"Fira Sans",system-ui,sans-serif;color:var(--tinte);
+  background:var(--tisch);font-size:16px;line-height:1.45}
+
+/* ---------- Planungsleiste ---------- */
+.planung{display:flex;align-items:center;gap:3px;padding:9px 14px;background:var(--tisch-tief);
+  flex-wrap:wrap;flex:0 0 auto}
+.planung a{color:#DDE2D6;text-decoration:none;font-size:15px;padding:5px 11px;border-radius:2px}
+.planung a:hover,.planung a:focus-visible{background:rgba(255,255,255,.1);text-decoration:underline;
+  text-underline-offset:3px}
+.planung .luecke{flex:1}
+.stift{background:none;border:1px solid rgba(255,255,255,.3);color:#DDE2D6;font:inherit;font-size:14px;
+  padding:4px 11px;border-radius:2px;cursor:pointer}
+.stift.an{background:#DDE2D6;color:var(--tisch-tief);border-color:#DDE2D6}
+/* Kopfzeile im Bearbeiten-Modus: Name als Knopf, daneben zwei Pfeile. */
+.zoom{display:inline-flex;gap:3px;margin-right:7px}
+.zoom .stift{min-width:30px;font-size:16px;line-height:1;padding:4px 8px}
+.stift[disabled]{opacity:.35;cursor:default}
+.pl-halter{display:inline-flex;align-items:center;gap:1px;margin-right:7px}
+.pl-name{background:none;border:0;border-bottom:1px dashed rgba(221,226,214,.45);color:#DDE2D6;
+  font:inherit;font-size:15px;padding:4px 6px;border-radius:2px;cursor:pointer}
+.pl-name:hover{background:rgba(255,255,255,.1)}
+.pl-pfeil{background:none;border:1px solid rgba(255,255,255,.25);color:#DDE2D6;font:inherit;
+  font-size:11px;line-height:1;padding:5px 5px;border-radius:2px;cursor:pointer}
+.pl-pfeil:hover{background:rgba(255,255,255,.16)}
+body.b-schmal .pl-name{font-size:14px;padding:3px 5px}
+body.b-schmal .pl-halter{margin-right:5px}
+
+/* ---------- Tisch ---------- */
+.tisch{flex:1;display:flex;min-height:0}
+.flaeche{flex:1;padding:22px 24px;overflow:auto;min-width:0}
+.reihe-titel{color:#C5CCBC;font-size:14.5px;font-weight:500;margin:0 0 12px}
+.reihe-titel:not(:first-child){margin-top:28px}
+.stapel-reihe{display:flex;flex-wrap:wrap;gap:26px}
+
+/* ---------- Der Stapel ---------- */
+.stapel{position:relative;border:0;background:none;padding:0;cursor:pointer;
+  font:inherit;color:inherit;text-align:left;display:flex;flex-direction:column;gap:9px}
+.stapel-halter{display:flex;flex-direction:column}
+.stapel:focus-visible{outline:2px solid #FBFAF6;outline-offset:4px}
+.stapel .lage{transition:top .14s ease,box-shadow .14s ease}
+
+/* ---------- Die Fachmappe rechts ---------- */
+.mappe{flex:0 0 310px;background:var(--papier);padding:22px 24px;overflow:auto;
+  display:flex;flex-direction:column}
+.mappe-kopf{display:flex;align-items:flex-start;gap:11px;padding-bottom:14px;border-bottom:1px solid var(--linie)}
+.mappe-kopf .fleck{flex:0 0 7px;height:30px;border-radius:2px;margin-top:2px}
+.mappe-kopf h3{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
+.mappe-kopf .quelle{font-size:14px;color:var(--tinte-leise);margin-top:1px}
+.verweise{list-style:none;margin:6px 0 0;padding:0}
+.verweise li{border-bottom:1px solid var(--linie)}
+.verweise a{display:block;padding:11px 2px;color:var(--tinte);text-decoration:none;font-size:16.5px}
+.verweise a:hover,.verweise a:focus-visible{text-decoration:underline;text-underline-offset:3px}
+.verweise .ohne{display:block;padding:11px 2px;color:var(--tinte-leise);font-size:16.5px;font-style:italic}
+.oeffnen{margin-top:auto;padding-top:18px}
+.oeffnen a{display:inline-block;background:var(--tinte);color:var(--papier);text-decoration:none;
+  padding:9px 17px;border-radius:2px;font-size:16px}
+.ablage{font-size:14px;color:var(--tinte-leise);padding-top:14px;line-height:1.4}
+.ablage button{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--tinte);
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+
+/* ---------- Bearbeiten ---------- */
+/* Kein Stift mehr auf dem Stapel: Seit die Steller daneben stehen, sagt
+   er dasselbe ein zweites Mal — und einer davon ist selbst ein Stift. */
+.werkzeug{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap}
+.werkzeug button{font:inherit;font-size:14.5px;padding:5px 11px;background:var(--papier);
+  border:1px solid var(--linie);border-radius:2px;cursor:pointer;color:var(--tinte)}
+/* Die kleinen Steller neben einem Eintrag: höher, tiefer, ändern, weg. */
+.steller{display:inline-flex;gap:2px;margin-left:7px;vertical-align:middle}
+.steller button{font:inherit;font-size:15.5px;line-height:1;width:26px;height:26px;padding:0;
+  background:var(--papier);border:1px solid var(--linie);border-radius:2px;cursor:pointer;
+  color:var(--tinte)}
+.steller button:hover{background:var(--papier-schatten)}
+.verweise li{display:flex;align-items:center}
+.verweise li a,.verweise li .ohne{flex:1}
+/* Blatt und seine Steller stehen in einer Spalte — sonst sieht man nicht,
+   welcher Steller zu welchem Blatt gehört. */
+.seite-halter{display:flex;flex-direction:column;gap:7px;width:calc(132px * var(--z))}
+.seite-halter .seite{width:100%}
+.seite-halter .steller{margin:0}
+.seite-halter .steller button{width:28px;height:26px}
+.leise{color:#A8B09E;font-size:14.5px;margin:4px 0}
+.unterseiten .leise,.aufklapp .leise,.mappe .leise{color:var(--tinte-leise)}
+
+
+/* ---------- Liegender Stapel (nach Alexanders Skizze) ----------
+   Das Blatt liegt auf dem Tisch, nicht aufrecht davor: ein Parallelogramm,
+   darunter die Kanten der Blätter desselben Stapels. Der Name steht darunter
+   — auf einer schrägen Fläche liest sich nichts. */
+body.b-weit .stapel{width:calc(178px * var(--z))}
+.lager{position:relative;height:calc(88px * var(--z));flex:0 0 calc(88px * var(--z))}
+.lage{position:absolute;left:0;top:0;width:calc(142px * var(--z));height:calc(52px * var(--z));
+  border-radius:2px;transform:skewX(-27deg);transform-origin:0 100%;background:#DFDBCD}
+.lage:nth-child(1){top:calc(24px * var(--z));left:calc(3px * var(--z));background:#D1CDBE}
+.lage:nth-child(2){top:calc(18px * var(--z));left:calc(2px * var(--z));background:#DDD9CA}
+.lage:nth-child(3){top:calc(12px * var(--z));left:calc(1px * var(--z));background:#E9E6D9}
+.lage:nth-child(4){top:calc(5px * var(--z));left:0;background:var(--papier);
+  box-shadow:0 9px 15px rgba(0,0,0,.3)}
+.lage .reiter{position:absolute;left:calc(9px * var(--z));top:calc(8px * var(--z));
+  bottom:calc(8px * var(--z));width:calc(9px * var(--z));border-radius:2px;
+  transform:skewX(27deg)}
+.stapel .name{display:block;color:#E7EADF;font-size:16.5px;font-weight:500;line-height:1.25}
+.stapel .wohin{display:block;color:#A8B09E;font-size:13.5px;margin-top:1px}
+/* Damit die Steller im Bearbeiten-Modus auf einer Linie stehen, auch
+   wenn ein Fach kein Notizbuch nennt. */
+body.b-weit .stapel .beschriftung{display:block;min-height:42px}
+body.b-weit .stapel-halter .steller{margin-top:2px}
+body.b-weit .stapel:hover .lage:nth-child(4){top:calc(1px * var(--z))}
+body.b-weit .stapel.gewaehlt .lage:nth-child(4){top:calc(-4px * var(--z));box-shadow:0 16px 22px rgba(0,0,0,.4)}
+body.b-weit .stapel.gewaehlt .lage:nth-child(3){top:calc(10px * var(--z))}
+body.b-weit .stapel.gewaehlt .name{color:#FBFAF6;font-weight:600}
+body.b-weit .stapel-reihe{gap:16px;align-items:flex-start}
+body.b-weit .mappe{flex:0 0 272px}
+body.b-weit .trenner{height:1px;background:rgba(255,255,255,.18);margin:28px 0 20px}
+body.b-weit .flaeche{padding:26px 22px}
+
+/* ---------- Fachansicht: die Seiten des Faches (dritte Ebene) ---------- */
+.fachkopf{display:flex;align-items:baseline;gap:12px;margin:0 0 20px}
+.fachkopf h3{margin:0;color:#FBFAF6;font-size:21px;font-weight:600;letter-spacing:-.01em}
+.fachkopf .zur{background:none;border:0;color:#B9C0B1;font:inherit;font-size:15px;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;padding:0}
+.seiten{display:flex;flex-wrap:wrap;gap:14px 16px;align-items:flex-start}
+.seite{width:100%;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;
+  display:flex;flex-direction:column;gap:7px}
+.s-lager{position:relative;height:calc(56px * var(--z))}
+.s-blatt{position:absolute;left:0;top:calc(6px * var(--z));width:calc(104px * var(--z));
+  height:calc(36px * var(--z));border-radius:2px;
+  transform:skewX(-27deg);transform-origin:0 100%;background:var(--papier);
+  box-shadow:0 5px 9px rgba(0,0,0,.26)}
+.s-blatt.unten{top:calc(14px * var(--z));left:calc(2px * var(--z));background:#DFDBCD;box-shadow:none}
+.seite .st{color:#E7EADF;font-size:14.5px;line-height:1.25}
+.seite.offen .s-blatt{top:calc(1px * var(--z));box-shadow:0 11px 16px rgba(0,0,0,.34)}
+.seite.offen .st{color:#FBFAF6;font-weight:600}
+/* Ein Verweis ohne Link: das Blatt bleibt blass, damit man es sieht, bevor man tippt. */
+.seite.leer .s-blatt{background:#CFCBBD;box-shadow:none}
+.seite.leer .st{color:#A8B09E;font-style:italic}
+.s-blatt{transition:top .14s ease,box-shadow .14s ease}
+/* Der Artstempel: grau, klein, in der Ecke des Blatts — wie ein Stempel
+   auf Papier, kein Abzeichen. Mitgeschert, damit er auf dem Blatt liegt
+   und nicht darüber schwebt. OneNote bekommt keinen. */
+.marke{position:absolute;right:9px;bottom:5px;font-size:10.5px;letter-spacing:.03em;
+  color:#9A958A;transform:skewX(27deg);pointer-events:none;line-height:1}
+.seite.leer .marke{color:#B5B1A6}
+.marke-zeile{flex:0 0 auto;font-size:11.5px;letter-spacing:.03em;color:var(--tinte-leise);
+  margin-left:7px;align-self:center}
+/* Das Unterseiten-Feld bricht die Reihe um: es gehört unter seine Seite,
+   nicht daneben. flex:0 0 100% zwingt es auf eine eigene Zeile. */
+.unterseiten{flex:0 0 100%;background:var(--papier);border-radius:2px;padding:3px 15px 12px;
+  margin:2px 0 4px;box-shadow:0 7px 15px rgba(0,0,0,.24)}
+.unterseiten .verweise a{font-size:16px;padding:9px 2px}
+.fest{margin-top:26px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18)}
+.fest .reihe-titel{margin:0 0 12px}
+.fachkopf .luecke{flex:1}
+.aufheben{background:var(--papier);color:var(--tinte);text-decoration:none;padding:7px 15px;
+  border-radius:2px;font-size:15.5px;align-self:center}
+.ablage.hell{color:#A8B09E;margin-top:28px;padding-top:0}
+.ablage.hell button{color:#D7DCCF}
+.unterseiten{max-width:460px}
+
+/* ---------- Schmal: Fächer als Raster, Mappe klappt auf ---------- */
+/* Bis 0.7.0 bekam der Stapel hier eine Papierkarte unter sich und schrumpfte
+   auf 42 %. Papier auf Papier: genau die Kanten, die einen Stapel ausmachen,
+   verschwanden — übrig blieb ein Streifen. Seit 0.8.0 liegt er wieder auf dem
+   Tisch, und es stehen mindestens drei nebeneinander. */
+body.b-schmal .tisch{flex-direction:column}
+body.b-schmal .flaeche{padding:16px 14px}
+/* min(…,29%) hält die Spalte immer unter einem Drittel — dadurch passen
+   auch im engsten Fenster drei hinein, und bei mehr Platz werden es mehr.
+   Nachgemessen: 292 px -> 3, 440 px -> 3, 700 px -> 4, 800 px -> 5. */
+body.b-schmal .stapel-reihe{display:grid;gap:20px 12px;align-items:start;
+  grid-template-columns:repeat(auto-fill,minmax(min(132px,29%),1fr))}
+body.b-schmal .stapel-halter{width:auto;min-width:0}
+body.b-schmal .stapel{width:100%;flex-direction:column;align-items:stretch;gap:7px;
+  background:none;border-radius:0;padding:0;box-shadow:none}
+/* Der Stapel misst in Prozent statt in Pixeln: so wächst und schrumpft er mit
+   seiner Spalte, statt in die Nachbarspalte zu ragen. Das Seitenverhältnis
+   hält die Schrägung an ihrem Platz. */
+body.b-schmal .lager{position:relative;flex:0 0 auto;width:100%;height:auto;aspect-ratio:118/70}
+body.b-schmal .lage{width:76%;height:46%}
+body.b-schmal .lage:nth-child(1){top:22%;left:2%}
+body.b-schmal .lage:nth-child(2){top:16%;left:1.5%}
+body.b-schmal .lage:nth-child(3){top:10%;left:1%}
+body.b-schmal .lage:nth-child(4){top:3%;left:0;box-shadow:0 7px 11px rgba(0,0,0,.3)}
+body.b-schmal .lage .reiter{left:7%;top:16%;bottom:16%;width:7%}
+body.b-schmal .stapel .beschriftung{flex:1 1 auto;min-width:0}
+/* Zwei Zeilen, dann Schluss. overflow-wrap muss dabei sein: ohne es läuft ein
+   langes Wort wie „Testautomatisierung“ seitlich aus der Spalte heraus — die
+   Zeilenklammer allein hält es nicht. */
+body.b-schmal .stapel .name{display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;hyphens:auto;
+  color:#E7EADF;font-size:15px;line-height:1.25}
+/* Schmal zählt nur der Fachname; das Notizbuch steht im geöffneten Fach. */
+body.b-schmal .stapel .wohin{display:none}
+body.b-schmal .stapel.gewaehlt .name{font-weight:600;color:#FBFAF6}
+body.b-schmal .stapel:focus-visible{outline-color:#FBFAF6}
+/* Das gewählte Fach klappt auf und braucht dafür die ganze Breite — sonst
+   stünde seine Leiste in einer gut 130 px schmalen Spalte. Der Stapel selbst
+   bleibt dabei so groß wie die anderen. */
+body.b-schmal .stapel-halter.gewaehlt{grid-column:1/-1}
+body.b-schmal .stapel-halter.gewaehlt .lager{max-width:132px}
+body.b-schmal .trenner{height:1px;background:rgba(255,255,255,.18);margin:24px 0 18px}
+.aufklapp{background:var(--papier);border-radius:2px;margin:9px 0 2px;padding:4px 15px 15px;
+  box-shadow:0 6px 14px rgba(0,0,0,.2)}
+/* Schmal gehört der Fachname auf eine eigene Zeile, sonst bricht „zurück
+   zum Tisch“ mitten im Satz um. */
+body.b-schmal .fachkopf{flex-wrap:wrap;gap:9px 14px;align-items:center}
+body.b-schmal .fachkopf h3{flex:0 0 100%}
+body.b-schmal .fachkopf .luecke{display:none}
+body.b-schmal .planung{padding:7px 10px;gap:1px}
+body.b-schmal .planung a{font-size:14px;padding:4px 8px}
+.ganzschmal .planung a{font-size:13.5px;padding:4px 6px}
+.ganzschmal .stapel .name{font-size:16px}
+
+/* ---------- Grundgerüst der laufenden App ---------- */
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column}
+.planung{flex:0 0 auto}
+.tisch{flex:1;min-height:0}
+.flaeche{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+body.b-schmal .tisch{flex-direction:column}
+body.b-schmal .mappe{display:none}
+/* In der Fachansicht ist die Mappe leer — dann darf sie auch keine
+   weiße Spalte am Rand stehen lassen. */
+.mappe:empty{display:none}
+/* Meldung */
+.meldung{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;
+  background:var(--tinte);color:var(--papier);padding:10px 18px;border-radius:3px;
+  font-size:16px;max-width:88vw;box-shadow:0 8px 20px rgba(0,0,0,.4);text-align:center}
+.meldung.warn{background:#8C3A33;max-width:min(620px,92vw);text-align:left;
+  display:flex;align-items:flex-start;gap:12px;line-height:1.4}
+.meldung .wort{flex:1}
+.meldung .zu{flex:0 0 auto;background:none;border:0;color:var(--papier);font:inherit;
+  font-size:21px;line-height:1;padding:0 2px;cursor:pointer;opacity:.8}
+.meldung .zu:hover{opacity:1}
+.meldung[hidden]{display:none}
+/* Nichts wird gespeichert: das muss man sehen, nicht suchen. */
+.ablage.alarm{color:#FFD9D4}
+.ablage.alarm b{color:#FFB3A8}
+/* Hinweis auf eine neue Fassung — ruhig, nicht alarmierend. */
+.meldung.neu{display:flex;align-items:center;gap:14px;background:var(--tinte)}
+.meldung .jetzt{flex:0 0 auto;background:var(--papier);color:var(--tinte);border:0;font:inherit;
+  font-size:15.5px;padding:6px 14px;border-radius:2px;cursor:pointer}
+.ablage button+button,.ablage button{margin-top:4px}
+/* Fenster */
+.schleier{position:fixed;inset:0;background:rgba(20,22,18,.55);z-index:70}
+.schleier[hidden]{display:none}
+.fenster{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;
+  background:var(--papier);border-radius:3px;width:min(460px,92vw);max-height:86vh;overflow:auto;
+  box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.fenster[hidden]{display:none}
+.fenster .titel{font-size:19px;font-weight:600;padding:17px 22px 0}
+.fenster .rumpf{padding:12px 22px 20px}
+.fenster label{display:block;font-size:14.5px;color:var(--tinte-leise);margin:13px 0 4px}
+.eingabe{width:100%;font:inherit;font-size:16.5px;padding:8px 10px;border:1px solid var(--linie);
+  border-radius:2px;background:#fff;color:var(--tinte)}
+.eingabe:focus-visible{outline:2px solid var(--tinte);outline-offset:1px}
+.farbwahl{display:flex;flex-wrap:wrap;gap:8px}
+.farbwahl button{width:30px;height:30px;border-radius:3px;border:2px solid transparent;cursor:pointer}
+.farbwahl button.an{border-color:var(--tinte)}
+.linkfeld{resize:vertical;min-height:62px;font-size:14px;font-family:Consolas,monospace;
+  line-height:1.4;word-break:break-all}
+.herkunft{margin:3px 0 0;font-size:14.5px;color:var(--tinte-leise)}
+.herkunft.warnton{color:#8C3A33}
+/* Der kleine Pfeil hinter einem Verweis: derselbe Ort im Browser. */
+.imweb{flex:0 0 auto;padding:11px 8px;color:var(--tinte-leise);text-decoration:none;font-size:15px}
+.imweb:hover,.imweb:focus-visible{color:var(--tinte)}
+.knoepfe .zweitweg{background:#fff;color:var(--tinte);border-color:var(--linie)}
+.oeffnen .zweitweg{background:none;color:var(--tinte-leise);text-decoration:underline;
+  text-underline-offset:3px;padding:9px 6px;margin-left:8px}
+.reihewahl{display:flex;gap:7px}
+.reihewahl.wickeln{flex-wrap:wrap}
+.reihewahl button{font:inherit;font-size:15px;padding:6px 13px;border:1px solid var(--linie);
+  border-radius:2px;background:#fff;cursor:pointer;color:var(--tinte)}
+.reihewahl button.an{background:var(--tinte);color:var(--papier);border-color:var(--tinte)}
+.knoepfe{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.knoepfe .knopf{font:inherit;font-size:16px;padding:9px 16px;border:1px solid var(--linie);
+  border-radius:2px;background:#fff;cursor:pointer;color:var(--tinte)}
+.knoepfe .knopf.voll{background:var(--tinte);color:var(--papier);border-color:var(--tinte)}
+.knoepfe .knopf.weg{color:#8C3A33}
+a:focus-visible,button:focus-visible{outline:2px solid #FBFAF6;outline-offset:2px}
+body.b-weit a:focus-visible,body.b-weit button:focus-visible{outline-color:#FBFAF6}
+.mappe a:focus-visible,.mappe button:focus-visible,.fenster a:focus-visible,.fenster button:focus-visible,
+.unterseiten a:focus-visible{outline-color:var(--tinte)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="b-weit">
+<nav class="planung" id="planung"></nav>
+<div class="tisch">
+  <div class="flaeche" id="flaeche"></div>
+  <aside class="mappe" id="mappe"></aside>
+</div>
+<div class="meldung" id="meldung" hidden></div>
+<div class="schleier" id="schleier" hidden onclick="sdFensterZu()"></div>
+<div class="fenster" id="fenster" hidden></div>
+<script>
+/*__SKRIPT__*/
+</script>
+</body>
+</html>

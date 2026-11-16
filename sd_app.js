@@ -1074,7 +1074,10 @@ function sdReiheHtml(reihe, titel) {
 
 function sdStapelHtml(f) {
   var gewaehlt = (f.id === sd.fachId);
-  var h = '<div class="stapel-halter">';
+  /* Die Marke am Halter, nicht nur am Knopf: im schmalen Raster muss das
+     gewählte Fach über alle Spalten gehen, sonst stünde die aufgeklappte
+     Leiste in einer 130 px schmalen Spalte (seit 0.8.0). */
+  var h = '<div class="stapel-halter' + (gewaehlt ? ' gewaehlt' : '') + '">';
   h += '<button type="button" class="stapel' + (gewaehlt ? ' gewaehlt' : '') + '"'
     + ' onclick="sdFachWaehlen(\'' + esc(f.id) + '\')"'
     + ' ondblclick="sdFachOeffnen(\'' + esc(f.id) + '\')">'

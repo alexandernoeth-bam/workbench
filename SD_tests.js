@@ -1394,6 +1394,79 @@ console.log('\nSD-30  Rahmen derselben Herkunft behält die Dateiauswahl (0.7.0)
     'der Service Worker hängt weiter am Rahmen selbst — eingebettet meldet er sich nicht an');
 }
 
+/* Fehlertyp: eine Ansicht, die beim Schrumpfen ihre Aussage verliert. Schmal
+   bekam der Stapel eine Papierkarte unter sich und schrumpfte auf 42 % —
+   Papier auf Papier, damit verschwanden genau die Kanten, die einen Stapel
+   ausmachen, und übrig blieb ein Streifen. Seit 0.8.0 liegt er wieder auf dem
+   Tisch, und es stehen mindestens drei nebeneinander. Die Spaltenformel wird
+   hier nicht geglaubt, sondern nachgerechnet. */
+console.log('\nSD-31  Schmal: Fächer bleiben Stapel, mindestens drei nebeneinander (0.8.0)');
+{
+  /* QUELLE ist die ganze Datei — der Stil steht im <style>, nicht im Skript. */
+  const block = QUELLE.slice(QUELLE.indexOf('Schmal: Fächer als Raster'));
+  const bis = block.slice(0, block.indexOf('body.b-schmal .trenner'));
+  pruefe(bis.length > 100, 'der schmale Fächer-Block steht in der Datei');
+
+  /* Keine Karte mehr unter dem Stapel */
+  const stapel = bis.match(/body\.b-schmal \.stapel\{[^}]*\}/);
+  pruefe(!!stapel && /background:none/.test(stapel[0]),
+    'der Stapel hat schmal keinen eigenen Hintergrund — er liegt auf dem Tisch');
+  pruefe(!!stapel && !/var\(--papier\)/.test(stapel[0]),
+    'und ausdrücklich keine Papierkarte, sonst verschwinden seine Kanten');
+  pruefe(!!stapel && /box-shadow:none/.test(stapel[0]), 'auch kein Kartenschatten');
+
+  /* Die vier Lagen sind das, was den Stapel zum Stapel macht */
+  [1, 2, 3, 4].forEach(function (n) {
+    pruefe(new RegExp('body\\.b-schmal \\.lage:nth-child\\(' + n + '\\)').test(bis),
+      'Lage ' + n + ' wird schmal eigens gesetzt');
+  });
+  pruefe(/body\.b-schmal \.lager\{[^}]*aspect-ratio/.test(bis),
+    'der Stapel misst in Prozent mit festem Seitenverhältnis — er wächst mit seiner Spalte');
+
+  /* Nachrechnen statt glauben: die Spaltenformel muss bis hinunter zu
+     292 px drei Spalten ergeben. So füllt der Browser auto-fill:
+     Spalten = floor((Breite + Abstand) / (Spaltenbreite + Abstand)). */
+  const f = bis.match(/minmax\(min\((\d+)px,\s*(\d+)%\),\s*1fr\)/);
+  pruefe(!!f, 'die Spaltenformel steht im Stil' + (f ? ' (' + f[0] + ')' : ''));
+  const g = bis.match(/body\.b-schmal \.stapel-reihe\{[^}]*gap:\s*\d+px\s+(\d+)px/);
+  pruefe(!!g, 'und ein Spaltenabstand dazu');
+  if (f && g) {
+    const grenze = parseInt(f[1], 10), anteil = parseInt(f[2], 10) / 100, luecke = parseInt(g[1], 10);
+    const spalten = function (breite) {
+      const min = Math.min(grenze, breite * anteil);
+      return Math.max(1, Math.floor((breite + luecke) / (min + luecke)));
+    };
+    [292, 330, 440, 470, 560].forEach(function (b) {
+      pruefe(spalten(b) >= 3, 'bei ' + b + ' px stehen ' + spalten(b) + ' Fächer nebeneinander (mindestens 3)');
+    });
+    pruefe(spalten(800) > 3, 'und bei 800 px werden es ' + spalten(800) + ' — bei Platz mehr als drei');
+  }
+
+  /* Ein langes Wort muss umbrechen, nicht aus der Spalte laufen */
+  const name = bis.match(/body\.b-schmal \.stapel \.name\{[^}]*\}/);
+  pruefe(!!name && /line-clamp:2/.test(name[0]), 'der Name endet nach zwei Zeilen');
+  pruefe(!!name && /overflow-wrap:anywhere/.test(name[0]),
+    'und bricht um — ohne das liefe „Testautomatisierung" seitlich heraus');
+
+  /* Nur der Fachname, kein Notizbuch */
+  pruefe(/body\.b-schmal \.stapel \.wohin\{display:none\}/.test(bis),
+    'das Notizbuch steht schmal nicht unter dem Fach');
+
+  /* Das gewählte Fach klappt auf und braucht die ganze Breite */
+  pruefe(/body\.b-schmal \.stapel-halter\.gewaehlt\{grid-column:1\/-1\}/.test(bis),
+    'das gewählte Fach spannt über alle Spalten');
+  const mitWahl = ladeIn(SKRIPT, 'wahl', 470);
+  mitWahl.DB = mitWahl.sdLeer();
+  mitWahl.DB.faecher = [{ id: 'f1', name: 'ÜQS mit CTS', reihe: 'zusammen', farbe: '#6B8A2F',
+    quelle: 'Team', ordnung: 10, leiste: [], seiten: [], geaendert: 1 }];
+  mitWahl.sd.fachId = 'f1';
+  const markup = mitWahl.sdStapelHtml(mitWahl.DB.faecher[0]);
+  pruefe(/class="stapel-halter gewaehlt"/.test(markup),
+    'und der Halter trägt die Marke dafür, nicht nur der Knopf');
+  pruefe((markup.match(/class="lage"/g) || []).length === 4,
+    'der Stapel hat weiterhin vier Lagen');
+}
+
 /* ============================================================
    ERGEBNIS
    ============================================================ */
