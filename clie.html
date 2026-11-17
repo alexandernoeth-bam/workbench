@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.130.0</title>
+<title>CLIE 0.131.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -104,6 +104,14 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .aufklapp button.an,.aufklapp button:active{background:var(--px);color:var(--lcd)}
 .aufklapp .trenn{border-top:2px dotted var(--px-zart);margin:2px 0}
 .menue-zeile{display:flex;gap:0;border-bottom:2px solid var(--px);background:var(--px);color:var(--lcd)}
+/* Kalenderzuordnung im Menü (seit 0.131.0). „offen“ heißt: die Datei
+   kennt diesen Kalender nicht — gestrichelt, damit man es sieht. */
+.kal-zeile{display:flex;align-items:center;gap:7px;padding:5px 10px}
+.kal-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kal-wahl{flex:0 0 auto;font:inherit;font-size:15.5px;background:none;color:var(--px);
+  border:1px solid var(--px-zart);border-radius:2px;padding:2px 8px;cursor:pointer}
+.kal-wahl.an{background:var(--px);color:var(--lcd)}
+.kal-wahl.offen{border-style:dashed;font-style:italic}
 .menue-zeile span{padding:3px 12px;font-weight:600}
 .schleier{position:absolute;inset:0;z-index:15;display:none}
 .schleier.auf{display:block}
@@ -1331,7 +1339,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.130.0';
+var APP_VERSION = '0.131.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1427,7 +1435,7 @@ var kalenderLaeuft = false;
 var kalenderUhr = null;
 
 /* ============================================================
-   Unterbau aus der Workbench 7.4.0 — wörtlich übernommen:
+   Unterbau aus der Workbench 7.5.0 — wörtlich übernommen:
    Speicher, Google-Anmeldung, Drive, Abgleich, Löschvermerke,
    Kalender lesen, leere Datenbank und der Aktivitäten-Kern (kp…).
    ============================================================ */
@@ -1746,6 +1754,15 @@ function zusammenfuehren(lokal, fremd) {
      verschmolzen, sonst verlöre man die Wahl des anderen Geräts. */
   var VERZEICHNISSE = ['artenImJahr', 'flaecheOben', 'skizzenVorschau'];
 
+  /* Und diese sind Listen mit eigener Kennung — dieselbe Überlegung, nur
+     für Felder statt Verzeichnisse (seit 7.5.0). „kalender“ stand bisher
+     nicht hier: die Liste gewann als Ganzes vom jüngeren Stempel. Ein
+     Gerät, das einen Kalender nie zugeordnet hatte, ersetzte damit die
+     Zuordnung aller anderen — still, denn ein unbekannter Kalender gilt
+     als privat. So verschwand ein Arbeitskalender, ohne dass jemand
+     etwas umgestellt hatte. */
+  var LISTEN = ['kalender'];
+
   var e;
   for (e in aelter) {
     if (Object.prototype.hasOwnProperty.call(aelter, e)) {
@@ -1754,6 +1771,30 @@ function zusammenfuehren(lokal, fremd) {
   }
   for (e in juenger) {
     if (!Object.prototype.hasOwnProperty.call(juenger, e)) { continue; }
+    if (LISTEN.indexOf(e) >= 0) {
+      /* Je Kennung: der jüngere Stand gewinnt den Eintrag, aber Einträge,
+         die er nicht kennt, bleiben stehen. Reihenfolge: erst die alten,
+         dann die neuen — so bleibt die gewohnte Liste stabil. */
+      var zusL = [];
+      var stelle = {};
+      var q2, p2;
+      for (q2 = 0; q2 < 2; q2++) {
+        var lz = (q2 === 0) ? (aelter[e] || []) : (juenger[e] || []);
+        if (!lz.length && !Array.isArray(lz)) { continue; }
+        for (p2 = 0; p2 < lz.length; p2++) {
+          var ein = lz[p2];
+          if (!ein || !ein.id) { continue; }
+          if (Object.prototype.hasOwnProperty.call(stelle, ein.id)) {
+            zusL[stelle[ein.id]] = ein;
+          } else {
+            stelle[ein.id] = zusL.length;
+            zusL.push(ein);
+          }
+        }
+      }
+      ergebnis.einstellungen[e] = zusL;
+      continue;
+    }
     if (VERZEICHNISSE.indexOf(e) >= 0) {
       var zus = {};
       var q, k2;
@@ -2383,6 +2424,27 @@ function kalenderKontext(id) {
     if (gewaehlt[i].id === id) { return gewaehlt[i].kontext || 'privat'; }
   }
   return 'privat';
+}
+
+function kalenderEintrag(id, name) {
+  if (!DB.einstellungen.kalender) { DB.einstellungen.kalender = []; }
+  var liste = DB.einstellungen.kalender;
+  var i;
+  for (i = 0; i < liste.length; i++) {
+    if (liste[i].id === id) { return liste[i]; }
+  }
+  var neu = { id: id, name: name || '', aktiv: true, kontext: 'privat' };
+  liste.push(neu);
+  return neu;
+}
+
+function kalenderBekannt(id) {
+  var gewaehlt = (DB.einstellungen && DB.einstellungen.kalender) || [];
+  var i;
+  for (i = 0; i < gewaehlt.length; i++) {
+    if (gewaehlt[i].id === id) { return typeof gewaehlt[i].kontext === 'string' && gewaehlt[i].kontext !== ''; }
+  }
+  return false;
 }
 
 function zeitAusEintrag(wert) {
@@ -3940,6 +4002,65 @@ function clIstCoachTermin(t) {
   return /^Coach:/.test(String((t && (t.rohTitel || t.titel)) || ''));
 }
 
+/* ---------- Kalender zuordnen (seit 0.131.0) ----------
+   Bis dahin ging das nur in der Workbench, und die steht nur am
+   Arbeits-PC. Auf dem Pixel war ein Kalender, dessen Zuordnung
+   verlorengegangen war, nicht wieder einzurichten. Geschrieben wird in
+   dieselbe Liste wie dort — DB.einstellungen.kalender, Eintrag je
+   Kalender-Kennung —, deshalb benutzt CLIE kalenderEintrag der
+   Workbench, statt die Regel ein zweites Mal zu formulieren. */
+function clKalenderAuf() {
+  cl.aufklapp = 'kalender';
+  aufklappZeichnen();
+  if (!kalenderListe.length && tokenGueltig()) {
+    kalenderListeHolen().then(function () { if (cl.aufklapp === 'kalender') { aufklappZeichnen(); } })
+      .catch(function () { return null; });
+  }
+}
+
+function clKalenderHtml() {
+  var h = '<div class="aufklapp menue-unten"><div class="menue-zeile"><span>Calendars</span></div>';
+  if (!tokenGueltig()) {
+    return h + '<div class="menue-zeile leise">Dafür einmal mit Google verbinden.</div></div>';
+  }
+  if (!kalenderListe.length) {
+    return h + '<div class="menue-zeile leise">Kalender werden geholt …</div></div>';
+  }
+  kalenderListe.forEach(function (k) {
+    var bek = kalenderBekannt(k.id);
+    var beruf = kalenderKontext(k.id) === 'beruflich';
+    var liest = kalenderGewaehlt(k.id);
+    h += '<div class="kal-zeile"><span class="kal-name">' + esc(k.name) + '</span>'
+      + '<button type="button" class="kal-wahl' + (beruf ? ' an' : '') + (bek ? '' : ' offen') + '"'
+      + ' onclick="clKalKontextUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
+      + (bek ? (beruf ? 'Arbeit' : 'Privat') : 'nicht zugeordnet') + '</button>'
+      + '<button type="button" class="kal-wahl' + (liest ? ' an' : '') + '"'
+      + ' onclick="clKalLesenUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
+      + (liest ? 'wird gelesen' : 'aus') + '</button></div>';
+  });
+  return h + '</div>';
+}
+
+/* Umstellen heißt: Eintrag anlegen oder ändern, Stempel setzen, sichern.
+   Der Stempel muss sein — ohne ihn gewinnt beim Abgleich der andere Stand. */
+function clKalKontextUm(id, name) {
+  var e = kalenderEintrag(id, name);
+  e.kontext = (e.kontext === 'beruflich') ? 'privat' : 'beruflich';
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  aufklappZeichnen();
+  zeichne();
+}
+
+function clKalLesenUm(id, name) {
+  var e = kalenderEintrag(id, name);
+  e.aktiv = (e.aktiv === false);
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  aufklappZeichnen();
+  zeichne();
+}
+
 /* Termine: Coach-Termine nie, sonst nach dem ▼ (Arbeit = berufliche Kalender) */
 function clPasstTerminKontext(t) {
   if (clIstCoachTermin(t)) { return false; }
@@ -4945,6 +5066,8 @@ function aufklappZeichnen() {
     el.innerHTML = memoFensterHtml();
   } else if (cl.aufklapp === 'fokus') {
     el.innerHTML = fkFensterHtml();
+  } else if (cl.aufklapp === 'kalender') {
+    el.innerHTML = clKalenderHtml();
   } else if (cl.aufklapp === 'rafang') {
     el.innerHTML = raFangHtml();
   } else if (cl.aufklapp === 'pmon') {
@@ -5041,6 +5164,7 @@ function aufklappZeichnen() {
       /* Seit 0.127.0: Calc steht nicht mehr im Raster, aber hier (siehe CL_APPS) */
       + '<button type="button" onclick="menueWahl(\'rechner\')">Calc</button>'
       + '<button type="button" onclick="menueWahl(\'verknuepfungen\')">Shortcuts…</button>'
+      + '<button type="button" onclick="menueWahl(\'kalender\')">Calendars…</button>'
       + '<button type="button" onclick="menueWahl(\'version\')">Check for update</button>'
       + '<button type="button" onclick="menueWahl(\'termine\')">Fetch events</button>'
       + ((cl.app === 'checklisten' || (cl.app === 'projekte' && cl.pj.id)) ? '<div class="trenn"></div>'
@@ -5267,6 +5391,7 @@ function menueWahl(was) {
   if (was === 'kategorien') { oeffne('kategorien'); return; }
   if (was === 'rechner') { oeffne('rechner'); return; }
   if (was === 'verknuepfungen') { oeffne('verknuepfungen'); return; }
+  if (was === 'kalender') { clKalenderAuf(); return; }
   if (was === 'termine') { aufklappZeichnen(); clTermineHolen(true); return; }
   if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
   if (was === 'statistik') { oeffne('statistik'); return; }

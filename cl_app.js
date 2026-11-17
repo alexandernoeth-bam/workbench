@@ -406,6 +406,65 @@ function clIstCoachTermin(t) {
   return /^Coach:/.test(String((t && (t.rohTitel || t.titel)) || ''));
 }
 
+/* ---------- Kalender zuordnen (seit 0.131.0) ----------
+   Bis dahin ging das nur in der Workbench, und die steht nur am
+   Arbeits-PC. Auf dem Pixel war ein Kalender, dessen Zuordnung
+   verlorengegangen war, nicht wieder einzurichten. Geschrieben wird in
+   dieselbe Liste wie dort — DB.einstellungen.kalender, Eintrag je
+   Kalender-Kennung —, deshalb benutzt CLIE kalenderEintrag der
+   Workbench, statt die Regel ein zweites Mal zu formulieren. */
+function clKalenderAuf() {
+  cl.aufklapp = 'kalender';
+  aufklappZeichnen();
+  if (!kalenderListe.length && tokenGueltig()) {
+    kalenderListeHolen().then(function () { if (cl.aufklapp === 'kalender') { aufklappZeichnen(); } })
+      .catch(function () { return null; });
+  }
+}
+
+function clKalenderHtml() {
+  var h = '<div class="aufklapp menue-unten"><div class="menue-zeile"><span>Calendars</span></div>';
+  if (!tokenGueltig()) {
+    return h + '<div class="menue-zeile leise">Dafür einmal mit Google verbinden.</div></div>';
+  }
+  if (!kalenderListe.length) {
+    return h + '<div class="menue-zeile leise">Kalender werden geholt …</div></div>';
+  }
+  kalenderListe.forEach(function (k) {
+    var bek = kalenderBekannt(k.id);
+    var beruf = kalenderKontext(k.id) === 'beruflich';
+    var liest = kalenderGewaehlt(k.id);
+    h += '<div class="kal-zeile"><span class="kal-name">' + esc(k.name) + '</span>'
+      + '<button type="button" class="kal-wahl' + (beruf ? ' an' : '') + (bek ? '' : ' offen') + '"'
+      + ' onclick="clKalKontextUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
+      + (bek ? (beruf ? 'Arbeit' : 'Privat') : 'nicht zugeordnet') + '</button>'
+      + '<button type="button" class="kal-wahl' + (liest ? ' an' : '') + '"'
+      + ' onclick="clKalLesenUm(\'' + esc(k.id) + '\',\'' + esc(k.name) + '\')">'
+      + (liest ? 'wird gelesen' : 'aus') + '</button></div>';
+  });
+  return h + '</div>';
+}
+
+/* Umstellen heißt: Eintrag anlegen oder ändern, Stempel setzen, sichern.
+   Der Stempel muss sein — ohne ihn gewinnt beim Abgleich der andere Stand. */
+function clKalKontextUm(id, name) {
+  var e = kalenderEintrag(id, name);
+  e.kontext = (e.kontext === 'beruflich') ? 'privat' : 'beruflich';
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  aufklappZeichnen();
+  zeichne();
+}
+
+function clKalLesenUm(id, name) {
+  var e = kalenderEintrag(id, name);
+  e.aktiv = (e.aktiv === false);
+  DB.einstellungen.stempel = jetzt();
+  spaeterSichern();
+  aufklappZeichnen();
+  zeichne();
+}
+
 /* Termine: Coach-Termine nie, sonst nach dem ▼ (Arbeit = berufliche Kalender) */
 function clPasstTerminKontext(t) {
   if (clIstCoachTermin(t)) { return false; }
@@ -1411,6 +1470,8 @@ function aufklappZeichnen() {
     el.innerHTML = memoFensterHtml();
   } else if (cl.aufklapp === 'fokus') {
     el.innerHTML = fkFensterHtml();
+  } else if (cl.aufklapp === 'kalender') {
+    el.innerHTML = clKalenderHtml();
   } else if (cl.aufklapp === 'rafang') {
     el.innerHTML = raFangHtml();
   } else if (cl.aufklapp === 'pmon') {
@@ -1507,6 +1568,7 @@ function aufklappZeichnen() {
       /* Seit 0.127.0: Calc steht nicht mehr im Raster, aber hier (siehe CL_APPS) */
       + '<button type="button" onclick="menueWahl(\'rechner\')">Calc</button>'
       + '<button type="button" onclick="menueWahl(\'verknuepfungen\')">Shortcuts…</button>'
+      + '<button type="button" onclick="menueWahl(\'kalender\')">Calendars…</button>'
       + '<button type="button" onclick="menueWahl(\'version\')">Check for update</button>'
       + '<button type="button" onclick="menueWahl(\'termine\')">Fetch events</button>'
       + ((cl.app === 'checklisten' || (cl.app === 'projekte' && cl.pj.id)) ? '<div class="trenn"></div>'
@@ -1733,6 +1795,7 @@ function menueWahl(was) {
   if (was === 'kategorien') { oeffne('kategorien'); return; }
   if (was === 'rechner') { oeffne('rechner'); return; }
   if (was === 'verknuepfungen') { oeffne('verknuepfungen'); return; }
+  if (was === 'kalender') { clKalenderAuf(); return; }
   if (was === 'termine') { aufklappZeichnen(); clTermineHolen(true); return; }
   if (was === 'version') { aufklappZeichnen(); versionPruefen(true); return; }
   if (was === 'statistik') { oeffne('statistik'); return; }

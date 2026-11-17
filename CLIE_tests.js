@@ -11629,6 +11629,86 @@ function deskQuelleTest() {
   S.cl.app = 'uebersicht';
 }
 
+/* Fehlertyp: eine Liste in den Einstellungen, die beim Abgleich als GANZES
+   vom jüngeren Stempel ersetzt wird. „einstellungen.kalender“ hält fest,
+   welcher Google-Kalender beruflich ist. Ein Gerät, das einen Kalender nie
+   zugeordnet hatte, ersetzte mit seinem Stand die Zuordnung aller anderen —
+   und weil ein unbekannter Kalender stillschweigend als privat gilt, fiel
+   es nicht auf: der Arbeitskalender „Alex“ war eines Morgens privat, ohne
+   dass jemand etwas umgestellt hatte. Dieselbe Fehlerart wie 0.124.0, nur
+   eine Ebene tiefer. */
+function kalenderZuordnungTest() {
+  console.log('\n228. Kalenderzuordnung übersteht den Abgleich (0.131.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+
+  /* Dieses Gerät kennt „Alex“ als beruflich und „Familie“ als privat. */
+  const hier = {
+    einstellungen: { stempel: 1000, kalender: [
+      { id: 'alex@firma.de', name: 'Alex', aktiv: true, kontext: 'beruflich' },
+      { id: 'familie@gmail.com', name: 'Familie', aktiv: true, kontext: 'privat' }
+    ] }
+  };
+  /* Das andere Gerät hat „Alex“ nie gesehen, dafür einen dritten Kalender —
+     und es hat zuletzt gesichert, sein Stempel ist jünger. */
+  const dort = {
+    einstellungen: { stempel: 2000, kalender: [
+      { id: 'familie@gmail.com', name: 'Familie', aktiv: true, kontext: 'privat' },
+      { id: 'verein@gmail.com', name: 'Verein', aktiv: true, kontext: 'privat' }
+    ] }
+  };
+
+  /* zusammenfuehren liefert { db, bericht } — nicht die Datenbank selbst. */
+  const z = S.zusammenfuehren(hier, dort).db;
+  const liste = (z.einstellungen && z.einstellungen.kalender) || [];
+  const von = function (id) { return liste.filter(function (k) { return k.id === id; })[0]; };
+
+  pruefe(!!von('alex@firma.de'), '„Alex“ überlebt den Abgleich mit einem Gerät, das ihn nicht kennt');
+  pruefe(!!von('alex@firma.de') && von('alex@firma.de').kontext === 'beruflich',
+    'und bleibt beruflich — das war der eigentliche Verlust');
+  pruefe(!!von('verein@gmail.com'), 'der neue Kalender des anderen Geräts kommt dazu');
+  pruefe(liste.length === 3, 'drei Einträge, keiner doppelt (' + liste.length + ')');
+  pruefe(liste.filter(function (k) { return k.id === 'familie@gmail.com'; }).length === 1,
+    'ein Kalender, den beide kennen, steht genau einmal da');
+
+  /* Andersherum muss der jüngere Stand auch gewinnen dürfen */
+  const alt = { einstellungen: { stempel: 1000, kalender: [{ id: 'a@x', name: 'A', aktiv: true, kontext: 'privat' }] } };
+  const neu = { einstellungen: { stempel: 2000, kalender: [{ id: 'a@x', name: 'A', aktiv: true, kontext: 'beruflich' }] } };
+  const z2 = S.zusammenfuehren(alt, neu).db;
+  pruefe(z2.einstellungen.kalender[0].kontext === 'beruflich',
+    'eine echte Umstellung auf dem anderen Gerät setzt sich durch');
+
+  /* Unbekannt ist nicht dasselbe wie privat */
+  S.DB.einstellungen.kalender = [{ id: 'alex@firma.de', name: 'Alex', aktiv: true, kontext: 'beruflich' }];
+  pruefe(S.kalenderBekannt('alex@firma.de') === true, 'ein zugeordneter Kalender gilt als bekannt');
+  pruefe(S.kalenderBekannt('fremd@x.de') === false, 'ein nie zugeordneter gilt als unbekannt');
+  pruefe(S.kalenderKontext('fremd@x.de') === 'privat',
+    'behandelt wird er weiterhin wie privat — am Verhalten ändert sich nichts');
+
+  /* Und CLIE kann die Zuordnung jetzt selbst setzen */
+  pruefe(typeof S.clKalKontextUm === 'function' && typeof S.clKalenderHtml === 'function',
+    'CLIE hat ein eigenes Blatt dafür — die Workbench steht nur am Arbeits-PC');
+  S.kalenderListe.length = 0;
+  S.kalenderListe.push({ id: 'neu@x.de', name: 'Neuer Kalender' });
+  S.DB.einstellungen.stempel = 0;
+  S.clKalKontextUm('neu@x.de', 'Neuer Kalender');
+  pruefe(S.kalenderKontext('neu@x.de') === 'beruflich', 'umgestellt wird auf beruflich');
+  pruefe(S.DB.einstellungen.stempel > 0,
+    'und der Stempel wird gesetzt — ohne ihn verlöre die Änderung beim nächsten Abgleich');
+  S.clKalKontextUm('neu@x.de', 'Neuer Kalender');
+  pruefe(S.kalenderKontext('neu@x.de') === 'privat', 'noch einmal tippen stellt zurück auf privat');
+  pruefe(S.DB.einstellungen.kalender.filter(function (k) { return k.id === 'neu@x.de'; }).length === 1,
+    'dabei entsteht kein zweiter Eintrag für denselben Kalender');
+
+  /* Das Blatt sagt, woran man ist */
+  S.DB.einstellungen.kalender = [];
+  S.tokenMerken('x', 3600);
+  const blatt = S.clKalenderHtml();
+  pruefe(/nicht zugeordnet/.test(blatt), 'ein unbekannter Kalender steht als „nicht zugeordnet“ im Blatt');
+  pruefe(/clKalKontextUm/.test(blatt) && /clKalLesenUm/.test(blatt), 'und lässt sich von dort umstellen');
+}
+
 function ruineTest() {
   console.log('\n226. Nach einem Ausbau: jede App und jede Sicht zeichnet ohne Fehler (0.129.0)');
   if (!CL) { return; }
@@ -11973,6 +12053,7 @@ function huellenTest() {
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskQuelleTest(); } catch (e) { fail('0.130.0 Desk-Quelle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { kalenderZuordnungTest(); } catch (e) { fail('0.131.0 Kalenderzuordnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
