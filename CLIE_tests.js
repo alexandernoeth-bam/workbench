@@ -11674,6 +11674,9 @@ function tagessteuerungTest() {
   const ohneDatum = mach('Ohne Datum', 'run', true, '');
   const ueberfaellig = mach('Gestern fällig, noch offen', 'run', true, gestern);
   const ohneBereich = mach('Ohne Bereich', '', true, h);
+  /* Eine zweite sichtbare Aufgabe in einem anderen Abschnitt — damit die
+     Zählung der Zeichen weiter unten mehr als eine Stichprobe ist. */
+  mach('Woche sichten', 'control', true, h);
 
   /* Die drei Bedingungen, Fall für Fall */
   pruefe(S.tgImKreis(sichtbar, h) === true, 'Bereich, heute fällig, Kennzeichen: sichtbar');
@@ -11712,6 +11715,17 @@ function tagessteuerungTest() {
   });
   pruefe(!/class="kasten"/.test(blatt) && /onclick="tgOeffnen\(/.test(blatt),
     'kein Kästchen, aber jede Zeile öffnet ihre Aufgabe');
+  /* Seit 0.134.0 steht vor jeder Aufgabe ein Quadrat — ohne Zeichen
+     verschwammen die Zeilen mit den Abschnittsüberschriften. Kein
+     Dreieck: ▸ heißt in CLIE schon „Ordner“. */
+  pruefe(S.TG_MARKE === '▪', 'das Aufgabenzeichen ist das Quadrat');
+  const marken = (blatt.match(/class="tg-mk"/g) || []).length;
+  const zeilen = (blatt.match(/class="tg-zeile/g) || []).length;
+  pruefe(marken === zeilen && zeilen > 0,
+    'vor jeder Aufgabe steht genau ein Zeichen (' + marken + '/' + zeilen + ')');
+  pruefe(blatt.indexOf('▸') < 0, 'und kein Ordner-Dreieck dazwischen');
+  pruefe(/class="tg-mk">▪<\/span><span class="tg-titel"/.test(blatt),
+    'es steht vor dem Titel, nicht dahinter');
 
   /* Der aufgeschlagene Abschnitt zeigt nur diesen Tag */
   S.tgAufschlagen('run');
@@ -11721,6 +11735,8 @@ function tagessteuerungTest() {
   pruefe(ab.indexOf('Morgen fällig') < 0 && ab.indexOf('Ohne Datum') < 0,
     'Aufgaben anderer Tage stehen auch im Abschnitt nicht');
   pruefe(/onclick="tgAugeUm\(/.test(ab), 'und lassen sich je Aufgabe umstellen');
+  pruefe((ab.match(/class="tg-mk"/g) || []).length === (ab.match(/class="tg-zeile/g) || []).length,
+    'auch im aufgeschlagenen Abschnitt trägt jede Zeile ihr Zeichen');
 
   /* Umstellen setzt den Stempel */
   const vorher = verborgen.geaendert;

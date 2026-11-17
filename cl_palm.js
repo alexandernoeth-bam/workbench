@@ -3069,6 +3069,13 @@ function pmNachpflegen() {
 
 cl.tg = { tag: '', abschnitt: '' };
 
+/* Vor jeder Aufgabe ein Quadrat (seit 0.134.0). Ohne Zeichen verschwammen
+   die Zeilen mit den Abschnittsüberschriften. Kein Dreieck: ▸ heißt in CLIE
+   schon „Ordner“ (Games ▸), zwei Dreiecke mit zwei Bedeutungen wären eines
+   zu viel. Der Einzug hängt — ein umbrechender Titel rückt unter den Text,
+   nicht unter das Zeichen. */
+var TG_MARKE = '▪';
+
 var TG_KREIS = [
   { id: 'control', name: 'CONTROL', phase: 'Plan',  satz: 'Was kommt auf mich zu?' },
   { id: 'run',     name: 'RUN',     phase: 'Do',    satz: 'Bekanntes zuverlässig durchführen' },
@@ -3193,6 +3200,7 @@ function tgZeileHtml(a, tag) {
   var rechts = a.uhrzeit ? esc(a.uhrzeit) : '';
   return '<li><button type="button" class="tg-zeile' + (tgErledigtAn(a, tag) ? ' erl' : '') + '"'
     + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
+    + '<span class="tg-mk">' + TG_MARKE + '</span>'
     + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span>'
     + (rechts ? '<span class="tg-rechts">' + rechts + '</span>' : '')
     + '</button></li>';
@@ -3217,6 +3225,7 @@ function tgAbschnittHtml() {
     h += '<ul class="tg-liste">' + l.map(function (a) {
       return '<li><button type="button" class="tg-zeile' + (tgErledigtAn(a, tag) ? ' erl' : '') + '"'
         + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
+        + '<span class="tg-mk">' + TG_MARKE + '</span>'
         + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span></button>'
         + '<button type="button" class="tg-auge" title="in der Tagessteuerung zeigen"'
         + ' onclick="tgAugeUm(\'' + esc(a.id) + '\')">' + (tgSichtbar(a) ? '◉' : '○') + '</button></li>';
