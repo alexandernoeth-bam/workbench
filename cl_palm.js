@@ -31,7 +31,9 @@ cl.pm = { tab: 'datum', datum: 'woche', wahl: '', frisch: {}, fenster: null, zei
 var PM_MARKE = /\s?⟦([A-Za-z0-9_-]{4,40})⟧\s*$/;
 var PM_SHOW_KEY = 'clie-pm-show';
 var PM_TAB_KEY = 'clie-pm-tab';
-var PM_SHOW_STD = { sort: 'prio', erl: false, faellig: false, datum: true, prio: true, kat: false };
+/* ohneKreis seit 0.133.0: zeigt nur Aufgaben ohne Bereich — damit findest
+   du, was für Day Control noch einzusortieren ist. Standardmäßig aus. */
+var PM_SHOW_STD = { sort: 'prio', erl: false, faellig: false, datum: true, prio: true, kat: false, ohneKreis: false };
 var PM_SORT = [['prio', 'Priorität, Datum'], ['datum', 'Datum, Priorität'], ['kat', 'Kategorie, Priorität'], ['abc', 'Alphabetisch']];
 var PM_DATUM = [['woche', 'Diese Woche'], ['heute', 'Heute'], ['7', 'Nächste 7 Tage'], ['ueber', 'Überfällig'], ['alle', 'Alle mit Datum']];
 /* Seit 0.94: T = ToDo-Liste (nur Kennzeichen — die Kästchen bleiben im Memo).
@@ -643,6 +645,9 @@ function pmTodoAlle() {
     if (pmErledigtJetzt(a) && !show.erl && !cl.pm.frisch[a.id]) { return false; }
     var d = pmDatum(a);
     if (show.faellig && d && d > h && !cl.pm.frisch[a.id]) { return false; }
+    /* Seit 0.133.0: was noch keinen Bereich hat, erscheint nicht in Day
+       Control — über diesen Haken findest du es. */
+    if (show.ohneKreis && tgKreisVon(a)) { return false; }
     return true;
   });
 }
@@ -1113,7 +1118,8 @@ function pmShowLesen() {
   if (!f) { return null; }
   var s = document.getElementById('pmShowSort');
   if (s && typeof s.value === 'string' && PM_SORT.some(function (x) { return x[0] === s.value; })) { f.sort = s.value; }
-  [['erl', 'pmShowErl'], ['faellig', 'pmShowFaellig'], ['datum', 'pmShowDatum'], ['prio', 'pmShowPrio'], ['kat', 'pmShowKat']].forEach(function (k) {
+  [['erl', 'pmShowErl'], ['faellig', 'pmShowFaellig'], ['datum', 'pmShowDatum'], ['prio', 'pmShowPrio'], ['kat', 'pmShowKat'],
+   ['ohneKreis', 'pmShowOhneKreis']].forEach(function (k) {
     var el = document.getElementById(k[1]);
     if (el && typeof el.checked === 'boolean') { f[k[0]] = el.checked; }
   });
@@ -1133,6 +1139,7 @@ function pmShowHtml() {
     + haken('pmShowDatum', f.datum, 'Datum zeigen')
     + haken('pmShowPrio', f.prio, 'Priorität zeigen')
     + haken('pmShowKat', f.kat, 'Kategorie zeigen')
+    + haken('pmShowOhneKreis', f.ohneKreis, 'Nur ohne Bereich (Day Control)')
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmShowOk()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button></div></div></div>';
 }
@@ -3087,43 +3094,69 @@ function tgSichtbar(a) { return !!(a && a.tsSichtbar === true); }
 
 function tgTag() { return pmIstDatum(cl.tg.tag) ? cl.tg.tag : isoDatum(); }
 
-/* Die Regel. Überfälliges zählt am heutigen Tag mit: sonst fiele eine
-   gekennzeichnete Aufgabe, die gestern dran war und offen blieb, heute
-   lautlos aus dem Kreis — und lautlos verschwinden soll hier nichts. */
+/* Die Regel, und sie steht nur hier. Drei Bedingungen, alle drei nötig:
+     1. die Aufgabe trägt einen der fünf Bereiche,
+     2. sie ist an DIESEM Tag fällig,
+     3. sie trägt das Kennzeichen „in Day Control sichtbar“.
+   Fehlt der Bereich oder die Fälligkeit, erscheint sie gar nicht. Fehlt
+   nur das Kennzeichen, erscheint sie als verborgen für den Tag.
+
+   Überfälliges zählt ausdrücklich NICHT mit (0.133.0): fällig ist der
+   Tag, an dem etwas erscheinen soll, und gestern ist nicht heute. In
+   0.132.0 hatte ich das ungefragt anders gebaut. */
+
+/* Fällig an einem bestimmten Tag — bei Wiederholungen die Instanz dieses
+   Tages, nicht die nächste offene. pmDatum() liefert bei einer Serie nur
+   den nächsten Termin; damit fehlte beim Blättern jede Routine. */
+function tgFaelligAn(a, tag) {
+  if (!a) { return false; }
+  if (a.wiederholung) { return aufgabeFaelligAn(a, tag); }
+  return pmDatum(a) === tag;
+}
+
+/* Erledigt an diesem Tag — bei einer Serie je Tag, nicht als Ganzes. */
+function tgErledigtAn(a, tag) {
+  if (!a) { return false; }
+  if (a.wiederholung) { return istErledigtAn(a, tag); }
+  return a.status === 'erledigt';
+}
+
 function tgImKreis(a, tag) {
-  if (!a || !tgKreisVon(a) || !tgSichtbar(a)) { return false; }
-  var d = pmDatum(a);
-  if (!d) { return false; }
-  if (d === tag) { return true; }
-  return (d < tag) && (tag === isoDatum()) && !pmErledigtJetzt(a);
+  return !!(a && tgKreisVon(a) && tgSichtbar(a) && tgFaelligAn(a, tag));
 }
 
-function tgUeberfaellig(a, tag) {
-  var d = pmDatum(a);
-  return !!d && d < tag && !pmErledigtJetzt(a);
+function tgVerborgenAn(a, tag) {
+  return !!(a && tgKreisVon(a) && !tgSichtbar(a) && tgFaelligAn(a, tag));
 }
 
-/* Alle Aufgaben eines Abschnitts, ohne Rücksicht auf den Tag.
-   Dieselben Ausschlüsse wie in der To-Do-Liste: pausierte Routinen und
+/* Alle Aufgaben eines Bereichs, die an diesem Tag fällig sind.
+   Dieselben Ausschlüsse wie in der To-Do-Liste: pausierte Serien und
    maskiert Privates gehören auch hier nicht hin. */
-function tgAlle(kreis) {
+function tgTages(kreis, tag) {
   return (DB.aufgaben || []).filter(function (a) {
     if (!a || typeof a !== 'object' || !a.id) { return false; }
     if (tgKreisVon(a) !== kreis) { return false; }
     if (a.wiederholung && a.pausiert) { return false; }
     if (prPrivatVerborgen(null, a)) { return false; }
-    return true;
+    return tgFaelligAn(a, tag);
+  });
+}
+
+function tgSortiert(l) {
+  return l.slice().sort(function (x, y) {
+    var zx = String(x.uhrzeit || ''), zy = String(y.uhrzeit || '');
+    if (zx && zy && zx !== zy) { return zx < zy ? -1 : 1; }
+    if (zx !== zy) { return zx ? -1 : 1; }
+    return pmTitel(x) < pmTitel(y) ? -1 : 1;
   });
 }
 
 function tgHeute(kreis, tag) {
-  return tgAlle(kreis).filter(function (a) { return tgImKreis(a, tag); })
-    .sort(function (x, y) {
-      var zx = String(x.uhrzeit || ''), zy = String(y.uhrzeit || '');
-      if (zx && zy && zx !== zy) { return zx < zy ? -1 : 1; }
-      if (zx !== zy) { return zx ? -1 : 1; }
-      return pmTitel(x) < pmTitel(y) ? -1 : 1;
-    });
+  return tgSortiert(tgTages(kreis, tag).filter(function (a) { return tgSichtbar(a); }));
+}
+
+function tgVerborgen(kreis, tag) {
+  return tgSortiert(tgTages(kreis, tag).filter(function (a) { return !tgSichtbar(a); }));
 }
 
 /* ---------- Die Übersicht ---------- */
@@ -3134,7 +3167,9 @@ function tgHtml() {
   var h = '';
   TG_KREIS.forEach(function (s) {
     var l = tgHeute(s.id, tag);
-    var verborgen = tgAlle(s.id).length - l.length;
+    /* Verborgen sind nur die von DIESEM Tag ohne Kennzeichen — nicht
+       alles, was der Bereich sonst noch enthält (0.133.0). */
+    var verborgen = tgVerborgen(s.id, tag).length;
     h += '<div class="tg-abschnitt">'
       + '<button type="button" class="tg-kopf" onclick="tgAufschlagen(\'' + s.id + '\')">'
       + '<span class="tg-zeichen">' + tgZeichen(s.id) + '</span>'
@@ -3155,10 +3190,8 @@ function tgHtml() {
 }
 
 function tgZeileHtml(a, tag) {
-  var rechts = '';
-  if (tgUeberfaellig(a, tag)) { rechts = 'seit ' + esc(clKurzDatum(pmDatum(a))); }
-  else if (a.uhrzeit) { rechts = esc(a.uhrzeit); }
-  return '<li><button type="button" class="tg-zeile' + (pmErledigtJetzt(a) ? ' erl' : '') + '"'
+  var rechts = a.uhrzeit ? esc(a.uhrzeit) : '';
+  return '<li><button type="button" class="tg-zeile' + (tgErledigtAn(a, tag) ? ' erl' : '') + '"'
     + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
     + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span>'
     + (rechts ? '<span class="tg-rechts">' + rechts + '</span>' : '')
@@ -3171,17 +3204,18 @@ function tgAbschnittHtml() {
   var s = tgSatz(cl.tg.abschnitt);
   if (!s) { cl.tg.abschnitt = ''; return tgHtml(); }
   var tag = tgTag();
-  var alle = tgAlle(s.id);
-  var sicht = alle.filter(function (a) { return tgImKreis(a, tag); });
-  var rest = alle.filter(function (a) { return !tgImKreis(a, tag); });
+  /* Auch hier nur dieser Tag: was an anderen Tagen fällig ist, gehört
+     nicht in die Tagessteuerung und steht deshalb nirgends (0.133.0). */
+  var sicht = tgHeute(s.id, tag);
+  var rest = tgVerborgen(s.id, tag);
   var teil = function (titel, l, an) {
     var h = '<div class="tg-abschnitt"><div class="tg-kopf fest">'
       + '<span class="tg-zeichen">' + tgZeichen(s.id) + '</span>'
       + '<span class="tg-name">' + esc(titel) + '</span>'
       + '<span class="tg-phase">' + l.length + '</span></div>';
-    if (!l.length) { return h + '<div class="tg-leer">' + (an ? 'heute nichts' : 'nichts') + '</div></div>'; }
+    if (!l.length) { return h + '<div class="tg-leer">' + (an ? 'nichts sichtbar' : 'nichts verborgen') + '</div></div>'; }
     h += '<ul class="tg-liste">' + l.map(function (a) {
-      return '<li><button type="button" class="tg-zeile' + (pmErledigtJetzt(a) ? ' erl' : '') + '"'
+      return '<li><button type="button" class="tg-zeile' + (tgErledigtAn(a, tag) ? ' erl' : '') + '"'
         + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
         + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span></button>'
         + '<button type="button" class="tg-auge" title="in der Tagessteuerung zeigen"'
@@ -3189,8 +3223,9 @@ function tgAbschnittHtml() {
     }).join('') + '</ul>';
     return h + '</div>';
   };
+  var wann = (tag === isoDatum()) ? 'Heute' : clKurzDatum(tag);
   return '<div class="tg-satz">' + esc(s.satz) + '</div>'
-    + teil('Heute sichtbar', sicht, true) + teil('Verborgen', rest, false);
+    + teil(wann + ' sichtbar', sicht, true) + teil('Verborgen', rest, false);
 }
 
 function tgAufschlagen(id) {

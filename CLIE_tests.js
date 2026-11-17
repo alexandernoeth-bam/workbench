@@ -11650,7 +11650,7 @@ function deskQuelleTest() {
    gar nicht erst entstehen, und eine Umstellung ohne Stempel verlöre sich
    beim nächsten Abgleich — derselbe stille Verlust wie bei den Kalendern. */
 function tagessteuerungTest() {
-  console.log('\n229. Day Control: die Sichtbarkeitsregel (0.132.0)');
+  console.log('\n229. Day Control: die Sichtbarkeitsregel (0.133.0)');
   if (!CL) { return; }
   const S = CL;
   frisch();
@@ -11668,82 +11668,139 @@ function tagessteuerungTest() {
     return a;
   };
 
-  const heuteSichtbar = mach('Heute und gekennzeichnet', 'run', true, h);
-  const ohneKennzeichen = mach('Heute, aber ohne Kennzeichen', 'run', false, h);
-  const andererTag = mach('Gekennzeichnet, aber morgen', 'run', true, morgen);
-  const ohnePlan = mach('Gekennzeichnet, aber ungeplant', 'run', true, '');
-  const ueberfaellig = mach('Gestern, noch offen', 'run', true, gestern);
-  const gesternErledigt = mach('Gestern, erledigt', 'run', true, gestern, 'erledigt');
-  const ohneKreis = mach('Ohne Kategorie', '', true, h);
+  const sichtbar = mach('Heute, Bereich, Kennzeichen', 'run', true, h);
+  const verborgen = mach('Heute, Bereich, ohne Kennzeichen', 'run', false, h);
+  const andererTag = mach('Morgen fällig', 'run', true, morgen);
+  const ohneDatum = mach('Ohne Datum', 'run', true, '');
+  const ueberfaellig = mach('Gestern fällig, noch offen', 'run', true, gestern);
+  const ohneBereich = mach('Ohne Bereich', '', true, h);
 
-  /* Die Regel, Fall für Fall */
-  pruefe(S.tgImKreis(heuteSichtbar, h) === true, 'gekennzeichnet und für heute eingeplant: im Kreis');
-  pruefe(S.tgImKreis(ohneKennzeichen, h) === false, 'ohne Kennzeichen: verborgen, auch wenn heute geplant');
-  pruefe(S.tgImKreis(andererTag, h) === false, 'für einen anderen Tag geplant: heute verborgen');
-  pruefe(S.tgImKreis(ohnePlan, h) === false, 'gekennzeichnet, aber ungeplant: verborgen');
-  pruefe(S.tgImKreis(ohneKreis, h) === false, 'ohne Kategorie gar nicht im Kreis — auch gekennzeichnet nicht');
+  /* Die drei Bedingungen, Fall für Fall */
+  pruefe(S.tgImKreis(sichtbar, h) === true, 'Bereich, heute fällig, Kennzeichen: sichtbar');
+  pruefe(S.tgImKreis(verborgen, h) === false && S.tgVerborgenAn(verborgen, h) === true,
+    'ohne Kennzeichen: nicht sichtbar, aber als verborgen gezählt');
+  pruefe(S.tgImKreis(ohneBereich, h) === false && S.tgVerborgenAn(ohneBereich, h) === false,
+    'ohne Bereich: gar nicht in Day Control, auch nicht verborgen');
+  pruefe(S.tgImKreis(andererTag, h) === false && S.tgVerborgenAn(andererTag, h) === false,
+    'an einem anderen Tag fällig: heute gar nicht, auch nicht als Zahl');
+  pruefe(S.tgImKreis(ohneDatum, h) === false && S.tgVerborgenAn(ohneDatum, h) === false,
+    'ohne Datum: gar nicht');
 
-  /* Überfälliges: mitzeigen, aber nur heute und nur solange offen */
-  pruefe(S.tgImKreis(ueberfaellig, h) === true, 'gestern fällig und noch offen: heute mit dabei');
-  pruefe(S.tgImKreis(gesternErledigt, h) === false, 'gestern fällig und erledigt: nicht mehr');
-  pruefe(S.tgImKreis(ueberfaellig, morgen) === false,
-    'beim Blättern auf einen anderen Tag zählt Überfälliges nicht mit');
-  pruefe(S.tgUeberfaellig(ueberfaellig, h) === true && S.tgUeberfaellig(heuteSichtbar, h) === false,
-    'überfällig wird als solches erkannt');
+  /* Überfälliges ausdrücklich NICHT — das war mein ungefragter Zusatz in 0.132.0 */
+  pruefe(S.tgImKreis(ueberfaellig, h) === false && S.tgVerborgenAn(ueberfaellig, h) === false,
+    'gestern fällig und offen: erscheint heute NICHT — fällig ist der Tag, nicht „ab dem Tag“');
+  pruefe(S.tgImKreis(ueberfaellig, gestern) === true, 'an seinem eigenen Tag erscheint es sehr wohl');
+  pruefe(typeof S.tgUeberfaellig === 'undefined', 'die Überfälligkeits-Sonderbehandlung ist restlos weg');
 
   /* Ein fremder Wert im Feld darf nichts aufreißen */
   const fremd = mach('Unsinn im Feld', 'run', true, h);
   fremd.kreis = 'erfunden';
-  pruefe(S.tgKreisVon(fremd) === '' && S.tgImKreis(fremd, h) === false,
-    'ein unbekannter Kreis-Wert zählt wie keiner');
+  pruefe(S.tgKreisVon(fremd) === '' && S.tgImKreis(fremd, h) === false, 'ein unbekannter Bereich zählt wie keiner');
 
-  /* Die Übersicht zeigt genau das */
+  /* Die Übersicht */
   S.oeffne('tagessteuerung');
   const blatt = S.tgHtml();
-  pruefe(blatt.indexOf('Heute und gekennzeichnet') >= 0, 'die Übersicht zeigt die sichtbare Aufgabe');
-  pruefe(blatt.indexOf('Ohne Kategorie') < 0, 'und die Aufgabe ohne Kategorie nirgends');
-  pruefe(blatt.indexOf('Heute, aber ohne Kennzeichen') < 0, 'auch die ohne Kennzeichen nicht');
+  pruefe(blatt.indexOf('Heute, Bereich, Kennzeichen') >= 0, 'die Übersicht zeigt die sichtbare Aufgabe');
+  pruefe(blatt.indexOf('Heute, Bereich, ohne Kennzeichen') < 0, 'das Verborgene steht nicht mit Titel da');
+  pruefe(/\+ 1 verborgen/.test(blatt), 'sondern nur als Zahl — „+ 1 verborgen“');
+  pruefe(blatt.indexOf('Ohne Bereich') < 0 && blatt.indexOf('Morgen fällig') < 0 && blatt.indexOf('Ohne Datum') < 0,
+    'was nicht heute fällig ist oder keinen Bereich hat, steht nirgends');
+  pruefe(blatt.indexOf('Gestern fällig') < 0, 'und Überfälliges auch nicht');
   pruefe(/heute nichts/.test(blatt), 'ein leerer Abschnitt bleibt stehen und sagt „heute nichts“');
   S.TG_KREIS.forEach(function (k) {
     pruefe(blatt.indexOf(k.name) >= 0, 'der Abschnitt ' + k.name + ' steht im Kreis, auch wenn er leer ist');
   });
-  pruefe(!/type="checkbox"/.test(blatt) && !/class="kasten"/.test(blatt),
-    'kein Kästchen zum Abhaken — die Seite ist eine Übersicht');
-  pruefe(/onclick="tgOeffnen\(/.test(blatt), 'jede Zeile öffnet beim Antippen ihre Aufgabe');
+  pruefe(!/class="kasten"/.test(blatt) && /onclick="tgOeffnen\(/.test(blatt),
+    'kein Kästchen, aber jede Zeile öffnet ihre Aufgabe');
 
-  /* Der aufgeschlagene Abschnitt trennt sichtbar und verborgen */
+  /* Der aufgeschlagene Abschnitt zeigt nur diesen Tag */
   S.tgAufschlagen('run');
   const ab = S.tgHtml();
   pruefe(/Heute sichtbar/.test(ab) && /Verborgen/.test(ab), 'der Abschnitt trennt Sichtbares und Verborgenes');
-  pruefe(ab.indexOf('Heute, aber ohne Kennzeichen') >= 0, 'das Verborgene ist dort zu sehen');
-  pruefe(/onclick="tgAugeUm\(/.test(ab), 'und lässt sich je Aufgabe umstellen');
+  pruefe(ab.indexOf('Heute, Bereich, ohne Kennzeichen') >= 0, 'das Verborgene des Tages ist dort zu sehen');
+  pruefe(ab.indexOf('Morgen fällig') < 0 && ab.indexOf('Ohne Datum') < 0,
+    'Aufgaben anderer Tage stehen auch im Abschnitt nicht');
+  pruefe(/onclick="tgAugeUm\(/.test(ab), 'und lassen sich je Aufgabe umstellen');
 
-  /* Umstellen setzt den Stempel — ohne ihn verlöre es sich beim Abgleich */
-  const vorher = ohneKennzeichen.geaendert;
-  S.tgAugeUm(ohneKennzeichen.id);
-  pruefe(ohneKennzeichen.tsSichtbar === true, 'das Auge setzt das Kennzeichen');
-  pruefe(ohneKennzeichen.geaendert > vorher,
-    'und den Stempel — sonst gewänne beim Abgleich der alte Stand des anderen Geräts');
+  /* Umstellen setzt den Stempel */
+  const vorher = verborgen.geaendert;
+  S.tgAugeUm(verborgen.id);
+  pruefe(verborgen.tsSichtbar === true && verborgen.geaendert > vorher,
+    'das Auge setzt Kennzeichen und Stempel');
 
-  /* Bestandsaufgaben bleiben unangetastet */
+  /* ---- Wiederkehrende Aufgaben: die Instanz DIESES Tages ---- */
+  frisch();
+  const serie = { id: 'serie-1', titel: 'Jeden Werktag', beschreibung: '', kontext: 'beruflich',
+    themaId: null, projektId: null, frist: '', planung: 'backlog', uhrzeit: '', art: 'haupt',
+    wiederholung: { takt: 'woche', intervall: 1, tage: [1, 2, 3, 4, 5], tag: 1 },
+    status: 'offen', erledigtAm: null, zuletztErledigt: null, ablaufSchritt: null, ab: '',
+    prio: 3, kreis: 'run', tsSichtbar: true, geaendert: 1 };
+  S.DB.aufgaben.push(serie);
+
+  /* Irgendein Werktag in der Zukunft und ein Wochenende dazu */
+  let werktag = h, wochenende = '';
+  let i;
+  for (i = 1; i <= 14; i++) {
+    const t = S.tagePlus(h, i);
+    const wt = new Date(t + 'T12:00:00').getDay();
+    if (wt >= 1 && wt <= 5 && werktag === h) { werktag = t; }
+    if ((wt === 0 || wt === 6) && !wochenende) { wochenende = t; }
+  }
+  pruefe(S.tgFaelligAn(serie, werktag) === true,
+    'eine Serie ist an ihrem Werktag fällig — auch wenn der in der Zukunft liegt');
+  pruefe(S.tgFaelligAn(serie, wochenende) === false, 'am Wochenende nicht');
+  pruefe(S.tgImKreis(serie, werktag) === true, 'und steht an diesem Tag im Kreis');
+
+  /* Genau hier wäre 0.132.0 gescheitert: pmDatum() liefert nur den
+     NÄCHSTEN Termin, nicht den des angezeigten Tages. */
+  S.cl.tg.tag = werktag;
+  S.cl.tg.abschnitt = '';
+  pruefe(S.tgHtml().indexOf('Jeden Werktag') >= 0, 'beim Blättern auf diesen Tag steht sie da');
+  S.cl.tg.tag = wochenende;
+  pruefe(S.tgHtml().indexOf('Jeden Werktag') < 0, 'am Wochenende nicht');
+
+  /* Ausgelassene und zusätzliche Tage zählen mit */
+  serie.ausfallTage = [werktag];
+  pruefe(S.tgFaelligAn(serie, werktag) === false, 'ein ausgelassener Tag fällt heraus');
+  serie.zusatzTage = [wochenende];
+  pruefe(S.tgFaelligAn(serie, wochenende) === true, 'ein Zusatztag kommt hinzu');
+  serie.pausiert = true;
+  pruefe(S.tgFaelligAn(serie, wochenende) === false, 'eine pausierte Serie fällt ganz weg');
+  serie.pausiert = false;
+  S.cl.tg.tag = '';
+
+  /* ---- Bestandsdaten und Abgleich ---- */
   frisch();
   const alt = { id: 'alt-1', titel: 'Aus alter Zeit', status: 'offen', planung: h, geaendert: 5 };
   S.DB.aufgaben.push(alt);
   S.oeffne('tagessteuerung');
   S.tgHtml();
   pruefe(typeof alt.kreis === 'undefined' && typeof alt.tsSichtbar === 'undefined',
-    'eine Aufgabe, die nie im Kreis war, bekommt die neuen Felder gar nicht erst angehängt');
-  pruefe(alt.geaendert === 5, 'und ihr Stempel bleibt unberührt — kein Scheinabgleich');
+    'eine Aufgabe ohne Bereich bekommt die neuen Felder gar nicht erst angehängt');
+  pruefe(alt.geaendert === 5, 'und ihr Stempel bleibt unberührt');
 
-  /* Und beide Felder überstehen den Abgleich mit einem Gerät, das sie nicht kennt */
-  const hier = { aufgaben: [{ id: 'a1', titel: 'Mit Kreis', kreis: 'change', tsSichtbar: true,
+  const hier = { aufgaben: [{ id: 'a1', titel: 'Mit Bereich', kreis: 'change', tsSichtbar: true,
     status: 'offen', planung: h, geaendert: 2000 }], grabsteine: [] };
-  const dort = { aufgaben: [{ id: 'a1', titel: 'Mit Kreis', status: 'offen', planung: h, geaendert: 1000 }],
+  const dort = { aufgaben: [{ id: 'a1', titel: 'Mit Bereich', status: 'offen', planung: h, geaendert: 1000 }],
     grabsteine: [] };
   const z = S.zusammenfuehren(hier, dort).db;
-  const a1 = (z.aufgaben || []).filter(function (a) { return a.id === 'a1'; })[0];
+  const a1 = (z.aufgaben || []).filter(function (x) { return x.id === 'a1'; })[0];
   pruefe(!!a1 && a1.kreis === 'change' && a1.tsSichtbar === true,
-    'der jüngere Stand mit den neuen Feldern setzt sich gegen ein Gerät durch, das sie nicht kennt');
+    'beide Felder überstehen den Abgleich mit einem Gerät, das sie nicht kennt');
+
+  /* ---- Der Filter in To Do ---- */
+  frisch();
+  mach('Mit Bereich', 'run', true, h);
+  mach('Ohne Bereich', '', false, h);
+  pruefe(S.PM_SHOW_STD.ohneKreis === false, 'der Filter „Nur ohne Bereich“ ist standardmäßig aus');
+  pruefe(/pmShowOhneKreis/.test(S.SKRIPT || '') || /pmShowOhneKreis/.test(SKRIPT),
+    'und steht als Haken im Show-Fenster');
+  try { S.window.localStorage.setItem('clie-pm-show', JSON.stringify({ ohneKreis: true })); } catch (e) { /* egal */ }
+  const nurOhne = S.pmTodoAlle().map(function (x) { return x.titel; });
+  pruefe(nurOhne.indexOf('Ohne Bereich') >= 0 && nurOhne.indexOf('Mit Bereich') < 0,
+    'eingeschaltet zeigt To Do nur noch Aufgaben ohne Bereich');
+  try { S.window.localStorage.removeItem('clie-pm-show'); } catch (e) { /* egal */ }
+  pruefe(S.pmTodoAlle().length === 2, 'ausgeschaltet wieder alle');
 
   S.cl.tg.abschnitt = '';
   S.cl.app = 'uebersicht';
