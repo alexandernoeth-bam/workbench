@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1C2116">
+<title>Day Control 1.3.0</title>
+<link rel="manifest" href="./daycontrol.webmanifest?v=1.3.0">
+<link rel="icon" href="./daycontrol-192.png?v=1.3.0">
+<link rel="apple-touch-icon" href="./daycontrol-192.png?v=1.3.0">
+<!--
+  Day Control als eigene App (Hülle 1.3.0).
+  Die Seite liegt bewusst außerhalb des Bereichs von CLIE (./clie…) und ihr
+  eigener Bereich ist nur diese Datei. Darin läuft CLIE eingebettet, direkt
+  in Day Control — dieselbe Adresse, dieselben Daten.
+-->
+<style>
+html,body{height:100%;margin:0;background:#B9C4A6;overflow:hidden}
+body{display:flex;flex-direction:column}
+#hinweis{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:#1C2116;color:#DCE4CC;font:15px/1.35 ui-monospace,"Courier New",monospace}
+#hinweis span{flex:1}
+#hinweis button{font:inherit;color:#1C2116;background:#DCE4CC;border:0;border-radius:12px;padding:4px 12px}
+#clie{flex:1 1 auto;width:100%;border:0;display:block}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div id="hinweis" hidden><span>Day Control als App: Chrome-Menü ⋮ › Zum Startbildschirm hinzufügen › Installieren</span><button type="button" id="installieren" hidden>Installieren</button></div>
+<iframe id="clie" title="Day Control" src="./clie.html#tagessteuerung" allow="clipboard-read; clipboard-write; fullscreen; screen-wake-lock; autoplay"></iframe>
+<script>
+'use strict';
+var aufschub = null;
+
+function alsApp() {
+  try {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || window.navigator.standalone === true;
+  } catch (e) { return false; }
+}
+
+function installieren() {
+  if (!aufschub) { return; }
+  aufschub.prompt();
+  aufschub.userChoice.then(function () {
+    aufschub = null;
+    document.getElementById('hinweis').hidden = true;
+  });
+}
+
+function startSeite() {
+  /* Als installierte App ist nichts zu zeigen — nur CLIE. */
+  if (!alsApp()) {
+    document.getElementById('hinweis').hidden = false;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      aufschub = e;
+      document.getElementById('installieren').hidden = false;
+    });
+    document.getElementById('installieren').addEventListener('click', installieren);
+  }
+  /* Derselbe Service Worker und Bereich wie CLIE — die Hülle legt keinen eigenen an. */
+  if (navigator.serviceWorker && /^https?:/.test(window.location.protocol)) {
+    navigator.serviceWorker.register('./sw-clie.js', { scope: './clie' }).catch(function () { return null; });
+  }
+}
+startSeite();
+</script>
+</body>
+</html>
