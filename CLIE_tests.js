@@ -420,7 +420,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 32, 'zwölf Felder im Raster (seit 0.127.0 mit Desk statt Calc, 3×4), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 13 && CL.CL_APPS.length === 33, 'dreizehn Felder im Raster (seit 0.132.0 mit Day Control), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -551,13 +551,13 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","memo","sammlungen","fokus","vorlesen","kategorien","casestudies","desk","lernkartei","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","tagessteuerung","memo","sammlungen","fokus","vorlesen","kategorien","casestudies","desk","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest'),
-    'Start (seit 0.127.0): Roots, Date Book, To Do List / Memo Pad, Collections, Fokus / Reader, Categories, Casestudies / Desk, Flashcards, Games ▸ — das Raster ist wieder voll');
+    'Start (seit 0.127.0): Roots, Date Book, To Do List, Day Control / Memo Pad, Collections, Fokus / Reader, Categories, Casestudies / Desk, Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
+  pruefe(syms === 13, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/13)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -2535,7 +2535,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,memo,sammlungen,fokus,vorlesen,kategorien,casestudies,desk,lernkartei,spiele', 'Start: zwölf Felder (seit 0.127.0), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,tagessteuerung,memo,sammlungen,fokus,vorlesen,kategorien,casestudies,desk,lernkartei,spiele', 'Start: dreizehn Felder (seit 0.132.0), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -3277,7 +3277,7 @@ function sammlerTest() {
   pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
   S.aufklappZu();
   const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 12 Felder (seit 0.123.0)');
+  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 13 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 13 Felder (seit 0.132.0)');
   S.oeffne('uebersicht');
 }
 
@@ -6463,7 +6463,7 @@ function startOrdnerTest() {
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
   pruefe(doppelt.length === 0, 'keine App doppelt (Raster und Ordner)');
-  pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
+  pruefe(raster.length === 13 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
   pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && !/oeffne\('sos'\)/.test(inhalt()) && /oeffne\('fokus'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && !/oeffne\('gemini'\)/.test(inhalt()), 'Routines (seit 0.72) auf dem Start, Fokus statt SOS (seit 0.98.1), Drive und Coach nicht mehr im Raster');
@@ -8388,7 +8388,11 @@ function raster35Test() {
   /* Fehlerarten: Raster nicht voll oder überzählig, eine App doppelt (Raster und Ordner) oder gar nicht erreichbar, Ordner zeigt auf eine App, die es nicht gibt */
   const S = pmFrisch();
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.length === 12 && raster.length % 3 === 0, 'Raster genau voll: zwölf Felder in drei Spalten (seit 0.123.0)');
+  /* Bis 0.131.0 ging die Rechnung glatt auf: zwölf Felder, drei Spalten,
+     vier volle Reihen. Mit Day Control sind es dreizehn — die letzte Reihe
+     hat nur noch ein Feld. Das ist eine bewusste Abweichung, keine Panne,
+     und steht hier, damit sie nicht unbemerkt wieder kippt. */
+  pruefe(raster.length === 13, 'dreizehn Felder in drei Spalten — seit 0.132.0 ist die letzte Reihe nicht mehr voll');
   pruefe(['routinen', 'lernkartei'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Roots und Flashcards direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
@@ -8396,7 +8400,7 @@ function raster35Test() {
   pruefe(!fehlt.length, 'jede App im Ordner gibt es und sie liegt nicht zusätzlich im Raster' + (fehlt.length ? ': ' + fehlt.join(', ') : ''));
   pruefe(raster.every(id => S.CL_BILD[id]), 'jedes Feld hat ein Symbol');
   S.oeffne('uebersicht');
-  pruefe((inhalt().match(/class="app"/g) || []).length === 12 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 12 Felder, eines davon Ordner (Games ▸)');
+  pruefe((inhalt().match(/class="app"/g) || []).length === 13 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 13 Felder, eines davon Ordner (Games ▸)');
   const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
   pruefe(/\.sym\{width:68px;height:68px/.test(css) && /\.sym svg\{width:68px;height:68px/.test(css) && /\.apps\{display:grid;grid-template-columns:repeat\(3,1fr\);gap:14px 4px/.test(css), 'kleinere Symbole (68 px) und engere Zeilen, damit fünf Reihen ohne Rollen passen');
   S.oeffne('rechner'); S.clZurueck();
@@ -9183,7 +9187,7 @@ function fokusRasterTest() {
   pruefe(typeof S.CL_BILD.fokus === 'string' && S.CL_BILD.fokus.length > 40, 'Fokus hat ein eigenes Bildzeichen');
   const h = S.uebersichtHtml();
   pruefe(/onclick="oeffne\('fokus'\)"/.test(h) && !/fk-start/.test(QUELLE), 'kein Knopf oben mehr; die Kachel steht im Raster');
-  pruefe((h.match(/class="app"/g) || []).length === 12, 'im Raster bleiben 12 Kacheln');
+  pruefe((h.match(/class="app"/g) || []).length === 13, 'im Raster bleiben 13 Kacheln');
 }
 
 function terminErinnerungTest() {
@@ -10690,7 +10694,7 @@ function leuchtturmTest() {
   /* Roots ist geblieben, Manifest und Umprogrammierung sind weg */
   pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'Roots gibt es, das Manifest nicht');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
-  pruefe(raster.length === 12 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
+  pruefe(raster.length === 13 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
   pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
   /* Das ▼ kennt nur noch drei Sichten */
@@ -10848,7 +10852,7 @@ function rueckbau122Test() {
 
   /* ---- 5. Das Raster ---- */
   const raster = S.CL_APPS.filter(x => x.raster !== false);
-  pruefe(raster.length === 12, 'zwölf Felder im Raster (' + raster.length + ')');
+  pruefe(raster.length === 13, 'dreizehn Felder im Raster (' + raster.length + ')');
   pruefe(raster.every(x => S.CL_BILD[x.id]), 'jedes Feld hat sein Bildzeichen');
   pruefe(S.CL_APPS.every(x => S.CL_BILD[x.id]), 'zu jeder App, auch außerhalb des Rasters, gibt es eines');
 
@@ -11637,6 +11641,114 @@ function deskQuelleTest() {
    es nicht auf: der Arbeitskalender „Alex“ war eines Morgens privat, ohne
    dass jemand etwas umgestellt hatte. Dieselbe Fehlerart wie 0.124.0, nur
    eine Ebene tiefer. */
+/* Fehlertyp: eine Sichtbarkeitsregel, die an mehreren Stellen steht und
+   auseinanderläuft — und neue Felder, die Bestandsdaten anfassen. Day
+   Control zeigt eine Aufgabe nur, wenn sie eine der fünf Kategorien trägt,
+   das Kennzeichen hat UND für diesen Tag eingeplant ist. Schon eine
+   Bedingung zu viel oder zu wenig, und der Kreis zeigt entweder alles oder
+   nichts. Dazu: beide Felder dürfen an Aufgaben, die nie im Kreis waren,
+   gar nicht erst entstehen, und eine Umstellung ohne Stempel verlöre sich
+   beim nächsten Abgleich — derselbe stille Verlust wie bei den Kalendern. */
+function tagessteuerungTest() {
+  console.log('\n229. Day Control: die Sichtbarkeitsregel (0.132.0)');
+  if (!CL) { return; }
+  const S = CL;
+  frisch();
+  const h = S.isoDatum();
+  const gestern = S.tagePlus(h, -1);
+  const morgen = S.tagePlus(h, 1);
+
+  const mach = function (titel, kreis, sicht, plan, status) {
+    const a = { id: S.neueKennung(), titel: titel, beschreibung: '', kontext: 'beruflich',
+      themaId: null, projektId: null, frist: '', planung: plan, uhrzeit: '', art: 'haupt',
+      wiederholung: null, status: status || 'offen', erledigtAm: status === 'erledigt' ? h : null,
+      zuletztErledigt: null, ablaufSchritt: null, ab: '', prio: 3, geaendert: 1 };
+    if (kreis) { a.kreis = kreis; a.tsSichtbar = sicht; }
+    S.DB.aufgaben.push(a);
+    return a;
+  };
+
+  const heuteSichtbar = mach('Heute und gekennzeichnet', 'run', true, h);
+  const ohneKennzeichen = mach('Heute, aber ohne Kennzeichen', 'run', false, h);
+  const andererTag = mach('Gekennzeichnet, aber morgen', 'run', true, morgen);
+  const ohnePlan = mach('Gekennzeichnet, aber ungeplant', 'run', true, '');
+  const ueberfaellig = mach('Gestern, noch offen', 'run', true, gestern);
+  const gesternErledigt = mach('Gestern, erledigt', 'run', true, gestern, 'erledigt');
+  const ohneKreis = mach('Ohne Kategorie', '', true, h);
+
+  /* Die Regel, Fall für Fall */
+  pruefe(S.tgImKreis(heuteSichtbar, h) === true, 'gekennzeichnet und für heute eingeplant: im Kreis');
+  pruefe(S.tgImKreis(ohneKennzeichen, h) === false, 'ohne Kennzeichen: verborgen, auch wenn heute geplant');
+  pruefe(S.tgImKreis(andererTag, h) === false, 'für einen anderen Tag geplant: heute verborgen');
+  pruefe(S.tgImKreis(ohnePlan, h) === false, 'gekennzeichnet, aber ungeplant: verborgen');
+  pruefe(S.tgImKreis(ohneKreis, h) === false, 'ohne Kategorie gar nicht im Kreis — auch gekennzeichnet nicht');
+
+  /* Überfälliges: mitzeigen, aber nur heute und nur solange offen */
+  pruefe(S.tgImKreis(ueberfaellig, h) === true, 'gestern fällig und noch offen: heute mit dabei');
+  pruefe(S.tgImKreis(gesternErledigt, h) === false, 'gestern fällig und erledigt: nicht mehr');
+  pruefe(S.tgImKreis(ueberfaellig, morgen) === false,
+    'beim Blättern auf einen anderen Tag zählt Überfälliges nicht mit');
+  pruefe(S.tgUeberfaellig(ueberfaellig, h) === true && S.tgUeberfaellig(heuteSichtbar, h) === false,
+    'überfällig wird als solches erkannt');
+
+  /* Ein fremder Wert im Feld darf nichts aufreißen */
+  const fremd = mach('Unsinn im Feld', 'run', true, h);
+  fremd.kreis = 'erfunden';
+  pruefe(S.tgKreisVon(fremd) === '' && S.tgImKreis(fremd, h) === false,
+    'ein unbekannter Kreis-Wert zählt wie keiner');
+
+  /* Die Übersicht zeigt genau das */
+  S.oeffne('tagessteuerung');
+  const blatt = S.tgHtml();
+  pruefe(blatt.indexOf('Heute und gekennzeichnet') >= 0, 'die Übersicht zeigt die sichtbare Aufgabe');
+  pruefe(blatt.indexOf('Ohne Kategorie') < 0, 'und die Aufgabe ohne Kategorie nirgends');
+  pruefe(blatt.indexOf('Heute, aber ohne Kennzeichen') < 0, 'auch die ohne Kennzeichen nicht');
+  pruefe(/heute nichts/.test(blatt), 'ein leerer Abschnitt bleibt stehen und sagt „heute nichts“');
+  S.TG_KREIS.forEach(function (k) {
+    pruefe(blatt.indexOf(k.name) >= 0, 'der Abschnitt ' + k.name + ' steht im Kreis, auch wenn er leer ist');
+  });
+  pruefe(!/type="checkbox"/.test(blatt) && !/class="kasten"/.test(blatt),
+    'kein Kästchen zum Abhaken — die Seite ist eine Übersicht');
+  pruefe(/onclick="tgOeffnen\(/.test(blatt), 'jede Zeile öffnet beim Antippen ihre Aufgabe');
+
+  /* Der aufgeschlagene Abschnitt trennt sichtbar und verborgen */
+  S.tgAufschlagen('run');
+  const ab = S.tgHtml();
+  pruefe(/Heute sichtbar/.test(ab) && /Verborgen/.test(ab), 'der Abschnitt trennt Sichtbares und Verborgenes');
+  pruefe(ab.indexOf('Heute, aber ohne Kennzeichen') >= 0, 'das Verborgene ist dort zu sehen');
+  pruefe(/onclick="tgAugeUm\(/.test(ab), 'und lässt sich je Aufgabe umstellen');
+
+  /* Umstellen setzt den Stempel — ohne ihn verlöre es sich beim Abgleich */
+  const vorher = ohneKennzeichen.geaendert;
+  S.tgAugeUm(ohneKennzeichen.id);
+  pruefe(ohneKennzeichen.tsSichtbar === true, 'das Auge setzt das Kennzeichen');
+  pruefe(ohneKennzeichen.geaendert > vorher,
+    'und den Stempel — sonst gewänne beim Abgleich der alte Stand des anderen Geräts');
+
+  /* Bestandsaufgaben bleiben unangetastet */
+  frisch();
+  const alt = { id: 'alt-1', titel: 'Aus alter Zeit', status: 'offen', planung: h, geaendert: 5 };
+  S.DB.aufgaben.push(alt);
+  S.oeffne('tagessteuerung');
+  S.tgHtml();
+  pruefe(typeof alt.kreis === 'undefined' && typeof alt.tsSichtbar === 'undefined',
+    'eine Aufgabe, die nie im Kreis war, bekommt die neuen Felder gar nicht erst angehängt');
+  pruefe(alt.geaendert === 5, 'und ihr Stempel bleibt unberührt — kein Scheinabgleich');
+
+  /* Und beide Felder überstehen den Abgleich mit einem Gerät, das sie nicht kennt */
+  const hier = { aufgaben: [{ id: 'a1', titel: 'Mit Kreis', kreis: 'change', tsSichtbar: true,
+    status: 'offen', planung: h, geaendert: 2000 }], grabsteine: [] };
+  const dort = { aufgaben: [{ id: 'a1', titel: 'Mit Kreis', status: 'offen', planung: h, geaendert: 1000 }],
+    grabsteine: [] };
+  const z = S.zusammenfuehren(hier, dort).db;
+  const a1 = (z.aufgaben || []).filter(function (a) { return a.id === 'a1'; })[0];
+  pruefe(!!a1 && a1.kreis === 'change' && a1.tsSichtbar === true,
+    'der jüngere Stand mit den neuen Feldern setzt sich gegen ein Gerät durch, das sie nicht kennt');
+
+  S.cl.tg.abschnitt = '';
+  S.cl.app = 'uebersicht';
+}
+
 function kalenderZuordnungTest() {
   console.log('\n228. Kalenderzuordnung übersteht den Abgleich (0.131.0)');
   if (!CL) { return; }
@@ -12053,6 +12165,7 @@ function huellenTest() {
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskQuelleTest(); } catch (e) { fail('0.130.0 Desk-Quelle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { tagessteuerungTest(); } catch (e) { fail('0.132.0 Day Control warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kalenderZuordnungTest(); } catch (e) { fail('0.131.0 Kalenderzuordnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.131.0</title>
+<title>CLIE 0.132.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -104,6 +104,30 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .aufklapp button.an,.aufklapp button:active{background:var(--px);color:var(--lcd)}
 .aufklapp .trenn{border-top:2px dotted var(--px-zart);margin:2px 0}
 .menue-zeile{display:flex;gap:0;border-bottom:2px solid var(--px);background:var(--px);color:var(--lcd)}
+
+/* ---------- Day Control (seit 0.132.0) ----------
+   Eine Übersichtsseite: Zeilen sind Knöpfe, aber nichts sieht nach
+   Bedienung aus — keine Kästchen, keine Rahmen. */
+.tg-abschnitt{margin-top:14px}
+.tg-kopf{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+  border-bottom:1px solid var(--px-zart);padding:0 0 2px}
+.tg-kopf.fest{cursor:default}
+.tg-zeichen{flex:0 0 auto;display:flex}
+.tg-svg{width:24px;height:24px;display:block}
+.tg-name{flex:1 1 auto;font-weight:600;letter-spacing:.04em;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tg-phase{flex:0 0 auto;font-size:17px;color:var(--px-mitte)}
+.tg-satz{color:var(--px-mitte);font-size:17px;padding:6px 0 2px}
+.tg-leer{color:var(--px-zart);font-size:18px;padding:5px 0 1px}
+.tg-verborgen{color:var(--px-mitte);font-size:17px;padding:3px 0 0;text-align:left;width:100%}
+.tg-liste{list-style:none;margin:4px 0 0;padding:0}
+.tg-liste li{display:flex;align-items:flex-start;gap:8px}
+.tg-zeile{flex:1 1 auto;min-width:0;display:flex;align-items:flex-start;gap:8px;
+  text-align:left;padding:4px 0;width:100%}
+.tg-titel{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.tg-rechts{flex:0 0 auto;color:var(--px-mitte);font-size:17px}
+.tg-zeile.erl .tg-titel{text-decoration:line-through;color:var(--px-mitte)}
+.tg-auge{flex:0 0 auto;color:var(--px-mitte);font-size:17px;padding:4px 0 4px 4px}
 /* Kalenderzuordnung im Menü (seit 0.131.0). „offen“ heißt: die Datei
    kennt diesen Kalender nicht — gestrichelt, damit man es sieht. */
 .kal-zeile{display:flex;align-items:center;gap:7px;padding:5px 10px}
@@ -1339,7 +1363,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.131.0';
+var APP_VERSION = '0.132.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3635,10 +3659,13 @@ var CL_APPS = [
      Raster 3×4 — was ständig gebraucht wird, dazu drei Ordner (seit 0.35) */
   /* Seit 0.96.3 das Manifest als erste App; seit 0.109.0 Roots an seiner Stelle */
   /* Seit 0.109.0: Manifest und Routines unter einem Dach */
-  { id: 'routinen', name: 'Roots', stufe: '',    was: 'Manifest, Umprogrammierung, Gewohnheiten und Routinen an einem Ort.' },
+  { id: 'routinen', name: 'Roots', stufe: '',    was: 'Gewohnheiten und Routinen an einem Ort.' },
   { id: 'kalender', name: 'Date Book', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
   /* Seit 0.61 eine App „To Do“; seit 0.71 nur noch Alle, Sammler und Listen */
   { id: 'aufgaben', name: 'To Do List', stufe: '',    was: 'Alle offenen Aufgaben aus Listen und dem Sammler, dazu Eingeplantes aus Memo Pad.' },
+  /* Seit 0.132.0: die Tagessteuerung als Kreis, neben den Aufgaben */
+  { id: 'tagessteuerung', name: 'Day Control', stufe: '',
+    was: 'Der Tag als PDCA-Kreis: CONTROL, RUN, CHANGE, REVIEW, IMPROVE. Zeigt je Abschnitt, was heute sichtbar ist. Eine Übersicht — ein Tipp öffnet die Aufgabe.' },
   { id: 'checklisten', name: 'To Do List', stufe: '', was: '', raster: false },
   /* Seit 0.119.0: das Dock — der Tag und die Aufgaben in einem schmalen Fenster am PC.
      Kein Platz im Raster (3×5 ist voll); es öffnet aus dem Menü ≡, über #dock und von selbst. */
@@ -3697,6 +3724,13 @@ var CL_APPS = [
 var CL_STRICH = 'stroke="#C9D3B7" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"';
 var CL_FUELL = 'fill="#C9D3B7"';
 var CL_BILD = {
+  /* Day Control (seit 0.132.0): der Kreis als Pfeilring — PDCA, das sich
+     dreht. Kein Zahnrad, keine Uhr: beides heißt in CLIE schon etwas
+     anderes (Routinen, Fokus). */
+  tagessteuerung: '<g fill="none" stroke="#C9D3B7" stroke-width="5" stroke-linecap="butt" stroke-linejoin="miter">'
+    + '<path d="M46 20A18 18 0 1 0 50 32"/></g>'
+    + '<path d="M50 14L56 26L42 26Z" fill="#C9D3B7"/>'
+    + '<circle cx="32" cy="32" r="5" fill="#C9D3B7"/>',
   /* Seit 0.109.2: zwei Bänder, die sich kreuzen — unten Wurzel, oben Wuchs, in der Mitte
      die Kreuzung. Gerade Schnittkanten und volle Bandbreite statt dünner Striche. */
   routinen: '<g fill="none" stroke="#C9D3B7" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round">'
@@ -4790,6 +4824,7 @@ function inhaltZeichnen() {
   /* Seit 0.125.0: Desk — der Schreibtisch, nur lesend */
   else if (cl.app === 'desk') { el.innerHTML = sdkHtml(); }
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
+  else if (cl.app === 'tagessteuerung') { el.innerHTML = tgHtml(); }
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
@@ -4839,6 +4874,7 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
       : (cl.app === 'casestudies') ? csKopfText()
+      : (cl.app === 'tagessteuerung') ? tgKopfText()
       : (cl.app === 'desk') ? (sdkQuelle() === 'beruf' ? 'Beruf' : 'Privat')
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
@@ -5226,6 +5262,7 @@ function fussZeichnen() {
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sos') ? sosFussHtml()
         : (cl.app === 'desk') ? sdkFussHtml()
+        : (cl.app === 'tagessteuerung') ? tgFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'casestudies') ? csFussHtml()
@@ -29512,7 +29549,7 @@ function pmDetails(id) {
   cl.pm.fenster = { modus: 'details', id: a.id, titel: a.titel || '', prio: pmPrio(a), bereich: clKategorieVon(a), privat: !!a.privat,
                     datum: a.wiederholung ? '' : pmDatum(a), zeit: a.uhrzeit || '', notiz: a.beschreibung || '',
                     memo: a.memo ? { id: a.memo.id, zeile: a.memo.zeile || '' } : null,
-                    liste: pmListeIdVon(a) };
+                    liste: pmListeIdVon(a), kreis: tgKreisVon(a), tsSichtbar: tgSichtbar(a) };
   cl.aufklapp = 'pmaufgabe';
   aufklappNeu();
 }
@@ -29528,6 +29565,21 @@ function pmFensterLesen() {
   var l = wert('pmListe'); if (l !== null && pmListeSatz(l)) { f.liste = l; }
   katPrivatLesen('pm', f);
   return f;
+}
+
+function pmKreisWahl(k) {
+  var f = pmFensterLesen();
+  if (!f) { return; }
+  f.kreis = tgSatz(k) ? k : '';
+  if (!f.kreis) { f.tsSichtbar = false; }
+  aufklappNeu();
+}
+
+function pmTsWahl(an) {
+  var f = pmFensterLesen();
+  if (!f) { return; }
+  f.tsSichtbar = !!an;
+  aufklappNeu();
 }
 
 function pmPrioWahl(p) {
@@ -29566,6 +29618,21 @@ function pmFensterHtml() {
     + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (p) {
       return '<button type="button"' + (f.prio === p ? ' class="an"' : '') + ' onclick="pmPrioWahl(' + p + ')">' + p + '</button>';
     }).join('') + '</div>';
+  /* Seit 0.132.0: Kreis und Sichtbarkeit für Day Control. „keiner“ heißt,
+     die Aufgabe steht gar nicht im Kreis — das ist die Vorgabe und bleibt
+     es, solange du nichts wählst. */
+  x += '<label>Kreis:</label><div class="wahlreihe wahlreihe-kreis">'
+    + '<button type="button"' + (!f.kreis ? ' class="an"' : '') + ' onclick="pmKreisWahl(\'\')">keiner</button>'
+    + TG_KREIS.map(function (k) {
+      return '<button type="button"' + (f.kreis === k.id ? ' class="an"' : '')
+        + ' onclick="pmKreisWahl(\'' + k.id + '\')">' + esc(k.name) + '</button>';
+    }).join('') + '</div>';
+  if (f.kreis) {
+    x += '<label>Tagessteuerung:</label><div class="wahlreihe">'
+      + '<button type="button"' + (f.tsSichtbar ? ' class="an"' : '') + ' onclick="pmTsWahl(true)">sichtbar</button>'
+      + '<button type="button"' + (!f.tsSichtbar ? ' class="an"' : '') + ' onclick="pmTsWahl(false)">verborgen</button>'
+      + '</div>';
+  }
   /* Seit 0.103.1: die Liste ist Pflicht und steht im Fenster — so wandert eine Aufgabe
      von einer Liste in die andere. Hat die Liste eine Kategorie, gilt sie und ist hier
      nur noch zu lesen; im Sammler wählst du sie weiter selbst. */
@@ -29643,6 +29710,11 @@ function pmUebernehmen() {
   a.titel = titel.slice(0, 300);
   a.prio = f.prio;
   a.beschreibung = String(f.notiz || '');
+  /* Seit 0.132.0: nur schreiben, wenn etwas gewählt ist. Eine Aufgabe, die
+     nie im Kreis war, bekommt so auch kein leeres Feld angehängt — die
+     Bestandsdaten bleiben, wie sie sind. */
+  if (tgSatz(f.kreis)) { a.kreis = f.kreis; a.tsSichtbar = !!f.tsSichtbar; }
+  else if (a.kreis || a.tsSichtbar) { a.kreis = ''; a.tsSichtbar = false; }
   katPrivatSchreiben(a, { bereich: f.bereich || '', privat: !!f.privat });
   /* Die Liste zuletzt: sie entscheidet über die Kategorie (0.103.1) */
   if (pmListeSatz(f.liste)) { a.themaId = f.liste; }
@@ -31350,6 +31422,241 @@ function pmNachpflegen() {
   z += raus;
   if (z) { spaeterSichern(true); }
   return z;
+}
+
+/* ============================================================
+   Day Control — die Tagessteuerung als Kreis (seit 0.132.0)
+
+   Fünf Abschnitte nach Alexanders PDCA-Kreis. Die Seite ist eine
+   ÜBERSICHT, keine Bedienfläche: kein Abhaken, jede Zeile öffnet beim
+   Antippen ihre Aufgabe im gewohnten Dialog.
+
+   Die Sichtbarkeitsregel steht genau einmal, in tgImKreis():
+   eine Aufgabe steht im Kreis, wenn sie eine der fünf Kategorien
+   trägt, das Kennzeichen „in der Tagessteuerung sichtbar“ gesetzt hat
+   UND für diesen Tag eingeplant ist. Alles andere ist verborgen und
+   nur im aufgeschlagenen Abschnitt zu sehen.
+
+   Zwei neue Felder an der Aufgabe: „kreis“ und „tsSichtbar“. Beide
+   werden erst geschrieben, wenn du sie setzt — Bestandsaufgaben
+   bleiben unangetastet, und die Workbench reicht sie unverändert
+   durch, weil sie Felder, die sie nicht kennt, nicht anfasst.
+   ============================================================ */
+
+cl.tg = { tag: '', abschnitt: '' };
+
+var TG_KREIS = [
+  { id: 'control', name: 'CONTROL', phase: 'Plan',  satz: 'Was kommt auf mich zu?' },
+  { id: 'run',     name: 'RUN',     phase: 'Do',    satz: 'Bekanntes zuverlässig durchführen' },
+  { id: 'change',  name: 'CHANGE',  phase: 'Do',    satz: 'Neues verstehen und gestalten' },
+  { id: 'review',  name: 'REVIEW',  phase: 'Check', satz: 'Was ist tatsächlich passiert?' },
+  { id: 'improve', name: 'IMPROVE', phase: 'Act',   satz: 'Was soll beim nächsten Mal besser laufen?' }
+];
+
+function tgSatz(id) {
+  var i;
+  for (i = 0; i < TG_KREIS.length; i++) { if (TG_KREIS[i].id === id) { return TG_KREIS[i]; } }
+  return null;
+}
+
+/* Nur die fünf gelten. Ein unbekannter Wert zählt wie keiner — so kann
+   ein fremdes Gerät nichts hereinschreiben, was der Kreis nicht kennt. */
+function tgKreisVon(a) {
+  var k = String((a && a.kreis) || '');
+  return tgSatz(k) ? k : '';
+}
+
+function tgSichtbar(a) { return !!(a && a.tsSichtbar === true); }
+
+function tgTag() { return pmIstDatum(cl.tg.tag) ? cl.tg.tag : isoDatum(); }
+
+/* Die Regel. Überfälliges zählt am heutigen Tag mit: sonst fiele eine
+   gekennzeichnete Aufgabe, die gestern dran war und offen blieb, heute
+   lautlos aus dem Kreis — und lautlos verschwinden soll hier nichts. */
+function tgImKreis(a, tag) {
+  if (!a || !tgKreisVon(a) || !tgSichtbar(a)) { return false; }
+  var d = pmDatum(a);
+  if (!d) { return false; }
+  if (d === tag) { return true; }
+  return (d < tag) && (tag === isoDatum()) && !pmErledigtJetzt(a);
+}
+
+function tgUeberfaellig(a, tag) {
+  var d = pmDatum(a);
+  return !!d && d < tag && !pmErledigtJetzt(a);
+}
+
+/* Alle Aufgaben eines Abschnitts, ohne Rücksicht auf den Tag.
+   Dieselben Ausschlüsse wie in der To-Do-Liste: pausierte Routinen und
+   maskiert Privates gehören auch hier nicht hin. */
+function tgAlle(kreis) {
+  return (DB.aufgaben || []).filter(function (a) {
+    if (!a || typeof a !== 'object' || !a.id) { return false; }
+    if (tgKreisVon(a) !== kreis) { return false; }
+    if (a.wiederholung && a.pausiert) { return false; }
+    if (prPrivatVerborgen(null, a)) { return false; }
+    return true;
+  });
+}
+
+function tgHeute(kreis, tag) {
+  return tgAlle(kreis).filter(function (a) { return tgImKreis(a, tag); })
+    .sort(function (x, y) {
+      var zx = String(x.uhrzeit || ''), zy = String(y.uhrzeit || '');
+      if (zx && zy && zx !== zy) { return zx < zy ? -1 : 1; }
+      if (zx !== zy) { return zx ? -1 : 1; }
+      return pmTitel(x) < pmTitel(y) ? -1 : 1;
+    });
+}
+
+/* ---------- Die Übersicht ---------- */
+
+function tgHtml() {
+  var tag = tgTag();
+  if (cl.tg.abschnitt) { return tgAbschnittHtml(); }
+  var h = '';
+  TG_KREIS.forEach(function (s) {
+    var l = tgHeute(s.id, tag);
+    var verborgen = tgAlle(s.id).length - l.length;
+    h += '<div class="tg-abschnitt">'
+      + '<button type="button" class="tg-kopf" onclick="tgAufschlagen(\'' + s.id + '\')">'
+      + '<span class="tg-zeichen">' + tgZeichen(s.id) + '</span>'
+      + '<span class="tg-name">' + esc(s.name) + '</span>'
+      + '<span class="tg-phase">' + esc(s.phase) + '</span></button>';
+    if (!l.length) {
+      h += '<div class="tg-leer">heute nichts</div>';
+    } else {
+      h += '<ul class="tg-liste">' + l.map(function (a) { return tgZeileHtml(a, tag); }).join('') + '</ul>';
+    }
+    if (verborgen > 0) {
+      h += '<button type="button" class="tg-verborgen" onclick="tgAufschlagen(\'' + s.id + '\')">+ '
+        + verborgen + ' verborgen</button>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+
+function tgZeileHtml(a, tag) {
+  var rechts = '';
+  if (tgUeberfaellig(a, tag)) { rechts = 'seit ' + esc(clKurzDatum(pmDatum(a))); }
+  else if (a.uhrzeit) { rechts = esc(a.uhrzeit); }
+  return '<li><button type="button" class="tg-zeile' + (pmErledigtJetzt(a) ? ' erl' : '') + '"'
+    + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
+    + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span>'
+    + (rechts ? '<span class="tg-rechts">' + rechts + '</span>' : '')
+    + '</button></li>';
+}
+
+/* ---------- Ein Abschnitt aufgeschlagen ---------- */
+
+function tgAbschnittHtml() {
+  var s = tgSatz(cl.tg.abschnitt);
+  if (!s) { cl.tg.abschnitt = ''; return tgHtml(); }
+  var tag = tgTag();
+  var alle = tgAlle(s.id);
+  var sicht = alle.filter(function (a) { return tgImKreis(a, tag); });
+  var rest = alle.filter(function (a) { return !tgImKreis(a, tag); });
+  var teil = function (titel, l, an) {
+    var h = '<div class="tg-abschnitt"><div class="tg-kopf fest">'
+      + '<span class="tg-zeichen">' + tgZeichen(s.id) + '</span>'
+      + '<span class="tg-name">' + esc(titel) + '</span>'
+      + '<span class="tg-phase">' + l.length + '</span></div>';
+    if (!l.length) { return h + '<div class="tg-leer">' + (an ? 'heute nichts' : 'nichts') + '</div></div>'; }
+    h += '<ul class="tg-liste">' + l.map(function (a) {
+      return '<li><button type="button" class="tg-zeile' + (pmErledigtJetzt(a) ? ' erl' : '') + '"'
+        + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
+        + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span></button>'
+        + '<button type="button" class="tg-auge" title="in der Tagessteuerung zeigen"'
+        + ' onclick="tgAugeUm(\'' + esc(a.id) + '\')">' + (tgSichtbar(a) ? '◉' : '○') + '</button></li>';
+    }).join('') + '</ul>';
+    return h + '</div>';
+  };
+  return '<div class="tg-satz">' + esc(s.satz) + '</div>'
+    + teil('Heute sichtbar', sicht, true) + teil('Verborgen', rest, false);
+}
+
+function tgAufschlagen(id) {
+  cl.tg.abschnitt = tgSatz(id) ? id : '';
+  zeichne();
+}
+
+function tgZurueck() { cl.tg.abschnitt = ''; zeichne(); }
+
+function tgOeffnen(id) { pmDetails(id); }
+
+/* Das Auge setzt das Kennzeichen — und den Stempel, sonst verlöre die
+   Änderung beim nächsten Abgleich gegen das andere Gerät. */
+function tgAugeUm(id) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  a.tsSichtbar = !tgSichtbar(a);
+  a.geaendert = jetzt();
+  spaeterSichern();
+  zeichne();
+}
+
+function tgKreisSetzen(id, kreis) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  a.kreis = tgSatz(kreis) ? kreis : '';
+  a.geaendert = jetzt();
+  spaeterSichern();
+  zeichne();
+}
+
+/* ---------- Tag blättern ---------- */
+
+function tgTagUm(schritt) {
+  cl.tg.tag = tagePlus(tgTag(), schritt);
+  zeichne();
+}
+
+function tgHeuteZeigen() { cl.tg.tag = ''; zeichne(); }
+
+function tgFussHtml() {
+  var tag = tgTag();
+  if (cl.tg.abschnitt) {
+    return '<button type="button" class="knopf" onclick="tgZurueck()">zurück zur Übersicht</button>';
+  }
+  return '<button type="button" class="knopf" onclick="tgTagUm(-1)">◀</button>'
+    + '<button type="button" class="knopf' + (tag === isoDatum() ? ' voll' : '') + '"'
+    + ' onclick="tgHeuteZeigen()">' + esc(tag === isoDatum() ? 'heute' : clKurzDatum(tag)) + '</button>'
+    + '<button type="button" class="knopf" onclick="tgTagUm(1)">▶</button>';
+}
+
+/* Links in der Kopfzeile steht ohnehin „Day Control“. Rechts gehört
+   deshalb nur hin, worin man gerade steckt — auf der Übersicht nichts. */
+function tgKopfText() {
+  var s = cl.tg.abschnitt ? tgSatz(cl.tg.abschnitt) : null;
+  return s ? s.name : '';
+}
+
+/* Die fünf Abschnittszeichen. Bewusst flächig und grob wie die
+   App-Symbole — eine Zeile hoch, kein Scheibenrund drumherum. */
+var TG_BILD = {
+  /* Schieberegler: was kommt auf mich zu, und woran stelle ich.
+     Breite Balken statt dünner Striche — wie die App-Symbole. */
+  control: '<rect x="1" y="4" width="24" height="4"/><rect x="1" y="17" width="24" height="4"/>'
+    + '<rect x="16" y="1" width="5" height="10"/><rect x="5" y="14" width="5" height="10"/>',
+  /* Flamme: läuft und muss zuverlässig laufen */
+  run: '<path d="M13 0C13 6 7 7 7 13C7 15 8 17 9 18C8 15 10 13 12 12C12 16 16 17 16 21C16 23 15 24 14 25C19 24 22 20 22 15C22 8 17 4 13 0Z"/>'
+    + '<path d="M7 16C5 18 4 20 4 22C4 24 5 25 7 26C6 24 6 22 8 20Z"/>',
+  /* Rakete: Neues */
+  change: '<path d="M13 0C18 5 20 10 20 16H6C6 10 8 5 13 0Z"/>'
+    + '<circle cx="13" cy="9" r="3" fill="#B9C4A6"/>'
+    + '<path d="M6 13L1 20L6 19Z"/><path d="M20 13L25 20L20 19Z"/>'
+    + '<path d="M9 18H17L13 26Z"/>',
+  /* Lupe: was ist tatsächlich passiert */
+  review: '<path d="M11 1A10 10 0 1 0 11 21A10 10 0 1 0 11 1ZM11 5A6 6 0 1 1 11 17A6 6 0 1 1 11 5Z"/>'
+    + '<path d="M17 18L19 16L26 23L24 25Z"/>',
+  /* Schraubenschlüssel: was soll besser laufen */
+  improve: '<path d="M25 7A8 8 0 0 1 14 15L5 24A3 3 0 0 1 1 20L10 11A8 8 0 0 1 21 3L16 8L18 11L22 11Z"/>'
+};
+
+function tgZeichen(id) {
+  return '<svg viewBox="0 0 26 26" aria-hidden="true" class="tg-svg">'
+    + '<g fill="var(--px)">' + (TG_BILD[id] || '') + '</g></svg>';
 }
 
 /* ============================================================

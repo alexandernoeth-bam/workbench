@@ -195,7 +195,7 @@ function pmListenNachziehen() {
     }
     if (!ziel) { ckKorb(true); ziel = CK_KORB_ID; }
     a.themaId = ziel;
-    a.geaendert = jetzt();
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
     n++;
   });
   return n;
@@ -221,7 +221,8 @@ function pmNotizenAufraeumen() {
   var ids = Object.keys(weg);
   if (!ids.length) { return 0; }
   (DB.aufgaben || []).forEach(function (a) {
-    if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+    if (a && a.memo && weg[a.memo.id]) { delete a.memo; }
   });
   DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
   ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
@@ -269,7 +270,7 @@ function pmListenKatNachziehen() {
     if (!best || !kgName(best)) { return; }
     t.bereich = best;
     t.kontext = clIstArbeit(best) ? 'beruflich' : 'privat';
-    t.geaendert = jetzt();
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
     n++;
   });
   return n;
@@ -354,7 +355,8 @@ function mpArtenAufraeumen() {
   var ids = Object.keys(weg);
   if (ids.length) {
     (DB.aufgaben || []).forEach(function (a) {
-      if (a && a.memo && weg[a.memo.id]) { delete a.memo; a.geaendert = jetzt(); }
+      /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+      if (a && a.memo && weg[a.memo.id]) { delete a.memo; }
     });
     DB.gedanken = (DB.gedanken || []).filter(function (g) { return !(g && weg[g.id]); });
     ids.forEach(function (id) { grabsteinSetzen('gedanken', id); });
@@ -368,7 +370,7 @@ function mpArtenAufraeumen() {
     delete g.art;
     var t = mpTypZeile(g.text, 'Checkliste');
     if (t !== null) { g.text = t; }
-    g.geaendert = jetzt();
+    /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
     n++;
   });
   /* 3. Projekte und Ziele bekommen ihre Typ-Zeile */
@@ -377,7 +379,7 @@ function mpArtenAufraeumen() {
       var t = x ? mpTypZeile(x.flaeche, p[1]) : null;
       if (t === null || !x) { return; }
       x.flaeche = t;
-      x.geaendert = jetzt();
+      /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
       n++;
     });
   });
@@ -896,7 +898,7 @@ function wsStdText(min) {
 }
 
 function wsLeer() {
-  return { termine: [], aufgaben: [], routinen: [], memoNeu: [], memoArch: [], ideenNeu: [], ideenFertig: [] };
+  return { termine: [], aufgaben: [], routinen: [], memoNeu: [], memoArch: [] };
 }
 
 function pmWocheStand() {
@@ -958,11 +960,7 @@ function pmWocheStatRechnen(montag, modus) {
       if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].memoNeu.push({ titel: String(m.titel || ''), tag: x.angelegt }); }
       if (pmIstDatum(x.archivAm) && x.archivAm >= montag && x.archivAm <= heute) { s[b].memoArch.push({ titel: String(m.titel || ''), tag: x.archivAm }); }
     });
-    iwAlle().forEach(function (x) {
-      if (prPrivatVerborgen(null, x)) { return; }
-      var b = wsBereich(x);
-      if (pmIstDatum(x.angelegt) && x.angelegt >= montag && x.angelegt <= heute) { s[b].ideenNeu.push({ titel: String(x.titel || ''), tag: x.angelegt }); }
-      if (pmIstDatum(x.fertigAm) && x.fertigAm >= montag && x.fertigAm <= heute) { s[b].ideenFertig.push({ titel: String(x.titel || ''), tag: x.fertigAm }); }
+    [].forEach(function (x) {
     });
   }
   return s;
@@ -1002,7 +1000,6 @@ function pmWocheBereichHtml(b, d, st, modus) {
   h += '<div class="pm-wzeile"><span>Termine</span><span>' + (d.termine.length ? '<button type="button" class="pm-tipp" onclick="pmWocheDrill(\'' + b + '\',\'termine\',null)">' + wsStdText(min) + ' · ' + d.termine.length + '</button>' : '0') + '</span></div>';
   if (modus === 'erledigt') {
     h += '<div class="pm-wzeile"><span>Memo Pad · neu / archiviert</span><span>' + pmWocheZahl(b, 'memoNeu', undefined, d.memoNeu) + ' / ' + pmWocheZahl(b, 'memoArch', undefined, d.memoArch) + '</span></div>';
-    h += '<div class="pm-wzeile"><span>Ideen · neu / abgeschlossen</span><span>' + pmWocheZahl(b, 'ideenNeu', undefined, d.ideenNeu) + ' / ' + pmWocheZahl(b, 'ideenFertig', undefined, d.ideenFertig) + '</span></div>';
   }
   h += '<table><tr><th>Priorität</th><th>Aufgaben</th><th>Routinen</th></tr>';
   var p;
@@ -1024,7 +1021,7 @@ function pmWocheListeHtml(st) {
   if (art === 'aufgaben' || art === 'routinen') {
     l = d[art].filter(function (x) { return dr.p === null || x.prio === dr.p; }).map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) + ' · Prio ' + x.prio }; });
   }
-  if (art === 'memoNeu' || art === 'memoArch' || art === 'ideenNeu' || art === 'ideenFertig') {
+  if (art === 'memoNeu' || art === 'memoArch') {
     l = d[art].map(function (x) { return { t: x.titel, r: clKurzDatum(x.tag) }; });
   }
   var h = '<div class="pm-wliste"><div class="pm-wkopf">' + (dr.b === 'privat' ? 'Privat' : 'Beruflich') + ' · ' + esc(wsArtName(art)) + (dr.p ? ' · Priorität ' + dr.p : '') + '</div>';
@@ -1034,7 +1031,7 @@ function pmWocheListeHtml(st) {
 }
 
 function wsArtName(art) {
-  return { termine: 'Termine', aufgaben: 'Aufgaben', routinen: 'Routinen', memoNeu: 'Memo Pad neu', memoArch: 'Memo Pad archiviert', ideenNeu: 'Ideen neu', ideenFertig: 'Ideen abgeschlossen' }[art] || art;
+  return { termine: 'Termine', aufgaben: 'Aufgaben', routinen: 'Routinen', memoNeu: 'Memo Pad neu', memoArch: 'Memo Pad archiviert' }[art] || art;
 }
 
 function pmWocheHtml() {
@@ -1169,7 +1166,7 @@ function pmDetails(id) {
   cl.pm.fenster = { modus: 'details', id: a.id, titel: a.titel || '', prio: pmPrio(a), bereich: clKategorieVon(a), privat: !!a.privat,
                     datum: a.wiederholung ? '' : pmDatum(a), zeit: a.uhrzeit || '', notiz: a.beschreibung || '',
                     memo: a.memo ? { id: a.memo.id, zeile: a.memo.zeile || '' } : null,
-                    liste: pmListeIdVon(a) };
+                    liste: pmListeIdVon(a), kreis: tgKreisVon(a), tsSichtbar: tgSichtbar(a) };
   cl.aufklapp = 'pmaufgabe';
   aufklappNeu();
 }
@@ -1185,6 +1182,21 @@ function pmFensterLesen() {
   var l = wert('pmListe'); if (l !== null && pmListeSatz(l)) { f.liste = l; }
   katPrivatLesen('pm', f);
   return f;
+}
+
+function pmKreisWahl(k) {
+  var f = pmFensterLesen();
+  if (!f) { return; }
+  f.kreis = tgSatz(k) ? k : '';
+  if (!f.kreis) { f.tsSichtbar = false; }
+  aufklappNeu();
+}
+
+function pmTsWahl(an) {
+  var f = pmFensterLesen();
+  if (!f) { return; }
+  f.tsSichtbar = !!an;
+  aufklappNeu();
 }
 
 function pmPrioWahl(p) {
@@ -1223,6 +1235,21 @@ function pmFensterHtml() {
     + '<label>Priorität:</label><div class="wahlreihe">' + [1, 2, 3, 4, 5].map(function (p) {
       return '<button type="button"' + (f.prio === p ? ' class="an"' : '') + ' onclick="pmPrioWahl(' + p + ')">' + p + '</button>';
     }).join('') + '</div>';
+  /* Seit 0.132.0: Kreis und Sichtbarkeit für Day Control. „keiner“ heißt,
+     die Aufgabe steht gar nicht im Kreis — das ist die Vorgabe und bleibt
+     es, solange du nichts wählst. */
+  x += '<label>Kreis:</label><div class="wahlreihe wahlreihe-kreis">'
+    + '<button type="button"' + (!f.kreis ? ' class="an"' : '') + ' onclick="pmKreisWahl(\'\')">keiner</button>'
+    + TG_KREIS.map(function (k) {
+      return '<button type="button"' + (f.kreis === k.id ? ' class="an"' : '')
+        + ' onclick="pmKreisWahl(\'' + k.id + '\')">' + esc(k.name) + '</button>';
+    }).join('') + '</div>';
+  if (f.kreis) {
+    x += '<label>Tagessteuerung:</label><div class="wahlreihe">'
+      + '<button type="button"' + (f.tsSichtbar ? ' class="an"' : '') + ' onclick="pmTsWahl(true)">sichtbar</button>'
+      + '<button type="button"' + (!f.tsSichtbar ? ' class="an"' : '') + ' onclick="pmTsWahl(false)">verborgen</button>'
+      + '</div>';
+  }
   /* Seit 0.103.1: die Liste ist Pflicht und steht im Fenster — so wandert eine Aufgabe
      von einer Liste in die andere. Hat die Liste eine Kategorie, gilt sie und ist hier
      nur noch zu lesen; im Sammler wählst du sie weiter selbst. */
@@ -1300,6 +1327,11 @@ function pmUebernehmen() {
   a.titel = titel.slice(0, 300);
   a.prio = f.prio;
   a.beschreibung = String(f.notiz || '');
+  /* Seit 0.132.0: nur schreiben, wenn etwas gewählt ist. Eine Aufgabe, die
+     nie im Kreis war, bekommt so auch kein leeres Feld angehängt — die
+     Bestandsdaten bleiben, wie sie sind. */
+  if (tgSatz(f.kreis)) { a.kreis = f.kreis; a.tsSichtbar = !!f.tsSichtbar; }
+  else if (a.kreis || a.tsSichtbar) { a.kreis = ''; a.tsSichtbar = false; }
   katPrivatSchreiben(a, { bereich: f.bereich || '', privat: !!f.privat });
   /* Die Liste zuletzt: sie entscheidet über die Kategorie (0.103.1) */
   if (pmListeSatz(f.liste)) { a.themaId = f.liste; }
@@ -1321,50 +1353,9 @@ function pmSpeichern() {
   cl.pm.fenster = null;
   aufklappZu();
   zeichne();
-  /* Wie bisher: bei Prio 1/2 oder vollem Tag fragt der Coach nach */
-  if (neu && !a.wiederholung && coVorabNoetig(pmCoachText(a), pmDatum(a))) {
-    coVorabAuf({ art: 'aufgabe', text: pmCoachText(a), aufgabe: a.id, seite: '', datum: pmDatum(a), frist: '' });
-  }
 }
 
 /* ---------- Coach: die Aufgaben des Tages ---------- */
-
-/* Der Text, wie der Coach ihn kennt: „P1 Titel“ (ohne Kürzel = 3) */
-function pmCoachText(a) {
-  var p = pmPrio(a);
-  return (p !== 3 ? 'P' + p + ' ' : '') + pmTitel(a);
-}
-
-/* Zeilen im Format von coTagDaten: { a: { text, erledigt }, pm } */
-function pmCoachZeilen(is) {
-  return pmAmTag(is).filter(function (a) { return !a.wiederholung; }).map(function (a) {
-    return { nr: -1, roh: '', a: { text: pmCoachText(a), erledigt: a.status === 'erledigt', nichtRelevant: false }, zeit: pmIstZeit(a.uhrzeit) ? a.uhrzeit : '', pm: a.id, quelle: '', cls: '' };
-  });
-}
-
-/* Verschieben: an „is“ fällige Aufgabe mit diesem Text (oder Kennung) → neuer Tag oder ohne Datum */
-function pmCoachVerschieben(is, text, ziel) {
-  var a = pmAufgabeFinden(text);
-  if (!a || a.wiederholung) {
-    a = null;
-    (is ? pmAmTag(is) : []).forEach(function (x) { if (!a && !x.wiederholung && x.status !== 'erledigt' && pmCoachText(x) === text) { a = x; } });
-  }
-  if (!a) { return false; }
-  a.planung = pmIstDatum(ziel) ? ziel : 'backlog';
-  if (!pmIstDatum(ziel)) { a.uhrzeit = ''; }
-  a.geaendert = jetzt();
-  spaeterSichern();
-  return true;
-}
-
-function pmCoachStreichen(id) {
-  var a = pmAufgabeFinden(id);
-  if (!a) { return false; }
-  DB.aufgaben.splice(DB.aufgaben.indexOf(a), 1);
-  grabsteinSetzen('aufgaben', a.id);
-  spaeterSichern();
-  return true;
-}
 
 /* Wiederholung: aus der Aufgabe wird eine Routine — Regel im Routinen-Fenster */
 function pmWiederholung() {
@@ -2906,7 +2897,8 @@ function pmUmstellenKern(echt) {
       var plan = pmEingeplant(s, z.mid ? z.voll : z.a.text);
       if (z.mid) {
         var da = pmAufgabeZurMarke(z.mid);
-        if (echt && da && plan.datum && !da.wiederholung) { da.planung = plan.datum; if (plan.zeit) { da.uhrzeit = plan.zeit; } da.geaendert = jetzt(); }
+        /* kein Stempel: Aufräumen ist keine Benutzeränderung (0.124.0) */
+        if (echt && da && plan.datum && !da.wiederholung) { da.planung = plan.datum; if (plan.zeit) { da.uhrzeit = plan.zeit; } }
         if (plan.fund.length) { n.memo++; if (echt) { pmAusplanen(plan.fund); } }
         return;
       }
@@ -2980,15 +2972,18 @@ function pmMarkenPruefen() {
     if (a.memo.zeile === undefined) { if (pmMarkeWiederfinden(pmMemoVon(a), a) >= 0) { n++; } return; }
     if (!a.memo.zeile) { return; }
     var s = pmMemoVon(a);
-    if (!s) { delete a.memo; a.geaendert = jetzt(); n++; return; }
+    if (!s) { delete a.memo; n++; return; }
     var nr = pmZeileMitMarke(s, a.memo.zeile);
     if (nr < 0) { nr = pmMarkeWiederfinden(s, a); }
-    if (nr < 0) { delete a.memo.zeile; a.geaendert = jetzt(); n++; return; }
+    if (nr < 0) { delete a.memo.zeile; n++; return; }
     var k = kpAufgabe(String(s.text || '').split('\n')[nr]);
     if (k && !a.wiederholung && k.erledigt !== (a.status === 'erledigt')) {
+      /* Diese Zeile hat am 13.11.2026 zwei Wochen Arbeit gekostet: Das Gerät
+         las seinen zwei Wochen alten Memo-Text, setzte den Status darauf
+         zurück und stempelte ihn mit jetzt — womit der alte Stand beim
+         Abgleich gewann. Abgeleitet wird weiterhin, gestempelt nicht. */
       a.status = k.erledigt ? 'erledigt' : 'offen';
       a.erledigtAm = k.erledigt ? (a.erledigtAm || isoDatum()) : null;
-      a.geaendert = jetzt();
       n++;
     }
   });
@@ -3042,6 +3037,241 @@ function pmNachpflegen() {
   var raus = pmNotizenAufraeumen();
   if (raus) { melde(raus + (raus === 1 ? ' Notiz' : ' Notizen') + ' aufgeräumt — die Aufgaben liegen in ihren Listen.', null); }
   z += raus;
-  if (z) { spaeterSichern(); }
+  if (z) { spaeterSichern(true); }
   return z;
+}
+
+/* ============================================================
+   Day Control — die Tagessteuerung als Kreis (seit 0.132.0)
+
+   Fünf Abschnitte nach Alexanders PDCA-Kreis. Die Seite ist eine
+   ÜBERSICHT, keine Bedienfläche: kein Abhaken, jede Zeile öffnet beim
+   Antippen ihre Aufgabe im gewohnten Dialog.
+
+   Die Sichtbarkeitsregel steht genau einmal, in tgImKreis():
+   eine Aufgabe steht im Kreis, wenn sie eine der fünf Kategorien
+   trägt, das Kennzeichen „in der Tagessteuerung sichtbar“ gesetzt hat
+   UND für diesen Tag eingeplant ist. Alles andere ist verborgen und
+   nur im aufgeschlagenen Abschnitt zu sehen.
+
+   Zwei neue Felder an der Aufgabe: „kreis“ und „tsSichtbar“. Beide
+   werden erst geschrieben, wenn du sie setzt — Bestandsaufgaben
+   bleiben unangetastet, und die Workbench reicht sie unverändert
+   durch, weil sie Felder, die sie nicht kennt, nicht anfasst.
+   ============================================================ */
+
+cl.tg = { tag: '', abschnitt: '' };
+
+var TG_KREIS = [
+  { id: 'control', name: 'CONTROL', phase: 'Plan',  satz: 'Was kommt auf mich zu?' },
+  { id: 'run',     name: 'RUN',     phase: 'Do',    satz: 'Bekanntes zuverlässig durchführen' },
+  { id: 'change',  name: 'CHANGE',  phase: 'Do',    satz: 'Neues verstehen und gestalten' },
+  { id: 'review',  name: 'REVIEW',  phase: 'Check', satz: 'Was ist tatsächlich passiert?' },
+  { id: 'improve', name: 'IMPROVE', phase: 'Act',   satz: 'Was soll beim nächsten Mal besser laufen?' }
+];
+
+function tgSatz(id) {
+  var i;
+  for (i = 0; i < TG_KREIS.length; i++) { if (TG_KREIS[i].id === id) { return TG_KREIS[i]; } }
+  return null;
+}
+
+/* Nur die fünf gelten. Ein unbekannter Wert zählt wie keiner — so kann
+   ein fremdes Gerät nichts hereinschreiben, was der Kreis nicht kennt. */
+function tgKreisVon(a) {
+  var k = String((a && a.kreis) || '');
+  return tgSatz(k) ? k : '';
+}
+
+function tgSichtbar(a) { return !!(a && a.tsSichtbar === true); }
+
+function tgTag() { return pmIstDatum(cl.tg.tag) ? cl.tg.tag : isoDatum(); }
+
+/* Die Regel. Überfälliges zählt am heutigen Tag mit: sonst fiele eine
+   gekennzeichnete Aufgabe, die gestern dran war und offen blieb, heute
+   lautlos aus dem Kreis — und lautlos verschwinden soll hier nichts. */
+function tgImKreis(a, tag) {
+  if (!a || !tgKreisVon(a) || !tgSichtbar(a)) { return false; }
+  var d = pmDatum(a);
+  if (!d) { return false; }
+  if (d === tag) { return true; }
+  return (d < tag) && (tag === isoDatum()) && !pmErledigtJetzt(a);
+}
+
+function tgUeberfaellig(a, tag) {
+  var d = pmDatum(a);
+  return !!d && d < tag && !pmErledigtJetzt(a);
+}
+
+/* Alle Aufgaben eines Abschnitts, ohne Rücksicht auf den Tag.
+   Dieselben Ausschlüsse wie in der To-Do-Liste: pausierte Routinen und
+   maskiert Privates gehören auch hier nicht hin. */
+function tgAlle(kreis) {
+  return (DB.aufgaben || []).filter(function (a) {
+    if (!a || typeof a !== 'object' || !a.id) { return false; }
+    if (tgKreisVon(a) !== kreis) { return false; }
+    if (a.wiederholung && a.pausiert) { return false; }
+    if (prPrivatVerborgen(null, a)) { return false; }
+    return true;
+  });
+}
+
+function tgHeute(kreis, tag) {
+  return tgAlle(kreis).filter(function (a) { return tgImKreis(a, tag); })
+    .sort(function (x, y) {
+      var zx = String(x.uhrzeit || ''), zy = String(y.uhrzeit || '');
+      if (zx && zy && zx !== zy) { return zx < zy ? -1 : 1; }
+      if (zx !== zy) { return zx ? -1 : 1; }
+      return pmTitel(x) < pmTitel(y) ? -1 : 1;
+    });
+}
+
+/* ---------- Die Übersicht ---------- */
+
+function tgHtml() {
+  var tag = tgTag();
+  if (cl.tg.abschnitt) { return tgAbschnittHtml(); }
+  var h = '';
+  TG_KREIS.forEach(function (s) {
+    var l = tgHeute(s.id, tag);
+    var verborgen = tgAlle(s.id).length - l.length;
+    h += '<div class="tg-abschnitt">'
+      + '<button type="button" class="tg-kopf" onclick="tgAufschlagen(\'' + s.id + '\')">'
+      + '<span class="tg-zeichen">' + tgZeichen(s.id) + '</span>'
+      + '<span class="tg-name">' + esc(s.name) + '</span>'
+      + '<span class="tg-phase">' + esc(s.phase) + '</span></button>';
+    if (!l.length) {
+      h += '<div class="tg-leer">heute nichts</div>';
+    } else {
+      h += '<ul class="tg-liste">' + l.map(function (a) { return tgZeileHtml(a, tag); }).join('') + '</ul>';
+    }
+    if (verborgen > 0) {
+      h += '<button type="button" class="tg-verborgen" onclick="tgAufschlagen(\'' + s.id + '\')">+ '
+        + verborgen + ' verborgen</button>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+
+function tgZeileHtml(a, tag) {
+  var rechts = '';
+  if (tgUeberfaellig(a, tag)) { rechts = 'seit ' + esc(clKurzDatum(pmDatum(a))); }
+  else if (a.uhrzeit) { rechts = esc(a.uhrzeit); }
+  return '<li><button type="button" class="tg-zeile' + (pmErledigtJetzt(a) ? ' erl' : '') + '"'
+    + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
+    + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span>'
+    + (rechts ? '<span class="tg-rechts">' + rechts + '</span>' : '')
+    + '</button></li>';
+}
+
+/* ---------- Ein Abschnitt aufgeschlagen ---------- */
+
+function tgAbschnittHtml() {
+  var s = tgSatz(cl.tg.abschnitt);
+  if (!s) { cl.tg.abschnitt = ''; return tgHtml(); }
+  var tag = tgTag();
+  var alle = tgAlle(s.id);
+  var sicht = alle.filter(function (a) { return tgImKreis(a, tag); });
+  var rest = alle.filter(function (a) { return !tgImKreis(a, tag); });
+  var teil = function (titel, l, an) {
+    var h = '<div class="tg-abschnitt"><div class="tg-kopf fest">'
+      + '<span class="tg-zeichen">' + tgZeichen(s.id) + '</span>'
+      + '<span class="tg-name">' + esc(titel) + '</span>'
+      + '<span class="tg-phase">' + l.length + '</span></div>';
+    if (!l.length) { return h + '<div class="tg-leer">' + (an ? 'heute nichts' : 'nichts') + '</div></div>'; }
+    h += '<ul class="tg-liste">' + l.map(function (a) {
+      return '<li><button type="button" class="tg-zeile' + (pmErledigtJetzt(a) ? ' erl' : '') + '"'
+        + ' onclick="tgOeffnen(\'' + esc(a.id) + '\')">'
+        + '<span class="tg-titel">' + esc(pmTitel(a)) + '</span></button>'
+        + '<button type="button" class="tg-auge" title="in der Tagessteuerung zeigen"'
+        + ' onclick="tgAugeUm(\'' + esc(a.id) + '\')">' + (tgSichtbar(a) ? '◉' : '○') + '</button></li>';
+    }).join('') + '</ul>';
+    return h + '</div>';
+  };
+  return '<div class="tg-satz">' + esc(s.satz) + '</div>'
+    + teil('Heute sichtbar', sicht, true) + teil('Verborgen', rest, false);
+}
+
+function tgAufschlagen(id) {
+  cl.tg.abschnitt = tgSatz(id) ? id : '';
+  zeichne();
+}
+
+function tgZurueck() { cl.tg.abschnitt = ''; zeichne(); }
+
+function tgOeffnen(id) { pmDetails(id); }
+
+/* Das Auge setzt das Kennzeichen — und den Stempel, sonst verlöre die
+   Änderung beim nächsten Abgleich gegen das andere Gerät. */
+function tgAugeUm(id) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  a.tsSichtbar = !tgSichtbar(a);
+  a.geaendert = jetzt();
+  spaeterSichern();
+  zeichne();
+}
+
+function tgKreisSetzen(id, kreis) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  a.kreis = tgSatz(kreis) ? kreis : '';
+  a.geaendert = jetzt();
+  spaeterSichern();
+  zeichne();
+}
+
+/* ---------- Tag blättern ---------- */
+
+function tgTagUm(schritt) {
+  cl.tg.tag = tagePlus(tgTag(), schritt);
+  zeichne();
+}
+
+function tgHeuteZeigen() { cl.tg.tag = ''; zeichne(); }
+
+function tgFussHtml() {
+  var tag = tgTag();
+  if (cl.tg.abschnitt) {
+    return '<button type="button" class="knopf" onclick="tgZurueck()">zurück zur Übersicht</button>';
+  }
+  return '<button type="button" class="knopf" onclick="tgTagUm(-1)">◀</button>'
+    + '<button type="button" class="knopf' + (tag === isoDatum() ? ' voll' : '') + '"'
+    + ' onclick="tgHeuteZeigen()">' + esc(tag === isoDatum() ? 'heute' : clKurzDatum(tag)) + '</button>'
+    + '<button type="button" class="knopf" onclick="tgTagUm(1)">▶</button>';
+}
+
+/* Links in der Kopfzeile steht ohnehin „Day Control“. Rechts gehört
+   deshalb nur hin, worin man gerade steckt — auf der Übersicht nichts. */
+function tgKopfText() {
+  var s = cl.tg.abschnitt ? tgSatz(cl.tg.abschnitt) : null;
+  return s ? s.name : '';
+}
+
+/* Die fünf Abschnittszeichen. Bewusst flächig und grob wie die
+   App-Symbole — eine Zeile hoch, kein Scheibenrund drumherum. */
+var TG_BILD = {
+  /* Schieberegler: was kommt auf mich zu, und woran stelle ich.
+     Breite Balken statt dünner Striche — wie die App-Symbole. */
+  control: '<rect x="1" y="4" width="24" height="4"/><rect x="1" y="17" width="24" height="4"/>'
+    + '<rect x="16" y="1" width="5" height="10"/><rect x="5" y="14" width="5" height="10"/>',
+  /* Flamme: läuft und muss zuverlässig laufen */
+  run: '<path d="M13 0C13 6 7 7 7 13C7 15 8 17 9 18C8 15 10 13 12 12C12 16 16 17 16 21C16 23 15 24 14 25C19 24 22 20 22 15C22 8 17 4 13 0Z"/>'
+    + '<path d="M7 16C5 18 4 20 4 22C4 24 5 25 7 26C6 24 6 22 8 20Z"/>',
+  /* Rakete: Neues */
+  change: '<path d="M13 0C18 5 20 10 20 16H6C6 10 8 5 13 0Z"/>'
+    + '<circle cx="13" cy="9" r="3" fill="#B9C4A6"/>'
+    + '<path d="M6 13L1 20L6 19Z"/><path d="M20 13L25 20L20 19Z"/>'
+    + '<path d="M9 18H17L13 26Z"/>',
+  /* Lupe: was ist tatsächlich passiert */
+  review: '<path d="M11 1A10 10 0 1 0 11 21A10 10 0 1 0 11 1ZM11 5A6 6 0 1 1 11 17A6 6 0 1 1 11 5Z"/>'
+    + '<path d="M17 18L19 16L26 23L24 25Z"/>',
+  /* Schraubenschlüssel: was soll besser laufen */
+  improve: '<path d="M25 7A8 8 0 0 1 14 15L5 24A3 3 0 0 1 1 20L10 11A8 8 0 0 1 21 3L16 8L18 11L22 11Z"/>'
+};
+
+function tgZeichen(id) {
+  return '<svg viewBox="0 0 26 26" aria-hidden="true" class="tg-svg">'
+    + '<g fill="var(--px)">' + (TG_BILD[id] || '') + '</g></svg>';
 }

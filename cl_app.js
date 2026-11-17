@@ -39,10 +39,13 @@ var CL_APPS = [
      Raster 3×4 — was ständig gebraucht wird, dazu drei Ordner (seit 0.35) */
   /* Seit 0.96.3 das Manifest als erste App; seit 0.109.0 Roots an seiner Stelle */
   /* Seit 0.109.0: Manifest und Routines unter einem Dach */
-  { id: 'routinen', name: 'Roots', stufe: '',    was: 'Manifest, Umprogrammierung, Gewohnheiten und Routinen an einem Ort.' },
+  { id: 'routinen', name: 'Roots', stufe: '',    was: 'Gewohnheiten und Routinen an einem Ort.' },
   { id: 'kalender', name: 'Date Book', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
   /* Seit 0.61 eine App „To Do“; seit 0.71 nur noch Alle, Sammler und Listen */
   { id: 'aufgaben', name: 'To Do List', stufe: '',    was: 'Alle offenen Aufgaben aus Listen und dem Sammler, dazu Eingeplantes aus Memo Pad.' },
+  /* Seit 0.132.0: die Tagessteuerung als Kreis, neben den Aufgaben */
+  { id: 'tagessteuerung', name: 'Day Control', stufe: '',
+    was: 'Der Tag als PDCA-Kreis: CONTROL, RUN, CHANGE, REVIEW, IMPROVE. Zeigt je Abschnitt, was heute sichtbar ist. Eine Übersicht — ein Tipp öffnet die Aufgabe.' },
   { id: 'checklisten', name: 'To Do List', stufe: '', was: '', raster: false },
   /* Seit 0.119.0: das Dock — der Tag und die Aufgaben in einem schmalen Fenster am PC.
      Kein Platz im Raster (3×5 ist voll); es öffnet aus dem Menü ≡, über #dock und von selbst. */
@@ -101,6 +104,13 @@ var CL_APPS = [
 var CL_STRICH = 'stroke="#C9D3B7" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"';
 var CL_FUELL = 'fill="#C9D3B7"';
 var CL_BILD = {
+  /* Day Control (seit 0.132.0): der Kreis als Pfeilring — PDCA, das sich
+     dreht. Kein Zahnrad, keine Uhr: beides heißt in CLIE schon etwas
+     anderes (Routinen, Fokus). */
+  tagessteuerung: '<g fill="none" stroke="#C9D3B7" stroke-width="5" stroke-linecap="butt" stroke-linejoin="miter">'
+    + '<path d="M46 20A18 18 0 1 0 50 32"/></g>'
+    + '<path d="M50 14L56 26L42 26Z" fill="#C9D3B7"/>'
+    + '<circle cx="32" cy="32" r="5" fill="#C9D3B7"/>',
   /* Seit 0.109.2: zwei Bänder, die sich kreuzen — unten Wurzel, oben Wuchs, in der Mitte
      die Kreuzung. Gerade Schnittkanten und volle Bandbreite statt dünner Striche. */
   routinen: '<g fill="none" stroke="#C9D3B7" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round">'
@@ -1194,6 +1204,7 @@ function inhaltZeichnen() {
   /* Seit 0.125.0: Desk — der Schreibtisch, nur lesend */
   else if (cl.app === 'desk') { el.innerHTML = sdkHtml(); }
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
+  else if (cl.app === 'tagessteuerung') { el.innerHTML = tgHtml(); }
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
@@ -1243,6 +1254,7 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
       : (cl.app === 'casestudies') ? csKopfText()
+      : (cl.app === 'tagessteuerung') ? tgKopfText()
       : (cl.app === 'desk') ? (sdkQuelle() === 'beruf' ? 'Beruf' : 'Privat')
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
@@ -1630,6 +1642,7 @@ function fussZeichnen() {
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sos') ? sosFussHtml()
         : (cl.app === 'desk') ? sdkFussHtml()
+        : (cl.app === 'tagessteuerung') ? tgFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'casestudies') ? csFussHtml()
