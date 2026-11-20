@@ -463,7 +463,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 11 && CL.CL_APPS.length === 30, 'elf Felder im Raster (seit 0.141.0 ohne Casestudies und Desk), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 11 && CL.CL_APPS.length === 31, 'elf Felder im Raster (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -594,9 +594,9 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","tagessteuerung","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","thinklist","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest') && !CL.clApp('desk') && !CL.clApp('casestudies'),
-    'Start (seit 0.141.0): Roots, Date Book, To Do List / Day Control, Memo Pad, Collections / Fokus, Reader, Categories / Flashcards, Games ▸');
+    'Start (seit 0.142.0): Roots, Date Book, To Do List / Think List, Memo Pad, Collections / Fokus, Reader, Categories / Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2578,7 +2578,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,tagessteuerung,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: elf Felder (seit 0.141.0), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,thinklist,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: elf Felder (seit 0.142.0 mit Think List statt Day Control), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -6501,7 +6501,8 @@ function startOrdnerTest() {
   /* „dock“ seit 0.119.0 im Menü ≡, über #dock und beim Start am PC */
   /* „rechner“ seit 0.127.0 im Menü ≡ — Desk kam ins Raster, Calc ging dafür */
   /* „verknuepfungen“ seit 0.127.0 im Menü ≡ */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen'];
+  /* „agenda“ seit 0.142.0 als eigene App (Hülle agenda.html) und über #agenda */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen', 'agenda'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -12087,9 +12088,9 @@ function todoSchlankTest() {
   pruefe(!/Als Aufgabe…|Zeile → Aufgabe…|Umstellen…/.test(menu) && /Als Termin…/.test(menu), 'Menü im Memo: ohne „Als Aufgabe…“ und „Zeile → Aufgabe…“, „Als Termin…“ bleibt');
   S.aufklappZu();
 
-  /* Das PDCA-Konzept bleibt: Day Control ist da und liest den alten Kreis */
-  pruefe(!!S.clApp('tagessteuerung') && Array.isArray(S.TG_KREIS) && S.TG_KREIS.length === 5 && S.tgKreisVon(S.pmAufgabeFinden('a-alt')) === 'run',
-    'PDCA-Konzept bleibt: Day Control und TG_KREIS vorhanden');
+  /* Seit 0.142.0 lebt das PDCA-Konzept nur noch als Perspektiven der Think List */
+  pruefe(!S.clApp('tagessteuerung') && Array.isArray(S.TL_PERSPEKTIVEN) && S.TL_PERSPEKTIVEN.length === 4 && S.pmAufgabeFinden('a-alt').kreis === 'run',
+    'PDCA nur noch als Perspektiven der Think List — der alte Kreis bleibt in den Daten');
 
   /* Im Quelltext: nichts Ausgebautes mehr */
   const weg = ['pmListeSatz', 'pmListen', 'pmPrioWahl', 'pmPrioUm', 'pmKreisWahl', 'pmZuordnenAuf', 'pmZeileAlsAufgabe', 'pmMemoAlsAufgabe', 'pmMarkenPruefen', 'pmUmstellenKern', 'pmListenNachziehen'];
@@ -12211,7 +12212,124 @@ function deskCasestudiesWegTest() {
   pruefe(!/\.sdk-|\.cs-/.test(QUELLE), 'keine Stile von Desk und Casestudies');
   const fs = require('fs');
   pruefe(!fs.existsSync(path.join(ORDNER, 'desk.html')) && !fs.existsSync(path.join(ORDNER, 'clie-desk.html')), 'die Desk-Hüllen liegen nicht mehr im Ordner');
-  pruefe(/<title>CLIE 0\.141\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.141\.0'/.test(SKRIPT), 'Fassung 0.141.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+function thinkListTest() {
+  console.log('\n0.142.0 Think List — Denkpunkte, Denken in der Agenda, Day Control ausgebaut');
+  if (!CL) { return; }
+  /* Fehlerarten: ein Denkpunkt sieht aus wie eine Aufgabe (Kästchen), „Heute“
+     klebt über den Tageswechsel, ein beendeter Denkpunkt ist unauffindbar,
+     oder ein alter Weg führt noch in Day Control. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const gestern = S.tagePlus(heute, -1);
+  S.katNeuAnlegen('Haus');
+  const haus = S.kgAlle().filter(b => b.name === 'Haus')[0].id;
+  S.DB.denkpunkte = [
+    { id: 'dp-a', titel: 'QS-Tag → Kontakte', bereich: 'kb-arbeit', kontext: 'beruflich', link: 'onenote:https://d.docs.live.net/x/QS.one#Kontakte&section-id=1e7ff1b2-1111-2222-3333-444455556666&end', heute: heute, status: 'offen', angelegt: '2026-11-01', geaendert: 1 },
+    { id: 'dp-b', titel: 'Carport: Holz oder Stahl?', bereich: haus, kontext: 'privat', link: '', heute: gestern, status: 'offen', angelegt: '2026-11-02', geaendert: 1 },
+    { id: 'dp-c', titel: 'Alter Gedanke', bereich: haus, kontext: 'privat', link: '', heute: '', status: 'beendet', beendetAm: '2026-11-10', angelegt: '2026-10-01', geaendert: 1 }];
+
+  /* App und Raster */
+  pruefe(!!S.clApp('thinklist') && S.clApp('thinklist').name === 'Think List' && typeof S.CL_BILD.thinklist === 'string', 'App „Think List“ mit eigenem Symbol');
+  pruefe(!S.clApp('tagessteuerung') && typeof S.tgHtml === 'undefined' && !/\.tg-/.test(QUELLE), 'Day Control ist komplett ausgebaut (App, Code, Stile)');
+  S.oeffne('tagessteuerung');
+  pruefe(S.cl.app === 'thinklist', 'ein alter Weg nach Day Control landet in der Think List');
+
+  /* Liste */
+  let h = inhalt();
+  pruefe(/QS-Tag → Kontakte/.test(h) && /Carport/.test(h) && !/Alter Gedanke/.test(h), 'zeigt alle offenen, keine beendeten');
+  pruefe(/pm-bal">Arbeit/.test(h) && /pm-bal">Haus/.test(h), 'nach Kategorie gruppiert');
+  pruefe(!/class="k[ "]/.test(h) && !/aria-label="abhaken"/.test(h), 'kein Kästchen — Denkpunkte sehen nicht aus wie Aufgaben');
+  pruefe(/tlHeuteUm\('dp-a'\)/.test(h) && /tlBearbeiten\('dp-a'\)/.test(h) && /tlOeffnen\('dp-a'\)/.test(h), 'Aktionen je Zeile: Antippen, Heute, Bearbeiten');
+  pruefe(/class="tl-heute an" onclick="tlHeuteUm\('dp-a'\)"/.test(h) && /class="tl-heute" onclick="tlHeuteUm\('dp-b'\)"/.test(h), '„Heute“ von gestern gilt nicht mehr — Tageswechsel ohne Aufräumen');
+  S.katSetzen(haus);
+  pruefe(!/QS-Tag/.test(inhalt()) && /Carport/.test(inhalt()), '▼ filtert nach Kategorie');
+  S.katSetzen('alle');
+
+  /* Heute umschalten */
+  S.tlHeuteUm('dp-b');
+  pruefe(S.tlFinden('dp-b').heute === heute && S.tlIstHeute(S.tlFinden('dp-b')), 'Heute an: das heutige Datum steht am Denkpunkt');
+  S.tlHeuteUm('dp-b');
+  pruefe(S.tlFinden('dp-b').heute === '' && !S.tlIstHeute(S.tlFinden('dp-b')), 'Heute aus');
+
+  /* OneNote */
+  pruefe(S.tlLinkOk('onenote:https://x') && S.tlLinkOk('https://onedrive.live.com/x') && !S.tlLinkOk('http://x') && !S.tlLinkOk('ftp://x'), 'nur onenote: und https:// gelten als Link');
+  const altAndroid = S.tlAndroid;
+  S.tlAndroid = () => true;
+  const ziel = S.tlZiel(S.tlFinden('dp-a').link);
+  S.tlAndroid = altAndroid;
+  pruefe(/^intent:/.test(ziel) && /package=com\.microsoft\.office\.onenote/.test(ziel) && /section-id=\{1e7ff1b2-1111-2222-3333-444455556666\}/.test(ziel),
+    'am Pixel: onenote: als Intent an die OneNote-App, Kennung in Klammern');
+  S.tlOeffnen('dp-b');
+  pruefe(S.cl.aufklapp === 'tlfenster' && S.cl.tl.fenster.id === 'dp-b', 'ohne Link öffnet Antippen „Bearbeiten“');
+  S.aufklappZu();
+
+  /* Neu */
+  S.tlNeu();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/id="tlTitel"/.test(f) && /id="tlKat"/.test(f) && /id="tlLink"/.test(f) && !/tlPrivat|Priorität|Fällig|Wiederholung|CONTROL/.test(f), 'Fenster: Text, Kategorie, OneNote-Link — sonst nichts');
+  S.document.getElementById('tlTitel').value = '';
+  S.tlSpeichern();
+  pruefe(S.tlAlle().length === 3, 'ohne Text wird nichts angelegt');
+  S.document.getElementById('tlTitel').value = 'Warum kippen meine Montage?';
+  S.document.getElementById('tlKat').value = haus;
+  S.document.getElementById('tlLink').value = 'http://unsicher';
+  S.tlSpeichern();
+  pruefe(S.tlAlle().length === 3 && S.cl.aufklapp === 'tlfenster', 'ein Link ohne onenote:/https:// wird abgewiesen');
+  S.document.getElementById('tlTitel').value = 'Warum kippen meine Montage?';
+  S.document.getElementById('tlKat').value = haus;
+  S.document.getElementById('tlLink').value = '';
+  S.tlSpeichern();
+  const neu = S.tlAlle().filter(x => x.titel === 'Warum kippen meine Montage?')[0];
+  pruefe(neu && /^dp-/.test(neu.id) && neu.status === 'offen' && neu.heute === '' && neu.bereich === haus && neu.angelegt === heute
+    && !('prio' in neu) && !('datum' in neu) && !('kreis' in neu), 'angelegt: offen, ohne Heute, mit Kategorie — ohne Priorität, Datum, Typ');
+
+  /* Beenden und wieder öffnen */
+  S.tlBearbeiten(neu.id);
+  pruefe(/tlBeenden\(\)/.test(S.document.getElementById('aufklapp').innerHTML), 'Bearbeiten bietet „Beenden“');
+  S.document.getElementById('tlTitel').value = 'Warum kippen meine Montage?';
+  S.document.getElementById('tlKat').value = haus;
+  S.document.getElementById('tlLink').value = '';
+  S.tlBeenden();
+  pruefe(neu.status === 'beendet' && neu.beendetAm === heute && !/Montage/.test(inhalt()), 'beendet: verschwindet aus der Liste');
+  pruefe(/tlSichtUm\(\)">Beendete…/.test(S.document.getElementById('fuss').innerHTML), 'unten „Beendete…“');
+  S.tlSichtUm();
+  pruefe(/Montage/.test(inhalt()) && /Alter Gedanke/.test(inhalt()) && !/QS-Tag/.test(inhalt()) && /tlWiederOeffnen\(/.test(inhalt()), '„Beendete…“ zeigt die beendeten, mit „Wieder öffnen“');
+  S.tlWiederOeffnen(neu.id);
+  pruefe(neu.status === 'offen' && !neu.beendetAm, 'wieder geöffnet');
+  S.tlSichtUm();
+
+  /* Perspektiven */
+  S.tlInfoAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/CONTROL/.test(f) && /CHANGE/.test(f) && /REVIEW/.test(f) && /IMPROVE/.test(f) && !/>RUN</.test(f), '„i“: die vier Perspektiven für den Wochenblick, ohne RUN');
+  S.aufklappZu();
+
+  /* Date Book: Denken in der Agenda von heute */
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
+  h = inhalt();
+  pruefe(/<span>Denken<\/span><small>1<\/small>/.test(h) && /QS-Tag → Kontakte/.test(h) && !/Carport/.test(h), 'Agenda: „Denken“ mit den Denkpunkten von heute');
+  const denken = h.slice(h.indexOf('<span>Denken</span>'));
+  pruefe(!/class="k[ "]/.test(denken.slice(0, denken.indexOf('ag-morgen'))), 'in der Agenda ohne Kästchen');
+  S.clKalGehe(S.tagePlus(heute, 1), 'agenda');
+  pruefe(!/<span>Denken<\/span>/.test(inhalt()), 'an anderen Tagen kein „Denken“');
+  S.clKalGehe(heute, 'agenda');
+
+  /* Agenda als eigene App */
+  pruefe(!!S.clApp('agenda') && S.clApp('agenda').raster === false && typeof S.CL_BILD.agenda === 'string', 'App „Agenda“ außerhalb des Rasters, mit Symbol');
+  S.cl.kal.ansicht = 'monat'; S.cl.kal.datum = S.tagePlus(heute, 9);
+  S.oeffne('agenda');
+  pruefe(S.cl.app === 'kalender' && S.cl.kal.ansicht === 'agenda' && S.cl.kal.datum === '', '#agenda öffnet Date Book in der Agenda von heute');
+  const fs = require('fs');
+  const hl = fs.existsSync(path.join(ORDNER, 'agenda.html')) ? fs.readFileSync(path.join(ORDNER, 'agenda.html'), 'utf8') : '';
+  pruefe(/src="\.\/clie\.html#agenda"/.test(hl) && fs.existsSync(path.join(ORDNER, 'agenda.webmanifest')), 'Hülle agenda.html mit Manifest liegt daneben');
+  pruefe(!fs.existsSync(path.join(ORDNER, 'daycontrol.html')), 'die Hülle von Day Control ist weg');
+
+  /* Daten */
+  pruefe(/'denkpunkte'\]/.test(SKRIPT) && /'tagestexte',/.test(SKRIPT), '„denkpunkte“ wird abgeglichen, „tagestexte“ bleibt im Abgleich');
+  pruefe(/<title>CLIE 0\.142\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.142\.0'/.test(SKRIPT), 'Fassung 0.142.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -12503,17 +12621,18 @@ function huellenTest() {
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { abgeloest('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskQuelleTest(); } catch (e) { abgeloest('0.130.0 Desk-Quelle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { tagessteuerungTest(); } catch (e) { fail('0.132.0 Day Control warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { tagessteuerungTest(); } catch (e) { abgeloest('0.132.0 Day Control warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kalenderZuordnungTest(); } catch (e) { fail('0.131.0 Kalenderzuordnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todoSchlankTest(); } catch (e) { fail('0.139.0 To Do schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { datebookSchlankTest(); } catch (e) { fail('0.140.0 Date Book schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskCasestudiesWegTest(); } catch (e) { fail('0.141.0 Desk und Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { thinkListTest(); } catch (e) { fail('0.142.0 Think List warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
      ============================================================ */
-  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80, 0.139.0, 0.140.0 und 0.141.0)' : ''));
+  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80 und 0.139.0 bis 0.142.0)' : ''));
   process.exit(anzFail ? 1 : 0);
 })();

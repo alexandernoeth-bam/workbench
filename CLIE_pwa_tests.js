@@ -19,7 +19,9 @@ const { execFileSync } = require('child_process');
 const ORDNER = path.resolve(process.argv[2] || __dirname);
 const APPS = [
   { key: 'todo', name: 'To Do', anker: 'aufgaben' },
-  { key: 'datebook', name: 'Date Book', anker: 'kalender' }
+  { key: 'datebook', name: 'Date Book', anker: 'kalender' },
+  /* Seit CLIE 0.142.0: #agenda öffnet Date Book (kalender) in der Agenda von heute */
+  { key: 'agenda', name: 'Agenda', anker: 'agenda', app: 'kalender' }
 ];
 
 let anzOk = 0, anzFail = 0, anzWarn = 0;
@@ -42,7 +44,8 @@ APPS.forEach(function (a) {
   pruefe(m.name === a.name && m.short_name === a.name, a.name + ': Name „' + m.name + '“');
   pruefe(m.start_url === './' + a.key + '.html' && m.scope === './' + a.key + '.html', a.name + ': startet auf der eigenen Seite, eigener Bereich');
   pruefe(m.display === 'standalone', a.name + ': eigenständiges Fenster');
-  const groessen = (m.icons || []).map(function (i) { return i.sizes + (i.purpose ? '/' + i.purpose : ''); });
+  /* „any“ ist der Normalfall und zählt wie ohne Angabe (seit CLIE 0.142.0 berücksichtigt) */
+  const groessen = (m.icons || []).map(function (i) { return i.sizes + (i.purpose && i.purpose !== 'any' ? '/' + i.purpose : ''); });
   pruefe(groessen.indexOf('192x192') >= 0 && groessen.indexOf('512x512') >= 0 && groessen.indexOf('512x512/maskable') >= 0, a.name + ': Symbole 192, 512, 512 maskierbar');
   pruefe((m.icons || []).every(function (i) { return gibt(i.src.replace(/^\.\//, '')); }), a.name + ': alle Symboldateien vorhanden');
   pruefe(new RegExp("\\{ id: '" + a.anker + "'").test(CLIE), a.name + ': CLIE kennt die App #' + a.anker);
@@ -132,7 +135,7 @@ async function browserTests() {
     pruefe(!!rahmen, 'CLIE läuft eingebettet');
     const app = rahmen ? await rahmen.evaluate(function () { return cl.app; }) : '';
     const reiter = rahmen ? (await rahmen.textContent('#reiter')).trim() : '';
-    pruefe(app === a.anker, 'CLIE steht in „' + reiter + '“');
+    pruefe(app === (a.app || a.anker), 'CLIE steht in „' + reiter + '“');
     const box = await p.$eval('#clie', function (f) { const r = f.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.bottom)]; });
     pruefe(box[0] === 412 && box[1] === 860, 'CLIE füllt den Bildschirm (' + box.join(' × ') + ')');
     pruefe(await p.$eval('#hinweis', function (h) { return !h.hidden; }), 'im Browser-Tab: Hinweis zum Installieren');
