@@ -166,7 +166,17 @@ const ABGELOEST_0139 = [
   "bei offener Liste wird diese vorbelegt",
   "der Reiter lässt sich wählen",
   "die To-Do-Leiste hat den Reiter Listen",
-  "eine neue Aufgabe ohne Wahl landet im Sammler"
+  "eine neue Aufgabe ohne Wahl landet im Sammler",
+  /* 0.140.0: Dock und die Date-Book-Ansichten T (mit Zeitklammern) und W ausgebaut */
+  "Dock ist eine App", "das Dock hat ein eigenes Bildzeichen", "über das Menü erreichbar",
+  "seit 0.6 nur Belegtes", "eine mit Uhrzeit eingeplante Aufgabe steht an ihrer Stunde", "„Aufgaben“ (bis 0.79 „Vorgenommen“)",
+  "Routinen seit 0.80 bei den Aufgaben", "die Woche: KW im Reiter", "darunter die Abschnitte der Woche",
+  "Workshop 9–11", "der parallele Termin bekommt", "Endzeilen", "11:05–12:00 und 12:00–12:45", "13–15 endet in der Zeile",
+  "Kette 13–14", "Wechsel gezeichnet", "echte Überschneidung", "ein langer Termin ohne weitere Zeilen", "innere Klammer",
+  "äußere Klammer", "keine freien Stunden", "seit 0.6.2 auch kurze Termine", "vergangene Termine einzeilig",
+  "eingeplante Aufgabe: eine Zeile, keine eigene Klammer", "zwei enden um 12:00", "„schluss“ schließt", "▶ blättert eine Woche weiter",
+  "Woche: ◀", "und steht im Kalender an seiner Stunde", "Checklisten-Punkt mit Uhrzeit steht an seiner Stunde",
+  "zurück im Kalender steht sie unter „Aufgaben“"
 ];
 let anzAbgeloest = 0;
 function abgeloest(text) { console.log('  abgl ' + text); anzAbgeloest++; }
@@ -451,7 +461,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 13 && CL.CL_APPS.length === 33, 'dreizehn Felder im Raster (seit 0.132.0 mit Day Control), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 13 && CL.CL_APPS.length === 32, 'dreizehn Felder im Raster (seit 0.132.0 mit Day Control, seit 0.140.0 ohne Dock), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -725,7 +735,7 @@ function kalenderTest() {
     { id: 't3', zeit: '05:15', bis: '05:45', titel: 'Frühflug', kontext: 'privat', kalId: 'privat' }];
   CL.oeffne('kalender');
   let h = inhalt();
-  pruefe(CL.document.getElementById('reiter').textContent === CL.clWt(heute) + ' ' + CL.clKurzDatum(heute), 'der Reiter zeigt den Tag');
+  pruefe(CL.document.getElementById('reiter').textContent === 'Agenda ' + CL.clWt(heute) + ' ' + CL.clKurzDatum(heute), 'der Reiter zeigt den Tag (seit 0.140.0 als Agenda)');
   pruefe(/◆ Geburtstag Oma/.test(h) && /Rückruf Becker/.test(h), 'Termine und Ganztägiges stehen im Tag');
   /* Seit 0.80 stehen Routinen (auch mit Uhrzeit) unten bei den Aufgaben — im Raster nur Termine und Eingeplantes */
   pruefe((h.match(/class="z">/g) || []).length - (h.match(/class="std ende"/g) || []).length === 3 && /class="z">5:15</.test(h) && !/class="z">7:30</.test(h) && !/class="z">9:00</.test(h),
@@ -779,12 +789,12 @@ function kalenderTest() {
   h = inhalt();
   pruefe((h.match(/class="mt/g) || []).length >= 28 && /class="mt[^"]* heute/.test(h), 'der Monat: alle Tage, heute hervorgehoben');
   pruefe(/◆/.test(h), 'Ganztägiges als Raute');
-  CL.clKalGehe(heute, 'tag');
-  pruefe(CL.cl.kal.ansicht === 'tag', 'ein Tipp auf einen Tag öffnet ihn');
+  CL.clKalGehe(heute, 'agenda');
+  pruefe(CL.cl.kal.ansicht === 'agenda', 'ein Tipp auf einen Tag öffnet ihn — in der Agenda (0.140.0)');
   const fuss = CL.document.getElementById('fuss').innerHTML;
   pruefe(/terminNeu/.test(fuss) && /clGeheZuOeffnen/.test(fuss) && /clKalAnsicht\('monat'\)/.test(fuss), 'unten: Neu, Gehe zu, T / W / M');
-  CL.clKalGehe('kaputt', 'woche');
-  pruefe(CL.cl.kal.ansicht === 'tag', 'ein ungültiges Datum wird ignoriert');
+  CL.clKalGehe('kaputt', 'monat');
+  pruefe(CL.cl.kal.ansicht === 'agenda', 'ein ungültiges Datum wird ignoriert');
   CL.oeffne('rechner');
   pruefe(CL.document.getElementById('fuss').innerHTML === '', 'andere Apps haben keine Kalender-Knöpfe');
   CL.oeffne('uebersicht');
@@ -2123,18 +2133,18 @@ function agendaTest() {
   S.clKalAnsicht('agenda');
   const h = inhalt();
   pruefe(/Als Nächstes: Mittag bei Eltern · in 1 Std\. 20/.test(h), 'oben: als Nächstes mit Abstand');
-  pruefe(/Termine heute/.test(h) && /Geburtstag Anna/.test(h) && /Mittag bei Eltern/.test(h), 'Termine heute, auch ganztägige');
-  pruefe(/To Do · heute/.test(h) && /ZEO Solar Auftrag/.test(h) && /Netflix kündigen<\/span><span class="frist-marke">⚑ heute/.test(h), 'To Dos: eingeplante und ⚑ heute fällige');
+  pruefe(/<span>Termine<\/span>/.test(h) && /Geburtstag Anna/.test(h) && /Mittag bei Eltern/.test(h), 'Termine heute, auch ganztägige');
+  pruefe(/<span>To Do<\/span>/.test(h) && /ZEO Solar Auftrag/.test(h) && /Netflix kündigen<\/span><span class="frist-marke">⚑ heute/.test(h), 'To Dos: eingeplante und ⚑ heute fällige');
   pruefe((h.match(/Geplant und Frist/g) || []).length === 1, 'eingeplant und fällig: nur einmal');
   pruefe(/Überfällig/.test(h) && /Steuer sortieren/.test(h), 'Überfälliges (⚑ vor heute)');
-  pruefe(/Morgen ›/.test(h) && /clKalGehe\('[^']+','tag'\)/.test(h), 'eine Zeile für morgen, antippen öffnet den Tag');
+  pruefe(/Morgen ›/.test(h) && /clKalGehe\('[^']+','agenda'\)/.test(h), 'eine Zeile für morgen, antippen öffnet den Tag in der Agenda');
   pruefe(/^Agenda /.test(S.document.getElementById('reiter').textContent) && /clKalAnsicht\('agenda'\)">A</.test(S.document.getElementById('fuss').innerHTML), 'Reiter „Agenda …“, unten A als erste Ansicht');
   S.aufHaken(s.id, 1);
   pruefe(!/Netflix kündigen/.test(inhalt()), 'abgehakt direkt in der Agenda');
   S.clBlaettern(1);
-  pruefe(S.cl.kal.ansicht === 'tag' && S.clKalDatum() === S.tagePlus(heute, 1), 'Blättern führt in den Tag danach');
+  pruefe(S.cl.kal.ansicht === 'agenda' && S.clKalDatum() === S.tagePlus(heute, 1) && !/Als Nächstes/.test(inhalt()), 'Blättern führt in den Tag danach — Agenda bleibt, ohne „Als Nächstes“');
   S.clUhrzeit = altUhr;
-  S.clKalAnsicht('tag'); S.clKalGehe(heute, 'tag');
+  S.clKalGehe(heute, 'agenda');
   S.oeffne('uebersicht');
 }
 
@@ -7948,13 +7958,13 @@ function palmAgendaTest() {
   e.status = 'erledigt'; e.erledigtAm = heute;
   S.DB.aufgaben.push({ id: 'r1', titel: 'Daily', wiederholung: { takt: 'woche', tage: [wt], intervall: 1 }, uhrzeit: '08:00', kontext: 'privat', geaendert: 1 });
   S.termineNachTag[heute] = [{ id: 't1', zeit: '10:00', bis: '11:30', titel: 'Jour fixe', kontext: 'privat', kalId: 'p' }];
-  S.oeffne('kalender'); S.clKalGehe(heute, 'tag');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
   let h = inhalt();
-  const ag = h.slice(h.indexOf('>Aufgaben<'));
-  pruefe(h.indexOf('Jour fixe') < h.indexOf('>Aufgaben<') && /Überfälliges/.test(ag) && /Anwendungen aufrufen/.test(ag) && /Daily/.test(ag) && !/Später/.test(h) && !/Schon erledigt/.test(h) && /1 erledigt · zeigen/.test(h),
+  const ag = h.slice(h.indexOf('>To Do<'));
+  pruefe(h.indexOf('Jour fixe') < h.indexOf('>To Do<') && /Überfälliges/.test(ag) && /Anwendungen aufrufen/.test(ag) && /Daily/.test(ag) && !/Später/.test(h) && !/Schon erledigt/.test(h) && /1 erledigt · zeigen/.test(h),
     'Tag: oben Termine, darunter Überfälliges, Heutiges und Routinen; Erledigtes gezählt');
   pruefe(ag.indexOf('Anwendungen aufrufen') < ag.indexOf('Daily') && ag.indexOf('Daily') < ag.indexOf('Überfälliges') && /◉ 7:30/.test(ag) && /◉ 8:00/.test(ag),
-    'nach Uhrzeit (Erinnerung), dann Priorität; die Uhrzeit steht beim ◉');
+    'nach Uhrzeit (Erinnerung), dann Titel; die Uhrzeit steht beim ◉');
   pruefe(/class="dt ue">/.test(ag), 'Überfälliges mit seinem Datum und „!“');
   S.clErlUm();
   pruefe(/Schon erledigt/.test(inhalt()), '„zeigen“ holt Erledigtes durchgestrichen zurück');
@@ -7962,13 +7972,12 @@ function palmAgendaTest() {
   const daily = S.pmAufgabeFinden('r1');
   S.pmHaken('r1', heute);
   pruefe(S.istErledigtAn(daily, heute), 'Routine im Tag abhaken — für diesen Tag');
-  S.clKalGehe(S.tagePlus(heute, 3), 'tag');
+  S.clKalGehe(S.tagePlus(heute, 3), 'agenda');
   pruefe(/Später/.test(inhalt()) && !/Überfälliges/.test(inhalt()), 'ein anderer Tag: nur seine Aufgaben, Überfälliges nur heute');
   S.clKalGehe(heute, 'agenda');
   S.clKalAnsicht('agenda');
   h = inhalt();
-  pruefe(/To Do · heute/.test(h) && /Anwendungen aufrufen/.test(h) && /Überfälliges/.test(h), 'Agenda: dieselben Aufgaben unter „To Do · heute“');
-  S.clKalAnsicht('tag');
+  pruefe(/<span>To Do<\/span>/.test(h) && /Anwendungen aufrufen/.test(h) && /Überfälliges/.test(h), 'Agenda: dieselben Aufgaben unter „To Do“');
   S.oeffne('uebersicht');
 }
 
@@ -11471,7 +11480,7 @@ function ankerTest() {
   pruefe(S.cl.app === 'uebersicht', 'und lässt die Seite darunter stehen');
 
   /* Die übrigen Apps setzen cl.app */
-  ['sammlungen', 'casestudies', 'desk', 'dock', 'kalender', 'memo'].forEach(function (id) {
+  ['sammlungen', 'casestudies', 'desk', 'kalender', 'memo'].forEach(function (id) {
     frisch();
     S.oeffne(id);
     pruefe(S.cl.app === id, '#' + id + ' öffnet ' + id + (S.cl.app === id ? '' : ' — kam aber bei ' + S.cl.app + ' an'));
@@ -12063,10 +12072,6 @@ function todoSchlankTest() {
   pruefe(!/Priorität|wichtig/.test(inhalt()) && /Aufgaben/.test(inhalt()), 'Woche: Aufgaben und Routinen als Anzahl, ohne Priorität');
   S.pmTab('alle');
 
-  /* Dock: nach Kategorien statt Listen */
-  S.oeffne('dock'); S.dockSicht('todo');
-  pruefe(/pm-bal">Haus/.test(inhalt()) && !/pmListenWahlAuf|Sammler/.test(inhalt()), 'Dock · To Do: nach Kategorien gruppiert, keine Listen');
-  S.dockSicht('tag');
 
   /* Memo Pad: keine Verbindung mehr */
   S.pmMemoOeffnen('m-alt');
@@ -12088,7 +12093,79 @@ function todoSchlankTest() {
   const weg = ['pmListeSatz', 'pmListen', 'pmPrioWahl', 'pmPrioUm', 'pmKreisWahl', 'pmZuordnenAuf', 'pmZeileAlsAufgabe', 'pmMemoAlsAufgabe', 'pmMarkenPruefen', 'pmUmstellenKern', 'pmListenNachziehen'];
   const rest = weg.filter(n => new RegExp('\\b' + n + '\\b').test(SKRIPT));
   pruefe(!rest.length, 'keine Reste ausgebauter Funktionen im Code' + (rest.length ? ': ' + rest.join(', ') : ''));
-  pruefe(/<title>CLIE 0\.139\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.139\.0'/.test(SKRIPT), 'Fassung 0.139.0 im Titel und in APP_VERSION');
+
+  S.oeffne('uebersicht');
+}
+
+function datebookSchlankTest() {
+  console.log('\n0.140.0 Date Book nur A · ▥ · M · J, kein Dock');
+  if (!CL) { return; }
+  /* Fehlerart: ein Sprung oder Startweg führt noch in eine ausgebaute Ansicht
+     (T, W, Dock) und zeigt dann eine leere oder falsche Seite. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const morgen = S.tagePlus(heute, 1);
+  S.termineNachTag[heute] = [{ id: 't1', zeit: '23:59', bis: '23:59', titel: 'Spätdienst', kontext: 'privat' }];
+  S.termineNachTag[morgen] = [{ id: 't2', zeit: '09:00', bis: '10:00', titel: 'Zahnarzt', kontext: 'privat' }];
+  S.pmNeueAufgabe({ titel: 'Überfällig alt', datum: S.tagePlus(heute, -3) });
+  S.pmNeueAufgabe({ titel: 'Morgen erledigen', datum: morgen });
+
+  /* Start und Umschalter */
+  S.cl.kal.ansicht = 'agenda'; S.cl.kal.datum = ''; S.cl.kal.erlZeigen = false;
+  S.oeffne('kalender');
+  pruefe(S.cl.kal.ansicht === 'agenda' && /Spätdienst/.test(inhalt()), 'Date Book öffnet in der Agenda');
+  pruefe(/ansicht: 'agenda'/.test(SKRIPT), 'A ist die Vorgabe beim Start');
+  const fuss = S.document.getElementById('fuss').innerHTML;
+  const ans = (fuss.match(/clKalAnsicht\('(\w+)'\)/g) || []).map(x => x.replace(/clKalAnsicht\('|'\)/g, ''));
+  pruefe(ans.join(',') === 'agenda,bloecke,monat,jahr', 'Ansichten A · ▥ · M · J (' + ans.join(',') + ')');
+  S.clKalAnsicht('tag');
+  pruefe(S.cl.kal.ansicht === 'agenda', 'clKalAnsicht(„tag“) wird ignoriert');
+  S.clKalAnsicht('woche');
+  pruefe(S.cl.kal.ansicht === 'agenda', 'clKalAnsicht(„woche“) wird ignoriert');
+
+  /* Agenda für jeden Tag */
+  let h = inhalt();
+  pruefe(/Überfällig alt/.test(h) && /class="blatt"/.test(h) && /· heute/.test(h), 'heute: Blättern oben, Überfälliges dabei');
+  S.clBlaettern(1);
+  h = inhalt();
+  pruefe(S.cl.kal.ansicht === 'agenda' && S.clKalDatum() === morgen, '▶ blättert in der Agenda einen Tag weiter');
+  pruefe(/Zahnarzt/.test(h) && /Morgen erledigen/.test(h) && !/Überfällig alt/.test(h) && !/Als Nächstes/.test(h) && !/Spätdienst/.test(h),
+    'ein anderer Tag: seine Termine und Aufgaben, ohne Überfälliges und „Als Nächstes“');
+  pruefe(S.document.getElementById('reiter').textContent === 'Agenda ' + S.clWt(morgen) + ' ' + S.clKurzDatum(morgen), 'Reiter „Agenda“ mit dem gezeigten Tag');
+  pruefe(!/>Morgen ›/.test(h) && new RegExp(S.clKurzDatum(S.tagePlus(morgen, 1)).replace(/\./g, '\\.') + ' ›').test(h), 'die Zeile darunter nennt den Folgetag statt „Morgen“');
+  S.clBlaettern(-1);
+  pruefe(S.cl.kal.datum === '', '◀ zurück auf heute');
+
+  /* Alle Sprünge auf einen Tag landen in der Agenda */
+  S.clKalAnsicht('monat');
+  pruefe(!/,\\'tag\\'\)|,'tag'\)/.test(inhalt()), 'der Monat springt nicht mehr in „tag“');
+  S.clKalAnsicht('bloecke');
+  pruefe(!/,\\'tag\\'\)|,'tag'\)/.test(inhalt()), 'die Wochenblöcke springen nicht mehr in „tag“');
+  S.clKalGehe(morgen, 'tag');
+  pruefe(S.cl.kal.ansicht === 'agenda' && S.clKalDatum() === morgen, 'ein alter Sprung mit „tag“ landet in der Agenda dieses Tages');
+  S.clKalGehe(heute, 'agenda');
+  pruefe(!/clKalGehe\([^)]*'tag'\)/.test(SKRIPT.replace(/ansicht === 'tag'/g, '')), 'im Code ruft niemand mehr clKalGehe(…, „tag“)');
+
+  /* Erledigtes in der Agenda */
+  const e = S.pmNeueAufgabe({ titel: 'Schon fertig', datum: heute });
+  e.status = 'erledigt'; e.erledigtAm = heute;
+  S.zeichne();
+  pruefe(/1 erledigt · zeigen/.test(inhalt()) && !/Schon fertig/.test(inhalt()), 'Agenda: Erledigtes gezählt und verborgen');
+  S.clErlUm();
+  pruefe(/Schon fertig/.test(inhalt()), '„zeigen“ holt es zurück');
+  S.clErlUm();
+
+  /* Dock ist weg */
+  pruefe(!S.clApp('dock') && typeof S.dockHtml === 'undefined' && typeof S.dockStartet === 'undefined', 'Dock: keine App, kein Code');
+  S.menueUm();
+  const menu = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(!/menueWahl\('dock'\)|menueWahl\('dockstart'\)|Start: /.test(menu), 'Menü ≡: weder „Dock“ noch „Start: …“');
+  S.aufklappZu();
+  const weg = ['kalTagHtml', 'kalWocheHtml', 'clKlammern', 'clTagReihen', 'clWochenleisteHtml', 'dockPosten', 'dockTagHtml', 'DK_START_KEY', 'cl.dock'];
+  const rest = weg.filter(n => SKRIPT.indexOf(n) >= 0);
+  pruefe(!rest.length, 'keine Reste von T, W und Dock im Code' + (rest.length ? ': ' + rest.join(', ') : ''));
+  pruefe(!/\.dk-|\.wochenleiste|\.wtag|^\.std/m.test(QUELLE), 'keine Stile von T, W und Dock');
+  pruefe(/<title>CLIE 0\.140\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.140\.0'/.test(SKRIPT), 'Fassung 0.140.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -12369,7 +12446,7 @@ function huellenTest() {
   try { raFangTest(); } catch (e) { fail('0.116.0 Radar-Fang warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { raHakenTest(); } catch (e) { fail('0.117.0 Merkliste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { verknuepfungTest(); } catch (e) { fail('0.118.0 Verknüpfungen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { dockTest(); } catch (e) { fail('0.119.0 Dock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { dockTest(); } catch (e) { abgeloest('0.119.0 Dock warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { symbolTest(); } catch (e) { fail('0.119.1 Symbole warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { textgroesseTest(); } catch (e) { fail('0.120.0 Textgröße warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { abgleichBerichtTest(); } catch (e) { fail('0.121.0 Abgleich-Bericht warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12385,10 +12462,11 @@ function huellenTest() {
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todoSchlankTest(); } catch (e) { fail('0.139.0 To Do schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { datebookSchlankTest(); } catch (e) { fail('0.140.0 Date Book schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
      ============================================================ */
-  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80 und 0.139.0)' : ''));
+  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80, 0.139.0 und 0.140.0)' : ''));
   process.exit(anzFail ? 1 : 0);
 })();
