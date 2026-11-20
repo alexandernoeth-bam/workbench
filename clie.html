@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.142.0</title>
+<title>CLIE 0.143.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -123,6 +123,19 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .tl-trest{flex:1 1 auto;min-width:0}
 .tl-tname{display:block;font-weight:600;letter-spacing:.04em}
 .tl-tsatz{display:block;font-size:17px;color:var(--px-mitte);overflow-wrap:anywhere}
+/* ---------- Weekly Perspective (seit 0.143.0) ---------- */
+.wk-schritte{display:flex;gap:4px;margin:2px 0 8px}
+.wk-schritte span{flex:1;height:8px;border:2px solid var(--px)}
+.wk-schritte span.an{background:var(--px)}
+.wk-name{font-weight:600;font-size:24px;letter-spacing:.04em}
+.wk-frage{margin:4px 0 6px;line-height:1.3}
+.wk-hinweis{color:var(--px-mitte);font-size:17px;line-height:1.3;margin-bottom:6px}
+.wk-t{display:flex;gap:8px;font-size:17px;padding:3px 0;border-bottom:1px dotted var(--px-zart)}
+.wk-t b{flex:0 0 86px;font-weight:400;color:var(--px-mitte)}
+.wk-t span{flex:1;min-width:0;overflow-wrap:anywhere}
+.wk-mehr{color:var(--px-mitte);font-size:17px;padding:4px 0;text-align:left;width:100%}
+.wk-wahl{display:flex;flex-direction:column;gap:8px;margin:12px 0 6px}
+.tl-zeile.wk-zu .tl-tx{color:var(--px-zart);text-decoration:line-through}
 /* Kalenderzuordnung im Menü (seit 0.131.0). „offen“ heißt: die Datei
    kennt diesen Kalender nicht — gestrichelt, damit man es sieht.
    Seit 0.136.0 zwei Zeilen je Kalender. Die Knopfregeln stehen unter
@@ -1272,7 +1285,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.142.0';
+var APP_VERSION = '0.143.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3586,6 +3599,8 @@ var CL_APPS = [
   /* Seit 0.142.0: Think List — Denkpunkte, offene Gedanken mit OneNote-Denkraum (ersetzt Day Control) */
   { id: 'thinklist', name: 'Think List', stufe: '',
     was: 'Offene Denkpunkte nach Kategorie. Ein Tipp öffnet den Denkraum in OneNote, „Heute“ holt den Gedanken in die Agenda.' },
+  /* Seit 0.143.0: Weekly Perspective — der Wochenblick, über die Think List und #weekly */
+  { id: 'weekly', name: 'Weekly', stufe: '', was: 'Einmal pro Woche: CONTROL, REVIEW, IMPROVE, CHANGE — und die offenen Denkpunkte aufräumen.', raster: false },
   /* Seit 0.142.0: die Agenda als eigene App (Hülle agenda.html) — öffnet Date Book in A, heute */
   { id: 'agenda', name: 'Agenda', stufe: '', was: 'Die Agenda von heute: Termine, Aufgaben und Denkpunkte.', raster: false },
   { id: 'checklisten', name: 'To Do List', stufe: '', was: '', raster: false },
@@ -3641,6 +3656,9 @@ var CL_BILD = {
   thinklist: '<ellipse cx="34" cy="25" rx="17" ry="12" fill="#C9D3B7"/>'
     + '<circle cx="21" cy="42" r="4.5" fill="#C9D3B7"/><circle cx="14" cy="50" r="2.8" fill="#C9D3B7"/>'
     + '<path d="M26 22h16M26 28h11" stroke="#3B4433" stroke-width="3" stroke-linecap="round"/>',
+  /* Weekly (seit 0.143.0): vier Blickrichtungen um einen Punkt */
+  weekly: '<circle cx="32" cy="32" r="5" fill="#C9D3B7"/>'
+    + '<path d="M32 10l5 9H27zM32 54l-5-9h10zM10 32l9-5v10zM54 32l-9 5V27z" fill="#C9D3B7"/>',
   /* Agenda (seit 0.142.0): ein Kalenderblatt mit drei Zeilen */
   agenda: '<rect x="15" y="15" width="34" height="36" rx="3" fill="#C9D3B7"/>'
     + '<rect x="15" y="15" width="34" height="9" fill="#C9D3B7"/>'
@@ -4721,6 +4739,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'verknuepfungen') { el.innerHTML = vkHtml(); }
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'thinklist') { el.innerHTML = tlHtml(); }
+  else if (cl.app === 'weekly') { el.innerHTML = wkHtml(); }
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
@@ -4768,6 +4787,7 @@ function kopfZeichnen() {
       : (cl.app === 'vorlesen') ? vlKopfText()
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
+      : (cl.app === 'weekly') ? wkKopfText()
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '')
@@ -5148,6 +5168,7 @@ function fussZeichnen() {
         : (cl.app === 'routinen') ? routinenFussHtml()
         : (cl.app === 'sos') ? sosFussHtml()
         : (cl.app === 'thinklist') ? tlFussHtml()
+        : (cl.app === 'weekly') ? wkFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
@@ -5209,6 +5230,8 @@ function oeffne(id) {
   /* Alte Wege nach Day Control landen in der Think List (seit 0.142.0) */
   if (id === 'tagessteuerung' || id === 'daycontrol') { id = 'thinklist'; }
   if (id === 'thinklist' && cl.app !== 'thinklist') { cl.tl.sicht = 'offen'; }
+  /* Das Weekly beginnt von außen immer bei CONTROL (seit 0.143.0) */
+  if (id === 'weekly' && cl.app !== 'weekly') { cl.wk = wkFrisch(); }
   /* Fokus ist kein Blatt, sondern der Dialog (seit 0.98.1) */
   if (id === 'fokus') { fkStartenAuf(); return; }
   /* Ordner sind keine eigene Seite: ein Fenster mit ihren Apps (seit 0.35) */
@@ -5251,7 +5274,7 @@ function katUm() {
     aufklappZeichnen();
     return;
   }
-  if (cl.app === 'stones' || cl.app === 'poker' || cl.app === 'schafkopf' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'sos' || cl.app === 'verknuepfungen') { return; }
+  if (cl.app === 'stones' || cl.app === 'poker' || cl.app === 'schafkopf' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'sos' || cl.app === 'verknuepfungen' || cl.app === 'weekly') { return; }
   /* Ein offener Eintrag aus Memo Pad: oben steht seine Art — kein ▼ (seit 0.71) */
   if ((cl.app === 'projekte' && cl.pj.id) || (cl.app === 'ziele' && cl.zi.id) || (cl.app === 'checklisten' && aufIstCheckliste(kpSeiteFinden(cl.cls.id)))) { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
@@ -29297,6 +29320,8 @@ function tlHtml() {
 function tlFussHtml() {
   return '<button type="button" class="knopf" onclick="tlNeu()">Neu</button>'
     + '<button type="button" class="knopf" onclick="tlSichtUm()">' + (cl.tl.sicht === 'beendet' ? 'Offene' : 'Beendete…') + '</button>'
+    /* Seit 0.143.0: der Wochenblick */
+    + '<button type="button" class="knopf" onclick="oeffne(\'weekly\')">Weekly…</button>'
     + '<button type="button" class="knopf tl-i" onclick="tlInfoAuf()" aria-label="Perspektiven">i</button>';
 }
 
@@ -29368,20 +29393,30 @@ function tlLinkAusFenster() {
 function tlUebernehmen() {
   var f = tlFensterLesen();
   if (!f) { return null; }
+  var d = f.id ? tlFinden(f.id) : null;
+  if (!d) { return tlAnlegen(f.titel, f.bereich, f.link); }
   var titel = String(f.titel || '').trim();
   if (!titel) { melde('Bitte den Denkpunkt formulieren.', 'warn'); return null; }
   var link = String(f.link || '').trim();
   if (link && !tlLinkOk(link)) { melde('Der Link muss mit onenote: oder https:// beginnen.', 'warn'); return null; }
-  var d = f.id ? tlFinden(f.id) : null;
-  if (!d) {
-    if (!Array.isArray(DB.denkpunkte)) { DB.denkpunkte = []; }
-    d = { id: 'dp-' + neueKennung(), status: 'offen', heute: '', angelegt: isoDatum(), kontext: 'privat' };
-    DB.denkpunkte.push(d);
-  }
   d.titel = titel.slice(0, 1000);
   d.link = link;
   katPrivatSchreiben(d, { bereich: f.bereich || '' });
   d.geaendert = jetzt();
+  return d;
+}
+
+/* Ein neuer Denkpunkt — aus dem Fenster der Think List und aus dem Weekly (0.143.0) */
+function tlAnlegen(titel, bereich, link) {
+  var t = String(titel || '').trim();
+  if (!t) { melde('Bitte den Denkpunkt formulieren.', 'warn'); return null; }
+  var l = String(link || '').trim();
+  if (l && !tlLinkOk(l)) { melde('Der Link muss mit onenote: oder https:// beginnen.', 'warn'); return null; }
+  if (!Array.isArray(DB.denkpunkte)) { DB.denkpunkte = []; }
+  var d = { id: 'dp-' + neueKennung(), status: 'offen', heute: '', angelegt: isoDatum(), kontext: 'privat', titel: t.slice(0, 1000), link: l };
+  katPrivatSchreiben(d, { bereich: bereich || '' });
+  d.geaendert = jetzt();
+  DB.denkpunkte.push(d);
   return d;
 }
 
@@ -29458,6 +29493,296 @@ function tlAgendaHtml() {
         + '<button type="button" class="tl-tx" onclick="tlOeffnen(\'' + esc(d.id) + '\')">' + esc(d.titel || '') + '</button>'
         + (tlLinkOk(d.link) ? '<span class="tl-on">ON</span>' : '') + '</div>';
     }).join('');
+}
+
+/* ============================================================
+   Weekly Perspective (seit 0.143.0)
+
+   Einmal pro Woche, 15–20 Minuten: vier Perspektiven nacheinander,
+   danach ein kurzer Blick über die offenen Denkpunkte. Jede Perspektive
+   hat nur drei Ausgänge — kein Denkpunkt, Denkpunkt anlegen, Vorhandene
+   ansehen. Die Perspektive erzeugt den Denkpunkt, wird aber nicht an
+   ihm gespeichert.
+
+   Ausgelöst wird das Ritual von außen: ein wiederkehrender Termin im
+   Google-Kalender mit dem Link clie.html#weekly. CLIE öffnet nichts von
+   selbst. Gemerkt wird nur der Tag des letzten Durchlaufs, je Gerät —
+   keine Serien, keine Statistik.
+   ============================================================ */
+
+var WK_ZULETZT_KEY = 'clie-weekly-am';
+var WK_ZEIGEN = 6;   /* so viele Termine stehen sofort da, der Rest hinter ▾ */
+
+var WK_SCHRITTE = [
+  { name: 'CONTROL', blick: 'voraus',
+    frage: 'Welche konkrete Situation der nächsten 1–3 Wochen sollte ich innerlich vorspulen, damit sie mich nicht überrascht?',
+    hinweis: 'Kalender kurz ansehen, eine Situation auswählen, gedanklich erleben.',
+    vorlage: 'Wie will ich … erleben?' },
+  { name: 'REVIEW', blick: 'zurueck',
+    frage: 'Welche Situation der vergangenen Woche möchte ich noch einmal bildlich zurückholen?',
+    hinweis: 'Situation aufrufen, Film zurückspulen, Erkenntnisse auftauchen lassen.',
+    vorlage: 'Was zeigt mir …?' },
+  { name: 'IMPROVE', blick: '',
+    frage: 'Was möchte ich beim nächsten Mal nicht wieder genauso erleben?',
+    hinweis: 'Nicht sofort lösen. Zunächst nur die eigentliche Verbesserungsfrage formulieren.',
+    vorlage: 'Wie kann ich …?' },
+  { name: 'CHANGE', blick: '',
+    frage: 'Welches Bild, Vorhaben oder Thema möchte ich bewusst weiterentwickeln, obwohl es sich nicht selbst aufdrängt?',
+    hinweis: 'Gestaltung jenseits des Tagesgeschäfts.',
+    vorlage: 'Wie soll … aussehen?' }
+];
+
+function wkFrisch() {
+  return { schritt: 0, modus: '', alle: false, f: null, neu: [], beendet: [] };
+}
+
+cl.wk = wkFrisch();
+
+function wkZuletzt() {
+  var d = '';
+  try { d = window.localStorage.getItem(WK_ZULETZT_KEY) || ''; } catch (e) { d = ''; }
+  return pmIstDatum(d) ? d : '';
+}
+
+function wkKopfText() {
+  return cl.wk.schritt < WK_SCHRITTE.length ? (cl.wk.schritt + 1) + ' / ' + WK_SCHRITTE.length : 'Abschluss';
+}
+
+/* ---- Was der Kalender beiträgt: voraus drei Wochen, zurück eine ---- */
+
+function wkTermine(von, bis) {
+  var aus = [];
+  var d = von;
+  while (d <= bis) {
+    var t = clTermineAm(d);
+    t.ganztags.filter(function (x) { return !x.jahr; }).forEach(function (x) { aus.push({ tag: d, zeit: '', titel: x.titel }); });
+    t.zeit.forEach(function (x) { aus.push({ tag: d, zeit: x.zeit, titel: x.titel }); });
+    d = tagePlus(d, 1);
+  }
+  return aus;
+}
+
+function wkErledigt(von, bis) {
+  return (DB.aufgaben || []).filter(function (a) {
+    return a && a.id && !a.wiederholung && a.status === 'erledigt' && pmIstDatum(a.erledigtAm)
+      && a.erledigtAm >= von && a.erledigtAm <= bis && clPasst(a) && !prPrivatVerborgen(null, a);
+  }).sort(function (x, y) { return x.erledigtAm < y.erledigtAm ? -1 : (x.erledigtAm > y.erledigtAm ? 1 : 0); });
+}
+
+function wkZeilen(l, ganz) {
+  var sicht = ganz ? l : l.slice(0, WK_ZEIGEN);
+  return sicht.map(function (x) {
+    return '<div class="wk-t"><b>' + esc(clWt(x.tag) + ' ' + clKurzDatum(x.tag)) + '</b><span>'
+      + (x.zeit ? esc(clZeitText(x.zeit)) + ' ' : '') + esc(x.titel) + '</span></div>';
+  }).join('') + (!ganz && l.length > WK_ZEIGEN
+    ? '<button type="button" class="wk-mehr" onclick="wkAlleUm()">… ' + (l.length - WK_ZEIGEN) + ' weitere ▾</button>' : '');
+}
+
+function wkBlickHtml(s) {
+  var heute = isoDatum();
+  if (s.blick === 'voraus') {
+    var v = wkTermine(tagePlus(heute, 1), tagePlus(heute, 21));
+    return '<div class="pm-bal">Nächste 3 Wochen<small>' + v.length + '</small></div>'
+      + (v.length ? wkZeilen(v, cl.wk.alle) : '<p class="leise">' + (kalVon ? 'Keine Termine.' : 'Noch keine Termine geholt — Date Book öffnen oder verbinden.') + '</p>');
+  }
+  if (s.blick === 'zurueck') {
+    var von = tagePlus(heute, -7), bis = tagePlus(heute, -1);
+    var z = wkTermine(von, bis);
+    var e = wkErledigt(von, bis).map(function (a) { return { tag: a.erledigtAm, zeit: '', titel: '✓ ' + pmTitel(a) }; });
+    var l = z.concat(e).sort(function (x, y) { return (x.tag < y.tag ? -1 : (x.tag > y.tag ? 1 : 0)) || (x.zeit < y.zeit ? -1 : 1); });
+    return '<div class="pm-bal">Vergangene Woche<small>' + z.length + ' Termine · ' + e.length + ' erledigt</small></div>'
+      + (l.length ? wkZeilen(l, cl.wk.alle) : '<p class="leise">Nichts gefunden.</p>');
+  }
+  return '';
+}
+
+function wkAlleUm() {
+  cl.wk.alle = !cl.wk.alle;
+  inhaltZeichnen();
+}
+
+/* ---- Ähnliche offene Denkpunkte — damit keiner doppelt entsteht ---- */
+
+function wkWoerter(t) {
+  return String(t || '').toLowerCase().split(/[^a-z0-9äöüß]+/).filter(function (w) { return w.length >= 4; });
+}
+
+function wkAehnliche(text) {
+  var w = wkWoerter(text);
+  if (!w.length) { return []; }
+  return tlAlle().filter(function (d) {
+    if (!tlOffen(d)) { return false; }
+    var dw = wkWoerter(d.titel);
+    return w.some(function (x) { return dw.some(function (y) { return y.indexOf(x) === 0 || x.indexOf(y) === 0; }); });
+  }).slice(0, 3);
+}
+
+function wkDenkpunktZeile(d, mitBeenden) {
+  var id = esc(d.id);
+  var zu = !tlOffen(d);
+  return '<div class="tl-zeile' + (zu ? ' wk-zu' : '') + '">'
+    + '<button type="button" class="tl-tx" onclick="tlOeffnen(\'' + id + '\')">' + esc(d.titel || '') + '</button>'
+    + (tlLinkOk(d.link) ? '<span class="tl-on">ON</span>' : '')
+    + (cl.wk.neu.indexOf(d.id) >= 0 ? '<span class="leise">neu</span>' : '')
+    + (mitBeenden ? '<button type="button" class="tl-heute' + (zu ? ' an' : '') + '" onclick="wkBeendenUm(\'' + id + '\')">' + (zu ? 'beendet ↺' : 'Beenden') + '</button>' : '')
+    + '</div>';
+}
+
+function wkAehnlichHtml(text) {
+  var l = wkAehnliche(text);
+  return l.length ? '<div class="pm-bal">Ähnliche offene Denkpunkte<small>' + l.length + '</small></div>'
+    + l.map(function (d) { return wkDenkpunktZeile(d, false); }).join('') : '';
+}
+
+/* Beim Tippen nur die Liste darunter erneuern — das Feld behält den Fokus */
+function wkTippen() {
+  var t = document.getElementById('wkTitel');
+  var el = document.getElementById('wkAehnlich');
+  if (t && el && typeof t.value === 'string') { el.innerHTML = wkAehnlichHtml(t.value); }
+}
+
+/* ---- Die Seite ---- */
+
+function wkHtml() {
+  var n = WK_SCHRITTE.length;
+  var h = '<div class="wk-schritte">';
+  var i;
+  for (i = 0; i <= n; i++) { h += '<span' + (i <= cl.wk.schritt ? ' class="an"' : '') + '></span>'; }
+  h += '</div>';
+  if (cl.wk.schritt >= n) { return h + wkAufraeumenHtml(); }
+  var s = WK_SCHRITTE[cl.wk.schritt];
+  h += '<div class="wk-name">' + esc(s.name) + '</div><div class="wk-frage">' + esc(s.frage) + '</div><div class="wk-hinweis">' + esc(s.hinweis) + '</div>';
+  if (cl.wk.modus === 'neu') { return h + wkNeuHtml(s); }
+  if (cl.wk.modus === 'ansehen') {
+    var offen = tlAlle().filter(tlOffen).sort(tlReihe);
+    return h + '<div class="pm-bal">Offene Denkpunkte<small>' + offen.length + '</small></div>'
+      + (offen.length ? offen.map(function (d) { return wkDenkpunktZeile(d, false); }).join('') : '<p class="leise">Noch keine.</p>')
+      + '<div class="wk-wahl"><button type="button" class="knopf voll" onclick="wkModus(\'neu\')">Denkpunkt anlegen</button>'
+      + '<button type="button" class="knopf" onclick="wkWeiter()">Kein neuer — weiter</button>'
+      + '<button type="button" class="knopf" onclick="wkModus(\'\')">Zurück</button></div>';
+  }
+  return h + wkBlickHtml(s)
+    + '<div class="wk-wahl"><button type="button" class="knopf" onclick="wkWeiter()">Kein Denkpunkt</button>'
+    + '<button type="button" class="knopf voll" onclick="wkModus(\'neu\')">Denkpunkt anlegen</button>'
+    + '<button type="button" class="knopf" onclick="wkModus(\'ansehen\')">Vorhandenen ansehen</button></div>';
+}
+
+function wkNeuHtml(s) {
+  var f = cl.wk.f || { titel: '', bereich: clNeuBereich(), link: '', heute: false };
+  return '<label for="wkTitel">Denkfrage:</label><textarea id="wkTitel" class="eingabe" rows="3" autocomplete="off" placeholder="' + esc(s.vorlage) + '" oninput="wkTippen()">' + esc(f.titel) + '</textarea>'
+    + katPrivatHtml('wk', f.bereich || '', false, true)
+    + '<label for="wkLink">OneNote-Link:</label><input id="wkLink" class="eingabe" type="url" autocomplete="off" value="' + esc(f.link) + '" placeholder="onenote:… oder https://… (optional)">'
+    + '<label class="haken"><input id="wkHeute" type="checkbox"' + (f.heute ? ' checked' : '') + '> Heute</label>'
+    + '<div id="wkAehnlich">' + wkAehnlichHtml(f.titel) + '</div>'
+    + '<div class="wk-wahl"><button type="button" class="knopf voll" onclick="wkAnlegen()">Anlegen und weiter</button>'
+    + '<button type="button" class="knopf" onclick="wkModus(\'\')">Zurück</button></div>';
+}
+
+function wkAufraeumenHtml() {
+  var l = tlAlle().filter(function (d) { return tlOffen(d) || cl.wk.beendet.indexOf(d.id) >= 0; }).sort(tlReihe);
+  var z = wkZuletzt();
+  return '<div class="wk-name">Aufräumen</div><div class="wk-frage">Welche offenen Denkpunkte sind zu Ende gedacht?</div>'
+    + '<div class="wk-hinweis">Kurz drüberschauen — nichts ist Pflicht.</div>'
+    + '<div class="pm-bal">Offene Denkpunkte<small>' + l.filter(tlOffen).length + '</small></div>'
+    + (l.length ? l.map(function (d) { return wkDenkpunktZeile(d, true); }).join('') : '<p class="leise">Keine offenen Denkpunkte.</p>')
+    + '<div class="wk-wahl"><button type="button" class="knopf voll" onclick="wkFertig()">Fertig</button></div>'
+    + '<p class="leise">Diese Runde: ' + cl.wk.neu.length + ' neu, ' + cl.wk.beendet.length + ' beendet.'
+    + (z ? ' Letzter Durchlauf: ' + esc(clWt(z) + ' ' + clKurzDatum(z)) + '.' : '') + '</p>';
+}
+
+function wkFussHtml() {
+  return (cl.wk.schritt > 0 ? '<button type="button" class="knopf" onclick="wkZurueck()">◀ Zurück</button>' : '')
+    + '<button type="button" class="knopf" onclick="wkAbbrechen()">Abbrechen</button>';
+}
+
+/* ---- Bedienen ---- */
+
+function wkNachOben() {
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+}
+
+function wkModus(m) {
+  cl.wk.modus = (m === 'neu' || m === 'ansehen') ? m : '';
+  if (cl.wk.modus === 'neu' && !cl.wk.f) { cl.wk.f = { titel: '', bereich: clNeuBereich(), link: '', heute: false }; }
+  zeichne();
+  if (cl.wk.modus === 'neu') {
+    var t = document.getElementById('wkTitel');
+    if (t && t.focus) { t.focus(); }
+  }
+}
+
+function wkWeiter() {
+  if (cl.wk.schritt < WK_SCHRITTE.length) { cl.wk.schritt++; }
+  cl.wk.modus = '';
+  cl.wk.f = null;
+  cl.wk.alle = false;
+  wkNachOben();
+  zeichne();
+}
+
+function wkZurueck() {
+  if (cl.wk.modus) { wkModus(''); return; }
+  if (cl.wk.schritt > 0) { cl.wk.schritt--; }
+  cl.wk.alle = false;
+  wkNachOben();
+  zeichne();
+}
+
+function wkAbbrechen() {
+  cl.wk = wkFrisch();
+  oeffne('thinklist');
+}
+
+function wkLesen() {
+  var f = cl.wk.f || { titel: '', bereich: '', link: '', heute: false };
+  var t = document.getElementById('wkTitel');
+  if (t && typeof t.value === 'string') { f.titel = t.value; }
+  var l = document.getElementById('wkLink');
+  if (l && typeof l.value === 'string') { f.link = l.value; }
+  var h = document.getElementById('wkHeute');
+  if (h && typeof h.checked === 'boolean') { f.heute = h.checked; }
+  katPrivatLesen('wk', f);
+  cl.wk.f = f;
+  return f;
+}
+
+function wkAnlegen() {
+  var f = wkLesen();
+  var d = tlAnlegen(f.titel, f.bereich, f.link);
+  if (!d) { return; }
+  if (f.heute) { d.heute = isoDatum(); }
+  cl.wk.neu.push(d.id);
+  spaeterSichern();
+  melde('Denkpunkt angelegt.', 'gut');
+  wkWeiter();
+}
+
+/* Beenden direkt in der Zeile — ein zweiter Tipp nimmt es zurück */
+function wkBeendenUm(id) {
+  var d = tlFinden(id);
+  if (!d) { return; }
+  if (tlOffen(d)) {
+    d.status = 'beendet';
+    d.beendetAm = isoDatum();
+    d.heute = '';
+    if (cl.wk.beendet.indexOf(id) < 0) { cl.wk.beendet.push(id); }
+  } else {
+    d.status = 'offen';
+    delete d.beendetAm;
+    cl.wk.beendet = cl.wk.beendet.filter(function (x) { return x !== id; });
+  }
+  d.geaendert = jetzt();
+  spaeterSichern();
+  inhaltZeichnen();
+}
+
+function wkFertig() {
+  try { window.localStorage.setItem(WK_ZULETZT_KEY, isoDatum()); } catch (e) { /* nur für jetzt */ }
+  var n = cl.wk.neu.length, b = cl.wk.beendet.length;
+  cl.wk = wkFrisch();
+  oeffne('thinklist');
+  melde('Weekly erledigt: ' + n + ' neu, ' + b + ' beendet.', 'gut');
 }
 
 /* ============================================================

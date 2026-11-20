@@ -463,7 +463,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 11 && CL.CL_APPS.length === 31, 'elf Felder im Raster (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 11 && CL.CL_APPS.length === 32, 'elf Felder im Raster (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda und seit 0.143.0 Weekly außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -6502,7 +6502,8 @@ function startOrdnerTest() {
   /* „rechner“ seit 0.127.0 im Menü ≡ — Desk kam ins Raster, Calc ging dafür */
   /* „verknuepfungen“ seit 0.127.0 im Menü ≡ */
   /* „agenda“ seit 0.142.0 als eigene App (Hülle agenda.html) und über #agenda */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen', 'agenda'];
+  /* „weekly“ seit 0.143.0 über die Think List und #weekly */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen', 'agenda', 'weekly'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -12329,7 +12330,108 @@ function thinkListTest() {
 
   /* Daten */
   pruefe(/'denkpunkte'\]/.test(SKRIPT) && /'tagestexte',/.test(SKRIPT), '„denkpunkte“ wird abgeglichen, „tagestexte“ bleibt im Abgleich');
-  pruefe(/<title>CLIE 0\.142\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.142\.0'/.test(SKRIPT), 'Fassung 0.142.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+function weeklyTest() {
+  console.log('\n0.143.0 Weekly Perspective');
+  if (!CL) { return; }
+  /* Fehlerarten: ein Schritt hat mehr als die drei Ausgänge, die Perspektive
+     landet doch am Denkpunkt, ein Denkpunkt entsteht doppelt, CLIE öffnet
+     das Ritual von selbst, oder Aufräumen beendet etwas ohne Zurück. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.__ablage['clie-weekly-am'] = '';
+  S.DB.denkpunkte = [
+    { id: 'dp-m', titel: 'Warum kippen meine Montage?', bereich: '', kontext: 'privat', link: '', heute: '', status: 'offen', angelegt: '2026-11-01', geaendert: 1 },
+    { id: 'dp-q', titel: 'QS-Tag Kontakte', bereich: 'kb-arbeit', kontext: 'beruflich', link: '', heute: '', status: 'offen', angelegt: '2026-11-02', geaendert: 1 }];
+  S.termineNachTag[S.tagePlus(heute, 3)] = [{ id: 'v1', zeit: '10:00', bis: '11:00', titel: 'Lenkungskreis Release', kontext: 'beruflich' }];
+  S.termineNachTag[S.tagePlus(heute, 30)] = [{ id: 'v2', zeit: '10:00', bis: '11:00', titel: 'Zu weit weg', kontext: 'beruflich' }];
+  S.termineNachTag[S.tagePlus(heute, -3)] = [{ id: 'z1', zeit: '09:00', bis: '10:00', titel: 'Retro Sprint 41', kontext: 'beruflich' }];
+  S.DB.aufgaben.push({ id: 'ea', titel: 'Angebot Dachrinne eingeholt', status: 'erledigt', erledigtAm: S.tagePlus(heute, -2), planung: 'backlog', kontext: 'privat', geaendert: 1 });
+
+  /* Einstieg */
+  pruefe(!!S.clApp('weekly') && S.clApp('weekly').raster === false && typeof S.CL_BILD.weekly === 'string', 'App „Weekly“ außerhalb des Rasters, mit Symbol');
+  S.oeffne('thinklist');
+  pruefe(/oeffne\('weekly'\)">Weekly…/.test(S.document.getElementById('fuss').innerHTML), 'Think List: Knopf „Weekly…“');
+  pruefe(!/oeffne\('weekly'\)/.test(SKRIPT.replace(/onclick="oeffne\(\\'weekly\\'\)"/g, '')), 'CLIE öffnet das Weekly nie von selbst — nur Knopf und #weekly');
+  S.cl.wk.schritt = 3;
+  S.oeffne('weekly');
+  pruefe(S.cl.app === 'weekly' && S.cl.wk.schritt === 0, '#weekly beginnt immer bei CONTROL');
+  pruefe(S.document.getElementById('katKnopf').textContent === '1 / 4', 'oben rechts der Schritt (1 / 4)');
+
+  /* CONTROL */
+  let h = inhalt();
+  pruefe(/CONTROL/.test(h) && /vorspulen/.test(h), 'CONTROL mit seiner Frage');
+  pruefe(/Lenkungskreis Release/.test(h) && !/Zu weit weg/.test(h) && !/Retro Sprint/.test(h), 'CONTROL zeigt die Termine der nächsten 3 Wochen — nicht weiter, nicht zurück');
+  const knoepfe = (h.match(/onclick="wk(Weiter|Modus)\([^)]*\)">[^<]+/g) || []).map(x => x.replace(/.*>/, ''));
+  pruefe(knoepfe.join(' | ') === 'Kein Denkpunkt | Denkpunkt anlegen | Vorhandenen ansehen', 'genau drei Ausgänge (' + knoepfe.join(' | ') + ')');
+
+  /* Kein Denkpunkt → REVIEW */
+  S.wkWeiter();
+  h = inhalt();
+  pruefe(S.cl.wk.schritt === 1 && /REVIEW/.test(h) && /Retro Sprint 41/.test(h) && /✓ Angebot Dachrinne eingeholt/.test(h) && !/Lenkungskreis/.test(h),
+    'REVIEW zeigt die vergangene Woche: Termine und Erledigtes');
+
+  /* Vorhandenen ansehen */
+  S.wkModus('ansehen');
+  h = inhalt();
+  pruefe(/Warum kippen meine Montage/.test(h) && /QS-Tag Kontakte/.test(h), '„Vorhandenen ansehen“ zeigt die offenen Denkpunkte');
+  S.wkWeiter();
+
+  /* IMPROVE: anlegen */
+  pruefe(S.cl.wk.schritt === 2 && /IMPROVE/.test(inhalt()), 'weiter zu IMPROVE');
+  S.wkModus('neu');
+  h = inhalt();
+  pruefe(/id="wkTitel"[^>]*placeholder="Wie kann ich …\?"/.test(h) && /id="wkKat"/.test(h) && /id="wkLink"/.test(h) && /id="wkHeute"/.test(h) && !/wkPrivat|Priorität|Fällig/.test(h),
+    'Anlegen: Denkfrage („Wie kann ich …?“), Kategorie, Link, Heute — sonst nichts');
+  pruefe(!/id="wkHeute" type="checkbox" checked/.test(h), '„Heute“ ist beim Anlegen aus');
+  S.document.getElementById('wkTitel').value = 'Wie verhindere ich, dass Montage kippen?';
+  S.wkTippen();
+  pruefe(/Ähnliche offene Denkpunkte/.test(S.document.getElementById('wkAehnlich').innerHTML) && /Warum kippen meine Montage/.test(S.document.getElementById('wkAehnlich').innerHTML),
+    'beim Tippen: ähnliche offene Denkpunkte darunter');
+  S.document.getElementById('wkTitel').value = '';
+  S.wkAnlegen();
+  pruefe(S.tlAlle().length === 2 && S.cl.wk.schritt === 2, 'ohne Text wird nichts angelegt, der Schritt bleibt');
+  S.document.getElementById('wkTitel').value = 'Wie verhindere ich, dass Montage kippen?';
+  S.document.getElementById('wkKat').value = 'kb-arbeit';
+  S.document.getElementById('wkLink').value = '';
+  S.document.getElementById('wkHeute').checked = false;
+  S.wkAnlegen();
+  const neu = S.tlAlle().filter(d => /Montage kippen/.test(d.titel))[0];
+  pruefe(neu && neu.status === 'offen' && neu.heute === '' && neu.bereich === 'kb-arbeit' && S.cl.wk.schritt === 3, 'angelegt — und weiter zu CHANGE');
+  pruefe(neu && !('perspektive' in neu) && !('kreis' in neu) && !('typ' in neu) && !('prio' in neu), 'die Perspektive wird nicht am Denkpunkt gespeichert');
+
+  /* CHANGE mit Heute */
+  S.wkModus('neu');
+  S.document.getElementById('wkTitel').value = 'Wie soll mein Arbeitsplatz 2027 aussehen?';
+  S.document.getElementById('wkHeute').checked = true;
+  S.wkAnlegen();
+  const heuteDp = S.tlAlle().filter(d => /Arbeitsplatz 2027/.test(d.titel))[0];
+  pruefe(heuteDp && heuteDp.heute === heute && S.cl.wk.schritt === 4, 'mit Haken „Heute“ — dann Aufräumen');
+
+  /* Aufräumen */
+  h = inhalt();
+  pruefe(/Aufräumen/.test(h) && (h.match(/onclick="wkBeendenUm\(/g) || []).length === 4, 'Aufräumen: alle offenen Denkpunkte mit „Beenden“ in der Zeile');
+  pruefe(/<span class="leise">neu<\/span>/.test(h), 'die neuen dieser Runde sind gekennzeichnet');
+  S.wkBeendenUm('dp-q');
+  pruefe(S.tlFinden('dp-q').status === 'beendet' && /beendet ↺/.test(inhalt()), 'Beenden: bleibt sichtbar, durchgestrichen, mit ↺');
+  S.wkBeendenUm('dp-q');
+  pruefe(S.tlFinden('dp-q').status === 'offen', 'ein zweiter Tipp nimmt es zurück');
+  S.wkBeendenUm('dp-q');
+  pruefe(/Diese Runde: 2 neu, 1 beendet/.test(inhalt()), 'die Runde in einem Satz');
+  S.wkZurueck();
+  pruefe(S.cl.wk.schritt === 3, '◀ Zurück geht einen Schritt zurück');
+  S.wkWeiter();
+  S.wkFertig();
+  pruefe(S.__ablage['clie-weekly-am'] === heute && S.cl.app === 'thinklist' && S.cl.wk.schritt === 0, '„Fertig“ merkt sich nur den Tag und führt in die Think List');
+  pruefe(JSON.stringify(Object.keys(S.DB)).indexOf('weekly') < 0, 'kein Weekly-Satz in der workbench.json — nur der Tag auf dem Gerät');
+
+  /* Abbrechen */
+  S.oeffne('weekly'); S.wkWeiter();
+  S.wkAbbrechen();
+  pruefe(S.cl.app === 'thinklist' && S.cl.wk.schritt === 0, 'Abbrechen führt zurück in die Think List');
+  pruefe(/<title>CLIE 0\.143\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.143\.0'/.test(SKRIPT), 'Fassung 0.143.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -12629,6 +12731,7 @@ function huellenTest() {
   try { datebookSchlankTest(); } catch (e) { fail('0.140.0 Date Book schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskCasestudiesWegTest(); } catch (e) { fail('0.141.0 Desk und Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { thinkListTest(); } catch (e) { fail('0.142.0 Think List warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { weeklyTest(); } catch (e) { fail('0.143.0 Weekly warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
