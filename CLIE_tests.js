@@ -138,10 +138,41 @@ const ABGELOEST_080 = [
   "Memo Pad ▼ Notizen: nummerierte Notizen wie am Palm",
   "▼ Notizen: keine Projekte, Ziele, Checklisten — keine Bereichsauswahl"
 ];
+/* Seit 0.139.0 ausgebaut: Priorität, Listen, Kreis an der Aufgabe, die
+   Verbindung Aufgabe ↔ Memo (Zuordnen, Zeile → Aufgabe, Marken) und die
+   Umstellung aus der Workbench. Ihre Prüfungen laufen weiter mit; was
+   fehlschlägt, zählt als „abgelöst“. Ganze Kategorien dieser Teile
+   melden ihren Abbruch über abgeloest(). Das Neue prüft Kategorie 0.139.0. */
+const ABGELOEST_0139 = [
+  "Anzeige: ein Memo, dessen Kästchen nicht zur Routine passt",
+  "Aufgabe abhaken: der heutige Tag ist erledigt, das Memo-Kästchen folgt",
+  "Details: „Memo: – Zuordnen…“",
+  "Memo abhaken (zurück): der heutige Tag ist wieder offen, die Aufgabe folgt",
+  "Memo abhaken: der heutige Tag ist erledigt, die Routine zeigt es ebenfalls",
+  "Menü ≡ im Memo: Details…, Als Aufgabe…, Als Termin…, Zeile → Aufgabe…",
+  "Vorschau: geplante offene Aufgabe mit Priorität",
+  "erledigter Routinen-Tag mit seiner Priorität",
+  "der Filter „Nur ohne Bereich“ ist standardmäßig aus",
+  "und steht als Haken im Show-Fenster",
+  "eingeschaltet zeigt To Do nur noch Aufgaben ohne Bereich",
+  "die Aufgabe liegt in der abgeleiteten Liste",
+  "die Memo-Verbindung wird dabei gelöst — entweder oder",
+  "eine Aufgabe am Memo zeigt nur den Memo-Knopf",
+  "in der Zeile schließen sich OneNote und Memo gegenseitig aus",
+  "gezeigt wird trotzdem nach Listen, mit der Listenwahl",
+  "für Notiz und Projekt entsteht je eine Liste",
+  "neue Aufgaben einer Notiz landen in deren Liste",
+  "seine Aufgabe bleibt in ihrer Liste, ohne Memo-Verbindung",
+  "bei offener Liste wird diese vorbelegt",
+  "der Reiter lässt sich wählen",
+  "die To-Do-Leiste hat den Reiter Listen",
+  "eine neue Aufgabe ohne Wahl landet im Sammler"
+];
 let anzAbgeloest = 0;
+function abgeloest(text) { console.log('  abgl ' + text); anzAbgeloest++; }
 function pruefe(bedingung, text) {
   if (bedingung) { ok(text); return; }
-  if (ABGELOEST_080.some(x => String(text).indexOf(x) === 0)) { console.log('  abgl ' + text); anzAbgeloest++; return; }
+  if (ABGELOEST_080.concat(ABGELOEST_0139).some(x => String(text).indexOf(x) === 0)) { abgeloest(text); return; }
   fail(text);
 }
 
@@ -7481,8 +7512,10 @@ function palmTodoTest() {
   S.oeffne('aufgaben');
   let h = inhalt();
   const reihe = x => (x.match(/<span class="tt">([^<]+)/g) || []).map(y => y.replace(/.*>/, '').trim());
-  pruefe(reihe(h).join(' | ') === 'Steuer abgeben | Dachrinne reinigen und abdichten, bevor der erste Frost kommt | Urlaub buchen | Blumen gießen | Toner bestellen',
-    'Alle: Priorität, dann Datum, ohne Datum zuletzt — ' + reihe(h).join(' | '));
+  /* Seit 0.139.0 ohne Priorität: nach Datum, am selben Tag nach Titel, ohne Datum zuletzt */
+  pruefe(reihe(h).join(' | ') === 'Steuer abgeben | Blumen gießen | Dachrinne reinigen und abdichten, bevor der erste Frost kommt | Urlaub buchen | Toner bestellen',
+    'Alle: nach Datum, dann Titel, ohne Datum zuletzt — ' + reihe(h).join(' | '));
+  pruefe(!/class="pd"/.test(h) && !/pmPrioUm/.test(h), 'Alle: keine Priorität in der Zeile (0.139.0)');
   pruefe(new RegExp('Steuer abgeben</span></button><span class="dt ue">' + S.clKurzDatum(gestern).replace(/\./g, '\\.') + '!</span>').test(h) && /<span class="dt">heute<\/span>/.test(h),
     'Datum rechts: überfällig mit „!“, heute als „heute“');
   pruefe(/class="tx lang" onclick="[^"]*"><span class="tt">Dachrinne/.test(h) && /class="tx" onclick="[^"]*"><span class="tt">Toner/.test(h) && !/kompakt|ausführlich/.test(h),
@@ -7526,16 +7559,14 @@ function palmTodoTest() {
   S.pmShowAuf();
   pruefe(S.cl.aufklapp === 'pmshow' && /pmShowSort/.test(S.document.getElementById('aufklapp').innerHTML) && /Erledigte zeigen/.test(S.document.getElementById('aufklapp').innerHTML), 'Show…: Sortierung und Haken');
   S.document.getElementById('pmShowSort').value = 'datum';
-  ['pmShowErl', 'pmShowFaellig', 'pmShowDatum', 'pmShowPrio', 'pmShowKat'].forEach(id => { S.document.getElementById(id).checked = (id !== 'pmShowFaellig'); });
+  pruefe(!/pmShowPrio|Priorität|Nur ohne Bereich/.test(S.document.getElementById('aufklapp').innerHTML), 'Show…: keine Priorität und kein Kreis-Filter mehr (0.139.0)');
+  ['pmShowErl', 'pmShowFaellig', 'pmShowDatum', 'pmShowKat'].forEach(id => { S.document.getElementById(id).checked = (id !== 'pmShowFaellig'); });
   S.pmShowOk();
   h = inhalt();
   pruefe(/Toner/.test(h) && reihe(h)[0] === 'Steuer abgeben' && /class="kt">Haus</.test(h) && JSON.parse(S.__ablage['clie-pm-show']).sort === 'datum', 'Show: Erledigte zeigen, nach Datum, Kategorie rechts — gemerkt');
   S.document.getElementById('pmShowFaellig').checked = true; S.pmShowAuf(); S.document.getElementById('pmShowFaellig').checked = true; S.pmShowOk();
   pruefe(!/Urlaub/.test(inhalt()) && /Toner/.test(inhalt()), 'Nur Fälliges: Künftiges weg, ohne Datum bleibt');
   delete S.__ablage['clie-pm-show'];
-  /* Priorität antippen */
-  S.pmPrioUm(a4.id);
-  pruefe(a4.prio === 3, 'Priorität antippen: 2 → 3');
   /* Privat */
   a4.privat = true;
   S.prModusSetzen('maskieren');
@@ -7544,10 +7575,10 @@ function palmTodoTest() {
   S.prModusSetzen('zeigen');
   /* Menü */
   S.menueUm();
-  pruefe(/menueWahl\('pmShow'\)">Show…/.test(S.document.getElementById('aufklapp').innerHTML) && /menueWahl\('pmUmstellen'\)">Umstellen…/.test(S.document.getElementById('aufklapp').innerHTML),
-    'Menü ≡: Show… und — vor der Umstellung — Umstellen…');
+  pruefe(/menueWahl\('pmShow'\)">Show…/.test(S.document.getElementById('aufklapp').innerHTML) && !/Umstellen…/.test(S.document.getElementById('aufklapp').innerHTML),
+    'Menü ≡: Show… — die Umstellung aus der Workbench ist ausgebaut (0.139.0)');
   S.aufklappZu();
-  pruefe(/class="pm-banner"/.test(inhalt()), 'vor der Umstellung ein Hinweis oben');
+  pruefe(!/class="pm-banner"/.test(inhalt()), 'kein Umstellungs-Hinweis mehr (0.139.0)');
   S.oeffne('uebersicht');
 }
 
@@ -7559,8 +7590,8 @@ function palmDetailsTest() {
   S.oeffne('aufgaben');
   S.pmNeu('', '');
   let f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'pmaufgabe' && /Neue Aufgabe/.test(f) && /pmPrioWahl\(5\)/.test(f) && /pmTagWahl\('morgen'\)">Morgen/.test(f) && /id="pmZeit"/.test(f) && /id="pmNotiz"/.test(f) && /Einrichten…/.test(f) && /id="pmKat"/.test(f),
-    'Neu: Titel, Priorität 1–5, Kategorie, Fällig (Kein/Heute/Morgen/+1 Woche/Datum), Erinnerung, Wiederholung, Notiz');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && /Neue Aufgabe/.test(f) && !/Priorität/.test(f) && /pmTagWahl\('morgen'\)">Morgen/.test(f) && !/\+1 Woche/.test(f) && /id="pmZeit"/.test(f) && /id="pmNotiz"/.test(f) && /Einrichten…/.test(f) && /id="pmKat"/.test(f),
+    'Neu: Titel, Kategorie, Fällig (Kein/Heute/Morgen/Datum), Erinnerung, Wiederholung, Notiz — ohne Priorität und „+1 Woche“ (0.139.0)');
   S.document.getElementById('pmTitel').value = '';
   S.pmSpeichern();
   pruefe(S.cl.aufklapp === 'pmaufgabe' && /Titel/.test(S.document.getElementById('toastText').textContent), 'ohne Titel: Hinweis, nichts angelegt');
@@ -7572,15 +7603,14 @@ function palmDetailsTest() {
   S.document.getElementById('pmDatum').value = S.tagePlus(heute, 1);
   S.document.getElementById('pmZeit').value = '18:00';
   S.document.getElementById('pmNotiz').value = 'Termin bei Müller';
-  S.pmPrioWahl(4);
   S.document.getElementById('pmTitel').value = 'Reifen  wechseln';
   S.document.getElementById('pmDatum').value = S.tagePlus(heute, 1);
   S.document.getElementById('pmZeit').value = '18:00';
   S.document.getElementById('pmNotiz').value = 'Termin bei Müller';
   S.pmSpeichern();
   const a = S.DB.aufgaben.filter(x => x.titel === 'Reifen wechseln')[0];
-  pruefe(a && a.prio === 4 && a.planung === S.tagePlus(heute, 1) && a.uhrzeit === '18:00' && a.beschreibung === 'Termin bei Müller' && S.cl.aufklapp === '',
-    'gespeichert: Priorität, Datum, Erinnerung, Notiz');
+  pruefe(a && a.prio === undefined && a.themaId === undefined && a.planung === S.tagePlus(heute, 1) && a.uhrzeit === '18:00' && a.beschreibung === 'Termin bei Müller' && S.cl.aufklapp === '',
+    'gespeichert: Datum, Erinnerung, Notiz — ohne Priorität und Liste (0.139.0)');
   pruefe(/aria-label="Notiz">▤/.test(inhalt()), 'mit Notiz: ▤ in der Zeile');
   pruefe(S.cl.pm.wahl === a.id, 'eine neue Aufgabe ist danach gewählt (wie am Palm)');
   S.cl.pm.wahl = '';
@@ -7611,12 +7641,10 @@ function palmDetailsTest() {
   S.oeffne('kalender');
   S.aufNeuAm(S.tagePlus(heute, 3), '');
   pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.datum === S.tagePlus(heute, 3), 'aus dem Date Book: „Neue Aufgabe“ für den gezeigten Tag');
-  S.document.getElementById('pmTitel').value = 'P1 wichtig'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
-  S.pmPrioWahl(1);
   S.document.getElementById('pmTitel').value = 'Angebot schreiben'; S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
   S.pmSpeichern();
   pruefe(!S.cl.aufklapp && S.DB.aufgaben.some(x => x.titel === 'Angebot schreiben'),
-    'neue Aufgabe mit Priorität 1: seit 0.122.0 fragt niemand mehr nach, sie ist einfach angelegt');
+    'neue Aufgabe aus dem Date Book: niemand fragt nach, sie ist einfach angelegt');
   S.oeffne('uebersicht');
 }
 
@@ -11950,6 +11978,120 @@ function ruineTest() {
   S.cl.app = 'uebersicht';
 }
 
+function todoSchlankTest() {
+  console.log('\n0.139.0 To Do ohne Priorität, Listen, Kreis und Memo-Zuordnung');
+  if (!CL) { return; }
+  /* Fehlerart: ausgebaute Felder tauchen über einen Nebenweg wieder auf (Fenster,
+     Reiter, Show…, Sortierung, Dock, Memo Pad, Nachpflegen beim Start) — oder der
+     Ausbau verändert alte Daten, die nur noch nicht mehr gelesen werden sollen. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.katNeuAnlegen('Haus');
+  const haus = S.kgAlle().filter(b => b.name === 'Haus')[0].id;
+  /* Ein alter Satz mit allem, was es nicht mehr gibt */
+  S.DB.themen.push({ id: 'l-alt', name: 'Reparaturen', kontext: 'privat', bereich: haus, text: '', ordnung: 1, geaendert: 1 });
+  S.DB.gedanken.push({ id: 'm-alt', titel: 'Reparaturliste', text: '[] Tür ölen ⟦a-alt⟧\n[] Fenster putzen', kontext: 'privat', bereich: haus, ordnung: 2, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'a-alt', titel: 'Tür ölen', status: 'offen', planung: heute, uhrzeit: '', kontext: 'privat', bereich: haus,
+                       prio: 1, themaId: 'l-alt', kreis: 'run', tsSichtbar: true, memo: { id: 'm-alt', zeile: 'a-alt' }, wiederholung: null, geaendert: 1 });
+  S.DB.aufgaben.push({ id: 'a-b', titel: 'Abfluss reinigen', status: 'offen', planung: heute, uhrzeit: '', kontext: 'privat', bereich: haus, prio: 5, wiederholung: null, geaendert: 1 });
+  const vorher = JSON.stringify(S.DB.themen) + JSON.stringify(S.DB.gedanken);
+
+  /* Start: Nachpflegen legt keine Listen an und räumt keine Notizen weg */
+  S.pmNachpflegen();
+  pruefe(JSON.stringify(S.DB.themen) + JSON.stringify(S.DB.gedanken) === vorher, 'Nachpflegen: keine Listen angelegt, keine Notiz weggeräumt, Memo-Text unverändert');
+
+  /* Fenster */
+  S.oeffne('aufgaben');
+  S.pmDetails('a-alt');
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(!/Priorität|pmPrioWahl/.test(f), 'Fenster: keine Priorität');
+  pruefe(!/Kreis:|pmKreisWahl|Tagessteuerung|CONTROL/.test(f), 'Fenster: kein Kreis, keine Tagessteuerung');
+  pruefe(!/id="pmListe"|Liste:|von der Liste/.test(f), 'Fenster: keine Liste');
+  pruefe(!/Memo:|pmZuordnenAuf|pmMemoAusFenster/.test(f), 'Fenster: keine Memo-Zuordnung');
+  pruefe(!/\+1 Woche|pmTagWahl\('woche'\)/.test(f) && /pmTagWahl\('morgen'\)/.test(f), 'Fenster: „+1 Woche“ ist weg, „Morgen“ bleibt');
+  pruefe(/id="pmKat"/.test(f) && /OneNote/.test(f), 'Fenster: Kategorie immer selbst wählbar, OneNote bleibt');
+  S.pmTagWahl('woche');
+  pruefe(S.cl.pm.fenster.datum === '', 'pmTagWahl(„woche“) setzt kein Datum mehr in einer Woche');
+  S.document.getElementById('pmTitel').value = 'Tür ölen';
+  S.document.getElementById('pmDatum').value = heute;
+  S.document.getElementById('pmZeit').value = '';
+  S.document.getElementById('pmNotiz').value = '';
+  S.document.getElementById('pmKat').value = haus;   /* so liefert es der Browser aus der Auswahl */
+  S.pmSpeichern();
+  const alt = S.pmAufgabeFinden('a-alt');
+  pruefe(alt.prio === 1 && alt.themaId === 'l-alt' && alt.kreis === 'run' && alt.tsSichtbar === true && alt.memo && alt.memo.id === 'm-alt',
+    'Speichern lässt alte Felder (prio, themaId, kreis, memo) unangetastet in den Daten');
+  pruefe(S.clKategorieVon(alt) === haus, 'die Kategorie bleibt die eigene der Aufgabe');
+
+  /* Neu */
+  S.pmNeu('', '');
+  S.document.getElementById('pmTitel').value = 'Dachrinne'; S.document.getElementById('pmDatum').value = ''; S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+  S.pmSpeichern();
+  const neu = S.DB.aufgaben.filter(x => x.titel === 'Dachrinne')[0];
+  pruefe(neu && !('prio' in neu) && !('themaId' in neu) && !('memo' in neu) && !('kreis' in neu), 'neue Aufgabe: ohne prio, themaId, memo, kreis');
+  pruefe(S.DB.themen.length === 1, 'neue Aufgabe legt keine Liste und keinen Sammler an');
+
+  /* Reiter */
+  const fuss = S.pmTodoFussHtml();
+  const reiter = (fuss.match(/pmTab\('(\w+)'\)/g) || []).map(x => x.replace(/pmTab\('|'\)/g, ''));
+  pruefe(reiter.join(',') === 'datum,kategorie,alle,woche', 'Reiter: Datum · Kategorie · Alle · Woche (' + reiter.join(',') + ')');
+  S.pmTab('alle'); S.pmTab('liste');
+  pruefe(S.cl.pm.tab === 'alle', 'pmTab(„liste“) wird ignoriert');
+  S.pmTab('pdca');
+  pruefe(S.cl.pm.tab === 'alle', 'pmTab(„pdca“) wird ignoriert');
+  S.__ablage['clie-pm-tab'] = 'pdca'; S.pmTabLaden();
+  pruefe(S.cl.pm.tab === 'datum', 'gemerkter Reiter „pdca“ fällt auf Datum zurück');
+  S.__ablage['clie-pm-tab'] = 'liste'; S.pmTabLaden();
+  pruefe(S.cl.pm.tab === 'datum', 'gemerkter Reiter „liste“ fällt auf Datum zurück');
+  S.pmTab('alle');
+
+  /* Zeilen und Sortierung */
+  const h = inhalt();
+  pruefe(!/class="pd"|pmPrioUm|pmRangTauschen|pmListenWahlAuf|pmMemoVonAufgabe/.test(h), 'Zeilen: keine Priorität, keine Listen-Pfeile, kein Memo-Knopf');
+  pruefe(!/Ohne Bereich|CONTROL/.test(h), 'kein „Ohne Bereich“ und kein Kreis in der Liste');
+  const reihe = (h.match(/<span class="tt">([^<]+)/g) || []).map(x => x.replace(/.*>/, '').trim());
+  pruefe(reihe.indexOf('Abfluss reinigen') < reihe.indexOf('Tür ölen'), 'gleicher Tag: nach Titel, nicht nach alter Priorität (' + reihe.join(' | ') + ')');
+  S.__ablage['clie-pm-show'] = JSON.stringify({ sort: 'prio', prio: true, ohneKreis: true });
+  const sh = S.pmShow();
+  pruefe(sh.sort === 'datum' && !('prio' in sh) && !('ohneKreis' in sh), 'gemerktes Show mit „prio“/„ohneKreis“ fällt auf Datum zurück, ohne diese Felder');
+  pruefe(S.pmTodoAlle().some(a => a.id === 'a-alt'), 'ein alter „ohneKreis“-Wunsch filtert nichts mehr weg');
+  delete S.__ablage['clie-pm-show'];
+  pruefe(S.PM_SORT.every(x => !/Priorität/.test(x[1])), 'Sortierungen ohne Priorität');
+
+  /* Woche */
+  S.pmTab('woche');
+  pruefe(!/Priorität|wichtig/.test(inhalt()) && /Aufgaben/.test(inhalt()), 'Woche: Aufgaben und Routinen als Anzahl, ohne Priorität');
+  S.pmTab('alle');
+
+  /* Dock: nach Kategorien statt Listen */
+  S.oeffne('dock'); S.dockSicht('todo');
+  pruefe(/pm-bal">Haus/.test(inhalt()) && !/pmListenWahlAuf|Sammler/.test(inhalt()), 'Dock · To Do: nach Kategorien gruppiert, keine Listen');
+  S.dockSicht('tag');
+
+  /* Memo Pad: keine Verbindung mehr */
+  S.pmMemoOeffnen('m-alt');
+  const m = inhalt();
+  pruefe(!/⟦|pm-todo|pmAufgabeZurZeile|pmZeileTipp/.test(m) && /Tür ölen/.test(m), 'Memo: alte Marke unsichtbar, kein Aufgaben-Knopf, Zeile nicht mehr wählbar');
+  const zeilen = S.DB.gedanken.filter(g => g.id === 'm-alt')[0];
+  S.pmMemoHaken('m-alt', 0);
+  pruefe(/^\[x\] Tür ölen ⟦a-alt⟧/.test(zeilen.text) && S.pmAufgabeFinden('a-alt').status === 'offen', 'Memo-Haken setzt nur die Zeile — die alte Aufgabe bleibt offen');
+  S.menueUm();
+  const menu = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(!/Als Aufgabe…|Zeile → Aufgabe…|Umstellen…/.test(menu) && /Als Termin…/.test(menu), 'Menü im Memo: ohne „Als Aufgabe…“ und „Zeile → Aufgabe…“, „Als Termin…“ bleibt');
+  S.aufklappZu();
+
+  /* Das PDCA-Konzept bleibt: Day Control ist da und liest den alten Kreis */
+  pruefe(!!S.clApp('tagessteuerung') && Array.isArray(S.TG_KREIS) && S.TG_KREIS.length === 5 && S.tgKreisVon(S.pmAufgabeFinden('a-alt')) === 'run',
+    'PDCA-Konzept bleibt: Day Control und TG_KREIS vorhanden');
+
+  /* Im Quelltext: nichts Ausgebautes mehr */
+  const weg = ['pmListeSatz', 'pmListen', 'pmPrioWahl', 'pmPrioUm', 'pmKreisWahl', 'pmZuordnenAuf', 'pmZeileAlsAufgabe', 'pmMemoAlsAufgabe', 'pmMarkenPruefen', 'pmUmstellenKern', 'pmListenNachziehen'];
+  const rest = weg.filter(n => new RegExp('\\b' + n + '\\b').test(SKRIPT));
+  pruefe(!rest.length, 'keine Reste ausgebauter Funktionen im Code' + (rest.length ? ': ' + rest.join(', ') : ''));
+  pruefe(/<title>CLIE 0\.139\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.139\.0'/.test(SKRIPT), 'Fassung 0.139.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
 function huellenTest() {
   console.log('\n225. Hüllen für einzelne Apps (1.2.0)');
   if (!CL) { return; }
@@ -12160,15 +12302,15 @@ function huellenTest() {
   try { palmTodoTest(); } catch (e) { fail('Palm To Do warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmDetailsTest(); } catch (e) { fail('Palm Details warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmMemoTest(); } catch (e) { fail('Palm Memo Pad warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { palmVerbindungTest(); } catch (e) { fail('Palm Verbindung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmVerbindungTest(); } catch (e) { abgeloest('Palm Verbindung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmEditorTest(); } catch (e) { fail('Palm Editor warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { palmUmstellungTest(); } catch (e) { fail('Palm Umstellung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmUmstellungTest(); } catch (e) { abgeloest('Palm Umstellung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmAgendaTest(); } catch (e) { fail('Palm Agenda warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmFix0801Test(); } catch (e) { fail('0.80.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { palmZuordnenTest(); } catch (e) { fail('0.81 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { palmZuordnenTest(); } catch (e) { abgeloest('0.81 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { palmKuerzelFilterTest(); } catch (e) { fail('0.82 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { arbeitMetaTest(); } catch (e) { fail('0.83 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { zuordnenFilterTest(); } catch (e) { fail('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { zuordnenFilterTest(); } catch (e) { abgeloest('0.83.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { memoSortTest(); } catch (e) { fail('0.84/0.85 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { fehlerZeigenTest(); } catch (e) { fail('0.85.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leisteCssTest(); } catch (e) { fail('0.86.1 warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12177,8 +12319,8 @@ function huellenTest() {
   try { farbschemaTest(); } catch (e) { fail('0.88 Farbschema warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { raster35Test(); } catch (e) { fail('0.89 Raster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminMemoTest(); } catch (e) { fail('0.90 Termin→Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { markenReparaturTest(); } catch (e) { fail('0.90.1 Marken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { zeileImSchreibenTest(); } catch (e) { fail('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { markenReparaturTest(); } catch (e) { abgeloest('0.90.1 Marken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { zeileImSchreibenTest(); } catch (e) { abgeloest('0.91.1 Zeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { auszeichnungVerschachteltTest(); } catch (e) { fail('0.91.2 Auszeichnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { await serienTerminTest(); } catch (e) { fail('0.92 Serien warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { balkenVorlageTest(); } catch (e) { fail('0.93 Balken warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12204,20 +12346,20 @@ function huellenTest() {
   try { lkStapelNeuTest(); } catch (e) { fail('0.99.2 Lernkartei-Stapel anlegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelFensterTest(); } catch (e) { fail('0.99.3 Lernkartei-Stapel-Fenster warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { lkStapelAbgleichTest(); } catch (e) { fail('0.100.0 Lernkartei-Stapel im Abgleich warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { todoListenReiterTest(); } catch (e) { fail('0.102.0 Reiter Listen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmListenNachziehenTest(); } catch (e) { fail('0.102.1 Listen nachziehen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmListePflegenTest(); } catch (e) { fail('0.102.2 Listen pflegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmNotizenAufraeumenTest(); } catch (e) { fail('0.102.3 Notizen aufräumen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmKatVonListeTest(); } catch (e) { fail('0.103.0 Kategorie von der Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmAufgabeVerschiebenTest(); } catch (e) { fail('0.103.1 Aufgabe verschieben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { todoListenReiterTest(); } catch (e) { abgeloest('0.102.0 Reiter Listen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListenNachziehenTest(); } catch (e) { abgeloest('0.102.1 Listen nachziehen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListePflegenTest(); } catch (e) { abgeloest('0.102.2 Listen pflegen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmNotizenAufraeumenTest(); } catch (e) { abgeloest('0.102.3 Notizen aufräumen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmKatVonListeTest(); } catch (e) { abgeloest('0.103.0 Kategorie von der Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmAufgabeVerschiebenTest(); } catch (e) { abgeloest('0.103.1 Aufgabe verschieben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clPrivatKategorieTest(); } catch (e) { fail('0.103.2 Kategorie Privat warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpArtenAufraeumenTest(); } catch (e) { fail('0.104.0 Memo Pad zurückbauen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmListeBleibtGeloeschtTest(); } catch (e) { fail('0.104.1 gelöschte Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListeBleibtGeloeschtTest(); } catch (e) { abgeloest('0.104.1 gelöschte Liste warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpVorlagenZurueckTest(); } catch (e) { fail('0.104.2 Vorlagen zurück warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clAbgleichReihenfolgeTest(); } catch (e) { fail('0.104.3 Abgleich-Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { mpTypErkennenTest(); } catch (e) { fail('0.104.4 Typ-Erkennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmListenNichtImMemoTest(); } catch (e) { fail('0.104.5 Listen nicht im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { pmReihenfolgeTest(); } catch (e) { fail('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmListenNichtImMemoTest(); } catch (e) { abgeloest('0.104.5 Listen nicht im Memo warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { pmReihenfolgeTest(); } catch (e) { abgeloest('0.105.0 Reihenfolge warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { clDriveKennungTest(); } catch (e) { fail('0.105.1 Drive-Kennung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { pmRoutineDiesmalTest(); } catch (e) { fail('0.105.2 Routine an der Aufgabe warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { leuchtturmTest(); } catch (e) { fail('0.109.0 Roots warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12233,7 +12375,7 @@ function huellenTest() {
   try { abgleichBerichtTest(); } catch (e) { fail('0.121.0 Abgleich-Bericht warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rueckbau122Test(); } catch (e) { fail('0.122.0 Rückbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { casestudiesTest(); } catch (e) { fail('0.123.0 Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { veraltetesGeraetTest(); } catch (e) { fail('0.124.0 veraltetes Gerät warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { veraltetesGeraetTest(); } catch (e) { abgeloest('0.124.0 veraltetes Gerät warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
@@ -12242,10 +12384,11 @@ function huellenTest() {
   try { kalenderZuordnungTest(); } catch (e) { fail('0.131.0 Kalenderzuordnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { todoSchlankTest(); } catch (e) { fail('0.139.0 To Do schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
      ============================================================ */
-  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (alte Oberfläche, seit 0.80)' : ''));
+  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80 und 0.139.0)' : ''));
   process.exit(anzFail ? 1 : 0);
 })();
