@@ -1,7 +1,7 @@
 /* ============================================================
    huellen.js — kleine Hüllen für einzelne CLIE-Apps      1.2.0
 
-     node huellen.js lesezeichen desk sammlungen
+     node huellen.js lesezeichen sammlungen
 
    Erzeugt je App:
      <name>.html             die Hülle
@@ -10,7 +10,7 @@
      <name>-512.png
      <name>-512-maskierbar.png
 
-   Nach dem Muster von todo.html / desk.html / datebook.html (1.1.0),
+   Nach dem Muster von todo.html / datebook.html (1.1.0),
    die auf dem Pixel nachweislich installierbar sind. Zwei Dinge daran
    sind nicht Geschmack, sondern die Bedingung dafür:
 
@@ -147,7 +147,7 @@ function manifest(app, datei) {
 (async () => {
   const wunsch = process.argv.slice(2);
   if (!wunsch.length) {
-    console.log('Aufruf: node huellen.js <app> [<app> …]   z. B. lesezeichen desk');
+    console.log('Aufruf: node huellen.js <app> [<app> …]   z. B. lesezeichen sammlungen');
     process.exit(1);
   }
   if (!fs.existsSync(QUELLE)) {

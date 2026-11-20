@@ -18,7 +18,6 @@ const { execFileSync } = require('child_process');
 
 const ORDNER = path.resolve(process.argv[2] || __dirname);
 const APPS = [
-  { key: 'desk', name: 'Desk', anker: 'desk' },
   { key: 'todo', name: 'To Do', anker: 'aufgaben' },
   { key: 'datebook', name: 'Date Book', anker: 'kalender' }
 ];

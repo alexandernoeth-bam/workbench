@@ -176,7 +176,9 @@ const ABGELOEST_0139 = [
   "äußere Klammer", "keine freien Stunden", "seit 0.6.2 auch kurze Termine", "vergangene Termine einzeilig",
   "eingeplante Aufgabe: eine Zeile, keine eigene Klammer", "zwei enden um 12:00", "„schluss“ schließt", "▶ blättert eine Woche weiter",
   "Woche: ◀", "und steht im Kalender an seiner Stunde", "Checklisten-Punkt mit Uhrzeit steht an seiner Stunde",
-  "zurück im Kalender steht sie unter „Aufgaben“"
+  "zurück im Kalender steht sie unter „Aufgaben“",
+  /* 0.141.0: Casestudies und Desk ausgebaut */
+  "das Modul lässt sich öffnen", "ohne Semester steht nur „Belegen…“ da"
 ];
 let anzAbgeloest = 0;
 function abgeloest(text) { console.log('  abgl ' + text); anzAbgeloest++; }
@@ -461,7 +463,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 13 && CL.CL_APPS.length === 32, 'dreizehn Felder im Raster (seit 0.132.0 mit Day Control, seit 0.140.0 ohne Dock), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 11 && CL.CL_APPS.length === 30, 'elf Felder im Raster (seit 0.141.0 ohne Casestudies und Desk), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -592,13 +594,13 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","tagessteuerung","memo","sammlungen","fokus","vorlesen","kategorien","casestudies","desk","lernkartei","spiele"]'
-    && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest'),
-    'Start (seit 0.127.0): Roots, Date Book, To Do List, Day Control / Memo Pad, Collections, Fokus / Reader, Categories, Casestudies / Desk, Flashcards, Games ▸');
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","tagessteuerung","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
+    && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest') && !CL.clApp('desk') && !CL.clApp('casestudies'),
+    'Start (seit 0.141.0): Roots, Date Book, To Do List / Day Control, Memo Pad, Collections / Fokus, Reader, Categories / Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 13, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/13)');
+  pruefe(syms === 11, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/11)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -2576,7 +2578,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,tagessteuerung,memo,sammlungen,fokus,vorlesen,kategorien,casestudies,desk,lernkartei,spiele', 'Start: dreizehn Felder (seit 0.132.0), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,tagessteuerung,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: elf Felder (seit 0.141.0), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -3318,7 +3320,7 @@ function sammlerTest() {
   pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
   S.aufklappZu();
   const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 13 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 13 Felder (seit 0.132.0)');
+  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 11 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 11 Felder (seit 0.141.0)');
   S.oeffne('uebersicht');
 }
 
@@ -6504,7 +6506,7 @@ function startOrdnerTest() {
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
   pruefe(doppelt.length === 0, 'keine App doppelt (Raster und Ordner)');
-  pruefe(raster.length === 13 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
+  pruefe(raster.length === 11 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
   pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && !/oeffne\('sos'\)/.test(inhalt()) && /oeffne\('fokus'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && !/oeffne\('gemini'\)/.test(inhalt()), 'Routines (seit 0.72) auf dem Start, Fokus statt SOS (seit 0.98.1), Drive und Coach nicht mehr im Raster');
@@ -6523,7 +6525,7 @@ function startOrdnerTest() {
   pruefe(/Poker: /.test(S.document.getElementById('aufklapp').innerHTML) && /Sudoku: /.test(S.document.getElementById('aufklapp').innerHTML), 'Ordner zeigt den Stand je App');
   S.aufklappZu();
   /* Seit 0.127.0 steht Calc im Menü ≡ statt auf dem Start; dafür Desk. */
-  pruefe(/oeffne\('desk'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Desk, Vorlesen und Memo direkt auf dem Start');
+  pruefe(!/oeffne\('desk'\)/.test((S.oeffne('uebersicht'), inhalt())) && /oeffne\('vorlesen'\)/.test(inhalt()) && /oeffne\('memo'\)/.test(inhalt()), 'Vorlesen und Memo direkt auf dem Start, Desk nicht mehr (0.141.0)');
 }
 
 /* ============================================================
@@ -8429,7 +8431,7 @@ function raster35Test() {
      vier volle Reihen. Mit Day Control sind es dreizehn — die letzte Reihe
      hat nur noch ein Feld. Das ist eine bewusste Abweichung, keine Panne,
      und steht hier, damit sie nicht unbemerkt wieder kippt. */
-  pruefe(raster.length === 13, 'dreizehn Felder in drei Spalten — seit 0.132.0 ist die letzte Reihe nicht mehr voll');
+  pruefe(raster.length === 11, 'elf Felder in drei Spalten — die letzte Reihe ist nicht voll (0.141.0)');
   pruefe(['routinen', 'lernkartei'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Roots und Flashcards direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
@@ -8437,7 +8439,7 @@ function raster35Test() {
   pruefe(!fehlt.length, 'jede App im Ordner gibt es und sie liegt nicht zusätzlich im Raster' + (fehlt.length ? ': ' + fehlt.join(', ') : ''));
   pruefe(raster.every(id => S.CL_BILD[id]), 'jedes Feld hat ein Symbol');
   S.oeffne('uebersicht');
-  pruefe((inhalt().match(/class="app"/g) || []).length === 13 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 13 Felder, eines davon Ordner (Games ▸)');
+  pruefe((inhalt().match(/class="app"/g) || []).length === 11 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 11 Felder, eines davon Ordner (Games ▸)');
   const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
   pruefe(/\.sym\{width:68px;height:68px/.test(css) && /\.sym svg\{width:68px;height:68px/.test(css) && /\.apps\{display:grid;grid-template-columns:repeat\(3,1fr\);gap:14px 4px/.test(css), 'kleinere Symbole (68 px) und engere Zeilen, damit fünf Reihen ohne Rollen passen');
   S.oeffne('rechner'); S.clZurueck();
@@ -9224,7 +9226,7 @@ function fokusRasterTest() {
   pruefe(typeof S.CL_BILD.fokus === 'string' && S.CL_BILD.fokus.length > 40, 'Fokus hat ein eigenes Bildzeichen');
   const h = S.uebersichtHtml();
   pruefe(/onclick="oeffne\('fokus'\)"/.test(h) && !/fk-start/.test(QUELLE), 'kein Knopf oben mehr; die Kachel steht im Raster');
-  pruefe((h.match(/class="app"/g) || []).length === 13, 'im Raster bleiben 13 Kacheln');
+  pruefe((h.match(/class="app"/g) || []).length === 11, 'im Raster bleiben 11 Kacheln');
 }
 
 function terminErinnerungTest() {
@@ -10731,7 +10733,7 @@ function leuchtturmTest() {
   /* Roots ist geblieben, Manifest und Umprogrammierung sind weg */
   pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'Roots gibt es, das Manifest nicht');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
-  pruefe(raster.length === 13 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
+  pruefe(raster.length === 11 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
   pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
   /* Das ▼ kennt nur noch drei Sichten */
@@ -10889,7 +10891,7 @@ function rueckbau122Test() {
 
   /* ---- 5. Das Raster ---- */
   const raster = S.CL_APPS.filter(x => x.raster !== false);
-  pruefe(raster.length === 13, 'dreizehn Felder im Raster (' + raster.length + ')');
+  pruefe(raster.length === 11, 'elf Felder im Raster (seit 0.141.0) (' + raster.length + ')');
   pruefe(raster.every(x => S.CL_BILD[x.id]), 'jedes Feld hat sein Bildzeichen');
   pruefe(S.CL_APPS.every(x => S.CL_BILD[x.id]), 'zu jeder App, auch außerhalb des Rasters, gibt es eines');
 
@@ -11480,7 +11482,7 @@ function ankerTest() {
   pruefe(S.cl.app === 'uebersicht', 'und lässt die Seite darunter stehen');
 
   /* Die übrigen Apps setzen cl.app */
-  ['sammlungen', 'casestudies', 'desk', 'kalender', 'memo'].forEach(function (id) {
+  ['sammlungen', 'kalender', 'memo'].forEach(function (id) {
     frisch();
     S.oeffne(id);
     pruefe(S.cl.app === id, '#' + id + ' öffnet ' + id + (S.cl.app === id ? '' : ' — kam aber bei ' + S.cl.app + ' an'));
@@ -11500,7 +11502,7 @@ function ankerTest() {
   const zeilen = (h.match(/class="vk-zeile"/g) || []).length;
   const erwartet = S.CL_APPS.filter(a => S.VK_AUS.indexOf(a.id) < 0).length;
   pruefe(zeilen === erwartet, 'eine Zeile je App (' + zeilen + ' von ' + erwartet + ')');
-  pruefe(/#sammlungen</.test(h) && /#desk</.test(h) && /#spiele</.test(h),
+  pruefe(/#sammlungen</.test(h) && !/#desk</.test(h) && /#spiele</.test(h),
     'die Anker stehen im Klartext dabei');
   pruefe(!/#checklisten</.test(h) && !/#projekte</.test(h),
     'andere Sichten derselben App bekommen keine eigene Zeile');
@@ -12165,7 +12167,51 @@ function datebookSchlankTest() {
   const rest = weg.filter(n => SKRIPT.indexOf(n) >= 0);
   pruefe(!rest.length, 'keine Reste von T, W und Dock im Code' + (rest.length ? ': ' + rest.join(', ') : ''));
   pruefe(!/\.dk-|\.wochenleiste|\.wtag|^\.std/m.test(QUELLE), 'keine Stile von T, W und Dock');
-  pruefe(/<title>CLIE 0\.140\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.140\.0'/.test(SKRIPT), 'Fassung 0.140.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+function deskCasestudiesWegTest() {
+  console.log('\n0.141.0 Desk und Casestudies ausgebaut');
+  if (!CL) { return; }
+  /* Fehlerart: ein Weg führt noch in eine ausgebaute App (Raster, Anker,
+     Lesezeichen), oder der Ausbau verliert Daten, die nur unsichtbar
+     werden sollten (Semester in „casestudies“, Desk-Pins in der Pinnwand). */
+  const S = pmFrisch();
+  S.DB.casestudies = [{ id: 'cs-1', typ: 'semester', name: 'WS 26/27', geaendert: 1 }];
+  S.DB.pinnwand = [{ id: 'pin-d', art: 'desk', zielId: 'se-1', titel: 'Protokolle', link: 'https://example.com/x', ordnung: 1, geaendert: 1 },
+                   { id: 'pin-j', art: 'jahrliste', zielId: 'geburtstag', ordnung: 2, geaendert: 1 }];
+  const vorher = JSON.stringify(S.DB.casestudies) + JSON.stringify(S.DB.pinnwand);
+
+  pruefe(!S.clApp('desk') && !S.clApp('casestudies'), 'keine App „desk“ oder „casestudies“ mehr');
+  S.oeffne('uebersicht');
+  const h = inhalt();
+  pruefe(!/oeffne\('desk'\)|oeffne\('casestudies'\)/.test(h) && (h.match(/class="app"/g) || []).length === 11, 'Start: 11 Felder, weder Desk noch Casestudies');
+  S.oeffne('desk');
+  pruefe(S.cl.app === 'uebersicht', '#desk führt auf Home statt ins Leere');
+  S.oeffne('casestudies');
+  pruefe(S.cl.app === 'uebersicht', '#casestudies führt auf Home statt ins Leere');
+
+  /* Lesezeichen: Desk-Pins verborgen, nicht gelöscht (Variante B) */
+  S.oeffne('lesezeichen');
+  const lz = inhalt();
+  pruefe(!/Protokolle/.test(lz), 'Bookmarks: ein Desk-Lesezeichen wird nicht mehr gezeigt');
+  pruefe(S.lzZiel(S.DB.pinnwand[0]).lebt === false && S.lzZiel(S.DB.pinnwand[1]).lebt === true, 'lzZiel: Desk-Pin lebt nicht, andere Pins schon');
+  S.lzOeffnen('pin-d');
+  pruefe(S.cl.app === 'lesezeichen', 'ein verborgener Desk-Pin öffnet nichts');
+
+  /* Daten bleiben */
+  S.pmNachpflegen();
+  pruefe(JSON.stringify(S.DB.casestudies) + JSON.stringify(S.DB.pinnwand) === vorher, 'Semester und Desk-Pins bleiben unverändert in den Daten');
+  pruefe(/'casestudies',/.test(SKRIPT), '„casestudies“ wird weiter abgeglichen');
+
+  /* Im Code */
+  const weg = ['sdkHtml', 'sdkAnheften', 'sdkPinSprung', 'casestudiesHtml', 'csAlle', 'csAufklapp', 'cl.cs.', 'cl.sdk', 'SDK_BLATT'];
+  const rest = weg.filter(n => SKRIPT.indexOf(n) >= 0);
+  pruefe(!rest.length, 'keine Reste von Desk und Casestudies im Code' + (rest.length ? ': ' + rest.join(', ') : ''));
+  pruefe(!/\.sdk-|\.cs-/.test(QUELLE), 'keine Stile von Desk und Casestudies');
+  const fs = require('fs');
+  pruefe(!fs.existsSync(path.join(ORDNER, 'desk.html')) && !fs.existsSync(path.join(ORDNER, 'clie-desk.html')), 'die Desk-Hüllen liegen nicht mehr im Ordner');
+  pruefe(/<title>CLIE 0\.141\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.141\.0'/.test(SKRIPT), 'Fassung 0.141.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -12451,22 +12497,23 @@ function huellenTest() {
   try { textgroesseTest(); } catch (e) { fail('0.120.0 Textgröße warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { abgleichBerichtTest(); } catch (e) { fail('0.121.0 Abgleich-Bericht warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { rueckbau122Test(); } catch (e) { fail('0.122.0 Rückbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { casestudiesTest(); } catch (e) { fail('0.123.0 Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { casestudiesTest(); } catch (e) { abgeloest('0.123.0 Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { veraltetesGeraetTest(); } catch (e) { abgeloest('0.124.0 veraltetes Gerät warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTest(); } catch (e) { fail('0.126.0 onenote-Links warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ankerTest(); } catch (e) { fail('0.127.0 Anker warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { deskPinTest(); } catch (e) { fail('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { deskQuelleTest(); } catch (e) { fail('0.130.0 Desk-Quelle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deskPinTest(); } catch (e) { abgeloest('0.128.0 Desk-Pins warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deskQuelleTest(); } catch (e) { abgeloest('0.130.0 Desk-Quelle warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { tagessteuerungTest(); } catch (e) { fail('0.132.0 Day Control warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { kalenderZuordnungTest(); } catch (e) { fail('0.131.0 Kalenderzuordnung warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { ruineTest(); } catch (e) { fail('0.129.0 Ausbau warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { huellenTest(); } catch (e) { fail('0.128.0 Hüllen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todoSchlankTest(); } catch (e) { fail('0.139.0 To Do schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { datebookSchlankTest(); } catch (e) { fail('0.140.0 Date Book schlank warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deskCasestudiesWegTest(); } catch (e) { fail('0.141.0 Desk und Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
      ============================================================ */
-  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80, 0.139.0 und 0.140.0)' : ''));
+  console.log('\nERGEBNIS: ' + anzOk + ' ok, ' + anzFail + ' fehlgeschlagen, ' + anzWarn + ' Warnungen' + (anzAbgeloest ? ', ' + anzAbgeloest + ' abgelöst (ausgebaute Teile, seit 0.80, 0.139.0, 0.140.0 und 0.141.0)' : ''));
   process.exit(anzFail ? 1 : 0);
 })();
