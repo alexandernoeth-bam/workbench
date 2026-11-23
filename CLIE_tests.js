@@ -12520,11 +12520,15 @@ function followupTest() {
   S.document.getElementById('pmNotiz').value = 'Nur nachsehen';
   S.pmZuFollowupFragen();
   f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/wird ein Follow-up am/.test(f) && /die Notiz entfällt/.test(f) && /Die Aufgabe wird gelöscht/.test(f), 'Rückfrage: was übernommen wird und dass die Aufgabe geht');
+  /* Seit 0.144.1: Aufgabe UND Follow-up — die Aufgabe wird nicht mehr gelöscht */
+  pruefe(/wird ein Follow-up am/.test(f) && /Die Aufgabe bleibt bestehen/.test(f) && !/gelöscht/.test(f) && /pmZuFollowup\(\)">Anlegen/.test(f), 'Rückfrage: die Aufgabe bleibt bestehen (0.144.1)');
   S.pmZuFollowup();
   const umgezogen = S.fuAlle().filter(x => x.titel === 'Prüfen, ob Rechnung kam')[0];
-  pruefe(umgezogen && umgezogen.datum === S.tagePlus(heute, 5) && !S.pmAufgabeFinden(a.id), '→ Follow-up: Titel und Datum übernommen, Aufgabe gelöscht');
-  pruefe((S.DB.grabsteine || []).some(g => g.s === 'aufgaben' && g.id === a.id), 'die gelöschte Aufgabe bekommt einen Grabstein für den Abgleich');
+  const bleibt = S.pmAufgabeFinden(a.id);
+  pruefe(umgezogen && umgezogen.datum === S.tagePlus(heute, 5) && umgezogen.aufgabeId === a.id, '→ Follow-up: Titel und Datum übernommen, Bezug zur Aufgabe gemerkt');
+  pruefe(bleibt && bleibt.status === 'offen' && bleibt.planung === S.tagePlus(heute, 5) && bleibt.beschreibung === 'Nur nachsehen',
+    'die Aufgabe bleibt unverändert bestehen — mit Fälligkeit und Notiz (0.144.1)');
+  pruefe(!(S.DB.grabsteine || []).some(g => g.s === 'aufgaben' && g.id === a.id), 'kein Grabstein — die Aufgabe ist nicht gelöscht');
   const r = S.pmNeueAufgabe({ titel: 'Blumen gießen', datum: heute });
   r.wiederholung = { art: 'taeglich' };
   S.pmDetails(r.id);
@@ -12545,7 +12549,7 @@ function followupTest() {
   pruefe(/'followups'\]/.test(SKRIPT), '„followups“ wird abgeglichen');
   const fs = require('fs');
   pruefe(fs.existsSync(path.join(ORDNER, 'followup.html')) && /src="\.\/clie\.html#followup"/.test(fs.readFileSync(path.join(ORDNER, 'followup.html'), 'utf8')), 'Hülle followup.html als eigene App');
-  pruefe(/<title>CLIE 0\.144\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.144\.0'/.test(SKRIPT), 'Fassung 0.144.0 im Titel und in APP_VERSION');
+  pruefe(/<title>CLIE 0\.144\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.144\.1'/.test(SKRIPT), 'Fassung 0.144.1 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
