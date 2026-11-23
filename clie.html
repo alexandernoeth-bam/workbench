@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.145.1</title>
+<title>CLIE 0.145.3</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -134,7 +134,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .fu-zeile.erl .fu-tx{color:var(--px-zart);text-decoration:line-through}
 .fu-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 .fu-text .fu-tx{flex:0 0 auto}
-.fu-bz{display:block;text-align:left;background:none;border:0;padding:0 0 3px;color:var(--px-mitte);font-size:15.5px;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
+.fu-bz{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left;background:none;border:0;padding:0 0 3px;color:var(--px-mitte);font-size:15.5px;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
 .fu-bz.zu{text-decoration:line-through}
 .fu-bereich{display:flex;flex-direction:column}
 #aufklapp .fu-bereich button.fu-bzeile,.fu-bereich button.fu-bzeile{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:0;border-bottom:1px dotted var(--px-zart);padding:4px 0;margin:0}
@@ -1306,7 +1306,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.145.1';
+var APP_VERSION = '0.145.3';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29560,8 +29560,9 @@ function tlAgendaHtml() {
 
 cl.fu = { sicht: 'offen', fenster: null, zeichnen: false, zurueck: null };
 
-/* Termin anpassen: [Wert, Beschriftung, Tage ab heute] */
-var FU_SCHRITTE = [['morgen', 'Morgen', 1], ['3t', '+3 Tage', 3], ['1w', '+1 Woche', 7], ['2w', '+2 Wochen', 14]];
+/* Termin anpassen: [Wert, Beschriftung, Tage ab heute].
+   Seit 0.145.2 nur noch „Morgen“ — vorbelegt ist heute, alles andere über das Datumsfeld. */
+var FU_SCHRITTE = [['morgen', 'Morgen', 1]];
 
 function fuAlle() {
   return (Array.isArray(DB.followups) ? DB.followups : []).filter(function (x) { return x && typeof x === 'object' && x.id; });
@@ -29650,12 +29651,27 @@ function fuVonFenster(art, id, fuId) {
   if (x) {
     cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
   } else {
-    cl.fu.fenster = { id: '', titel: '', datum: tagePlus(isoDatum(), 7),
+    /* Seit 0.145.2: aus einer Aufgabe ist der Titel vorbelegt (wie gerade im Fenster getippt), der Termin ist heute.
+       Seit 0.145.3 auch aus einem Denkpunkt — beides auf zwei Zeilen gekürzt. */
+    var quelle = art === 'aufgabe' ? (cl.pm.fenster && cl.pm.fenster.titel) : (cl.tl.fenster && cl.tl.fenster.titel);
+    var titel = fuKurz(quelle);
+    cl.fu.fenster = { id: '', titel: titel, datum: isoDatum(),
                       aufgabeId: art === 'aufgabe' ? id : '', denkpunktId: art === 'denkpunkt' ? id : '' };
   }
   cl.fu.zeichnen = true;
   cl.aufklapp = 'fufenster';
   aufklappNeu();
+}
+
+/* Zwei Zeilen im Titelfeld am Pixel — gekürzt am Wortende, mit „…“ */
+var FU_KURZ = 70;
+function fuKurz(t) {
+  var s = String(t || '').replace(/\s+/g, ' ').trim();
+  if (s.length <= FU_KURZ) { return s; }
+  var k = s.slice(0, FU_KURZ - 1);
+  var w = k.lastIndexOf(' ');
+  if (w > FU_KURZ / 2) { k = k.slice(0, w); }
+  return k.replace(/[\s,;:.\-–→>]+$/, '') + '…';
 }
 
 /* Zurück ins Fenster, aus dem das Follow-up kam — sonst zu */
@@ -29736,7 +29752,7 @@ function fuErledigtUm(id) {
 
 /* ---------- Neu und Bearbeiten: nur Titel und Termin ---------- */
 function fuNeu() {
-  cl.fu.fenster = { id: '', titel: '', datum: tagePlus(isoDatum(), 7), aufgabeId: '', denkpunktId: '' };
+  cl.fu.fenster = { id: '', titel: '', datum: isoDatum(), aufgabeId: '', denkpunktId: '' };
   cl.fu.zurueck = null;
   cl.fu.zeichnen = true;
   cl.aufklapp = 'fufenster';

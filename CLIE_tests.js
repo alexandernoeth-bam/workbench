@@ -12462,10 +12462,13 @@ function followupTest() {
   S.fuNeu();
   let f = S.document.getElementById('aufklapp').innerHTML;
   pruefe(/id="fuTitel"/.test(f) && /id="fuDatum"/.test(f) && !/Kat|Notiz|OneNote|Priorität|Wiederholung|Uhrzeit|type="time"/.test(f), 'Fenster: nur Titel und Termin');
-  pruefe(/>Morgen</.test(f) && />\+3 Tage</.test(f) && />\+1 Woche</.test(f) && />\+2 Wochen</.test(f), 'Termin anpassen: Morgen, +3 Tage, +1 Woche, +2 Wochen');
+  /* Seit 0.145.2: vorbelegt ist heute, nur noch „Morgen“ als Knopf */
+  pruefe(S.cl.fu.fenster.datum === heute && /id="fuDatum" class="eingabe" type="date" value="[^"]*"/.test(f), 'Neu: der Termin ist heute vorbelegt (0.145.2)');
+  pruefe(/>Morgen</.test(f) && !/\+3 Tage|\+1 Woche|\+2 Wochen/.test(f), 'Termin anpassen: nur „Morgen“, ohne +3 Tage, +1 Woche, +2 Wochen (0.145.2)');
   S.document.getElementById('fuTitel').value = 'Ticket CTS-4711 – Fix im Nightly?';
-  S.fuSchritt('3t');
-  pruefe(S.cl.fu.fenster.datum === S.tagePlus(heute, 3) && S.document.getElementById('fuTitel').value === 'Ticket CTS-4711 – Fix im Nightly?', '+3 Tage setzt den Termin, der Titel bleibt stehen');
+  S.fuSchritt('morgen');
+  S.document.getElementById('fuDatum').value = S.tagePlus(heute, 3);   /* übers Datumsfeld */
+  pruefe(S.document.getElementById('fuTitel').value === 'Ticket CTS-4711 – Fix im Nightly?', '„Morgen“ setzt den Termin, der Titel bleibt stehen');
   S.fuSpeichern();
   const neu = S.fuAlle().filter(x => /CTS-4711/.test(x.titel))[0];
   pruefe(neu && /^fu-/.test(neu.id) && neu.datum === S.tagePlus(heute, 3) && neu.status === 'offen' && Object.keys(neu).sort().join(',') === 'datum,geaendert,id,status,titel',
@@ -12479,9 +12482,10 @@ function followupTest() {
   /* Termin verschieben */
   S.fuBearbeiten('fu-a');
   S.document.getElementById('fuTitel').value = 'Angebot Dachrinne – Rückmeldung Huber?';   /* so steht es im Feld */
-  S.fuSchritt('1w');
+  S.fuSchritt('morgen');
   S.fuSpeichern();
-  pruefe(S.fuFinden('fu-a').datum === S.tagePlus(heute, 7), 'Bearbeiten: +1 Woche verschiebt den Termin ab heute');
+  pruefe(S.fuFinden('fu-a').datum === S.tagePlus(heute, 1), 'Bearbeiten: „Morgen“ verschiebt den Termin');
+  S.fuFinden('fu-a').datum = S.tagePlus(heute, 7);
 
   /* Erledigen und zurückholen */
   S.fuErledigtUm('fu-b');
@@ -12522,9 +12526,10 @@ function followupTest() {
   S.fuVonFenster('aufgabe', a.id, '');
   f = S.document.getElementById('aufklapp').innerHTML;
   pruefe(S.cl.aufklapp === 'fufenster' && /<label>Bezug:<\/label>/.test(f) && /☑ Angebot Dachrinne einholen/.test(f) && /fuBezugLoesen\(\)">lösen/.test(f), 'Follow-up…: neues Follow-up mit Bezug ☑ zur Aufgabe, lösbar');
-  pruefe(S.document.getElementById('fuTitel').value === '' || /<textarea id="fuTitel"[^>]*><\/textarea>/.test(f), 'der Titel ist leer — die Aufgabe steht als Bezug darunter');
+  pruefe(/<textarea id="fuTitel"[^>]*>Angebot Dachrinne einholen \(2 Firmen\)<\/textarea>/.test(f), 'der Titel ist aus der Aufgabe vorbelegt — so, wie er gerade im Fenster steht (0.145.2)');
+  pruefe(S.cl.fu.fenster.datum === heute, 'der Termin ist heute vorbelegt (0.145.2)');
   S.document.getElementById('fuTitel').value = 'Huber nachfassen';
-  S.fuSchritt('3t');
+  S.document.getElementById('fuDatum').value = S.tagePlus(heute, 3);
   S.fuSpeichern();
   const huber = S.fuAlle().filter(x => x.titel === 'Huber nachfassen')[0];
   pruefe(huber && huber.aufgabeId === a.id && huber.datum === S.tagePlus(heute, 3) && !('denkpunktId' in huber), 'angelegt mit aufgabeId — höchstens ein Bezug');
@@ -12576,7 +12581,9 @@ function followupTest() {
   S.document.getElementById('tlTitel').value = 'QS-Tag → Kontakte';
   S.document.getElementById('tlLink').value = '';
   S.fuVonFenster('denkpunkt', 'dp-q', '');
+  pruefe(S.cl.fu.fenster.titel === 'QS-Tag → Kontakte', 'aus einem Denkpunkt: Titel vorbelegt (0.145.3)');
   S.document.getElementById('fuTitel').value = 'Mit Team spiegeln';
+  S.document.getElementById('fuDatum').value = heute;
   S.fuSpeichern();
   const team = S.fuAlle().filter(x => x.titel === 'Mit Team spiegeln')[0];
   pruefe(team && team.denkpunktId === 'dp-q' && !('aufgabeId' in team) && S.cl.aufklapp === 'tlfenster', 'Follow-up zum Denkpunkt (denkpunktId), danach zurück im Denkpunkt-Fenster');
@@ -12598,7 +12605,13 @@ function followupTest() {
   pruefe(/'followups'\]/.test(SKRIPT), '„followups“ wird abgeglichen');
   const fs = require('fs');
   pruefe(fs.existsSync(path.join(ORDNER, 'followup.html')) && /src="\.\/clie\.html#followup"/.test(fs.readFileSync(path.join(ORDNER, 'followup.html'), 'utf8')), 'Hülle followup.html als eigene App');
-  pruefe(/<title>CLIE 0\.145\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.145\.1'/.test(SKRIPT), 'Fassung 0.145.1 im Titel und in APP_VERSION');
+  pruefe(/<title>CLIE 0\.145\.3<\/title>/.test(QUELLE) && /APP_VERSION = '0\.145\.3'/.test(SKRIPT), 'Fassung 0.145.3 im Titel und in APP_VERSION');
+  /* 0.145.3: vorbelegte Titel höchstens zwei Zeilen — am Wortende gekürzt, mit „…“ */
+  const lang = 'Wie kann ich verhindern, dass die Montage regelmäßig schon um neun Uhr gekippt sind und ich den Rest der Woche hinterherlaufe?';
+  const kurz = S.fuKurz(lang);
+  pruefe(kurz.length <= 70 && /…$/.test(kurz) && lang.indexOf(kurz.slice(0, -1)) === 0 && !/ …$/.test(kurz), 'lange Titel werden am Wortende auf zwei Zeilen gekürzt (' + kurz + ')');
+  pruefe(S.fuKurz('Kurz genug') === 'Kurz genug' && S.fuKurz('  zwei   Leer  ') === 'zwei Leer', 'kurze Titel bleiben, Leerraum wird zusammengezogen');
+  pruefe(/\.fu-bz\{display:-webkit-box;-webkit-line-clamp:2/.test(QUELLE), 'der Bezug unter dem Titel zeigt höchstens zwei Zeilen');
   /* 0.145.1: die Follow-up-Zeilen im Fenster stehen links, Termin rechts — die allgemeine Knopf-Regel des Fensters darf sie nicht zentrieren */
   pruefe(/#aufklapp \.fu-bereich button\.fu-bzeile,\.fu-bereich button\.fu-bzeile\{display:flex;justify-content:space-between/.test(QUELLE), 'Follow-up-Zeilen im Fenster: Titel links, Termin rechts (0.145.1)');
   S.oeffne('uebersicht');
