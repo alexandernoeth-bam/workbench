@@ -594,9 +594,9 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","thinklist","followup","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","thinklist","deadlines","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest') && !CL.clApp('desk') && !CL.clApp('casestudies'),
-    'Start (seit 0.144.0): Roots, Date Book, To Do List / Think List, Follow-up, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
+    'Start (seit 0.147.0): Roots, Date Book, To Do List / Think List, Deadlines, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2578,7 +2578,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,thinklist,followup,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.144.0 mit Follow-up), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,thinklist,deadlines,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.147.0 mit Deadlines statt Follow-up), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -7530,8 +7530,9 @@ function palmTodoTest() {
   pruefe(reihe(h).join(' | ') === 'Steuer abgeben | Blumen gießen | Dachrinne reinigen und abdichten, bevor der erste Frost kommt | Urlaub buchen | Toner bestellen',
     'Alle: nach Datum, dann Titel, ohne Datum zuletzt — ' + reihe(h).join(' | '));
   pruefe(!/class="pd"/.test(h) && !/pmPrioUm/.test(h), 'Alle: keine Priorität in der Zeile (0.139.0)');
-  pruefe(new RegExp('Steuer abgeben</span></button><span class="dt frist ue">' + S.clKurzDatum(gestern).replace(/\./g, '\\.') + '!</span>').test(h) && /<span class="dt frist">heute<\/span>/.test(h),
-    'Datum rechts: überfällig mit „!“, heute als „heute“ — seit 0.144.0 als Frist gerahmt');
+  /* Seit 0.147.0 ist das Datum „geplant am“: Verpasstes rutscht still auf heute — kein „!“, kein Rahmen, nicht fett */
+  pruefe(/Steuer abgeben<\/span><\/button><span class="dt">heute<\/span>/.test(h) && !/class="dt frist|class="dt ue">[^<]*!</.test(h),
+    'Datum rechts (geplant am, 0.147.0): Verpasstes still als „heute“, ohne „!“ und ohne Rahmen');
   pruefe(/class="tx lang" onclick="[^"]*"><span class="tt">Dachrinne/.test(h) && /class="tx" onclick="[^"]*"><span class="tt">Toner/.test(h) && !/kompakt|ausführlich/.test(h),
     'ein- und zweizeilig gemischt nach Bedarf — kein „kompakt/ausführlich“');
   pruefe(/aria-label="Erinnerung">◉</.test(h) && /aria-label="Wiederholung">↻</.test(h), 'Zeichen: ◉ Erinnerung, ↻ Routine');
@@ -7969,7 +7970,7 @@ function palmAgendaTest() {
     'Tag: oben Termine, darunter Überfälliges, Heutiges und Routinen; Erledigtes gezählt');
   pruefe(ag.indexOf('Anwendungen aufrufen') < ag.indexOf('Daily') && ag.indexOf('Daily') < ag.indexOf('Überfälliges') && /◉ 7:30/.test(ag) && /◉ 8:00/.test(ag),
     'nach Uhrzeit (Erinnerung), dann Titel; die Uhrzeit steht beim ◉');
-  pruefe(/class="dt frist ue">/.test(ag), 'Überfälliges mit seinem Datum und „!“');
+  pruefe(!/class="dt frist|class="dt ue"/.test(ag.slice(0, ag.indexOf('Daily'))) && /class="dt">heute</.test(ag), 'Verpasste Planung steht still bei heute — ohne „!“ (0.147.0)');
   S.clErlUm();
   pruefe(/Schon erledigt/.test(inhalt()), '„zeigen“ holt Erledigtes durchgestrichen zurück');
   S.clErlUm();
@@ -12434,13 +12435,15 @@ function weeklyTest() {
   S.oeffne('uebersicht');
 }
 
-function followupTest() {
-  console.log('\n0.144.0 Follow-up, Fälligkeit und Notizen in der Zeile — seit 0.145.0 mit Bezug zu Aufgabe oder Denkpunkt');
+function deadlinesTest() {
+  console.log('\n0.147.0 Deadlines (bis 0.146.0 Follow-up) — „geplant am“ an der Aufgabe, eine Deadline an Aufgabe oder Denkpunkt');
   if (!CL) { return; }
-  /* Fehlerarten: ein Follow-up bekommt doch Felder (Kategorie, Notiz …), es
-     fehlt in der Agenda oder erscheint am falschen Tag, „→ Follow-up“
-     verliert Titel/Datum oder lässt die Aufgabe stehen, die Notiz sprengt
-     die Zeile, oder das Fälligkeitsdatum ist nicht mehr als solches erklärt. */
+  /* Fehlerarten: eine Aufgabe bekommt doch mehrere Deadlines oder das Feld
+     schreibt nichts; ✕ lässt die Deadline stehen; der Titel der Deadline
+     folgt der Aufgabe nicht; verpasste Planung wird wieder als überfällig
+     markiert (statt nur die Deadline); die Agenda zeigt Deadlines ohne
+     Vorlauf oder zu früh; die alte Hülle followup.html führt ins Leere;
+     Reste des Follow-up-Fensters („Morgen“, „Follow-up…“) tauchen wieder auf. */
   const S = pmFrisch();
   const heute = S.isoDatum();
   S.DB.followups = [
@@ -12450,181 +12453,184 @@ function followupTest() {
     { id: 'fu-d', titel: 'Längst erledigt', datum: S.tagePlus(heute, -10), status: 'erledigt', erledigtAm: S.tagePlus(heute, -9), geaendert: 1 }];
 
   /* App */
-  pruefe(!!S.clApp('followup') && S.clApp('followup').name === 'Follow-up' && S.clApp('followup').raster !== false && typeof S.CL_BILD.followup === 'string', 'App „Follow-up“ im Raster, mit Symbol');
-  S.oeffne('followup');
+  pruefe(!!S.clApp('deadlines') && S.clApp('deadlines').name === 'Deadlines' && S.clApp('deadlines').raster !== false && typeof S.CL_BILD.deadlines === 'string' && !S.clApp('followup'),
+    'App „Deadlines“ im Raster, mit Symbol — „Follow-up“ gibt es nicht mehr');
+  S.oeffne('deadlines');
   let h = inhalt();
-  /* Seit 0.146.0: eine schlichte Tabelle — keine Zwischenüberschriften, kein Zeichen, kein Bezug, nur TT.MM. */
-  pruefe(!/pm-bal/.test(h) && (h.match(/class="fu-zeile"/g) || []).length === 3 && !/Längst erledigt/.test(h), 'eine Liste ohne Zwischenüberschriften, Erledigtes nicht (0.146.0)');
+  pruefe(!/pm-bal/.test(h) && (h.match(/class="fu-zeile"/g) || []).length === 3 && !/Längst erledigt/.test(h), 'eine Liste ohne Zwischenüberschriften, Erledigtes nicht');
   pruefe(h.indexOf('Angebot Dachrinne') < h.indexOf('Doris') && h.indexOf('Doris') < h.indexOf('Kasse'), 'aufsteigend nach Termin');
-  pruefe(!/↻|fu-mk|fu-bz/.test(h), 'kein Zeichen vor dem Titel, kein Bezug in der Liste (0.146.0)');
-  pruefe(new RegExp('>' + S.clKurzDatum(heute).replace(/\./g, '\\.') + '<').test(h) && !/>heute</.test(h) && !/>(Mo|Di|Mi|Do|Fr|Sa|So) \d/.test(h), 'nur das Datum TT.MM. — kein „heute“, kein Wochentag (0.146.0)');
-  pruefe(/class="dt ue">/.test(h) && !/!<\/span>/.test(h), 'Überfälliges fett, ohne „!“');
-  pruefe(/^▼ /.test(S.document.getElementById('katKnopf').textContent), 'oben rechts der Kategorienfilter ▼ wie in To Do (0.146.0)');
+  pruefe(new RegExp('>' + S.clKurzDatum(heute).replace(/\./g, '\\.') + '<').test(h) && !/>heute</.test(h) && !/>(Mo|Di|Mi|Do|Fr|Sa|So) \d/.test(h), 'nur das Datum TT.MM. — kein „heute“, kein Wochentag');
+  pruefe(/class="dt ue">/.test(h) && !/!<\/span>/.test(h), 'Überschrittenes fett, ohne „!“');
+  pruefe(/^▼ /.test(S.document.getElementById('katKnopf').textContent), 'oben rechts der Kategorienfilter ▼');
+  S.fuSichtUm(); S.fuSichtUm();
+  S.DB.followups = [];
+  pruefe(/Keine Deadlines/.test((S.zeichne(), inhalt())), 'leere Liste: „Keine Deadlines“');
+  S.DB.followups = [
+    { id: 'fu-a', titel: 'Angebot Dachrinne – Rückmeldung Huber?', datum: S.tagePlus(heute, -3), status: 'offen', geaendert: 1 },
+    { id: 'fu-b', titel: 'Doris: Feedback nachhalten', datum: heute, status: 'offen', geaendert: 1 },
+    { id: 'fu-c', titel: 'Kasse: Erstattung Zahnarzt', datum: S.tagePlus(heute, 20), status: 'offen', geaendert: 1 }];
 
-  /* Fenster: Titel, Kategorie, Termin */
+  /* Fenster einer Deadline: Titel, Kategorie, Termin — ohne „Morgen“ */
   S.fuNeu();
   let f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/id="fuTitel"/.test(f) && /id="fuKat"/.test(f) && /id="fuDatum"/.test(f) && !/fuPrivat|Notiz|OneNote|Priorität|Wiederholung|Uhrzeit|type="time"/.test(f), 'Fenster: Titel, Kategorie, Termin (0.146.0)');
-  /* Seit 0.145.2: vorbelegt ist heute, nur noch „Morgen“ als Knopf */
-  pruefe(S.cl.fu.fenster.datum === heute && /id="fuDatum" class="eingabe" type="date" value="[^"]*"/.test(f), 'Neu: der Termin ist heute vorbelegt (0.145.2)');
-  pruefe(/>Morgen</.test(f) && !/\+3 Tage|\+1 Woche|\+2 Wochen/.test(f), 'Termin anpassen: nur „Morgen“, ohne +3 Tage, +1 Woche, +2 Wochen (0.145.2)');
+  pruefe(/>Neue Deadline</.test(f) && /id="fuTitel"/.test(f) && /id="fuKat"/.test(f) && /id="fuDatum"/.test(f) && !/fuPrivat|Notiz|OneNote|Priorität|Wiederholung|type="time"/.test(f), 'Fenster: Titel, Kategorie, Termin');
+  pruefe(/Termin — zugesagt oder von außen festgelegt:/.test(f) && !/>Morgen</.test(f) && typeof S.fuSchritt === 'undefined' && typeof S.FU_SCHRITTE === 'undefined', 'Termin nur übers Datumsfeld — „Morgen“ ist ausgebaut');
+  pruefe(S.cl.fu.fenster.datum === heute, 'Neu: der Termin ist heute vorbelegt');
   S.document.getElementById('fuTitel').value = 'Ticket CTS-4711 – Fix im Nightly?';
-  S.fuSchritt('morgen');
-  S.document.getElementById('fuDatum').value = S.tagePlus(heute, 3);   /* übers Datumsfeld */
-  pruefe(S.document.getElementById('fuTitel').value === 'Ticket CTS-4711 – Fix im Nightly?', '„Morgen“ setzt den Termin, der Titel bleibt stehen');
+  S.document.getElementById('fuDatum').value = S.tagePlus(heute, 3);
   S.fuSpeichern();
   const neu = S.fuAlle().filter(x => /CTS-4711/.test(x.titel))[0];
   pruefe(neu && /^fu-/.test(neu.id) && neu.datum === S.tagePlus(heute, 3) && neu.status === 'offen' && 'kontext' in neu
-    && !/aufgabeId|denkpunktId|notiz|prio|uhrzeit/.test(Object.keys(neu).join(',')), 'angelegt mit titel, datum, status und Kategorie — sonst nichts');
+    && !/aufgabeId|denkpunktId|notiz|prio|uhrzeit/.test(Object.keys(neu).join(',')) && !S.cl.aufklapp, 'ohne Bezug angelegt — danach ist das Fenster zu');
   S.fuNeu();
   S.document.getElementById('fuTitel').value = '';
   S.fuSpeichern();
-  pruefe(S.fuAlle().length === 5, 'ohne Titel wird nichts angelegt');
+  pruefe(S.fuAlle().length === 4, 'ohne Titel wird nichts angelegt');
   S.fuAbbrechen();
-
-  /* Termin verschieben */
-  S.fuBearbeiten('fu-a');
-  S.document.getElementById('fuTitel').value = 'Angebot Dachrinne – Rückmeldung Huber?';   /* so steht es im Feld */
-  S.fuSchritt('morgen');
-  S.fuSpeichern();
-  pruefe(S.fuFinden('fu-a').datum === S.tagePlus(heute, 1), 'Bearbeiten: „Morgen“ verschiebt den Termin');
-  S.fuFinden('fu-a').datum = S.tagePlus(heute, 7);
+  pruefe(!S.cl.aufklapp && S.cl.fu.fenster === null, 'Abbrechen schließt das Fenster');
 
   /* Erledigen und zurückholen */
+  S.oeffne('deadlines');
   S.fuErledigtUm('fu-b');
-  pruefe(S.fuFinden('fu-b').status === 'erledigt' && S.fuFinden('fu-b').erledigtAm === heute && !/Doris/.test(inhalt()), '✓ hakt ab — weg aus der Liste');
-  S.fuSichtUm();
-  pruefe(/Doris/.test(inhalt()) && /Längst erledigt/.test(inhalt()) && /fuErledigtUm\('fu-b'\)/.test(inhalt()), '„Erledigte…“ zeigt es, mit ↺');
+  pruefe(S.fuFinden('fu-b').status === 'erledigt' && !/Doris/.test(inhalt()), '✓ hakt ab — weg aus der Liste');
   S.fuErledigtUm('fu-b');
   pruefe(S.fuFinden('fu-b').status === 'offen' && !('erledigtAm' in S.fuFinden('fu-b')), '↺ holt es zurück');
-  S.fuSichtUm();
 
-  /* Agenda */
-  S.fuFinden('fu-a').datum = S.tagePlus(heute, -2);
+  /* Agenda: drei Tage Vorlauf, überschritten nur heute, vor dem To Do */
   S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
   h = inhalt();
-  pruefe(/<span>Follow-up<\/span><small>2<\/small>/.test(h) && /Angebot Dachrinne/.test(h) && /Doris/.test(h) && !/CTS-4711/.test(h), 'Agenda heute: Follow-up mit Überfälligem');
-  pruefe(h.indexOf('<span>To Do</span>') < h.indexOf('<span>Follow-up</span>'), 'die Gruppe steht nach To Do');
-  /* Seit 0.146.0 haben Follow-ups eine Kategorie — die Agenda filtert sie wie Aufgaben */
+  pruefe(/<span>Deadlines<\/span><small>3<\/small>/.test(h) && /Angebot Dachrinne/.test(h) && /Doris/.test(h) && /CTS-4711/.test(h) && !/Kasse/.test(h),
+    'Agenda heute: Überschrittenes, Heutiges und alles bis in drei Tagen — nicht später');
+  pruefe(h.indexOf('<span>Deadlines</span>') < h.indexOf('<span>To Do</span>'), 'die Gruppe steht vor dem To Do');
+  pruefe(S.FU_VORLAUF === 3, 'Vorlauf: drei Tage');
+  S.clKalGehe(S.tagePlus(heute, 1), 'agenda');
+  h = inhalt();
+  pruefe(/<span>Deadlines<\/span><small>1<\/small>/.test(h) && /CTS-4711/.test(h) && !/Angebot Dachrinne|Doris/.test(h), 'ein anderer Tag: nur was ab diesem Tag in drei Tagen fällig ist');
+  S.clKalGehe(S.tagePlus(heute, 17), 'agenda');
+  pruefe(/Kasse/.test(inhalt()), 'drei Tage vorher taucht die Deadline auf');
+  S.clKalGehe(S.tagePlus(heute, 16), 'agenda');
+  pruefe(!/Kasse/.test(inhalt()), 'vier Tage vorher noch nicht');
   S.fuFinden('fu-a').bereich = 'kb-arbeit'; S.fuFinden('fu-a').kontext = 'beruflich';
+  S.clKalGehe(heute, 'agenda');
   S.katSetzen('kb-arbeit');
   h = inhalt();
-  pruefe(/Angebot Dachrinne/.test(h) && !/Doris/.test(h), 'der Filter ▼ wirkt auch auf Follow-ups in der Agenda (0.146.0)');
-  S.oeffne('followup');
-  pruefe(/Angebot Dachrinne/.test(inhalt()) && !/Doris/.test(inhalt()), 'und in der Follow-up-Liste');
+  pruefe(/Angebot Dachrinne/.test(h) && !/Doris/.test(h), 'der Filter ▼ wirkt auf Deadlines in der Agenda');
   S.katSetzen('alle');
-  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
-  S.clKalGehe(S.tagePlus(heute, 3), 'agenda');
-  h = inhalt();
-  pruefe(/<span>Follow-up<\/span><small>1<\/small>/.test(h) && /CTS-4711/.test(h) && !/Angebot Dachrinne/.test(h), 'ein anderer Tag: nur die Follow-ups dieses Tages');
-  S.clKalGehe(heute, 'agenda');
 
-  /* Aufgaben: Fälligkeit und Follow-ups dazu (seit 0.145.0 nebeneinander, kein → Follow-up mehr) */
-  const a = S.pmNeueAufgabe({ titel: 'Angebot Dachrinne einholen', datum: S.tagePlus(heute, 20), notiz: 'Huber und Schmitt angefragt' });
+  /* Aufgabe: „Geplant am“ und genau ein Feld „Deadline“ */
+  const a = S.pmNeueAufgabe({ titel: 'Angebot Dachrinne einholen', datum: S.tagePlus(heute, -2), notiz: 'Huber und Schmitt angefragt' });
   S.oeffne('aufgaben');
   S.pmDetails(a.id);
   f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/Fällig — zugesagter oder von außen festgelegter Termin:/.test(f), 'Aufgabe: „Fällig — zugesagter oder von außen festgelegter Termin“');
-  pruefe(!/→ Follow-up|pmZuFollowup|Nur wiedervorlegen/.test(f) && typeof S.pmZuFollowup === 'undefined', '„→ Follow-up“ ist ausgebaut (0.145.0)');
-  pruefe(/<label>Follow-up:<\/label>/.test(f) && /fuVonFenster\('aufgabe','[^']+',''\)">Follow-up…/.test(f), 'Aufgabe: Bereich „Follow-up“ mit „Follow-up…“');
-  /* im Aufgaben-Fenster schon etwas geändert — das darf nicht verloren gehen */
-  S.document.getElementById('pmTitel').value = 'Angebot Dachrinne einholen (2 Firmen)';
-  S.document.getElementById('pmDatum').value = S.tagePlus(heute, 20);
-  S.document.getElementById('pmZeit').value = '';
-  S.document.getElementById('pmNotiz').value = 'Huber und Schmitt angefragt';
-  S.fuVonFenster('aufgabe', a.id, '');
-  f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(S.cl.aufklapp === 'fufenster' && /<label>Bezug:<\/label>/.test(f) && /☑ Angebot Dachrinne einholen/.test(f) && /fuBezugLoesen\(\)">lösen/.test(f), 'Follow-up…: neues Follow-up mit Bezug ☑ zur Aufgabe, lösbar');
-  pruefe(/<textarea id="fuTitel"[^>]*>Angebot Dachrinne einholen \(2 Firmen\)<\/textarea>/.test(f), 'der Titel ist aus der Aufgabe vorbelegt — so, wie er gerade im Fenster steht (0.145.2)');
-  pruefe(S.cl.fu.fenster.datum === heute, 'der Termin ist heute vorbelegt (0.145.2)');
-  S.document.getElementById('fuTitel').value = 'Huber nachfassen';
-  S.document.getElementById('fuDatum').value = S.tagePlus(heute, 3);
-  S.fuSpeichern();
-  const huber = S.fuAlle().filter(x => x.titel === 'Huber nachfassen')[0];
-  pruefe(huber && huber.aufgabeId === a.id && huber.datum === S.tagePlus(heute, 3) && !('denkpunktId' in huber), 'angelegt mit aufgabeId — höchstens ein Bezug');
-  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.titel === 'Angebot Dachrinne einholen (2 Firmen)', 'danach zurück im Aufgaben-Fenster, das Getippte steht noch da');
-  pruefe(S.pmAufgabeFinden(a.id) && S.pmAufgabeFinden(a.id).planung === S.tagePlus(heute, 20), 'die Aufgabe bleibt mit ihrer Fälligkeit bestehen');
-  S.aufklappZu(); S.pmDetails(a.id);
-  f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/↻ Huber nachfassen/.test(f) && new RegExp(S.clKurzDatum(S.tagePlus(heute, 3)).replace(/\./g, '\\.')).test(f), 'im Aufgaben-Fenster steht das Follow-up mit Termin');
-  S.fuVonFenster('aufgabe', a.id, huber.id);
-  S.fuAbbrechen();
-  pruefe(S.cl.aufklapp === 'pmaufgabe', 'ein Follow-up aus der Aufgabe öffnen und abbrechen führt zurück');
+  pruefe(/Geplant am — wann du dich darum kümmerst:/.test(f) && !/Fällig —/.test(f), 'Aufgabe: „Geplant am“ statt „Fällig“');
+  pruefe(/Deadline — zugesagt oder von außen festgelegt:/.test(f) && (f.match(/id="pmDeadline"/g) || []).length === 1 && /fuFeldLeeren\('pm'\)/.test(f), 'Aufgabe: genau ein Feld „Deadline“ mit ✕');
+  pruefe(!/Follow-up|fuVonFenster|fu-bereich/.test(f) && typeof S.fuVonFenster === 'undefined' && typeof S.fuBereichHtml === 'undefined', 'Bereich „Follow-up…“ ist ausgebaut');
+  /* die Ersatz-Elemente merken sich Werte — alle Felder ausdrücklich setzen */
+  const felder = (titel, datum, deadline) => {
+    S.document.getElementById('pmTitel').value = titel; S.document.getElementById('pmDatum').value = datum;
+    S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = '';
+    S.document.getElementById('pmDeadline').value = deadline;
+  };
+  felder('Angebot Dachrinne einholen (2 Firmen)', S.tagePlus(heute, -2), S.tagePlus(heute, 5));
+  S.pmSpeichern();
+  let dl = S.fuDeadline('aufgabe', a.id);
+  pruefe(dl && dl.datum === S.tagePlus(heute, 5) && dl.titel === 'Angebot Dachrinne einholen (2 Firmen)' && dl.aufgabeId === a.id && !('denkpunktId' in dl),
+    'OK legt die Deadline an — Titel aus der Aufgabe, Bezug aufgabeId');
+  pruefe(S.pmAufgabeFinden(a.id).planung === S.tagePlus(heute, -2), 'die Aufgabe behält ihr „geplant am“');
+  S.pmDetails(a.id);
+  pruefe(S.document.getElementById('pmDeadline').value === S.tagePlus(heute, 5) || /id="pmDeadline" class="eingabe" type="date" value="[0-9-]{10}"/.test(S.document.getElementById('aufklapp').innerHTML), 'wieder geöffnet: die Deadline steht im Feld');
+  felder('Dachrinne: Angebot einholen', S.tagePlus(heute, -2), S.tagePlus(heute, 6));
+  S.pmSpeichern();
+  pruefe(S.fuZu('aufgabe', a.id).length === 1 && S.fuDeadline('aufgabe', a.id) === dl && dl.datum === S.tagePlus(heute, 6) && dl.titel === 'Dachrinne: Angebot einholen',
+    'ändern ändert dieselbe Deadline — keine zweite, der Titel folgt der Aufgabe');
+  /* Zeile: geplant am still, „bis …“ */
+  S.pmTab('alle');
+  h = inhalt();
+  const zeile = h.slice(h.indexOf('Dachrinne: Angebot einholen'), h.indexOf('Dachrinne: Angebot einholen') + 600);
+  pruefe(new RegExp('<span class="fu-bis">bis ' + S.clKurzDatum(S.tagePlus(heute, 6)).replace(/\./g, '\\.') + '</span></button><span class="dt">heute</span>').test(zeile),
+    'To Do: „bis TT.MM.“ unter dem Titel; die verpasste Planung steht still als „heute“');
+  dl.datum = S.tagePlus(heute, -1);
+  pruefe(/<span class="fu-bis ue">bis /.test(inhalt()) || /<span class="fu-bis ue">bis /.test((S.zeichne(), inhalt())), 'überschrittene Deadline: „bis …“ fett');
+  pruefe(/\.fu-bis\.ue\{font-weight:700/.test(QUELLE), 'und die Regel dafür steht im CSS');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
+  pruefe(/<span class="fu-bis ue">bis /.test(inhalt()), 'Agenda: „bis …“ auch an der Aufgabe');
+  /* ✕ entfernt sie */
+  S.oeffne('aufgaben');
+  S.pmDetails(a.id);
+  felder('Dachrinne: Angebot einholen', S.tagePlus(heute, -2), S.tagePlus(heute, -1));
+  S.fuFeldLeeren('pm');
+  S.pmSpeichern();
+  pruefe(!S.fuDeadline('aufgabe', a.id) && !S.fuFinden(dl.id) && S.DB.grabsteine.some(g => g.s === 'followups' && g.id === dl.id), '✕ und OK: die Deadline ist weg, mit Grabstein für den Abgleich');
+  /* Neue Aufgabe gleich mit Deadline */
+  S.pmNeu('', '');
+  felder('Reifenwechsel buchen', heute, S.tagePlus(heute, 2));
+  S.pmSpeichern();
+  const rw = S.DB.aufgaben.filter(x => x.titel === 'Reifenwechsel buchen')[0];
+  pruefe(rw && S.fuDeadlineDatum('aufgabe', rw.id) === S.tagePlus(heute, 2), 'neue Aufgabe: die Deadline kommt gleich mit');
+  /* Ungültiges Datum */
+  S.pmDetails(rw.id);
+  felder('Reifenwechsel buchen', heute, '2026-13-99x');
+  S.pmSpeichern();
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.fuDeadlineDatum('aufgabe', rw.id) === S.tagePlus(heute, 2), 'ungültige Deadline: nichts gespeichert, das Fenster bleibt');
+  S.aufklappZu();
+  /* Ältere Daten mit zwei Einträgen an einer Aufgabe: die früheste gilt, die andere bleibt */
+  const alt2 = S.fuAnlegen('Zweite aus der Follow-up-Zeit', S.tagePlus(heute, 9)); alt2.aufgabeId = rw.id;
+  pruefe(S.fuDeadlineDatum('aufgabe', rw.id) === S.tagePlus(heute, 2) && S.fuFinden(alt2.id), 'mehrere aus der Follow-up-Zeit: die früheste gilt, die andere bleibt in der Liste');
+  /* Routine: kein Feld */
+  S.DB.aufgaben.push({ id: 'rdl', titel: 'Wochenrückblick', wiederholung: { takt: 'woche', tage: [1], intervall: 1 }, kontext: 'privat', geaendert: 1 });
+  S.pmDetails('rdl');
+  pruefe(!/pmDeadline/.test(S.document.getElementById('aufklapp').innerHTML), 'Routinen haben keine Deadline');
   S.aufklappZu();
 
-  /* Seit 0.146.0 steht der Bezug nur noch im Fenster — nicht in Liste und Agenda */
-  S.oeffne('followup');
-  pruefe(/Huber nachfassen/.test(inhalt()) && !/☑ Angebot Dachrinne einholen/.test(inhalt()), 'Liste: kein Bezug unter dem Titel (0.146.0)');
-  S.pmAufgabeFinden(a.id).status = 'erledigt';
-  S.fuBearbeiten(huber.id);
-  pruefe(/<span class="fu-bz zu">☑ Angebot Dachrinne einholen/.test(S.document.getElementById('aufklapp').innerHTML) && S.fuOffen(huber),
-    'Aufgabe erledigt: das Follow-up bleibt offen, im Fenster ist der Bezug durchgestrichen');
-  S.fuAbbrechen();
-  S.pmAufgabeFinden(a.id).status = 'offen';
-  S.oeffne('kalender'); S.clKalGehe(S.tagePlus(heute, 3), 'agenda');
-  pruefe(/Huber nachfassen/.test(inhalt()) && !/☑ Angebot Dachrinne einholen/.test(inhalt()), 'Agenda: kein Bezug (0.146.0)');
-  S.clKalGehe(heute, 'agenda');
-  /* Kategorie: aus der Aufgabe übernommen, ältere ohne Kategorie über ihren Bezug */
-  pruefe(S.fuKatQuelle({ titel: 'alt', datum: heute, aufgabeId: a.id }) === S.pmAufgabeFinden(a.id), 'ein älteres Follow-up ohne Kategorie filtert über seinen Bezug');
-
-  /* Bezug lösen */
-  S.fuBearbeiten(huber.id);
-  S.document.getElementById('fuTitel').value = 'Huber nachfassen';
-  S.fuBezugLoesen();
-  S.fuSpeichern();
-  pruefe(!('aufgabeId' in huber) && !('denkpunktId' in huber), '„lösen“ entfernt den Bezug');
-  huber.aufgabeId = a.id;
-
-  /* Gelöschte Aufgabe: Follow-up bleibt, ohne Bezug */
-  const b2 = S.pmNeueAufgabe({ titel: 'Wird gelöscht', datum: heute });
-  const fuB = S.fuAnlegen('Nachfassen trotz Löschen', S.tagePlus(heute, 1)); fuB.aufgabeId = b2.id;
-  S.DB.aufgaben.splice(S.DB.aufgaben.indexOf(b2), 1);
-  pruefe(S.fuFinden(fuB.id) && S.fuBezug(fuB) === null, 'Aufgabe gelöscht: das Follow-up bleibt, ohne Bezug');
-
-  /* Denkpunkt */
-  S.DB.denkpunkte = [{ id: 'dp-q', titel: 'QS-Tag → Kontakte', bereich: '', kontext: 'privat', link: '', heute: '', status: 'offen', angelegt: heute, geaendert: 1 }];
+  /* Denkpunkt: dasselbe Feld */
+  S.DB.denkpunkte = [{ id: 'dp-q', titel: 'QS-Tag → Kontakte', bereich: 'kb-arbeit', kontext: 'beruflich', link: '', heute: '', status: 'offen', angelegt: heute, geaendert: 1 }];
   S.oeffne('thinklist');
   S.tlBearbeiten('dp-q');
   f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/<label>Follow-up:<\/label>/.test(f) && /fuVonFenster\('denkpunkt','dp-q',''\)">Follow-up…/.test(f), 'Denkpunkt: Bereich „Follow-up“ mit „Follow-up…“');
+  pruefe((f.match(/id="tlDeadline"/g) || []).length === 1 && !/Follow-up/.test(f), 'Denkpunkt: genau ein Feld „Deadline“');
   S.document.getElementById('tlTitel').value = 'QS-Tag → Kontakte';
   S.document.getElementById('tlLink').value = '';
-  S.fuVonFenster('denkpunkt', 'dp-q', '');
-  pruefe(S.cl.fu.fenster.titel === 'QS-Tag → Kontakte', 'aus einem Denkpunkt: Titel vorbelegt (0.145.3)');
-  S.document.getElementById('fuTitel').value = 'Mit Team spiegeln';
-  S.document.getElementById('fuDatum').value = heute;
-  S.fuSpeichern();
-  const team = S.fuAlle().filter(x => x.titel === 'Mit Team spiegeln')[0];
-  pruefe(team && team.denkpunktId === 'dp-q' && !('aufgabeId' in team) && S.cl.aufklapp === 'tlfenster', 'Follow-up zum Denkpunkt (denkpunktId), danach zurück im Denkpunkt-Fenster');
-  S.fuBearbeiten(team.id);
-  pruefe(/· QS-Tag → Kontakte/.test(S.document.getElementById('aufklapp').innerHTML), 'Bezug zum Denkpunkt mit „·“ im Fenster');
-  S.fuAbbrechen();
-  S.aufklappZu();
+  S.document.getElementById('tlDeadline').value = S.tagePlus(heute, 4);
+  S.tlSpeichern();
+  const dq = S.fuDeadline('denkpunkt', 'dp-q');
+  pruefe(dq && dq.denkpunktId === 'dp-q' && !('aufgabeId' in dq) && dq.titel === 'QS-Tag → Kontakte' && (dq.bereich || '') === (S.tlFinden('dp-q').bereich || ''), 'Deadline zum Denkpunkt — Titel und Kategorie vom Denkpunkt');
+  pruefe(/<span class="fu-bis">bis /.test(inhalt()), 'Think List: „bis …“ unter dem Denkpunkt');
+  S.tlNeu();
+  S.document.getElementById('tlTitel').value = 'Rolle im Qualitätszirkel';
+  S.document.getElementById('tlDeadline').value = S.tagePlus(heute, 8);
+  S.tlSpeichern();
+  const dpNeu = S.tlAlle().filter(x => x.titel === 'Rolle im Qualitätszirkel')[0];
+  pruefe(dpNeu && S.fuDeadlineDatum('denkpunkt', dpNeu.id) === S.tagePlus(heute, 8), 'neuer Denkpunkt: die Deadline kommt gleich mit');
 
-  /* Notiz in der Zeile */
+  /* Bezug im Fenster der Deadline, lösen */
+  S.fuBearbeiten(dq.id);
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/>Deadline</.test(f) && /<label>Bezug:<\/label>/.test(f) && /· QS-Tag → Kontakte/.test(f), 'im Fenster der Deadline steht der Bezug');
+  S.document.getElementById('fuTitel').value = 'QS-Tag → Kontakte';
+  S.document.getElementById('fuDatum').value = S.tagePlus(heute, 4);
+  S.fuBezugLoesen();
+  S.fuSpeichern();
+  pruefe(!('denkpunktId' in dq) && !S.fuDeadline('denkpunkt', 'dp-q'), '„lösen“ entfernt den Bezug');
+  pruefe(S.fuKatQuelle({ titel: 'alt', datum: heute, aufgabeId: rw.id }) === rw, 'ein älterer Eintrag ohne Kategorie filtert über seinen Bezug');
+
+  /* Notiz in der Zeile bleibt */
   S.pmNeueAufgabe({ titel: 'Skills in WorkDay eintragen', datum: heute, notiz: 'Bis Freitag lt. Mail HR\nmind. 5 Skills, davon 2 mit Nachweis' });
   S.oeffne('aufgaben');
   S.pmTab('alle');
-  h = inhalt();
-  pruefe(/<span class="pm-notiz">Bis Freitag lt\. Mail HR\nmind\. 5 Skills/.test(h), 'To Do: die Notiz unter dem Titel');
-  pruefe(/\.pm-notiz\{[^}]*-webkit-line-clamp:2/.test(QUELLE), 'höchstens zwei Zeilen (line-clamp: 2)');
-  pruefe(/class="dt frist">heute</.test(h) && !/Blumen gießen<\/span><\/button><span class="pm-sym"[^>]*>↻<\/span><span class="dt frist/.test(h), 'Fälligkeit gerahmt, Routinen nicht');
-  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
-  pruefe(/<span class="pm-notiz">Bis Freitag/.test(inhalt()), 'Date Book (Agenda): die Notiz ebenso');
+  pruefe(/<span class="pm-notiz">Bis Freitag lt\. Mail HR\nmind\. 5 Skills/.test(inhalt()) && /\.pm-notiz\{[^}]*-webkit-line-clamp:2/.test(QUELLE), 'To Do: die Notiz unter dem Titel, höchstens zwei Zeilen');
+  pruefe(!/class="dt frist/.test(inhalt()) && !/\.dt\.frist\{/.test(QUELLE), '„geplant am“ ist nicht mehr als Frist gerahmt');
 
-  /* Daten */
-  pruefe(/'followups'\]/.test(SKRIPT), '„followups“ wird abgeglichen');
+  /* Daten und Hülle */
+  pruefe(/'followups'\]/.test(SKRIPT), 'die Sammlung heißt weiter „followups“ und wird abgeglichen');
+  pruefe(/if \(clAnker === 'followup'\) \{ clAnker = 'deadlines'; \}/.test(SKRIPT), 'eine noch installierte Hülle followup.html öffnet Deadlines');
   const fs = require('fs');
-  pruefe(fs.existsSync(path.join(ORDNER, 'followup.html')) && /src="\.\/clie\.html#followup"/.test(fs.readFileSync(path.join(ORDNER, 'followup.html'), 'utf8')), 'Hülle followup.html als eigene App');
-  pruefe(/<title>CLIE 0\.146\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.146\.0'/.test(SKRIPT), 'Fassung 0.146.0 im Titel und in APP_VERSION');
-  /* 0.145.3: vorbelegte Titel höchstens zwei Zeilen — am Wortende gekürzt, mit „…“ */
+  pruefe(fs.existsSync(path.join(ORDNER, 'deadlines.html')) && /src="\.\/clie\.html#deadlines"/.test(fs.readFileSync(path.join(ORDNER, 'deadlines.html'), 'utf8')), 'Hülle deadlines.html als eigene App');
   const lang = 'Wie kann ich verhindern, dass die Montage regelmäßig schon um neun Uhr gekippt sind und ich den Rest der Woche hinterherlaufe?';
   const kurz = S.fuKurz(lang);
-  pruefe(kurz.length <= 70 && /…$/.test(kurz) && lang.indexOf(kurz.slice(0, -1)) === 0 && !/ …$/.test(kurz), 'lange Titel werden am Wortende auf zwei Zeilen gekürzt (' + kurz + ')');
-  pruefe(S.fuKurz('Kurz genug') === 'Kurz genug' && S.fuKurz('  zwei   Leer  ') === 'zwei Leer', 'kurze Titel bleiben, Leerraum wird zusammengezogen');
-  pruefe(/\.fu-bz\{display:-webkit-box;-webkit-line-clamp:2/.test(QUELLE), 'der Bezug unter dem Titel zeigt höchstens zwei Zeilen');
-  /* 0.145.1: die Follow-up-Zeilen im Fenster stehen links, Termin rechts — die allgemeine Knopf-Regel des Fensters darf sie nicht zentrieren */
-  pruefe(/#aufklapp \.fu-bereich button\.fu-bzeile,\.fu-bereich button\.fu-bzeile\{display:flex;justify-content:space-between/.test(QUELLE), 'Follow-up-Zeilen im Fenster: Titel links, Termin rechts (0.145.1)');
+  pruefe(kurz.length <= 70 && /…$/.test(kurz) && lang.indexOf(kurz.slice(0, -1)) === 0, 'lange Titel werden am Wortende auf zwei Zeilen gekürzt');
+  pruefe(/<title>CLIE 0\.147\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.147\.0'/.test(SKRIPT), 'Fassung 0.147.0 im Titel und in APP_VERSION');
+  /* Aufräumen: die Ersatz-Elemente sollen spätere Kategorien nicht mit einer Deadline füttern */
+  ['pmDeadline', 'tlDeadline', 'pmDatum', 'pmTitel', 'tlTitel', 'fuTitel', 'fuDatum'].forEach(id => { S.document.getElementById(id).value = ''; });
   S.oeffne('uebersicht');
 }
 
@@ -12925,7 +12931,7 @@ function huellenTest() {
   try { deskCasestudiesWegTest(); } catch (e) { fail('0.141.0 Desk und Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { thinkListTest(); } catch (e) { fail('0.142.0 Think List warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { weeklyTest(); } catch (e) { fail('0.143.0 Weekly warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
-  try { followupTest(); } catch (e) { fail('0.144.0 Follow-up warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deadlinesTest(); } catch (e) { fail('0.147.0 Deadlines warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
