@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.144.1</title>
+<title>CLIE 0.145.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -116,7 +116,7 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .tl-mk{flex:0 0 12px;font-weight:700;padding-top:3px}
 .ag-denken{border-bottom:2px dotted var(--px-zart)}
 .fuss .tl-i{margin-left:auto;min-width:36px;text-align:center;font-weight:600}
-.aufklapp .tl-tab{padding:2px 0 0}
+#aufklapp .tl-tab{padding:2px 0 0}
 .tl-tz{display:flex;gap:8px;align-items:flex-start;padding:6px 1px;border-bottom:1px dotted var(--px-zart)}
 .tl-tz:last-child{border-bottom:0}
 .tl-tph{flex:0 0 52px;font-size:15.5px;color:var(--px-mitte);padding-top:4px}
@@ -132,6 +132,15 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .fu-ok{flex:0 0 auto;min-width:34px;border:2px solid var(--px);border-radius:5px;padding:1px 6px;margin-top:2px}
 .fu-ok.an{background:var(--px);color:var(--lcd)}
 .fu-zeile.erl .fu-tx{color:var(--px-zart);text-decoration:line-through}
+.fu-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.fu-text .fu-tx{flex:0 0 auto}
+.fu-bz{display:block;text-align:left;background:none;border:0;padding:0 0 3px;color:var(--px-mitte);font-size:15.5px;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
+.fu-bz.zu{text-decoration:line-through}
+.fu-bereich{display:flex;flex-direction:column}
+#aufklapp .fu-bereich button.fu-bzeile,.fu-bereich button.fu-bzeile{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:0;border-bottom:1px dotted var(--px-zart);padding:4px 0;margin:0}
+.fu-bzeile span:first-child{flex:1 1 auto;min-width:0;text-align:left;overflow-wrap:anywhere}
+.fu-bzeile .dt{flex:0 0 auto;white-space:nowrap}
+.fu-bzeile .dt.ue{font-weight:700}
 /* Notiz unter dem Aufgabentitel und echte Fälligkeit (seit 0.144.0) */
 .aufg.palm .tx .pm-notiz{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;color:var(--px-mitte);font-size:15.5px;line-height:1.25;margin-top:2px}
 .aufg.palm .dt.frist{border:1px solid var(--px);border-radius:3px;padding:0 3px;min-width:0}
@@ -1297,7 +1306,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.144.1';
+var APP_VERSION = '0.145.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27806,7 +27815,6 @@ function pmFensterHtml() {
   var f = cl.pm.fenster;
   if (!f) { return ''; }
   var a = f.id ? pmAufgabeFinden(f.id) : null;
-  if (f.modus === 'followup' && a) { return pmZuFollowupHtml(a); }
   if (f.modus === 'loeschen' && a) {
     return '<div class="fenster"><div class="titel">Aufgabe löschen</div><div class="rumpf">'
       + '<p>„' + esc(pmTitel(a)) + '“ löschen?' + (a.wiederholung ? ' Auch ihre erledigten Tage verschwinden.' : '') + '</p>'
@@ -27832,10 +27840,11 @@ function pmFensterHtml() {
       + chip('kein', 'Kein Datum', !f.datum) + chip('heute', 'Heute', f.datum === h) + chip('morgen', 'Morgen', f.datum === tagePlus(h, 1)) + '</div>'
       + '<div class="zeitpaar"><input id="pmDatum" class="eingabe" type="date" value="' + esc(f.datum) + '" aria-label="Datum">'
       + '<span>◉</span><input id="pmZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '" aria-label="Erinnerung (Uhrzeit am Fälligkeitstag)"></div>'
-      + (a ? '<div class="pm-zeile"><span class="leise">Nur wiedervorlegen?</span><button type="button" class="knopf" onclick="pmZuFollowupFragen()">→ Follow-up</button></div>' : '')
       + '<label>Wiederholung:</label><div class="pm-zeile"><span>keine</span><button type="button" class="knopf" onclick="pmWiederholung()">Einrichten…</button></div>';
   }
   x += '<label for="pmNotiz">Notiz:</label><textarea id="pmNotiz" class="eingabe" rows="3">' + esc(f.notiz) + '</textarea>';
+  /* Seit 0.145.0: die Follow-ups dieser Aufgabe — Aufgabe und Follow-up nebeneinander */
+  if (a) { x += fuBereichHtml('aufgabe', a.id); }
   /* Seit 0.115.0: eine Seite in OneNote */
   if (a) {
     var kn = pmOnKnoten(a);
@@ -29407,6 +29416,8 @@ function tlFensterHtml() {
     + '<label for="tlLink">OneNote-Link:</label><input id="tlLink" class="eingabe" type="url" autocomplete="off" value="' + esc(f.link) + '" placeholder="onenote:… oder https://…">'
     + '<div class="pm-zeile"><span class="leise">Link zur Seite aus OneNote kopieren und hier einfügen</span>'
     + '<button type="button" class="knopf" onclick="tlLinkAusFenster()">Öffnen</button></div>';
+  /* Seit 0.145.0: Follow-ups auch zu einem Denkpunkt */
+  if (d) { x += fuBereichHtml('denkpunkt', d.id); }
   if (d && !tlOffen(d)) { x += '<p class="leise">Beendet' + (d.beendetAm ? ' am ' + esc(clKurzDatum(d.beendetAm)) : '') + '.</p>'; }
   x += '<div class="knoepfe"><button type="button" class="knopf voll" onclick="tlSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="tlAbbrechen()">Abbrechen</button>';
@@ -29539,12 +29550,15 @@ function tlAgendaHtml() {
    echtes Fälligkeitsdatum (zugesagt oder von außen festgelegt); alles,
    was nur wiedervorgelegt wird, gehört hierher.
 
-   Felder: titel, datum, status 'offen' | 'erledigt', erledigtAm.
-   Keine Kategorie, keine Notiz, keine Uhrzeit, keine Priorität, keine
-   Wiederholung. Eigene Sammlung „followups“ in der workbench.json.
+   Felder: titel, datum, status 'offen' | 'erledigt', erledigtAm — und
+   seit 0.145.0 höchstens ein Bezug: aufgabeId ODER denkpunktId.
+   Aufgabe und Follow-up stehen nebeneinander (nicht entweder oder): die
+   Aufgabe behält ihr Fälligkeitsdatum, das Follow-up den Tag des
+   Nachfassens. Keine Kategorie, keine Notiz, keine Uhrzeit, keine
+   Priorität, keine Wiederholung. Eigene Sammlung „followups“.
    ============================================================ */
 
-cl.fu = { sicht: 'offen', fenster: null, zeichnen: false };
+cl.fu = { sicht: 'offen', fenster: null, zeichnen: false, zurueck: null };
 
 /* Termin anpassen: [Wert, Beschriftung, Tage ab heute] */
 var FU_SCHRITTE = [['morgen', 'Morgen', 1], ['3t', '+3 Tage', 3], ['1w', '+1 Woche', 7], ['2w', '+2 Wochen', 14]];
@@ -29580,6 +29594,89 @@ function fuWochenEnde() {
   return tagePlus(h, wt === 0 ? 0 : 7 - wt);
 }
 
+/* ---------- Der Bezug (seit 0.145.0) ----------
+   Gibt es das Ziel nicht mehr (gelöscht), gilt das Follow-up als ohne Bezug. */
+function fuBezug(x) {
+  if (!x) { return null; }
+  if (x.aufgabeId) {
+    var a = pmAufgabeFinden(x.aufgabeId);
+    return a ? { art: 'aufgabe', id: a.id, zeichen: '☑', titel: pmTitel(a), zu: !a.wiederholung && a.status === 'erledigt' } : null;
+  }
+  if (x.denkpunktId) {
+    var dp = tlFinden(x.denkpunktId);
+    return dp ? { art: 'denkpunkt', id: dp.id, zeichen: '·', titel: dp.titel || '', zu: !tlOffen(dp) } : null;
+  }
+  return null;
+}
+
+function fuBezugHtml(x) {
+  var b = fuBezug(x);
+  if (!b) { return ''; }
+  return '<button type="button" class="fu-bz' + (b.zu ? ' zu' : '') + '" onclick="fuBezugOeffnen(\'' + esc(x.id) + '\')">' + b.zeichen + ' ' + esc(b.titel) + '</button>';
+}
+
+/* Ein Tipp auf den Bezug öffnet die Aufgabe bzw. den Denkpunkt */
+function fuBezugOeffnen(id) {
+  var b = fuBezug(fuFinden(id));
+  if (!b) { return; }
+  cl.fu.fenster = null;
+  cl.fu.zurueck = null;
+  if (b.art === 'aufgabe') { pmDetails(b.id); } else { tlBearbeiten(b.id); }
+}
+
+/* Die offenen Follow-ups einer Aufgabe oder eines Denkpunkts */
+function fuZu(art, id) {
+  var feld = art === 'aufgabe' ? 'aufgabeId' : 'denkpunktId';
+  return fuAlle().filter(function (x) { return fuOffen(x) && x[feld] === id; }).sort(fuReihe);
+}
+
+/* Der Bereich „Follow-up“ in den Fenstern von Aufgabe und Denkpunkt */
+function fuBereichHtml(art, id) {
+  return '<label>Follow-up:</label><div class="fu-bereich">'
+    + fuZu(art, id).map(function (x) {
+      return '<button type="button" class="fu-bzeile" onclick="fuVonFenster(\'' + art + '\',\'' + esc(id) + '\',\'' + esc(x.id) + '\')">'
+        + '<span>↻ ' + esc(x.titel || '') + '</span><span class="dt' + (x.datum < isoDatum() ? ' ue' : '') + '">' + esc(clWt(x.datum) + ' ' + clKurzDatum(x.datum)) + '</span></button>';
+    }).join('')
+    + '<div class="pm-zeile"><span></span><button type="button" class="knopf" onclick="fuVonFenster(\'' + art + '\',\'' + esc(id) + '\',\'\')">Follow-up…</button></div></div>';
+}
+
+/* Aus dem Fenster einer Aufgabe oder eines Denkpunkts: ein Follow-up öffnen
+   (fuId) oder neu anlegen (fuId leer). Was im Fenster schon getippt war, wird
+   gemerkt — nach OK/Abbrechen geht es genau dorthin zurück. */
+function fuVonFenster(art, id, fuId) {
+  if (art === 'aufgabe') { pmFensterLesen(); cl.fu.zurueck = { art: art, fenster: cl.pm.fenster }; }
+  else { tlFensterLesen(); cl.fu.zurueck = { art: art, fenster: cl.tl.fenster }; }
+  var x = fuId ? fuFinden(fuId) : null;
+  if (x) {
+    cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
+  } else {
+    cl.fu.fenster = { id: '', titel: '', datum: tagePlus(isoDatum(), 7),
+                      aufgabeId: art === 'aufgabe' ? id : '', denkpunktId: art === 'denkpunkt' ? id : '' };
+  }
+  cl.fu.zeichnen = true;
+  cl.aufklapp = 'fufenster';
+  aufklappNeu();
+}
+
+/* Zurück ins Fenster, aus dem das Follow-up kam — sonst zu */
+function fuFensterZu() {
+  var z = cl.fu.zurueck;
+  cl.fu.fenster = null;
+  cl.fu.zurueck = null;
+  if (z && z.art === 'aufgabe' && z.fenster) { cl.pm.fenster = z.fenster; cl.aufklapp = 'pmaufgabe'; aufklappNeu(); return; }
+  if (z && z.art === 'denkpunkt' && z.fenster) { cl.tl.fenster = z.fenster; cl.aufklapp = 'tlfenster'; aufklappNeu(); return; }
+  aufklappZu();
+}
+
+function fuBezugLoesen() {
+  var f = fuLesen();
+  if (!f) { return; }
+  f.aufgabeId = '';
+  f.denkpunktId = '';
+  cl.fu.zeichnen = true;
+  aufklappNeu();
+}
+
 /* ---------- Eine Zeile ---------- */
 function fuZeileHtml(x, mitDatum) {
   var id = esc(x.id);
@@ -29588,7 +29685,8 @@ function fuZeileHtml(x, mitDatum) {
   var dt = mitDatum === false ? '' : '<span class="dt' + (ue ? ' ue' : '') + '">' + esc(x.datum === h ? 'heute' : clWt(x.datum) + ' ' + clKurzDatum(x.datum)) + (ue ? '!' : '') + '</span>';
   return '<div class="fu-zeile' + (fuOffen(x) ? '' : ' erl') + '">'
     + '<span class="fu-mk">↻</span>'
-    + '<button type="button" class="fu-tx" onclick="fuBearbeiten(\'' + id + '\')">' + esc(x.titel || '') + '</button>'
+    + '<span class="fu-text"><button type="button" class="fu-tx" onclick="fuBearbeiten(\'' + id + '\')">' + esc(x.titel || '') + '</button>'
+    + fuBezugHtml(x) + '</span>'
     + dt
     + '<button type="button" class="fu-ok' + (fuOffen(x) ? '' : ' an') + '" onclick="fuErledigtUm(\'' + id + '\')" aria-label="' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '">' + (fuOffen(x) ? '✓' : '↺') + '</button>'
     + '</div>';
@@ -29638,7 +29736,8 @@ function fuErledigtUm(id) {
 
 /* ---------- Neu und Bearbeiten: nur Titel und Termin ---------- */
 function fuNeu() {
-  cl.fu.fenster = { id: '', titel: '', datum: tagePlus(isoDatum(), 7) };
+  cl.fu.fenster = { id: '', titel: '', datum: tagePlus(isoDatum(), 7), aufgabeId: '', denkpunktId: '' };
+  cl.fu.zurueck = null;
   cl.fu.zeichnen = true;
   cl.aufklapp = 'fufenster';
   aufklappNeu();
@@ -29649,7 +29748,8 @@ function fuNeu() {
 function fuBearbeiten(id) {
   var x = fuFinden(id);
   if (!x) { return; }
-  cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum() };
+  cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
+  cl.fu.zurueck = null;
   cl.fu.zeichnen = true;
   cl.aufklapp = 'fufenster';
   aufklappNeu();
@@ -29688,6 +29788,7 @@ function fuFensterHtml() {
       return '<button type="button"' + (f.datum === tagePlus(h, s[2]) ? ' class="an"' : '') + ' onclick="fuSchritt(\'' + s[0] + '\')">' + s[1] + '</button>';
     }).join('') + '</div>'
     + '<input id="fuDatum" class="eingabe" type="date" value="' + esc(f.datum) + '">'
+    + fuFensterBezugHtml(f)
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="fuSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="fuAbbrechen()">Abbrechen</button>'
     + (x ? '<button type="button" class="knopf" onclick="fuErledigtAusFenster()">' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '</button>' : '')
@@ -29696,6 +29797,13 @@ function fuFensterHtml() {
 
 /* Neu gezeichnet wird nur auf Wunsch (fuNeu, fuBearbeiten, fuSchritt) —
    sonst bliebe Getipptes bei einem Abgleich im Hintergrund nicht stehen */
+function fuFensterBezugHtml(f) {
+  var b = fuBezug({ aufgabeId: f.aufgabeId, denkpunktId: f.denkpunktId });
+  if (!b) { return ''; }
+  return '<label>Bezug:</label><div class="pm-zeile"><span class="fu-bz' + (b.zu ? ' zu' : '') + '">' + b.zeichen + ' ' + esc(b.titel) + '</span>'
+    + '<button type="button" class="knopf" onclick="fuBezugLoesen()">lösen</button></div>';
+}
+
 function fuAufklapp(el) {
   if (cl.aufklapp !== 'fufenster') { return false; }
   if (el.innerHTML.indexOf('id="fuTitel"') >= 0 && !cl.fu.zeichnen) { return true; }
@@ -29705,11 +29813,10 @@ function fuAufklapp(el) {
 }
 
 function fuAbbrechen() {
-  cl.fu.fenster = null;
-  aufklappZu();
+  fuFensterZu();
 }
 
-/* Ein neues Follow-up — aus der App und aus einer Aufgabe (→ Follow-up) */
+/* Ein neues Follow-up — aus der App und aus den Fenstern von Aufgabe und Denkpunkt */
 function fuAnlegen(titel, datum) {
   var t = String(titel || '').trim();
   if (!t) { melde('Bitte einen Titel eingeben.', 'warn'); return null; }
@@ -29731,19 +29838,31 @@ function fuSpeichern() {
     x.titel = t.slice(0, 300);
     x.datum = f.datum;
     x.geaendert = jetzt();
-  } else if (!fuAnlegen(f.titel, f.datum)) { return; }
+  } else {
+    x = fuAnlegen(f.titel, f.datum);
+    if (!x) { return; }
+  }
+  /* Höchstens ein Bezug — gelöst heißt: beide Felder weg */
+  delete x.aufgabeId;
+  delete x.denkpunktId;
+  if (f.aufgabeId && pmAufgabeFinden(f.aufgabeId)) { x.aufgabeId = f.aufgabeId; }
+  else if (f.denkpunktId && tlFinden(f.denkpunktId)) { x.denkpunktId = f.denkpunktId; }
   spaeterSichern();
-  cl.fu.fenster = null;
-  aufklappZu();
+  fuFensterZu();
   zeichne();
 }
 
 function fuErledigtAusFenster() {
   var f = cl.fu.fenster;
   if (!f || !f.id) { return; }
-  cl.fu.fenster = null;
-  aufklappZu();
-  fuErledigtUm(f.id);
+  var x = fuFinden(f.id);
+  if (x) {
+    if (fuOffen(x)) { x.status = 'erledigt'; x.erledigtAm = isoDatum(); } else { x.status = 'offen'; delete x.erledigtAm; }
+    x.geaendert = jetzt();
+    spaeterSichern();
+  }
+  fuFensterZu();
+  zeichne();
 }
 
 /* ---------- Im Date Book: „Follow-up“ in der Agenda ---------- */
@@ -29754,41 +29873,8 @@ function fuAgendaHtml(tag) {
     + l.map(function (x) { return fuZeileHtml(x, x.datum !== tag); }).join('');
 }
 
-/* ---------- Aus einer Aufgabe: → Follow-up ----------
-   Legt zur Aufgabe ein Follow-up an — mit Titel und Datum der Aufgabe.
-   Seit 0.144.1 bleibt die Aufgabe bestehen (Aufgabe und Follow-up, nicht
-   entweder oder); das Follow-up merkt sich die Aufgabe in „aufgabeId“. */
-function pmZuFollowupFragen() {
-  var f = pmFensterLesen();
-  if (!f || !f.id) { return; }
-  f.modus = 'followup';
-  aufklappNeu();
-}
 
-function pmZuFollowupHtml(a) {
-  var d = pmIstDatum(cl.pm.fenster.datum) ? cl.pm.fenster.datum : tagePlus(isoDatum(), 7);
-  return '<div class="fenster"><div class="titel">→ Follow-up</div><div class="rumpf">'
-    + '<p>„' + esc(pmTitel(a)) + '“ wird ein Follow-up am ' + esc(clWt(d) + ' ' + clKurzDatum(d)) + '.</p>'
-    + '<p class="leise">Übernommen werden Titel und Datum. Die Aufgabe bleibt bestehen; den Termin des Follow-ups kannst du dort anpassen.</p>'
-    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmZuFollowup()">Anlegen</button>'
-    + '<button type="button" class="knopf" onclick="pmDetails(\'' + esc(a.id) + '\')">Abbrechen</button></div></div></div>';
-}
 
-function pmZuFollowup() {
-  var f = cl.pm.fenster;
-  var a = f ? pmAufgabeFinden(f.id) : null;
-  if (!a || a.wiederholung) { aufklappZu(); return; }
-  var d = pmIstDatum(f.datum) ? f.datum : tagePlus(isoDatum(), 7);
-  var x = fuAnlegen(f.titel || pmTitel(a), d);
-  if (!x) { return; }
-  x.aufgabeId = a.id;
-  /* Änderungen aus dem Fenster (Titel, Datum, Notiz …) gehen dabei nicht verloren */
-  pmUebernehmen();
-  spaeterSichern();
-  cl.pm.fenster = null;
-  aufklappZu();
-  melde('Follow-up am ' + clKurzDatum(d) + ' angelegt — die Aufgabe bleibt.', 'gut');
-}
 
 /* ============================================================
    Weekly Perspective (seit 0.143.0)
