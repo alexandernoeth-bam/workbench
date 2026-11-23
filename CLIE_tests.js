@@ -12453,15 +12453,18 @@ function followupTest() {
   pruefe(!!S.clApp('followup') && S.clApp('followup').name === 'Follow-up' && S.clApp('followup').raster !== false && typeof S.CL_BILD.followup === 'string', 'App „Follow-up“ im Raster, mit Symbol');
   S.oeffne('followup');
   let h = inhalt();
-  pruefe(/pm-bal">Fällig<small>2/.test(h) && /pm-bal">Später<small>1/.test(h) && !/Längst erledigt/.test(h), 'Gruppen Fällig (mit Überfälligem) und Später, Erledigtes nicht');
-  pruefe(h.indexOf('Angebot Dachrinne') < h.indexOf('Doris'), 'nach Termin sortiert, Ältestes zuerst');
-  pruefe(/class="dt ue">/.test(h) && /!<\/span>/.test(h), 'Überfälliges fett mit „!“');
-  pruefe(S.document.getElementById('katKnopf').textContent === '', 'kein Filter ▼ — Follow-ups haben keine Kategorie');
+  /* Seit 0.146.0: eine schlichte Tabelle — keine Zwischenüberschriften, kein Zeichen, kein Bezug, nur TT.MM. */
+  pruefe(!/pm-bal/.test(h) && (h.match(/class="fu-zeile"/g) || []).length === 3 && !/Längst erledigt/.test(h), 'eine Liste ohne Zwischenüberschriften, Erledigtes nicht (0.146.0)');
+  pruefe(h.indexOf('Angebot Dachrinne') < h.indexOf('Doris') && h.indexOf('Doris') < h.indexOf('Kasse'), 'aufsteigend nach Termin');
+  pruefe(!/↻|fu-mk|fu-bz/.test(h), 'kein Zeichen vor dem Titel, kein Bezug in der Liste (0.146.0)');
+  pruefe(new RegExp('>' + S.clKurzDatum(heute).replace(/\./g, '\\.') + '<').test(h) && !/>heute</.test(h) && !/>(Mo|Di|Mi|Do|Fr|Sa|So) \d/.test(h), 'nur das Datum TT.MM. — kein „heute“, kein Wochentag (0.146.0)');
+  pruefe(/class="dt ue">/.test(h) && !/!<\/span>/.test(h), 'Überfälliges fett, ohne „!“');
+  pruefe(/^▼ /.test(S.document.getElementById('katKnopf').textContent), 'oben rechts der Kategorienfilter ▼ wie in To Do (0.146.0)');
 
-  /* Fenster: nur Titel und Termin */
+  /* Fenster: Titel, Kategorie, Termin */
   S.fuNeu();
   let f = S.document.getElementById('aufklapp').innerHTML;
-  pruefe(/id="fuTitel"/.test(f) && /id="fuDatum"/.test(f) && !/Kat|Notiz|OneNote|Priorität|Wiederholung|Uhrzeit|type="time"/.test(f), 'Fenster: nur Titel und Termin');
+  pruefe(/id="fuTitel"/.test(f) && /id="fuKat"/.test(f) && /id="fuDatum"/.test(f) && !/fuPrivat|Notiz|OneNote|Priorität|Wiederholung|Uhrzeit|type="time"/.test(f), 'Fenster: Titel, Kategorie, Termin (0.146.0)');
   /* Seit 0.145.2: vorbelegt ist heute, nur noch „Morgen“ als Knopf */
   pruefe(S.cl.fu.fenster.datum === heute && /id="fuDatum" class="eingabe" type="date" value="[^"]*"/.test(f), 'Neu: der Termin ist heute vorbelegt (0.145.2)');
   pruefe(/>Morgen</.test(f) && !/\+3 Tage|\+1 Woche|\+2 Wochen/.test(f), 'Termin anpassen: nur „Morgen“, ohne +3 Tage, +1 Woche, +2 Wochen (0.145.2)');
@@ -12471,8 +12474,8 @@ function followupTest() {
   pruefe(S.document.getElementById('fuTitel').value === 'Ticket CTS-4711 – Fix im Nightly?', '„Morgen“ setzt den Termin, der Titel bleibt stehen');
   S.fuSpeichern();
   const neu = S.fuAlle().filter(x => /CTS-4711/.test(x.titel))[0];
-  pruefe(neu && /^fu-/.test(neu.id) && neu.datum === S.tagePlus(heute, 3) && neu.status === 'offen' && Object.keys(neu).sort().join(',') === 'datum,geaendert,id,status,titel',
-    'angelegt mit genau titel, datum, status');
+  pruefe(neu && /^fu-/.test(neu.id) && neu.datum === S.tagePlus(heute, 3) && neu.status === 'offen' && 'kontext' in neu
+    && !/aufgabeId|denkpunktId|notiz|prio|uhrzeit/.test(Object.keys(neu).join(',')), 'angelegt mit titel, datum, status und Kategorie — sonst nichts');
   S.fuNeu();
   S.document.getElementById('fuTitel').value = '';
   S.fuSpeichern();
@@ -12502,9 +12505,15 @@ function followupTest() {
   h = inhalt();
   pruefe(/<span>Follow-up<\/span><small>2<\/small>/.test(h) && /Angebot Dachrinne/.test(h) && /Doris/.test(h) && !/CTS-4711/.test(h), 'Agenda heute: Follow-up mit Überfälligem');
   pruefe(h.indexOf('<span>To Do</span>') < h.indexOf('<span>Follow-up</span>'), 'die Gruppe steht nach To Do');
+  /* Seit 0.146.0 haben Follow-ups eine Kategorie — die Agenda filtert sie wie Aufgaben */
+  S.fuFinden('fu-a').bereich = 'kb-arbeit'; S.fuFinden('fu-a').kontext = 'beruflich';
   S.katSetzen('kb-arbeit');
-  pruefe(/<span>Follow-up<\/span>/.test(inhalt()), 'der Filter ▼ blendet Follow-ups nicht aus');
+  h = inhalt();
+  pruefe(/Angebot Dachrinne/.test(h) && !/Doris/.test(h), 'der Filter ▼ wirkt auch auf Follow-ups in der Agenda (0.146.0)');
+  S.oeffne('followup');
+  pruefe(/Angebot Dachrinne/.test(inhalt()) && !/Doris/.test(inhalt()), 'und in der Follow-up-Liste');
   S.katSetzen('alle');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
   S.clKalGehe(S.tagePlus(heute, 3), 'agenda');
   h = inhalt();
   pruefe(/<span>Follow-up<\/span><small>1<\/small>/.test(h) && /CTS-4711/.test(h) && !/Angebot Dachrinne/.test(h), 'ein anderer Tag: nur die Follow-ups dieses Tages');
@@ -12543,20 +12552,20 @@ function followupTest() {
   pruefe(S.cl.aufklapp === 'pmaufgabe', 'ein Follow-up aus der Aufgabe öffnen und abbrechen führt zurück');
   S.aufklappZu();
 
-  /* Bezug in Liste und Agenda */
+  /* Seit 0.146.0 steht der Bezug nur noch im Fenster — nicht in Liste und Agenda */
   S.oeffne('followup');
-  h = inhalt();
-  pruefe(/Huber nachfassen<\/button><button type="button" class="fu-bz" onclick="fuBezugOeffnen\('[^']+'\)">☑ Angebot Dachrinne einholen/.test(h), 'Liste: der Bezug steht klein unter dem Titel');
-  S.fuBezugOeffnen(huber.id);
-  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.id === a.id, 'ein Tipp auf den Bezug öffnet die Aufgabe');
-  S.aufklappZu();
+  pruefe(/Huber nachfassen/.test(inhalt()) && !/☑ Angebot Dachrinne einholen/.test(inhalt()), 'Liste: kein Bezug unter dem Titel (0.146.0)');
   S.pmAufgabeFinden(a.id).status = 'erledigt';
-  S.zeichne();
-  pruefe(/class="fu-bz zu"/.test(inhalt()) && S.fuOffen(huber), 'Aufgabe erledigt: das Follow-up bleibt offen, der Bezug durchgestrichen');
+  S.fuBearbeiten(huber.id);
+  pruefe(/<span class="fu-bz zu">☑ Angebot Dachrinne einholen/.test(S.document.getElementById('aufklapp').innerHTML) && S.fuOffen(huber),
+    'Aufgabe erledigt: das Follow-up bleibt offen, im Fenster ist der Bezug durchgestrichen');
+  S.fuAbbrechen();
   S.pmAufgabeFinden(a.id).status = 'offen';
   S.oeffne('kalender'); S.clKalGehe(S.tagePlus(heute, 3), 'agenda');
-  pruefe(/☑ Angebot Dachrinne einholen/.test(inhalt()), 'Agenda: der Bezug steht auch dort');
+  pruefe(/Huber nachfassen/.test(inhalt()) && !/☑ Angebot Dachrinne einholen/.test(inhalt()), 'Agenda: kein Bezug (0.146.0)');
   S.clKalGehe(heute, 'agenda');
+  /* Kategorie: aus der Aufgabe übernommen, ältere ohne Kategorie über ihren Bezug */
+  pruefe(S.fuKatQuelle({ titel: 'alt', datum: heute, aufgabeId: a.id }) === S.pmAufgabeFinden(a.id), 'ein älteres Follow-up ohne Kategorie filtert über seinen Bezug');
 
   /* Bezug lösen */
   S.fuBearbeiten(huber.id);
@@ -12570,7 +12579,7 @@ function followupTest() {
   const b2 = S.pmNeueAufgabe({ titel: 'Wird gelöscht', datum: heute });
   const fuB = S.fuAnlegen('Nachfassen trotz Löschen', S.tagePlus(heute, 1)); fuB.aufgabeId = b2.id;
   S.DB.aufgaben.splice(S.DB.aufgaben.indexOf(b2), 1);
-  pruefe(S.fuFinden(fuB.id) && S.fuBezug(fuB) === null && S.fuBezugHtml(fuB) === '', 'Aufgabe gelöscht: das Follow-up bleibt, ohne Bezug');
+  pruefe(S.fuFinden(fuB.id) && S.fuBezug(fuB) === null, 'Aufgabe gelöscht: das Follow-up bleibt, ohne Bezug');
 
   /* Denkpunkt */
   S.DB.denkpunkte = [{ id: 'dp-q', titel: 'QS-Tag → Kontakte', bereich: '', kontext: 'privat', link: '', heute: '', status: 'offen', angelegt: heute, geaendert: 1 }];
@@ -12587,7 +12596,9 @@ function followupTest() {
   S.fuSpeichern();
   const team = S.fuAlle().filter(x => x.titel === 'Mit Team spiegeln')[0];
   pruefe(team && team.denkpunktId === 'dp-q' && !('aufgabeId' in team) && S.cl.aufklapp === 'tlfenster', 'Follow-up zum Denkpunkt (denkpunktId), danach zurück im Denkpunkt-Fenster');
-  pruefe(/· QS-Tag → Kontakte/.test(S.fuBezugHtml(team)), 'Bezug zum Denkpunkt mit „·“');
+  S.fuBearbeiten(team.id);
+  pruefe(/· QS-Tag → Kontakte/.test(S.document.getElementById('aufklapp').innerHTML), 'Bezug zum Denkpunkt mit „·“ im Fenster');
+  S.fuAbbrechen();
   S.aufklappZu();
 
   /* Notiz in der Zeile */
@@ -12605,7 +12616,7 @@ function followupTest() {
   pruefe(/'followups'\]/.test(SKRIPT), '„followups“ wird abgeglichen');
   const fs = require('fs');
   pruefe(fs.existsSync(path.join(ORDNER, 'followup.html')) && /src="\.\/clie\.html#followup"/.test(fs.readFileSync(path.join(ORDNER, 'followup.html'), 'utf8')), 'Hülle followup.html als eigene App');
-  pruefe(/<title>CLIE 0\.145\.3<\/title>/.test(QUELLE) && /APP_VERSION = '0\.145\.3'/.test(SKRIPT), 'Fassung 0.145.3 im Titel und in APP_VERSION');
+  pruefe(/<title>CLIE 0\.146\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.146\.0'/.test(SKRIPT), 'Fassung 0.146.0 im Titel und in APP_VERSION');
   /* 0.145.3: vorbelegte Titel höchstens zwei Zeilen — am Wortende gekürzt, mit „…“ */
   const lang = 'Wie kann ich verhindern, dass die Montage regelmäßig schon um neun Uhr gekippt sind und ich den Rest der Woche hinterherlaufe?';
   const kurz = S.fuKurz(lang);

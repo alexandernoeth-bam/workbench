@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.145.3</title>
+<title>CLIE 0.146.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -125,15 +125,12 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .tl-tsatz{display:block;font-size:17px;color:var(--px-mitte);overflow-wrap:anywhere}
 /* ---------- Follow-up (seit 0.144.0) ---------- */
 .fu-zeile{display:flex;align-items:flex-start;gap:8px;border-bottom:2px dotted var(--px-zart);padding:4px 0}
-.fu-mk{flex:0 0 16px;padding-top:4px;color:var(--px-mitte)}
 .fu-tx{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;padding:3px 0;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
-.fu-zeile .dt{flex:0 0 auto;white-space:nowrap;padding-top:4px;font-size:16px}
+.fu-zeile .dt{flex:0 0 auto;white-space:nowrap;padding-top:4px;font-size:16px;min-width:52px;text-align:right}
 .fu-zeile .dt.ue{font-weight:700}
 .fu-ok{flex:0 0 auto;min-width:34px;border:2px solid var(--px);border-radius:5px;padding:1px 6px;margin-top:2px}
 .fu-ok.an{background:var(--px);color:var(--lcd)}
 .fu-zeile.erl .fu-tx{color:var(--px-zart);text-decoration:line-through}
-.fu-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
-.fu-text .fu-tx{flex:0 0 auto}
 .fu-bz{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left;background:none;border:0;padding:0 0 3px;color:var(--px-mitte);font-size:15.5px;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
 .fu-bz.zu{text-decoration:line-through}
 .fu-bereich{display:flex;flex-direction:column}
@@ -1306,7 +1303,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.145.3';
+var APP_VERSION = '0.146.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -4820,7 +4817,6 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
       : (cl.app === 'weekly') ? wkKopfText()
-      : (cl.app === 'followup') ? ''
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '')
@@ -5311,7 +5307,7 @@ function katUm() {
     aufklappZeichnen();
     return;
   }
-  if (cl.app === 'stones' || cl.app === 'poker' || cl.app === 'schafkopf' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'sos' || cl.app === 'verknuepfungen' || cl.app === 'weekly' || cl.app === 'followup') { return; }
+  if (cl.app === 'stones' || cl.app === 'poker' || cl.app === 'schafkopf' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'sos' || cl.app === 'verknuepfungen' || cl.app === 'weekly') { return; }
   /* Ein offener Eintrag aus Memo Pad: oben steht seine Art — kein ▼ (seit 0.71) */
   if ((cl.app === 'projekte' && cl.pj.id) || (cl.app === 'ziele' && cl.zi.id) || (cl.app === 'checklisten' && aufIstCheckliste(kpSeiteFinden(cl.cls.id)))) { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
@@ -29551,11 +29547,12 @@ function tlAgendaHtml() {
    was nur wiedervorgelegt wird, gehört hierher.
 
    Felder: titel, datum, status 'offen' | 'erledigt', erledigtAm — und
-   seit 0.145.0 höchstens ein Bezug: aufgabeId ODER denkpunktId.
+   seit 0.145.0 höchstens ein Bezug: aufgabeId ODER denkpunktId;
+   seit 0.146.0 eine Kategorie (bereich/kontext) für den Filter ▼.
    Aufgabe und Follow-up stehen nebeneinander (nicht entweder oder): die
    Aufgabe behält ihr Fälligkeitsdatum, das Follow-up den Tag des
-   Nachfassens. Keine Kategorie, keine Notiz, keine Uhrzeit, keine
-   Priorität, keine Wiederholung. Eigene Sammlung „followups“.
+   Nachfassens. Keine Notiz, keine Uhrzeit, keine Priorität, keine
+   Wiederholung. Eigene Sammlung „followups“.
    ============================================================ */
 
 cl.fu = { sicht: 'offen', fenster: null, zeichnen: false, zurueck: null };
@@ -29579,21 +29576,27 @@ function fuReihe(x, y) {
   return (a < b ? -1 : (a > b ? 1 : 0)) || String(x.titel || '').localeCompare(String(y.titel || ''), 'de');
 }
 
-/* Für die Agenda: heute auch Überfälliges, an anderen Tagen nur dieser Tag */
+/* Die Kategorie eines Follow-ups (seit 0.146.0): die eigene — fehlt sie bei
+   einem älteren Follow-up, die seines Bezugs. Gibt ein Objekt für clPasst. */
+function fuKatQuelle(x) {
+  if (!x) { return null; }
+  if (x.bereich) { return x; }
+  if (x.aufgabeId) { var a = pmAufgabeFinden(x.aufgabeId); if (a) { return a; } }
+  if (x.denkpunktId) { var dp = tlFinden(x.denkpunktId); if (dp) { return dp; } }
+  return x;
+}
+
+function fuPasst(x) { return clPasst(fuKatQuelle(x)); }
+
+/* Für die Agenda: heute auch Überfälliges, an anderen Tagen nur dieser Tag — gefiltert wie die Aufgaben */
 function fuAm(tag) {
   var heute = isoDatum();
   return fuAlle().filter(function (x) {
-    if (!fuOffen(x) || !pmIstDatum(x.datum)) { return false; }
+    if (!fuOffen(x) || !pmIstDatum(x.datum) || !fuPasst(x)) { return false; }
     return tag === heute ? x.datum <= heute : x.datum === tag;
   }).sort(fuReihe);
 }
 
-/* Montag bis Sonntag der laufenden Woche — „Diese Woche“ endet am Sonntag */
-function fuWochenEnde() {
-  var h = isoDatum();
-  var wt = new Date(h + 'T12:00:00').getDay();   /* 0 = Sonntag */
-  return tagePlus(h, wt === 0 ? 0 : 7 - wt);
-}
 
 /* ---------- Der Bezug (seit 0.145.0) ----------
    Gibt es das Ziel nicht mehr (gelöscht), gilt das Follow-up als ohne Bezug. */
@@ -29610,20 +29613,7 @@ function fuBezug(x) {
   return null;
 }
 
-function fuBezugHtml(x) {
-  var b = fuBezug(x);
-  if (!b) { return ''; }
-  return '<button type="button" class="fu-bz' + (b.zu ? ' zu' : '') + '" onclick="fuBezugOeffnen(\'' + esc(x.id) + '\')">' + b.zeichen + ' ' + esc(b.titel) + '</button>';
-}
 
-/* Ein Tipp auf den Bezug öffnet die Aufgabe bzw. den Denkpunkt */
-function fuBezugOeffnen(id) {
-  var b = fuBezug(fuFinden(id));
-  if (!b) { return; }
-  cl.fu.fenster = null;
-  cl.fu.zurueck = null;
-  if (b.art === 'aufgabe') { pmDetails(b.id); } else { tlBearbeiten(b.id); }
-}
 
 /* Die offenen Follow-ups einer Aufgabe oder eines Denkpunkts */
 function fuZu(art, id) {
@@ -29649,13 +29639,16 @@ function fuVonFenster(art, id, fuId) {
   else { tlFensterLesen(); cl.fu.zurueck = { art: art, fenster: cl.tl.fenster }; }
   var x = fuId ? fuFinden(fuId) : null;
   if (x) {
-    cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
+    cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), bereich: clKategorieVon(fuKatQuelle(x)) || '',
+                      aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
   } else {
     /* Seit 0.145.2: aus einer Aufgabe ist der Titel vorbelegt (wie gerade im Fenster getippt), der Termin ist heute.
        Seit 0.145.3 auch aus einem Denkpunkt — beides auf zwei Zeilen gekürzt. */
     var quelle = art === 'aufgabe' ? (cl.pm.fenster && cl.pm.fenster.titel) : (cl.tl.fenster && cl.tl.fenster.titel);
     var titel = fuKurz(quelle);
-    cl.fu.fenster = { id: '', titel: titel, datum: isoDatum(),
+    /* Seit 0.146.0: die Kategorie kommt aus dem Fenster, aus dem das Follow-up entsteht */
+    var kat = art === 'aufgabe' ? (cl.pm.fenster && cl.pm.fenster.bereich) : (cl.tl.fenster && cl.tl.fenster.bereich);
+    cl.fu.fenster = { id: '', titel: titel, datum: isoDatum(), bereich: kat || '',
                       aufgabeId: art === 'aufgabe' ? id : '', denkpunktId: art === 'denkpunkt' ? id : '' };
   }
   cl.fu.zeichnen = true;
@@ -29694,38 +29687,29 @@ function fuBezugLoesen() {
 }
 
 /* ---------- Eine Zeile ---------- */
+/* Seit 0.146.0 eine schlichte Tabellenzeile: Titel · Datum (TT.MM., ohne Wochentag,
+   nie „heute“) · ✓ — kein Zeichen davor, kein Bezug. Überfälliges ist fett. */
 function fuZeileHtml(x, mitDatum) {
   var id = esc(x.id);
-  var h = isoDatum();
-  var ue = fuOffen(x) && x.datum < h;
-  var dt = mitDatum === false ? '' : '<span class="dt' + (ue ? ' ue' : '') + '">' + esc(x.datum === h ? 'heute' : clWt(x.datum) + ' ' + clKurzDatum(x.datum)) + (ue ? '!' : '') + '</span>';
+  var ue = fuOffen(x) && x.datum < isoDatum();
+  var dt = mitDatum === false ? '' : '<span class="dt' + (ue ? ' ue' : '') + '">' + esc(clKurzDatum(x.datum)) + '</span>';
   return '<div class="fu-zeile' + (fuOffen(x) ? '' : ' erl') + '">'
-    + '<span class="fu-mk">↻</span>'
-    + '<span class="fu-text"><button type="button" class="fu-tx" onclick="fuBearbeiten(\'' + id + '\')">' + esc(x.titel || '') + '</button>'
-    + fuBezugHtml(x) + '</span>'
+    + '<button type="button" class="fu-tx" onclick="fuBearbeiten(\'' + id + '\')">' + esc(x.titel || '') + '</button>'
     + dt
     + '<button type="button" class="fu-ok' + (fuOffen(x) ? '' : ' an') + '" onclick="fuErledigtUm(\'' + id + '\')" aria-label="' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '">' + (fuOffen(x) ? '✓' : '↺') + '</button>'
     + '</div>';
 }
 
 /* ---------- Die App ---------- */
+/* Seit 0.146.0: eine Liste, aufsteigend nach Termin, ohne Zwischenüberschriften, gefiltert mit ▼ */
 function fuHtml() {
   if (cl.fu.sicht === 'erledigt') {
-    var e = fuAlle().filter(function (x) { return !fuOffen(x); }).sort(function (x, y) { return String(y.erledigtAm || '').localeCompare(String(x.erledigtAm || '')); });
-    return '<div class="pm-bal">Erledigt<small>' + e.length + '</small></div>'
-      + (e.length ? e.map(function (x) { return fuZeileHtml(x, true); }).join('') : '<p class="leise">Nichts erledigt.</p>');
+    var e = fuAlle().filter(function (x) { return !fuOffen(x) && fuPasst(x); }).sort(fuReihe);
+    return e.length ? e.map(function (x) { return fuZeileHtml(x, true); }).join('') : '<p class="leise">Nichts erledigt.</p>';
   }
-  var h = isoDatum();
-  var ende = fuWochenEnde();
-  var offen = fuAlle().filter(fuOffen).sort(fuReihe);
+  var offen = fuAlle().filter(function (x) { return fuOffen(x) && fuPasst(x); }).sort(fuReihe);
   if (!offen.length) { return '<p class="leise">Keine Follow-ups — „Neu“ tippen.</p>'; }
-  var gruppen = [['Fällig', function (x) { return x.datum <= h; }],
-                 ['Diese Woche', function (x) { return x.datum > h && x.datum <= ende; }],
-                 ['Später', function (x) { return x.datum > ende; }]];
-  return gruppen.map(function (g) {
-    var l = offen.filter(g[1]);
-    return l.length ? '<div class="pm-bal">' + g[0] + '<small>' + l.length + '</small></div>' + l.map(function (x) { return fuZeileHtml(x, true); }).join('') : '';
-  }).join('');
+  return offen.map(function (x) { return fuZeileHtml(x, true); }).join('');
 }
 
 function fuFussHtml() {
@@ -29752,7 +29736,7 @@ function fuErledigtUm(id) {
 
 /* ---------- Neu und Bearbeiten: nur Titel und Termin ---------- */
 function fuNeu() {
-  cl.fu.fenster = { id: '', titel: '', datum: isoDatum(), aufgabeId: '', denkpunktId: '' };
+  cl.fu.fenster = { id: '', titel: '', datum: isoDatum(), bereich: clNeuBereich(), aufgabeId: '', denkpunktId: '' };
   cl.fu.zurueck = null;
   cl.fu.zeichnen = true;
   cl.aufklapp = 'fufenster';
@@ -29764,7 +29748,8 @@ function fuNeu() {
 function fuBearbeiten(id) {
   var x = fuFinden(id);
   if (!x) { return; }
-  cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
+  cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum(), bereich: clKategorieVon(fuKatQuelle(x)) || '',
+                    aufgabeId: x.aufgabeId || '', denkpunktId: x.denkpunktId || '' };
   cl.fu.zurueck = null;
   cl.fu.zeichnen = true;
   cl.aufklapp = 'fufenster';
@@ -29778,6 +29763,7 @@ function fuLesen() {
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   var d = document.getElementById('fuDatum');
   if (d && typeof d.value === 'string') { f.datum = d.value; }
+  katPrivatLesen('fu', f);
   return f;
 }
 
@@ -29799,6 +29785,7 @@ function fuFensterHtml() {
   var h = isoDatum();
   return '<div class="fenster"><div class="titel">' + (x ? 'Follow-up' : 'Neues Follow-up') + '</div><div class="rumpf">'
     + '<label for="fuTitel">Titel:</label><textarea id="fuTitel" class="eingabe" rows="2" autocomplete="off">' + esc(f.titel) + '</textarea>'
+    + katPrivatHtml('fu', f.bereich || '', false, true)
     + '<label for="fuDatum">Termin:</label><div class="wahlreihe">'
     + FU_SCHRITTE.map(function (s) {
       return '<button type="button"' + (f.datum === tagePlus(h, s[2]) ? ' class="an"' : '') + ' onclick="fuSchritt(\'' + s[0] + '\')">' + s[1] + '</button>';
@@ -29859,6 +29846,7 @@ function fuSpeichern() {
     if (!x) { return; }
   }
   /* Höchstens ein Bezug — gelöst heißt: beide Felder weg */
+  katPrivatSchreiben(x, { bereich: f.bereich || '' });
   delete x.aufgabeId;
   delete x.denkpunktId;
   if (f.aufgabeId && pmAufgabeFinden(f.aufgabeId)) { x.aufgabeId = f.aufgabeId; }
