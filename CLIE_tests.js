@@ -463,7 +463,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 11 && CL.CL_APPS.length === 32, 'elf Felder im Raster (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda und seit 0.143.0 Weekly außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 33, 'zwölf Felder im Raster (seit 0.144.0 mit Follow-up), (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda und seit 0.143.0 Weekly außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -594,13 +594,13 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","thinklist","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","thinklist","followup","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest') && !CL.clApp('desk') && !CL.clApp('casestudies'),
-    'Start (seit 0.142.0): Roots, Date Book, To Do List / Think List, Memo Pad, Collections / Fokus, Reader, Categories / Flashcards, Games ▸');
+    'Start (seit 0.144.0): Roots, Date Book, To Do List / Think List, Follow-up, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
-  pruefe(syms === 11, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/11)');
+  pruefe(syms === 12, 'jede App im Raster hat ein Symbol als dunkle runde Scheibe (' + syms + '/12)');
   pruefe(CL.CL_APPS.every(a => CL.CL_BILD[a.id] && CL.CL_BILD[a.id].length > 40), 'zu jeder App gibt es ein eigenes Bildzeichen');
   pruefe(!/[▦◫☑◎◇≡✎↻]<span|"sym">[▦◫☑◎◇≡✎↻⇅]/.test(h), 'keine Schriftzeichen mehr als Symbol');
   pruefe(CL.CL_APPS.every(a => a.stufe === ''), 'keine App ist mehr als „kommt noch“ gekennzeichnet');
@@ -2578,7 +2578,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,thinklist,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: elf Felder (seit 0.142.0 mit Think List statt Day Control), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,thinklist,followup,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.144.0 mit Follow-up), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -3320,7 +3320,7 @@ function sammlerTest() {
   pruefe(/▼ Sammler/.test(S.aufFensterHtml()), 'Neu: „Checkliste: ▼ Sammler“');
   S.aufklappZu();
   const start = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 11 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 11 Felder (seit 0.141.0)');
+  pruefe(start.indexOf('ziele') < 0 && start.indexOf('memo') >= 0 && start.indexOf('kurs') < 0 && start.length === 12 && !S.clOrdnerVon('ziele'), 'Start: Ziele seit 0.71 im Memo Pad, 12 Felder (seit 0.144.0)');
   S.oeffne('uebersicht');
 }
 
@@ -6508,7 +6508,7 @@ function startOrdnerTest() {
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
   pruefe(doppelt.length === 0, 'keine App doppelt (Raster und Ordner)');
-  pruefe(raster.length === 11 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
+  pruefe(raster.length === 12 && Object.keys(S.CL_ORDNER).join(',') === 'spiele' && raster.indexOf('spiele') >= 0 && S.CL_BILD.spiele, 'ein Ordner im Raster (Games), mit eigenem Symbol');
   S.oeffne('uebersicht');
   pruefe((inhalt().match(/class="ord">▸/g) || []).length === 1, 'Ordner am ▸ erkennbar');
   pruefe(/class="sym"/.test(inhalt()) && /oeffne\('routinen'\)/.test(inhalt()) && !/oeffne\('sos'\)/.test(inhalt()) && /oeffne\('fokus'\)/.test(inhalt()) && !/oeffne\('drive'\)/.test(inhalt()) && !/oeffne\('gemini'\)/.test(inhalt()), 'Routines (seit 0.72) auf dem Start, Fokus statt SOS (seit 0.98.1), Drive und Coach nicht mehr im Raster');
@@ -7530,8 +7530,8 @@ function palmTodoTest() {
   pruefe(reihe(h).join(' | ') === 'Steuer abgeben | Blumen gießen | Dachrinne reinigen und abdichten, bevor der erste Frost kommt | Urlaub buchen | Toner bestellen',
     'Alle: nach Datum, dann Titel, ohne Datum zuletzt — ' + reihe(h).join(' | '));
   pruefe(!/class="pd"/.test(h) && !/pmPrioUm/.test(h), 'Alle: keine Priorität in der Zeile (0.139.0)');
-  pruefe(new RegExp('Steuer abgeben</span></button><span class="dt ue">' + S.clKurzDatum(gestern).replace(/\./g, '\\.') + '!</span>').test(h) && /<span class="dt">heute<\/span>/.test(h),
-    'Datum rechts: überfällig mit „!“, heute als „heute“');
+  pruefe(new RegExp('Steuer abgeben</span></button><span class="dt frist ue">' + S.clKurzDatum(gestern).replace(/\./g, '\\.') + '!</span>').test(h) && /<span class="dt frist">heute<\/span>/.test(h),
+    'Datum rechts: überfällig mit „!“, heute als „heute“ — seit 0.144.0 als Frist gerahmt');
   pruefe(/class="tx lang" onclick="[^"]*"><span class="tt">Dachrinne/.test(h) && /class="tx" onclick="[^"]*"><span class="tt">Toner/.test(h) && !/kompakt|ausführlich/.test(h),
     'ein- und zweizeilig gemischt nach Bedarf — kein „kompakt/ausführlich“');
   pruefe(/aria-label="Erinnerung">◉</.test(h) && /aria-label="Wiederholung">↻</.test(h), 'Zeichen: ◉ Erinnerung, ↻ Routine');
@@ -7625,7 +7625,7 @@ function palmDetailsTest() {
   const a = S.DB.aufgaben.filter(x => x.titel === 'Reifen wechseln')[0];
   pruefe(a && a.prio === undefined && a.themaId === undefined && a.planung === S.tagePlus(heute, 1) && a.uhrzeit === '18:00' && a.beschreibung === 'Termin bei Müller' && S.cl.aufklapp === '',
     'gespeichert: Datum, Erinnerung, Notiz — ohne Priorität und Liste (0.139.0)');
-  pruefe(/aria-label="Notiz">▤/.test(inhalt()), 'mit Notiz: ▤ in der Zeile');
+  pruefe(/<span class="pm-notiz">Termin bei Müller<\/span>/.test(inhalt()) && !/aria-label="Notiz">▤/.test(inhalt()), 'mit Notiz: die Notiz unter dem Titel statt ▤ (0.144.0)');
   pruefe(S.cl.pm.wahl === a.id, 'eine neue Aufgabe ist danach gewählt (wie am Palm)');
   S.cl.pm.wahl = '';
   S.pmTippen(a.id);
@@ -7969,7 +7969,7 @@ function palmAgendaTest() {
     'Tag: oben Termine, darunter Überfälliges, Heutiges und Routinen; Erledigtes gezählt');
   pruefe(ag.indexOf('Anwendungen aufrufen') < ag.indexOf('Daily') && ag.indexOf('Daily') < ag.indexOf('Überfälliges') && /◉ 7:30/.test(ag) && /◉ 8:00/.test(ag),
     'nach Uhrzeit (Erinnerung), dann Titel; die Uhrzeit steht beim ◉');
-  pruefe(/class="dt ue">/.test(ag), 'Überfälliges mit seinem Datum und „!“');
+  pruefe(/class="dt frist ue">/.test(ag), 'Überfälliges mit seinem Datum und „!“');
   S.clErlUm();
   pruefe(/Schon erledigt/.test(inhalt()), '„zeigen“ holt Erledigtes durchgestrichen zurück');
   S.clErlUm();
@@ -8433,7 +8433,7 @@ function raster35Test() {
      vier volle Reihen. Mit Day Control sind es dreizehn — die letzte Reihe
      hat nur noch ein Feld. Das ist eine bewusste Abweichung, keine Panne,
      und steht hier, damit sie nicht unbemerkt wieder kippt. */
-  pruefe(raster.length === 11, 'elf Felder in drei Spalten — die letzte Reihe ist nicht voll (0.141.0)');
+  pruefe(raster.length === 12, 'zwölf Felder in drei Spalten — 3×4 voll (0.144.0)');
   pruefe(['routinen', 'lernkartei'].every(id => raster.indexOf(id) >= 0 && !S.clOrdnerVon(id)), 'Roots und Flashcards direkt auf dem Start');
   pruefe(!S.CL_ORDNER.planung && !S.CL_ORDNER.lernen && raster.indexOf('planung') < 0 && raster.indexOf('lernen') < 0, 'keine Ordner Planning und Learning mehr');
   const fehlt = [];
@@ -8441,7 +8441,7 @@ function raster35Test() {
   pruefe(!fehlt.length, 'jede App im Ordner gibt es und sie liegt nicht zusätzlich im Raster' + (fehlt.length ? ': ' + fehlt.join(', ') : ''));
   pruefe(raster.every(id => S.CL_BILD[id]), 'jedes Feld hat ein Symbol');
   S.oeffne('uebersicht');
-  pruefe((inhalt().match(/class="app"/g) || []).length === 11 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 11 Felder, eines davon Ordner (Games ▸)');
+  pruefe((inhalt().match(/class="app"/g) || []).length === 12 && (inhalt().match(/class="ord">▸/g) || []).length === 1, 'Start zeigt 12 Felder, eines davon Ordner (Games ▸)');
   const css = (QUELLE.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
   pruefe(/\.sym\{width:68px;height:68px/.test(css) && /\.sym svg\{width:68px;height:68px/.test(css) && /\.apps\{display:grid;grid-template-columns:repeat\(3,1fr\);gap:14px 4px/.test(css), 'kleinere Symbole (68 px) und engere Zeilen, damit fünf Reihen ohne Rollen passen');
   S.oeffne('rechner'); S.clZurueck();
@@ -9228,7 +9228,7 @@ function fokusRasterTest() {
   pruefe(typeof S.CL_BILD.fokus === 'string' && S.CL_BILD.fokus.length > 40, 'Fokus hat ein eigenes Bildzeichen');
   const h = S.uebersichtHtml();
   pruefe(/onclick="oeffne\('fokus'\)"/.test(h) && !/fk-start/.test(QUELLE), 'kein Knopf oben mehr; die Kachel steht im Raster');
-  pruefe((h.match(/class="app"/g) || []).length === 11, 'im Raster bleiben 11 Kacheln');
+  pruefe((h.match(/class="app"/g) || []).length === 12, 'im Raster bleiben 12 Kacheln');
 }
 
 function terminErinnerungTest() {
@@ -10735,7 +10735,7 @@ function leuchtturmTest() {
   /* Roots ist geblieben, Manifest und Umprogrammierung sind weg */
   pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'Roots gibt es, das Manifest nicht');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
-  pruefe(raster.length === 11 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
+  pruefe(raster.length === 12 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
   pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
   /* Das ▼ kennt nur noch drei Sichten */
@@ -10893,7 +10893,7 @@ function rueckbau122Test() {
 
   /* ---- 5. Das Raster ---- */
   const raster = S.CL_APPS.filter(x => x.raster !== false);
-  pruefe(raster.length === 11, 'elf Felder im Raster (seit 0.141.0) (' + raster.length + ')');
+  pruefe(raster.length === 12, 'zwölf Felder im Raster (seit 0.144.0) (' + raster.length + ')');
   pruefe(raster.every(x => S.CL_BILD[x.id]), 'jedes Feld hat sein Bildzeichen');
   pruefe(S.CL_APPS.every(x => S.CL_BILD[x.id]), 'zu jeder App, auch außerhalb des Rasters, gibt es eines');
 
@@ -12187,7 +12187,7 @@ function deskCasestudiesWegTest() {
   pruefe(!S.clApp('desk') && !S.clApp('casestudies'), 'keine App „desk“ oder „casestudies“ mehr');
   S.oeffne('uebersicht');
   const h = inhalt();
-  pruefe(!/oeffne\('desk'\)|oeffne\('casestudies'\)/.test(h) && (h.match(/class="app"/g) || []).length === 11, 'Start: 11 Felder, weder Desk noch Casestudies');
+  pruefe(!/oeffne\('desk'\)|oeffne\('casestudies'\)/.test(h) && (h.match(/class="app"/g) || []).length === 12, 'Start: 12 Felder, weder Desk noch Casestudies');
   S.oeffne('desk');
   pruefe(S.cl.app === 'uebersicht', '#desk führt auf Home statt ins Leere');
   S.oeffne('casestudies');
@@ -12329,7 +12329,7 @@ function thinkListTest() {
   pruefe(!fs.existsSync(path.join(ORDNER, 'daycontrol.html')), 'die Hülle von Day Control ist weg');
 
   /* Daten */
-  pruefe(/'denkpunkte'\]/.test(SKRIPT) && /'tagestexte',/.test(SKRIPT), '„denkpunkte“ wird abgeglichen, „tagestexte“ bleibt im Abgleich');
+  pruefe(/'denkpunkte',/.test(SKRIPT) && /'tagestexte',/.test(SKRIPT), '„denkpunkte“ wird abgeglichen, „tagestexte“ bleibt im Abgleich');
   S.oeffne('uebersicht');
 }
 
@@ -12431,7 +12431,121 @@ function weeklyTest() {
   S.oeffne('weekly'); S.wkWeiter();
   S.wkAbbrechen();
   pruefe(S.cl.app === 'thinklist' && S.cl.wk.schritt === 0, 'Abbrechen führt zurück in die Think List');
-  pruefe(/<title>CLIE 0\.143\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.143\.0'/.test(SKRIPT), 'Fassung 0.143.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+function followupTest() {
+  console.log('\n0.144.0 Follow-up, Fälligkeit und Notizen in der Zeile');
+  if (!CL) { return; }
+  /* Fehlerarten: ein Follow-up bekommt doch Felder (Kategorie, Notiz …), es
+     fehlt in der Agenda oder erscheint am falschen Tag, „→ Follow-up“
+     verliert Titel/Datum oder lässt die Aufgabe stehen, die Notiz sprengt
+     die Zeile, oder das Fälligkeitsdatum ist nicht mehr als solches erklärt. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.DB.followups = [
+    { id: 'fu-a', titel: 'Angebot Dachrinne – Rückmeldung Huber?', datum: S.tagePlus(heute, -3), status: 'offen', geaendert: 1 },
+    { id: 'fu-b', titel: 'Doris: Feedback nachhalten', datum: heute, status: 'offen', geaendert: 1 },
+    { id: 'fu-c', titel: 'Kasse: Erstattung Zahnarzt', datum: S.tagePlus(heute, 20), status: 'offen', geaendert: 1 },
+    { id: 'fu-d', titel: 'Längst erledigt', datum: S.tagePlus(heute, -10), status: 'erledigt', erledigtAm: S.tagePlus(heute, -9), geaendert: 1 }];
+
+  /* App */
+  pruefe(!!S.clApp('followup') && S.clApp('followup').name === 'Follow-up' && S.clApp('followup').raster !== false && typeof S.CL_BILD.followup === 'string', 'App „Follow-up“ im Raster, mit Symbol');
+  S.oeffne('followup');
+  let h = inhalt();
+  pruefe(/pm-bal">Fällig<small>2/.test(h) && /pm-bal">Später<small>1/.test(h) && !/Längst erledigt/.test(h), 'Gruppen Fällig (mit Überfälligem) und Später, Erledigtes nicht');
+  pruefe(h.indexOf('Angebot Dachrinne') < h.indexOf('Doris'), 'nach Termin sortiert, Ältestes zuerst');
+  pruefe(/class="dt ue">/.test(h) && /!<\/span>/.test(h), 'Überfälliges fett mit „!“');
+  pruefe(S.document.getElementById('katKnopf').textContent === '', 'kein Filter ▼ — Follow-ups haben keine Kategorie');
+
+  /* Fenster: nur Titel und Termin */
+  S.fuNeu();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/id="fuTitel"/.test(f) && /id="fuDatum"/.test(f) && !/Kat|Notiz|OneNote|Priorität|Wiederholung|Uhrzeit|type="time"/.test(f), 'Fenster: nur Titel und Termin');
+  pruefe(/>Morgen</.test(f) && />\+3 Tage</.test(f) && />\+1 Woche</.test(f) && />\+2 Wochen</.test(f), 'Termin anpassen: Morgen, +3 Tage, +1 Woche, +2 Wochen');
+  S.document.getElementById('fuTitel').value = 'Ticket CTS-4711 – Fix im Nightly?';
+  S.fuSchritt('3t');
+  pruefe(S.cl.fu.fenster.datum === S.tagePlus(heute, 3) && S.document.getElementById('fuTitel').value === 'Ticket CTS-4711 – Fix im Nightly?', '+3 Tage setzt den Termin, der Titel bleibt stehen');
+  S.fuSpeichern();
+  const neu = S.fuAlle().filter(x => /CTS-4711/.test(x.titel))[0];
+  pruefe(neu && /^fu-/.test(neu.id) && neu.datum === S.tagePlus(heute, 3) && neu.status === 'offen' && Object.keys(neu).sort().join(',') === 'datum,geaendert,id,status,titel',
+    'angelegt mit genau titel, datum, status');
+  S.fuNeu();
+  S.document.getElementById('fuTitel').value = '';
+  S.fuSpeichern();
+  pruefe(S.fuAlle().length === 5, 'ohne Titel wird nichts angelegt');
+  S.fuAbbrechen();
+
+  /* Termin verschieben */
+  S.fuBearbeiten('fu-a');
+  S.document.getElementById('fuTitel').value = 'Angebot Dachrinne – Rückmeldung Huber?';   /* so steht es im Feld */
+  S.fuSchritt('1w');
+  S.fuSpeichern();
+  pruefe(S.fuFinden('fu-a').datum === S.tagePlus(heute, 7), 'Bearbeiten: +1 Woche verschiebt den Termin ab heute');
+
+  /* Erledigen und zurückholen */
+  S.fuErledigtUm('fu-b');
+  pruefe(S.fuFinden('fu-b').status === 'erledigt' && S.fuFinden('fu-b').erledigtAm === heute && !/Doris/.test(inhalt()), '✓ hakt ab — weg aus der Liste');
+  S.fuSichtUm();
+  pruefe(/Doris/.test(inhalt()) && /Längst erledigt/.test(inhalt()) && /fuErledigtUm\('fu-b'\)/.test(inhalt()), '„Erledigte…“ zeigt es, mit ↺');
+  S.fuErledigtUm('fu-b');
+  pruefe(S.fuFinden('fu-b').status === 'offen' && !('erledigtAm' in S.fuFinden('fu-b')), '↺ holt es zurück');
+  S.fuSichtUm();
+
+  /* Agenda */
+  S.fuFinden('fu-a').datum = S.tagePlus(heute, -2);
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
+  h = inhalt();
+  pruefe(/<span>Follow-up<\/span><small>2<\/small>/.test(h) && /Angebot Dachrinne/.test(h) && /Doris/.test(h) && !/CTS-4711/.test(h), 'Agenda heute: Follow-up mit Überfälligem');
+  pruefe(h.indexOf('<span>To Do</span>') < h.indexOf('<span>Follow-up</span>'), 'die Gruppe steht nach To Do');
+  S.katSetzen('kb-arbeit');
+  pruefe(/<span>Follow-up<\/span>/.test(inhalt()), 'der Filter ▼ blendet Follow-ups nicht aus');
+  S.katSetzen('alle');
+  S.clKalGehe(S.tagePlus(heute, 3), 'agenda');
+  h = inhalt();
+  pruefe(/<span>Follow-up<\/span><small>1<\/small>/.test(h) && /CTS-4711/.test(h) && !/Angebot Dachrinne/.test(h), 'ein anderer Tag: nur die Follow-ups dieses Tages');
+  S.clKalGehe(heute, 'agenda');
+
+  /* Aufgaben: Fälligkeit und → Follow-up */
+  const a = S.pmNeueAufgabe({ titel: 'Prüfen, ob Rechnung kam', datum: S.tagePlus(heute, 5), notiz: 'Nur nachsehen' });
+  S.oeffne('aufgaben');
+  S.pmDetails(a.id);
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Fällig — zugesagter oder von außen festgelegter Termin:/.test(f), 'Aufgabe: „Fällig — zugesagter oder von außen festgelegter Termin“');
+  pruefe(/pmZuFollowupFragen\(\)">→ Follow-up/.test(f), 'Aufgabe: „→ Follow-up“');
+  /* so liefert es der Browser aus den Feldern */
+  S.document.getElementById('pmTitel').value = 'Prüfen, ob Rechnung kam';
+  S.document.getElementById('pmDatum').value = S.tagePlus(heute, 5);
+  S.document.getElementById('pmZeit').value = '';
+  S.document.getElementById('pmNotiz').value = 'Nur nachsehen';
+  S.pmZuFollowupFragen();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/wird ein Follow-up am/.test(f) && /die Notiz entfällt/.test(f) && /Die Aufgabe wird gelöscht/.test(f), 'Rückfrage: was übernommen wird und dass die Aufgabe geht');
+  S.pmZuFollowup();
+  const umgezogen = S.fuAlle().filter(x => x.titel === 'Prüfen, ob Rechnung kam')[0];
+  pruefe(umgezogen && umgezogen.datum === S.tagePlus(heute, 5) && !S.pmAufgabeFinden(a.id), '→ Follow-up: Titel und Datum übernommen, Aufgabe gelöscht');
+  pruefe((S.DB.grabsteine || []).some(g => g.s === 'aufgaben' && g.id === a.id), 'die gelöschte Aufgabe bekommt einen Grabstein für den Abgleich');
+  const r = S.pmNeueAufgabe({ titel: 'Blumen gießen', datum: heute });
+  r.wiederholung = { art: 'taeglich' };
+  S.pmDetails(r.id);
+  pruefe(!/→ Follow-up/.test(S.document.getElementById('aufklapp').innerHTML), 'Routinen haben kein „→ Follow-up“');
+  S.aufklappZu();
+
+  /* Notiz in der Zeile */
+  S.pmNeueAufgabe({ titel: 'Skills in WorkDay eintragen', datum: heute, notiz: 'Bis Freitag lt. Mail HR\nmind. 5 Skills, davon 2 mit Nachweis' });
+  S.pmTab('alle');
+  h = inhalt();
+  pruefe(/<span class="pm-notiz">Bis Freitag lt\. Mail HR\nmind\. 5 Skills/.test(h), 'To Do: die Notiz unter dem Titel');
+  pruefe(/\.pm-notiz\{[^}]*-webkit-line-clamp:2/.test(QUELLE), 'höchstens zwei Zeilen (line-clamp: 2)');
+  pruefe(/class="dt frist">heute</.test(h) && !/Blumen gießen<\/span><\/button><span class="pm-sym"[^>]*>↻<\/span><span class="dt frist/.test(h), 'Fälligkeit gerahmt, Routinen nicht');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
+  pruefe(/<span class="pm-notiz">Bis Freitag/.test(inhalt()), 'Date Book (Agenda): die Notiz ebenso');
+
+  /* Daten */
+  pruefe(/'followups'\]/.test(SKRIPT), '„followups“ wird abgeglichen');
+  const fs = require('fs');
+  pruefe(fs.existsSync(path.join(ORDNER, 'followup.html')) && /src="\.\/clie\.html#followup"/.test(fs.readFileSync(path.join(ORDNER, 'followup.html'), 'utf8')), 'Hülle followup.html als eigene App');
+  pruefe(/<title>CLIE 0\.144\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.144\.0'/.test(SKRIPT), 'Fassung 0.144.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -12732,6 +12846,7 @@ function huellenTest() {
   try { deskCasestudiesWegTest(); } catch (e) { fail('0.141.0 Desk und Casestudies warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { thinkListTest(); } catch (e) { fail('0.142.0 Think List warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { weeklyTest(); } catch (e) { fail('0.143.0 Weekly warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { followupTest(); } catch (e) { fail('0.144.0 Follow-up warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

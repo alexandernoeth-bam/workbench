@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.143.0</title>
+<title>CLIE 0.144.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -123,6 +123,18 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .tl-trest{flex:1 1 auto;min-width:0}
 .tl-tname{display:block;font-weight:600;letter-spacing:.04em}
 .tl-tsatz{display:block;font-size:17px;color:var(--px-mitte);overflow-wrap:anywhere}
+/* ---------- Follow-up (seit 0.144.0) ---------- */
+.fu-zeile{display:flex;align-items:flex-start;gap:8px;border-bottom:2px dotted var(--px-zart);padding:4px 0}
+.fu-mk{flex:0 0 16px;padding-top:4px;color:var(--px-mitte)}
+.fu-tx{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;padding:3px 0;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
+.fu-zeile .dt{flex:0 0 auto;white-space:nowrap;padding-top:4px;font-size:16px}
+.fu-zeile .dt.ue{font-weight:700}
+.fu-ok{flex:0 0 auto;min-width:34px;border:2px solid var(--px);border-radius:5px;padding:1px 6px;margin-top:2px}
+.fu-ok.an{background:var(--px);color:var(--lcd)}
+.fu-zeile.erl .fu-tx{color:var(--px-zart);text-decoration:line-through}
+/* Notiz unter dem Aufgabentitel und echte Fälligkeit (seit 0.144.0) */
+.aufg.palm .tx .pm-notiz{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;color:var(--px-mitte);font-size:15.5px;line-height:1.25;margin-top:2px}
+.aufg.palm .dt.frist{border:1px solid var(--px);border-radius:3px;padding:0 3px;min-width:0}
 /* ---------- Weekly Perspective (seit 0.143.0) ---------- */
 .wk-schritte{display:flex;gap:4px;margin:2px 0 8px}
 .wk-schritte span{flex:1;height:8px;border:2px solid var(--px)}
@@ -1285,7 +1297,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.143.0';
+var APP_VERSION = '0.144.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -1345,7 +1357,9 @@ var SAMMLUNGEN = ['aufgaben','ziele','themen','projekte','ablaeufe','durchlaeufe
                      werden weiter abgeglichen. */
                   'tagestexte',
                   /* seit CLIE 0.142.0: Think List — Denkpunkte */
-                  'denkpunkte'];
+                  'denkpunkte',
+                  /* seit CLIE 0.144.0: Follow-up — Wiedervorlagen */
+                  'followups'];
 
 /* Aus der Workbench: nummerierte Zeilen */
 var NUMMER_MUSTER = /^(\d{1,3})[.)]\s+(.*)$/;
@@ -2323,6 +2337,7 @@ function leereDatenbank() {
     casestudies:       [],
     tagestexte:        [],
     denkpunkte:        [],
+    followups:         [],
     grabsteine:        [],
     einstellungen: {
       clientId:      CLIENT_ID,
@@ -3599,6 +3614,9 @@ var CL_APPS = [
   /* Seit 0.142.0: Think List — Denkpunkte, offene Gedanken mit OneNote-Denkraum (ersetzt Day Control) */
   { id: 'thinklist', name: 'Think List', stufe: '',
     was: 'Offene Denkpunkte nach Kategorie. Ein Tipp öffnet den Denkraum in OneNote, „Heute“ holt den Gedanken in die Agenda.' },
+  /* Seit 0.144.0: Follow-up — Wiedervorlagen, nur Titel und Termin (Hülle followup.html) */
+  { id: 'followup', name: 'Follow-up', stufe: '',
+    was: 'Wiedervorlagen: Titel und Termin. Erscheinen am Tag in der Agenda; das Datum einer Aufgabe bleibt ein echtes Fälligkeitsdatum.' },
   /* Seit 0.143.0: Weekly Perspective — der Wochenblick, über die Think List und #weekly */
   { id: 'weekly', name: 'Weekly', stufe: '', was: 'Einmal pro Woche: CONTROL, REVIEW, IMPROVE, CHANGE — und die offenen Denkpunkte aufräumen.', raster: false },
   /* Seit 0.142.0: die Agenda als eigene App (Hülle agenda.html) — öffnet Date Book in A, heute */
@@ -3656,6 +3674,10 @@ var CL_BILD = {
   thinklist: '<ellipse cx="34" cy="25" rx="17" ry="12" fill="#C9D3B7"/>'
     + '<circle cx="21" cy="42" r="4.5" fill="#C9D3B7"/><circle cx="14" cy="50" r="2.8" fill="#C9D3B7"/>'
     + '<path d="M26 22h16M26 28h11" stroke="#3B4433" stroke-width="3" stroke-linecap="round"/>',
+  /* Follow-up (seit 0.144.0): ein Pfeil im Kreis um einen Haken — wieder vorlegen */
+  followup: '<path d="M46 20a17 17 0 1 0 4 14" fill="none" stroke="#C9D3B7" stroke-width="4.5" stroke-linecap="round"/>'
+    + '<path d="M50 11v12H38z" fill="#C9D3B7"/>'
+    + '<path d="M24 33l6 6 11-12" fill="none" stroke="#C9D3B7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>',
   /* Weekly (seit 0.143.0): vier Blickrichtungen um einen Punkt */
   weekly: '<circle cx="32" cy="32" r="5" fill="#C9D3B7"/>'
     + '<path d="M32 10l5 9H27zM32 54l-5-9h10zM10 32l9-5v10zM54 32l-9 5V27z" fill="#C9D3B7"/>',
@@ -4740,6 +4762,7 @@ function inhaltZeichnen() {
   else if (cl.app === 'routinen') { el.innerHTML = routinenHtml(); }
   else if (cl.app === 'thinklist') { el.innerHTML = tlHtml(); }
   else if (cl.app === 'weekly') { el.innerHTML = wkHtml(); }
+  else if (cl.app === 'followup') { el.innerHTML = fuHtml(); }
   else if (cl.app === 'sos') { el.innerHTML = sosHtml(); }
   else if (cl.app === 'sammlungen') { el.innerHTML = sammlungenHtml(); }
   else if (cl.app === 'kategorien') { el.innerHTML = kategorienHtml(); }
@@ -4788,6 +4811,7 @@ function kopfZeichnen() {
       : (cl.app === 'kurs') ? krKopfText()
       : (cl.app === 'sos') ? sosKopfText()
       : (cl.app === 'weekly') ? wkKopfText()
+      : (cl.app === 'followup') ? ''
       : (cl.app === 'routinen') ? '▼ ' + rtKopfText()
       : (cl.app === 'rechner') ? (rt.grad ? 'DEG' : 'RAD')
       : (cl.app === 'kalender' && cl.kal.ansicht === 'jahr') ? '▼ ' + jaJahr() + (clFilter() !== 'alle' ? ' · ' + katName(cl.filter) : '')
@@ -4988,6 +5012,8 @@ function aufklappZeichnen() {
   if (ktAufklapp(el)) { return; }
   /* Seit 0.142.0: Fenster der Think List */
   if (tlAufklapp(el)) { return; }
+  /* Seit 0.144.0: Fenster eines Follow-ups */
+  if (fuAufklapp(el)) { return; }
   /* Seit 0.124.0: der Weg zurück nach einer Wiederherstellung */
   if (clVomServerAufklapp(el)) { return; }
   /* Seit 0.120.0: die Textgröße */
@@ -5169,6 +5195,7 @@ function fussZeichnen() {
         : (cl.app === 'sos') ? sosFussHtml()
         : (cl.app === 'thinklist') ? tlFussHtml()
         : (cl.app === 'weekly') ? wkFussHtml()
+        : (cl.app === 'followup') ? fuFussHtml()
         : (cl.app === 'sammlungen') ? sammlungenFussHtml()
         : (cl.app === 'kategorien') ? kategorienFussHtml()
         : (cl.app === 'suchen') ? suchenFussHtml()
@@ -5232,6 +5259,7 @@ function oeffne(id) {
   if (id === 'thinklist' && cl.app !== 'thinklist') { cl.tl.sicht = 'offen'; }
   /* Das Weekly beginnt von außen immer bei CONTROL (seit 0.143.0) */
   if (id === 'weekly' && cl.app !== 'weekly') { cl.wk = wkFrisch(); }
+  if (id === 'followup' && cl.app !== 'followup') { cl.fu.sicht = 'offen'; }
   /* Fokus ist kein Blatt, sondern der Dialog (seit 0.98.1) */
   if (id === 'fokus') { fkStartenAuf(); return; }
   /* Ordner sind keine eigene Seite: ein Fenster mit ihren Apps (seit 0.35) */
@@ -5274,7 +5302,7 @@ function katUm() {
     aufklappZeichnen();
     return;
   }
-  if (cl.app === 'stones' || cl.app === 'poker' || cl.app === 'schafkopf' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'sos' || cl.app === 'verknuepfungen' || cl.app === 'weekly') { return; }
+  if (cl.app === 'stones' || cl.app === 'poker' || cl.app === 'schafkopf' || cl.app === 'invasion' || cl.app === 'drive' || cl.app === 'schach' || cl.app === 'vorlesen' || cl.app === 'kurs' || cl.app === 'sos' || cl.app === 'verknuepfungen' || cl.app === 'weekly' || cl.app === 'followup') { return; }
   /* Ein offener Eintrag aus Memo Pad: oben steht seine Art — kein ▼ (seit 0.71) */
   if ((cl.app === 'projekte' && cl.pj.id) || (cl.app === 'ziele' && cl.zi.id) || (cl.app === 'checklisten' && aufIstCheckliste(kpSeiteFinden(cl.cls.id)))) { return; }
   /* In den Aufgaben: Filter und Liste in einer Aufklappliste */
@@ -5320,6 +5348,7 @@ function aufklappZu() {
   cl.auf.anzF = null;
   cl.sa.fenster = null;
   cl.tl.fenster = null;
+  cl.fu.fenster = null;
   zeichne();
 }
 
@@ -5820,6 +5849,8 @@ function agendaHtml(tag) {
   zahl += ag.zahl;
   todo = ag.html + todo;
   h += '<div class="gruppe ag-gr"><span>To Do</span><small>' + zahl + '</small></div>' + (todo || '<p class="leise">Nichts vorgenommen.</p>');
+  /* Seit 0.144.0: Follow-ups — heute mit Überfälligem, sonst nur dieser Tag */
+  h += fuAgendaHtml(is);
   /* Seit 0.142.0: die Denkpunkte, die heute vor Augen sein sollen — ohne Kästchen */
   if (heute) { h += tlAgendaHtml(); }
   /* Erledigtes zeigen/verbergen — bis 0.139.0 stand der Knopf in der Tagesansicht T */
@@ -27300,7 +27331,7 @@ function pmSortieren(l, art) {
   });
 }
 
-/* Eine Zeile: Kästchen · Titel (ein- oder zweizeilig) · Zeichen · Datum (seit 0.139.0 ohne Priorität) */
+/* Eine Zeile: Kästchen · Titel (ein- oder zweizeilig) und Notiz (höchstens zwei Zeilen, seit 0.144.0) · Zeichen · Datum (seit 0.139.0 ohne Priorität) */
 /* ---- Aufgaben mit einer Seite in OneNote (seit 0.115.0) ----
    Die Aufgabe merkt sich den Knoten im Radar, nicht die URL — so bleibt der Link an
    einer Stelle und eine Korrektur wirkt überall. Der Cluster wird dagegen beim Zuordnen
@@ -27386,17 +27417,19 @@ function pmZeileHtml(a, opt) {
   var sym = '';
   if (pmIstZeit(a.uhrzeit)) { sym += '<span class="pm-sym" aria-label="Erinnerung">◉' + (o.zeit ? ' ' + esc(clZeitText(a.uhrzeit)) : '') + '</span>'; }
   if (a.wiederholung) { sym += '<span class="pm-sym" aria-label="Wiederholung">↻</span>'; }
-  /* Entweder OneNote oder die Notiz — beides nebeneinander sprengt die Zeile (0.115.0) */
   if (pmOnLink(a)) { sym += '<button type="button" class="pm-on" onclick="raOeffnen(\'' + esc(a.radar) + '\')" aria-label="In OneNote öffnen">ON</button>'; }
-  else if (String(a.beschreibung || '').trim()) { sym += '<button type="button" class="pm-sym" onclick="pmDetails(\'' + id + '\')" aria-label="Notiz">▤</button>'; }
+  /* Seit 0.144.0 steht die Notiz selbst unter dem Titel (höchstens zwei Zeilen) statt ▤ */
+  var notiz = String(a.beschreibung || '').trim();
   var datum = '';
   if (o.mitDatum !== false && show.datum && d) {
-    datum = '<span class="dt' + (d < isoDatum() && !erl ? ' ue' : '') + '">' + esc(pmDatumText(d)) + '</span>';
+    /* Ein echtes Fälligkeitsdatum (seit 0.144.0) bekommt einen feinen Rahmen — Routinen nicht */
+    datum = '<span class="dt' + (a.wiederholung ? '' : ' frist') + (d < isoDatum() && !erl ? ' ue' : '') + '">' + esc(pmDatumText(d)) + '</span>';
   }
   var html = '<div class="aufg palm pm' + (erl ? ' erl' : '') + (gew ? ' gewaehlt' : '') + (lang ? ' ausf' : '') + '" id="pmA' + id + '">'
     + clKastenHtml(erl, 'pmHaken(\'' + id + '\'' + (tag ? ',\'' + esc(tag) + '\'' : '') + ')')
     + '<button type="button" class="tx' + (lang ? ' lang' : '') + '" onclick="' + (tag ? 'pmDetails' : 'pmTippen') + '(\'' + id + '\')"><span class="tt">'
-    + (a.clusterTag ? '<span class="pm-clu">[' + esc(a.clusterTag) + ']</span> ' : '') + esc(titel) + '</span></button>'
+    + (a.clusterTag ? '<span class="pm-clu">[' + esc(a.clusterTag) + ']</span> ' : '') + esc(titel) + '</span>'
+    + (notiz ? '<span class="pm-notiz">' + esc(notiz.slice(0, 300)) + '</span>' : '') + '</button>'
     + sym + datum
     + (show.kat && o.mitKat !== false ? '<span class="kt">' + esc(pmKatName(clKategorieVon(a))) + '</span>' : '')
     + '</div>';
@@ -27773,6 +27806,7 @@ function pmFensterHtml() {
   var f = cl.pm.fenster;
   if (!f) { return ''; }
   var a = f.id ? pmAufgabeFinden(f.id) : null;
+  if (f.modus === 'followup' && a) { return pmZuFollowupHtml(a); }
   if (f.modus === 'loeschen' && a) {
     return '<div class="fenster"><div class="titel">Aufgabe löschen</div><div class="rumpf">'
       + '<p>„' + esc(pmTitel(a)) + '“ löschen?' + (a.wiederholung ? ' Auch ihre erledigten Tage verschwinden.' : '') + '</p>'
@@ -27793,10 +27827,12 @@ function pmFensterHtml() {
       + '<button type="button" class="knopf" onclick="pmRoutineDiesmal()">Auslassen / Verlegen…</button></div>'
       + '<label for="pmZeit">Erinnerung (Uhrzeit):</label><input id="pmZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '">';
   } else {
-    x += '<label>Fällig:</label><div class="wahlreihe">'
+    /* Seit 0.144.0: ein echtes Fälligkeitsdatum — Wiedervorlagen gehören ins Follow-up */
+    x += '<label>Fällig — zugesagter oder von außen festgelegter Termin:</label><div class="wahlreihe">'
       + chip('kein', 'Kein Datum', !f.datum) + chip('heute', 'Heute', f.datum === h) + chip('morgen', 'Morgen', f.datum === tagePlus(h, 1)) + '</div>'
       + '<div class="zeitpaar"><input id="pmDatum" class="eingabe" type="date" value="' + esc(f.datum) + '" aria-label="Datum">'
       + '<span>◉</span><input id="pmZeit" class="eingabe zeitfeld" type="time" value="' + esc(f.zeit) + '" aria-label="Erinnerung (Uhrzeit am Fälligkeitstag)"></div>'
+      + (a ? '<div class="pm-zeile"><span class="leise">Nur wiedervorlegen?</span><button type="button" class="knopf" onclick="pmZuFollowupFragen()">→ Follow-up</button></div>' : '')
       + '<label>Wiederholung:</label><div class="pm-zeile"><span>keine</span><button type="button" class="knopf" onclick="pmWiederholung()">Einrichten…</button></div>';
   }
   x += '<label for="pmNotiz">Notiz:</label><textarea id="pmNotiz" class="eingabe" rows="3">' + esc(f.notiz) + '</textarea>';
@@ -29493,6 +29529,263 @@ function tlAgendaHtml() {
         + '<button type="button" class="tl-tx" onclick="tlOeffnen(\'' + esc(d.id) + '\')">' + esc(d.titel || '') + '</button>'
         + (tlLinkOk(d.link) ? '<span class="tl-on">ON</span>' : '') + '</div>';
     }).join('');
+}
+
+/* ============================================================
+   Follow-up — Wiedervorlagen (seit 0.144.0)
+
+   Eine Wiedervorlage ist nur ein Titel und ein Termin: „an diesem Tag
+   schaue ich wieder darauf“. Das Datum einer Aufgabe ist seitdem ein
+   echtes Fälligkeitsdatum (zugesagt oder von außen festgelegt); alles,
+   was nur wiedervorgelegt wird, gehört hierher.
+
+   Felder: titel, datum, status 'offen' | 'erledigt', erledigtAm.
+   Keine Kategorie, keine Notiz, keine Uhrzeit, keine Priorität, keine
+   Wiederholung. Eigene Sammlung „followups“ in der workbench.json.
+   ============================================================ */
+
+cl.fu = { sicht: 'offen', fenster: null, zeichnen: false };
+
+/* Termin anpassen: [Wert, Beschriftung, Tage ab heute] */
+var FU_SCHRITTE = [['morgen', 'Morgen', 1], ['3t', '+3 Tage', 3], ['1w', '+1 Woche', 7], ['2w', '+2 Wochen', 14]];
+
+function fuAlle() {
+  return (Array.isArray(DB.followups) ? DB.followups : []).filter(function (x) { return x && typeof x === 'object' && x.id; });
+}
+
+function fuFinden(id) {
+  return fuAlle().filter(function (x) { return x.id === id; })[0] || null;
+}
+
+function fuOffen(x) { return !!x && x.status !== 'erledigt'; }
+
+function fuReihe(x, y) {
+  var a = String(x.datum || ''), b = String(y.datum || '');
+  return (a < b ? -1 : (a > b ? 1 : 0)) || String(x.titel || '').localeCompare(String(y.titel || ''), 'de');
+}
+
+/* Für die Agenda: heute auch Überfälliges, an anderen Tagen nur dieser Tag */
+function fuAm(tag) {
+  var heute = isoDatum();
+  return fuAlle().filter(function (x) {
+    if (!fuOffen(x) || !pmIstDatum(x.datum)) { return false; }
+    return tag === heute ? x.datum <= heute : x.datum === tag;
+  }).sort(fuReihe);
+}
+
+/* Montag bis Sonntag der laufenden Woche — „Diese Woche“ endet am Sonntag */
+function fuWochenEnde() {
+  var h = isoDatum();
+  var wt = new Date(h + 'T12:00:00').getDay();   /* 0 = Sonntag */
+  return tagePlus(h, wt === 0 ? 0 : 7 - wt);
+}
+
+/* ---------- Eine Zeile ---------- */
+function fuZeileHtml(x, mitDatum) {
+  var id = esc(x.id);
+  var h = isoDatum();
+  var ue = fuOffen(x) && x.datum < h;
+  var dt = mitDatum === false ? '' : '<span class="dt' + (ue ? ' ue' : '') + '">' + esc(x.datum === h ? 'heute' : clWt(x.datum) + ' ' + clKurzDatum(x.datum)) + (ue ? '!' : '') + '</span>';
+  return '<div class="fu-zeile' + (fuOffen(x) ? '' : ' erl') + '">'
+    + '<span class="fu-mk">↻</span>'
+    + '<button type="button" class="fu-tx" onclick="fuBearbeiten(\'' + id + '\')">' + esc(x.titel || '') + '</button>'
+    + dt
+    + '<button type="button" class="fu-ok' + (fuOffen(x) ? '' : ' an') + '" onclick="fuErledigtUm(\'' + id + '\')" aria-label="' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '">' + (fuOffen(x) ? '✓' : '↺') + '</button>'
+    + '</div>';
+}
+
+/* ---------- Die App ---------- */
+function fuHtml() {
+  if (cl.fu.sicht === 'erledigt') {
+    var e = fuAlle().filter(function (x) { return !fuOffen(x); }).sort(function (x, y) { return String(y.erledigtAm || '').localeCompare(String(x.erledigtAm || '')); });
+    return '<div class="pm-bal">Erledigt<small>' + e.length + '</small></div>'
+      + (e.length ? e.map(function (x) { return fuZeileHtml(x, true); }).join('') : '<p class="leise">Nichts erledigt.</p>');
+  }
+  var h = isoDatum();
+  var ende = fuWochenEnde();
+  var offen = fuAlle().filter(fuOffen).sort(fuReihe);
+  if (!offen.length) { return '<p class="leise">Keine Follow-ups — „Neu“ tippen.</p>'; }
+  var gruppen = [['Fällig', function (x) { return x.datum <= h; }],
+                 ['Diese Woche', function (x) { return x.datum > h && x.datum <= ende; }],
+                 ['Später', function (x) { return x.datum > ende; }]];
+  return gruppen.map(function (g) {
+    var l = offen.filter(g[1]);
+    return l.length ? '<div class="pm-bal">' + g[0] + '<small>' + l.length + '</small></div>' + l.map(function (x) { return fuZeileHtml(x, true); }).join('') : '';
+  }).join('');
+}
+
+function fuFussHtml() {
+  return '<button type="button" class="knopf" onclick="fuNeu()">Neu</button>'
+    + '<button type="button" class="knopf" onclick="fuSichtUm()">' + (cl.fu.sicht === 'erledigt' ? 'Offene' : 'Erledigte…') + '</button>';
+}
+
+function fuSichtUm() {
+  cl.fu.sicht = cl.fu.sicht === 'erledigt' ? 'offen' : 'erledigt';
+  var el = document.getElementById('inhalt');
+  if (el) { el.scrollTop = 0; }
+  zeichne();
+}
+
+function fuErledigtUm(id) {
+  var x = fuFinden(id);
+  if (!x) { return; }
+  if (fuOffen(x)) { x.status = 'erledigt'; x.erledigtAm = isoDatum(); }
+  else { x.status = 'offen'; delete x.erledigtAm; }
+  x.geaendert = jetzt();
+  spaeterSichern();
+  zeichne();
+}
+
+/* ---------- Neu und Bearbeiten: nur Titel und Termin ---------- */
+function fuNeu() {
+  cl.fu.fenster = { id: '', titel: '', datum: tagePlus(isoDatum(), 7) };
+  cl.fu.zeichnen = true;
+  cl.aufklapp = 'fufenster';
+  aufklappNeu();
+  var t = document.getElementById('fuTitel');
+  if (t && t.focus) { t.focus(); }
+}
+
+function fuBearbeiten(id) {
+  var x = fuFinden(id);
+  if (!x) { return; }
+  cl.fu.fenster = { id: x.id, titel: x.titel || '', datum: x.datum || isoDatum() };
+  cl.fu.zeichnen = true;
+  cl.aufklapp = 'fufenster';
+  aufklappNeu();
+}
+
+function fuLesen() {
+  var f = cl.fu.fenster;
+  if (!f) { return null; }
+  var t = document.getElementById('fuTitel');
+  if (t && typeof t.value === 'string') { f.titel = t.value; }
+  var d = document.getElementById('fuDatum');
+  if (d && typeof d.value === 'string') { f.datum = d.value; }
+  return f;
+}
+
+function fuSchritt(w) {
+  var f = fuLesen();
+  if (!f) { return; }
+  var s = FU_SCHRITTE.filter(function (x) { return x[0] === w; })[0];
+  if (s) { f.datum = tagePlus(isoDatum(), s[2]); }
+  var d = document.getElementById('fuDatum');
+  if (d) { d.value = f.datum; }
+  cl.fu.zeichnen = true;
+  aufklappNeu();
+}
+
+function fuFensterHtml() {
+  var f = cl.fu.fenster;
+  if (!f) { return ''; }
+  var x = f.id ? fuFinden(f.id) : null;
+  var h = isoDatum();
+  return '<div class="fenster"><div class="titel">' + (x ? 'Follow-up' : 'Neues Follow-up') + '</div><div class="rumpf">'
+    + '<label for="fuTitel">Titel:</label><textarea id="fuTitel" class="eingabe" rows="2" autocomplete="off">' + esc(f.titel) + '</textarea>'
+    + '<label for="fuDatum">Termin:</label><div class="wahlreihe">'
+    + FU_SCHRITTE.map(function (s) {
+      return '<button type="button"' + (f.datum === tagePlus(h, s[2]) ? ' class="an"' : '') + ' onclick="fuSchritt(\'' + s[0] + '\')">' + s[1] + '</button>';
+    }).join('') + '</div>'
+    + '<input id="fuDatum" class="eingabe" type="date" value="' + esc(f.datum) + '">'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="fuSpeichern()">OK</button>'
+    + '<button type="button" class="knopf" onclick="fuAbbrechen()">Abbrechen</button>'
+    + (x ? '<button type="button" class="knopf" onclick="fuErledigtAusFenster()">' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '</button>' : '')
+    + '</div></div></div>';
+}
+
+/* Neu gezeichnet wird nur auf Wunsch (fuNeu, fuBearbeiten, fuSchritt) —
+   sonst bliebe Getipptes bei einem Abgleich im Hintergrund nicht stehen */
+function fuAufklapp(el) {
+  if (cl.aufklapp !== 'fufenster') { return false; }
+  if (el.innerHTML.indexOf('id="fuTitel"') >= 0 && !cl.fu.zeichnen) { return true; }
+  cl.fu.zeichnen = false;
+  el.innerHTML = fuFensterHtml();
+  return true;
+}
+
+function fuAbbrechen() {
+  cl.fu.fenster = null;
+  aufklappZu();
+}
+
+/* Ein neues Follow-up — aus der App und aus einer Aufgabe (→ Follow-up) */
+function fuAnlegen(titel, datum) {
+  var t = String(titel || '').trim();
+  if (!t) { melde('Bitte einen Titel eingeben.', 'warn'); return null; }
+  if (!pmIstDatum(datum)) { melde('Bitte einen Termin wählen.', 'warn'); return null; }
+  if (!Array.isArray(DB.followups)) { DB.followups = []; }
+  var x = { id: 'fu-' + neueKennung(), titel: t.slice(0, 300), datum: datum, status: 'offen', geaendert: jetzt() };
+  DB.followups.push(x);
+  return x;
+}
+
+function fuSpeichern() {
+  var f = fuLesen();
+  if (!f) { return; }
+  var x = f.id ? fuFinden(f.id) : null;
+  if (x) {
+    var t = String(f.titel || '').trim();
+    if (!t) { melde('Bitte einen Titel eingeben.', 'warn'); return; }
+    if (!pmIstDatum(f.datum)) { melde('Bitte einen Termin wählen.', 'warn'); return; }
+    x.titel = t.slice(0, 300);
+    x.datum = f.datum;
+    x.geaendert = jetzt();
+  } else if (!fuAnlegen(f.titel, f.datum)) { return; }
+  spaeterSichern();
+  cl.fu.fenster = null;
+  aufklappZu();
+  zeichne();
+}
+
+function fuErledigtAusFenster() {
+  var f = cl.fu.fenster;
+  if (!f || !f.id) { return; }
+  cl.fu.fenster = null;
+  aufklappZu();
+  fuErledigtUm(f.id);
+}
+
+/* ---------- Im Date Book: „Follow-up“ in der Agenda ---------- */
+function fuAgendaHtml(tag) {
+  var l = fuAm(tag);
+  if (!l.length) { return ''; }
+  return '<div class="gruppe ag-gr"><span>Follow-up</span><small>' + l.length + '</small></div>'
+    + l.map(function (x) { return fuZeileHtml(x, x.datum !== tag); }).join('');
+}
+
+/* ---------- Aus einer Aufgabe: → Follow-up ----------
+   Für Aufgaben, deren Datum eigentlich nur „nochmal anschauen“ heißt.
+   Übernommen werden nur Titel und Datum; die Aufgabe wird gelöscht. */
+function pmZuFollowupFragen() {
+  var f = pmFensterLesen();
+  if (!f || !f.id) { return; }
+  f.modus = 'followup';
+  aufklappNeu();
+}
+
+function pmZuFollowupHtml(a) {
+  var d = pmIstDatum(cl.pm.fenster.datum) ? cl.pm.fenster.datum : tagePlus(isoDatum(), 7);
+  return '<div class="fenster"><div class="titel">→ Follow-up</div><div class="rumpf">'
+    + '<p>„' + esc(pmTitel(a)) + '“ wird ein Follow-up am ' + esc(clWt(d) + ' ' + clKurzDatum(d)) + '.</p>'
+    + '<p class="leise">Übernommen werden nur Titel und Datum' + (String(a.beschreibung || '').trim() ? ' — die Notiz entfällt' : '') + '. Die Aufgabe wird gelöscht.</p>'
+    + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmZuFollowup()">Umziehen</button>'
+    + '<button type="button" class="knopf" onclick="pmDetails(\'' + esc(a.id) + '\')">Abbrechen</button></div></div></div>';
+}
+
+function pmZuFollowup() {
+  var f = cl.pm.fenster;
+  var a = f ? pmAufgabeFinden(f.id) : null;
+  if (!a || a.wiederholung) { aufklappZu(); return; }
+  var d = pmIstDatum(f.datum) ? f.datum : tagePlus(isoDatum(), 7);
+  if (!fuAnlegen(f.titel || pmTitel(a), d)) { return; }
+  DB.aufgaben.splice(DB.aufgaben.indexOf(a), 1);
+  grabsteinSetzen('aufgaben', a.id);
+  if (cl.pm.wahl === a.id) { cl.pm.wahl = ''; }
+  spaeterSichern();
+  cl.pm.fenster = null;
+  aufklappZu();
+  melde('Als Follow-up am ' + clKurzDatum(d) + ' abgelegt.', 'gut');
 }
 
 /* ============================================================
