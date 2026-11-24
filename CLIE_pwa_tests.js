@@ -22,7 +22,7 @@ const APPS = [
   { key: 'datebook', name: 'Date Book', anker: 'kalender' },
   /* Seit CLIE 0.142.0: #agenda öffnet Date Book (kalender) in der Agenda von heute */
   { key: 'agenda', name: 'Agenda', anker: 'agenda', app: 'kalender' },
-  { key: 'thinklist', name: 'Think List', anker: 'thinklist' },
+  { key: 'today', name: 'Today', anker: 'today' },
   { key: 'deadlines', name: 'Deadlines', anker: 'deadlines' }
 ];
 

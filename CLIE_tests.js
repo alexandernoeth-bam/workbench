@@ -178,7 +178,11 @@ const ABGELOEST_0139 = [
   "Woche: ◀", "und steht im Kalender an seiner Stunde", "Checklisten-Punkt mit Uhrzeit steht an seiner Stunde",
   "zurück im Kalender steht sie unter „Aufgaben“",
   /* 0.141.0: Casestudies und Desk ausgebaut */
-  "das Modul lässt sich öffnen", "ohne Semester steht nur „Belegen…“ da"
+  "das Modul lässt sich öffnen", "ohne Semester steht nur „Belegen…“ da",
+  /* 0.149.0: die Think List als eigene Ansicht ausgebaut — Denkpunkte werden Aufgaben, Today statt „Denken“ in der Agenda */
+  "zeigt alle offenen, keine beendeten", "nach Kategorie gruppiert", "Aktionen je Zeile: Antippen, Heute, Bearbeiten",
+  "unten „Beendete…“", "„Beendete…“ zeigt die beendeten, mit „Wieder öffnen“", "„Heute“ von gestern gilt nicht mehr",
+  "Agenda: „Denken“ mit den Denkpunkten von heute", "Think List: Knopf „Weekly…“", "Think List: ▼ filtert nach Kategorie"
 ];
 let anzAbgeloest = 0;
 function abgeloest(text) { console.log('  abgl ' + text); anzAbgeloest++; }
@@ -463,7 +467,7 @@ function uebersichtTest() {
   pruefe(!/class="zahl"/.test(h) && !/class="app" onclick="oeffne\('heute'\)"/.test(h) && typeof CL.clAppZahl === 'undefined',
     '„Heute“ nicht mehr im Raster (seit 0.28), keine Zahlen an den Symbolen');
   pruefe(CL.clTermineRest().length === 1, 'heute noch kommende Termine — Vergangenes zählt nicht');
-  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 33, 'zwölf Felder im Raster (seit 0.144.0 mit Follow-up), (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda und seit 0.143.0 Weekly außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
+  pruefe((h.match(/class="app"/g) || []).length === 12 && CL.CL_APPS.length === 34, 'zwölf Felder im Raster (seit 0.149.0 Today statt Think List), (seit 0.141.0 ohne Casestudies und Desk, seit 0.142.0 Think List statt Day Control, Agenda und seit 0.143.0 Weekly außerhalb), Lesezeichen in der Leiste, die Spiele im Ordner Games');
   /* Seit 0.1.2 gewünscht: „Jeden Tag im Blick“ gehört in den Tag der Workbench, nicht auf das Handy. */
   pruefe(!/Erst das Wichtige/.test(h) && !/class="blick"/.test(h) && !/function blickHtml\(/.test(SKRIPT),
     '„Jeden Tag im Blick“ erscheint in CLIE nicht — auch wenn Leitsätze gepflegt sind');
@@ -594,9 +598,9 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","thinklist","deadlines","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","today","deadlines","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest') && !CL.clApp('desk') && !CL.clApp('casestudies'),
-    'Start (seit 0.147.0): Roots, Date Book, To Do List / Think List, Deadlines, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
+    'Start (seit 0.149.0): Roots, Date Book, To Do List / Today, Deadlines, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2578,7 +2582,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,thinklist,deadlines,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.147.0 mit Deadlines statt Follow-up), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,today,deadlines,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.149.0 Today statt Think List), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -6502,8 +6506,9 @@ function startOrdnerTest() {
   /* „rechner“ seit 0.127.0 im Menü ≡ — Desk kam ins Raster, Calc ging dafür */
   /* „verknuepfungen“ seit 0.127.0 im Menü ≡ */
   /* „agenda“ seit 0.142.0 als eigene App (Hülle agenda.html) und über #agenda */
-  /* „weekly“ seit 0.143.0 über die Think List und #weekly */
-  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen', 'agenda', 'weekly'];
+  /* „weekly“ seit 0.143.0 über die Think List und #weekly — seit 0.149.0 nur noch über #weekly */
+  /* „thinklist“ seit 0.149.0 ausgebaut — der Eintrag bleibt nur, damit #thinklist nach Today führt */
+  const leiste = ['lesezeichen', 'abgleich', 'kurs', 'checklisten', 'kategorien', 'projekte', 'ziele', 'coach', 'drive', 'sos', 'dock', 'rechner', 'verknuepfungen', 'agenda', 'weekly', 'thinklist'];
   const weg = S.CL_APPS.map(a => a.id).filter(id => !S.CL_ORDNER[id] && raster.indexOf(id) < 0 && imOrdner.indexOf(id) < 0 && leiste.indexOf(id) < 0);
   pruefe(weg.length === 0, 'jede App ist erreichbar: im Raster, in einem Ordner oder in der Leiste' + (weg.length ? ' — fehlt: ' + weg.join(', ') : ''));
   const doppelt = imOrdner.filter((id, i) => imOrdner.indexOf(id) !== i || raster.indexOf(id) >= 0);
@@ -12238,7 +12243,7 @@ function thinkListTest() {
   pruefe(!!S.clApp('thinklist') && S.clApp('thinklist').name === 'Think List' && typeof S.CL_BILD.thinklist === 'string', 'App „Think List“ mit eigenem Symbol');
   pruefe(!S.clApp('tagessteuerung') && typeof S.tgHtml === 'undefined' && !/\.tg-/.test(QUELLE), 'Day Control ist komplett ausgebaut (App, Code, Stile)');
   S.oeffne('tagessteuerung');
-  pruefe(S.cl.app === 'thinklist', 'ein alter Weg nach Day Control landet in der Think List');
+  pruefe(S.cl.app === 'today', 'ein alter Weg nach Day Control landet seit 0.149.0 in Today');
 
   /* Liste */
   let h = inhalt();
@@ -12248,7 +12253,7 @@ function thinkListTest() {
   pruefe(/tlHeuteUm\('dp-a'\)/.test(h) && /tlBearbeiten\('dp-a'\)/.test(h) && /tlOeffnen\('dp-a'\)/.test(h), 'Aktionen je Zeile: Antippen, Heute, Bearbeiten');
   pruefe(/class="tl-heute an" onclick="tlHeuteUm\('dp-a'\)"/.test(h) && /class="tl-heute" onclick="tlHeuteUm\('dp-b'\)"/.test(h), '„Heute“ von gestern gilt nicht mehr — Tageswechsel ohne Aufräumen');
   S.katSetzen(haus);
-  pruefe(!/QS-Tag/.test(inhalt()) && /Carport/.test(inhalt()), '▼ filtert nach Kategorie');
+  pruefe(!/QS-Tag/.test(inhalt()) && /Carport/.test(inhalt()), 'Think List: ▼ filtert nach Kategorie');
   S.katSetzen('alle');
 
   /* Heute umschalten */
@@ -12426,13 +12431,13 @@ function weeklyTest() {
   pruefe(S.cl.wk.schritt === 3, '◀ Zurück geht einen Schritt zurück');
   S.wkWeiter();
   S.wkFertig();
-  pruefe(S.__ablage['clie-weekly-am'] === heute && S.cl.app === 'thinklist' && S.cl.wk.schritt === 0, '„Fertig“ merkt sich nur den Tag und führt in die Think List');
+  pruefe(S.__ablage['clie-weekly-am'] === heute && S.cl.app === 'today' && S.cl.wk.schritt === 0, '„Fertig“ merkt sich nur den Tag und führt nach Today (seit 0.149.0)');
   pruefe(JSON.stringify(Object.keys(S.DB)).indexOf('weekly') < 0, 'kein Weekly-Satz in der workbench.json — nur der Tag auf dem Gerät');
 
   /* Abbrechen */
   S.oeffne('weekly'); S.wkWeiter();
   S.wkAbbrechen();
-  pruefe(S.cl.app === 'thinklist' && S.cl.wk.schritt === 0, 'Abbrechen führt zurück in die Think List');
+  pruefe(S.cl.app === 'today' && S.cl.wk.schritt === 0, 'Abbrechen führt nach Today (seit 0.149.0)');
   S.oeffne('uebersicht');
 }
 
@@ -12723,7 +12728,143 @@ function onenoteLinkTextTest() {
   pruefe(/id="pmOnLink"[^>]*oninput="onLinkFeld\(this\)"/.test(SKRIPT) && /id="tlLink"[^>]*oninput="onLinkFeld\(this\)"/.test(SKRIPT) && /id="wkLink"[^>]*oninput="onLinkFeld\(this\)"/.test(SKRIPT),
     'Aufgabe, Think List und Weekly räumen beim Einfügen auf');
   pruefe(/f\.link = onLinkAusText\(l\.value\)/.test(SKRIPT) && !/id="(tlLink|wkLink)" class="eingabe" type="url"/.test(SKRIPT), 'Think List und Weekly lesen den Link genauso — und kein type="url" mehr');
-  pruefe(/<title>CLIE 0\.148\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.148\.1'/.test(SKRIPT), 'Fassung 0.148.1 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+
+function todayTest() {
+  console.log('\n0.149.0 Today — Tag oben, Worklist darunter; Einfügen; Think List ausgebaut, Denkpunkte werden Aufgaben');
+  if (!CL) { return; }
+  /* Fehlerarten: Uhrzeit-Termine oder Ungeplantes rutschen in Today; der
+     Abschnitt Tag steht unter der Worklist oder hat verschiedene Stile;
+     Blättern bleibt hängen; Einfügen trennt Titel und Link nicht oder legt
+     nichts an; „Mehr…“ verliert den Link; eine Übernahme verändert den
+     Denkpunkt, legt doppelt an oder lässt die Deadline am Denkpunkt hängen;
+     die Think List ist noch zu öffnen oder steht noch in der Agenda. */
+  const S = pmFrisch();
+  const heute = S.isoDatum(), morgen = S.tagePlus(heute, 1), gestern = S.tagePlus(heute, -1);
+  /* App */
+  pruefe(!!S.clApp('today') && S.clApp('today').name === 'Today' && S.clApp('today').raster !== false && typeof S.CL_BILD.today === 'string'
+    && S.clApp('thinklist').raster === false, 'App „Today“ im Raster (statt Think List), mit Symbol');
+  S.oeffne('thinklist');
+  pruefe(S.cl.app === 'today', 'ein Weg in die Think List führt nach Today');
+  pruefe(/if \(clAnker === 'thinklist'\) \{ clAnker = 'today'; \}/.test(SKRIPT), 'eine noch installierte Hülle thinklist.html öffnet Today');
+  const fs = require('fs');
+  pruefe(fs.existsSync(path.join(ORDNER, 'today.html')) && /src="\.\/clie\.html#today"/.test(fs.readFileSync(path.join(ORDNER, 'today.html'), 'utf8')), 'Hülle today.html als eigene App');
+
+  /* Daten für einen Tag */
+  S.DB.aufgaben.push(
+    { id: 'td-r', titel: 'Posteingang leeren', wiederholung: { takt: 'woche', tage: [0, 1, 2, 3, 4, 5, 6], intervall: 1 }, status: 'offen', planung: heute, kontext: 'privat', geaendert: 1 },
+    { id: 'td-a', titel: 'DFÜ-Freigabetest durchführen', status: 'offen', planung: heute, kontext: 'privat', geaendert: 1 },
+    { id: 'td-g', titel: 'Liegengebliebenes von gestern', status: 'offen', planung: gestern, kontext: 'privat', geaendert: 1 },
+    { id: 'td-m', titel: 'Erst morgen dran', status: 'offen', planung: morgen, kontext: 'privat', geaendert: 1 },
+    { id: 'td-o', titel: 'Ohne Datum im Backlog', status: 'offen', planung: 'backlog', kontext: 'privat', geaendert: 1 });
+  S.DB.jahrestermine = [{ id: 'jt-td', titel: 'Urlaub Müller', von: heute }];
+  S.DB.followups = [{ id: 'fu-td1', titel: 'Reifenwechsel buchen', datum: S.tagePlus(heute, -4), status: 'offen', geaendert: 1 },
+                    { id: 'fu-td2', titel: 'Konzept QS-Tag abgeben', datum: S.tagePlus(heute, 2), status: 'offen', geaendert: 1 }];
+  S.oeffne('today');
+  let h = inhalt();
+  const iTag = h.indexOf('<span>Tag</span>'), iWork = h.indexOf('<span>Worklist</span>');
+  pruefe(iTag >= 0 && iWork > iTag, 'oben „Tag“, darunter „Worklist“');
+  const tag = h.slice(iTag, iWork), work = h.slice(iWork);
+  pruefe(/Urlaub Müller/.test(tag) && /Reifenwechsel buchen/.test(tag) && /Konzept QS-Tag abgeben/.test(tag) && /Posteingang leeren/.test(tag), 'Tag: ganztägige Termine, Deadlines (überschritten und drei Tage voraus) und Routinen');
+  pruefe((tag.match(/<div class="aufg palm/g) || []).length === 4 && !/class="gz|ganztags/.test(tag), 'alles im Abschnitt Tag im gleichen Stil — ohne Rahmen');
+  pruefe(/<div class="aufg palm td-z"><span class="k td-leer"/.test(tag) && /<div class="aufg palm td-z"><button type="button" class="k"[^>]*onclick="fuErledigtUm\('fu-td1'\)"/.test(tag), 'Kästchen vorne — bei Deadlines hakt es ab, ganztägig bleibt die Stelle frei');
+  pruefe(/<span class="dt ue">bis /.test(tag) && /<span class="dt">bis /.test(tag), 'Deadline rechts „bis TT.MM.“, überschritten fett');
+  pruefe(/DFÜ-Freigabetest durchführen/.test(work) && /Liegengebliebenes von gestern/.test(work) && !/Erst morgen dran|Ohne Datum im Backlog|Posteingang leeren/.test(work), 'Worklist: auf heute Geplantes und Liegengebliebenes — nichts Ungeplantes, keine Routinen');
+  pruefe(!/ag-zt|Als Nächstes|<span>Termine<\/span>|☆|★|Vorhaben/.test(h), 'keine Uhrzeit-Termine, kein Stern, kein Typ');
+  S.pmHaken('td-a', heute);
+  pruefe(!/DFÜ-Freigabetest durchführen/.test(inhalt()) && /1 erledigt · zeigen/.test(inhalt()), 'Abgehaktes verschwindet — „1 erledigt · zeigen“');
+  S.pmHaken('td-a', heute);
+  /* Blättern */
+  S.clBlaettern(1);
+  h = inhalt();
+  pruefe(S.cl.app === 'today' && S.clKalDatum() === morgen && /Erst morgen dran/.test(h) && !/Liegengebliebenes von gestern/.test(h), '▶ blättert einen Tag weiter — Liegengebliebenes nur heute');
+  pruefe(/Konzept QS-Tag abgeben/.test(h) && !/Reifenwechsel buchen/.test(h), 'an einem anderen Tag: Deadlines ab diesem Tag, Überschrittenes nur heute');
+  /* Neu */
+  S.tdNeuAuf();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/tdNeu\('aufgabe'\)">Aufgabe/.test(f) && /tdNeu\('termin'\)">Termin/.test(f) && /tdNeu\('deadline'\)">Deadline/.test(f), 'Neu: Aufgabe, Termin oder Deadline');
+  S.tdNeu('deadline');
+  pruefe(S.cl.aufklapp === 'fufenster' && S.cl.fu.fenster.datum === morgen, 'Neu · Deadline: für den Tag, der zu sehen ist');
+  S.aufklappZu();
+  S.tdNeu('aufgabe');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.datum === morgen, 'Neu · Aufgabe: geplant auf den Tag, der zu sehen ist');
+  S.aufklappZu();
+  pruefe(/terminNeu\(is, ''\)/.test(SKRIPT), 'Neu · Termin: das gewohnte Terminfenster für diesen Tag');
+  S.clBlaettern(-1);
+  pruefe(S.clKalDatum() === heute, '◀ zurück auf heute');
+  pruefe(/tdEinfuegenAuf\(\)">\+ Einfügen/.test(S.document.getElementById('fuss').innerHTML) && /tdNeuAuf\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML), 'unten „+ Einfügen“ und „Neu“');
+
+  /* Zerlegen */
+  const web = 'https://datevde-my.sharepoint.com/personal/x/_layouts/Doc.aspx?sourcedoc=%7b04CF%7d&wd=target%28A.one%7CC4%2FDF%7C59%2F%29&end';
+  let z = S.tdZerlegen('DFÜ-Freigabetest 26.11.2026 - 20.0 SR und 20.0JW PS2  ([Webansicht](' + web + '))');
+  pruefe(z.titel === 'DFÜ-Freigabetest 26.11.2026 - 20.0 SR und 20.0JW PS2' && z.link === web, 'OneNote, nur Webansicht: Titel und Link getrennt');
+  const on = 'onenote:https://datevde-my.sharepoint.com/Notizbuch/Arbeitsfläche.one#DFÜ-Freigabetest  26.11.2026&section-id={C4}&page-id={59}&end';
+  z = S.tdZerlegen('DFÜ-Freigabetest 26.11.2026  (Webansicht: ' + web + ')\r\n' + on);
+  pruefe(z.titel === 'DFÜ-Freigabetest 26.11.2026' && z.link === on, 'OneNote mit onenote:-Link: der Titel ohne „(Webansicht …)“, der onenote:-Link');
+  z = S.tdZerlegen('Garten winterfest machen\nRosen abdecken');
+  pruefe(z.titel === 'Garten winterfest machen' && z.link === '', 'reiner Text: die erste Zeile ist der Titel, kein Link');
+  /* Einfügen → OK */
+  S.tdEinfuegenAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/id="tdText"/.test(f) && /id="tdTitel"/.test(f) && /id="tdLink"/.test(f) && /Geplant am:/.test(f) && /tdEinMehr\(\)">Mehr…/.test(f) && /id="tdKat"/.test(f), 'Einfügen: Text, Titel, OneNote, Geplant am, Kategorie — OK, Abbrechen, Mehr…');
+  S.document.getElementById('tdText').value = 'DFÜ-Freigabetest 26.11.2026 - 20.0 SR  ([Webansicht](' + web + '))';
+  S.tdTextNeu();
+  pruefe(S.document.getElementById('tdTitel').value === 'DFÜ-Freigabetest 26.11.2026 - 20.0 SR' && S.document.getElementById('tdLink').value === web, 'beim Einfügen füllen sich Titel und Link');
+  S.document.getElementById('tdKat').value = '';
+  S.tdEinOk();
+  const neu = S.DB.aufgaben.filter(a => a.titel === 'DFÜ-Freigabetest 26.11.2026 - 20.0 SR')[0];
+  pruefe(neu && neu.planung === heute && neu.onenote === web && !S.cl.aufklapp, 'OK legt die Aufgabe an — geplant heute, mit OneNote-Link');
+  pruefe(/DFÜ-Freigabetest 26\.11\.2026 - 20\.0 SR/.test(inhalt()), 'und sie steht sofort in der Worklist');
+  S.tdEinfuegenAuf();
+  ['tdText', 'tdTitel', 'tdLink'].forEach(id => { S.document.getElementById(id).value = ''; });
+  S.tdEinOk();
+  pruefe(S.cl.aufklapp === 'tdein', 'ohne Titel wird nichts angelegt');
+  /* Mehr… */
+  S.document.getElementById('tdText').value = 'Konzept QS-Tag (Webansicht: ' + web + ')';
+  S.tdTextNeu();
+  S.tdEinDatum('');
+  pruefe(S.cl.td.ein.datum === '' && S.cl.td.ein.titel === 'Konzept QS-Tag', 'Kein Datum — Getipptes bleibt beim Umschalten');
+  S.tdEinMehr();
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.titel === 'Konzept QS-Tag' && S.cl.pm.fenster.onenote === web && S.cl.pm.fenster.datum === '', 'Mehr…: das volle Aufgabenfenster, vorbelegt');
+  S.document.getElementById('pmTitel').value = 'Konzept QS-Tag'; S.document.getElementById('pmDatum').value = '';
+  S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = ''; S.document.getElementById('pmDeadline').value = '';
+  S.pmSpeichern();
+  const mehr = S.DB.aufgaben.filter(a => a.titel === 'Konzept QS-Tag')[0];
+  pruefe(mehr && mehr.onenote === web, 'und der Link kommt mit');
+  S.aufklappZu();
+
+  /* Denkpunkte werden Aufgaben */
+  S.DB.denkpunkte = [
+    { id: 'dp-1', titel: 'Rolle im Qualitätszirkel klären', bereich: '', kontext: 'beruflich', link: 'onenote:https://x/QZ.one#Rolle&end', heute: heute, status: 'offen', angelegt: gestern, geaendert: 1 },
+    { id: 'dp-2', titel: 'GitLab-Anbindung durchdenken', bereich: '', kontext: 'beruflich', link: '', heute: '', status: 'offen', angelegt: heute, geaendert: 1 },
+    { id: 'dp-3', titel: 'Längst beendet', status: 'beendet', angelegt: gestern, geaendert: 1 }];
+  S.DB.followups.push({ id: 'fu-dp', titel: 'Rolle im Qualitätszirkel klären', datum: S.tagePlus(heute, 5), status: 'offen', denkpunktId: 'dp-1', geaendert: 1 });
+  const vorher = JSON.stringify(S.DB.denkpunkte);
+  S.oeffne('aufgaben');
+  pruefe(/tdDpAuf\(\)">Denkpunkte…/.test(S.document.getElementById('fuss').innerHTML), 'To Do: „Denkpunkte…“, solange offene noch keine Aufgabe sind');
+  S.tdDpAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/Rolle im Qualitätszirkel/.test(f) && /GitLab-Anbindung/.test(f) && !/Längst beendet/.test(f) && /tdDpAlle\(\)/.test(f), 'Liste der offenen Denkpunkte — einzeln oder alle');
+  S.tdDpUebernehmen('dp-1');
+  const a1 = S.tdVonDenkpunkt('dp-1');
+  pruefe(a1 && a1.titel === 'Rolle im Qualitätszirkel klären' && a1.planung === heute && a1.onenote === 'onenote:https://x/QZ.one#Rolle&end' && a1.kontext === 'beruflich',
+    'übernommen: Titel, Kategorie, OneNote-Link; „heute“ wird „Geplant am“ heute');
+  const fx = S.fuFinden('fu-dp');
+  pruefe(fx.aufgabeId === a1.id && !('denkpunktId' in fx) && S.fuDeadlineDatum('aufgabe', a1.id) === S.tagePlus(heute, 5), 'die Deadline wandert an die Aufgabe');
+  pruefe(JSON.stringify(S.DB.denkpunkte) === vorher, 'der Denkpunkt selbst bleibt unverändert');
+  S.tdDpUebernehmen('dp-1');
+  pruefe(S.DB.aufgaben.filter(a => a.vonDenkpunkt === 'dp-1').length === 1 && !/Rolle im Qualitätszirkel/.test(S.document.getElementById('aufklapp').innerHTML), 'kein zweites Mal — Übernommenes verschwindet aus der Liste');
+  S.tdDpAlle();
+  pruefe(S.tdVonDenkpunkt('dp-2') && S.tdVonDenkpunkt('dp-2').planung === 'backlog' && S.tdDpOffen().length === 0, '„Alle übernehmen“ — ohne „heute“ ohne Datum');
+  S.aufklappZu(); S.zeichne();
+  pruefe(!/tdDpAuf/.test(S.document.getElementById('fuss').innerHTML), 'danach verschwindet „Denkpunkte…“');
+  /* Agenda ohne Denken */
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
+  pruefe(!/<span>Denken<\/span>/.test(inhalt()) && typeof S.tlAgendaHtml === 'undefined', 'die Agenda zeigt kein „Denken“ mehr');
+  ['tdText', 'tdTitel', 'tdLink', 'pmTitel'].forEach(id => { S.document.getElementById(id).value = ''; });
+  pruefe(/<title>CLIE 0\.149\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.149\.0'/.test(SKRIPT), 'Fassung 0.149.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -13028,6 +13169,7 @@ function huellenTest() {
   try { deadlinesTest(); } catch (e) { fail('0.147.0 Deadlines warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTest(); } catch (e) { fail('0.148.0 OneNote-Link warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTextTest(); } catch (e) { fail('0.148.1 OneNote-Linktext warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { todayTest(); } catch (e) { fail('0.149.0 Today warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
