@@ -12987,8 +12987,8 @@ function todayTermineTest() {
     h = inhalt();
     const iE = h.indexOf('Erinnerungen / Deadlines …'), iT = h.indexOf('>Termine …<'), iA = h.indexOf('Daran arbeite ich heute …');
     pruefe(iE >= 0 && iT > iE && iA > iT, 'eingeblendet: „Termine …“ zwischen Erinnerungen und „Daran arbeite ich heute …“');
-    pruefe(/class="td-uhr an"/.test(h) && /<span class="ag-zt">[^<]*9[^<]*<\/span><button type="button" class="tx lang" onclick="terminZeigen\('[^']+','tz1'\)">/.test(h), 'Knopf dunkel; Zeilen mit Uhrzeit, ein Tipp öffnet den Termin');
-    pruefe(/td-z ausf vorbei"><span class="ag-zt">[^<]*9/.test(h) || new Date().getHours() < 9, 'Vorbeigegangenes steht grau');
+    pruefe(/class="td-uhr an"/.test(h) && /<span class="tz-zt">09:00<small>09:30<\/small><\/span><button type="button" class="tz-tx" onclick="terminZeigen\('[^']+','tz1'\)">/.test(h), 'Knopf dunkel; Zeilen mit Beginn und Ende, ein Tipp öffnet den Termin');
+    pruefe(/class="tz-z[^"]* vorbei"><span class="tz-zt">09:00/.test(h) || new Date().getHours() < 10, 'Vorbeigegangenes steht grau');
     S.clBlaettern(1);
     pruefe(S.cl.td.termine === false && !/td-uhr/.test(inhalt()), 'blättern klappt zu — ohne Termine kein Knopf');
     S.clBlaettern(-1);
@@ -13047,7 +13047,7 @@ function outlookTest() {
   pruefe(/termineNachTag\[is\] \|\| \[\];/.test(SKRIPT) && !/function termineFuerTag[\s\S]{0,200}olAm/.test(SKRIPT), 'termineFuerTag bleibt wie in der Workbench — Outlook kommt in clTermineAm dazu');
   S.oeffne('kalender'); S.clKalGehe(morgen, 'agenda');
   let h = inhalt();
-  pruefe(/Jour fixe QS<span class="ol-mk">OL<\/span>/.test(h) && /Release 20\.0 SR<span class="ol-mk">OL<\/span>/.test(h) && /<div class="ol-stand">Outlook · Stand /.test(h), 'Agenda: mit „OL“ und dem Stand');
+  pruefe(/Jour fixe QS<\/button>/.test(h) && /Release 20\.0 SR/.test(h) && !/ol-mk/.test(h) && /<div class="ol-stand">Outlook · Stand /.test(h), 'Agenda: Outlook-Termine ohne Zeichen (seit 0.153.1), darunter der Stand');
   pruefe(/olAuf\(\)">Einlesen…/.test(S.document.getElementById('fuss').innerHTML), 'Date Book: unten „Einlesen…“');
   const id = S.clTermineAm(morgen).zeit.filter(x => x.outlook)[0].id;
   S.terminZeigen(morgen, id);
@@ -13056,7 +13056,7 @@ function outlookTest() {
   S.oeffne('today'); S.clKalGehe(morgen, '');
   S.tdTermineUm();
   h = inhalt();
-  pruefe(/aria-label="ganztägig"[\s\S]*?Release 20\.0 SR<span class="ol-mk">OL/.test(h) && /Jour fixe QS<span class="ol-mk">OL/.test(h) && /class="td-uhr an"/.test(h), 'Today: ganztägig bei den Erinnerungen, mit Uhrzeit im Block „Termine …“ — mit „OL“');
+  pruefe(/aria-label="ganztägig"[\s\S]*?Release 20\.0 SR/.test(h) && /<div class="tz-z tz-ber[^"]*"><span class="tz-zt">09:00<small>09:30<\/small><\/span>[^]*?Jour fixe QS/.test(h) && /class="td-uhr an"/.test(h), 'Today: ganztägig bei den Erinnerungen, mit Uhrzeit im Block „Termine …“ — beruflich hinterlegt');
   /* Fenster */
   S.oeffne('kalender');
   S.olAuf();
@@ -13075,8 +13075,25 @@ function outlookTest() {
   pruefe(!S.cl.aufklapp && S.olAlle().length === 2, 'Einlesen ersetzt den Zeitraum und schließt das Fenster');
   S.document.getElementById('olText').value = '';
   pruefe(/'outlooktermine'\]/.test(SKRIPT) && Array.isArray(S.DB.outlooktermine), 'eigene Sammlung „outlooktermine“ — wird abgeglichen');
-  pruefe(/<title>CLIE 0\.153\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.153\.0'/.test(SKRIPT), 'Fassung 0.153.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
+}
+
+
+function terminZeileTest() {
+  console.log('\n0.153.1 Terminzeilen ruhig — Beginn und Ende, Strich zwischen Uhrzeit und Titel, beruflich hinterlegt');
+  if (!CL) { return; }
+  /* Fehlerart: die Terminliste wird unruhig — Zeichen nur an manchen
+     Zeilen, Uhrzeit kleiner als der Titel und mal ein-, mal zweistellig. */
+  const S = pmFrisch();
+  const tag = '2026-11-25';
+  const b = S.tzZeileHtml(tag, { id: 'x1', titel: 'Weekly üQS', zeit: '08:15', bis: '09:00', kontext: 'beruflich', outlook: true });
+  const p = S.tzZeileHtml(tag, { id: 'x2', titel: 'Whiskey Club Treffen', zeit: '17:00', bis: '', kontext: 'privat' });
+  pruefe(/^<div class="tz-z tz-ber[^"]*"><span class="tz-zt">08:15<small>09:00<\/small><\/span>/.test(b) && /^<div class="tz-z( vorbei)?"><span class="tz-zt">17:00<\/span>/.test(p), 'Beginn zweistellig, Ende klein darunter; nur beruflich hinterlegt');
+  pruefe(!/OL|ol-mk/.test(b) && typeof S.olMarke === 'undefined' && !/\.ol-mk\{/.test(QUELLE), 'kein „OL“ mehr — die Herkunft sagen Stand-Zeile und Tipp');
+  pruefe(/\.tz-zt\{[^}]*border-right:1px solid/.test(QUELLE) && /\.tz-zt\{[^}]*font-size:17px/.test(QUELLE) && /\.tz-z\{[^}]*align-items:baseline[^}]*border-bottom:1px dotted/.test(QUELLE), 'Strich zwischen Uhrzeit und Titel, gleiche Linie, gepunktete Trennlinie');
+  pruefe(/html\.schema-wb \.tz-z\.tz-ber\{background:rgba\(25,82,90,\.10\)\}/.test(QUELLE), 'Hinterlegung im Petrol des Farbschemas — privat ohne Farbe');
+  pruefe(/t\.zeit\.forEach\(function \(x\) \{ h \+= tzZeileHtml\(is, x\); \}\);/.test(SKRIPT), 'die Agenda nutzt dieselbe Zeile');
+  pruefe(/<title>CLIE 0\.153\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.153\.1'/.test(SKRIPT), 'Fassung 0.153.1 im Titel und in APP_VERSION');
 }
 
 
@@ -13385,6 +13402,7 @@ function huellenTest() {
   try { deadlineMontagTest(); } catch (e) { fail('0.151.0 Montag warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todayTermineTest(); } catch (e) { fail('0.152.0 Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { outlookTest(); } catch (e) { fail('0.153.0 Outlook warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { terminZeileTest(); } catch (e) { fail('0.153.1 Terminzeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
