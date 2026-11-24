@@ -12633,7 +12633,7 @@ function deadlinesTest() {
   pruefe(!/class="dt frist/.test(inhalt()) && !/\.dt\.frist\{/.test(QUELLE), '„geplant am“ ist nicht mehr als Frist gerahmt');
 
   /* Daten und Hülle */
-  pruefe(/'followups'\]/.test(SKRIPT), 'die Sammlung heißt weiter „followups“ und wird abgeglichen');
+  pruefe(/'followups'[,\]]/.test(SKRIPT), 'die Sammlung heißt weiter „followups“ und wird abgeglichen');
   pruefe(/if \(clAnker === 'followup'\) \{ clAnker = 'deadlines'; \}/.test(SKRIPT), 'eine noch installierte Hülle followup.html öffnet Deadlines');
   const fs = require('fs');
   pruefe(fs.existsSync(path.join(ORDNER, 'deadlines.html')) && /src="\.\/clie\.html#deadlines"/.test(fs.readFileSync(path.join(ORDNER, 'deadlines.html'), 'utf8')), 'Hülle deadlines.html als eigene App');
@@ -12996,7 +12996,86 @@ function todayTermineTest() {
     pruefe(S.cl.td.termine === false, 'neu geöffnet: wieder aus');
     pruefe(/' …<\/div>'/.test(SKRIPT) && !/Daran arbeite ich heute…/.test(QUELLE), '„Daran arbeite ich heute …“ mit Leerzeichen vor den Punkten');
   } finally { S.termineFuerTag = echt; }
-  pruefe(/<title>CLIE 0\.152\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.152\.0'/.test(SKRIPT), 'Fassung 0.152.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+
+function outlookTest() {
+  console.log('\n0.153.0 Termine aus Outlook einlesen — JSON von Copilot, Zeitraum ersetzen, nur lesen');
+  if (!CL) { return; }
+  /* Fehlerarten: ein kaputter oder eingerahmter JSON-Block ändert trotzdem
+     Daten; ein Import löscht Termine außerhalb seines Zeitraums oder lässt
+     gelöschte stehen; derselbe Termin bekommt bei jedem Import eine neue
+     Kennung (Abgleich-Flut); Zeiten mit Z/Offset landen falsch; Outlook-
+     Termine öffnen das Google-Fenster zum Ändern; termineFuerTag weicht
+     von der Workbench ab. */
+  const S = pmFrisch();
+  const heute = S.isoDatum(), morgen = S.tagePlus(heute, 1), uebermorgen = S.tagePlus(heute, 2);
+  S.DB.outlooktermine = [];
+  const json = (von, bis, termine, stand) => '```json\n' + JSON.stringify({ quelle: 'outlook', stand: stand || (heute + 'T15:40'), von, bis, termine }) + '\n```';
+  /* Lesen */
+  let r = S.olLesen(json(heute, uebermorgen, [
+    { id: 'AAMk-1', titel: 'Jour fixe QS', start: morgen + 'T09:00', ende: morgen + 'T09:30', ganztags: false, ort: 'Teams' },
+    { id: 'AAMk-2', titel: 'Release 20.0 SR', start: morgen, ende: morgen, ganztags: true },
+    { id: 'AAMk-3', titel: 'Review', start: heute + 'T13:30:00', ende: heute + 'T14:00:00' },
+    { titel: 'kaputt', start: 'irgendwann' }]));
+  pruefe(!r.fehler && r.liste.length === 3 && r.falsch === 1 && r.von === heute && r.bis === uebermorgen, 'liest den Block auch in ```json … ``` — Unlesbares wird übergangen und gezählt');
+  const j = r.liste.filter(x => x.oid === 'AAMk-1')[0], g = r.liste.filter(x => x.oid === 'AAMk-2')[0];
+  pruefe(j.datum === morgen && j.zeit === '09:00' && j.bis === '09:30' && !j.ganztags && g.ganztags && g.datum === morgen && g.bisDatum === morgen, 'Zeiten und ganztägig richtig erkannt');
+  const utc = S.olZeitpunkt('2026-07-15T07:00:00Z');
+  pruefe(utc && utc.datum === '2026-07-15' && utc.zeit === '09:00', 'Z/Offset wird in Ortszeit umgerechnet (Sommerzeit: 07:00Z → 09:00)');
+  pruefe(/nicht lesbar/.test(S.olLesen('{ "termine": [ }').fehler) && /„termine“/.test(S.olLesen('{"von":"2026-01-01"}').fehler) && /Kein JSON/.test(S.olLesen('hallo').fehler), 'kaputter Text: eine klare Meldung');
+  /* Einlesen */
+  S.DB.outlooktermine.push({ id: 'ol-alt-draussen', titel: 'Außerhalb', datum: S.tagePlus(heute, 10), zeit: '10:00', bis: '11:00', ganztags: false, kontext: 'beruflich', geaendert: 1 });
+  let n = S.olUebernehmen(r, '');
+  pruefe(n === 3 && S.olAlle().length === 4 && S.olAlle().every(x => /^ol-/.test(x.id) && x.geaendert && x.kontext === 'beruflich'), 'eingelesen — Sätze mit Kennung, Zeitstempel und beruflich');
+  const idJour = S.olAlle().filter(x => x.oid === 'AAMk-1')[0].id;
+  /* zweiter Import: Review fällt weg, Jour fixe bleibt, neuer Termin */
+  r = S.olLesen(json(heute, uebermorgen, [
+    { id: 'AAMk-1', titel: 'Jour fixe QS', start: morgen + 'T09:00', ende: morgen + 'T09:30' },
+    { id: 'AAMk-2', titel: 'Release 20.0 SR', start: morgen, ende: morgen, ganztags: true },
+    { id: 'AAMk-4', titel: 'Workshop', start: uebermorgen + 'T10:00', ende: uebermorgen + 'T12:00' }], heute + 'T16:05'));
+  S.olUebernehmen(r, '');
+  const l = S.olAlle();
+  pruefe(!l.some(x => x.oid === 'AAMk-3') && S.DB.grabsteine.some(x => x.s === 'outlooktermine'), 'im Zeitraum Weggefallenes wird entfernt — mit Grabstein');
+  pruefe(l.some(x => x.oid === 'AAMk-4') && l.filter(x => x.oid === 'AAMk-1')[0].id === idJour && l.filter(x => x.oid === 'AAMk-1').length === 1, 'derselbe Termin behält seine Kennung, Neues kommt dazu');
+  pruefe(l.some(x => x.id === 'ol-alt-draussen'), 'außerhalb des Zeitraums bleibt alles stehen');
+  pruefe(l.every(x => x.id === 'ol-alt-draussen' || x.stand === heute + 'T16:05'), 'der Stand des Imports steht an jedem Termin');
+  /* Anzeige */
+  const tm = S.clTermineAm(morgen);
+  pruefe(tm.zeit.some(x => x.outlook && x.titel === 'Jour fixe QS') && tm.ganztags.some(x => x.outlook && x.titel === 'Release 20.0 SR'), 'Date Book: die Outlook-Termine stehen bei den Terminen des Tages');
+  pruefe(/termineNachTag\[is\] \|\| \[\];/.test(SKRIPT) && !/function termineFuerTag[\s\S]{0,200}olAm/.test(SKRIPT), 'termineFuerTag bleibt wie in der Workbench — Outlook kommt in clTermineAm dazu');
+  S.oeffne('kalender'); S.clKalGehe(morgen, 'agenda');
+  let h = inhalt();
+  pruefe(/Jour fixe QS<span class="ol-mk">OL<\/span>/.test(h) && /Release 20\.0 SR<span class="ol-mk">OL<\/span>/.test(h) && /<div class="ol-stand">Outlook · Stand /.test(h), 'Agenda: mit „OL“ und dem Stand');
+  pruefe(/olAuf\(\)">Einlesen…/.test(S.document.getElementById('fuss').innerHTML), 'Date Book: unten „Einlesen…“');
+  const id = S.clTermineAm(morgen).zeit.filter(x => x.outlook)[0].id;
+  S.terminZeigen(morgen, id);
+  pruefe(S.cl.aufklapp !== 'termin', 'ein Outlook-Termin öffnet kein Fenster zum Ändern — nur die Info');
+  pruefe(/olInfoText\(t\)/.test(SKRIPT) && /ändern in Outlook/.test(S.olInfoText(S.clTerminFinden(morgen, id))), 'die Info sagt: aus Outlook, Stand, ändern in Outlook');
+  S.oeffne('today'); S.clKalGehe(morgen, '');
+  S.tdTermineUm();
+  h = inhalt();
+  pruefe(/aria-label="ganztägig"[\s\S]*?Release 20\.0 SR<span class="ol-mk">OL/.test(h) && /Jour fixe QS<span class="ol-mk">OL/.test(h) && /class="td-uhr an"/.test(h), 'Today: ganztägig bei den Erinnerungen, mit Uhrzeit im Block „Termine …“ — mit „OL“');
+  /* Fenster */
+  S.oeffne('kalender');
+  S.olAuf();
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'olein' && /id="olText"/.test(f) && /id="olVorschau"/.test(f) && /id="olKat"/.test(f) && /olEinlesen\(\)">Einlesen/.test(f), 'Fenster: Einfügen, Vorschau, Kategorie, Einlesen');
+  S.document.getElementById('olText').value = json(heute, uebermorgen, [{ id: 'AAMk-1', titel: 'Jour fixe QS', start: morgen + 'T09:00' }]);
+  S.olVorschau();
+  pruefe(/1 Termine/.test(S.document.getElementById('olVorschau').innerHTML) && /ersetzt 3 bisherige/.test(S.document.getElementById('olVorschau').innerHTML), 'Vorschau: wie viele, welcher Zeitraum, wie viele ersetzt — ohne etwas zu ändern');
+  pruefe(S.olAlle().length === 4, 'die Vorschau ändert nichts');
+  S.document.getElementById('olText').value = '{ kaputt';
+  S.olEinlesen();
+  pruefe(S.cl.aufklapp === 'olein' && S.olAlle().length === 4, 'kaputter Block: Fenster bleibt offen, nichts geändert');
+  S.document.getElementById('olText').value = json(heute, uebermorgen, [{ id: 'AAMk-1', titel: 'Jour fixe QS', start: morgen + 'T09:00' }]);
+  S.document.getElementById('olKat').value = '';
+  S.olEinlesen();
+  pruefe(!S.cl.aufklapp && S.olAlle().length === 2, 'Einlesen ersetzt den Zeitraum und schließt das Fenster');
+  S.document.getElementById('olText').value = '';
+  pruefe(/'outlooktermine'\]/.test(SKRIPT) && Array.isArray(S.DB.outlooktermine), 'eigene Sammlung „outlooktermine“ — wird abgeglichen');
+  pruefe(/<title>CLIE 0\.153\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.153\.0'/.test(SKRIPT), 'Fassung 0.153.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -13305,6 +13384,7 @@ function huellenTest() {
   try { deadlineMischformTest(); } catch (e) { fail('0.150.0 Mischform warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deadlineMontagTest(); } catch (e) { fail('0.151.0 Montag warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todayTermineTest(); } catch (e) { fail('0.152.0 Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { outlookTest(); } catch (e) { fail('0.153.0 Outlook warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
