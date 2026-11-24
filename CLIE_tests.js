@@ -12690,7 +12690,40 @@ function onenoteLinkTest() {
   pruefe(!('onenote' in x) && !('radar' in x), '„Lösen“ entfernt beides');
   S.document.getElementById('pmOnLink').value = '';
   S.aufklappZu();
-  pruefe(/<title>CLIE 0\.148\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.148\.0'/.test(SKRIPT), 'Fassung 0.148.0 im Titel und in APP_VERSION');
+
+  S.oeffne('uebersicht');
+}
+
+
+function onenoteLinkTextTest() {
+  console.log('\n0.148.1 OneNote: aus „Link zur Seite kopieren“ genau einen Link herausholen');
+  if (!CL) { return; }
+  /* Fehlerart: OneNote kopiert Titel, Webansicht und onenote:-Link in einen Text —
+     ohne Aufräumen landet alles im Feld und die Prüfung lehnt ab, oder eine
+     schließende Klammer hängt am Link und die Seite geht nicht auf. */
+  const S = CL;
+  const web = 'https://datevde-my.sharepoint.com/personal/x/_layouts/Doc.aspx?sourcedoc=%7b04CF%7d&wd=target%28Arbeitsfl%C3%A4che.one%7CC4%2FDF%C3%9C%7C59%2F%29&wdpartid=%7b09%7d%7b1%7d&end';
+  const on = 'onenote:https://datevde-my.sharepoint.com/personal/x/Documents/Notizbuch/Arbeitsfläche.one#DFÜ-Freigabetest  26.11.2026 - 20.0 SR&section-id={C435737D}&page-id={592F78CA}&end';
+  pruefe(S.onLinkAusText('DFÜ-Freigabetest 26.11.2026 - 20.0 SR  ([Webansicht](' + web + '))') === web, 'nur Webansicht (Markdown): die https-Adresse ohne „))“');
+  pruefe(S.onLinkAusText('DFÜ-Freigabetest  (Webansicht: ' + web + ')\r\n' + on) === on, 'Webansicht und onenote:: es gewinnt der onenote:-Link');
+  pruefe(S.onLinkAusText(on + ' (Webansicht: ' + web + ')') === on, 'Leerzeichen im Seitennamen bleiben — der Link endet mit &end');
+  pruefe(S.onLinkAusText('  ' + web + '  ') === web && S.onLinkAusText('https://x/a_(b)') === 'https://x/a_(b)', 'ein einzelner Link bleibt, Klammern im Link auch');
+  pruefe(S.onLinkAusText('nur Text') === 'nur Text', 'ohne Link bleibt der Text — die Prüfung meldet dann den Fehler');
+  /* in der Aufgabe */
+  const a = pmFrisch().pmNeueAufgabe({ titel: 'DFÜ-Freigabetest', datum: S.isoDatum() });
+  S.oeffne('aufgaben'); S.pmDetails(a.id); S.pmOnWahlAuf();
+  S.document.getElementById('pmOnLink').value = 'DFÜ-Freigabetest  ([Webansicht](' + web + '))';
+  S.pmOnLinkUebernehmen();
+  pruefe(S.pmAufgabeFinden(a.id).onenote === web, 'Aufgabe: der kopierte Text wird zu genau einem Link');
+  S.document.getElementById('pmOnLink').value = ''; S.aufklappZu();
+  /* Felder räumen beim Einfügen auf */
+  const feld = { value: 'Titel ([Webansicht](' + web + '))' };
+  S.onLinkFeld(feld);
+  pruefe(feld.value === web, 'beim Einfügen steht sofort nur noch der Link im Feld');
+  pruefe(/id="pmOnLink"[^>]*oninput="onLinkFeld\(this\)"/.test(SKRIPT) && /id="tlLink"[^>]*oninput="onLinkFeld\(this\)"/.test(SKRIPT) && /id="wkLink"[^>]*oninput="onLinkFeld\(this\)"/.test(SKRIPT),
+    'Aufgabe, Think List und Weekly räumen beim Einfügen auf');
+  pruefe(/f\.link = onLinkAusText\(l\.value\)/.test(SKRIPT) && !/id="(tlLink|wkLink)" class="eingabe" type="url"/.test(SKRIPT), 'Think List und Weekly lesen den Link genauso — und kein type="url" mehr');
+  pruefe(/<title>CLIE 0\.148\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.148\.1'/.test(SKRIPT), 'Fassung 0.148.1 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -12994,6 +13027,7 @@ function huellenTest() {
   try { weeklyTest(); } catch (e) { fail('0.143.0 Weekly warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deadlinesTest(); } catch (e) { fail('0.147.0 Deadlines warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTest(); } catch (e) { fail('0.148.0 OneNote-Link warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { onenoteLinkTextTest(); } catch (e) { fail('0.148.1 OneNote-Linktext warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.148.0</title>
+<title>CLIE 0.148.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -1309,7 +1309,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.148.0';
+var APP_VERSION = '0.148.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27375,7 +27375,7 @@ function pmOnLinkUebernehmen() {
   var a = f && f.id ? pmAufgabeFinden(f.id) : null;
   if (!a) { aufklappZu(); return; }
   var e = document.getElementById('pmOnLink');
-  var t = String((e && e.value) || '').trim();
+  var t = onLinkAusText(e && e.value);
   if (!tlLinkOk(t)) { melde('Das ist kein OneNote-Link — er muss mit onenote: oder https:// beginnen.', 'warn'); return; }
   a.onenote = t;
   delete a.radar;
@@ -27417,7 +27417,7 @@ function pmOnWahlHtml() {
   var h = '<div class="fenster"><div class="titel">Seite in OneNote</div><div class="rumpf">';
   /* Seit 0.148.0: in OneNote „Link zur Seite kopieren“ und hier einfügen */
   h += '<label for="pmOnLink">Link einfügen:</label><div class="pm-on-link">'
-    + '<input id="pmOnLink" class="eingabe" type="text" inputmode="url" spellcheck="false" autocomplete="off" placeholder="onenote:… oder https://…" value="' + esc(a && a.onenote ? a.onenote : '') + '">'
+    + '<input id="pmOnLink" class="eingabe" type="text" inputmode="url" spellcheck="false" autocomplete="off" oninput="onLinkFeld(this)" placeholder="onenote:… oder https://…" value="' + esc(a && a.onenote ? a.onenote : '') + '">'
     + '<button type="button" class="knopf" onclick="pmOnLinkUebernehmen()">Übernehmen</button></div>'
     + '<div class="gruppe">Oder aus dem Radar</div>';
   var leer = true;
@@ -29331,6 +29331,35 @@ function tlLinkOk(t) {
   return /^onenote:\S/i.test(x) || /^https:\/\/\S+$/i.test(x);
 }
 
+/* Seit 0.148.1: „Link zur Seite kopieren“ in OneNote liefert Titel, onenote:-Link und
+   Webansicht in einem Text, je nach App auch als [Webansicht](https://…).
+   Herausgeholt wird genau ein Link: der onenote:-Link (bis „&end“), sonst die erste https-Adresse.
+   Schließende Klammern, die nicht zum Link gehören, fallen weg.
+   Ohne Link bleibt der Text, wie er ist (dann meldet die Prüfung den Fehler). */
+function onLinkAusText(t) {
+  var x = String(t || '').trim();
+  var putz = function (u) {
+    u = u.replace(/[\]>"'.,;]+$/, '');
+    while (/\)$/.test(u) && (u.match(/\)/g) || []).length > (u.match(/\(/g) || []).length) {
+      u = u.slice(0, -1).replace(/[\]>"'.,;]+$/, '');
+    }
+    return u;
+  };
+  /* Der Seitenname im onenote:-Link darf Leerzeichen haben — er endet mit &end */
+  var on = x.match(/onenote:[^\n<>"\]]*?&end\b/i) || x.match(/onenote:[^\s<>"\]]+/i);
+  if (on) { return putz(on[0]); }
+  var web = x.match(/https:\/\/[^\s<>"\]]+/i);
+  if (web) { return putz(web[0]); }
+  return x;
+}
+
+/* Beim Einfügen gleich aufräumen — man sieht sofort, welcher Link bleibt */
+function onLinkFeld(e) {
+  if (!e || typeof e.value !== 'string') { return; }
+  var l = onLinkAusText(e.value);
+  if (l !== e.value && tlLinkOk(l)) { e.value = l; }
+}
+
 function tlAndroid() {
   return /Android/i.test(String((window.navigator && window.navigator.userAgent) || ''));
 }
@@ -29451,7 +29480,7 @@ function tlFensterLesen() {
   var t = document.getElementById('tlTitel');
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   var l = document.getElementById('tlLink');
-  if (l && typeof l.value === 'string') { f.link = l.value; }
+  if (l && typeof l.value === 'string') { f.link = onLinkAusText(l.value); }
   var dl = document.getElementById('tlDeadline');
   if (dl && typeof dl.value === 'string') { f.deadline = dl.value; }
   katPrivatLesen('tl', f);
@@ -29465,7 +29494,7 @@ function tlFensterHtml() {
   var x = '<div class="fenster"><div class="titel">' + (d ? 'Denkpunkt bearbeiten' : 'Neuer Denkpunkt') + '</div><div class="rumpf">'
     + '<label for="tlTitel">Denkpunkt:</label><textarea id="tlTitel" class="eingabe" rows="3" autocomplete="off">' + esc(f.titel) + '</textarea>'
     + katPrivatHtml('tl', f.bereich || '', false, true)
-    + '<label for="tlLink">OneNote-Link:</label><input id="tlLink" class="eingabe" type="url" autocomplete="off" value="' + esc(f.link) + '" placeholder="onenote:… oder https://…">'
+    + '<label for="tlLink">OneNote-Link:</label><input id="tlLink" class="eingabe" type="text" inputmode="url" spellcheck="false" autocomplete="off" oninput="onLinkFeld(this)" value="' + esc(f.link) + '" placeholder="onenote:… oder https://…">'
     + '<div class="pm-zeile"><span class="leise">Link zur Seite aus OneNote kopieren und hier einfügen</span>'
     + '<button type="button" class="knopf" onclick="tlLinkAusFenster()">Öffnen</button></div>';
   /* Seit 0.147.0: genau eine Deadline, wie bei der Aufgabe */
@@ -30119,7 +30148,7 @@ function wkNeuHtml(s) {
   var f = cl.wk.f || { titel: '', bereich: clNeuBereich(), link: '', heute: false };
   return '<label for="wkTitel">Denkfrage:</label><textarea id="wkTitel" class="eingabe" rows="3" autocomplete="off" placeholder="' + esc(s.vorlage) + '" oninput="wkTippen()">' + esc(f.titel) + '</textarea>'
     + katPrivatHtml('wk', f.bereich || '', false, true)
-    + '<label for="wkLink">OneNote-Link:</label><input id="wkLink" class="eingabe" type="url" autocomplete="off" value="' + esc(f.link) + '" placeholder="onenote:… oder https://… (optional)">'
+    + '<label for="wkLink">OneNote-Link:</label><input id="wkLink" class="eingabe" type="text" inputmode="url" spellcheck="false" autocomplete="off" oninput="onLinkFeld(this)" value="' + esc(f.link) + '" placeholder="onenote:… oder https://… (optional)">'
     + '<label class="haken"><input id="wkHeute" type="checkbox"' + (f.heute ? ' checked' : '') + '> Heute</label>'
     + '<div id="wkAehnlich">' + wkAehnlichHtml(f.titel) + '</div>'
     + '<div class="wk-wahl"><button type="button" class="knopf voll" onclick="wkAnlegen()">Anlegen und weiter</button>'
@@ -30187,7 +30216,7 @@ function wkLesen() {
   var t = document.getElementById('wkTitel');
   if (t && typeof t.value === 'string') { f.titel = t.value; }
   var l = document.getElementById('wkLink');
-  if (l && typeof l.value === 'string') { f.link = l.value; }
+  if (l && typeof l.value === 'string') { f.link = onLinkAusText(l.value); }
   var h = document.getElementById('wkHeute');
   if (h && typeof h.checked === 'boolean') { f.heute = h.checked; }
   katPrivatLesen('wk', f);
