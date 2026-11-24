@@ -10220,7 +10220,8 @@ function aufgabeOnTest() {
 
   /* Die Zeile */
   const z1 = S.pmZeileHtml(mitOn, {});
-  pruefe(/pm-on"/.test(z1) && /raOeffnen\('ra-s'\)/.test(z1), 'die Aufgabe zeigt das ON-Badge');
+  /* seit 0.148.0 über pmOnOeffnen — Radar oder eingefügter Link */
+  pruefe(/pm-on"/.test(z1) && /pmOnOeffnen\('/.test(z1), 'die Aufgabe zeigt das ON-Badge');
   pruefe(/\[Testdaten\]/.test(z1) && /pm-clu/.test(z1), 'der Cluster steht als Vorsatz vor dem Titel');
   pruefe(z1.indexOf('pmMemoVonAufgabe') < 0, 'und eben KEIN Memo-Knopf daneben');
   const z2 = S.pmZeileHtml(mitMemo, {});
@@ -12628,11 +12629,71 @@ function deadlinesTest() {
   const lang = 'Wie kann ich verhindern, dass die Montage regelmäßig schon um neun Uhr gekippt sind und ich den Rest der Woche hinterherlaufe?';
   const kurz = S.fuKurz(lang);
   pruefe(kurz.length <= 70 && /…$/.test(kurz) && lang.indexOf(kurz.slice(0, -1)) === 0, 'lange Titel werden am Wortende auf zwei Zeilen gekürzt');
-  pruefe(/<title>CLIE 0\.147\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.147\.0'/.test(SKRIPT), 'Fassung 0.147.0 im Titel und in APP_VERSION');
+  pruefe(/<title>CLIE \d+\.\d+\.\d+<\/title>/.test(QUELLE) && /APP_VERSION = '\d+\.\d+\.\d+'/.test(SKRIPT), 'Fassung im Titel und in APP_VERSION (die Nummer prüft die jüngste Kategorie)');
   /* Aufräumen: die Ersatz-Elemente sollen spätere Kategorien nicht mit einer Deadline füttern */
   ['pmDeadline', 'tlDeadline', 'pmDatum', 'pmTitel', 'tlTitel', 'fuTitel', 'fuDatum'].forEach(id => { S.document.getElementById(id).value = ''; });
   S.oeffne('uebersicht');
 }
+
+function onenoteLinkTest() {
+  console.log('\n0.148.0 OneNote-Link direkt in die Aufgabe einfügen');
+  if (!CL) { return; }
+  /* Fehlerarten: ohne Radar-Eintrag lässt sich keine Seite verbinden; das
+     Linkfeld weist onenote: ab (type="url"); die Auswahl sieht nicht tippbar
+     aus; Getipptes im Aufgabenfenster geht beim Weg über „OneNote…“ verloren;
+     Radar und eingefügter Link gelten gleichzeitig. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const a = S.pmNeueAufgabe({ titel: 'DFÜ-Abruftest durchführen', datum: heute });
+  S.oeffne('aufgaben');
+  S.pmDetails(a.id);
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/<span>–<\/span><button type="button" class="knopf" onclick="pmOnWahlAuf\(\)">OneNote…/.test(f), 'ohne Verbindung: „–“ und „OneNote…“');
+  /* Getipptes bleibt */
+  S.document.getElementById('pmTitel').value = 'DFÜ-Abruftest am 26.11. durchführen';
+  S.document.getElementById('pmDatum').value = heute; S.document.getElementById('pmZeit').value = '';
+  S.document.getElementById('pmNotiz').value = ''; S.document.getElementById('pmDeadline').value = '';
+  S.pmOnWahlAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'pmon' && /id="pmOnLink"/.test(f) && /pmOnLinkUebernehmen\(\)/.test(f) && /Oder aus dem Radar/.test(f), 'Auswahl: oben „Link einfügen“ mit „Übernehmen“, darunter das Radar');
+  pruefe(/<input id="pmOnLink"[^>]*type="text"/.test(f) && !/<input id="pmOnLink"[^>]*type="url"/.test(f), 'das Feld nimmt auch onenote:-Links (kein type="url")');
+  pruefe(/#aufklapp button\.ra-ziel,\.ra-ziel\{display:flex/.test(QUELLE) && /\.ra-ziel::after\{content:'›'/.test(QUELLE), 'die Radar-Einträge sind als Zeilen mit „›“ gestaltet — tippbar erkennbar');
+  /* ungültig */
+  S.document.getElementById('pmOnLink').value = 'irgendwas';
+  S.pmOnLinkUebernehmen();
+  pruefe(!S.pmAufgabeFinden(a.id).onenote && S.cl.aufklapp === 'pmon', 'kein gültiger Link: nichts gespeichert, die Auswahl bleibt offen');
+  /* gültig */
+  const link = 'onenote:https://firma.sharepoint.com/sites/QS/Notizbuch/Abruf.one#DFÜ&section-id=5a1b2c3d-1111-2222-3333-444455556666';
+  S.document.getElementById('pmOnLink').value = '  ' + link + ' ';
+  S.pmOnLinkUebernehmen();
+  const x = S.pmAufgabeFinden(a.id);
+  pruefe(x.onenote === link && !('radar' in x) && S.pmOnLink(x) === link, 'gültiger Link wird übernommen (ohne Leerzeichen)');
+  pruefe(S.cl.aufklapp === 'pmaufgabe' && S.cl.pm.fenster.titel === 'DFÜ-Abruftest am 26.11. durchführen', 'zurück im Aufgabenfenster — Getipptes ist noch da');
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/pmOnOeffnen\('[^']+'\)">Seite öffnen ›<\/button>/.test(f) && />Ändern…</.test(f), 'Aufgabe: „Seite öffnen ›“ und „Ändern…“');
+  S.oeffne('aufgaben'); S.pmTab('alle');
+  pruefe(new RegExp('class="pm-on" onclick="pmOnOeffnen\\(\'' + a.id + '\'\\)"').test(inhalt()), 'die Zeile zeigt ON — öffnet den eingefügten Link');
+  /* Radar ersetzt den Link und umgekehrt */
+  S.DB.kurs = (S.DB.kurs || []).concat([{ id: 'ra-on1', typ: 'radar', art: 'link', name: 'SMAXUmstellungsprojekt', bereich: 'beruflich', urlWeb: 'https://firma.sharepoint.com/smax', geaendert: 1 }]);
+  S.pmDetails(a.id);
+  S.pmOnWahlAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/value="onenote:/.test(f) && />Lösen</.test(f), 'Ändern: der Link steht im Feld, „Lösen“ ist da');
+  S.pmOnZu('ra-on1');
+  pruefe(x.radar === 'ra-on1' && !('onenote' in x), 'Radar gewählt: der eingefügte Link fällt weg — es gilt nur eines');
+  S.pmOnWahlAuf();
+  S.document.getElementById('pmOnLink').value = 'https://firma.sharepoint.com/:o:/r/sites/QS/Abruf';
+  S.pmOnLinkUebernehmen();
+  pruefe(x.onenote === 'https://firma.sharepoint.com/:o:/r/sites/QS/Abruf' && !('radar' in x), 'Link eingefügt: die Radar-Verbindung fällt weg');
+  S.pmOnWahlAuf();
+  S.pmOnZu('');
+  pruefe(!('onenote' in x) && !('radar' in x), '„Lösen“ entfernt beides');
+  S.document.getElementById('pmOnLink').value = '';
+  S.aufklappZu();
+  pruefe(/<title>CLIE 0\.148\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.148\.0'/.test(SKRIPT), 'Fassung 0.148.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
 
 function huellenTest() {
   console.log('\n225. Hüllen für einzelne Apps (1.2.0)');
@@ -12932,6 +12993,7 @@ function huellenTest() {
   try { thinkListTest(); } catch (e) { fail('0.142.0 Think List warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { weeklyTest(); } catch (e) { fail('0.143.0 Weekly warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deadlinesTest(); } catch (e) { fail('0.147.0 Deadlines warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { onenoteLinkTest(); } catch (e) { fail('0.148.0 OneNote-Link warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

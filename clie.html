@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.147.0</title>
+<title>CLIE 0.148.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -752,6 +752,13 @@ ul.sos-p{margin:6px 0 0;padding-left:22px;line-height:1.45}ul.sos-p li{margin-bo
 .fenster .titel{background:var(--px);color:var(--lcd);font-weight:600;padding:4px 10px;text-align:center}
 .fenster .rumpf{padding:10px 12px;font-size:20px}
 /* Aufgabe mit Seite in OneNote (0.115.0) */
+/* Auswahl „Seite in OneNote“ (seit 0.148.0): eingefügter Link, darunter tippbare Zeilen aus dem Radar */
+#aufklapp button.ra-ziel,.ra-ziel{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-bottom:1px dotted var(--px-zart);border-radius:0;padding:8px 0;margin:0}
+.ra-ziel::after{content:'›';flex:0 0 auto}
+.ra-ziel.an{font-weight:700}
+.pm-on-link{display:flex;gap:6px;align-items:center}
+.pm-on-link .eingabe{flex:1 1 auto;min-width:0}
+.pm-on-link .knopf{flex:0 0 auto}
 .pm-on{font:inherit;font-size:15.5px;background:none;color:var(--px);border:1px solid var(--px);border-radius:4px;padding:0 4px;margin-left:4px;flex:0 0 auto}
 .pm-clu{color:var(--px-mitte);font-size:16px}
 .ra-tropf{outline:3px dashed var(--px);outline-offset:-5px}
@@ -1302,7 +1309,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.147.0';
+var APP_VERSION = '0.148.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -27347,17 +27354,44 @@ function pmOnKnoten(a) {
   return (a && a.radar) ? raFinden(a.radar) : null;
 }
 
+/* Seit 0.148.0 kann eine Aufgabe auch einen eingefügten Link tragen (a.onenote) —
+   dann zählt er; sonst der Knoten im Radar. Es gilt immer nur eines von beiden. */
 function pmOnLink(a) {
+  if (a && tlLinkOk(a.onenote)) { return String(a.onenote).trim(); }
   var k = pmOnKnoten(a);
   return k ? raLink(k) : '';
+}
+
+function pmOnOeffnen(id) {
+  var a = pmAufgabeFinden(id);
+  if (!a) { return; }
+  if (tlLinkOk(a.onenote)) { tlLinkOeffnen(a.onenote); return; }
+  if (a.radar) { raOeffnen(a.radar); }
+}
+
+/* Den eingefügten Link übernehmen */
+function pmOnLinkUebernehmen() {
+  var f = cl.pm.fenster;
+  var a = f && f.id ? pmAufgabeFinden(f.id) : null;
+  if (!a) { aufklappZu(); return; }
+  var e = document.getElementById('pmOnLink');
+  var t = String((e && e.value) || '').trim();
+  if (!tlLinkOk(t)) { melde('Das ist kein OneNote-Link — er muss mit onenote: oder https:// beginnen.', 'warn'); return; }
+  a.onenote = t;
+  delete a.radar;
+  a.geaendert = Date.now();
+  spaeterSichern();
+  melde('Mit OneNote verbunden.', null);
+  pmDetailsZurueck();
 }
 
 function pmOnSetzen(id, knotenId) {
   var a = pmAufgabeFinden(id);
   var k = knotenId ? raFinden(knotenId) : null;
   if (!a) { return false; }
-  if (!knotenId) { delete a.radar; } else if (!k || k.art === 'ordner') { return false; } else {
+  if (!knotenId) { delete a.radar; delete a.onenote; } else if (!k || k.art === 'ordner') { return false; } else {
     a.radar = k.id;
+    delete a.onenote;
     var c = raCluster(k);
     if (c) { a.clusterTag = c; }
   }
@@ -27369,6 +27403,8 @@ function pmOnSetzen(id, knotenId) {
 /* Die Auswahl: alle Knoten des Radars, die einen Link tragen */
 function pmOnWahlAuf() {
   if (!cl.pm.fenster || !cl.pm.fenster.id) { return; }
+  /* Seit 0.148.0: schon Getipptes bleibt beim Zurückkommen stehen */
+  pmFensterLesen();
   cl.aufklapp = 'pmon';
   aufklappNeu();
 }
@@ -27377,8 +27413,13 @@ function pmOnWahlHtml() {
   var f = cl.pm.fenster;
   if (!f) { return ''; }
   var a = f.id ? pmAufgabeFinden(f.id) : null;
-  var jetzt = a && a.radar ? a.radar : '';
+  var jetzt = a && a.radar && !tlLinkOk(a.onenote) ? a.radar : '';
   var h = '<div class="fenster"><div class="titel">Seite in OneNote</div><div class="rumpf">';
+  /* Seit 0.148.0: in OneNote „Link zur Seite kopieren“ und hier einfügen */
+  h += '<label for="pmOnLink">Link einfügen:</label><div class="pm-on-link">'
+    + '<input id="pmOnLink" class="eingabe" type="text" inputmode="url" spellcheck="false" autocomplete="off" placeholder="onenote:… oder https://…" value="' + esc(a && a.onenote ? a.onenote : '') + '">'
+    + '<button type="button" class="knopf" onclick="pmOnLinkUebernehmen()">Übernehmen</button></div>'
+    + '<div class="gruppe">Oder aus dem Radar</div>';
   var leer = true;
   RA_BEREICHE.forEach(function (b) {
     var l = raKnoten().filter(function (k) { return String(k.bereich || 'beruflich') === b[0] && k.art !== 'ordner' && raHatLink(k); });
@@ -27392,7 +27433,7 @@ function pmOnWahlHtml() {
     }).join('');
   });
   if (leer) { h += '<p class="leise">Noch kein Knoten mit Link im Radar — Memo Pad, ▼ Radar.</p>'; }
-  if (jetzt) { h += '<div class="gruppe">Verbindung</div><button type="button" class="ra-ziel" onclick="pmOnZu(\'\')">Lösen</button>'; }
+  if (a && (jetzt || tlLinkOk(a.onenote))) { h += '<div class="gruppe">Verbindung</div><button type="button" class="ra-ziel" onclick="pmOnZu(\'\')">Lösen</button>'; }
   return h + '<div class="knoepfe"><button type="button" class="knopf" onclick="pmDetailsZurueck()">Zurück</button></div></div></div>';
 }
 
@@ -27401,12 +27442,13 @@ function pmOnZu(knotenId) {
   if (!f || !f.id) { aufklappZu(); return; }
   if (!pmOnSetzen(f.id, knotenId)) { melde('Das ging nicht.', 'warn'); return; }
   melde(knotenId ? 'Mit OneNote verbunden.' : 'Verbindung gelöst.', null);
-  pmDetails(f.id);
+  pmDetailsZurueck();
 }
 
+/* Zurück ins Aufgabenfenster — mit dem, was dort schon getippt war (seit 0.148.0) */
 function pmDetailsZurueck() {
   var f = cl.pm.fenster;
-  if (f && f.id) { pmDetails(f.id); } else { aufklappZu(); }
+  if (f && f.id && pmAufgabeFinden(f.id)) { cl.aufklapp = 'pmaufgabe'; aufklappNeu(); } else { aufklappZu(); }
 }
 
 function pmZeileHtml(a, opt) {
@@ -27423,7 +27465,7 @@ function pmZeileHtml(a, opt) {
   var sym = '';
   if (pmIstZeit(a.uhrzeit)) { sym += '<span class="pm-sym" aria-label="Erinnerung">◉' + (o.zeit ? ' ' + esc(clZeitText(a.uhrzeit)) : '') + '</span>'; }
   if (a.wiederholung) { sym += '<span class="pm-sym" aria-label="Wiederholung">↻</span>'; }
-  if (pmOnLink(a)) { sym += '<button type="button" class="pm-on" onclick="raOeffnen(\'' + esc(a.radar) + '\')" aria-label="In OneNote öffnen">ON</button>'; }
+  if (pmOnLink(a)) { sym += '<button type="button" class="pm-on" onclick="pmOnOeffnen(\'' + id + '\')" aria-label="In OneNote öffnen">ON</button>'; }
   /* Seit 0.144.0 steht die Notiz selbst unter dem Titel (höchstens zwei Zeilen) statt ▤ */
   var notiz = String(a.beschreibung || '').trim();
   var datum = '';
@@ -27848,12 +27890,13 @@ function pmFensterHtml() {
   x += '<label for="pmNotiz">Notiz:</label><textarea id="pmNotiz" class="eingabe" rows="3">' + esc(f.notiz) + '</textarea>';
   /* Seit 0.147.0: genau eine Deadline — nicht bei Routinen */
   if (!(a && a.wiederholung)) { x += fuFeldHtml('pm', f.deadline); }
-  /* Seit 0.115.0: eine Seite in OneNote */
+  /* Seit 0.115.0: eine Seite in OneNote — seit 0.148.0 auch als eingefügter Link */
   if (a) {
-    var kn = pmOnKnoten(a);
+    var kn = tlLinkOk(a.onenote) ? null : pmOnKnoten(a);
+    var on = !!kn || tlLinkOk(a.onenote);
     x += '<label>OneNote:</label><div class="pm-zeile">'
-      + (kn ? '<button type="button" class="verweis" onclick="raOeffnen(\'' + esc(kn.id) + '\')">' + esc(kn.name || '') + '</button>' : '<span>–</span>')
-      + '<button type="button" class="knopf" onclick="pmOnWahlAuf()">' + (kn ? 'Ändern…' : 'OneNote…') + '</button></div>';
+      + (on ? '<button type="button" class="verweis" onclick="pmOnOeffnen(\'' + esc(a.id) + '\')">' + (kn ? esc(kn.name || '') : 'Seite öffnen ›') + '</button>' : '<span>–</span>')
+      + '<button type="button" class="knopf" onclick="pmOnWahlAuf()">' + (on ? 'Ändern…' : 'OneNote…') + '</button></div>';
   }
   return x + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="pmSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="aufklappZu()">Abbrechen</button>'
