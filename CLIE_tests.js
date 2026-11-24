@@ -12508,17 +12508,20 @@ function deadlinesTest() {
   /* Agenda: drei Tage Vorlauf, überschritten nur heute, vor dem To Do */
   S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
   h = inhalt();
-  pruefe(/<span>Deadlines<\/span><small>3<\/small>/.test(h) && /Angebot Dachrinne/.test(h) && /Doris/.test(h) && /CTS-4711/.test(h) && !/Kasse/.test(h),
+  /* seit 0.151.0 zeigt ein Montag zusätzlich alle späteren — die Erwartung hängt am Wochentag */
+  const mo = tg => new Date(tg + 'T12:00:00').getDay() === 1;
+  pruefe((mo(heute) ? /<span>Deadlines<\/span><small>4<\/small>/.test(h) && /Kasse/.test(h) : /<span>Deadlines<\/span><small>3<\/small>/.test(h) && !/Kasse/.test(h))
+    && /Angebot Dachrinne/.test(h) && /Doris/.test(h) && /CTS-4711/.test(h),
     'Agenda heute: Überschrittenes, Heutiges und alles bis in drei Tagen — nicht später');
   pruefe(h.indexOf('<span>Deadlines</span>') < h.indexOf('<span>To Do</span>'), 'die Gruppe steht vor dem To Do');
   pruefe(S.FU_VORLAUF === 3, 'Vorlauf: drei Tage');
   S.clKalGehe(S.tagePlus(heute, 1), 'agenda');
   h = inhalt();
-  pruefe(/<span>Deadlines<\/span><small>1<\/small>/.test(h) && /CTS-4711/.test(h) && !/Angebot Dachrinne|Doris/.test(h), 'ein anderer Tag: nur was ab diesem Tag in drei Tagen fällig ist');
+  pruefe((mo(S.tagePlus(heute, 1)) ? /<span>Deadlines<\/span><small>2<\/small>/.test(h) : /<span>Deadlines<\/span><small>1<\/small>/.test(h)) && /CTS-4711/.test(h) && !/Angebot Dachrinne|Doris/.test(h), 'ein anderer Tag: nur was ab diesem Tag in drei Tagen fällig ist');
   S.clKalGehe(S.tagePlus(heute, 17), 'agenda');
   pruefe(/Kasse/.test(inhalt()), 'drei Tage vorher taucht die Deadline auf');
   S.clKalGehe(S.tagePlus(heute, 16), 'agenda');
-  pruefe(!/Kasse/.test(inhalt()), 'vier Tage vorher noch nicht');
+  pruefe(mo(S.tagePlus(heute, 16)) || !/Kasse/.test(inhalt()), 'vier Tage vorher noch nicht (außer an einem Montag)');
   S.fuFinden('fu-a').bereich = 'kb-arbeit'; S.fuFinden('fu-a').kontext = 'beruflich';
   S.clKalGehe(heute, 'agenda');
   S.katSetzen('kb-arbeit');
@@ -12931,7 +12934,35 @@ function deadlineMischformTest() {
   pruefe(/^<div class="td">/.test(inhalt()) && /class="aufg palm pm erl/.test(inhalt()), 'Erledigtes steht in Today in einem eigenen Rahmen (.td)');
   pruefe(/\.td \.aufg\.erl \.tx,\.td \.aufg\.palm\.erl \.tt,\.td \.aufg\.erl \.pm-notiz\{color:inherit;text-decoration:none\}/.test(QUELLE)
     && /\.td \.k\.an::after\{[^}]*border:solid #C8102E/.test(QUELLE), 'erledigt: nicht durchgestrichen, nicht grau — roter Haken im schwarzen Kästchen');
-  pruefe(/<title>CLIE 0\.150\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.150\.0'/.test(SKRIPT), 'Fassung 0.150.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+
+function deadlineMontagTest() {
+  console.log('\n0.151.0 Deadlines: Zielscheibe statt Sanduhr, montags auch die späteren');
+  if (!CL) { return; }
+  /* Fehlerarten: eine Deadline weit in der Zukunft taucht erst drei Tage
+     vorher auf (kein Wochenblick); oder sie steht jeden Tag da; das
+     Symbol kommt als buntes Emoji statt einfarbig. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  let montag = heute;
+  while (new Date(montag + 'T12:00:00').getDay() !== 1) { montag = S.tagePlus(montag, 1); }
+  const dienstag = S.tagePlus(montag, 1);
+  S.DB.followups = [
+    { id: 'mo-1', titel: 'Jahresgespräch vorbereiten', datum: S.tagePlus(montag, 12), status: 'offen', geaendert: 1 },
+    { id: 'mo-2', titel: 'Angebot Carport', datum: S.tagePlus(montag, 2), status: 'offen', geaendert: 1 }];
+  pruefe(S.fuAm(montag).map(x => x.id).join(',') === 'mo-2,mo-1', 'Montag: die nächsten drei Tage und zusätzlich alle späteren, nach Termin');
+  pruefe(S.fuAm(dienstag).map(x => x.id).join(',') === 'mo-2', 'Dienstag: nur die nächsten drei Tage');
+  S.oeffne('today'); S.clKalGehe(montag, '');
+  pruefe(/Jahresgespräch vorbereiten/.test(inhalt()), 'Today am Montag zeigt die spätere Deadline');
+  S.clKalGehe(dienstag, '');
+  pruefe(!/Jahresgespräch vorbereiten/.test(inhalt()), 'am Dienstag nicht mehr');
+  S.oeffne('kalender'); S.clKalGehe(montag, 'agenda');
+  pruefe(/Jahresgespräch vorbereiten/.test(inhalt()), 'die Agenda am Montag ebenso');
+  pruefe(/aria-label="Deadline">'\s*\+ '<circle cx="9" cy="11" r="7\.6"/.test(SKRIPT) && !/🎯/.test(QUELLE), 'Deadline-Symbol: Zielscheibe mit Pfeil, einfarbig — kein Emoji');
+  S.clKalGehe(heute, 'agenda');
+  pruefe(/<title>CLIE 0\.151\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.151\.0'/.test(SKRIPT), 'Fassung 0.151.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -13238,6 +13269,7 @@ function huellenTest() {
   try { onenoteLinkTextTest(); } catch (e) { fail('0.148.1 OneNote-Linktext warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todayTest(); } catch (e) { fail('0.149.0 Today warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deadlineMischformTest(); } catch (e) { fail('0.150.0 Mischform warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deadlineMontagTest(); } catch (e) { fail('0.151.0 Montag warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

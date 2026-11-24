@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.150.0</title>
+<title>CLIE 0.151.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -1334,7 +1334,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.150.0';
+var APP_VERSION = '0.151.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29680,12 +29680,14 @@ cl.td = { ein: null, erlWeg: false };
 
 var TD_WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
-/* Kleine Symbole an der Stelle des Kästchens (seit 0.150.0) */
+/* Kleine Symbole an der Stelle des Kästchens (seit 0.150.0; Deadline seit 0.151.0 eine Zielscheibe mit Pfeil — einfarbig, kein Emoji) */
 var TD_SYM_KALENDER = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="ganztägig"><rect x="2" y="3.5" width="16" height="14.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>'
   + '<path d="M2 8h16M6.5 1.5v4M13.5 1.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-var TD_SYM_DEADLINE = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="Deadline"><path d="M4 2h12M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
-  + '<path d="M5.5 2.5c0 4 4.5 5 4.5 7.5s-4.5 3.5-4.5 7.5M14.5 2.5c0 4-4.5 5-4.5 7.5s4.5 3.5 4.5 7.5" fill="none" stroke="currentColor" stroke-width="1.6"/>'
-  + '<path d="M7 17h6l-3-3.5z" fill="currentColor"/></svg>';
+var TD_SYM_DEADLINE = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="Deadline">'
+  + '<circle cx="9" cy="11" r="7.6" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  + '<circle cx="9" cy="11" r="4.3" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  + '<circle cx="9" cy="11" r="1.6" fill="currentColor"/>'
+  + '<path d="M9 11L17.5 2.5M14 2.5h3.5V6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 /* Die Datumszeile als Kalenderblatt: Tageszahl groß, Wochentag, Monat; Pfeile rechts,
    „Heute“ springt zurück, wenn ein anderer Tag zu sehen ist. */
@@ -30035,14 +30037,16 @@ function fuKatQuelle(x) {
 
 function fuPasst(x) { return clPasst(fuKatQuelle(x)); }
 
-/* Für die Agenda (seit 0.147.0): alles, was ab diesem Tag in FU_VORLAUF Tagen fällig ist;
-   heute auch Überschrittenes — gefiltert wie die Aufgaben */
+/* Für Today und die Agenda (seit 0.147.0): alles, was ab diesem Tag in FU_VORLAUF Tagen fällig ist;
+   heute auch Überschrittenes — gefiltert wie die Aufgaben.
+   Seit 0.151.0 an jedem Montag zusätzlich alle späteren — der Wochenblick nach vorn. */
 function fuAm(tag) {
   var heute = isoDatum();
   var bis = tagePlus(tag, FU_VORLAUF);
+  var montag = ausIso(tag).getDay() === 1;
   return fuAlle().filter(function (x) {
     if (!fuAktiv(x) || !pmIstDatum(x.datum) || !fuPasst(x)) { return false; }
-    if (x.datum > bis) { return false; }
+    if (x.datum > bis && !montag) { return false; }
     return tag === heute ? true : x.datum >= tag;
   }).sort(fuReihe);
 }
