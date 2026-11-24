@@ -12770,9 +12770,9 @@ function todayTest() {
                     { id: 'fu-td2', titel: 'Konzept QS-Tag abgeben', datum: S.tagePlus(heute, 2), status: 'offen', geaendert: 1 }];
   S.oeffne('today');
   let h = inhalt();
-  const iTag = h.indexOf('<div class="td-tag">'), iWork = h.indexOf('Daran arbeite ich heute…');
-  pruefe(iTag >= 0 && iWork > iTag && !/<span>Tag<\/span>|<span>Worklist<\/span>/.test(h), 'oben der Tag, darunter „Daran arbeite ich heute…“ (0.149.1)');
-  pruefe(/<div class="pm-bal td-bal">Daran arbeite ich heute…<\/div>/.test(h) && !/td-bal">[^<]*<small>/.test(h), 'Balken wie die Gruppen im To Do — ohne Zähler');
+  const iTag = h.indexOf('<div class="td-tag">'), iWork = h.indexOf('Daran arbeite ich heute …');
+  pruefe(iTag >= 0 && iWork > iTag && !/<span>Tag<\/span>|<span>Worklist<\/span>/.test(h), 'oben der Tag, darunter „Daran arbeite ich heute …“ (0.149.1)');
+  pruefe(/<div class="pm-bal td-bal">Daran arbeite ich heute …<\/div>/.test(h) && !/td-bal">[^<]*<small>/.test(h), 'Balken wie die Gruppen im To Do — ohne Zähler');
   const tag = h.slice(iTag, iWork), work = h.slice(iWork);
   pruefe(/Urlaub Müller/.test(tag) && /Reifenwechsel buchen/.test(tag) && /Konzept QS-Tag abgeben/.test(tag) && /Posteingang leeren/.test(tag), 'Tag: ganztägige Termine, Deadlines (überschritten und drei Tage voraus) und Routinen');
   pruefe((tag.match(/<div class="aufg palm/g) || []).length === 4 && !/class="gz|ganztags/.test(tag), 'alles im Abschnitt Tag im gleichen Stil — ohne Rahmen');
@@ -12962,7 +12962,41 @@ function deadlineMontagTest() {
   pruefe(/Jahresgespräch vorbereiten/.test(inhalt()), 'die Agenda am Montag ebenso');
   pruefe(/aria-label="Deadline">'\s*\+ '<circle cx="9" cy="11" r="7\.6"/.test(SKRIPT) && !/🎯/.test(QUELLE), 'Deadline-Symbol: Zielscheibe mit Pfeil, einfarbig — kein Emoji');
   S.clKalGehe(heute, 'agenda');
-  pruefe(/<title>CLIE 0\.151\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.151\.0'/.test(SKRIPT), 'Fassung 0.151.0 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+
+function todayTermineTest() {
+  console.log('\n0.152.0 Today: Uhrzeit-Termine auf Wunsch — Knopf mit Uhr, Block zwischen Erinnerungen und Arbeit');
+  if (!CL) { return; }
+  /* Fehlerarten: Termine stehen ungefragt in Today; der Block landet an
+     der falschen Stelle; der Knopf bleibt offen beim Blättern; ohne
+     Termine steht ein leerer Knopf da. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  const echt = S.termineFuerTag;
+  S.termineFuerTag = is => is === heute
+    ? { ganztags: [], zeit: [{ id: 'tz1', zeit: '09:00', bis: '09:30', titel: 'Jour fixe QS', ganztags: false }, { id: 'tz2', zeit: '23:58', bis: '23:59', titel: 'Abstimmung DFÜ', ganztags: false }] }
+    : { ganztags: [], zeit: [] };
+  try {
+    S.DB.followups = [{ id: 'tt-f', titel: 'Kita-Anmeldung', datum: heute, status: 'offen', geaendert: 1 }];
+    S.oeffne('today');
+    let h = inhalt();
+    pruefe(/<button type="button" class="td-uhr" onclick="tdTermineUm\(\)"[^>]*><svg[\s\S]*?<\/svg>2<\/button>/.test(h) && !/Jour fixe QS/.test(h) && S.cl.td.termine === false, 'standardmäßig aus — oben rechts die Uhr mit der Anzahl');
+    S.tdTermineUm();
+    h = inhalt();
+    const iE = h.indexOf('Erinnerungen / Deadlines …'), iT = h.indexOf('>Termine …<'), iA = h.indexOf('Daran arbeite ich heute …');
+    pruefe(iE >= 0 && iT > iE && iA > iT, 'eingeblendet: „Termine …“ zwischen Erinnerungen und „Daran arbeite ich heute …“');
+    pruefe(/class="td-uhr an"/.test(h) && /<span class="ag-zt">[^<]*9[^<]*<\/span><button type="button" class="tx lang" onclick="terminZeigen\('[^']+','tz1'\)">/.test(h), 'Knopf dunkel; Zeilen mit Uhrzeit, ein Tipp öffnet den Termin');
+    pruefe(/td-z ausf vorbei"><span class="ag-zt">[^<]*9/.test(h) || new Date().getHours() < 9, 'Vorbeigegangenes steht grau');
+    S.clBlaettern(1);
+    pruefe(S.cl.td.termine === false && !/td-uhr/.test(inhalt()), 'blättern klappt zu — ohne Termine kein Knopf');
+    S.clBlaettern(-1);
+    S.tdTermineUm(); S.oeffne('aufgaben'); S.oeffne('today');
+    pruefe(S.cl.td.termine === false, 'neu geöffnet: wieder aus');
+    pruefe(/' …<\/div>'/.test(SKRIPT) && !/Daran arbeite ich heute…/.test(QUELLE), '„Daran arbeite ich heute …“ mit Leerzeichen vor den Punkten');
+  } finally { S.termineFuerTag = echt; }
+  pruefe(/<title>CLIE 0\.152\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.152\.0'/.test(SKRIPT), 'Fassung 0.152.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -13270,6 +13304,7 @@ function huellenTest() {
   try { todayTest(); } catch (e) { fail('0.149.0 Today warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deadlineMischformTest(); } catch (e) { fail('0.150.0 Mischform warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { deadlineMontagTest(); } catch (e) { fail('0.151.0 Montag warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { todayTermineTest(); } catch (e) { fail('0.152.0 Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS

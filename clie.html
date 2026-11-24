@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.151.0</title>
+<title>CLIE 0.152.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -144,6 +144,11 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .td-pf{display:flex;gap:4px;margin-left:auto;align-items:center}
 .td-pf .blatt-pfeil{min-width:36px;border:2px solid var(--px);border-radius:4px;height:30px}
 .td-pf .knopf{padding:1px 8px}
+/* Termine ein-/ausblenden (seit 0.152.0): Uhr mit Anzahl, dunkel wenn offen */
+.td-uhr{display:inline-flex;align-items:center;gap:3px;border:2px solid var(--px);border-radius:4px;height:30px;padding:0 6px;font-size:16.5px}
+.td-uhr svg{width:17px;height:17px}
+.td-uhr.an{background:var(--px);color:var(--lcd)}
+.td-z.vorbei .tt,.td-z.vorbei .ag-zt{color:var(--px-mitte)}
 /* Erledigtes in Today (seit 0.150.0): nicht durchgestrichen, nicht grau — roter Haken im schwarzen Kästchen wie in OneNote */
 .td .aufg.erl .tx,.td .aufg.palm.erl .tt,.td .aufg.erl .pm-notiz{color:inherit;text-decoration:none}
 .td .k.an{background:transparent;position:relative}
@@ -1334,7 +1339,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.151.0';
+var APP_VERSION = '0.152.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3646,7 +3651,7 @@ var CL_APPS = [
   /* Seit 0.149.0: Today — der Arbeitstag ohne Uhrzeit-Termine (Hülle today.html); ersetzt die Think List im Raster,
      seit 0.149.1 das erste Feld */
   { id: 'today', name: 'Today', stufe: '',
-    was: 'Der Tag zum Arbeiten: oben ganztägige Termine, Deadlines und Routinen, darunter „Daran arbeite ich heute…“ mit allem, was auf diesen Tag geplant ist.' },
+    was: 'Der Tag zum Arbeiten: oben ganztägige Termine, Deadlines und Routinen, darunter „Daran arbeite ich heute …“ mit allem, was auf diesen Tag geplant ist.' },
   /* Seit 0.109.0: Manifest und Routines unter einem Dach */
   { id: 'routinen', name: 'Roots', stufe: '',    was: 'Gewohnheiten und Routinen an einem Ort.' },
   { id: 'kalender', name: 'Date Book', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
@@ -5302,7 +5307,7 @@ function oeffne(id) {
   /* Day Control und Think List sind ausgebaut — ihre Wege führen seit 0.149.0 nach Today */
   if (id === 'tagessteuerung' || id === 'daycontrol' || id === 'thinklist') { id = 'today'; }
   /* Today beginnt von außen immer bei heute */
-  if (id === 'today' && cl.app !== 'today') { cl.kal.datum = ''; }
+  if (id === 'today' && cl.app !== 'today') { cl.kal.datum = ''; cl.td.termine = false; }
   /* Das Weekly beginnt von außen immer bei CONTROL (seit 0.143.0) */
   if (id === 'weekly' && cl.app !== 'weekly') { cl.wk = wkFrisch(); }
   if (id === 'deadlines' && cl.app !== 'deadlines') { cl.fu.sicht = 'offen'; }
@@ -5974,7 +5979,7 @@ function clBlattHtml(text) {
 function clBlaettern(richtung) {
   if (cl.kal.ansicht === 'jahr') { jaJahrUm(richtung); return; }
   /* Seit 0.149.0 blättert Today tageweise — derselbe Tag wie im Date Book */
-  if (cl.app === 'today') { clKalGehe(tagePlus(clKalDatum(), richtung), ''); return; }
+  if (cl.app === 'today') { cl.td.termine = false; clKalGehe(tagePlus(clKalDatum(), richtung), ''); return; }
   /* Seit 0.140.0 blättert die Agenda selbst tageweise */
   if (cl.kal.ansicht === 'agenda') { clKalGehe(tagePlus(clKalDatum(), richtung), 'agenda'); return; }
   var d = clKalDatum();
@@ -29676,9 +29681,14 @@ function tlAufklapp(el) {
    ============================================================ */
 
 /* erlWeg: Erledigtes verbergen — seit 0.149.1 standardmäßig aus (eigener Schalter, nicht der der Agenda) */
-cl.td = { ein: null, erlWeg: false };
+/* termine: die Uhrzeit-Termine des Tages zeigen — seit 0.152.0, standardmäßig aus,
+   beim Öffnen und beim Blättern wieder zu */
+cl.td = { ein: null, erlWeg: false, termine: false };
 
 var TD_WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+var TD_SYM_UHR = '<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.3" fill="none" stroke="currentColor" stroke-width="1.7"/>'
+  + '<path d="M9 4.5V9l3 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 
 /* Kleine Symbole an der Stelle des Kästchens (seit 0.150.0; Deadline seit 0.151.0 eine Zielscheibe mit Pfeil — einfarbig, kein Emoji) */
 var TD_SYM_KALENDER = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="ganztägig"><rect x="2" y="3.5" width="16" height="14.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>'
@@ -29691,18 +29701,26 @@ var TD_SYM_DEADLINE = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="Deadl
 
 /* Die Datumszeile als Kalenderblatt: Tageszahl groß, Wochentag, Monat; Pfeile rechts,
    „Heute“ springt zurück, wenn ein anderer Tag zu sehen ist. */
-function tdDatumHtml(is) {
+function tdDatumHtml(is, nTermine) {
   var heute = is === isoDatum();
   return '<div class="td-datum"><span class="td-zahl">' + Number(is.slice(8, 10)) + '</span>'
     + '<span class="td-wt"><b>' + esc(TD_WOCHENTAGE[ausIso(is).getDay()]) + '</b><small>' + esc(KAL_MONATE[Number(is.slice(5, 7)) - 1] + ' ' + is.slice(0, 4)) + (heute ? ' · heute' : '') + '</small></span>'
     + '<span class="td-pf">' + (heute ? '' : '<button type="button" class="knopf" onclick="clKalGehe(isoDatum(), \'\')">Heute</button>')
+    + (nTermine ? '<button type="button" class="td-uhr' + (cl.td.termine ? ' an' : '') + '" onclick="tdTermineUm()" aria-label="Termine '
+      + (cl.td.termine ? 'ausblenden' : 'einblenden') + '">' + TD_SYM_UHR + nTermine + '</button>' : '')
     + clPfeilHtml(-1) + clPfeilHtml(1) + '</span></div>';
+}
+
+function tdTermineUm() {
+  cl.td.termine = !cl.td.termine;
+  zeichne();
 }
 
 function tdHtml() {
   var is = clKalDatum();
   var heute = is === isoDatum();
-  var h = tdDatumHtml(is);
+  var t = clTermineAm(is);
+  var h = tdDatumHtml(is, t.zeit.length);
   var weg = 0;
   var sichtbar = function (a) {
     var erl = a.wiederholung ? istErledigtAn(a, is) : a.status === 'erledigt';
@@ -29719,7 +29737,6 @@ function tdHtml() {
   var show = { datum: false, prio: false, kat: false };
   var alle = pmAmTag(is);
   /* Tag: ganztägig, Deadlines, Routinen */
-  var t = clTermineAm(is);
   var dl = fuAm(is);
   var rout = alle.filter(function (a) { return a.wiederholung; }).filter(sichtbar).sort(nachZeit);
   var tag = t.ganztags.map(function (x) {
@@ -29731,9 +29748,16 @@ function tdHtml() {
   /* Seit 0.150.0 wieder mit Balken — ohne Zähler */
   h += '<div class="pm-bal td-bal">Erinnerungen / Deadlines …</div>'
     + '<div class="td-tag">' + (tag || '<p class="leise">Nichts für diesen Tag.</p>') + '</div>';
+  /* Seit 0.152.0: die Uhrzeit-Termine — nur auf Wunsch (Uhr oben rechts), zwischen Erinnerungen und Arbeit */
+  if (cl.td.termine && t.zeit.length) {
+    h += '<div class="pm-bal td-bal">Termine …</div>' + t.zeit.map(function (x) {
+      return '<div class="aufg palm td-z ausf' + (clVorbei(is, x.bis || x.zeit) ? ' vorbei' : '') + '"><span class="ag-zt">' + esc(clZeitText(x.zeit)) + '</span>'
+        + '<button type="button" class="tx lang" onclick="terminZeigen(\'' + esc(is) + '\',\'' + esc(x.id) + '\')"><span class="tt">' + esc(x.titel) + '</span></button></div>';
+    }).join('');
+  }
   /* Was auf diesen Tag geplant ist — Balken wie die Gruppen im To Do */
   var work = alle.filter(function (a) { return !a.wiederholung; }).filter(sichtbar).sort(nachZeit);
-  h += '<div class="pm-bal td-bal">Daran arbeite ich ' + esc(heute ? 'heute' : 'am ' + clWt(is) + ' ' + clKurzDatum(is)) + '…</div>'
+  h += '<div class="pm-bal td-bal">Daran arbeite ich ' + esc(heute ? 'heute' : 'am ' + clWt(is) + ' ' + clKurzDatum(is)) + ' …</div>'
     + (work.length ? work.map(function (a) { return pmZeileHtml(a, { show: show, tag: is, zeit: true, mitDatum: false }); }).join('')
       : '<p class="leise">Nichts geplant — „+ Einfügen“ oder „Neu“.</p>');
   if (weg) {
