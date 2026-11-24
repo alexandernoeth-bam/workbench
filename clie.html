@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.149.1</title>
+<title>CLIE 0.150.0</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -128,15 +128,29 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .fu-tx{flex:1 1 auto;min-width:0;text-align:left;background:none;border:0;padding:3px 0;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
 .fu-zeile .dt{flex:0 0 auto;white-space:nowrap;padding-top:4px;font-size:16px;min-width:52px;text-align:right}
 .fu-zeile .dt.ue{font-weight:700}
-.fu-ok{flex:0 0 auto;min-width:34px;border:2px solid var(--px);border-radius:5px;padding:1px 6px;margin-top:2px}
-.fu-ok.an{background:var(--px);color:var(--lcd)}
 .fu-zeile.erl .fu-tx{color:var(--px-zart);text-decoration:line-through}
 .fu-bz{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left;background:none;border:0;padding:0 0 3px;color:var(--px-mitte);font-size:15.5px;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
 .fu-bz.zu{text-decoration:line-through}
 /* Today (seit 0.149.0): alles im Abschnitt Tag im gleichen Stil, Kästchen vorne */
 .td-leer{visibility:hidden}
+/* Seit 0.150.0: Symbol statt Kästchen — Kalender für ganztägig, Sanduhr für Deadlines */
+.td-sym{width:20px;height:20px;flex:0 0 20px;color:var(--px);margin-top:2px}
+/* Datumszeile als Kalenderblatt (seit 0.150.0) */
+.td-datum{display:flex;align-items:flex-end;gap:10px;padding:4px 0 6px;border-bottom:2px solid var(--px)}
+.td-zahl{font-size:42px;font-weight:700;line-height:1}
+.td-wt{line-height:1.15}
+.td-wt b{display:block;font-size:19px}
+.td-wt small{font-size:15.5px;color:var(--px-mitte)}
+.td-pf{display:flex;gap:4px;margin-left:auto;align-items:center}
+.td-pf .blatt-pfeil{min-width:36px;border:2px solid var(--px);border-radius:4px;height:30px}
+.td-pf .knopf{padding:1px 8px}
+/* Erledigtes in Today (seit 0.150.0): nicht durchgestrichen, nicht grau — roter Haken im schwarzen Kästchen wie in OneNote */
+.td .aufg.erl .tx,.td .aufg.palm.erl .tt,.td .aufg.erl .pm-notiz{color:inherit;text-decoration:none}
+.td .k.an{background:transparent;position:relative}
+.td .k.an::after{content:'';position:absolute;left:5px;top:0;width:5px;height:11px;border:solid #C8102E;border-width:0 3px 3px 0;transform:rotate(45deg)}
 .td-tag{margin-top:2px}
 .pm-bal.td-bal{margin-top:14px}
+.td > .pm-bal.td-bal:first-of-type{margin-top:8px}
 .td-z .dt.ue{font-weight:700}
 .td-neu{display:flex;flex-direction:column;gap:8px}
 .td-neu .knopf{width:100%;text-align:center}
@@ -1320,7 +1334,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.149.1';
+var APP_VERSION = '0.150.0';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -29654,6 +29668,9 @@ function tlAufklapp(el) {
    keine Zähler. Erledigtes bleibt sichtbar, bis man es verbirgt.
    „+ Einfügen“ legt aus der Zwischenablage eine Aufgabe an — Titel und
    OneNote-Link getrennt. „Neu“ fragt: Aufgabe, Termin oder Deadline.
+   Seit 0.150.0: Datumszeile als Kalenderblatt, Balken „Erinnerungen /
+   Deadlines …“, Symbole statt Kästchen bei Ganztägigem und Deadlines,
+   Erledigtes mit rotem Haken statt durchgestrichen.
    Die Think List ist ausgebaut: Denkpunkte werden in To Do einzeln zu
    Aufgaben (vonDenkpunkt); die Denkpunkte selbst bleiben unverändert.
    ============================================================ */
@@ -29661,10 +29678,29 @@ function tlAufklapp(el) {
 /* erlWeg: Erledigtes verbergen — seit 0.149.1 standardmäßig aus (eigener Schalter, nicht der der Agenda) */
 cl.td = { ein: null, erlWeg: false };
 
+var TD_WOCHENTAGE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+/* Kleine Symbole an der Stelle des Kästchens (seit 0.150.0) */
+var TD_SYM_KALENDER = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="ganztägig"><rect x="2" y="3.5" width="16" height="14.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>'
+  + '<path d="M2 8h16M6.5 1.5v4M13.5 1.5v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+var TD_SYM_DEADLINE = '<svg class="td-sym" viewBox="0 0 20 20" aria-label="Deadline"><path d="M4 2h12M4 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
+  + '<path d="M5.5 2.5c0 4 4.5 5 4.5 7.5s-4.5 3.5-4.5 7.5M14.5 2.5c0 4-4.5 5-4.5 7.5s4.5 3.5 4.5 7.5" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  + '<path d="M7 17h6l-3-3.5z" fill="currentColor"/></svg>';
+
+/* Die Datumszeile als Kalenderblatt: Tageszahl groß, Wochentag, Monat; Pfeile rechts,
+   „Heute“ springt zurück, wenn ein anderer Tag zu sehen ist. */
+function tdDatumHtml(is) {
+  var heute = is === isoDatum();
+  return '<div class="td-datum"><span class="td-zahl">' + Number(is.slice(8, 10)) + '</span>'
+    + '<span class="td-wt"><b>' + esc(TD_WOCHENTAGE[ausIso(is).getDay()]) + '</b><small>' + esc(KAL_MONATE[Number(is.slice(5, 7)) - 1] + ' ' + is.slice(0, 4)) + (heute ? ' · heute' : '') + '</small></span>'
+    + '<span class="td-pf">' + (heute ? '' : '<button type="button" class="knopf" onclick="clKalGehe(isoDatum(), \'\')">Heute</button>')
+    + clPfeilHtml(-1) + clPfeilHtml(1) + '</span></div>';
+}
+
 function tdHtml() {
   var is = clKalDatum();
   var heute = is === isoDatum();
-  var h = clBlattHtml(clWt(is) + ' ' + clKurzDatum(is) + (heute ? ' · heute' : ''));
+  var h = tdDatumHtml(is);
   var weg = 0;
   var sichtbar = function (a) {
     var erl = a.wiederholung ? istErledigtAn(a, is) : a.status === 'erledigt';
@@ -29685,13 +29721,14 @@ function tdHtml() {
   var dl = fuAm(is);
   var rout = alle.filter(function (a) { return a.wiederholung; }).filter(sichtbar).sort(nachZeit);
   var tag = t.ganztags.map(function (x) {
-    return '<div class="aufg palm td-z"><span class="k td-leer" aria-hidden="true"></span>'
-      + '<button type="button" class="tx" onclick="' + clGanzAufruf(is, x) + '"><span class="tt">' + esc(x.titel) + '</span></button></div>';
+    return '<div class="aufg palm td-z ausf">' + TD_SYM_KALENDER
+      + '<button type="button" class="tx lang" onclick="' + clGanzAufruf(is, x) + '"><span class="tt">' + esc(x.titel) + '</span></button></div>';
   }).join('')
     + dl.map(tdDeadlineHtml).join('')
     + rout.map(function (a) { return pmZeileHtml(a, { show: show, tag: is, zeit: true, mitDatum: false }); }).join('');
-  /* Seit 0.149.1 ohne Überschrift und Zähler — der Tag steht einfach oben */
-  h += '<div class="td-tag">' + (tag || '<p class="leise">Nichts für diesen Tag.</p>') + '</div>';
+  /* Seit 0.150.0 wieder mit Balken — ohne Zähler */
+  h += '<div class="pm-bal td-bal">Erinnerungen / Deadlines …</div>'
+    + '<div class="td-tag">' + (tag || '<p class="leise">Nichts für diesen Tag.</p>') + '</div>';
   /* Was auf diesen Tag geplant ist — Balken wie die Gruppen im To Do */
   var work = alle.filter(function (a) { return !a.wiederholung; }).filter(sichtbar).sort(nachZeit);
   h += '<div class="pm-bal td-bal">Daran arbeite ich ' + esc(heute ? 'heute' : 'am ' + clWt(is) + ' ' + clKurzDatum(is)) + '…</div>'
@@ -29700,7 +29737,7 @@ function tdHtml() {
   if (weg) {
     h += '<button type="button" class="erl-knopf" onclick="tdErlUm()">' + (cl.td.erlWeg ? weg + ' erledigt · zeigen' : 'Erledigtes verbergen') + '</button>';
   }
-  return h;
+  return '<div class="td">' + h + '</div>';
 }
 
 function tdErlUm() {
@@ -29708,11 +29745,13 @@ function tdErlUm() {
   zeichne();
 }
 
-/* Eine Deadline im Abschnitt Tag: Kästchen vorne, „bis TT.MM.“ rechts */
+/* Eine Deadline in Today und in der Agenda: Sanduhr statt Kästchen — abgehakt
+   wird die Arbeit, nicht die Deadline (seit 0.150.0); „bis TT.MM.“ rechts */
 function tdDeadlineHtml(x) {
   var id = esc(x.id);
-  return '<div class="aufg palm td-z">' + clKastenHtml(false, 'fuErledigtUm(\'' + id + '\')')
-    + '<button type="button" class="tx" onclick="fuBearbeiten(\'' + id + '\')"><span class="tt">' + esc(x.titel || '') + '</span></button>'
+  /* lange Titel umbrechen wie bei den Aufgaben (.ausf/.lang) statt „…“ */
+  return '<div class="aufg palm td-z ausf">' + TD_SYM_DEADLINE
+    + '<button type="button" class="tx lang" onclick="fuBearbeiten(\'' + id + '\')"><span class="tt">' + esc(x.titel || '') + '</span></button>'
     + '<span class="dt' + (x.datum < isoDatum() ? ' ue' : '') + '">bis ' + esc(clKurzDatum(x.datum)) + '</span></div>';
 }
 
@@ -29968,6 +30007,17 @@ function fuFinden(id) {
 
 function fuOffen(x) { return !!x && x.status !== 'erledigt'; }
 
+/* Mischform (seit 0.150.0): abgehakt wird die Arbeit, nicht die Deadline.
+   Eine Deadline an einer Aufgabe (einem Denkpunkt) gilt, solange die Arbeit
+   offen ist — auch überschritten. Eine Deadline ohne Bezug ist eine reine
+   Erinnerung: nach ihrem Tag ist sie vorbei. Abgehakt (status) zählt weiter. */
+function fuAktiv(x) {
+  if (!fuOffen(x)) { return false; }
+  if (x.aufgabeId) { var a = pmAufgabeFinden(x.aufgabeId); if (a) { return a.status !== 'erledigt'; } }
+  if (x.denkpunktId) { var d = tlFinden(x.denkpunktId); if (d) { return tlOffen(d); } }
+  return !pmIstDatum(x.datum) || x.datum >= isoDatum();
+}
+
 function fuReihe(x, y) {
   var a = String(x.datum || ''), b = String(y.datum || '');
   return (a < b ? -1 : (a > b ? 1 : 0)) || String(x.titel || '').localeCompare(String(y.titel || ''), 'de');
@@ -29991,7 +30041,7 @@ function fuAm(tag) {
   var heute = isoDatum();
   var bis = tagePlus(tag, FU_VORLAUF);
   return fuAlle().filter(function (x) {
-    if (!fuOffen(x) || !pmIstDatum(x.datum) || !fuPasst(x)) { return false; }
+    if (!fuAktiv(x) || !pmIstDatum(x.datum) || !fuPasst(x)) { return false; }
     if (x.datum > bis) { return false; }
     return tag === heute ? true : x.datum >= tag;
   }).sort(fuReihe);
@@ -30102,32 +30152,32 @@ function fuBezugLoesen() {
 /* ---------- Eine Zeile ---------- */
 /* Seit 0.146.0 eine schlichte Tabellenzeile: Titel · Datum (TT.MM., ohne Wochentag,
    nie „heute“) · ✓ — kein Zeichen davor, kein Bezug. Überfälliges ist fett. */
+/* Seit 0.150.0 ohne ✓ — erledigt ist eine Deadline mit ihrer Arbeit; von Hand im Fenster */
 function fuZeileHtml(x, mitDatum) {
   var id = esc(x.id);
-  var ue = fuOffen(x) && x.datum < isoDatum();
+  var an = fuAktiv(x);
+  var ue = an && x.datum < isoDatum();
   var dt = mitDatum === false ? '' : '<span class="dt' + (ue ? ' ue' : '') + '">' + esc(clKurzDatum(x.datum)) + '</span>';
-  return '<div class="fu-zeile' + (fuOffen(x) ? '' : ' erl') + '">'
+  return '<div class="fu-zeile' + (an ? '' : ' erl') + '">'
     + '<button type="button" class="fu-tx" onclick="fuBearbeiten(\'' + id + '\')">' + esc(x.titel || '') + '</button>'
-    + dt
-    + '<button type="button" class="fu-ok' + (fuOffen(x) ? '' : ' an') + '" onclick="fuErledigtUm(\'' + id + '\')" aria-label="' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '">' + (fuOffen(x) ? '✓' : '↺') + '</button>'
-    + '</div>';
+    + dt + '</div>';
 }
 
 /* ---------- Die App ---------- */
 /* Seit 0.146.0: eine Liste, aufsteigend nach Termin, ohne Zwischenüberschriften, gefiltert mit ▼ */
 function fuHtml() {
   if (cl.fu.sicht === 'erledigt') {
-    var e = fuAlle().filter(function (x) { return !fuOffen(x) && fuPasst(x); }).sort(fuReihe);
-    return e.length ? e.map(function (x) { return fuZeileHtml(x, true); }).join('') : '<p class="leise">Nichts erledigt.</p>';
+    var e = fuAlle().filter(function (x) { return !fuAktiv(x) && fuPasst(x); }).sort(fuReihe);
+    return e.length ? e.map(function (x) { return fuZeileHtml(x, true); }).join('') : '<p class="leise">Nichts erledigt oder vorbei.</p>';
   }
-  var offen = fuAlle().filter(function (x) { return fuOffen(x) && fuPasst(x); }).sort(fuReihe);
+  var offen = fuAlle().filter(function (x) { return fuAktiv(x) && fuPasst(x); }).sort(fuReihe);
   if (!offen.length) { return '<p class="leise">Keine Deadlines — „Neu“ tippen.</p>'; }
   return offen.map(function (x) { return fuZeileHtml(x, true); }).join('');
 }
 
 function fuFussHtml() {
   return '<button type="button" class="knopf" onclick="fuNeu()">Neu</button>'
-    + '<button type="button" class="knopf" onclick="fuSichtUm()">' + (cl.fu.sicht === 'erledigt' ? 'Offene' : 'Erledigte…') + '</button>';
+    + '<button type="button" class="knopf" onclick="fuSichtUm()">' + (cl.fu.sicht === 'erledigt' ? 'Offene' : 'Erledigt/vorbei…') + '</button>';
 }
 
 function fuSichtUm() {
@@ -30137,15 +30187,6 @@ function fuSichtUm() {
   zeichne();
 }
 
-function fuErledigtUm(id) {
-  var x = fuFinden(id);
-  if (!x) { return; }
-  if (fuOffen(x)) { x.status = 'erledigt'; x.erledigtAm = isoDatum(); }
-  else { x.status = 'offen'; delete x.erledigtAm; }
-  x.geaendert = jetzt();
-  spaeterSichern();
-  zeichne();
-}
 
 /* ---------- Neu und Bearbeiten: nur Titel und Termin ---------- */
 function fuNeu(datum) {
@@ -30192,7 +30233,9 @@ function fuFensterHtml() {
     + fuFensterBezugHtml(f)
     + '<div class="knoepfe"><button type="button" class="knopf voll" onclick="fuSpeichern()">OK</button>'
     + '<button type="button" class="knopf" onclick="fuAbbrechen()">Abbrechen</button>'
-    + (x ? '<button type="button" class="knopf" onclick="fuErledigtAusFenster()">' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '</button>' : '')
+    + (x ? '<button type="button" class="knopf" onclick="fuErledigtAusFenster()">' + (fuOffen(x) ? 'Erledigt' : 'Wieder offen') + '</button>'
+      /* Seit 0.150.0: löschen, wenn sie sich erledigt hat */
+      + '<button type="button" class="knopf" onclick="fuLoeschen()">Löschen</button>' : '')
     + '</div></div></div>';
 }
 
@@ -30270,12 +30313,22 @@ function fuErledigtAusFenster() {
   zeichne();
 }
 
+function fuLoeschen() {
+  var f = cl.fu.fenster;
+  var x = f && f.id ? fuFinden(f.id) : null;
+  if (x) { fuEntfernen(x); spaeterSichern(); melde('Deadline gelöscht.', null); }
+  cl.fu.fenster = null;
+  aufklappZu();
+  zeichne();
+}
+
 /* ---------- Im Date Book: „Deadlines“ in der Agenda (seit 0.147.0 mit drei Tagen Vorlauf) ---------- */
 function fuAgendaHtml(tag) {
   var l = fuAm(tag);
   if (!l.length) { return ''; }
   return '<div class="gruppe ag-gr"><span>Deadlines</span><small>' + l.length + '</small></div>'
-    + l.map(function (x) { return fuZeileHtml(x, true); }).join('');
+    /* Seit 0.150.0 wie in Today: Sanduhr, „bis TT.MM.“ */
+    + l.map(tdDeadlineHtml).join('');
 }
 
 

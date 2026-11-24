@@ -12452,8 +12452,10 @@ function deadlinesTest() {
      Reste des Follow-up-Fensters („Morgen“, „Follow-up…“) tauchen wieder auf. */
   const S = pmFrisch();
   const heute = S.isoDatum();
+  /* seit 0.150.0 (Mischform) bleibt eine überschrittene Deadline nur mit offener Arbeit stehen */
+  S.DB.aufgaben.push({ id: 'dl-auf', titel: 'Dachrinne', status: 'offen', planung: 'backlog', kontext: 'privat', geaendert: 1 });
   S.DB.followups = [
-    { id: 'fu-a', titel: 'Angebot Dachrinne – Rückmeldung Huber?', datum: S.tagePlus(heute, -3), status: 'offen', geaendert: 1 },
+    { id: 'fu-a', titel: 'Angebot Dachrinne – Rückmeldung Huber?', datum: S.tagePlus(heute, -3), status: 'offen', aufgabeId: 'dl-auf', geaendert: 1 },
     { id: 'fu-b', titel: 'Doris: Feedback nachhalten', datum: heute, status: 'offen', geaendert: 1 },
     { id: 'fu-c', titel: 'Kasse: Erstattung Zahnarzt', datum: S.tagePlus(heute, 20), status: 'offen', geaendert: 1 },
     { id: 'fu-d', titel: 'Längst erledigt', datum: S.tagePlus(heute, -10), status: 'erledigt', erledigtAm: S.tagePlus(heute, -9), geaendert: 1 }];
@@ -12472,7 +12474,7 @@ function deadlinesTest() {
   S.DB.followups = [];
   pruefe(/Keine Deadlines/.test((S.zeichne(), inhalt())), 'leere Liste: „Keine Deadlines“');
   S.DB.followups = [
-    { id: 'fu-a', titel: 'Angebot Dachrinne – Rückmeldung Huber?', datum: S.tagePlus(heute, -3), status: 'offen', geaendert: 1 },
+    { id: 'fu-a', titel: 'Angebot Dachrinne – Rückmeldung Huber?', datum: S.tagePlus(heute, -3), status: 'offen', aufgabeId: 'dl-auf', geaendert: 1 },
     { id: 'fu-b', titel: 'Doris: Feedback nachhalten', datum: heute, status: 'offen', geaendert: 1 },
     { id: 'fu-c', titel: 'Kasse: Erstattung Zahnarzt', datum: S.tagePlus(heute, 20), status: 'offen', geaendert: 1 }];
 
@@ -12497,10 +12499,11 @@ function deadlinesTest() {
 
   /* Erledigen und zurückholen */
   S.oeffne('deadlines');
-  S.fuErledigtUm('fu-b');
-  pruefe(S.fuFinden('fu-b').status === 'erledigt' && !/Doris/.test(inhalt()), '✓ hakt ab — weg aus der Liste');
-  S.fuErledigtUm('fu-b');
-  pruefe(S.fuFinden('fu-b').status === 'offen' && !('erledigtAm' in S.fuFinden('fu-b')), '↺ holt es zurück');
+  /* seit 0.150.0 ohne ✓ in der Zeile — von Hand im Fenster */
+  S.fuBearbeiten('fu-b'); S.fuErledigtAusFenster();
+  pruefe(S.fuFinden('fu-b').status === 'erledigt' && !/Doris/.test(inhalt()), 'im Fenster „Erledigt“ — weg aus der Liste');
+  S.fuBearbeiten('fu-b'); S.fuErledigtAusFenster();
+  pruefe(S.fuFinden('fu-b').status === 'offen' && !('erledigtAm' in S.fuFinden('fu-b')), '„Wieder offen“ holt es zurück');
 
   /* Agenda: drei Tage Vorlauf, überschritten nur heute, vor dem To Do */
   S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
@@ -12760,17 +12763,18 @@ function todayTest() {
     { id: 'td-m', titel: 'Erst morgen dran', status: 'offen', planung: morgen, kontext: 'privat', geaendert: 1 },
     { id: 'td-o', titel: 'Ohne Datum im Backlog', status: 'offen', planung: 'backlog', kontext: 'privat', geaendert: 1 });
   S.DB.jahrestermine = [{ id: 'jt-td', titel: 'Urlaub Müller', von: heute }];
-  S.DB.followups = [{ id: 'fu-td1', titel: 'Reifenwechsel buchen', datum: S.tagePlus(heute, -4), status: 'offen', geaendert: 1 },
+  S.DB.followups = [{ id: 'fu-td1', titel: 'Reifenwechsel buchen', datum: S.tagePlus(heute, -4), status: 'offen', aufgabeId: 'td-g', geaendert: 1 },
                     { id: 'fu-td2', titel: 'Konzept QS-Tag abgeben', datum: S.tagePlus(heute, 2), status: 'offen', geaendert: 1 }];
   S.oeffne('today');
   let h = inhalt();
-  const iTag = h.indexOf('<div class="td-tag">'), iWork = h.indexOf('class="pm-bal td-bal"');
-  pruefe(iTag >= 0 && iWork > iTag && !/<span>Tag<\/span>|<span>Worklist<\/span>/.test(h), 'oben der Tag ohne Überschrift, darunter „Daran arbeite ich heute…“ (0.149.1)');
+  const iTag = h.indexOf('<div class="td-tag">'), iWork = h.indexOf('Daran arbeite ich heute…');
+  pruefe(iTag >= 0 && iWork > iTag && !/<span>Tag<\/span>|<span>Worklist<\/span>/.test(h), 'oben der Tag, darunter „Daran arbeite ich heute…“ (0.149.1)');
   pruefe(/<div class="pm-bal td-bal">Daran arbeite ich heute…<\/div>/.test(h) && !/td-bal">[^<]*<small>/.test(h), 'Balken wie die Gruppen im To Do — ohne Zähler');
   const tag = h.slice(iTag, iWork), work = h.slice(iWork);
   pruefe(/Urlaub Müller/.test(tag) && /Reifenwechsel buchen/.test(tag) && /Konzept QS-Tag abgeben/.test(tag) && /Posteingang leeren/.test(tag), 'Tag: ganztägige Termine, Deadlines (überschritten und drei Tage voraus) und Routinen');
   pruefe((tag.match(/<div class="aufg palm/g) || []).length === 4 && !/class="gz|ganztags/.test(tag), 'alles im Abschnitt Tag im gleichen Stil — ohne Rahmen');
-  pruefe(/<div class="aufg palm td-z"><span class="k td-leer"/.test(tag) && /<div class="aufg palm td-z"><button type="button" class="k"[^>]*onclick="fuErledigtUm\('fu-td1'\)"/.test(tag), 'Kästchen vorne — bei Deadlines hakt es ab, ganztägig bleibt die Stelle frei');
+  pruefe(/<div class="aufg palm td-z ausf"><svg class="td-sym"[^>]*aria-label="ganztägig"/.test(tag) && /<div class="aufg palm td-z ausf"><svg class="td-sym"[^>]*aria-label="Deadline"/.test(tag) && /class="tx lang" onclick="fuBearbeiten/.test(tag) && !/fuErledigtUm/.test(tag),
+    'vorne ein Symbol statt Kästchen: Kalender bei ganztägig, Sanduhr bei Deadlines (0.150.0)');
   pruefe(/<span class="dt ue">bis /.test(tag) && /<span class="dt">bis /.test(tag), 'Deadline rechts „bis TT.MM.“, überschritten fett');
   pruefe(/DFÜ-Freigabetest durchführen/.test(work) && /Liegengebliebenes von gestern/.test(work) && !/Erst morgen dran|Ohne Datum im Backlog|Posteingang leeren/.test(work), 'Daran arbeite ich heute: auf heute Geplantes und Liegengebliebenes — nichts Ungeplantes, keine Routinen');
   pruefe(!/ag-zt|Als Nächstes|<span>Termine<\/span>|☆|★|Vorhaben/.test(h), 'keine Uhrzeit-Termine, kein Stern, kein Typ');
@@ -12868,7 +12872,66 @@ function todayTest() {
   S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
   pruefe(!/<span>Denken<\/span>/.test(inhalt()) && typeof S.tlAgendaHtml === 'undefined', 'die Agenda zeigt kein „Denken“ mehr');
   ['tdText', 'tdTitel', 'tdLink', 'pmTitel'].forEach(id => { S.document.getElementById(id).value = ''; });
-  pruefe(/<title>CLIE 0\.149\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.149\.1'/.test(SKRIPT), 'Fassung 0.149.1 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+
+function deadlineMischformTest() {
+  console.log('\n0.150.0 Deadlines als Mischform — abgehakt wird die Arbeit; Today als Kalenderblatt, roter Haken');
+  if (!CL) { return; }
+  /* Fehlerarten: eine Deadline muss noch einmal extra abgehakt werden;
+     eine überschrittene Deadline verschwindet, obwohl die Arbeit offen ist;
+     eine Erinnerung ohne Bezug bleibt nach ihrem Tag stehen; das Datum
+     springt nicht zurück; Erledigtes in Today wieder durchgestrichen. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  S.DB.aufgaben.push({ id: 'mf-a', titel: 'Steuerunterlagen sortieren', status: 'offen', planung: heute, kontext: 'privat', geaendert: 1 });
+  S.DB.jahrestermine = [{ id: 'jt-mf', titel: 'Geburtstag Antje', von: heute }];
+  S.DB.followups = [
+    { id: 'mf-1', titel: 'Steuer abgeben', datum: S.tagePlus(heute, -2), status: 'offen', aufgabeId: 'mf-a', geaendert: 1 },
+    { id: 'mf-2', titel: 'Abgabe Gutachten (nur Erinnerung)', datum: S.tagePlus(heute, -1), status: 'offen', geaendert: 1 },
+    { id: 'mf-3', titel: 'Kita-Anmeldung', datum: heute, status: 'offen', geaendert: 1 }];
+  pruefe(S.fuAktiv(S.fuFinden('mf-1')) && !S.fuAktiv(S.fuFinden('mf-2')) && S.fuAktiv(S.fuFinden('mf-3')), 'mit offener Arbeit gilt sie auch überschritten — ohne Bezug ist sie nach ihrem Tag vorbei');
+  S.oeffne('today');
+  let h = inhalt();
+  pruefe(/Steuer abgeben/.test(h) && /<span class="dt ue">bis /.test(h) && !/Abgabe Gutachten/.test(h) && /Kita-Anmeldung/.test(h), 'Today: überschritten mit offener Aufgabe fett; die vorbeigegangene Erinnerung ist weg; am Tag selbst steht sie da');
+  pruefe(!/fuErledigtUm|fu-ok/.test(h) && typeof S.fuErledigtUm === 'undefined', 'kein Kästchen und kein ✓ an Deadlines');
+  S.pmHaken('mf-a', heute);
+  pruefe(!S.fuAktiv(S.fuFinden('mf-1')) && S.fuFinden('mf-1').status === 'offen' && !/Steuer abgeben/.test(inhalt()), 'Aufgabe abgehakt: ihre Deadline ist mit erledigt — ohne zweiten Haken');
+  S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
+  pruefe(!/Steuer abgeben/.test(inhalt()) && /Kita-Anmeldung/.test(inhalt()) && /aria-label="Deadline"/.test(inhalt()), 'die Agenda folgt derselben Regel — mit Sanduhr');
+  S.oeffne('aufgaben'); S.pmHaken('mf-a');
+  pruefe(S.fuAktiv(S.fuFinden('mf-1')), 'Aufgabe wieder offen: die Deadline gilt wieder');
+  /* Liste und Fenster */
+  S.oeffne('deadlines');
+  h = inhalt();
+  pruefe(/Steuer abgeben/.test(h) && /Kita-Anmeldung/.test(h) && !/Abgabe Gutachten/.test(h) && !/fu-ok/.test(h), 'Deadlines: nur was gilt, ohne ✓');
+  S.fuSichtUm();
+  pruefe(/Abgabe Gutachten/.test(inhalt()) && /Offene/.test(S.document.getElementById('fuss').innerHTML), '„Erledigt/vorbei…“ zeigt die vorbeigegangene Erinnerung');
+  S.fuSichtUm();
+  S.fuBearbeiten('mf-3');
+  pruefe(/fuLoeschen\(\)">Löschen/.test(S.document.getElementById('aufklapp').innerHTML), 'im Fenster: „Löschen“');
+  S.fuLoeschen();
+  pruefe(!S.fuFinden('mf-3') && S.DB.grabsteine.some(g => g.s === 'followups' && g.id === 'mf-3') && !S.cl.aufklapp, 'Löschen entfernt sie — mit Grabstein');
+  /* Today: Kalenderblatt, Balken, Symbol, roter Haken */
+  S.oeffne('today');
+  h = inhalt();
+  const wt = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][new Date(heute + 'T12:00:00').getDay()];
+  pruefe(new RegExp('<div class="td-datum"><span class="td-zahl">' + Number(heute.slice(8, 10)) + '</span><span class="td-wt"><b>' + wt + '</b>').test(h) && /· heute<\/small>/.test(h) && !/>Heute<\/button>/.test(h),
+    'Datumszeile als Kalenderblatt: Tageszahl, Wochentag, Monat · heute');
+  S.clBlaettern(1);
+  h = inhalt();
+  pruefe(/clKalGehe\(isoDatum\(\), ''\)">Heute<\/button>/.test(h) && !/· heute/.test(h) && /Daran arbeite ich am /.test(h), 'an einem anderen Tag: Knopf „Heute“');
+  S.clKalGehe(heute, '');
+  pruefe(S.clKalDatum() === heute, '„Heute“ springt zurück');
+  h = inhalt();
+  pruefe(h.indexOf('Erinnerungen / Deadlines …') >= 0 && h.indexOf('Erinnerungen / Deadlines …') < h.indexOf('Geburtstag Antje') && /<div class="pm-bal td-bal">Erinnerungen/.test(h), 'oben wieder ein Balken „Erinnerungen / Deadlines …“');
+  pruefe(/aria-label="ganztägig"[\s\S]*?Geburtstag Antje/.test(h), 'vor ganztägigen Terminen ein Kalender-Symbol');
+  S.pmHaken('mf-a', heute);
+  pruefe(/^<div class="td">/.test(inhalt()) && /class="aufg palm pm erl/.test(inhalt()), 'Erledigtes steht in Today in einem eigenen Rahmen (.td)');
+  pruefe(/\.td \.aufg\.erl \.tx,\.td \.aufg\.palm\.erl \.tt,\.td \.aufg\.erl \.pm-notiz\{color:inherit;text-decoration:none\}/.test(QUELLE)
+    && /\.td \.k\.an::after\{[^}]*border:solid #C8102E/.test(QUELLE), 'erledigt: nicht durchgestrichen, nicht grau — roter Haken im schwarzen Kästchen');
+  pruefe(/<title>CLIE 0\.150\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.150\.0'/.test(SKRIPT), 'Fassung 0.150.0 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 
@@ -13174,6 +13237,7 @@ function huellenTest() {
   try { onenoteLinkTest(); } catch (e) { fail('0.148.0 OneNote-Link warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { onenoteLinkTextTest(); } catch (e) { fail('0.148.1 OneNote-Linktext warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { todayTest(); } catch (e) { fail('0.149.0 Today warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { deadlineMischformTest(); } catch (e) { fail('0.150.0 Mischform warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
