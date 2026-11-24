@@ -13093,7 +13093,39 @@ function terminZeileTest() {
   pruefe(/\.tz-zt\{[^}]*border-right:1px solid/.test(QUELLE) && /\.tz-zt\{[^}]*font-size:17px/.test(QUELLE) && /\.tz-z\{[^}]*align-items:baseline[^}]*border-bottom:1px dotted/.test(QUELLE), 'Strich zwischen Uhrzeit und Titel, gleiche Linie, gepunktete Trennlinie');
   pruefe(/html\.schema-wb \.tz-z\.tz-ber\{background:rgba\(25,82,90,\.10\)\}/.test(QUELLE), 'Hinterlegung im Petrol des Farbschemas — privat ohne Farbe');
   pruefe(/t\.zeit\.forEach\(function \(x\) \{ h \+= tzZeileHtml\(is, x\); \}\);/.test(SKRIPT), 'die Agenda nutzt dieselbe Zeile');
-  pruefe(/<title>CLIE 0\.153\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.153\.1'/.test(SKRIPT), 'Fassung 0.153.1 im Titel und in APP_VERSION');
+}
+
+
+function saDiaFilterTest() {
+  console.log('\n0.153.2 Collections: der gewählte Filter wirkt auch auf die Diagramme');
+  if (!CL) { return; }
+  /* Fehlerart: die Tabelle zeigt nur „Laufen“, das Diagramm rechnet aber
+     über alle Einträge der Sammlung — Filter und Bild passen nicht zusammen. */
+  frisch();
+  const S = CL;
+  const heute = S.isoDatum();
+  S.localStorage.removeItem('clie-sa-filter'); S.cl.sa.wahl = {};
+  S.DB.sammlungen = [{ id: 'sf', name: 'Sport', felder: [{ id: 'fd', name: 'Datum', typ: 'datum' }, { id: 'fa', name: 'Art', typ: 'text' }, { id: 'fm', name: 'Minuten', typ: 'zahl' }],
+    filter: [{ id: 'fl', name: 'Laufen', feld: 'fa', op: 'gleich', wert: 'Laufen' }],
+    diagramme: [{ art: 'zeit', feld: 'fm', wie: 'summe', takt: 'monat' }, { art: 'torte', feld: 'fm', gruppe: 'fa', wie: 'anzahl' }], rollen: {}, geaendert: 1 }];
+  S.DB.datensaetze = [
+    { id: 'e1', sammlung: 'sf', werte: { fd: heute, fa: 'Laufen', fm: 30 }, geaendert: 1 },
+    { id: 'e2', sammlung: 'sf', werte: { fd: heute, fa: 'Rad', fm: 90 }, geaendert: 1 },
+    { id: 'e3', sammlung: 'sf', werte: { fd: heute, fa: 'Laufen', fm: 45 }, geaendert: 1 }];
+  const s = S.DB.sammlungen[0];
+  S.oeffne('sammlungen'); S.saOeffnen('sf'); S.saAnsicht('diagramm');
+  pruefe(S.saDiaEintraege(s).length === 3, 'ohne Filter: alle Einträge im Diagramm');
+  pruefe(S.saKatText() === 'Alle', 'auch in der Diagramm-Ansicht steht oben rechts der Filter ▼');
+  S.saFilterSetzen('fl');
+  pruefe(S.saDiaEintraege(s).length === 2 && S.saDiaEintraege(s).every(x => x.d.werte.fa === 'Laufen'), 'Filter „Laufen“: das Diagramm rechnet nur mit den gefilterten Einträgen');
+  pruefe(S.cl.sa.ansicht === 'diagramm' && S.saKatText() === 'Laufen', 'die Ansicht bleibt beim Diagramm, oben steht „Laufen“');
+  pruefe(!/Rad/.test(inhalt()), 'im gezeichneten Diagramm kommt „Rad“ nicht mehr vor');
+  S.saFilterSetzen('');
+  pruefe(S.saDiaEintraege(s).length === 3, 'Alle: wieder alles');
+  S.localStorage.removeItem('clie-sa-filter'); S.cl.sa.wahl = {};
+  S.saZurListe();
+  pruefe(/<title>CLIE 0\.153\.2<\/title>/.test(QUELLE) && /APP_VERSION = '0\.153\.2'/.test(SKRIPT), 'Fassung 0.153.2 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
 }
 
 
@@ -13403,6 +13435,7 @@ function huellenTest() {
   try { todayTermineTest(); } catch (e) { fail('0.152.0 Termine warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { outlookTest(); } catch (e) { fail('0.153.0 Outlook warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminZeileTest(); } catch (e) { fail('0.153.1 Terminzeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { saDiaFilterTest(); } catch (e) { fail('0.153.2 Diagramm-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
