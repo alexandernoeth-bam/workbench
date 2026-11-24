@@ -598,9 +598,9 @@ function palmTest() {
   CL.zeichne();
   const h = inhalt();
   /* Seit 0.127.0: Desk kam dazu, Calc ging ins Menü ≡ — zwölf bleiben zwölf. */
-  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["routinen","kalender","aufgaben","today","deadlines","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
+  pruefe(JSON.stringify(CL.CL_APPS.filter(a => a.raster !== false).map(a => a.id)) === '["today","routinen","kalender","aufgaben","deadlines","memo","sammlungen","fokus","vorlesen","kategorien","lernkartei","spiele"]'
     && !CL.clApp('heute') && !CL.clApp('coach') && !CL.clApp('manifest') && !CL.clApp('desk') && !CL.clApp('casestudies'),
-    'Start (seit 0.149.0): Roots, Date Book, To Do List / Today, Deadlines, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
+    'Start (seit 0.149.1): Today, Roots, Date Book / To Do List, Deadlines, Memo Pad / Collections, Fokus, Reader / Categories, Flashcards, Games ▸');
   pruefe(!/oeffne\('(listen|woche|kurs|projekte|ziele)'\)/.test(h) && />Memo Pad</.test(h) && />Date Book</.test(h), 'Projekte und Ziele seit 0.71 im Memo Pad; englische Namen unter den Symbolen');
   pruefe(!/unterz/.test(h) && !/unterz/.test(QUELLE), 'keine Unterzeile unter den Apps');
   const syms = (h.match(/<span class="sym"><svg viewBox="0 0 64 64"[^>]*><circle cx="32" cy="32" r="30" fill="#3B4433"/g) || []).length;
@@ -2582,7 +2582,7 @@ function memoPadTest() {
   S.DB.gedanken.push({ id: 'kv', titel: 'Packliste Urlaub', text: '[] Pass', kontext: 'privat', checkliste: 'vorlage', ordnung: 6, geaendert: 1 });
   /* Start und Namen */
   const raster = S.CL_APPS.filter(a => a.raster !== false).map(a => a.id);
-  pruefe(raster.join(',') === 'routinen,kalender,aufgaben,today,deadlines,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.149.0 Today statt Think List), SOS und Calc nur im Menü');
+  pruefe(raster.join(',') === 'today,routinen,kalender,aufgaben,deadlines,memo,sammlungen,fokus,vorlesen,kategorien,lernkartei,spiele', 'Start: zwölf Felder (seit 0.149.1 Today vorne, statt Think List), SOS und Calc nur im Menü');
   pruefe(S.clApp('kalender').name === 'Date Book' && S.clApp('aufgaben').name === 'To Do List' && S.clApp('memo').name === 'Memo Pad' && S.clApp('rechner').name === 'Calc',
     'Icon-Namen englisch wie am Palm');
   /* Das ▼ */
@@ -10742,7 +10742,7 @@ function leuchtturmTest() {
   /* Roots ist geblieben, Manifest und Umprogrammierung sind weg */
   pruefe(!S.clApp('manifest') && S.clApp('routinen').name === 'Roots', 'Roots gibt es, das Manifest nicht');
   const raster = S.CL_APPS.filter((a) => a.raster !== false);
-  pruefe(raster.length === 12 && raster[0].id === 'routinen', 'Roots steht als erste App im Raster');
+  pruefe(raster.length === 12 && raster[0].id === 'today' && raster[1].id === 'routinen', 'Today steht seit 0.149.1 als erste App im Raster, Roots als zweite');
   pruefe(!S.CL_BILD.manifest && /M16 23H23C31 23 31 33 39 39/.test(S.CL_BILD.routinen), 'und trägt das Bänder-Symbol');
 
   /* Das ▼ kennt nur noch drei Sichten */
@@ -12764,17 +12764,21 @@ function todayTest() {
                     { id: 'fu-td2', titel: 'Konzept QS-Tag abgeben', datum: S.tagePlus(heute, 2), status: 'offen', geaendert: 1 }];
   S.oeffne('today');
   let h = inhalt();
-  const iTag = h.indexOf('<span>Tag</span>'), iWork = h.indexOf('<span>Worklist</span>');
-  pruefe(iTag >= 0 && iWork > iTag, 'oben „Tag“, darunter „Worklist“');
+  const iTag = h.indexOf('<div class="td-tag">'), iWork = h.indexOf('class="pm-bal td-bal"');
+  pruefe(iTag >= 0 && iWork > iTag && !/<span>Tag<\/span>|<span>Worklist<\/span>/.test(h), 'oben der Tag ohne Überschrift, darunter „Daran arbeite ich heute…“ (0.149.1)');
+  pruefe(/<div class="pm-bal td-bal">Daran arbeite ich heute…<\/div>/.test(h) && !/td-bal">[^<]*<small>/.test(h), 'Balken wie die Gruppen im To Do — ohne Zähler');
   const tag = h.slice(iTag, iWork), work = h.slice(iWork);
   pruefe(/Urlaub Müller/.test(tag) && /Reifenwechsel buchen/.test(tag) && /Konzept QS-Tag abgeben/.test(tag) && /Posteingang leeren/.test(tag), 'Tag: ganztägige Termine, Deadlines (überschritten und drei Tage voraus) und Routinen');
   pruefe((tag.match(/<div class="aufg palm/g) || []).length === 4 && !/class="gz|ganztags/.test(tag), 'alles im Abschnitt Tag im gleichen Stil — ohne Rahmen');
   pruefe(/<div class="aufg palm td-z"><span class="k td-leer"/.test(tag) && /<div class="aufg palm td-z"><button type="button" class="k"[^>]*onclick="fuErledigtUm\('fu-td1'\)"/.test(tag), 'Kästchen vorne — bei Deadlines hakt es ab, ganztägig bleibt die Stelle frei');
   pruefe(/<span class="dt ue">bis /.test(tag) && /<span class="dt">bis /.test(tag), 'Deadline rechts „bis TT.MM.“, überschritten fett');
-  pruefe(/DFÜ-Freigabetest durchführen/.test(work) && /Liegengebliebenes von gestern/.test(work) && !/Erst morgen dran|Ohne Datum im Backlog|Posteingang leeren/.test(work), 'Worklist: auf heute Geplantes und Liegengebliebenes — nichts Ungeplantes, keine Routinen');
+  pruefe(/DFÜ-Freigabetest durchführen/.test(work) && /Liegengebliebenes von gestern/.test(work) && !/Erst morgen dran|Ohne Datum im Backlog|Posteingang leeren/.test(work), 'Daran arbeite ich heute: auf heute Geplantes und Liegengebliebenes — nichts Ungeplantes, keine Routinen');
   pruefe(!/ag-zt|Als Nächstes|<span>Termine<\/span>|☆|★|Vorhaben/.test(h), 'keine Uhrzeit-Termine, kein Stern, kein Typ');
   S.pmHaken('td-a', heute);
-  pruefe(!/DFÜ-Freigabetest durchführen/.test(inhalt()) && /1 erledigt · zeigen/.test(inhalt()), 'Abgehaktes verschwindet — „1 erledigt · zeigen“');
+  pruefe(/DFÜ-Freigabetest durchführen/.test(inhalt()) && /tdErlUm\(\)">Erledigtes verbergen/.test(inhalt()) && S.cl.td.erlWeg === false, 'Erledigtes bleibt standardmäßig sichtbar (0.149.1) — „Erledigtes verbergen“');
+  S.tdErlUm();
+  pruefe(!/DFÜ-Freigabetest durchführen/.test(inhalt()) && /1 erledigt · zeigen/.test(inhalt()), 'verborgen: „1 erledigt · zeigen“');
+  S.tdErlUm();
   S.pmHaken('td-a', heute);
   /* Blättern */
   S.clBlaettern(1);
@@ -12864,7 +12868,7 @@ function todayTest() {
   S.oeffne('kalender'); S.clKalGehe(heute, 'agenda');
   pruefe(!/<span>Denken<\/span>/.test(inhalt()) && typeof S.tlAgendaHtml === 'undefined', 'die Agenda zeigt kein „Denken“ mehr');
   ['tdText', 'tdTitel', 'tdLink', 'pmTitel'].forEach(id => { S.document.getElementById(id).value = ''; });
-  pruefe(/<title>CLIE 0\.149\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.149\.0'/.test(SKRIPT), 'Fassung 0.149.0 im Titel und in APP_VERSION');
+  pruefe(/<title>CLIE 0\.149\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.149\.1'/.test(SKRIPT), 'Fassung 0.149.1 im Titel und in APP_VERSION');
   S.oeffne('uebersicht');
 }
 

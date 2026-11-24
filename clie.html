@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CLIE 0.149.0</title>
+<title>CLIE 0.149.1</title>
 <meta name="theme-color" content="#1C2116">
 <link rel="manifest" href="./clie.webmanifest">
 <link rel="icon" href="./clie-192.png?v=0491" sizes="192x192" type="image/png">
@@ -135,6 +135,8 @@ button:focus-visible{outline:2px dotted var(--px);outline-offset:1px}
 .fu-bz.zu{text-decoration:line-through}
 /* Today (seit 0.149.0): alles im Abschnitt Tag im gleichen Stil, Kästchen vorne */
 .td-leer{visibility:hidden}
+.td-tag{margin-top:2px}
+.pm-bal.td-bal{margin-top:14px}
 .td-z .dt.ue{font-weight:700}
 .td-neu{display:flex;flex-direction:column;gap:8px}
 .td-neu .knopf{width:100%;text-align:center}
@@ -1318,7 +1320,7 @@ html.schema-wb .so-k.rot,html.schema-wb .sd-gitter button.x{color:#8A0B22}
    lokal nicht in die Quere; zusammen kommen sie über Google Drive.
    ============================================================ */
 
-var APP_VERSION = '0.149.0';
+var APP_VERSION = '0.149.1';
 var DATEINAME   = 'workbench.json';
 var IDB_NAME    = 'clie-speicher';
 var IDB_STORE   = 'handles';
@@ -3627,14 +3629,15 @@ var CL_APPS = [
   /* Seit 0.71: Namen unter den Symbolen englisch wie am Palm (Date Book, Memo Pad …), alles andere deutsch.
      Raster 3×4 — was ständig gebraucht wird, dazu drei Ordner (seit 0.35) */
   /* Seit 0.96.3 das Manifest als erste App; seit 0.109.0 Roots an seiner Stelle */
+  /* Seit 0.149.0: Today — der Arbeitstag ohne Uhrzeit-Termine (Hülle today.html); ersetzt die Think List im Raster,
+     seit 0.149.1 das erste Feld */
+  { id: 'today', name: 'Today', stufe: '',
+    was: 'Der Tag zum Arbeiten: oben ganztägige Termine, Deadlines und Routinen, darunter „Daran arbeite ich heute…“ mit allem, was auf diesen Tag geplant ist.' },
   /* Seit 0.109.0: Manifest und Routines unter einem Dach */
   { id: 'routinen', name: 'Roots', stufe: '',    was: 'Gewohnheiten und Routinen an einem Ort.' },
   { id: 'kalender', name: 'Date Book', stufe: '',    was: 'Der Tag mit Uhrzeiten: Termine aus dem Google-Kalender und für heute eingeplante Aufgaben, darunter „Vorgenommen“ und die Routinen zum Abhaken. Dazu Woche und Monat.' },
   /* Seit 0.61 eine App „To Do“; seit 0.71 nur noch Alle, Sammler und Listen */
   { id: 'aufgaben', name: 'To Do List', stufe: '',    was: 'Alle offenen Aufgaben aus Listen und dem Sammler, dazu Eingeplantes aus Memo Pad.' },
-  /* Seit 0.149.0: Today — der Arbeitstag ohne Uhrzeit-Termine (Hülle today.html); ersetzt die Think List im Raster */
-  { id: 'today', name: 'Today', stufe: '',
-    was: 'Der Tag zum Arbeiten: oben ganztägige Termine, Deadlines und Routinen, darunter die Worklist mit allem, was auf diesen Tag geplant ist.' },
   /* Seit 0.147.0: Deadlines (bis 0.146.0 Follow-up) — zugesagte oder von außen festgelegte Termine (Hülle deadlines.html) */
   { id: 'deadlines', name: 'Deadlines', stufe: '',
     was: 'Zugesagte oder von außen festgelegte Termine, einzeln oder an einer Aufgabe oder einem Denkpunkt. Drei Tage vorher in der Agenda.' },
@@ -29643,17 +29646,20 @@ function tlAufklapp(el) {
 
    Der Tag zum Arbeiten — die Agenda ohne Uhrzeit-Termine, mit ◀ ▶ zu
    blättern (derselbe Tag wie im Date Book, cl.kal.datum).
-   Oben „Tag“: ganztägige Termine, Deadlines (überschritten und drei Tage
-   voraus) und die Routinen — alles im gleichen Stil, das Kästchen vorne.
-   Darunter „Worklist“: die Aufgaben, die auf diesen Tag geplant sind
-   (heute auch Liegengebliebenes). Kein Stern, kein Typ.
+   Oben der Tag (seit 0.149.1 ohne Überschrift): ganztägige Termine,
+   Deadlines (überschritten und drei Tage voraus) und die Routinen — alles
+   im gleichen Stil, das Kästchen vorne. Darunter „Daran arbeite ich
+   heute…“ (bis 0.149.0 „Worklist“): die Aufgaben, die auf diesen Tag
+   geplant sind (heute auch Liegengebliebenes). Kein Stern, kein Typ,
+   keine Zähler. Erledigtes bleibt sichtbar, bis man es verbirgt.
    „+ Einfügen“ legt aus der Zwischenablage eine Aufgabe an — Titel und
    OneNote-Link getrennt. „Neu“ fragt: Aufgabe, Termin oder Deadline.
    Die Think List ist ausgebaut: Denkpunkte werden in To Do einzeln zu
    Aufgaben (vonDenkpunkt); die Denkpunkte selbst bleiben unverändert.
    ============================================================ */
 
-cl.td = { ein: null };
+/* erlWeg: Erledigtes verbergen — seit 0.149.1 standardmäßig aus (eigener Schalter, nicht der der Agenda) */
+cl.td = { ein: null, erlWeg: false };
 
 function tdHtml() {
   var is = clKalDatum();
@@ -29662,8 +29668,8 @@ function tdHtml() {
   var weg = 0;
   var sichtbar = function (a) {
     var erl = a.wiederholung ? istErledigtAn(a, is) : a.status === 'erledigt';
-    if (erl && !cl.kal.erlZeigen) { weg++; return false; }
-    return true;
+    if (erl) { weg++; }
+    return !(erl && cl.td.erlWeg);
   };
   var nachZeit = function (x, y) {
     var zx = x.wiederholung ? aufgabeZeitAn(x, is) : x.uhrzeit;
@@ -29684,17 +29690,22 @@ function tdHtml() {
   }).join('')
     + dl.map(tdDeadlineHtml).join('')
     + rout.map(function (a) { return pmZeileHtml(a, { show: show, tag: is, zeit: true, mitDatum: false }); }).join('');
-  var n = t.ganztags.length + dl.length + rout.length;
-  h += '<div class="gruppe ag-gr"><span>Tag</span><small>' + n + '</small></div>' + (tag || '<p class="leise">Nichts für diesen Tag.</p>');
-  /* Worklist: was auf diesen Tag geplant ist */
+  /* Seit 0.149.1 ohne Überschrift und Zähler — der Tag steht einfach oben */
+  h += '<div class="td-tag">' + (tag || '<p class="leise">Nichts für diesen Tag.</p>') + '</div>';
+  /* Was auf diesen Tag geplant ist — Balken wie die Gruppen im To Do */
   var work = alle.filter(function (a) { return !a.wiederholung; }).filter(sichtbar).sort(nachZeit);
-  h += '<div class="gruppe ag-gr"><span>Worklist</span><small>' + work.length + '</small></div>'
+  h += '<div class="pm-bal td-bal">Daran arbeite ich ' + esc(heute ? 'heute' : 'am ' + clWt(is) + ' ' + clKurzDatum(is)) + '…</div>'
     + (work.length ? work.map(function (a) { return pmZeileHtml(a, { show: show, tag: is, zeit: true, mitDatum: false }); }).join('')
       : '<p class="leise">Nichts geplant — „+ Einfügen“ oder „Neu“.</p>');
-  if (weg || cl.kal.erlZeigen) {
-    h += '<button type="button" class="erl-knopf" onclick="clErlUm()">' + (cl.kal.erlZeigen ? 'Erledigtes verbergen' : weg + ' erledigt · zeigen') + '</button>';
+  if (weg) {
+    h += '<button type="button" class="erl-knopf" onclick="tdErlUm()">' + (cl.td.erlWeg ? weg + ' erledigt · zeigen' : 'Erledigtes verbergen') + '</button>';
   }
   return h;
+}
+
+function tdErlUm() {
+  cl.td.erlWeg = !cl.td.erlWeg;
+  zeichne();
 }
 
 /* Eine Deadline im Abschnitt Tag: Kästchen vorne, „bis TT.MM.“ rechts */
