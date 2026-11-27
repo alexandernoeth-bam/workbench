@@ -182,7 +182,16 @@ const ABGELOEST_0139 = [
   /* 0.149.0: die Think List als eigene Ansicht ausgebaut — Denkpunkte werden Aufgaben, Today statt „Denken“ in der Agenda */
   "zeigt alle offenen, keine beendeten", "nach Kategorie gruppiert", "Aktionen je Zeile: Antippen, Heute, Bearbeiten",
   "unten „Beendete…“", "„Beendete…“ zeigt die beendeten, mit „Wieder öffnen“", "„Heute“ von gestern gilt nicht mehr",
-  "Agenda: „Denken“ mit den Denkpunkten von heute", "Think List: Knopf „Weekly…“", "Think List: ▼ filtert nach Kategorie"
+  "Agenda: „Denken“ mit den Denkpunkten von heute", "Think List: Knopf „Weekly…“", "Think List: ▼ filtert nach Kategorie",
+  /* 0.154.1: Projekte und Ziele stehen nicht mehr in der Memo-Liste (Reiter „Notizen“), sondern im Reiter „Vorhaben“ —
+     Gruppen, Kürzel und Filter mit Projekten/Zielen prüft seitdem vorhabenTest / vorhabenNotizenTest */
+  "Alle: jede Art, Vorlagen nicht", "Balken: ToDo-Listen · Checklisten · Sonstiges",
+  "Gruppiert: Überschriften (seit 0.94.1) Abläufe · Projekte · Ziele · Sonstiges",
+  "Kategorie: Balken mit Anzahl, „Nicht abgelegt“ zuletzt", "Liste: Kürzel als eigene Spalte, alphabetisch (seit 0.84)",
+  "Memo Pad ▼ Arbeit: „Arbeit“ und „Arbeit - …“, nicht „Arbeitszimmer“", "Privat — ohne Arbeit: keine der Arbeit-Kategorien",
+  "Standard (seit 0.95): Balken nach Typ mit Anzahl", "Standard: alphabetisch, Kürzel als Spalte",
+  "Typ „–“ aus und Kürzel-Spalte aus", "Typ: Balken Projekte 2 · Ziele 1", "Vorlage steht nicht in der Liste",
+  "eine Kategorie gewählt: Balken nach Typ, kein Umschalter", "▼ Haus: nur Memos der Kategorie (gemeinsam mit To Do)"
 ];
 let anzAbgeloest = 0;
 function abgeloest(text) { console.log('  abgl ' + text); anzAbgeloest++; }
@@ -13156,7 +13165,7 @@ function vorhabenTest() {
   S.cl.vh.reiter = 'vorhaben';
   S.oeffne('memo'); S.cl.memo.id = ''; S.zeichne();
   let h = inhalt();
-  pruefe(/vhReiter\('vorhaben'\)">Vorhaben/.test(h) && /vhReiter\('memos'\)">Memos/.test(h), 'oben die Reiter Vorhaben | Memos');
+  pruefe(/vhReiter\('vorhaben'\)">Vorhaben/.test(h) && /vhReiter\('memos'\)">Notizen/.test(h), 'oben die Reiter Vorhaben | Notizen (seit 0.154.1)');
   pruefe(h.indexOf('>läuft<') >= 0 && h.indexOf('>ruht<') > h.indexOf('>läuft<') && /Arbeitszimmer umgestalten/.test(h) && /Halbmarathon/.test(h) && /Carport planen/.test(h) && !/Altes Projekt/.test(h), 'Vorhaben nach läuft und ruht — Erledigte nicht');
   pruefe(/Arbeitszimmer umgestalten<small>2 offen · <b>Deadline [^<]* überschritten<\/b> · heute geplant<\/small>/.test(h), 'je Vorhaben: offene Aufgaben, nächste Deadline (überschritten fett), heute geplant');
   pruefe(/Arbeitszimmer umgestalten<small>[^]*?<\/small><\/button><span class="vh-fehlt">OneNote fehlt<\/span>/.test(h) && /Halbmarathon Fürth 2027<small>Ziel · 1 offen<\/small><\/button><button type="button" class="pm-on" onclick="vhOneNote\('vz1'\)"/.test(h), 'mit Seite „ON“, ohne Seite „OneNote fehlt“; Ziele tragen „Ziel“');
@@ -13165,7 +13174,7 @@ function vorhabenTest() {
   pruefe(/Altes Projekt/.test(inhalt()), '„Erledigte…“ zeigt die erledigten');
   S.vhErledigteUm();
   S.vhReiter('memos');
-  pruefe(/class="memo-zeile pm/.test(inhalt()) && /vhReiter\('vorhaben'\)/.test(inhalt()), 'Reiter „Memos“: die bisherige Memo-Liste, unverändert');
+  pruefe(/vhReiter\('vorhaben'\)/.test(inhalt()) && !/Arbeitszimmer umgestalten|Halbmarathon|Carport planen/.test(inhalt()), 'Reiter „Notizen“: keine Projekte und Ziele mehr (seit 0.154.1)');
   S.vhReiter('vorhaben');
   /* Seite */
   S.pmMemoOeffnen('vp1');
@@ -13249,7 +13258,40 @@ function vorhabenTest() {
   pruefe(/Kisten aussortieren<\/span><span class="pm-vh">Arbeitszimmer umgestalten<\/span>/.test(h), 'Today: auch unter der Deadline');
   S.oeffne('aufgaben'); S.pmTab('alle');
   pruefe(!/pm-vh/.test(inhalt()), 'To Do bleibt einzeilig wie bisher');
-  pruefe(/<title>CLIE 0\.154\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.154\.0'/.test(SKRIPT), 'Fassung 0.154.0 im Titel und in APP_VERSION');
+  S.cl.vh.reiter = 'memos';
+  S.oeffne('uebersicht');
+}
+
+
+function vorhabenNotizenTest() {
+  console.log('\n0.154.1 Memo Pad: Reiter „Notizen“ ohne Projekte und Ziele — Filter ▼ im Reiter „Vorhaben“');
+  if (!CL) { return; }
+  /* Fehlerart: ein Vorhaben steht doppelt im Memo Pad (einmal als Vorhaben,
+     einmal als Memo) — derselbe Datensatz, zwei Anzeigen. */
+  const S = pmFrisch();
+  const arbeit = S.kgAlle().filter(b => S.clIstArbeit(b.id))[0];
+  S.DB.projekte = [{ id: 'nn1', name: 'Arbeitszimmer umgestalten', kontext: 'privat', status: 'laufend', flaeche: '', geaendert: 1 },
+                   { id: 'nn2', name: 'Hybrider Workflowtest', kontext: 'beruflich', bereich: arbeit ? arbeit.id : undefined, status: 'laufend', flaeche: '', geaendert: 1 },
+                   { id: 'nn3', name: 'Erledigtes Projekt', kontext: 'privat', status: 'abgeschlossen', flaeche: '', geaendert: 1 }];
+  S.DB.ziele = [{ id: 'nz1', name: '78 KG bis Mitte 2027', kontext: 'privat', status: 'laufend', flaeche: '', geaendert: 1 }];
+  S.DB.gedanken = [{ id: 'ng1', titel: 'Borkum Morgenroutine', kontext: 'privat', text: 'Ruhig anfangen', geaendert: 1 }];
+  S.cl.vh.reiter = 'memos';
+  S.oeffne('memo'); S.cl.memo.id = ''; S.zeichne();
+  let h = inhalt();
+  pruefe(/Borkum Morgenroutine/.test(h) && !/Arbeitszimmer|Hybrider|78 KG/.test(h) && !/>Projekte<|>Ziele</.test(h), 'Notizen: nur Notizen — Projekte und Ziele nicht doppelt');
+  S.memoArtSetzen('archiv');
+  pruefe(!/Erledigtes Projekt/.test(inhalt()), 'auch im Archiv keine erledigten Vorhaben — die stehen unter Vorhaben, „Erledigte…“');
+  S.memoArtSetzen('alles');
+  S.cl.vh.reiter = 'vorhaben'; S.zeichne();
+  h = inhalt();
+  pruefe(/Arbeitszimmer umgestalten/.test(h) && /Hybrider Workflowtest/.test(h) && /78 KG/.test(h), 'unter Vorhaben stehen sie');
+  if (arbeit) {
+    S.katSetzen(arbeit.id);
+    h = inhalt();
+    pruefe(/Hybrider Workflowtest/.test(h) && !/Arbeitszimmer umgestalten/.test(h), 'der Filter ▼ wirkt im Reiter Vorhaben');
+    S.katSetzen('alle');
+  }
+  pruefe(/<title>CLIE 0\.154\.1<\/title>/.test(QUELLE) && /APP_VERSION = '0\.154\.1'/.test(SKRIPT), 'Fassung 0.154.1 im Titel und in APP_VERSION');
   S.cl.vh.reiter = 'memos';
   S.oeffne('uebersicht');
 }
@@ -13563,6 +13605,7 @@ function huellenTest() {
   try { terminZeileTest(); } catch (e) { fail('0.153.1 Terminzeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saDiaFilterTest(); } catch (e) { fail('0.153.2 Diagramm-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { vorhabenTest(); } catch (e) { fail('0.154.0 Vorhaben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { vorhabenNotizenTest(); } catch (e) { fail('0.154.1 Notizen warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
