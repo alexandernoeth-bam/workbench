@@ -320,6 +320,8 @@ function frisch() {
   /* Seit 0.97.7 ist „Letzte“ Standard; die älteren Tests prüfen die Gruppen, also wie bisher Alle */
   try { CL.localStorage.setItem('clie-sa-letzte', '0'); } catch (e) { /* egal */ }
   CL.cl.sa.letzte = undefined;
+  /* Seit 0.154.0 öffnet das Memo Pad im Reiter „Vorhaben“; die älteren Tests prüfen die Memo-Liste — dort, unverändert, im Reiter „Memos“ */
+  CL.cl.vh.reiter = 'memos';
 }
 function inhalt() { return CL.document.getElementById('inhalt').innerHTML; }
 
@@ -13124,7 +13126,131 @@ function saDiaFilterTest() {
   pruefe(S.saDiaEintraege(s).length === 3, 'Alle: wieder alles');
   S.localStorage.removeItem('clie-sa-filter'); S.cl.sa.wahl = {};
   S.saZurListe();
-  pruefe(/<title>CLIE 0\.153\.2<\/title>/.test(QUELLE) && /APP_VERSION = '0\.153\.2'/.test(SKRIPT), 'Fassung 0.153.2 im Titel und in APP_VERSION');
+  S.oeffne('uebersicht');
+}
+
+
+function vorhabenTest() {
+  console.log('\n0.154.0 Memo Pad als Vorhaben — Aufgaben, Deadlines und OneNote je Vorhaben');
+  if (!CL) { return; }
+  /* Fehlerarten: Aufgaben eines Vorhabens fehlen oder erledigte stehen bei
+     den offenen; die Typ-Zeile verschiebt die Zeilennummern (Haken trifft
+     die falsche Zeile); ein Vorhaben entsteht ohne OneNote-Seite; die
+     Zuordnung schreibt andere Felder als die Workbench (projektId/zielId);
+     „Aufgabe“ aus dem Vorhaben vergisst das Vorhaben; der Memo-Reiter
+     verdeckt die bisherige Memo-Liste. */
+  const S = pmFrisch();
+  const heute = S.isoDatum();
+  pruefe(/cl\.vh = \{ reiter: 'vorhaben'/.test(SKRIPT), 'das Memo Pad öffnet im Reiter „Vorhaben“');
+  S.DB.projekte = [
+    { id: 'vp1', name: 'Arbeitszimmer umgestalten', kontext: 'privat', status: 'laufend', flaeche: 'Typ: Projekt\nIch gestalte mein Arbeitszimmer um, so dass es einfacher ist.\n[ ] Regal abbauen\n1. Der Tisch ist eine feste Platte', geaendert: 1 },
+    { id: 'vp2', name: 'Carport planen', kontext: 'privat', status: 'ruht', flaeche: '', onenote: 'onenote:https://x/Carport.one#Plan&end', geaendert: 1 },
+    { id: 'vp3', name: 'Altes Projekt', kontext: 'privat', status: 'abgeschlossen', flaeche: '', geaendert: 1 }];
+  S.DB.ziele = [{ id: 'vz1', name: 'Halbmarathon Fürth 2027', kontext: 'privat', status: 'laufend', flaeche: '', onenote: 'https://x.sharepoint.com/hm', geaendert: 1 }];
+  S.DB.aufgaben.push(
+    { id: 'va1', titel: 'Regal aus dem Schlafzimmer abbauen', status: 'offen', planung: heute, kontext: 'privat', projektId: 'vp1', geaendert: 1 },
+    { id: 'va2', titel: 'Kisten aussortieren', status: 'offen', planung: 'backlog', kontext: 'privat', projektId: 'vp1', geaendert: 1 },
+    { id: 'va3', titel: 'Tischplatte ausmessen', status: 'erledigt', erledigtAm: heute, planung: heute, kontext: 'privat', projektId: 'vp1', geaendert: 1 },
+    { id: 'va4', titel: 'Laufschuhe kaufen', status: 'offen', planung: 'backlog', kontext: 'privat', zielId: 'vz1', geaendert: 1 });
+  S.DB.followups = [{ id: 'vf1', titel: 'Kisten aussortieren', datum: S.tagePlus(heute, -1), status: 'offen', aufgabeId: 'va2', geaendert: 1 }];
+  S.cl.vh.reiter = 'vorhaben';
+  S.oeffne('memo'); S.cl.memo.id = ''; S.zeichne();
+  let h = inhalt();
+  pruefe(/vhReiter\('vorhaben'\)">Vorhaben/.test(h) && /vhReiter\('memos'\)">Memos/.test(h), 'oben die Reiter Vorhaben | Memos');
+  pruefe(h.indexOf('>läuft<') >= 0 && h.indexOf('>ruht<') > h.indexOf('>läuft<') && /Arbeitszimmer umgestalten/.test(h) && /Halbmarathon/.test(h) && /Carport planen/.test(h) && !/Altes Projekt/.test(h), 'Vorhaben nach läuft und ruht — Erledigte nicht');
+  pruefe(/Arbeitszimmer umgestalten<small>2 offen · <b>Deadline [^<]* überschritten<\/b> · heute geplant<\/small>/.test(h), 'je Vorhaben: offene Aufgaben, nächste Deadline (überschritten fett), heute geplant');
+  pruefe(/Arbeitszimmer umgestalten<small>[^]*?<\/small><\/button><span class="vh-fehlt">OneNote fehlt<\/span>/.test(h) && /Halbmarathon Fürth 2027<small>Ziel · 1 offen<\/small><\/button><button type="button" class="pm-on" onclick="vhOneNote\('vz1'\)"/.test(h), 'mit Seite „ON“, ohne Seite „OneNote fehlt“; Ziele tragen „Ziel“');
+  pruefe(/vhNeuAuf\(\)">Neu/.test(S.document.getElementById('fuss').innerHTML) && /vhErledigteUm\(\)">Erledigte…/.test(S.document.getElementById('fuss').innerHTML), 'unten: Neu, Erledigte…');
+  S.vhErledigteUm();
+  pruefe(/Altes Projekt/.test(inhalt()), '„Erledigte…“ zeigt die erledigten');
+  S.vhErledigteUm();
+  S.vhReiter('memos');
+  pruefe(/class="memo-zeile pm/.test(inhalt()) && /vhReiter\('vorhaben'\)/.test(inhalt()), 'Reiter „Memos“: die bisherige Memo-Liste, unverändert');
+  S.vhReiter('vorhaben');
+  /* Seite */
+  S.pmMemoOeffnen('vp1');
+  h = inhalt();
+  pruefe(/<span class="vh-typ">Projekt<\/span>/.test(h) && !/Typ: Projekt/.test(h), 'oben der Typ — die Zeile „Typ: …“ steht nicht doppelt im Text');
+  pruefe(/<div class="vh-text zu">[^]*Ich gestalte mein Arbeitszimmer um/.test(h) && /vhTextUm\(\)">ganzer Text ▾/.test(h), 'der Text bleibt, zugeklappt — „ganzer Text ▾“');
+  pruefe(/vhZustand\('vp1','laeuft'\)">läuft/.test(h) && /class="an" onclick="vhZustand\('vp1','laeuft'\)/.test(h), 'Zustand läuft · ruht · erledigt im Kopf');
+  pruefe(/<label for="vhLink">Mit OneNote-Seite verbinden/.test(h) && !/vhOneNote\('vp1'\)">OneNote ›/.test(h), 'ohne Seite: „Mit OneNote-Seite verbinden“');
+  const iD = h.indexOf('>Deadlines<'), iA = h.indexOf('>Aufgaben<');
+  pruefe(iD > 0 && iA > iD && /aria-label="Deadline"/.test(h.slice(iD, iA)) && /Kisten aussortieren/.test(h.slice(iD, iA)) && !/pm-vh/.test(h.slice(iD, iA)), 'Deadlines der Aufgaben des Vorhabens — ohne den eigenen Namen darunter');
+  const auf = h.slice(iA);
+  pruefe(/Regal aus dem Schlafzimmer abbauen/.test(auf) && /Kisten aussortieren/.test(auf) && !/Tischplatte ausmessen/.test(auf) && !/Laufschuhe/.test(auf) && auf.indexOf('Regal aus') < auf.indexOf('Kisten aus'), 'Aufgaben: nur seine offenen, Geplantes zuerst');
+  pruefe(/vhAufgabeNeu\('vp1'\)">\+ Aufgabe/.test(auf) && /vhErlUm\(\)">1 erledigt · zeigen/.test(auf), '„+ Aufgabe“ und „1 erledigt · zeigen“');
+  S.vhErlUm();
+  pruefe(/Tischplatte ausmessen/.test(inhalt()), 'Erledigtes aufgeklappt');
+  pruefe(/pmMemoZuListe\(\)">Fertig/.test(S.document.getElementById('fuss').innerHTML) && /pmSchreibenUm\(\)">Schreiben/.test(S.document.getElementById('fuss').innerHTML) && /pmMemoDetails\(\)">Details…/.test(S.document.getElementById('fuss').innerHTML),
+    'unten wie bisher: Fertig, Schreiben, Details…');
+  S.pmMemoHaken('vp1', 2);
+  pruefe(/^Typ: Projekt\n[^\n]*\n\[x\] Regal abbauen/.test(S.DB.projekte[0].flaeche), 'der Haken im Text trifft trotz verborgener Typ-Zeile die richtige Zeile');
+  /* Link verbinden */
+  S.document.getElementById('vhLink').value = 'Arbeitszimmer  ([Webansicht](https://x.sharepoint.com/az&end))';
+  S.vhLinkUebernehmen('vp1');
+  pruefe(S.DB.projekte[0].onenote === 'https://x.sharepoint.com/az&end' && /vhOneNote\('vp1'\)">OneNote ›/.test(inhalt()) && !/id="vhLink"/.test(inhalt()), 'verbunden: „OneNote ›“ statt Hinweis');
+  S.vhZustand('vp1', 'ruht');
+  pruefe(S.DB.projekte[0].status === 'ruht', 'Zustand ruht — als „ruht“ für die Workbench');
+  S.vhZustand('vp1', 'laeuft');
+  /* Details */
+  S.pmMemoDetails();
+  pruefe(/id="pmMLink"[^>]*value="https:\/\/x\.sharepoint\.com\/az&amp;end"/.test(S.document.getElementById('aufklapp').innerHTML), 'Details: die OneNote-Seite lässt sich ändern');
+  S.document.getElementById('pmMLink').value = 'kein link';
+  S.pmMemoSpeichern();
+  pruefe(S.cl.aufklapp === 'pmmemo' && S.DB.projekte[0].onenote === 'https://x.sharepoint.com/az&end', 'ungültiger Link: nicht gespeichert');
+  S.document.getElementById('pmMLink').value = 'https://x.sharepoint.com/az&end';
+  S.aufklappZu();
+  /* + Aufgabe aus dem Vorhaben */
+  S.vhAufgabeNeu('vp1');
+  let f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'tdein' && /<div class="titel">Aufgabe<\/div>/.test(f) && /Vorhaben: Arbeitszimmer umgestalten/.test(f) && S.cl.td.ein.datum === '', '„+ Aufgabe“: das Einfügen-Fenster mit Vorhaben, ohne Datum');
+  S.document.getElementById('tdText').value = 'Lampe montieren';
+  S.tdTextNeu();
+  S.document.getElementById('tdKat').value = '';
+  S.tdEinOk();
+  const neu = S.DB.aufgaben.filter(a => a.titel === 'Lampe montieren')[0];
+  pruefe(neu && neu.projektId === 'vp1' && !neu.zielId && neu.planung === 'backlog' && /Lampe montieren/.test(inhalt()), 'die neue Aufgabe gehört zum Vorhaben und steht gleich in der Liste');
+  ['tdText', 'tdTitel', 'tdLink'].forEach(id => { S.document.getElementById(id).value = ''; });
+  /* Aufgabenfenster */
+  S.pmDetails('va4');
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(/<select id="pmVh"/.test(f) && /<option value="z:vz1" selected>Halbmarathon Fürth 2027 \(Ziel\)/.test(f) && !/Altes Projekt/.test(f), 'Aufgabe: Feld „Vorhaben“ — laufende und ruhende, das eigene gewählt');
+  S.document.getElementById('pmTitel').value = 'Laufschuhe kaufen'; S.document.getElementById('pmDatum').value = '';
+  S.document.getElementById('pmZeit').value = ''; S.document.getElementById('pmNotiz').value = ''; S.document.getElementById('pmDeadline').value = '';
+  S.document.getElementById('pmVh').value = 'p:vp2';
+  S.pmSpeichern();
+  const a4 = S.pmAufgabeFinden('va4');
+  pruefe(a4.projektId === 'vp2' && a4.zielId === null, 'umgehängt: projektId gesetzt, zielId leer — wie die Workbench');
+  S.pmDetails('va4');
+  S.document.getElementById('pmTitel').value = 'Laufschuhe kaufen'; S.document.getElementById('pmVh').value = '';
+  S.pmSpeichern();
+  pruefe(a4.projektId === null && a4.zielId === null, '„– keins –“ löst die Zugehörigkeit');
+  S.document.getElementById('pmVh').value = '';
+  /* Neues Vorhaben */
+  S.vhNeuAuf();
+  f = S.document.getElementById('aufklapp').innerHTML;
+  pruefe(S.cl.aufklapp === 'vhneu' && /id="vhText"/.test(f) && /id="vhTitel"/.test(f) && /id="vhLinkN"/.test(f) && /vhNeuTyp\('ziel'\)/.test(f), 'Neu: Einfügen, Titel, OneNote-Seite, Typ, Kategorie');
+  S.document.getElementById('vhText').value = 'Gartenhütte streichen';
+  S.vhTextNeu();
+  S.vhNeuOk();
+  pruefe(S.cl.aufklapp === 'vhneu' && !S.DB.projekte.some(p => p.name === 'Gartenhütte streichen'), 'ohne OneNote-Seite entsteht kein Vorhaben');
+  S.document.getElementById('vhText').value = 'Gartenhütte streichen  ([Webansicht](https://x.sharepoint.com/gh&end))';
+  S.vhTextNeu();
+  S.vhNeuTyp('ziel');
+  S.document.getElementById('vhNKat').value = '';
+  S.vhNeuOk();
+  const gz = S.DB.ziele.filter(z => z.name === 'Gartenhütte streichen')[0];
+  pruefe(gz && gz.onenote === 'https://x.sharepoint.com/gh&end' && gz.status === 'laufend' && S.cl.memo.id === gz.id && !S.cl.aufklapp, 'mit Seite: angelegt (hier als Ziel) und gleich geöffnet');
+  ['vhText', 'vhTitel', 'vhLinkN'].forEach(id => { S.document.getElementById(id).value = ''; });
+  /* Today */
+  S.oeffne('today');
+  h = inhalt();
+  pruefe(/Regal aus dem Schlafzimmer abbauen<\/span>[^]*?<span class="pm-vh">Arbeitszimmer umgestalten<\/span>/.test(h), 'Today: unter der Aufgabe klein das Vorhaben');
+  pruefe(/Kisten aussortieren<\/span><span class="pm-vh">Arbeitszimmer umgestalten<\/span>/.test(h), 'Today: auch unter der Deadline');
+  S.oeffne('aufgaben'); S.pmTab('alle');
+  pruefe(!/pm-vh/.test(inhalt()), 'To Do bleibt einzeilig wie bisher');
+  pruefe(/<title>CLIE 0\.154\.0<\/title>/.test(QUELLE) && /APP_VERSION = '0\.154\.0'/.test(SKRIPT), 'Fassung 0.154.0 im Titel und in APP_VERSION');
+  S.cl.vh.reiter = 'memos';
   S.oeffne('uebersicht');
 }
 
@@ -13436,6 +13562,7 @@ function huellenTest() {
   try { outlookTest(); } catch (e) { fail('0.153.0 Outlook warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { terminZeileTest(); } catch (e) { fail('0.153.1 Terminzeile warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
   try { saDiaFilterTest(); } catch (e) { fail('0.153.2 Diagramm-Filter warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
+  try { vorhabenTest(); } catch (e) { fail('0.154.0 Vorhaben warf: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); }
 
   /* ============================================================
      ERGEBNIS
